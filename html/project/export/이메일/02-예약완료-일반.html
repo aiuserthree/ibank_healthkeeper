@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>[헬스키퍼] 예약이 확정되었습니다</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #eef1f6; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    #__bundler_loading { position: fixed; bottom: 20px; right: 20px; font: 13px/1.4 -apple-system, BlinkMacSystemFont, sans-serif; color: #666; background: #fff; padding: 8px 14px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.12); z-index: 10000; }
+    #__bundler_thumbnail { position: fixed; inset: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #eef1f6; z-index: 9999; }
+    #__bundler_thumbnail svg { width: 100%; height: 100%; object-fit: contain; }
+    #__bundler_placeholder { color: #999; font-size: 14px; }
+  </style>
+  <noscript>
+    <style>#__bundler_loading { display: none; }</style>
+    <div style="position:fixed;bottom:12px;left:12px;font:13px/1.4 -apple-system,BlinkMacSystemFont,sans-serif;color:#999;background:rgba(255,255,255,0.9);padding:6px 12px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.08);z-index:10000;">
+      This page requires JavaScript to display.
+    </div>
+  </noscript>
+</head>
+<body>
+  <div id="__bundler_thumbnail"><svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="800" fill="#eef1f6"></rect><rect x="450" y="250" width="300" height="300" rx="60" fill="#0b3558"></rect><circle cx="600" cy="400" r="78" fill="none" stroke="#ffffff" stroke-width="16"></circle><path d="M566 402 L592 428 L640 372" fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+  <div id="__bundler_loading">Unpacking...</div>
+
+  <script>
+    
+document.addEventListener('DOMContentLoaded', async function() {
+  const loading = document.getElementById('__bundler_loading');
+  function setStatus(msg) { if (loading) loading.textContent = msg; }
+
+  // Error sink persists across replaceWith since it's on window, not the DOM.
+  window.addEventListener('error', function(e) {
+    var p = document.body || document.documentElement;
+    var d = document.getElementById('__bundler_err') || p.appendChild(document.createElement('div'));
+    d.id = '__bundler_err';
+    d.style.cssText = 'position:fixed;bottom:12px;left:12px;right:12px;font:12px/1.4 ui-monospace,monospace;background:#2a1215;color:#ff8a80;padding:10px 14px;border-radius:8px;border:1px solid #5c2b2e;z-index:99999;white-space:pre-wrap;max-height:40vh;overflow:auto';
+    d.textContent = (d.textContent ? d.textContent + String.fromCharCode(10) : '') +
+      '[bundle] ' + (e.message || e.type) +
+      (e.filename ? ' (' + e.filename.slice(0, 60) + ':' + e.lineno + ')' : '');
+  }, true);
+
+  try {
+    const manifestEl = document.querySelector('script[type="__bundler/manifest"]');
+    const templateEl = document.querySelector('script[type="__bundler/template"]');
+    if (!manifestEl || !templateEl) {
+      setStatus('Error: missing bundle data');
+      console.error('[bundler] Missing script tags — manifestEl:', !!manifestEl, 'templateEl:', !!templateEl);
+      return;
+    }
+
+    const manifest = JSON.parse(manifestEl.textContent);
+    let template = JSON.parse(templateEl.textContent);
+
+    const uuids = Object.keys(manifest);
+    setStatus('Unpacking ' + uuids.length + ' assets...');
+
+    const blobUrls = {};
+    await Promise.all(uuids.map(async (uuid) => {
+      const entry = manifest[uuid];
+      try {
+        const binaryStr = atob(entry.data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+        let finalBytes = bytes;
+        if (entry.compressed) {
+          if (typeof DecompressionStream !== 'undefined') {
+            const ds = new DecompressionStream('gzip');
+            const writer = ds.writable.getWriter();
+            const reader = ds.readable.getReader();
+            writer.write(bytes);
+            writer.close();
+            const chunks = [];
+            let totalLen = 0;
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              chunks.push(value);
+              totalLen += value.length;
+            }
+            finalBytes = new Uint8Array(totalLen);
+            let offset = 0;
+            for (const chunk of chunks) { finalBytes.set(chunk, offset); offset += chunk.length; }
+          } else {
+            console.warn('DecompressionStream not available, asset ' + uuid + ' may not render');
+          }
+        }
+
+        blobUrls[uuid] = URL.createObjectURL(new Blob([finalBytes], { type: entry.mime }));
+      } catch (err) {
+        console.error('Failed to decode asset ' + uuid + ':', err);
+        blobUrls[uuid] = URL.createObjectURL(new Blob([], { type: entry.mime }));
+      }
+    }));
+
+    const extResEl = document.querySelector('script[type="__bundler/ext_resources"]');
+    const extResources = extResEl ? JSON.parse(extResEl.textContent) : [];
+    const resourceMap = {};
+    for (const entry of extResources) {
+      if (blobUrls[entry.uuid]) resourceMap[entry.id] = blobUrls[entry.uuid];
+    }
+
+    setStatus('Rendering...');
+    for (const uuid of uuids) template = template.split(uuid).join(blobUrls[uuid]);
+
+    // Strip integrity + crossorigin — blob URLs from a file:// document inherit
+    // a null origin, so crossorigin forces a CORS fetch that SRI then rejects.
+    // The manifest bytes are ours; SRI protects against CDN compromise, not this.
+    template = template.replace(/\s+integrity="[^"]*"/gi, '').replace(/\s+crossorigin="[^"]*"/gi, '');
+
+    const resourceScript = '<script>window.__resources = ' +
+      JSON.stringify(resourceMap).split('</' + 'script>').join('<\\/' + 'script>') +
+      ';</' + 'script>';
+    // Inject after <head> so the DOCTYPE stays first; prepending the script
+    // would push the parser into quirks mode. DOMParser always emits a <head>
+    // (synthesizing one if the source HTML omitted it) but may carry
+    // attributes through, so match the full opening tag. slice() rather than
+    // replace() keeps us clear of $-pattern substitution in resourceScript.
+    const headOpen = template.match(/<head[^>]*>/i);
+    if (headOpen) {
+      const i = headOpen.index + headOpen[0].length;
+      template = template.slice(0, i) + resourceScript + template.slice(i);
+    }
+
+    // Parse the template and swap the root element. Scripts inserted via
+    // DOMParser/replaceWith are inert per spec — re-create each with
+    // createElement so they execute, awaiting onload for src scripts to
+    // preserve ordering (React before ReactDOM before Babel before text/babel).
+    const doc = new DOMParser().parseFromString(template, 'text/html');
+    document.documentElement.replaceWith(doc.documentElement);
+    const dead = Array.from(document.scripts);
+    for (const old of dead) {
+      const s = document.createElement('script');
+      for (const a of old.attributes) s.setAttribute(a.name, a.value);
+      s.textContent = old.textContent;
+      // text/babel scripts with a src: fetch and inline. transformScriptTags
+      // does XHR against the src, but blob:null/ from a file:// origin is
+      // silently dropped. Inlining makes it a plain inline babel script,
+      // which transformScriptTags handles unconditionally.
+      if ((s.type === 'text/babel' || s.type === 'text/jsx') && s.src) {
+        const r = await fetch(s.src);
+        s.textContent = await r.text();
+        s.removeAttribute('src');
+      }
+      const p = s.src ? new Promise(function(r) { s.onload = s.onerror = r; }) : null;
+      old.replaceWith(s);
+      if (p) await p;
+    }
+    // Babel standalone auto-transforms type=text/babel on DOMContentLoaded,
+    // which fired before we swapped the document. Trigger manually if present.
+    if (window.Babel && typeof window.Babel.transformScriptTags === 'function') {
+      window.Babel.transformScriptTags();
+    }
+  } catch (err) {
+    setStatus('Error unpacking: ' + err.message);
+    console.error('Bundle unpack error:', err);
+  }
+});
+
+  </script>
+
+  <script type="__bundler/manifest">
+{"41073eda-2db2-42d0-9fef-5907404d5749":{"mime":"image/svg+xml","compressed":true,"data":"H4sIAAAAAAAAE42SzYrbMBSF932Ky53t2JZ/E4plmIFAymTKUOYFFOfaVqPIRlZjp6vSZaG7Ql9gln2EPs2sm3cozs+QmhaqjdBB95zv6ipttyV0cmUrjoGfIFQky8pyjBOEraTutu45MmAQ+AkMYiGV4qhrTQj9RumWY2Vt89rzuq5zu9CtTekFjDGv3ZYIplbEUW5KBGGkcJRYkuK4//7j15en/een/def8PzpG8il0GuYk1C2WhM1ZDB7BZAayu0ZMB7xmZ6jH52RrtgyjOMpZqk3FB2qc2lyRZD3HIMpQr477oajH7sxQmtNvSaOV8VhnQXnFBgOZkePg10jbAUrjveB78YQTN14ESQQhoswhiD8H0M3epGU1JSLhqOpP+jVH/L7WuqznqXeEDtuJ2JD3NDQsRPD8eIlWLIsihG8pd5Cz3ESIOw4hgyhqLV1CrGRasfxwZAlvRJmdQ33Qpu6oWtohW6dlowsTrdb+ZE4BvHp2J3GMWEMQZG1ZJy2EbnUJUfnwDiazuXkU2+AGtENNTuOUTLie2G6BP0Hn++P+JK/8fkXeNEkmUynmL25vXl7B/PZzeJxfjebPczenSHT4UNnvwGBgkxSMQMAAA=="}}
+  </script>
+
+  <script type="__bundler/ext_resources">
+[]
+  </script>
+
+  <script type="__bundler/template">
+"<!DOCTYPE html>\n<html lang=\"ko\"><head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n<meta name=\"x-apple-disable-message-reformatting\">\n<title>[헬스키퍼] 예약이 확정되었습니다<\u002Ftitle>\n<style>\n@media (max-width:620px){\n  table[width=\"600\"]{ width:100% !important; max-width:100% !important; }\n  td[style*=\"40px\"]{ padding-left:20px !important; padding-right:20px !important; }\n}\n<\u002Fstyle>\n\n<\u002Fhead>\n<body style=\"margin:0; padding:0; background:#eef1f6; -webkit-font-smoothing:antialiased; font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;\">\n<div style=\"display:none; max-height:0; overflow:hidden; opacity:0; color:#eef1f6; font-size:1px; line-height:1px;\">안마서비스 예약이 확정되었습니다 · 6/23(화) 15:30–16:00<\u002Fdiv>\n<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#eef1f6;\">\n<tbody><tr><td align=\"center\" style=\"padding:36px 12px;\">\n  <table role=\"presentation\" width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"width:600px; max-width:600px; background:#ffffff; border:1px solid #d4e0ed; border-radius:14px; overflow:hidden;\">\n    <tbody><tr><td style=\"padding:22px 32px; border-bottom:1px solid #eef1f6;\">\n      <img src=\"41073eda-2db2-42d0-9fef-5907404d5749\" alt=\"헬스키퍼\" height=\"30\" style=\"display:block; border:0;\">\n    <\u002Ftd><\u002Ftr>\n    <tr><td style=\"padding:40px 40px 8px;\">\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tbody><tr><td style=\"width:60px; height:60px; background:#e4f4ec; border-radius:999px; text-align:center; vertical-align:middle;\">\n        <img src=\"data:image/svg+xml;utf8,&lt;svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke='%231f8a5b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'&gt;&lt;path d='M21.801 10A10 10 0 1 1 17 3.335'/&gt;&lt;path d='m9 11 3 3L22 4'/&gt;&lt;/svg&gt;\" alt=\"\" width=\"28\" height=\"28\" style=\"vertical-align:middle;\">\n      <\u002Ftd><\u002Ftr><\u002Ftbody><\u002Ftable>\n      <h1 style=\"margin:24px 0 12px; font-size:26px; line-height:1.25; color:#0b3558; font-weight:700; letter-spacing:-0.01em;\">예약이 확정되었습니다<\u002Fh1>\n      <p style=\"margin:0 0 8px; font-size:16px; line-height:1.7; color:#0a0a0a;\">안녕하세요, <strong style=\"color:#0b3558;\">김민수님<\u002Fstrong>.<\u002Fp>\n      <p style=\"margin:0; font-size:16px; line-height:1.7; color:#476788;\">신청하신 안마서비스 예약이 <strong style=\"color:#1f8a5b;\">관리자 확정<\u002Fstrong>으로 완료되었습니다. 아래 일정에 맞춰 방문해 주세요.<\u002Fp>\n    <\u002Ftd><\u002Ftr>\n    <!-- 예약 정보 카드 -->\n    <tr><td style=\"padding:24px 40px 8px;\">\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"border:1px solid #d4e0ed; border-radius:10px; overflow:hidden;\">\n        <tbody><tr><td style=\"padding:18px 22px; background:#f8f9fb; border-bottom:1px solid #d4e0ed;\">\n          <span style=\"display:inline-block; padding:4px 12px; background:#e4f4ec; color:#1f8a5b; font-size:13px; font-weight:700; border-radius:999px;\">확정 완료<\u002Fspan>\n        <\u002Ftd><\u002Ftr>\n        <tr><td style=\"padding:6px 22px 18px;\">\n          <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\">\n            <tbody><tr>\n              <td style=\"padding:14px 0; border-bottom:1px solid #eef1f6; font-size:14px; color:#476788; width:96px;\">날짜<\u002Ftd>\n              <td style=\"padding:14px 0; border-bottom:1px solid #eef1f6; font-size:16px; color:#0b3558; font-weight:700;\">6월 23일 (화)<\u002Ftd>\n            <\u002Ftr>\n            <tr>\n              <td style=\"padding:14px 0; font-size:14px; color:#476788;\">시간<\u002Ftd>\n              <td style=\"padding:14px 0; font-size:16px; color:#0b3558; font-weight:700;\">15:30 – 16:00 <span style=\"font-size:13px; color:#476788; font-weight:400;\">(30분)<\u002Fspan><\u002Ftd>\n            <\u002Ftr>\n          <\u002Ftbody><\u002Ftable>\n        <\u002Ftd><\u002Ftr>\n      <\u002Ftbody><\u002Ftable>\n    <\u002Ftd><\u002Ftr>\n    <tr><td style=\"padding:20px 40px 8px;\">\n      <table role=\"presentation\" cellpadding=\"0\" cellspacing=\"0\"><tbody><tr><td style=\"border-radius:6px; background:#006bff;\">\n        <a href=\"#\" style=\"display:inline-block; padding:15px 30px; font-size:15px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:6px;\">내 예약 확인하기<\u002Fa>\n      <\u002Ftd><\u002Ftr><\u002Ftbody><\u002Ftable>\n    <\u002Ftd><\u002Ftr>\n    <tr><td style=\"padding:20px 40px 40px;\">\n      <table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f8f9fb; border-radius:8px;\">\n        <tbody><tr><td style=\"padding:16px 18px; font-size:13.5px; line-height:1.7; color:#476788;\">\n          · 일반 신청 취소는 <strong style=\"color:#0b3558;\">마감(수요일 17:00) 전까지<\u002Fstrong> 가능합니다. 마감 이후에는 취소할 수 없습니다.<br>\n          · 부득이한 사정으로 방문이 어려우면 마이페이지에서 미리 취소해 주세요.\n        <\u002Ftd><\u002Ftr>\n      <\u002Ftbody><\u002Ftable>\n    <\u002Ftd><\u002Ftr>\n    <tr><td style=\"padding:22px 40px; background:#0b3558;\">\n      <p style=\"margin:0 0 4px; font-size:13px; color:#cfe0f5; font-weight:700;\">ibank Healthkeeper<\u002Fp>\n      <p style=\"margin:0; font-size:12px; line-height:1.6; color:#8fb0d6;\">사내 안마서비스 예약 시스템 · 매주 수요일 09:00 차주 예약 오픈<br>본 메일은 발신 전용입니다. © 2026 ibank.<\u002Fp>\n    <\u002Ftd><\u002Ftr>\n  <\u002Ftbody><\u002Ftable>\n<\u002Ftd><\u002Ftr>\n<\u002Ftbody><\u002Ftable>\n\n\n<\u002Fbody><\u002Fhtml>"
+  </script>
+</body>
+</html>

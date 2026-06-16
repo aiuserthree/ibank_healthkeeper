@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>헬스키퍼 예약 시스템 — 전체 화면</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<link rel="stylesheet" href="_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+<script>
+/* 번들이 내부 UI킷 데모를 #root 에 자동 렌더한다 — 우리 페이지가 마운트(__hkReady)하기 전의
+   자동 렌더만 무력화한다. */
+(function(){ if (window.ReactDOM && ReactDOM.createRoot && !ReactDOM.__hkPatched) {
+  var o = ReactDOM.createRoot.bind(ReactDOM);
+  ReactDOM.createRoot = function (c, p) {
+    if (!c || (c.id === "root" && !window.__hkReady)) return { render: function(){}, unmount: function(){} };
+    return o(c, p);
+  };
+  ReactDOM.__hkPatched = true;
+} })();
+</script>
+<script src="_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/_ds_bundle.js"></script>
+<link rel="stylesheet" href="_shared/responsive.css">
+<meta name="ext-resource-dependency" content="assets/logo-lockup.svg" data-resource-id="logoLockup" />
+<meta name="ext-resource-dependency" content="assets/logo-mark.svg" data-resource-id="logoMark" />
+<style>
+  html,body{height:100%}
+  body{margin:0;background:var(--surface-canvas,#f8f9fb);color:var(--text-body,#0a0a0a)}
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0b3558">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0b3558"></rect>
+    <circle cx="600" cy="352" r="150" fill="none" stroke="#ffffff" stroke-width="28"></circle>
+    <path d="M538 356 L585 403 L672 304" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"></path>
+    <circle cx="726" cy="238" r="38" fill="#006bff"></circle>
+    <text x="600" y="576" font-family="Pretendard, sans-serif" font-size="76" font-weight="700" fill="#ffffff" text-anchor="middle">헬스키퍼</text>
+    <text x="600" y="636" font-family="sans-serif" font-size="30" font-weight="600" letter-spacing="6" fill="#8fb0d6" text-anchor="middle">IBANK HEALTHKEEPER</text>
+  </svg>
+</template>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const NS = "HealthkeeperDS_31e44b";
+const { useEffect } = React;
+
+function Icon({ name, size = 18, color, style }) {
+  return <i data-lucide={name} style={{ width: size, height: size, color, display: "inline-flex", ...style }} />;
+}
+
+const MEMBER = [
+  { icon: "home", title: "서비스 소개 (홈)", desc: "헬스키퍼 안내 · 운영 사이클 · 정책 요약", href: "사용자/index.html" },
+  { icon: "log-in", title: "로그인", desc: "Microsoft Teams SSO 로그인", href: "사용자/로그인.html" },
+  { icon: "calendar-days", title: "예약하기 (캘린더)", desc: "주간 슬롯 · 상태 전환 · 우선권 경합", href: "사용자/예약하기.html" },
+  { icon: "rotate-ccw", title: "탈락자 재신청", desc: "빈 슬롯 선착순 · 즉시 확정 · 충돌 거절", href: "사용자/재신청.html" },
+  { icon: "list-checks", title: "마이페이지 · 예약 내역", desc: "상태별 내역 · 마감 전 취소", href: "사용자/마이페이지-예약내역.html" },
+  { icon: "user-round-cog", title: "마이페이지 · 내 정보", desc: "정보 수정 · 비밀번호 변경 · 탈퇴", href: "사용자/마이페이지-내정보.html" },
+];
+const ADMIN = [
+  { icon: "shield", title: "관리자 로그인", desc: "관리자 인증 · 실패 처리", href: "관리자/로그인.html" },
+  { icon: "layout-dashboard", title: "대시보드", desc: "현황 통계 · 확정 대기 · 메일 발송 상태", href: "관리자/대시보드.html" },
+  { icon: "calendar-check", title: "예약 관리", desc: "날짜·상태별 신청 목록 (일반/재신청)", href: "관리자/예약관리.html" },
+  { icon: "scale", title: "신청자 상세 · 우선권", desc: "우선권 자동 정렬 · 수동 확정 · 탈락", href: "관리자/신청자상세.html" },
+  { icon: "mail", title: "재신청 안내 메일", desc: "탈락자 선택 · 빈슬롯 안내 · 발송 상태", href: "관리자/재신청메일.html" },
+  { icon: "palmtree", title: "휴가 관리", desc: "차주 휴가 지정 · 오픈 후 등록 차단", href: "관리자/휴가관리.html" },
+  { icon: "settings", title: "운영 설정", desc: "시간/슬롯 · 오픈마감 · 메일 템플릿", href: "관리자/운영설정.html" },
+];
+
+function Column({ tag, tagColor, title, sub, items }) {
+  return (
+    <section>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: tagColor, background: tagColor + "1a", padding: "4px 10px", borderRadius: 999 }}>{tag}</span>
+      </div>
+      <h2 style={{ fontSize: 24, margin: "10px 0 2px" }}>{title}</h2>
+      <p style={{ fontSize: 14.5, color: "var(--text-secondary)", margin: "0 0 18px" }}>{sub}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {items.map((it, i) => (
+          <a key={it.href} href={it.href} style={{ textDecoration: "none" }}>
+            <div className="hub-card" style={{ display: "flex", alignItems: "center", gap: 14, padding: "16px 18px", background: "var(--surface-card)",
+              border: "1px solid var(--border-default)", borderRadius: "var(--radius-md, 8px)", boxShadow: "var(--shadow-xs)", transition: "transform .14s var(--ease-standard), box-shadow .14s" }}>
+              <div style={{ width: 28, textAlign: "center", fontSize: 12, fontWeight: 700, color: "var(--text-muted)" }}>{String(i + 1).padStart(2, "0")}</div>
+              <div style={{ width: 42, height: 42, borderRadius: 10, background: "var(--color-signal-blue-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Icon name={it.icon} size={21} color="var(--color-signal-blue)" />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 15.5, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{it.title}</div>
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 1 }}>{it.desc}</div>
+              </div>
+              <Icon name="arrow-right" size={18} color="var(--color-steel-blue)" />
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Hub() {
+  useEffect(() => { window.lucide && window.lucide.createIcons(); });
+  return (
+    <>
+      <header style={{ background: "var(--surface-card)", borderBottom: "1px solid var(--border-default)" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 32px", height: 72, display: "flex", alignItems: "center" }}>
+          <img src={window.__resources.logoLockup} alt="헬스키퍼" height="34" />
+          <div style={{ flex: 1 }} />
+          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>화면 설계 · 전체 페이지</span>
+        </div>
+      </header>
+
+      <main style={{ maxWidth: 1100, margin: "0 auto", padding: "48px 32px 72px" }}>
+        <div style={{ marginBottom: 40, maxWidth: 720 }}>
+          <h1 style={{ fontSize: 38, letterSpacing: "-0.02em", margin: "0 0 12px" }}>아이뱅크 안마서비스(헬스키퍼)<br />예약 시스템 화면</h1>
+          <p style={{ fontSize: 16.5, color: "var(--text-secondary)", lineHeight: 1.6, margin: 0 }}>
+            설계서 기준 전체 화면입니다. 사용자(회원) 영역과 관리자 영역으로 나뉘며, 각 화면은 데모 상태 전환·신청·확정 등 주요 상호작용을 포함합니다.
+          </p>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "start" }}>
+          <Column tag="MEMBER" tagColor="#006bff" title="사용자 화면" sub="회원 · 비회원 · 예약 신청자" items={MEMBER} />
+          <Column tag="ADMIN" tagColor="#0b3558" title="관리자 화면" sub="서비스 운영자" items={ADMIN} />
+        </div>
+
+        <a href="이메일/index.html" style={{ textDecoration: "none", display: "block", marginTop: 40 }}>
+          <div className="hub-card" style={{ display: "flex", alignItems: "center", gap: 18, padding: "22px 24px", background: "var(--surface-card)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md, 8px)", boxShadow: "var(--shadow-xs)", transition: "transform .14s var(--ease-standard), box-shadow .14s" }}>
+            <div style={{ width: 48, height: 48, borderRadius: 11, background: "var(--color-signal-blue-soft)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <Icon name="mail" size={24} color="var(--color-signal-blue)" />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.08em", color: "#006bff", background: "#006bff1a", padding: "3px 9px", borderRadius: 999 }}>EMAIL</span>
+                <span style={{ fontSize: 17, fontWeight: 700, color: "var(--color-midnight-navy)" }}>이메일 템플릿</span>
+              </div>
+              <div style={{ fontSize: 13.5, color: "var(--text-secondary)", marginTop: 3 }}>인증 · 예약 완료(일반/재신청) · 탈락/재신청 안내 — 메일 발송 정책 기반 4종</div>
+            </div>
+            <Icon name="arrow-right" size={18} color="var(--color-steel-blue)" />
+          </div>
+        </a>
+      </main>
+
+      <footer style={{ borderTop: "1px solid var(--border-default)", background: "var(--surface-card)" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 32px", display: "flex", alignItems: "center", gap: 12 }}>
+          <img src={window.__resources.logoMark} width="26" height="26" alt="" />
+          <span style={{ fontSize: 13, color: "var(--text-muted)" }}>© 2026 ibank Healthkeeper · 사내 안마서비스 예약 시스템 · 헬스키퍼 디자인 시스템</span>
+        </div>
+      </footer>
+      <style>{`.hub-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm)!important;border-color:var(--color-steel-blue)!important}`}</style>
+    </>
+  );
+}
+(function wait(){ if (window[NS] && window.lucide) { window.__hkReady = true; ReactDOM.createRoot(document.getElementById("root")).render(<Hub />); } else setTimeout(wait, 40); })();
+</script>
+</body>
+</html>

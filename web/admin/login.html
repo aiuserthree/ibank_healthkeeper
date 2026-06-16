@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>헬스키퍼 관리자 — 로그인</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/admin-shell.js"></script>
+</head>
+<body>
+  <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px">
+    <div style="width:420px">
+      <div style="text-align:center;margin-bottom:24px">
+        <img src="/assets/logo-mark.svg" alt="" width="54" height="54">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px">
+          <h1 style="font-size:26px;margin:0">헬스키퍼 관리자</h1>
+        </div>
+        <p style="font-size:14px;color:var(--text-muted);margin:6px 0 0;letter-spacing:0.06em">ADMIN CONSOLE</p>
+      </div>
+      <div id="error-box" style="margin-bottom:16px;display:none"></div>
+      <form class="hk-card hk-card--pad" id="login-form">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="hk-field"><label class="hk-field__label">관리자 ID</label><input class="hk-input" name="loginId" type="text" placeholder="admin" autocomplete="username" required></div>
+          <div class="hk-field"><label class="hk-field__label">비밀번호</label><input class="hk-input" name="password" type="password" placeholder="••••••••" autocomplete="current-password" required></div>
+          <label style="display:flex;align-items:center;gap:10px;font-size:14px;color:var(--text-secondary);cursor:pointer;user-select:none">
+            <input type="checkbox" name="rememberMe" style="width:17px;height:17px;accent-color:var(--color-signal-blue)">
+            로그인 유지하기
+          </label>
+          <button type="submit" class="hk-btn hk-btn--primary hk-btn--block hk-btn--lg">로그인</button>
+        </div>
+      </form>
+      <div style="text-align:center;margin-top:18px;font-size:13.5px;color:var(--text-secondary)">
+        <a href="/index" style="color:var(--color-slate-blue);text-decoration:none">← 회원 화면으로 이동</a>
+      </div>
+    </div>
+  </div>
+  <script>
+    document.getElementById("login-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const rememberMe = fd.get("rememberMe") === "on";
+      try {
+        await HKApi.adminLogin(fd.get("loginId"), fd.get("password"), rememberMe);
+        window.location.href = HKAdminRoutes.dashboard;
+      } catch (err) {
+        document.getElementById("error-box").style.display = "block";
+        document.getElementById("error-box").innerHTML = HKUI.alertBox("danger", "로그인에 실패했습니다", "관리자 계정 정보를 확인해 주세요.");
+      }
+    };
+    HKUI.loadLucide().then(() => HKUI.refreshIcons());
+  </script>
+</body>
+</html>

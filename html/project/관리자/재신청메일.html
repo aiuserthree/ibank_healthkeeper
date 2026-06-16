@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>헬스키퍼 관리자 — 재신청 안내 메일</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+(function(){ if (window.ReactDOM && ReactDOM.createRoot && !ReactDOM.__hkPatched) { var o = ReactDOM.createRoot.bind(ReactDOM); ReactDOM.createRoot = function (c, p) { if (!c || (c.id === "root" && !window.__hkReady)) return { render:function(){}, unmount:function(){} }; return o(c, p); }; ReactDOM.__hkPatched = true; } })();
+</script>
+<link rel="stylesheet" href="../_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+<script src="../_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/_ds_bundle.js"></script>
+<link rel="stylesheet" href="../_shared/responsive.css">
+<meta name="ext-resource-dependency" content="../assets/logo-mark.svg" data-resource-id="logoMark" />
+<style>
+  html,body{height:100%}
+  body{margin:0;background:var(--surface-canvas,#f8f9fb);color:var(--text-body,#0a0a0a)}
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0b3558"><svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="800" fill="#0b3558"></rect><circle cx="600" cy="356" r="150" fill="none" stroke="#ffffff" stroke-width="28"></circle><path d="M538 360 L585 407 L672 308" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="726" cy="242" r="38" fill="#006bff"></circle></svg></template>
+<div id="root"></div>
+<script type="text/babel" src="../_shared/admin-shell.js" data-presets="react"></script>
+<script type="text/babel" data-presets="react">
+const NS = "HealthkeeperDS_31e44b";
+const { Icon, PageHead, Shell, boot } = window.AdminUI;
+const { useState } = React;
+
+const LOSERS = [
+  { name: "정현우", dept: "재무팀", pos: "사원", email: "hyunwoo.jung@ibank.co.kr", slot: "6/22(월) 15:30", sent: "success" },
+  { name: "강다은", dept: "경영지원실", pos: "과장", email: "daeun.kang@ibank.co.kr", slot: "6/22(월) 15:30", sent: "success" },
+  { name: "이서연", dept: "마케팅팀", pos: "사원", email: "seoyeon.lee@ibank.co.kr", slot: "6/22(월) 13:30", sent: "fail" },
+  { name: "윤아름", dept: "마케팅팀", pos: "대리", email: "areum.yoon@ibank.co.kr", slot: "6/23(화) 14:30", sent: "pending" },
+];
+const EMPTY_SLOTS = ["화 6/23 13:30", "화 6/23 15:30", "목 6/25 14:30", "목 6/25 16:30", "금 6/26 13:30", "금 6/26 15:30"];
+
+function Page() {
+  const { Button, Card, Badge, Avatar, Alert, Switch, Toast } = window[NS];
+  const [sel, setSel] = useState(() => new Set(LOSERS.filter(l => l.sent !== "success").map(l => l.email)));
+  const [toast, setToast] = useState(null);
+  const toggle = (e) => setSel(s => { const n = new Set(s); n.has(e) ? n.delete(e) : n.add(e); return n; });
+
+  const send = () => {
+    setToast(`재신청 안내 메일 ${sel.size}건을 발송했습니다`);
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  const sentBadge = (s) => s === "success" ? <Badge variant="success" dot>발송 완료</Badge>
+    : s === "fail" ? <Badge variant="danger">발송 실패</Badge>
+    : <Badge variant="warning">대기</Badge>;
+
+  return (
+    <Shell active="reapply">
+      <PageHead title="재신청 안내 메일"
+        sub="우선권 탈락자에게 빈 슬롯·재신청 시간·선착순 안내를 발송합니다"
+        right={<Button variant="primary" iconLeft={<Icon name="send" size={16} color="#fff" />} onClick={send}>선택 {sel.size}명에게 발송</Button>} />
+
+      <div style={{ marginBottom: 20 }}>
+        <Alert variant="info" title="마감 배치 시 자동 발송됩니다">
+          이 메일은 마감(수 17:00) 시 탈락자에게 자동 발송돼요. 실패·누락 건은 아래에서 수동으로 재발송할 수 있습니다.
+        </Alert>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 16, alignItems: "start" }}>
+        {/* 탈락자 목록 */}
+        <Card padded>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <h2 style={{ fontSize: 18, margin: 0 }}>탈락자 목록</h2>
+            <Badge variant="soft">{LOSERS.length}명</Badge>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {LOSERS.map(l => {
+              const checked = sel.has(l.email);
+              return (
+                <label key={l.email} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: "var(--radius-sm)", cursor: "pointer",
+                  border: "1px solid " + (checked ? "var(--color-signal-blue)" : "var(--border-default)"), background: checked ? "var(--color-signal-blue-soft)" : "var(--surface-card)" }}>
+                  <input type="checkbox" checked={checked} onChange={() => toggle(l.email)} style={{ width: 17, height: 17, accentColor: "var(--color-signal-blue)" }} />
+                  <Avatar name={l.name} size="sm" />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{l.name} <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 12.5 }}>· {l.slot} 탈락</span></div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{l.dept} · {l.pos} · {l.email}</div>
+                  </div>
+                  {sentBadge(l.sent)}
+                </label>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* 메일 미리보기 */}
+        <Card padded>
+          <h2 style={{ fontSize: 18, margin: "0 0 14px" }}>메일 미리보기</h2>
+          <div style={{ border: "1px solid var(--border-default)", borderRadius: "var(--radius-sm)", overflow: "hidden" }}>
+            <div style={{ padding: "14px 16px", background: "var(--color-mist)", borderBottom: "1px solid var(--border-default)" }}>
+              <div style={{ fontSize: 12, color: "var(--text-muted)" }}>제목</div>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: "var(--color-midnight-navy)" }}>[헬스키퍼] 탈락 안내 및 재신청 가능 슬롯 안내</div>
+            </div>
+            <div style={{ padding: "16px", fontSize: 13.5, color: "var(--text-body)", lineHeight: 1.7 }}>
+              <p style={{ margin: "0 0 10px" }}>안녕하세요, OOO님.</p>
+              <p style={{ margin: "0 0 10px" }}>신청하신 시간대는 우선권에 따라 다른 분께 확정되어 <b>탈락</b> 처리되었습니다. 아래 비어있는 슬롯에 <b>선착순·즉시 확정</b>으로 재신청하실 수 있어요.</p>
+              <div style={{ background: "var(--color-signal-blue-soft)", borderRadius: 6, padding: "10px 12px", margin: "0 0 10px" }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "var(--color-info-blue)", marginBottom: 6 }}>비어있는 슬롯</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {EMPTY_SLOTS.map(s => <span key={s} style={{ fontSize: 12, background: "#fff", border: "1px solid var(--color-mist-border)", borderRadius: 999, padding: "3px 9px", color: "var(--color-midnight-navy)" }}>{s}</span>)}
+                </div>
+              </div>
+              <p style={{ margin: "0 0 4px" }}>· 재신청 마감: <b>내일(목) 17:00</b></p>
+              <p style={{ margin: "0 0 4px" }}>· 재신청은 <b>즉시 확정되며 취소할 수 없습니다.</b></p>
+              <p style={{ margin: "0" }}>· 이미 확정된 슬롯은 신청이 거절될 수 있습니다.</p>
+            </div>
+          </div>
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+            <Switch label="빈 슬롯 정보 자동 포함" defaultChecked />
+            <Switch label="발송 실패 시 재시도 큐 적재" defaultChecked />
+          </div>
+        </Card>
+      </div>
+    </Shell>
+  );
+}
+boot(() => <Page />);
+</script>
+</body>
+</html>

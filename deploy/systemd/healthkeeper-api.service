@@ -1,0 +1,16 @@
+[Unit]
+Description=Healthkeeper FastAPI
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/healthkeeper/app/backend
+EnvironmentFile=/opt/healthkeeper/app/backend/.env
+ExecStart=/opt/healthkeeper/app/backend/.venv/bin/gunicorn asgi:app -k uvicorn.workers.UvicornWorker -b 127.0.0.1:8100 -w 2
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,61 @@
+# 원격 서버(115.68.221.73) 전용 — 로컬에 PostgreSQL/Redis 설치 금지
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: healthkeeper-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-healthkeeper}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-healthkeeper}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-healthkeeper} -d ${POSTGRES_DB:-healthkeeper}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: healthkeeper-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:?set REDIS_PASSWORD} --appendonly yes
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  neo4j:
+    profiles: ["neo4j"]  # 선택 — Docker Hub 접속 불가 시 생략 가능
+    image: neo4j:5
+    container_name: healthkeeper-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:?set NEO4J_PASSWORD}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:7687:7687"
+      - "127.0.0.1:7474:7474"
+    volumes:
+      - neo4jdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  pgdata:
+  redisdata:
+  neo4jdata:

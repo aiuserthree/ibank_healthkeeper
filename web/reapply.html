@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>헬스키퍼 — 탈락자 재신청</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+    const DEMO_SLOTS = [
+      { id: "demo-1", slotDate: "2026-06-23", startTime: "13:30" },
+      { id: "demo-2", slotDate: "2026-06-23", startTime: "15:30" },
+      { id: "demo-3", slotDate: "2026-06-25", startTime: "14:30" },
+      { id: "demo-4", slotDate: "2026-06-25", startTime: "16:30", taken: true },
+      { id: "demo-5", slotDate: "2026-06-26", startTime: "13:30" },
+      { id: "demo-6", slotDate: "2026-06-26", startTime: "15:30" },
+    ];
+
+    let access = "eligible";
+    let apiState = "REAPPLY";
+    let slots = [];
+    let confirmedSlotId = null;
+    let confirmedSlot = null;
+
+    function isLiveReapply() {
+      return apiState === "REAPPLY";
+    }
+
+    function hasReapplyDone() {
+      return confirmedSlotId != null;
+    }
+
+    function slotMode(s) {
+      if (String(confirmedSlotId) === String(s.id)) return "confirmed";
+      if (hasReapplyDone()) return "locked";
+      return "open";
+    }
+
+    function displaySlots() {
+      const base = isLiveReapply() ? slots : DEMO_SLOTS;
+      if (!hasReapplyDone()) return base;
+      if (base.some((s) => String(s.id) === String(confirmedSlotId))) return base;
+      if (confirmedSlot) return [confirmedSlot, ...base];
+      return base;
+    }
+
+    function dayLabel(slot) {
+      const d = new Date(slot.slotDate + "T12:00:00");
+      return `${d.getMonth() + 1}/${d.getDate()}(${DAY_NAMES[d.getDay()]})`;
+    }
+
+    function blocked(iconName, title, desc, ctaHtml) {
+      return `<div class="hk-card hk-card--pad">${HKUI.emptyState({ iconName, title, desc, actionHtml: ctaHtml })}</div>`;
+    }
+
+    function slotCard(s, mode) {
+      const label = dayLabel(s);
+      const end = HKUI.endT(s.startTime);
+      if (mode === "confirmed") {
+        return `<div class="hk-card hk-card--pad" style="border-color:var(--color-success);background:var(--color-success-soft)">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div style="width:46px;height:46px;border-radius:11px;background:var(--color-success);display:flex;align-items:center;justify-content:center;flex-shrink:0">${HKUI.icon("check", 22, "#fff")}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${label}</div>
+              <div style="font-size:14px;color:var(--text-secondary)">${s.startTime} – ${end}</div>
+            </div>
+            ${HKUI.badge("확정 완료", "success", true)}
+          </div>
+        </div>`;
+      }
+      if (mode === "locked") {
+        return `<div class="hk-card hk-card--pad" style="opacity:0.58">
+          <div style="display:flex;align-items:center;gap:14px">
+            <div style="width:46px;height:46px;border-radius:11px;background:var(--color-fog);display:flex;align-items:center;justify-content:center;flex-shrink:0">${HKUI.icon("clock", 22, "var(--color-steel-blue)")}</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${label}</div>
+              <div style="font-size:14px;color:var(--text-secondary)">${s.startTime} – ${end}</div>
+            </div>
+            <span style="font-size:13px;font-weight:600;color:var(--text-muted);white-space:nowrap">신청 불가</span>
+          </div>
+        </div>`;
+      }
+      return `<div class="hk-card hk-card--pad">
+        <div style="display:flex;align-items:center;gap:14px">
+          <div style="width:46px;height:46px;border-radius:11px;background:var(--color-signal-blue-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">${HKUI.icon("clock", 22, "var(--color-signal-blue)")}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${label}</div>
+            <div style="font-size:14px;color:var(--text-secondary)">${s.startTime} – ${end}</div>
+          </div>
+          <button type="button" class="hk-btn hk-btn--primary hk-btn--sm" data-slot="${s.id}">재신청</button>
+        </div>
+      </div>`;
+    }
+
+    async function submitReapply(slot) {
+      const label = dayLabel(slot);
+      const end = HKUI.endT(slot.startTime);
+
+      if (hasReapplyDone() && String(confirmedSlotId) !== String(slot.id)) {
+        await HKUI.confirmDialog(
+          "재신청을 완료했습니다",
+          "이번 주 재신청은 <b>한 타임만</b> 가능합니다. 마이페이지에서 확정 내역을 확인하세요.",
+          { confirmLabel: "내 예약 내역 보기", hideCancel: true }
+        );
+        window.location.href = HKRoutes.mypage;
+        return;
+      }
+
+      if (!isLiveReapply()) {
+        if (slot.taken) {
+          await HKUI.confirmDialog(
+            "이미 예약이 완료되었습니다",
+            `${label} ${slot.startTime} 타임은 방금 다른 분이 확정했습니다. <b>이미 예약이 완료된 날짜 및 시간대입니다.</b> 다른 빈 슬롯을 선택해 주세요.`,
+            { confirmLabel: "다른 슬롯 보기", hideCancel: true }
+          );
+          return;
+        }
+        const ok = await HKUI.confirmDialog(
+          "즉시 확정됩니다",
+          `${label} <b>${slot.startTime} – ${end}</b> 타임으로 재신청합니다. 재신청은 <b>신청 즉시 확정</b>되고 <b>취소할 수 없습니다.</b>`,
+          { confirmLabel: "재신청 확정" }
+        );
+        if (!ok) return;
+        confirmedSlotId = slot.id;
+        confirmedSlot = slot;
+        HKUI.toast(`${label} ${slot.startTime} 예약이 확정되었습니다 · 완료 메일 발송 (취소 불가)`);
+        renderContent();
+        return;
+      }
+
+      const ok = await HKUI.confirmDialog(
+        "즉시 확정됩니다",
+        `${label} <b>${slot.startTime} – ${end}</b> 타임으로 재신청합니다. 재신청은 <b>신청 즉시 확정</b>되고 <b>취소할 수 없습니다.</b>`,
+        { confirmLabel: "재신청 확정" }
+      );
+      if (!ok) return;
+      try {
+        await HKApi.reapplySlot(Number(slot.id));
+        confirmedSlotId = slot.id;
+        confirmedSlot = slot;
+        HKUI.toast(`${slot.startTime} 예약이 확정되었습니다 · 완료 메일 발송 (취소 불가)`);
+        renderContent();
+      } catch (e) {
+        if (e.code === "WEEK_APPLY_LIMIT") {
+          await HKUI.confirmDialog(
+            "재신청을 완료했습니다",
+            "이번 주 재신청은 <b>한 타임만</b> 가능합니다. 마이페이지에서 확정 내역을 확인하세요.",
+            { confirmLabel: "내 예약 내역 보기", hideCancel: true }
+          );
+          window.location.href = HKRoutes.mypage;
+        } else if (e.code === "SLOT_TAKEN" || e.message.includes("완료")) {
+          await HKUI.confirmDialog(
+            "이미 예약이 완료되었습니다",
+            `${label} ${slot.startTime} 타임은 방금 다른 분이 확정했습니다. <b>이미 예약이 완료된 날짜 및 시간대입니다.</b> 다른 빈 슬롯을 선택해 주세요.`,
+            { confirmLabel: "다른 슬롯 보기", hideCancel: true }
+          );
+        } else {
+          HKUI.toast(e.message, "danger");
+        }
+      }
+    }
+
+    function renderAccessToggle() {
+      const el = document.getElementById("demo-access");
+      el.innerHTML = HKUI.demoToggle("데모 접근", [
+        ["eligible", "탈락자 (대상)"],
+        ["ineligible", "비대상자"],
+        ["closed", "기간 종료"],
+      ], access, "data-access");
+      el.querySelectorAll("[data-access]").forEach((btn) => {
+        btn.onclick = () => {
+          access = btn.dataset.access;
+          renderAccessToggle();
+          renderContent();
+        };
+      });
+    }
+
+    function renderEligibleContent(el) {
+      const doneAlert = hasReapplyDone()
+        ? `<div style="margin-bottom:20px">${HKUI.alertBox("info", "재신청 완료", "이번 주 재신청은 <b>한 타임만</b> 가능합니다. 다른 슬롯은 더 이상 신청할 수 없어요.")}</div>`
+        : `<div style="margin-bottom:20px">${HKUI.alertBox("warning", "재신청 안내 · 내일(목) 17:00까지", "재신청은 <b>선착순으로 즉시 확정</b>되며, <b>취소할 수 없습니다.</b> 이미 확정된 슬롯은 신청이 거절됩니다.")}</div>`;
+
+      el.innerHTML = `${doneAlert}
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">${HKUI.icon("calendar-search", 18, "var(--color-slate-blue)")}<h2 style="font-size:18px;margin:0">비어있는 슬롯</h2><span id="slot-count"></span></div>
+        <div class="hk-grid-2eq" style="gap:12px" id="slots"></div>`;
+
+      const list = displaySlots();
+      const grid = document.getElementById("slots");
+
+      if (isLiveReapply() && !list.length && !hasReapplyDone()) {
+        grid.innerHTML = HKUI.emptyState({
+          iconName: "calendar-x",
+          title: "재신청 가능한 빈 슬롯이 없습니다",
+          desc: "모든 슬롯이 채워졌거나 아직 오픈되지 않았습니다.",
+        });
+        HKUI.refreshIcons();
+        return;
+      }
+
+      const remaining = hasReapplyDone() ? 0 : list.filter((s) => slotMode(s) === "open").length;
+      document.getElementById("slot-count").innerHTML = hasReapplyDone()
+        ? HKUI.badge("재신청 완료", "success", true)
+        : HKUI.badge(`${remaining}개 남음`, "soft");
+      grid.innerHTML = list.map((s) => slotCard(s, slotMode(s))).join("");
+      grid.querySelectorAll("[data-slot]").forEach((btn) => {
+        btn.onclick = () => {
+          const slot = list.find((s) => String(s.id) === btn.dataset.slot);
+          if (!slot || slotMode(slot) !== "open") return;
+          submitReapply(slot);
+        };
+      });
+      HKUI.refreshIcons();
+    }
+
+    function renderContent() {
+      const el = document.getElementById("content");
+      if (access === "ineligible") {
+        el.innerHTML = blocked(
+          "ban",
+          "재신청 대상이 아닙니다",
+          "재신청은 이번 주차 우선권 경합에서 탈락한 회원만 신청할 수 있어요.",
+          `<a href="${HKRoutes.mypage}"><button type="button" class="hk-btn hk-btn--primary">내 예약 내역 보기</button></a>`
+        );
+        HKUI.refreshIcons();
+        return;
+      }
+      if (access === "closed") {
+        el.innerHTML = blocked(
+          "clock-x",
+          "재신청 기간이 종료되었습니다",
+          "재신청 창은 목요일 17:00에 마감되었습니다. 다음 차주 일정은 다음 주 수요일 09:00에 새로 오픈됩니다.",
+          `<a href="${HKRoutes.home}"><button type="button" class="hk-btn hk-btn--secondary">서비스 소개로</button></a>`
+        );
+        HKUI.refreshIcons();
+        return;
+      }
+      renderEligibleContent(el);
+    }
+
+    HKMember.mountPage({
+      active: "reserve",
+      auth: true,
+      mainStyle: "max-width:920px;margin:0 auto;padding:36px 32px 72px",
+      render() {
+        return `
+          <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:16px">
+            <div>
+              <div style="display:flex;align-items:center;gap:10px">
+                <h1 style="font-size:32px;margin:0">탈락자 재신청</h1>
+                ${HKUI.badge("선착순 · 즉시 확정", "info")}
+              </div>
+              <p style="font-size:15px;color:var(--text-secondary);margin:6px 0 0">마감 후 비어있는 슬롯을 선착순으로 신청하세요.</p>
+            </div>
+            <div id="demo-access"></div>
+          </div>
+          <div id="content"></div>`;
+      },
+      afterMount: async () => {
+        try {
+          const sys = await HKApi.systemState();
+          apiState = sys.state;
+          if (sys.state === "REAPPLY") {
+            try {
+              const data = await HKApi.reapplySlots();
+              slots = data.slots || [];
+            } catch (_) {
+              slots = [];
+            }
+            try {
+              const cal = await HKApi.calendar();
+              if (cal.weekApplied && cal.appliedSlotId) {
+                confirmedSlotId = cal.appliedSlotId;
+                const mine = (cal.slots || []).find((s) => s.id === cal.appliedSlotId && s.mine);
+                if (mine) {
+                  confirmedSlot = {
+                    id: mine.id,
+                    slotDate: mine.slotDate,
+                    startTime: mine.startTime,
+                    endTime: mine.endTime,
+                  };
+                }
+              }
+            } catch (_) {
+              /* ignore */
+            }
+          }
+        } catch (_) {
+          /* 데모 화면은 API 없이도 표시 */
+        }
+        renderAccessToggle();
+        renderContent();
+      },
+    });
+  </script>
+</body>
+</html>

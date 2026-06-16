@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>헬스키퍼 관리자 — 재신청 안내 메일</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/admin-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    let selected = new Set();
+    let targets = null;
+    let cycleId = null;
+    let members = [];
+
+    function sendBtnHtml() {
+      return `<button type="button" class="hk-btn hk-btn--primary" id="send-btn">${HKUI.icon("send", 16, "#fff")} 선택 <span id="sel-count">0</span>명에게 발송</button>`;
+    }
+
+    function sentBadge(status) {
+      if (status === "success") return HKUI.badge("발송 완료", "success", true);
+      if (status === "fail" || status === "failed") return HKUI.badge("발송 실패", "danger");
+      return HKUI.badge("미발송", "soft");
+    }
+
+    function memberRow(m) {
+      const email = m.email;
+      const checked = selected.has(email);
+      const cls = checked ? "hk-reapply-member hk-reapply-member--checked" : "hk-reapply-member hk-reapply-member--unchecked";
+      const status = m.mailStatus || "pending";
+      const meta = m.email;
+      return `<label class="${cls}" data-email="${HKUI.escapeHtml(email)}">
+        <input type="checkbox" ${checked ? "checked" : ""} data-email="${HKUI.escapeHtml(email)}" style="width:17px;height:17px;accent-color:var(--color-signal-blue)">
+        ${HKUI.avatar(m.name, "sm")}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            ${HKUI.escapeHtml(m.name)}
+            ${HKUI.statusBadge("DROPPED")}
+            <span style="font-weight:400;color:var(--text-muted);font-size:12.5px">${HKUI.escapeHtml(m.slotLabel || "-")}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(meta)}</div>
+        </div>
+        ${sentBadge(status)}
+      </label>`;
+    }
+
+    function renderMembers() {
+      const list = document.getElementById("member-list");
+      if (!list) return;
+      list.innerHTML = members.length
+        ? members.map(memberRow).join("")
+        : `<div style="font-size:13px;color:var(--text-muted)">탈락 회원이 없습니다.</div>`;
+      list.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+        cb.onchange = () => toggleEmail(cb.dataset.email, cb.checked);
+      });
+      HKUI.refreshIcons(list);
+    }
+
+    function toggleEmail(email, checked) {
+      if (checked) selected.add(email);
+      else selected.delete(email);
+      updateCount();
+      renderMembers();
+    }
+
+    function updateCount() {
+      const el = document.getElementById("sel-count");
+      if (el) el.textContent = selected.size;
+    }
+
+    function slotChips(slots) {
+      if (!slots.length) {
+        return `<span style="font-size:12px;color:var(--text-muted)">없음</span>`;
+      }
+      return `<div style="display:flex;flex-wrap:wrap;gap:6px">${slots
+        .map((s) => `<span class="hk-reapply-slot-chip">${HKUI.escapeHtml(s.label || `${HKUI.formatDateShort(s.slotDate)} ${s.startTime || ""}`)}</span>`)
+        .join("")}</div>`;
+    }
+
+    function previewHtml(t) {
+      const deadline = t.reapplyDeadline || "내일(목) 17:00";
+      const subject = t.mailSubject || "[헬스키퍼] 탈락 안내 및 재신청 가능 슬롯 안내";
+      return `
+        <div class="hk-reapply-preview">
+          <div class="hk-reapply-preview-head">
+            <div style="font-size:12px;color:var(--text-muted)">제목</div>
+            <div style="font-size:14.5px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(subject)}</div>
+          </div>
+          <div class="hk-reapply-preview-body">
+            <p style="margin:0 0 10px">안녕하세요, OOO님.</p>
+            <p style="margin:0 0 10px">신청하신 시간대는 우선권에 따라 다른 분께 확정되어 <b>탈락</b> 처리되었습니다. <b>목요일 09:00</b>부터 아래 비어있는 슬롯에 <b>선착순·즉시 확정</b>으로 재신청하실 수 있어요.</p>
+            <div class="hk-reapply-slot-box">
+              <div style="font-size:12px;font-weight:700;color:var(--color-info-blue);margin-bottom:6px">비어있는 슬롯</div>
+              ${slotChips(t.emptySlots || [])}
+            </div>
+            <p style="margin:0 0 4px">· 재신청 시작: <b>목요일 09:00</b>부터 선착순·즉시 확정</p>
+            <p style="margin:0 0 4px">· 재신청 마감: <b>${HKUI.escapeHtml(deadline)}</b></p>
+            <p style="margin:0 0 4px">· 재신청 건은 <b>취소할 수 없습니다.</b></p>
+            <p style="margin:0">· 이미 확정된 슬롯은 신청이 거절될 수 있습니다.</p>
+          </div>
+        </div>
+        <div class="hk-reapply-switches">
+          ${HKUI.switchRow("빈 슬롯 정보 자동 포함", true, true)}
+          ${HKUI.switchRow("발송 실패 시 재시도 큐 적재", true, true)}
+        </div>`;
+    }
+
+    function bindSend() {
+      document.getElementById("send-btn").onclick = async () => {
+        if (!selected.size) {
+          HKUI.toast("발송할 대상을 선택해 주세요.", "danger");
+          return;
+        }
+        const ok = await HKUI.confirmDialog("메일 발송", `선택한 ${selected.size}명에게 재신청 안내 메일을 발송할까요?`);
+        if (!ok) return;
+        const memberIds = members.filter((m) => selected.has(m.email)).map((m) => m.id);
+        try {
+          const res = await HKApi.sendReapplyMail(cycleId, memberIds);
+          const sentCount = res.sentCount ?? memberIds.length;
+          targets = await HKApi.reapplyTargets(cycleId);
+          members = targets.droppedMembers || [];
+          selected = new Set(members.filter((m) => m.mailStatus !== "success").map((m) => m.email));
+          renderMembers();
+          updateCount();
+          document.getElementById("preview-panel").innerHTML = `<h2 style="font-size:18px;margin:0 0 14px">메일 미리보기</h2>${previewHtml(targets)}`;
+          HKUI.refreshIcons();
+          await HKUI.confirmDialog(
+            "발송되었습니다",
+            `재신청 안내 메일 <b>${sentCount}건</b>을 발송했습니다.`,
+            { confirmLabel: "확인", hideCancel: true }
+          );
+        } catch (e) {
+          await HKUI.confirmDialog(
+            "발송할 수 없습니다",
+            HKUI.escapeHtml(e.message),
+            { confirmLabel: "확인", hideCancel: true }
+          );
+        }
+      };
+    }
+
+    HKAdmin.mountPage({
+      active: "reapply",
+      render() {
+        return `${HKAdmin.pageHead("재신청 안내 메일", "우선권 탈락자에게 빈 슬롯·재신청 시간·선착순 안내를 발송합니다", sendBtnHtml())}
+          <div style="margin-bottom:20px">${HKUI.alertBox("info", "목요일 09:00 자동 발송", "탈락자에게 재신청 안내 메일이 <b>매주 목요일 09:00</b>에 자동 발송됩니다. 실패·누락 건은 아래에서 수동으로 재발송할 수 있습니다.")}</div>
+          <div class="hk-reapply-grid" id="content"></div>`;
+      },
+      afterMount: async () => {
+        const dash = await HKApi.dashboard();
+        cycleId = dash.cycleId;
+        const el = document.getElementById("content");
+        if (!cycleId) {
+          el.innerHTML = `<div class="hk-card hk-card--pad" style="grid-column:1/-1"><div style="font-size:13px;color:var(--text-muted)">활성 사이클이 없습니다.</div></div>`;
+          HKUI.refreshIcons();
+          return;
+        }
+
+        targets = await HKApi.reapplyTargets(cycleId);
+        members = targets.droppedMembers || [];
+        selected = new Set(members.filter((m) => m.mailStatus !== "success").map((m) => m.email));
+
+        el.innerHTML = `
+          <div class="hk-card hk-card--pad">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+              <h2 style="font-size:18px;margin:0">탈락자 목록</h2>
+              ${HKUI.badge(`${members.length}명`, "soft")}
+            </div>
+            <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 14px">우선권 경합으로 탈락한 회원만 표시됩니다 · 우측 배지는 메일 발송 상태입니다.</p>
+            <div class="hk-reapply-members" id="member-list"></div>
+          </div>
+          <div class="hk-card hk-card--pad" id="preview-panel">
+            <h2 style="font-size:18px;margin:0 0 14px">메일 미리보기</h2>
+            ${previewHtml(targets)}
+          </div>`;
+
+        renderMembers();
+        updateCount();
+        bindSend();
+        HKUI.refreshIcons();
+      },
+    });
+  </script>
+</body>
+</html>

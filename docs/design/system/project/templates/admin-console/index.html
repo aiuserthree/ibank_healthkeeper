@@ -1,0 +1,93 @@
+<!-- @template name="관리자 콘솔" description="헬스키퍼 관리자 — 사이드바 + 예약 관리 테이블(우선권/확정). 운영 콘솔의 시작점." -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리자 콘솔 — 헬스키퍼</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="./ds-base.js"></script>
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--surface-canvas, #f8f9fb); }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel" data-presets="react">
+    const NS = "HealthkeeperDS_31e44b";
+    function start() {
+      const { Button, IconButton, Card, Avatar, Badge, StatusBadge, Alert } = window[NS];
+      const { useState, useEffect } = React;
+      const NAV = [
+        { k:"dashboard", label:"대시보드", icon:"layout-dashboard" },
+        { k:"reservations", label:"예약 관리", icon:"calendar-check" },
+        { k:"vacation", label:"휴가 관리", icon:"palmtree" },
+        { k:"settings", label:"운영 설정", icon:"settings" },
+      ];
+      const APPLICANTS = [
+        { name:"박지훈", email:"jihoon.park@ibank.co.kr", applied:"09:01", lastUse:"이력 없음", priority:true },
+        { name:"최유진", email:"yujin.choi@ibank.co.kr", applied:"09:33", lastUse:"2025.04.02", priority:false },
+        { name:"강다은", email:"daeun.kang@ibank.co.kr", applied:"11:40", lastUse:"2025.06.01", priority:false },
+      ];
+
+      function Console() {
+        const [route, setRoute] = useState("reservations");
+        useEffect(() => { window.lucide && window.lucide.createIcons(); });
+        return (
+          <div style={{ display:"flex", minHeight:"100vh" }}>
+            <aside style={{ width:240, background:"var(--surface-card)", borderRight:"1px solid var(--border-default)", position:"sticky", top:0, height:"100vh", display:"flex", flexDirection:"column" }}>
+              <div style={{ padding:"22px 20px", display:"flex", alignItems:"center", gap:10, borderBottom:"1px solid var(--border-default)" }}>
+                <img src="../../assets/logo-mark.svg" width="34" height="34" alt="" />
+                <div><div style={{ fontSize:15, fontWeight:700, color:"var(--color-midnight-navy)" }}>헬스키퍼</div><div style={{ fontSize:11, color:"var(--text-muted)", letterSpacing:"0.04em" }}>ADMIN</div></div>
+              </div>
+              <nav style={{ padding:12, display:"flex", flexDirection:"column", gap:2 }}>
+                {NAV.map(it => { const a = route===it.k; return (
+                  <button key={it.k} onClick={() => setRoute(it.k)} style={{ display:"flex", alignItems:"center", gap:12, padding:"11px 14px", borderRadius:"var(--radius-sm)", border:"none", cursor:"pointer", textAlign:"left", font:"inherit", fontSize:15, fontWeight:600, background:a?"var(--color-signal-blue-soft)":"transparent", color:a?"var(--color-info-blue)":"var(--color-slate-blue)" }}>
+                    <i data-lucide={it.icon} style={{ width:19, height:19 }}></i>{it.label}
+                  </button>
+                ); })}
+              </nav>
+            </aside>
+            <main style={{ flex:1, padding:"32px 40px", maxWidth:1080 }}>
+              <h1 style={{ fontSize:30, marginBottom:6 }}>예약 관리</h1>
+              <p style={{ fontSize:15, color:"var(--text-secondary)", marginBottom:20 }}>6/22(월) 15:30 — 우선권을 확인하고 확정하세요</p>
+              <Card padded>
+                <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:16 }}>
+                  <i data-lucide="clock" style={{ width:18, height:18, color:"var(--color-signal-blue)" }}></i>
+                  <span style={{ fontSize:17, fontWeight:700, color:"var(--color-midnight-navy)" }}>15:30 – 16:00</span>
+                  <Badge variant="warning">중복 3명</Badge>
+                </div>
+                <div style={{ display:"grid", gridTemplateColumns:"28px 1.4fr 1fr 110px 96px 84px", gap:12, padding:"0 8px 10px", borderBottom:"1px solid var(--border-default)" }}>
+                  {["","신청자","신청 시각","마지막 이용","우선권",""].map((h,i)=><div key={i} style={{ fontSize:12, fontWeight:700, color:"var(--text-muted)" }}>{h}</div>)}
+                </div>
+                {APPLICANTS.map((a, i) => (
+                  <div key={a.email} style={{ display:"grid", gridTemplateColumns:"28px 1.4fr 1fr 110px 96px 84px", gap:12, padding:"12px 8px", alignItems:"center", borderBottom:"1px solid var(--color-mist)" }}>
+                    <div style={{ fontSize:13, fontWeight:700, color: i===0?"var(--color-signal-blue)":"var(--text-muted)" }}>{i+1}</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:10, minWidth:0 }}>
+                      <Avatar name={a.name} size="sm" />
+                      <div style={{ minWidth:0 }}>
+                        <div style={{ fontSize:14, fontWeight:700, color:"var(--color-midnight-navy)" }}>{a.name}</div>
+                        <div style={{ fontSize:12, color:"var(--text-muted)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{a.email}</div>
+                      </div>
+                    </div>
+                    <div style={{ fontSize:14, color:"var(--text-secondary)" }}>{a.applied}</div>
+                    <div style={{ fontSize:13, color: a.lastUse==="이력 없음"?"var(--color-warning)":"var(--text-secondary)", fontWeight: a.lastUse==="이력 없음"?700:400 }}>{a.lastUse}</div>
+                    <div>{a.priority ? <Badge variant="info">우선권 O</Badge> : <Badge variant="neutral">X</Badge>}</div>
+                    <div>{i===0 ? <Button variant="primary" size="sm">확정</Button> : <span style={{ fontSize:13, color:"var(--text-muted)" }}>대기</span>}</div>
+                  </div>
+                ))}
+              </Card>
+            </main>
+          </div>
+        );
+      }
+      ReactDOM.createRoot(document.getElementById("root")).render(<Console />);
+    }
+    (function wait(){ window[NS] ? start() : setTimeout(wait, 40); })();
+  </script>
+</body>
+</html>

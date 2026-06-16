@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>헬스키퍼 관리자 — 신청자 상세</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/admin-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const slotId = Number(HKUI.queryParam("slotId"));
+
+    function field(label, value, warn, tabular) {
+      return `<div style="min-width:84px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">${label}</div><div style="font-size:14px;font-weight:${warn ? 700 : 600};color:${warn ? "var(--color-warning)" : "var(--color-midnight-navy)"};font-variant-numeric:${tabular ? "tabular-nums" : "normal"}">${value}</div></div>`;
+    }
+
+    HKAdmin.mountPage({
+      active: "reservations",
+      render() {
+        return `${HKAdmin.pageHead("신청자 상세 · 우선권 확인", "동일 슬롯 신청자를 우선권 순으로 정렬합니다 · 마지막 이용일 오래된 순 → 동률 시 신청 시각", `<a href="${HKAdminRoutes.reservations}"><button type="button" class="hk-btn hk-btn--ghost hk-btn--sm">${HKUI.icon("arrow-left", 16, "var(--color-slate-blue)")} 목록으로</button></a>`)}
+          <div id="content"></div>`;
+      },
+      afterMount: async () => {
+        const el = document.getElementById("content");
+        if (!slotId) {
+          el.innerHTML = HKUI.alertBox("danger", "오류", "slotId 파라미터가 필요합니다.");
+          HKUI.refreshIcons();
+          return;
+        }
+        try {
+          const data = await HKApi.slotDetail(slotId);
+          const slot = data.slot;
+          const applicants = (data.applicants || []).slice().sort((a, b) => (a.priority_rank || 99) - (b.priority_rank || 99));
+          const allNoHistory = applicants.length > 0 && applicants.every((a) => a.no_history || !a.last_used_date);
+          const decided = slot.status === "CONFIRMED" || applicants.some((a) => a.status === "CONFIRMED");
+
+          el.innerHTML = `
+            <div class="hk-card hk-card--pad" style="margin-bottom:16px">
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                ${HKUI.icon("clock", 20, "var(--color-signal-blue)")}
+                <span style="font-size:19px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.formatDateLong(slot.slotDate)} ${slot.startTime || ""} – ${slot.endTime || ""}</span>
+                ${applicants.length > 1 ? HKUI.badge(`중복 ${applicants.length}명`, "warning") : ""}
+                ${decided ? HKUI.badge("확정 완료", "success", true) : ""}
+              </div>
+            </div>
+            ${data.needsManual || allNoHistory
+              ? `<div style="margin-bottom:16px">${HKUI.alertBox("warning", "자동 우선권 판단 불가 · 수동 확정 필요", "신청자 전원이 <b>이력 없음</b>입니다. 우선권을 자동으로 정할 수 없으니 관리자가 직접 1명을 확정해 주세요. (동률 기준은 신청 시각)")}</div>`
+              : applicants.length
+                ? `<div style="margin-bottom:16px">${HKUI.alertBox("info", "우선권 1순위가 자동 정렬되었습니다", `마지막 이용일이 가장 오래된 <b>${HKUI.escapeHtml(applicants[0].member_name)}</b>님이 1순위입니다. 확정하면 나머지 신청자는 자동으로 <b>탈락</b> 처리됩니다.`)}</div>`
+                : ""}
+            <div style="display:flex;flex-direction:column;gap:12px" id="applicants"></div>`;
+
+          const list = document.getElementById("applicants");
+          list.innerHTML = applicants
+            .map((a, i) => {
+              const isTop = i === 0 && !allNoHistory;
+              const noHist = a.no_history || !a.last_used_date;
+              const st = a.status === "CONFIRMED" ? "CONFIRMED" : a.status === "DROPPED" ? "DROPPED" : null;
+              const pos = a.position || a.job_title || "";
+              const dept = a.department || a.dept || "";
+              const borderColor = st === "CONFIRMED" ? "var(--color-success)" : isTop && !decided && !allNoHistory ? "var(--color-signal-blue)" : "var(--border-default)";
+              const borderW = st === "CONFIRMED" || (isTop && !decided && !allNoHistory) ? 2 : 1;
+              const bg = st === "CONFIRMED" ? "var(--color-success-soft)" : "var(--surface-card)";
+              return `<div class="hk-card hk-card--pad" style="border:${borderW}px solid ${borderColor};background:${bg}">
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                  <div style="width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${isTop && !allNoHistory ? "var(--color-signal-blue)" : "var(--color-fog)"};color:${isTop && !allNoHistory ? "#fff" : "var(--color-slate-blue)"};font-weight:700;font-size:14px">${i + 1}</div>
+                  ${HKUI.avatar(a.member_name, "md")}
+                  <div style="min-width:160px">
+                    <div style="display:flex;align-items:center;gap:8px">
+                      <span style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}</span>
+                      ${isTop && !allNoHistory && !decided ? HKUI.badge("우선권 1순위", "info") : ""}
+                    </div>
+                    <div style="font-size:13px;color:var(--color-slate-blue);font-weight:600">${HKUI.escapeHtml(dept)}${pos ? ` · ${HKUI.escapeHtml(pos)}` : ""}</div>
+                    <div style="font-size:13px;color:var(--text-muted)">${HKUI.escapeHtml(a.member_email || "")}</div>
+                  </div>
+                  ${field("신청 시각", a.applied_at ? HKUI.formatTimeKst(a.applied_at) : "-", false, true)}
+                  ${field("마지막 이용일", noHist ? "이력 없음" : HKUI.formatDate(a.last_used_date), noHist)}
+                  ${field("누적 이용", a.total_uses != null ? `${a.total_uses}회` : "-")}
+                  <div style="flex:1"></div>
+                  <div style="min-width:96px;display:flex;justify-content:flex-end">
+                    ${decided && a.status === "CONFIRMED" ? HKUI.statusBadge("CONFIRMED") : decided ? HKUI.statusBadge(a.status) : `<button type="button" class="hk-btn hk-btn--${isTop && !allNoHistory ? "primary" : "secondary"} hk-btn--sm" data-rid="${a.reservation_id}">확정</button>`}
+                  </div>
+                </div>
+              </div>`;
+            })
+            .join("");
+
+          list.querySelectorAll("[data-rid]").forEach((btn) => {
+            btn.onclick = async () => {
+              const ok = await HKUI.confirmDialog("예약을 확정할까요?", "선택한 신청자를 확정합니다. 같은 슬롯의 다른 신청자는 <b>탈락</b> 처리되고, 확정자에게 <b>완료 메일</b>이 발송됩니다. 확정자의 마지막 이용일이 갱신됩니다.");
+              if (!ok) return;
+              try {
+                await HKApi.confirmSlot(slotId, Number(btn.dataset.rid));
+                HKUI.toast("예약이 확정되었습니다 · 완료 메일 발송 · 마지막 이용일 갱신");
+                location.reload();
+              } catch (e) {
+                HKUI.toast(e.message, "danger");
+              }
+            };
+          });
+          HKUI.refreshIcons();
+        } catch (e) {
+          el.innerHTML = HKUI.alertBox("danger", "오류", HKUI.escapeHtml(e.message));
+          HKUI.refreshIcons();
+        }
+      },
+    });
+  </script>
+</body>
+</html>

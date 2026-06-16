@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>헬스키퍼 — 마이페이지 · 예약 내역</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKMember.mountPage({
+      active: "mypage",
+      auth: true,
+      mainStyle: "max-width:1200px;margin:0 auto;padding:36px 32px 72px",
+      render(profile) {
+        return `
+          <h1 style="font-size:34px;margin-bottom:4px">마이페이지</h1>
+          <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">${HKUI.escapeHtml(profile.name)}님의 예약 신청 내역입니다.</p>
+          ${HKUI.subNav("res")}
+          <div class="hk-card hk-card--pad hk-card--flat" style="margin-bottom:20px;background:var(--color-mist)" id="stats"></div>
+          <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b>")}</div>
+          <div id="list"></div>`;
+      },
+      afterMount: async (profile) => {
+        const statsEl = document.getElementById("stats");
+        const lastUsed = profile.lastUsedDate ? profile.lastUsedDate.replace(/-/g, ".") : "-";
+        statsEl.innerHTML = `<div style="display:flex;gap:48px;flex-wrap:wrap">
+          ${HKUI.kv("마지막 이용일", lastUsed)}
+          ${HKUI.kv("우선권", HKUI.badge(profile.lastUsedDate ? "보유 O" : "이력 없음 · 최우선", "info"))}
+          <div id="week-count"></div>
+        </div>`;
+        const el = document.getElementById("list");
+        try {
+          const data = await HKApi.myReservations();
+          const items = data.items || [];
+          const weekCount = items.filter((r) => r.status !== "CANCELLED").length;
+          document.getElementById("week-count").outerHTML = HKUI.kv("이번 주 신청", `${weekCount}건`);
+          if (!items.length) {
+            el.innerHTML = `<div class="hk-card hk-card--pad">${HKUI.emptyState({
+              iconName: "calendar-x",
+              title: "신청 내역이 없습니다",
+              desc: "예약하기에서 차주 안마서비스를 신청해 보세요.",
+              actionHtml: `<a href="${HKRoutes.reserve}"><button type="button" class="hk-btn hk-btn--primary">예약하러 가기</button></a>`,
+            })}</div>`;
+            HKUI.refreshIcons();
+            return;
+          }
+          el.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${items.map((r) => HKUI.reservationCard(r)).join("")}</div>`;
+          el.querySelectorAll("[data-cancel]").forEach((btn) => {
+            btn.onclick = async () => {
+              const r = items.find((x) => x.id === Number(btn.dataset.cancel));
+              const d = new Date(r.slotDate + "T12:00:00");
+              const dow = ["일","월","화","수","목","금","토"][d.getDay()];
+              const dateLabel = `${HKUI.formatDateShort(r.slotDate)}(${dow})`;
+              const ok = await HKUI.confirmDialog("신청을 취소할까요?", `${dateLabel} <b>${r.startTime}</b> 신청을 취소합니다. 마감 전 취소는 <b>우선권에 영향을 주지 않습니다.</b>`, { confirmLabel: "취소하기", confirmVariant: "danger" });
+              if (!ok) return;
+              try {
+                await HKApi.cancelReservation(Number(btn.dataset.cancel));
+                HKUI.toast("신청이 취소되었습니다 · 우선권에는 영향이 없습니다");
+                location.reload();
+              } catch (e) {
+                HKUI.toast(e.message, "danger");
+              }
+            };
+          });
+          HKUI.refreshIcons();
+        } catch (e) {
+          el.innerHTML = `<div class="hk-card hk-card--pad"><div class="hk-empty">${HKUI.escapeHtml(e.message)}</div></div>`;
+        }
+      },
+    });
+  </script>
+</body>
+</html>

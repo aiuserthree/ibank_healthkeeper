@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>헬스키퍼 — 마이페이지 · 내 정보</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+(function(){ if (window.ReactDOM && ReactDOM.createRoot && !ReactDOM.__hkPatched) { var o = ReactDOM.createRoot.bind(ReactDOM); ReactDOM.createRoot = function (c, p) { if (!c || (c.id === "root" && !window.__hkReady)) return { render:function(){}, unmount:function(){} }; return o(c, p); }; ReactDOM.__hkPatched = true; } })();
+</script>
+<link rel="stylesheet" href="../_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+<script src="../_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/_ds_bundle.js"></script>
+<link rel="stylesheet" href="../_shared/responsive.css">
+<meta name="ext-resource-dependency" content="../assets/logo-lockup.svg" data-resource-id="logoLockup" />
+<meta name="ext-resource-dependency" content="../assets/logo-mark.svg" data-resource-id="logoMark" />
+<style>
+  html,body{height:100%}
+  body{margin:0;background:var(--surface-canvas,#f8f9fb);color:var(--text-body,#0a0a0a)}
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0b3558"><svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="800" fill="#0b3558"></rect><circle cx="600" cy="356" r="150" fill="none" stroke="#ffffff" stroke-width="28"></circle><path d="M538 360 L585 407 L672 308" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="726" cy="242" r="38" fill="#006bff"></circle></svg></template>
+<div id="root"></div>
+<script type="text/babel" src="../_shared/member-shell.js" data-presets="react"></script>
+<script type="text/babel" data-presets="react">
+const NS = "HealthkeeperDS_31e44b";
+const { Icon, Header, Footer, boot } = window.MemberUI;
+const { useState } = React;
+
+function SubNav({ active }) {
+  const items = [["res", "예약 내역", "마이페이지-예약내역.html"], ["profile", "내 정보 관리", "마이페이지-내정보.html"]];
+  return (
+    <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border-default)", marginBottom: 28 }}>
+      {items.map(([k, l, href]) => (
+        <a key={k} href={href} style={{ padding: "12px 4px", marginRight: 20, textDecoration: "none", fontSize: 15.5, fontWeight: 600,
+          color: active === k ? "var(--color-signal-blue)" : "var(--text-secondary)",
+          borderBottom: "2px solid " + (active === k ? "var(--color-signal-blue)" : "transparent"), marginBottom: -1 }}>{l}</a>
+      ))}
+    </div>
+  );
+}
+
+function Page() {
+  const { Button, Card, Input, Alert, Dialog, Toast } = window[NS];
+  const [toast, setToast] = useState(null);
+  const [withdraw, setWithdraw] = useState(false);
+  const flash = (m) => { setToast(m); setTimeout(() => setToast(null), 3000); };
+
+  return (
+    <>
+      <Header active="mypage" loggedIn={true} />
+      <main style={{ maxWidth: 880, margin: "0 auto", padding: "40px 32px 72px" }}>
+        <h1 style={{ fontSize: 34, marginBottom: 4 }}>마이페이지</h1>
+        <p style={{ fontSize: 16, color: "var(--text-secondary)", marginTop: 0, marginBottom: 24 }}>회원 정보를 확인하고 수정하세요.</p>
+        <SubNav active="profile" />
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, alignItems: "start" }}>
+          {/* 기본 정보 */}
+          <Card padded>
+            <h2 style={{ fontSize: 18, marginTop: 0, marginBottom: 16 }}>기본 정보</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <Input label="이름" defaultValue="김민수" />
+              <Input label="이메일" type="email" defaultValue="minsu.kim@ibank.co.kr" disabled hint="이메일은 변경할 수 없습니다." />
+              <Button variant="primary" onClick={() => flash("기본 정보가 저장되었습니다")}>정보 저장</Button>
+            </div>
+          </Card>
+
+          {/* 비밀번호 변경 */}
+          <Card padded>
+            <h2 style={{ fontSize: 18, marginTop: 0, marginBottom: 16 }}>비밀번호 변경</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <Input label="현재 비밀번호" type="password" placeholder="••••••••" />
+              <Input label="새 비밀번호" type="password" placeholder="••••••••" hint="영문·숫자·특수문자 조합 8자 이상" />
+              <Input label="새 비밀번호 확인" type="password" placeholder="••••••••" />
+              <Button variant="secondary" onClick={() => flash("비밀번호가 변경되었습니다")}>비밀번호 변경</Button>
+            </div>
+          </Card>
+        </div>
+
+        {/* 이용 정보 */}
+        <Card padded flat style={{ marginTop: 16, background: "var(--color-mist)" }}>
+          <div style={{ display: "flex", gap: 48, flexWrap: "wrap" }}>
+            <KV k="가입일" v="2025.01.10" />
+            <KV k="마지막 이용일" v="2025.04.18" />
+            <KV k="누적 이용" v="6회" />
+          </div>
+        </Card>
+
+        {/* 회원 탈퇴 */}
+        <div style={{ marginTop: 28 }}>
+          <Alert variant="warning" title="회원 탈퇴">
+            진행 중인 예약 신청이 있으면 탈퇴 시 모두 취소됩니다. 탈퇴 후에는 이용 이력이 삭제되어 복구할 수 없습니다.
+          </Alert>
+          <div style={{ marginTop: 12 }}>
+            <Button variant="danger" onClick={() => setWithdraw(true)}>회원 탈퇴</Button>
+          </div>
+        </div>
+      </main>
+      <Footer />
+
+      <Dialog open={withdraw} title="정말 탈퇴하시겠어요?" confirmLabel="탈퇴하기" confirmVariant="danger" cancelLabel="닫기"
+        onConfirm={() => { setWithdraw(false); flash("탈퇴 요청이 접수되었습니다"); }} onCancel={() => setWithdraw(false)}>
+        탈퇴하면 진행 중인 신청이 취소되고 계정 정보가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.
+      </Dialog>
+
+      {toast && (
+        <div style={{ position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 200 }}>
+          <Toast variant="success">{toast}</Toast>
+        </div>
+      )}
+    </>
+  );
+}
+function KV({ k, v }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>{k}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{v}</div>
+    </div>
+  );
+}
+boot(() => <Page />);
+</script>
+</body>
+</html>

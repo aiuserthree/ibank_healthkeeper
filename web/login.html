@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>헬스키퍼 — 로그인</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKMember.mountPage({
+      authPage: true,
+      render() {
+        return `<main style="display:flex;justify-content:center;padding:64px 24px 72px">
+          <div style="width:420px">
+            <div style="text-align:center;margin-bottom:26px">
+              <img src="/assets/logo-mark.svg" alt="" width="52" height="52">
+              <h1 style="font-size:28px;margin:16px 0 6px">로그인</h1>
+              <p style="font-size:15px;color:var(--text-secondary);line-height:1.6;margin:0">
+                사내 메신저 <b style="color:var(--color-midnight-navy)">Microsoft Teams</b> 계정으로<br>
+                로그인하고 헬스키퍼 예약을 진행하세요.
+              </p>
+            </div>
+            <div id="error-box" style="margin-bottom:16px;display:none"></div>
+            <div class="hk-card hk-card--pad" id="sso-card">
+              <button type="button" class="hk-sso-btn" id="sso-btn">
+                ${HKUI.msLogo(20)}
+                Microsoft Teams로 로그인
+              </button>
+            </div>
+            <div style="margin-top:18px">${HKUI.alertBox("info", "처음 이용하시나요?", "사내 Teams 계정으로 첫 로그인하면 자동으로 가입이 완료됩니다. 별도 회원가입이 필요하지 않아요.")}</div>
+          </div>
+        </main>`;
+      },
+      afterMount() {
+        const err = HKUI.queryParam("error");
+        if (err) {
+          document.getElementById("error-box").style.display = "block";
+          document.getElementById("error-box").innerHTML = HKUI.alertBox("danger", "로그인 실패", HKUI.escapeHtml(err));
+        }
+        document.getElementById("sso-btn").onclick = () => {
+          document.getElementById("sso-card").innerHTML = `<div style="padding:20px 4px;text-align:center">
+            <span class="hk-spin"></span>
+            <p style="font-size:15px;font-weight:600;color:var(--color-midnight-navy);margin:16px 0 4px">Teams 계정으로 인증 중…</p>
+            <p style="font-size:13.5px;color:var(--text-secondary);margin:0">Microsoft 인증 창에서 계정을 확인해 주세요.</p>
+          </div>`;
+          const returnTo = HKUI.queryParam("returnTo") || HKRoutes.reserve;
+          window.location.href = "/api/auth/sso/login?returnTo=" + encodeURIComponent(returnTo);
+        };
+      },
+    });
+  </script>
+</body>
+</html>

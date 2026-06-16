@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>헬스키퍼 — 마이페이지 · 내 정보</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKMember.mountPage({
+      active: "mypage",
+      auth: true,
+      mainStyle: "max-width:1200px;margin:0 auto;padding:36px 32px 72px",
+      render() {
+        return `
+          <h1 style="font-size:34px;margin-bottom:4px">마이페이지</h1>
+          <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">회원 정보를 확인하세요.</p>
+          ${HKUI.subNav("profile")}
+          <div class="hk-card hk-card--pad" id="profile-card"></div>
+          <div class="hk-card hk-card--pad hk-card--flat" style="margin-top:16px;background:var(--color-mist)" id="usage-card"></div>
+          <div style="margin-top:28px">
+            ${HKUI.alertBox("warning", "회원 탈퇴", "진행 중인 예약 신청이 있으면 탈퇴 시 모두 취소됩니다. 탈퇴 후에는 이용 이력이 삭제되어 복구할 수 없습니다.")}
+            <div style="margin-top:12px"><button type="button" class="hk-btn hk-btn--danger" id="withdraw-btn">회원 탈퇴</button></div>
+          </div>`;
+      },
+      afterMount: async (profile) => {
+        const pos = profile.position || profile.jobTitle || "";
+        const dept = profile.department || profile.dept || "-";
+        document.getElementById("profile-card").innerHTML = `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap">
+            <h2 style="font-size:18px;margin:0">기본 정보</h2>
+            ${HKUI.teamsBadge()}
+          </div>
+          <div style="display:flex;align-items:center;gap:16px;padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--color-mist)">
+            ${HKUI.avatar(profile.name, "lg")}
+            <div>
+              <div style="font-size:19px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(profile.name)} ${pos ? `<span style="font-size:14px;font-weight:500;color:var(--text-secondary)">${HKUI.escapeHtml(pos)}</span>` : ""}</div>
+              <div style="font-size:14px;color:var(--text-secondary);margin-top:2px">${HKUI.escapeHtml(dept)} · ibank</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px 32px">
+            ${HKUI.readField("이름", profile.name)}
+            ${HKUI.readField("이메일", profile.email || "-")}
+            ${HKUI.readField("부서", dept)}
+            ${HKUI.readField("직급", pos || "-")}
+          </div>`;
+        document.getElementById("usage-card").innerHTML = `<div style="display:flex;gap:48px;flex-wrap:wrap">
+          ${HKUI.kv("최근 로그인", profile.lastLoginAt ? HKUI.formatDateTimeKst(profile.lastLoginAt) : "-")}
+          ${HKUI.kv("마지막 이용일", profile.lastUsedDate ? profile.lastUsedDate.replace(/-/g, ".") : "-")}
+          ${HKUI.kv("누적 이용", profile.totalUses != null ? `${profile.totalUses}회` : "-")}
+        </div>`;
+        document.getElementById("withdraw-btn").onclick = async () => {
+          const ok = await HKUI.confirmDialog("정말 탈퇴하시겠어요?", "탈퇴하면 진행 중인 신청이 취소되고 계정 정보가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.", { confirmLabel: "탈퇴하기", confirmVariant: "danger" });
+          if (!ok) return;
+          try {
+            await HKApi.withdraw();
+            await HKApi.logout();
+            HKUI.toast("탈퇴 요청이 접수되었습니다");
+            window.location.href = HKRoutes.home;
+          } catch (e) {
+            HKUI.toast(e.message, "danger");
+          }
+        };
+        HKUI.refreshIcons();
+      },
+    });
+  </script>
+</body>
+</html>

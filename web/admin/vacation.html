@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>헬스키퍼 관리자 — 휴가 관리</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <style>
+    .hk-vac-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; width: 100%; }
+    .hk-vac-head { text-align: center; font-size: 12px; font-weight: 700; color: var(--text-muted); padding: 4px 0 6px; }
+    .hk-vac-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 24px; margin-bottom: 16px; font-size: 12.5px; color: var(--text-secondary); }
+    .hk-vac-legend__item { display: inline-flex; align-items: center; gap: 8px; }
+    .hk-vac-legend__swatch {
+      width: 28px; height: 18px; border-radius: 4px; border: 1px solid var(--border-default); flex-shrink: 0;
+    }
+    .hk-vac-legend__swatch--edit { background: var(--surface-card); border-color: var(--color-signal-blue); box-shadow: inset 0 2px 0 var(--color-signal-blue); }
+    .hk-vac-legend__swatch--lock {
+      background: repeating-linear-gradient(-45deg, var(--color-fog), var(--color-fog) 3px, #eef2f8 3px, #eef2f8 6px);
+      border-style: dashed; border-color: var(--color-steel-blue);
+    }
+    .hk-vac-cell {
+      padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-default);
+      background: var(--surface-card); min-height: 78px; display: flex; flex-direction: column; justify-content: space-between;
+      box-shadow: inset 0 2px 0 var(--color-signal-blue);
+    }
+    .hk-vac-cell--off { border-color: var(--color-danger); background: var(--color-danger-soft); box-shadow: none; }
+    .hk-vac-cell--locked {
+      background: repeating-linear-gradient(-45deg, var(--color-fog), var(--color-fog) 4px, #eef2f8 4px, #eef2f8 8px);
+      border: 1.5px dashed var(--color-steel-blue);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+    .hk-vac-cell--locked.hk-vac-cell--off {
+      background: repeating-linear-gradient(-45deg, #f3e4e4, #f3e4e4 4px, #faefef 4px, #faefef 8px);
+      border-color: #d9a8a8;
+    }
+    .hk-vac-cell--locked .hk-vac-cell__date,
+    .hk-vac-cell--locked .hk-vac-cell__date b { color: var(--text-muted); }
+    .hk-vac-cell--weekend { min-height: 78px; padding: 10px 12px; border-radius: var(--radius-sm); background: var(--color-fog); opacity: 0.55; box-shadow: none; }
+    .hk-vac-cell--empty { min-height: 78px; }
+    .hk-vac-cell__top { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 20px; }
+    .hk-vac-cell__date { font-size: 12px; color: var(--text-muted); line-height: 1.2; }
+    .hk-vac-cell__date b { font-size: 14px; font-weight: 700; color: var(--color-midnight-navy); }
+    .hk-vac-cell__lock {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10.5px; font-weight: 700; color: #fff; background: var(--color-slate-blue);
+      padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+    }
+    .hk-vac-cell__bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+    .hk-vac-cell__status { font-size: 12px; font-weight: 700; color: var(--color-success); white-space: nowrap; }
+    .hk-vac-cell__status--off { color: var(--color-danger); }
+    .hk-vac-cell--locked .hk-vac-cell__status { color: var(--text-muted); font-weight: 600; }
+    .hk-vac-cell--locked.hk-vac-cell--off .hk-vac-cell__status { color: #b86a6a; }
+    .hk-vac-cell__locked-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; height: 20px; color: var(--color-slate-blue); opacity: 0.85;
+    }
+  </style>
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/admin-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+    const kstNow = HKUI.nowKst();
+    let year = kstNow.getFullYear();
+    let month = kstNow.getMonth() + 1;
+    let weeks = [];
+    let offMap = {};
+    let dayMeta = {};
+    let summary = { vacationDays: 0, editableDays: 0, lockedDays: 0 };
+
+    function monthLabel(y, m) {
+      return `${y}년 ${m}월`;
+    }
+
+    function renderBanner() {
+      const el = document.getElementById("banner");
+      if (summary.lockedDays > 0 && summary.editableDays > 0) {
+        el.innerHTML = HKUI.alertBox(
+          "info",
+          `${monthLabel(year, month)} 휴가 일정`,
+          "휴가로 지정한 날짜는 회원 예약 화면에서 <b>예약 불가</b>로 표시됩니다. <b>이번 주 및 과거 주차</b>와 예약이 오픈된 주차는 수정할 수 없어요."
+        );
+      } else if (summary.editableDays === 0 && summary.lockedDays > 0) {
+        el.innerHTML = HKUI.alertBox(
+          "danger",
+          "수정 가능한 일정이 없습니다",
+          "이번 주·과거 주차와 예약이 오픈된 주차는 휴가를 변경할 수 없습니다. 아직 오픈되지 않은 미래 주차를 선택해 주세요."
+        );
+      } else {
+        el.innerHTML = HKUI.alertBox(
+          "info",
+          `${monthLabel(year, month)} 휴가 일정`,
+          "휴가로 지정한 날짜는 회원 예약 화면에서 <b>예약 불가</b>로 표시됩니다. <b>이번 주 및 과거</b>는 수정할 수 없고, 다음 주 이후 미오픈 일정만 등록할 수 있어요."
+        );
+      }
+    }
+
+    function updateSummary() {
+      const vac = Object.keys(offMap).filter((d) => dayMeta[d]?.inMonth && dayMeta[d]?.isServiceDay).length;
+      document.getElementById("summary").textContent =
+        `휴가 ${vac}일 · 수정 가능 ${summary.editableDays}일 · 잠김 ${summary.lockedDays}일`;
+    }
+
+    function renderLegend() {
+      const el = document.getElementById("vac-legend");
+      if (!el) return;
+      el.innerHTML = `
+        <div class="hk-vac-legend">
+          <span class="hk-vac-legend__item"><span class="hk-vac-legend__swatch hk-vac-legend__swatch--edit"></span>수정 가능</span>
+          <span class="hk-vac-legend__item"><span class="hk-vac-legend__swatch hk-vac-legend__swatch--lock"></span>잠김 · 수정 불가</span>
+          <span class="hk-vac-legend__item"><span class="hk-vac-legend__swatch" style="background:var(--color-danger-soft);border-color:var(--color-danger)"></span>휴가</span>
+        </div>`;
+    }
+
+    function renderCalendar() {
+      const grid = document.getElementById("day-grid");
+      const head = DOW.map((d) => `<div class="hk-vac-head">${d}</div>`).join("");
+
+      const cells = weeks.flatMap((row) =>
+        row.map((cell) => {
+          const d = new Date(cell.date + "T12:00:00");
+          const label = d.getDate();
+          if (!cell.inMonth) {
+            return `<div class="hk-vac-cell--empty"></div>`;
+          }
+          if (!cell.isServiceDay) {
+            return `<div class="hk-vac-cell--weekend"><div class="hk-vac-cell__date">${label}</div></div>`;
+          }
+          const isOff = !!offMap[cell.date];
+          const lk = cell.locked;
+          return `<div class="hk-vac-cell${isOff ? " hk-vac-cell--off" : ""}${lk ? " hk-vac-cell--locked" : ""}">
+            <div class="hk-vac-cell__top">
+              <span class="hk-vac-cell__date">${label} <b>${DOW[d.getDay()]}</b></span>
+              ${lk ? `<span class="hk-vac-cell__lock">${HKUI.icon("lock", 11, "#fff")} 잠김</span>` : ""}
+            </div>
+            <div class="hk-vac-cell__bottom">
+              <span class="hk-vac-cell__status${isOff ? " hk-vac-cell__status--off" : ""}">${isOff ? "휴가" : "운영"}</span>
+              ${lk
+                ? `<span class="hk-vac-cell__locked-icon" title="수정 불가">${HKUI.icon("lock", 15, "var(--color-slate-blue)")}</span>`
+                : `<label class="hk-switch"><input type="checkbox" data-date="${cell.date}" ${isOff ? "checked" : ""}><span class="hk-switch__track"><span class="hk-switch__thumb"></span></span></label>`}
+            </div>
+          </div>`;
+        })
+      ).join("");
+
+      grid.innerHTML = `<div class="hk-vac-grid">${head}${cells}</div>`;
+
+      grid.querySelectorAll("input[data-date]").forEach((inp) => {
+        inp.onchange = () => {
+          const meta = dayMeta[inp.dataset.date];
+          if (meta?.locked) {
+            HKUI.confirmDialog("등록할 수 없습니다", "이번 주·과거 주차와 예약이 오픈된 주차는 휴가를 수정할 수 없습니다.", { confirmLabel: "확인", hideCancel: true });
+            inp.checked = !inp.checked;
+            return;
+          }
+          if (inp.checked) offMap[inp.dataset.date] = true;
+          else delete offMap[inp.dataset.date];
+          renderCalendar();
+          updateSummary();
+        };
+      });
+      HKUI.refreshIcons();
+    }
+
+    async function loadMonth(y, m) {
+      const data = await HKApi.vacationMonth(y, m);
+      year = data.year;
+      month = data.month;
+      weeks = data.weeks || [];
+      summary = data.summary || { vacationDays: 0, editableDays: 0, lockedDays: 0 };
+      offMap = {};
+      dayMeta = {};
+      for (const row of weeks) {
+        for (const cell of row) {
+          dayMeta[cell.date] = cell;
+          if (cell.isVacation) offMap[cell.date] = true;
+        }
+      }
+      document.getElementById("month-label").textContent = monthLabel(year, month);
+      document.getElementById("save-btn").disabled = summary.editableDays === 0;
+      document.getElementById("reset-btn").disabled = summary.editableDays === 0;
+      renderBanner();
+      renderLegend();
+      renderCalendar();
+      updateSummary();
+    }
+
+    HKAdmin.mountPage({
+      active: "vacation",
+      render() {
+        return `${HKAdmin.pageHead("휴가 관리", "월별로 안마사 휴가를 지정하세요. 이번 주·과거 및 오픈된 주차는 수정할 수 없습니다.")}
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" id="prev-month">${HKUI.icon("chevron-left", 18, "var(--color-midnight-navy)")}</button>
+              <span id="month-label" style="font-size:18px;font-weight:700;color:var(--color-midnight-navy);min-width:96px;text-align:center"></span>
+              <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" id="next-month">${HKUI.icon("chevron-right", 18, "var(--color-midnight-navy)")}</button>
+            </div>
+          </div>
+          <div id="banner"></div>
+          <div id="vac-legend"></div>
+          <div id="day-grid"></div>
+          <div style="margin-top:18px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button type="button" class="hk-btn hk-btn--primary" id="save-btn">휴가 저장</button>
+            <button type="button" class="hk-btn hk-btn--secondary" id="reset-btn">변경 취소</button>
+            <div style="flex:1"></div>
+            <span id="summary" style="font-size:13px;color:var(--text-secondary)"></span>
+          </div>`;
+      },
+      afterMount: async () => {
+        document.getElementById("prev-month").onclick = () => {
+          let m = month - 1;
+          let y = year;
+          if (m < 1) { m = 12; y -= 1; }
+          loadMonth(y, m).catch((e) => HKUI.toast(e.message, "danger"));
+        };
+        document.getElementById("next-month").onclick = () => {
+          let m = month + 1;
+          let y = year;
+          if (m > 12) { m = 1; y += 1; }
+          loadMonth(y, m).catch((e) => HKUI.toast(e.message, "danger"));
+        };
+        document.getElementById("save-btn").onclick = async () => {
+          const dates = Object.keys(offMap).filter((d) => dayMeta[d]?.isServiceDay && dayMeta[d]?.inMonth);
+          const vacCount = dates.length;
+          const ok = await HKUI.confirmDialog(
+            "휴가 일정을 저장할까요?",
+            `${monthLabel(year, month)} 기준 <b>휴가 ${vacCount}일</b>로 저장합니다.<br>잠긴 주차(이번 주·과거·오픈됨)는 변경되지 않습니다.`,
+            { confirmLabel: "저장하기" }
+          );
+          if (!ok) return;
+          try {
+            await HKApi.saveVacationMonth(year, month, dates);
+            await loadMonth(year, month);
+            await HKUI.confirmDialog(
+              "저장되었습니다",
+              "휴가 일정이 저장되었습니다.",
+              { confirmLabel: "확인", hideCancel: true }
+            );
+          } catch (e) {
+            await HKUI.confirmDialog(
+              "저장할 수 없습니다",
+              HKUI.escapeHtml(e.message),
+              { confirmLabel: "확인", hideCancel: true }
+            );
+          }
+        };
+        document.getElementById("reset-btn").onclick = () => {
+          loadMonth(year, month).catch((e) => HKUI.toast(e.message, "danger"));
+        };
+        try {
+          await loadMonth(year, month);
+        } catch (e) {
+          document.getElementById("day-grid").innerHTML = `<div class="hk-card hk-card--pad">${HKUI.escapeHtml(e.message)}</div>`;
+        }
+      },
+    });
+  </script>
+</body>
+</html>
