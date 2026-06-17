@@ -77,7 +77,7 @@ async def confirm_reservation(
             cycle_id=reservation.cycle_id,
             context={
                 "name": member.name,
-                "slotDate": slot.slot_date.isoformat(),
+                "slotDate": slot.slot_date,
                 "slotTime": f"{slot.start_time.strftime('%H:%M')} – {slot.end_time.strftime('%H:%M')}",
             },
             dedupe_key=f"done:{prefix}:{reservation.id}",

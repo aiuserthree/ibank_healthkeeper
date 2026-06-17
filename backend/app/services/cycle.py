@@ -57,6 +57,38 @@ def week_friday(monday: date) -> date:
     return monday + timedelta(days=4)
 
 
+def compute_cycle_state(cycle: ReservationCycle, now: datetime | None = None) -> CycleState:
+    """open_at/close_at 등 시각 기준 런타임 상태 (DB cycle.state 와 다를 수 있음)."""
+    now = now or now_kst()
+    if now < to_kst(cycle.open_at):
+        return CycleState.BEFORE_OPEN
+    if now < to_kst(cycle.close_at):
+        return CycleState.OPEN
+    if now < to_kst(cycle.reapply_open_at):
+        return CycleState.CLOSED
+    if now < to_kst(cycle.reapply_close_at):
+        return CycleState.REAPPLY
+    return CycleState.CLOSED
+
+
+async def sync_cycle_state_if_due(db: AsyncSession, cycle: ReservationCycle) -> CycleState:
+    """스케줄러 미실행 등으로 DB state 가 뒤처진 경우 보정."""
+    computed = compute_cycle_state(cycle)
+    now = now_kst()
+    if computed == CycleState.OPEN and cycle.state == CycleState.BEFORE_OPEN:
+        await apply_vacations_to_slots(db, cycle.id)
+        cycle.state = CycleState.OPEN
+        cycle.opened_at = cycle.opened_at or now
+        await db.commit()
+    elif computed != cycle.state and computed in (
+        CycleState.CLOSED,
+        CycleState.REAPPLY,
+    ):
+        cycle.state = computed
+        await db.commit()
+    return computed
+
+
 async def get_active_cycle(db: AsyncSession) -> Optional[ReservationCycle]:
     now = now_kst()
     result = await db.execute(
@@ -88,19 +120,8 @@ async def get_admin_view_cycle(db: AsyncSession) -> Optional[ReservationCycle]:
 
 async def resolve_system_state(db: AsyncSession) -> tuple[CycleState, Optional[ReservationCycle]]:
     cycle = await get_active_cycle(db)
-    now = now_kst()
-    if cycle:
-        if now < to_kst(cycle.open_at):
-            return CycleState.BEFORE_OPEN, cycle
-        if now < to_kst(cycle.close_at):
-            return CycleState.OPEN, cycle
-        if now < to_kst(cycle.reapply_open_at):
-            return CycleState.CLOSED, cycle
-        if now < to_kst(cycle.reapply_close_at):
-            return CycleState.REAPPLY, cycle
-        return CycleState.CLOSED, cycle
-
-    cycle = await get_vacation_cycle(db)
+    if not cycle:
+        cycle = await get_vacation_cycle(db)
     if not cycle:
         result = await db.execute(
             select(ReservationCycle)
@@ -110,15 +131,8 @@ async def resolve_system_state(db: AsyncSession) -> tuple[CycleState, Optional[R
         cycle = result.scalar_one_or_none()
     if not cycle:
         return CycleState.BEFORE_OPEN, None
-    if now < to_kst(cycle.open_at):
-        return CycleState.BEFORE_OPEN, cycle
-    if now < to_kst(cycle.close_at):
-        return CycleState.OPEN, cycle
-    if now < to_kst(cycle.reapply_open_at):
-        return CycleState.CLOSED, cycle
-    if now < to_kst(cycle.reapply_close_at):
-        return CycleState.REAPPLY, cycle
-    return CycleState.CLOSED, cycle
+    state = await sync_cycle_state_if_due(db, cycle)
+    return state, cycle
 
 
 def week_dates(monday: date) -> list[str]:

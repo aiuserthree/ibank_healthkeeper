@@ -32,7 +32,7 @@
     }
 
     function headRight(d) {
-      const state = d.cycleState || d.state;
+      const state = d.state || d.cycleState;
       return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         ${HKUI.badge(STATE_LABEL[state] || state || "-", "info", true)}
         <a href="${HKAdminRoutes.reapplyMail}"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm">${HKUI.icon("mail", 16, "var(--color-midnight-navy)")} 탈락자 안내 메일</button></a>
@@ -41,10 +41,11 @@
 
     function topAlert(d) {
       const r = d.reservations || {};
-      if ((r.requested || 0) > 0 && d.cycleState !== "BEFORE_OPEN") {
+      const state = d.state || d.cycleState;
+      if ((r.requested || 0) > 0 && state !== "BEFORE_OPEN") {
         return `<div style="margin-bottom:20px">${HKUI.alertBox("warning", "확정 대기 중인 신청이 있습니다", "마감(수요일 17:00) 전까지 우선권을 확인하고 예약을 확정해 주세요. 이력 없는 신청자는 수동 확정이 필요합니다.")}</div>`;
       }
-      if (d.cycleState === "BEFORE_OPEN" && d.weekStart && d.weekEnd) {
+      if (state === "BEFORE_OPEN" && d.weekStart && d.weekEnd) {
         const openText = d.openAt ? HKUI.formatDateTimeKst(d.openAt) : "수요일 09:00";
         return `<div style="margin-bottom:20px">${HKUI.alertBox("info", `차주 일정 · ${HKUI.formatDate(d.weekStart)} – ${HKUI.formatDate(d.weekEnd)}`, `수요일 09:00 오픈 예정입니다. (${openText})`)}</div>`;
       }
@@ -223,6 +224,17 @@
       return n;
     }
 
+    function pendingCountByDate(iso) {
+      let n = 0;
+      for (const slot of allSlots) {
+        if (slot.slotDate !== iso) continue;
+        for (const a of slot.applicants || []) {
+          if (a.status === "REQUESTED") n++;
+        }
+      }
+      return n;
+    }
+
     function dateHeading(d) {
       const dt = new Date(d + "T12:00:00");
       const dow = ["일", "월", "화", "수", "목", "금", "토"][dt.getDay()];
@@ -303,7 +315,9 @@
         .map((d) => {
           const off = vacationDates.has(d);
           const active = d === selectedDate;
-          return HKAdmin.datePill(datePillLabel(d, off), active, off && filter === "all", `data-date="${d}"`);
+          const pending = pendingCountByDate(d);
+          const label = datePillLabel(d, off) + (pending ? ` (${pending})` : "");
+          return HKAdmin.datePill(label, active, off && filter === "all", `data-date="${d}"`);
         })
         .join("");
       document.getElementById("date-tabs").querySelectorAll("[data-date]").forEach((btn) => {

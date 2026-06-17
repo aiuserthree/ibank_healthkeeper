@@ -28,6 +28,7 @@ from app.models import (
 from app.services.confirm import get_slot_detail
 from app.services.cycle import (
     apply_vacations_to_slots,
+    compute_cycle_state,
     create_cycle_for_week,
     get_active_cycle,
     get_admin_view_cycle,
@@ -191,7 +192,7 @@ async def _pending_confirmation_slots(db: AsyncSession, cycle_id: int) -> list[d
     pending: list[dict] = []
     for slot in slots.scalars().all():
         applicants = await rank_applicants(db, slot.id, requested_only=True)
-        if len(applicants) < 2:
+        if not applicants:
             continue
         pending.append(
             {
@@ -199,6 +200,7 @@ async def _pending_confirmation_slots(db: AsyncSession, cycle_id: int) -> list[d
                 "label": _slot_label(slot),
                 "count": len(applicants),
                 "noHistory": await needs_manual(db, slot.id),
+                "applicants": applicants,
             }
         )
     return pending
@@ -307,7 +309,7 @@ async def dashboard(db: AsyncSession) -> dict:
         payload["weekEnd"] = view_cycle.target_week_end.isoformat()
         payload["weekLabel"] = _week_label(view_cycle.target_week_start, view_cycle.target_week_end)
         payload["openAt"] = format_kst_iso(view_cycle.open_at)
-        payload["cycleState"] = view_cycle.state.value
+        payload["cycleState"] = compute_cycle_state(view_cycle).value
         payload["pendingSlots"] = await _pending_confirmation_slots(db, view_cycle.id)
 
     if vacation_cycle:
@@ -637,6 +639,15 @@ async def send_reapply_notice(
 
     empty = await get_empty_slots(db, cycle_id)
     empty_text = ", ".join(_slot_chip_label(s.slot_date, s.start_time) for s in empty)
+    chip_style = (
+        "display:inline-block;margin:0 6px 6px 0;padding:6px 12px;"
+        "background:#ffffff;border:1px solid #d4e0ed;border-radius:999px;"
+        "font-size:13px;color:#0b3558;"
+    )
+    empty_html = "".join(
+        f'<span style="{chip_style}">{_slot_chip_label(s.slot_date, s.start_time)}</span>'
+        for s in empty
+    ) or f'<span style="{chip_style}">없음</span>'
     reapply_open = _reapply_open_label(cycle.reapply_open_at)
     deadline = _reapply_deadline_label(cycle.reapply_close_at)
 
@@ -660,6 +671,7 @@ async def send_reapply_notice(
             context={
                 "name": member.name,
                 "emptySlots": empty_text or "없음",
+                "emptySlotsHtml": empty_html,
                 "reapplyOpenAt": reapply_open,
                 "reapplyDeadline": deadline,
             },

@@ -44,24 +44,28 @@ async def job_precreate_cycle(db: AsyncSession) -> None:
 
 
 async def job_open_cycle(db: AsyncSession) -> None:
+    """수 09:00 — 오픈 시각이 지난 BEFORE_OPEN 사이클을 OPEN으로 전환 (재기동 catch-up 포함)."""
     monday = week_monday(now_kst().date() + timedelta(days=7))
     existing = await db.execute(
         select(ReservationCycle).where(ReservationCycle.target_week_start == monday)
     )
-    cycle = existing.scalar_one_or_none()
-    if not cycle:
-        cycle = await create_cycle_for_week(db, monday, CycleState.BEFORE_OPEN)
+    if not existing.scalar_one_or_none():
+        await create_cycle_for_week(db, monday, CycleState.BEFORE_OPEN)
 
-    if cycle.state == CycleState.OPEN and cycle.opened_at:
-        return
-
-    if now_kst() < to_kst(cycle.open_at):
-        return
-
-    await apply_vacations_to_slots(db, cycle.id)
-    cycle.state = CycleState.OPEN
-    cycle.opened_at = now_kst()
-    await db.commit()
+    now = now_kst()
+    result = await db.execute(
+        select(ReservationCycle).where(ReservationCycle.state == CycleState.BEFORE_OPEN)
+    )
+    changed = False
+    for cycle in result.scalars().all():
+        if now < to_kst(cycle.open_at):
+            continue
+        await apply_vacations_to_slots(db, cycle.id)
+        cycle.state = CycleState.OPEN
+        cycle.opened_at = cycle.opened_at or now
+        changed = True
+    if changed:
+        await db.commit()
 
 
 async def job_close_batch(db: AsyncSession) -> None:

@@ -217,7 +217,7 @@ async def reapply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reserv
         cycle_id=cycle.id,
         context={
             "name": member.name,
-            "slotDate": slot.slot_date.isoformat(),
+            "slotDate": slot.slot_date,
             "slotTime": f"{slot.start_time.strftime('%H:%M')} – {slot.end_time.strftime('%H:%M')}",
         },
         dedupe_key=f"done:r:{reservation.id}",

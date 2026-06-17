@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from: str = "noreply@healthkeeper.local"
+    smtp_from_name: str = "헬스키퍼"
     smtp_use_tls: bool = True
 
     mail_retry_max: int = 3
@@ -59,6 +60,10 @@ class Settings(BaseSettings):
     entra_redirect_uri: str = "http://localhost:5173/api/auth/sso/callback"
     sso_allowed_domain: str = ""
     sso_success_path: str = "/reserve"
+
+    def allowed_email_domains(self) -> list[str]:
+        """SSO_ALLOWED_DOMAIN — 쉼표 구분 (예: ibank.co.kr,digitalworks.co.kr)."""
+        return [d.strip().lower() for d in self.sso_allowed_domain.split(",") if d.strip()]
 
     @property
     def cookie_secure(self) -> bool:

@@ -219,6 +219,7 @@ async def sso_status():
             "appBaseUrl": settings.app_base_url,
             "redirectUri": settings.entra_redirect_uri,
             "allowedDomain": settings.sso_allowed_domain or None,
+            "allowedDomains": settings.allowed_email_domains() or None,
             "loginUrl": f"{settings.app_base_url}/api/auth/sso/login",
         }
     }

@@ -83,6 +83,11 @@ async def lifespan(app: FastAPI):
         logger.info("SSO: mock provider (dev login picker at /api/auth/sso/mock)")
     _schedule_jobs()
     scheduler.start()
+    async with AsyncSessionLocal() as db:
+        try:
+            await sched.job_open_cycle(db)
+        except Exception:
+            logger.exception("Startup open-cycle sync failed")
     yield
     scheduler.shutdown(wait=False)
     await close_redis()

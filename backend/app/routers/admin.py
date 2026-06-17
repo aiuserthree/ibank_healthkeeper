@@ -194,6 +194,30 @@ async def update_settings_api(
     return {"data": await admin_service.update_settings(db, body.settings)}
 
 
+@router.get("/mail-templates/{mail_type}")
+async def get_mail_template(
+    mail_type: MailType,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.mail import DEFAULT_SUBJECTS, get_template, load_design_html, _is_html_template
+
+    tpl = await get_template(db, mail_type)
+    subject = (tpl.subject_template if tpl else "") or DEFAULT_SUBJECTS.get(mail_type, "")
+    body = (tpl.body_template if tpl else "") or ""
+    if not _is_html_template(body):
+        design = load_design_html(mail_type)
+        if design:
+            body = design
+    return {
+        "data": {
+            "type": mail_type.value,
+            "subjectTemplate": subject,
+            "bodyTemplate": body,
+        }
+    }
+
+
 @router.put("/mail-templates/{mail_type}")
 async def update_mail_template(
     mail_type: MailType,
@@ -206,8 +230,10 @@ async def update_mail_template(
     if not tpl:
         tpl = MailTemplate(type=mail_type, subject_template="", body_template="")
         db.add(tpl)
-    tpl.subject_template = body.get("subjectTemplate", tpl.subject_template)
-    tpl.body_template = body.get("bodyTemplate", tpl.body_template)
+    tpl.subject_template = (
+        body.get("subjectTemplate") or body.get("subject") or tpl.subject_template
+    )
+    tpl.body_template = body.get("bodyTemplate") or body.get("body") or tpl.body_template
     await db.commit()
     return {"data": {"type": mail_type.value}}
 

@@ -258,11 +258,44 @@ async def pop_sso_code(redis: Redis, code: str) -> SSOClaims | None:
 
 def validate_allowed_domain(email: str) -> None:
     settings = get_settings()
-    domain = settings.sso_allowed_domain.strip().lower()
-    if not domain:
+    domains = settings.allowed_email_domains()
+    if not domains:
         return
-    if not email.lower().endswith(f"@{domain}"):
+    addr = email.strip().lower()
+    if not any(addr.endswith(f"@{domain}") for domain in domains):
         raise_app_error("FORBIDDEN", 403)
+
+
+def _matches_allowed(email: str, domains: list[str]) -> bool:
+    addr = email.strip().lower()
+    return any(addr.endswith(f"@{domain}") for domain in domains)
+
+
+def resolve_sso_email(
+    *,
+    preferred_username: str = "",
+    id_email: str = "",
+    upn: str = "",
+    graph_mail: str | None = None,
+    graph_upn: str | None = None,
+) -> str:
+    """마이페이지·SSO 계정 이메일 — Entra 로그인 UPN(preferred_username) 우선. Graph mail은 사용하지 않음."""
+    del graph_mail, graph_upn  # Graph mail(@ibank.co.kr)은 프로필 표시에 쓰지 않음
+    settings = get_settings()
+    allowed = settings.allowed_email_domains()
+    candidates = [
+        preferred_username.strip(),
+        upn.strip(),
+        id_email.strip(),
+    ]
+    if allowed:
+        for candidate in candidates:
+            if candidate and _matches_allowed(candidate, allowed):
+                return candidate.lower()
+    for candidate in candidates:
+        if candidate:
+            return candidate.lower()
+    return ""
 
 
 def sso_config_error_message() -> str | None:
@@ -369,16 +402,15 @@ class EntraSSOProvider(SSOProvider):
             raise SSOAuthError("Microsoft ID 토큰 검증에 실패했습니다.", detail=str(exc)) from exc
 
         oid = claims.get("oid") or claims.get("sub")
-        email = (
-            claims.get("preferred_username")
-            or claims.get("email")
-            or claims.get("upn")
-            or ""
-        )
-        name = claims.get("name") or (email.split("@")[0] if email else "")
+        id_preferred = claims.get("preferred_username") or ""
+        id_email = claims.get("email") or ""
+        id_upn = claims.get("upn") or ""
+        name = claims.get("name") or ""
 
         department: str | None = None
         position: str | None = None
+        graph_mail: str | None = None
+        graph_upn: str | None = None
         if access_token:
             try:
                 async with _microsoft_http_client() as client:
@@ -390,7 +422,8 @@ class EntraSSOProvider(SSOProvider):
                     )
                     if me and me.status_code == 200:
                         profile = me.json()
-                        email = email or profile.get("mail") or profile.get("userPrincipalName") or ""
+                        graph_mail = profile.get("mail") or None
+                        graph_upn = profile.get("userPrincipalName") or None
                         name = name or profile.get("displayName") or name
                         department = profile.get("department") or None
                         position = profile.get("jobTitle") or None
@@ -400,6 +433,16 @@ class EntraSSOProvider(SSOProvider):
                         )
             except Exception:
                 logger.exception("Microsoft Graph /me lookup failed")
+
+        email = resolve_sso_email(
+            preferred_username=id_preferred,
+            id_email=id_email,
+            upn=id_upn,
+            graph_mail=graph_mail,
+            graph_upn=graph_upn,
+        )
+        if not name and email:
+            name = email.split("@")[0]
 
         if not oid or not email:
             logger.error("Entra claims missing oid/email: %s", {k: claims.get(k) for k in ("oid", "sub", "email", "preferred_username")})

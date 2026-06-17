@@ -24,11 +24,7 @@
           <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">회원 정보를 확인하세요.</p>
           ${HKUI.subNav("profile")}
           <div class="hk-card hk-card--pad" id="profile-card"></div>
-          <div class="hk-card hk-card--pad hk-card--flat" style="margin-top:16px;background:var(--color-mist)" id="usage-card"></div>
-          <div style="margin-top:28px">
-            ${HKUI.alertBox("warning", "회원 탈퇴", "진행 중인 예약 신청이 있으면 탈퇴 시 모두 취소됩니다. 탈퇴 후에는 이용 이력이 삭제되어 복구할 수 없습니다.")}
-            <div style="margin-top:12px"><button type="button" class="hk-btn hk-btn--danger" id="withdraw-btn">회원 탈퇴</button></div>
-          </div>`;
+          <div class="hk-card hk-card--pad hk-card--flat" style="margin-top:16px;background:var(--color-mist)" id="usage-card"></div>`;
       },
       afterMount: async (profile) => {
         const pos = profile.position || profile.jobTitle || "";
@@ -56,18 +52,6 @@
           ${HKUI.kv("마지막 이용일", profile.lastUsedDate ? profile.lastUsedDate.replace(/-/g, ".") : "-")}
           ${HKUI.kv("누적 이용", profile.totalUses != null ? `${profile.totalUses}회` : "-")}
         </div>`;
-        document.getElementById("withdraw-btn").onclick = async () => {
-          const ok = await HKUI.confirmDialog("정말 탈퇴하시겠어요?", "탈퇴하면 진행 중인 신청이 취소되고 계정 정보가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.", { confirmLabel: "탈퇴하기", confirmVariant: "danger" });
-          if (!ok) return;
-          try {
-            await HKApi.withdraw();
-            await HKApi.logout();
-            HKUI.toast("탈퇴 요청이 접수되었습니다");
-            window.location.href = HKRoutes.home;
-          } catch (e) {
-            HKUI.toast(e.message, "danger");
-          }
-        };
         HKUI.refreshIcons();
       },
     });

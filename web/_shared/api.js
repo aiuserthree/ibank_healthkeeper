@@ -75,6 +75,7 @@ window.HKApi = (function () {
     settings: () => request("/admin/settings"),
     updateSettings: (settings) =>
       request("/admin/settings", { method: "PUT", body: JSON.stringify({ settings }) }),
+    mailTemplate: (type) => request(`/admin/mail-templates/${type}`),
     updateMailTemplate: (type, tpl) =>
       request(`/admin/mail-templates/${type}`, { method: "PUT", body: JSON.stringify(tpl) }),
   };

@@ -22,17 +22,29 @@
     };
 
     function stateBadge(d) {
-      const st = d.cycleState || d.state;
+      const st = d.state || d.cycleState;
       const label = STATE_LABEL[st] || st || "-";
       return HKUI.badge(`현재 상태 · ${label}`, "info", true);
     }
 
     function pendingItem(p) {
+      const applicants = (p.applicants || []).slice().sort((a, b) => (a.priority_rank || 99) - (b.priority_rank || 99));
+      const top = applicants[0];
+      const applicantHtml = top
+        ? `<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
+            ${HKUI.avatar(top.member_name, "sm")}
+            <div style="min-width:0">
+              <div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(top.member_name)}</div>
+              <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(top.member_email || "")}${top.no_history ? " · 이력 없음" : ""}</div>
+            </div>
+          </div>`
+        : "";
       return `<div class="hk-dash-pending-item">
         ${HKUI.icon("clock", 18, "var(--color-slate-blue)")}
         <span style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(p.label || p.slotLabel || "-")}</span>
         ${p.count > 1 ? HKUI.badge(`중복 ${p.count}명`, "warning") : ""}
         ${p.noHistory ? HKUI.badge("이력 없음 · 수동", "danger") : ""}
+        ${applicantHtml}
       </div>`;
     }
 

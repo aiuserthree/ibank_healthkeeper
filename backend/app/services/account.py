@@ -61,6 +61,8 @@ async def upsert_member_from_sso(
     if member:
         member.entra_oid = oid
         member.name = name.strip()
+        if email and member.email != email:
+            member.email = email
         member.status = MemberStatus.ACTIVE
         member.login_fail_count = 0
         member.locked_until = None

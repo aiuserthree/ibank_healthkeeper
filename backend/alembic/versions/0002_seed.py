@@ -46,17 +46,17 @@ TEMPLATES = [
     ),
     (
         "RESERVE_DONE_NORMAL",
-        "헬스키퍼 예약 확정 안내",
+        "[헬스키퍼] 예약이 확정되었습니다",
         "{name}님, 예약이 확정되었습니다.\n\n일시: {slotDate} {slotTime}\n\n이용해 주셔서 감사합니다.",
     ),
     (
         "RESERVE_DONE_REAPPLY",
-        "헬스키퍼 재신청 예약 확정",
+        "[헬스키퍼] 재신청 예약이 확정되었습니다",
         "{name}님, 재신청 예약이 확정되었습니다.\n\n일시: {slotDate} {slotTime}\n\n재신청 건은 취소할 수 없습니다.",
     ),
     (
         "DROP_REAPPLY_NOTICE",
-        "헬스키퍼 재신청 안내",
+        "[헬스키퍼] 탈락 안내 및 재신청 가능 슬롯 안내",
         "{name}님, 우선권 경합으로 이번 신청이 탈락되었습니다.\n\n빈 슬롯: {emptySlots}\n재신청 시작: {reapplyOpenAt}부터 선착순·즉시 확정\n재신청 마감: {reapplyDeadline}\n· 재신청 건은 취소할 수 없습니다.",
     ),
 ]
