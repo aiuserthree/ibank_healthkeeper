@@ -40,7 +40,8 @@ window.HKApi = (function () {
     cancelReservation: (id) => request(`/reservation/${id}/cancel`, { method: "POST" }),
     reapplySlots: () => request("/reservation/reapply/slots"),
     reapplySlot: (slotId) => request(`/reservation/reapply/slots/${slotId}`, { method: "POST" }),
-    myReservations: () => request("/me/reservations"),
+    myReservations: (page = 1, pageSize = 10) =>
+      request(`/me/reservations?page=${page}&pageSize=${pageSize}`),
 
     adminLogin: (loginId, password, rememberMe = false) =>
       request("/admin/login", {

@@ -23,11 +23,11 @@ if [[ -z "$TO" ]]; then
 fi
 
 if [[ -z "${SMTP_PASSWORD:-}" ]]; then
-  echo "SMTP_PASSWORD is empty — set Microsoft 365 app password in .env first."
+  echo "SMTP_PASSWORD is empty — set Microsoft 365 SMTP password in .env first."
   exit 1
 fi
 
-.venv/bin/python - <<'PY'
+.venv/bin/python - "$TO" <<'PY'
 import asyncio
 import os
 import sys
@@ -51,4 +51,3 @@ async def main():
 
 asyncio.run(main())
 PY
-"$TO"

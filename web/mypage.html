@@ -14,6 +14,8 @@
 <body>
   <div id="app"></div>
   <script>
+    const PAGE_SIZE = 10;
+
     HKMember.mountPage({
       active: "mypage",
       auth: true,
@@ -25,7 +27,8 @@
           ${HKUI.subNav("res")}
           <div class="hk-card hk-card--pad hk-card--flat" style="margin-bottom:20px;background:var(--color-mist)" id="stats"></div>
           <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b>")}</div>
-          <div id="list"></div>`;
+          <div id="list"></div>
+          <div id="pager"></div>`;
       },
       afterMount: async (profile) => {
         const statsEl = document.getElementById("stats");
@@ -33,26 +36,22 @@
         statsEl.innerHTML = `<div style="display:flex;gap:48px;flex-wrap:wrap">
           ${HKUI.kv("마지막 이용일", lastUsed)}
           ${HKUI.kv("우선권", HKUI.badge(profile.lastUsedDate ? "보유 O" : "이력 없음 · 최우선", "info"))}
-          <div id="week-count"></div>
+          <div id="total-count">${HKUI.kv("누적 신청", "…")}</div>
         </div>`;
-        const el = document.getElementById("list");
+
+        const listEl = document.getElementById("list");
+        const pagerEl = document.getElementById("pager");
+        let currentPage = 1;
+        let reapplyAvailable = false;
+        let listMeta = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0 };
+
         try {
-          const data = await HKApi.myReservations();
-          const items = data.items || [];
-          const weekCount = items.filter((r) => r.status !== "CANCELLED").length;
-          document.getElementById("week-count").outerHTML = HKUI.kv("이번 주 신청", `${weekCount}건`);
-          if (!items.length) {
-            el.innerHTML = `<div class="hk-card hk-card--pad">${HKUI.emptyState({
-              iconName: "calendar-x",
-              title: "신청 내역이 없습니다",
-              desc: "예약하기에서 차주 안마서비스를 신청해 보세요.",
-              actionHtml: `<a href="${HKRoutes.reserve}"><button type="button" class="hk-btn hk-btn--primary">예약하러 가기</button></a>`,
-            })}</div>`;
-            HKUI.refreshIcons();
-            return;
-          }
-          el.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${items.map((r) => HKUI.reservationCard(r)).join("")}</div>`;
-          el.querySelectorAll("[data-cancel]").forEach((btn) => {
+          const sys = await HKApi.systemState();
+          reapplyAvailable = sys.state === "REAPPLY";
+        } catch (_) {}
+
+        function bindCancelButtons(items) {
+          listEl.querySelectorAll("[data-cancel]").forEach((btn) => {
             btn.onclick = async () => {
               const r = items.find((x) => x.id === Number(btn.dataset.cancel));
               const d = new Date(r.slotDate + "T12:00:00");
@@ -63,16 +62,55 @@
               try {
                 await HKApi.cancelReservation(Number(btn.dataset.cancel));
                 HKUI.toast("신청이 취소되었습니다 · 우선권에는 영향이 없습니다");
-                location.reload();
+                await loadPage(currentPage);
               } catch (e) {
                 HKUI.toast(e.message, "danger");
               }
             };
           });
-          HKUI.refreshIcons();
-        } catch (e) {
-          el.innerHTML = `<div class="hk-card hk-card--pad"><div class="hk-empty">${HKUI.escapeHtml(e.message)}</div></div>`;
         }
+
+        async function loadPage(page) {
+          currentPage = page;
+          listEl.innerHTML = `<div class="hk-card hk-card--pad" style="text-align:center;padding:32px"><span class="hk-spin"></span></div>`;
+          pagerEl.innerHTML = "";
+          try {
+            const data = await HKApi.myReservations(page, PAGE_SIZE);
+            const items = data.items || [];
+            listMeta = {
+              page: data.page || page,
+              pageSize: data.pageSize || PAGE_SIZE,
+              total: data.total ?? 0,
+              totalPages: data.totalPages ?? 0,
+            };
+            document.getElementById("total-count").outerHTML = HKUI.kv(
+              "누적 신청",
+              `${data.activeTotal ?? listMeta.total}건`
+            );
+
+            if (!listMeta.total) {
+              listEl.innerHTML = `<div class="hk-card hk-card--pad">${HKUI.emptyState({
+                iconName: "calendar-x",
+                title: "신청 내역이 없습니다",
+                desc: "예약하기에서 차주 안마서비스를 신청해 보세요.",
+                actionHtml: `<a href="${HKRoutes.reserve}"><button type="button" class="hk-btn hk-btn--primary">예약하러 가기</button></a>`,
+              })}</div>`;
+              HKUI.refreshIcons();
+              return;
+            }
+
+            listEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${items.map((r) => HKUI.reservationCard(r, { reapplyAvailable })).join("")}</div>`;
+            pagerEl.innerHTML = HKUI.paginationBar(listMeta);
+            bindCancelButtons(items);
+            HKUI.bindPagination(pagerEl, listMeta, loadPage);
+            HKUI.refreshIcons();
+          } catch (e) {
+            listEl.innerHTML = `<div class="hk-card hk-card--pad"><div class="hk-empty">${HKUI.escapeHtml(e.message)}</div></div>`;
+          }
+        }
+
+        const initialPage = Math.max(1, parseInt(HKUI.queryParam("page") || "1", 10) || 1);
+        await loadPage(initialPage);
       },
     });
   </script>

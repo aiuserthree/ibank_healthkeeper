@@ -214,6 +214,8 @@ async def _mail_breakdown(db: AsyncSession) -> dict:
     stats = {
         "confirmSent": 0,
         "confirmFail": 0,
+        "confirmReapplySent": 0,
+        "confirmReapplyFail": 0,
         "reapplySent": 0,
         "reapplyFail": 0,
         "verifySent": 0,
@@ -222,11 +224,16 @@ async def _mail_breakdown(db: AsyncSession) -> dict:
     for mail_type, status, cnt in rows.all():
         sent = status in (MailStatus.SENT, MailStatus.SENDING)
         failed = status in (MailStatus.FAILED, MailStatus.DEAD)
-        if mail_type in (MailType.RESERVE_DONE_NORMAL, MailType.RESERVE_DONE_REAPPLY):
+        if mail_type == MailType.RESERVE_DONE_NORMAL:
             if sent:
                 stats["confirmSent"] += cnt
             if failed:
                 stats["confirmFail"] += cnt
+        elif mail_type == MailType.RESERVE_DONE_REAPPLY:
+            if sent:
+                stats["confirmReapplySent"] += cnt
+            if failed:
+                stats["confirmReapplyFail"] += cnt
         elif mail_type == MailType.DROP_REAPPLY_NOTICE:
             if sent:
                 stats["reapplySent"] += cnt

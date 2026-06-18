@@ -14,12 +14,23 @@ source .env
 
 echo "[1/3] Starting SSH tunnel (background)..."
 pkill -f "ssh -N -L 15432:127.0.0.1:5432" 2>/dev/null || true
-ssh -f -N \
+if ! ssh -f -N \
   -L 15432:127.0.0.1:5432 \
   -L 16379:127.0.0.1:6379 \
   -L 17687:127.0.0.1:7687 \
   -L 17474:127.0.0.1:7474 \
-  "${REMOTE_USER:-root}@${REMOTE_HOST:-115.68.221.73}"
+  "${REMOTE_USER:-root}@${REMOTE_HOST:-115.68.221.73}"; then
+  echo "ERROR: SSH tunnel failed — Teams 로그인(SSO)에 Redis(16379)가 필요합니다."
+  echo "       서버 SSH 비밀번호를 확인하고 다시 실행하세요."
+  exit 1
+fi
+sleep 1
+if ! nc -z 127.0.0.1 15432 2>/dev/null || ! nc -z 127.0.0.1 16379 2>/dev/null; then
+  echo "ERROR: SSH tunnel ports not open (15432/16379)."
+  echo "       ./scripts/dev-tunnel.sh 를 다른 터미널에서 먼저 실행하거나 dev.sh 를 재시작하세요."
+  exit 1
+fi
+echo "       Tunnel OK (PostgreSQL :15432, Redis :16379)"
 
 echo "[2/3] FastAPI (port ${API_PORT:-8100})..."
 cd backend
@@ -62,6 +73,6 @@ else
   echo "  SSO      : mock — real Teams test: set SSO_PROVIDER=entra in .env (see docs/setup/sso-local.md)"
 fi
 echo ""
-echo "Stop: kill $API_PID $VITE_PID && pkill -f 'ssh -N -L 5432'"
+echo "Stop: kill $API_PID $VITE_PID && pkill -f 'ssh -N -L 15432'"
 
 wait

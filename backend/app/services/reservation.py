@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
@@ -235,12 +235,39 @@ async def reapply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reserv
     return reservation
 
 
-async def list_my_reservations(db: AsyncSession, member: Member) -> list[dict]:
+async def list_my_reservations(
+    db: AsyncSession,
+    member: Member,
+    *,
+    page: int = 1,
+    page_size: int = 10,
+) -> dict:
+    page = max(1, page)
+    page_size = min(max(1, page_size), 50)
+    offset = (page - 1) * page_size
+
+    total_result = await db.execute(
+        select(func.count())
+        .select_from(Reservation)
+        .where(Reservation.member_id == member.id)
+    )
+    total = int(total_result.scalar_one())
+
+    active_result = await db.execute(
+        select(func.count())
+        .select_from(Reservation)
+        .where(Reservation.member_id == member.id)
+        .where(Reservation.status != ReservationStatus.CANCELLED)
+    )
+    active_total = int(active_result.scalar_one())
+
     result = await db.execute(
         select(Reservation, Slot)
         .join(Slot, Slot.id == Reservation.slot_id)
         .where(Reservation.member_id == member.id)
-        .order_by(Slot.slot_date.desc(), Slot.time_index)
+        .order_by(Slot.slot_date.desc(), Slot.time_index.desc())
+        .offset(offset)
+        .limit(page_size)
     )
     items = []
     state, _ = await resolve_system_state(db)
@@ -262,4 +289,13 @@ async def list_my_reservations(db: AsyncSession, member: Member) -> list[dict]:
                 "cancelable": cancelable,
             }
         )
-    return items
+
+    total_pages = (total + page_size - 1) // page_size if total else 0
+    return {
+        "items": items,
+        "page": page,
+        "pageSize": page_size,
+        "total": total,
+        "totalPages": total_pages,
+        "activeTotal": active_total,
+    }

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Cookie, Depends, Request
+from fastapi import APIRouter, Cookie, Depends, Query, Request
 from fastapi.responses import RedirectResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -177,8 +177,12 @@ async def reapply_slot(
 
 @router.get("/me/reservations")
 async def my_reservations(
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    items = await reservation_service.list_my_reservations(db, member)
-    return {"data": {"items": items}}
+    data = await reservation_service.list_my_reservations(
+        db, member, page=page, page_size=pageSize
+    )
+    return {"data": data}

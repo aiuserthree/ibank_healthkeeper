@@ -5,14 +5,6 @@
   let systemState = "BEFORE_OPEN";
   let systemInfo = null;
   let selected = null;
-  let myReservations = [];
-
-  function hasDroppedThisCycle() {
-    if (!calendar?.slots?.length) return false;
-    const dates = new Set(calendar.slots.map((s) => s.slotDate));
-    return myReservations.some((r) => r.status === "DROPPED" && dates.has(r.slotDate));
-  }
-
   function groupSlots(slots) {
     const byDate = {};
     for (const s of slots) {
@@ -69,10 +61,12 @@
         reapplyCloseAt: systemInfo?.reapplyCloseAt,
         closeAt: systemInfo?.closeAt,
       });
-      el.innerHTML = HKUI.alertBox(banner.variant, banner.title, banner.body);
+      const reapplyAction =
+        systemState === "REAPPLY"
+          ? `<a href="${HKRoutes.reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청 화면으로</button></a>`
+          : "";
+      el.innerHTML = HKUI.alertBox(banner.variant, banner.title, banner.body, reapplyAction);
     }
-    document.getElementById("reapply-link").style.display =
-      systemState === "REAPPLY" && hasDroppedThisCycle() ? "block" : "none";
   }
 
   function renderGrid() {
@@ -236,14 +230,9 @@
       const gridEl = document.getElementById("calendar-grid");
       const summaryEl = document.getElementById("summary");
       try {
-        const [sys, cal, mine] = await Promise.all([
-          HKApi.systemState(),
-          HKApi.calendar(),
-          HKApi.myReservations().catch(() => ({ items: [] })),
-        ]);
+        const [sys, cal] = await Promise.all([HKApi.systemState(), HKApi.calendar()]);
         systemState = sys.state;
         systemInfo = sys;
-        myReservations = mine.items || [];
         calendar = {
           ...cal,
           slots: (cal.slots || []).map((s) => ({ ...s })),

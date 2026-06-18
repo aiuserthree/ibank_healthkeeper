@@ -191,14 +191,20 @@ window.HKUI = (function () {
     return `<span class="hk-badge hk-badge--${variant}">${dotHtml}${escapeHtml(text)}</span>`;
   }
 
-  function alertBox(variant, title, body) {
+  function alertBox(variant, title, body, actionHtml) {
     const icons = { info: "info", success: "circle-check-big", warning: "triangle-alert", danger: "circle-x" };
-    return `<div class="hk-alert hk-alert--${variant}">
+    const wrapStyle = actionHtml ? "align-items:center;flex-wrap:wrap" : "";
+    const bodyStyle = actionHtml ? "flex:1;min-width:0" : "";
+    const action = actionHtml
+      ? `<div style="flex-shrink:0;margin-left:auto">${actionHtml}</div>`
+      : "";
+    return `<div class="hk-alert hk-alert--${variant}" style="${wrapStyle}">
       <div class="hk-alert__icon">${icon(icons[variant] || "info", 20)}</div>
-      <div class="hk-alert__body">
+      <div class="hk-alert__body" style="${bodyStyle}">
         ${title ? `<div class="hk-alert__title">${escapeHtml(title)}</div>` : ""}
         <div>${body}</div>
       </div>
+      ${action}
     </div>`;
   }
 
@@ -443,19 +449,20 @@ window.HKUI = (function () {
       .join("")}</div>`;
   }
 
-  function reservationCard(r) {
+  function reservationCard(r, opts = {}) {
+    const reapplyAvailable = !!opts.reapplyAvailable;
     const muted = r.status === "CANCELLED";
     const dow = DAY_NAMES[new Date(r.slotDate + "T12:00:00").getDay()];
     const dayNum = formatDateShort(r.slotDate).split("/")[1] || formatDateShort(r.slotDate);
     let sub = "일반 신청 · 확정 대기";
-    if (r.status === "DROPPED") sub = "탈락 — 재신청 가능";
+    if (r.status === "DROPPED") sub = reapplyAvailable ? "탈락 — 재신청 가능" : "탈락";
     else if (r.type === "REAPPLY") sub = "재신청 · 즉시 확정 (취소 불가)";
     else if (r.status === "CONFIRMED") sub = "일반 신청 · 예약 확정";
     else if (r.status === "CANCELLED") sub = "취소됨";
     const reapplyBadge = r.type === "REAPPLY" ? badge("재신청", "info") + " " : "";
     let action = `<span style="width:1px"></span>`;
     if (r.cancelable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel="${r.id}">취소</button>`;
-    else if (r.status === "DROPPED") action = `<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`;
+    else if (r.status === "DROPPED" && reapplyAvailable) action = `<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`;
     return `<div class="hk-card hk-card--pad" style="opacity:${muted ? 0.7 : 1}">
       <div style="display:flex;align-items:center;gap:16px">
         <div style="width:50px;height:50px;border-radius:10px;background:${muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)"};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
@@ -509,11 +516,16 @@ window.HKUI = (function () {
     return out;
   }
 
-  /** 미리보기 HTML — 링크 절대화 + 새 탭 강제 (srcdoc iframe 기준 URL 오류 방지) */
+  /** 미리보기 HTML — 링크·에셋 절대화 + 새 탭 강제 (blob iframe 기준 URL 오류 방지) */
   function prepareMailPreviewHtml(html, origin) {
     const base = origin || window.location.origin;
     const tgt = ' target="_blank" rel="noopener noreferrer"';
     let out = applyMailPreviewVars(html, base);
+
+    out = out.replace(/src="\/assets\//g, `src="${base}/assets/`).replace(
+      /src='\/assets\//g,
+      `src='${base}/assets/`
+    );
 
     const appLinks = {
       "/mypage": base + "/api/mypage/enter",
@@ -561,6 +573,49 @@ window.HKUI = (function () {
     const win = window.open(url, "_blank", "noopener,noreferrer");
     if (win) win.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
     else URL.revokeObjectURL(url);
+  }
+
+  function paginationBar(meta, opts = {}) {
+    const page = meta.page || 1;
+    const totalPages = meta.totalPages || 0;
+    const total = meta.total ?? 0;
+    const pageSize = meta.pageSize || 10;
+    if (totalPages <= 1) {
+      if (total <= pageSize) return "";
+      return `<p style="margin:16px 0 0;font-size:13px;color:var(--text-muted);text-align:center">총 ${total}건</p>`;
+    }
+    const id = opts.id || "hk-pager";
+    const start = (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, total);
+    const btn = (p, label, disabled, active) =>
+      `<button type="button" class="hk-btn hk-btn--${active ? "primary" : "secondary"} hk-btn--sm" data-page="${p}" ${disabled ? "disabled" : ""} style="min-width:36px">${label}</button>`;
+    let pages = "";
+    const windowSize = 5;
+    let from = Math.max(1, page - Math.floor(windowSize / 2));
+    let to = Math.min(totalPages, from + windowSize - 1);
+    from = Math.max(1, to - windowSize + 1);
+    for (let p = from; p <= to; p += 1) {
+      pages += btn(p, String(p), false, p === page);
+    }
+    return `<nav id="${id}" aria-label="예약 내역 페이지" style="margin-top:20px;display:flex;flex-direction:column;align-items:center;gap:12px">
+      <p style="margin:0;font-size:13px;color:var(--text-muted)">${start}–${end} / 총 ${total}건</p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center">
+        ${btn(page - 1, "이전", page <= 1, false)}
+        ${pages}
+        ${btn(page + 1, "다음", page >= totalPages, false)}
+      </div>
+    </nav>`;
+  }
+
+  function bindPagination(container, meta, onPage) {
+    if (!container) return;
+    container.querySelectorAll("[data-page]").forEach((btn) => {
+      btn.onclick = () => {
+        const next = Number(btn.dataset.page);
+        if (!next || next === meta.page || next < 1 || next > meta.totalPages) return;
+        onPage(next);
+      };
+    });
   }
 
   return {
@@ -616,5 +671,7 @@ window.HKUI = (function () {
     prepareMailPreviewHtml,
     mountMailPreviewIframe,
     openMailPreviewHtml,
+    paginationBar,
+    bindPagination,
   };
 })();
