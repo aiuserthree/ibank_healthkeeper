@@ -1,0 +1,389 @@
+<!-- @dsCard group="회원 예약 앱" viewport="1280x760" name="회원 예약 앱" subtitle="서비스 소개 · 로그인 · 예약 캘린더 · 마이페이지" -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>헬스키퍼 — 예약</title>
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--surface-canvas); }
+  #root { min-height: 100%; }
+</style>
+</head>
+<body>
+  <div id="root"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel" data-presets="react">
+  /* 헬스키퍼 — 회원 예약 앱 (member booking app). Inlined so the compiler does not bundle it. */
+  (function () {
+  const DS = window.HealthkeeperDS_31e44b;
+  const { Button, IconButton, Input, Checkbox, Card, Avatar, SlotButton, Tabs, Badge, StatusBadge, Alert, Toast, Dialog, EmptyState } = DS;
+  const { useState, useEffect } = React;
+
+  function Icon({ name, size = 18, color, strokeWidth = 1.75, style }) {
+    return <i data-lucide={name} style={{ width: size, height: size, color, strokeWidth, display: "inline-flex", ...style }} />;
+  }
+  function useIcons() { useEffect(() => { window.lucide && window.lucide.createIcons(); }); }
+
+  const TIMES = ["13:30", "14:30", "15:30", "16:30"];
+  const DAYS = [
+    { d: "월", date: "6/22", off: false },
+    { d: "화", date: "6/23", off: false },
+    { d: "수", date: "6/24", off: true },
+    { d: "목", date: "6/25", off: false },
+    { d: "금", date: "6/26", off: false },
+  ];
+  const CONFIRMED = new Set(["0-16:30", "3-13:30", "1-14:30"]);
+
+  function Header({ route, go, user, onLogout }) {
+    useIcons();
+    const NavLink = ({ to, children }) => (
+      <button onClick={() => go(to)}
+        style={{
+          background: "none", border: "none", cursor: "pointer", font: "inherit",
+          fontSize: 15, fontWeight: 600, padding: "8px 4px", whiteSpace: "nowrap",
+          color: route === to ? "var(--color-signal-blue)" : "var(--color-midnight-navy)",
+        }}>{children}</button>
+    );
+    return (
+      <header style={{ height: 72, background: "var(--surface-card)", borderBottom: "1px solid var(--border-default)", position: "sticky", top: 0, zIndex: 50 }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", height: "100%", padding: "0 32px", display: "flex", alignItems: "center", gap: 32 }}>
+          <button onClick={() => go("landing")} style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+            <img src="../../assets/logo-lockup.svg" alt="헬스키퍼" height="34" />
+          </button>
+          <nav style={{ display: "flex", gap: 24, marginLeft: 8 }}>
+            <NavLink to="landing">서비스 소개</NavLink>
+            <NavLink to="reserve">예약하기</NavLink>
+            {user && <NavLink to="mypage">마이페이지</NavLink>}
+          </nav>
+          <div style={{ flex: 1 }} />
+          {user ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <button onClick={() => go("mypage")} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", cursor: "pointer" }}>
+                <Avatar name={user.name} size="sm" />
+                <span style={{ fontSize: 14, fontWeight: 600, color: "var(--color-midnight-navy)" }}>{user.name}님</span>
+              </button>
+              <Button variant="ghost" size="sm" onClick={onLogout}>로그아웃</Button>
+            </div>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Button variant="ghost" size="sm" onClick={() => go("login")}>로그인</Button>
+              <Button variant="primary" size="sm" onClick={() => go("signup")}>회원가입</Button>
+            </div>
+          )}
+        </div>
+      </header>
+    );
+  }
+
+  function MiniCalendar() {
+    return (
+      <Card padded style={{ width: 360, position: "relative", zIndex: 2 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <b style={{ fontSize: 15, color: "var(--color-midnight-navy)", whiteSpace: "nowrap" }}>이번 주 예약</b>
+          <Badge variant="success" dot>예약 가능</Badge>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8 }}>
+          <SlotButton time="13:30" meta="가능" />
+          <SlotButton time="14:30" meta="선택" state="selected" />
+          <SlotButton time="15:30" meta="가능" />
+          <SlotButton time="16:30" meta="완료" state="confirmed" />
+        </div>
+        <div style={{ marginTop: 14, fontSize: 13, color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: 6 }}>
+          <Icon name="clock" size={15} color="var(--color-slate-blue)" /> 매일 13:30 – 17:00 · 하루 4타임
+        </div>
+      </Card>
+    );
+  }
+
+  function Feature({ icon, title, desc }) {
+    return (
+      <div style={{ display: "flex", gap: 16 }}>
+        <div style={{ flexShrink: 0, width: 44, height: 44, borderRadius: 10, background: "var(--color-signal-blue-soft)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon name={icon} size={22} color="var(--color-signal-blue)" />
+        </div>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: "var(--color-midnight-navy)", marginBottom: 4 }}>{title}</div>
+          <div style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.6 }}>{desc}</div>
+        </div>
+      </div>
+    );
+  }
+
+  function Landing({ go, user }) {
+    useIcons();
+    return (
+      <main>
+        <section style={{ maxWidth: 1200, margin: "0 auto", padding: "72px 32px 56px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
+          <div>
+            <Badge variant="soft">사내 복지 · 안마서비스</Badge>
+            <h1 style={{ fontSize: 52, lineHeight: 1.1, letterSpacing: "-0.02em", margin: "20px 0 16px" }}>
+              마음까지 풀리는<br />헬스키퍼 예약
+            </h1>
+            <p style={{ fontSize: 19, lineHeight: 1.64, color: "var(--text-secondary)", maxWidth: 460, margin: "0 0 28px" }}>
+              매주 수요일, 차주 안마서비스를 신청하세요. 한정된 시간을 공정하게 — 오래 기다린 분께 우선권을 드립니다.
+            </p>
+            <div style={{ display: "flex", gap: 12 }}>
+              <Button variant="primary" size="lg" onClick={() => go(user ? "reserve" : "signup")}
+                iconRight={<Icon name="arrow-right" size={18} color="#fff" />}>
+                {user ? "예약하기" : "무료로 시작하기"}
+              </Button>
+              <Button variant="secondary" size="lg" onClick={() => go("reserve")}>예약 현황 보기</Button>
+            </div>
+          </div>
+          <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
+            <div style={{ position: "absolute", width: 340, height: 300, background: "var(--blob-sunrise)", filter: "blur(40px)", opacity: 0.8, top: -30, right: 40 }} />
+            <div style={{ position: "absolute", width: 260, height: 240, background: "var(--blob-calm)", filter: "blur(44px)", opacity: 0.7, bottom: -40, left: 30 }} />
+            <MiniCalendar />
+          </div>
+        </section>
+        <section style={{ borderTop: "1px solid var(--border-default)", borderBottom: "1px solid var(--border-default)", background: "var(--surface-card)" }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px", display: "flex", gap: 64 }}>
+            {[["주 20타임", "월~금 · 하루 4타임"], ["1명", "전담 안마사"], ["수요일 9시", "차주 예약 오픈"]].map(([n, l]) => (
+              <div key={l}>
+                <div style={{ fontSize: 32, fontWeight: 700, color: "var(--color-midnight-navy)", letterSpacing: "-0.01em" }}>{n}</div>
+                <div style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 2 }}>{l}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+        <section style={{ maxWidth: 1200, margin: "0 auto", padding: "64px 32px 80px" }}>
+          <h2 style={{ fontSize: 34, marginBottom: 8 }}>예약은 이렇게 진행돼요</h2>
+          <p style={{ fontSize: 17, color: "var(--text-secondary)", marginBottom: 40 }}>신청 → 확정 → 안내 메일까지, 공정하고 투명하게.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 32 }}>
+            <Feature icon="calendar-days" title="수요일에 신청" desc="매주 수요일 09:00~16:59 동안 차주(월~금) 예약을 신청합니다." />
+            <Feature icon="scale" title="우선권 배분" desc="같은 시간에 몰리면 가장 오래 기다린 분께 우선권이 돌아갑니다." />
+            <Feature icon="bell-ring" title="재신청 안내" desc="탈락하면 다음날 17시까지 빈 슬롯에 선착순으로 재신청할 수 있어요." />
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  function Auth({ mode, go, onAuth }) {
+    useIcons();
+    const isSignup = mode === "signup";
+    const [agree, setAgree] = useState(false);
+    return (
+      <main style={{ display: "flex", justifyContent: "center", padding: "64px 24px" }}>
+        <div style={{ width: 420 }}>
+          <div style={{ textAlign: "center", marginBottom: 28 }}>
+            <img src="../../assets/logo-mark.svg" alt="" width="52" height="52" />
+            <h1 style={{ fontSize: 28, marginTop: 16 }}>{isSignup ? "회원가입" : "로그인"}</h1>
+            <p style={{ fontSize: 15, color: "var(--text-secondary)", marginTop: 6 }}>
+              {isSignup ? "이메일 인증 후 예약을 신청할 수 있어요." : "헬스키퍼 예약을 이어서 진행하세요."}
+            </p>
+          </div>
+          <Card padded>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {isSignup && <Input label="이름" placeholder="홍길동" required />}
+              <Input label="이메일" type="email" placeholder="name@ibank.co.kr" required
+                hint={isSignup ? "회사 이메일로 인증 메일이 발송됩니다." : undefined} />
+              <Input label="비밀번호" type="password" placeholder="••••••••" required />
+              {isSignup && (
+                <Checkbox label="개인정보 수집·이용 및 서비스 약관에 동의합니다" checked={agree} onChange={e => setAgree(e.target.checked)} />
+              )}
+              <Button variant="primary" block size="lg" disabled={isSignup && !agree} onClick={onAuth}>
+                {isSignup ? "인증 메일 받기" : "로그인"}
+              </Button>
+            </div>
+          </Card>
+          <div style={{ textAlign: "center", marginTop: 18, fontSize: 14, color: "var(--text-secondary)" }}>
+            {isSignup ? "이미 계정이 있으신가요? " : "아직 회원이 아니신가요? "}
+            <button onClick={() => go(isSignup ? "login" : "signup")}
+              style={{ background: "none", border: "none", cursor: "pointer", font: "inherit", color: "var(--color-signal-blue)", fontWeight: 700 }}>
+              {isSignup ? "로그인" : "회원가입"}
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  function Reserve({ user, go, onReserved }) {
+    useIcons();
+    const [sel, setSel] = useState(null);
+    const [confirm, setConfirm] = useState(false);
+    const [toast, setToast] = useState(null);
+    if (!user) {
+      return (
+        <main style={{ maxWidth: 1200, margin: "0 auto", padding: "48px 32px" }}>
+          <Card padded><EmptyState icon={<Icon name="lock" />} title="로그인이 필요합니다"
+            description="예약을 신청하려면 로그인해 주세요."
+            action={<Button variant="primary" onClick={() => go("login")}>로그인하기</Button>} /></Card>
+        </main>
+      );
+    }
+    const slotState = (di, t) => {
+      if (DAYS[di].off) return "disabled";
+      if (CONFIRMED.has(`${di}-${t}`)) return "confirmed";
+      if (sel && sel.day === di && sel.time === t) return "selected";
+      return "available";
+    };
+    const submit = () => {
+      setConfirm(false);
+      onReserved({ day: DAYS[sel.day], time: sel.time });
+      setSel(null);
+      setToast("예약 신청이 접수되었습니다 · 마이페이지에서 확인하세요");
+      setTimeout(() => setToast(null), 3200);
+    };
+    return (
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: "40px 32px 80px" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 6 }}>
+          <h1 style={{ fontSize: 34 }}>차주 예약</h1>
+          <span style={{ fontSize: 16, color: "var(--text-secondary)" }}>6/22(월) – 6/26(금)</span>
+        </div>
+        <div style={{ marginBottom: 20, maxWidth: 720 }}>
+          <Alert variant="info" title="예약 가능 · 오늘 16:59 마감">
+            신청은 접수 후 <b>관리자 확정</b>으로 완료됩니다. 같은 시간에 신청이 몰리면 마지막 이용일이 오래된 분께 우선권이 부여됩니다.
+          </Alert>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
+          <Card padded>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 12 }}>
+              {DAYS.map((day, di) => (
+                <div key={di}>
+                  <div style={{ textAlign: "center", marginBottom: 10 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: day.off ? "var(--text-muted)" : "var(--color-midnight-navy)" }}>{day.d}</div>
+                    <div style={{ fontSize: 12, color: "var(--text-muted)" }}>{day.date}</div>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {day.off
+                      ? <div style={{ textAlign: "center", padding: "28px 0", border: "1.5px dashed var(--border-default)", borderRadius: "var(--radius-sm)", color: "var(--text-muted)", fontSize: 13 }}>
+                          <Icon name="ban" size={18} color="var(--color-steel-blue)" /><div style={{ marginTop: 4 }}>휴가</div>
+                        </div>
+                      : TIMES.map(t => (
+                          <SlotButton key={t} time={t} state={slotState(di, t)}
+                            meta={CONFIRMED.has(`${di}-${t}`) ? "마감" : undefined}
+                            onClick={() => setSel({ day: di, time: t })} style={{ width: "100%" }} />
+                        ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card padded style={{ position: "sticky", top: 96 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 14 }}>선택한 예약</div>
+            {sel ? (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <Icon name="calendar-days" size={20} color="var(--color-signal-blue)" />
+                  <span style={{ fontSize: 18, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{DAYS[sel.day].date} ({DAYS[sel.day].d})</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                  <Icon name="clock" size={20} color="var(--color-signal-blue)" />
+                  <span style={{ fontSize: 18, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{sel.time} – {addMin(sel.time)}</span>
+                </div>
+                <Button variant="primary" block onClick={() => setConfirm(true)}>예약 신청하기</Button>
+                <p style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 12, lineHeight: 1.5 }}>신청은 마감(17:00) 전까지 취소할 수 있어요.</p>
+              </>
+            ) : (
+              <div style={{ color: "var(--text-secondary)", fontSize: 14, lineHeight: 1.6, padding: "8px 0 4px" }}>왼쪽 캘린더에서 원하는 날짜·시간을 선택하세요.</div>
+            )}
+          </Card>
+        </div>
+        <Dialog open={confirm} title="예약을 신청할까요?" confirmLabel="신청하기" onConfirm={submit} onCancel={() => setConfirm(false)}>
+          {sel && <>{DAYS[sel.day].date}({DAYS[sel.day].d}) <b>{sel.time}</b> 타임으로 신청합니다. 확정은 관리자 처리 후 완료되며, 완료 메일을 보내드려요.</>}
+        </Dialog>
+        {toast && (
+          <div style={{ position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 200 }}>
+            <Toast variant="success">{toast}</Toast>
+          </div>
+        )}
+      </main>
+    );
+  }
+  function addMin(t) {
+    const [h, m] = t.split(":").map(Number);
+    const d = new Date(2000, 0, 1, h, m + 30);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  function MyPage({ user, go, reservations, onCancel }) {
+    useIcons();
+    if (!user) { go("login"); return null; }
+    return (
+      <main style={{ maxWidth: 880, margin: "0 auto", padding: "40px 32px 80px" }}>
+        <h1 style={{ fontSize: 34, marginBottom: 4 }}>마이페이지</h1>
+        <p style={{ fontSize: 16, color: "var(--text-secondary)", marginBottom: 28 }}>{user.name}님의 예약 신청 내역입니다.</p>
+        <Card padded flat style={{ marginBottom: 20, background: "var(--color-mist)" }}>
+          <div style={{ display: "flex", gap: 40 }}>
+            <KV k="마지막 이용일" v="2025.04.18" />
+            <KV k="우선권" v={<Badge variant="info">보유 O</Badge>} />
+            <KV k="이번 주 신청" v={`${reservations.length}건`} />
+          </div>
+        </Card>
+        {reservations.length === 0 ? (
+          <Card padded><EmptyState icon={<Icon name="calendar-x" />} title="신청 내역이 없습니다"
+            description="예약하기에서 차주 안마서비스를 신청해 보세요."
+            action={<Button variant="primary" onClick={() => go("reserve")}>예약하러 가기</Button>} /></Card>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {reservations.map((r, i) => (
+              <Card key={i} padded>
+                <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                  <div style={{ width: 48, height: 48, borderRadius: 10, background: "var(--color-signal-blue-soft)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <span style={{ fontSize: 16, fontWeight: 700, color: "var(--color-info-blue)", lineHeight: 1 }}>{r.day.date.split("/")[1]}</span>
+                    <span style={{ fontSize: 11, color: "var(--color-slate-blue)" }}>{r.day.d}</span>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 17, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{r.time} – {addMin(r.time)}</div>
+                    <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2 }}>{r.type === "reapply" ? "재신청 · 즉시 확정" : "일반 신청 · 확정 대기"}</div>
+                  </div>
+                  <StatusBadge status={r.status} />
+                  {r.status === "신청" && (<Button variant="secondary" size="sm" onClick={() => onCancel(i)}>취소</Button>)}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </main>
+    );
+  }
+  function KV({ k, v }) {
+    return (
+      <div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>{k}</div>
+        <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{v}</div>
+      </div>
+    );
+  }
+
+  function App() {
+    const [route, setRoute] = useState("landing");
+    const [user, setUser] = useState(null);
+    const [reservations, setReservations] = useState([]);
+    const go = (r) => { setRoute(r); window.scrollTo(0, 0); };
+    const login = () => { setUser({ name: "김민수" }); go("reserve"); };
+    const logout = () => { setUser(null); go("landing"); };
+    const addReservation = (r) => setReservations(rs => [...rs, { ...r, type: "general", status: "신청" }]);
+    const cancel = (i) => setReservations(rs => rs.filter((_, idx) => idx !== i));
+    useEffect(() => { window.lucide && window.lucide.createIcons(); });
+    return (
+      <>
+        <Header route={route} go={go} user={user} onLogout={logout} />
+        {route === "landing" && <Landing go={go} user={user} />}
+        {(route === "login" || route === "signup") && <Auth mode={route} go={go} onAuth={login} />}
+        {route === "reserve" && <Reserve user={user} go={go} onReserved={addReservation} />}
+        {route === "mypage" && <MyPage user={user} go={go} reservations={reservations} onCancel={cancel} />}
+        <footer style={{ borderTop: "1px solid var(--border-default)", background: "var(--surface-card)", marginTop: 40 }}>
+          <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 32px", display: "flex", alignItems: "center", gap: 12 }}>
+            <img src="../../assets/logo-mark.svg" width="28" height="28" alt="" />
+            <span style={{ fontSize: 13, color: "var(--text-muted)" }}>© 2026 iBank Healthkeeper · 사내 안마서비스 예약 시스템</span>
+          </div>
+        </footer>
+      </>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  })();
+  </script>
+</body>
+</html>

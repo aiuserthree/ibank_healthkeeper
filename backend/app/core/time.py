@@ -39,3 +39,21 @@ def format_kst_display(dt: datetime | None) -> str:
     if dt is None:
         return "-"
     return to_kst(dt).strftime("%Y-%m-%d %H:%M")
+
+
+_WEEKDAY_KO = ("월", "화", "수", "목", "금", "토", "일")
+
+
+def format_deadline_relative_ko(dt: datetime | None, fallback: str = "목요일 17:00") -> str:
+    """마감 시각을 오늘/내일/요일 기준으로 표시 (예: 오늘 17:00)."""
+    if dt is None:
+        return fallback
+    close_kst = to_kst(dt)
+    delta = (close_kst.date() - now_kst().date()).days
+    time_label = close_kst.strftime("%H:%M")
+    if delta == 0:
+        return f"오늘 {time_label}"
+    if delta == 1:
+        return f"내일 {time_label}"
+    dow = _WEEKDAY_KO[close_kst.weekday()]
+    return f"{dow}요일 {time_label}"

@@ -56,6 +56,17 @@ window.HKUI = (function () {
     return new Date(new Date().toLocaleString("en-US", { timeZone: KST }));
   }
 
+  /** KST 기준 오늘 날짜 (YYYY-MM-DD) */
+  function kstTodayKey() {
+    return new Date().toLocaleDateString("sv-SE", { timeZone: KST });
+  }
+
+  function addDaysToDateKey(key, days) {
+    const [y, m, d] = key.split("-").map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + days));
+    return dt.toISOString().slice(0, 10);
+  }
+
   /** ISO datetime → KST HH:MM */
   function formatTimeKst(iso) {
     if (!iso) return "-";
@@ -84,13 +95,9 @@ window.HKUI = (function () {
     if (!iso) return `목요일 ${fallbackTime}`;
     const time = formatTimeKst(iso);
     const target = kstDateKey(iso);
-    const now = nowKst();
-    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const todayKey = kstTodayKey();
     if (target === todayKey) return `오늘 ${time}`;
-    const tomorrow = nowKst();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
-    if (target === tomorrowKey) return `내일 ${time}`;
+    if (target === addDaysToDateKey(todayKey, 1)) return `내일 ${time}`;
     const dow = kstDayName(iso);
     return dow ? `${dow}요일 ${time}` : time;
   }

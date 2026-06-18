@@ -1,0 +1,86 @@
+<!-- @dsCard group="Components" viewport="700x440" name="Data display" subtitle="Card · avatar · slot buttons · tabs · empty state" -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  body { margin: 0; padding: 24px; background: var(--surface-canvas); }
+  .wrap { display: flex; flex-direction: column; gap: 20px; }
+  .lab { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px; }
+  .slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .two { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; align-items: start; }
+  .person { display: flex; align-items: center; gap: 12px; }
+  .person b { font-size: 15px; color: var(--text-heading); display:block; }
+  .person span { font-size: 13px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+  <div id="root" class="wrap"></div>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="../../_ds_bundle.js"></script>
+  <script type="text/babel" data-presets="react">
+    const { Card, Avatar, SlotButton, Tabs, EmptyState, StatusBadge, Button } = window.HealthkeeperDS_31e44b;
+    function Demo() {
+      const [sel, setSel] = React.useState("14:30");
+      const [tab, setTab] = React.useState("general");
+      const slots = [
+        { t: "13:30", m: "휴가", s: "disabled" },
+        { t: "14:30", m: "예약 가능" },
+        { t: "15:30", m: "예약 가능" },
+        { t: "16:30", m: "예약 완료", s: "confirmed" },
+      ];
+      return (
+        <>
+          <div>
+            <div className="lab">Card · Slot buttons · Tabs</div>
+            <Card>
+              <Tabs value={tab} onChange={setTab} items={[
+                { value: "general", label: "일반 신청" },
+                { value: "reapply", label: "재신청" },
+              ]} />
+              <div style={{height:16}} />
+              <div className="slots">
+                {slots.map(x => (
+                  <SlotButton key={x.t} time={x.t} meta={x.m}
+                    state={x.s ? x.s : (sel === x.t ? "selected" : "available")}
+                    onClick={() => setSel(x.t)} />
+                ))}
+              </div>
+            </Card>
+          </div>
+          <div className="two">
+            <div>
+              <div className="lab">Avatar · Status</div>
+              <Card>
+                <div className="person">
+                  <Avatar name="김민수" size="lg" />
+                  <div style={{flex:1}}>
+                    <b>김민수</b>
+                    <span>마지막 이용 · 2025.04.18</span>
+                  </div>
+                  <StatusBadge status="신청" />
+                </div>
+              </Card>
+            </div>
+            <div>
+              <div className="lab">Empty state</div>
+              <Card flat>
+                <EmptyState
+                  icon={<i data-lucide="calendar-clock"></i>}
+                  title="예약 오픈 전입니다"
+                  description="매주 수요일 오전 9시에 차주 예약이 열립니다." />
+              </Card>
+            </div>
+          </div>
+        </>
+      );
+    }
+    ReactDOM.createRoot(document.getElementById("root")).render(<Demo />);
+    setTimeout(() => window.lucide && window.lucide.createIcons(), 60);
+  </script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+</body>
+</html>

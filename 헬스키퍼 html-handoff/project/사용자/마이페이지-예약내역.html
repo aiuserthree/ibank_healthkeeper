@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>헬스키퍼 — 마이페이지 · 예약 내역</title>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+(function(){ if (window.ReactDOM && ReactDOM.createRoot && !ReactDOM.__hkPatched) { var o = ReactDOM.createRoot.bind(ReactDOM); ReactDOM.createRoot = function (c, p) { if (!c || (c.id === "root" && !window.__hkReady)) return { render:function(){}, unmount:function(){} }; return o(c, p); }; ReactDOM.__hkPatched = true; } })();
+</script>
+<link rel="stylesheet" href="../_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+<script src="../_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/_ds_bundle.js"></script>
+<link rel="stylesheet" href="../_shared/responsive.css">
+<meta name="ext-resource-dependency" content="../assets/logo-lockup.svg" data-resource-id="logoLockup" />
+<meta name="ext-resource-dependency" content="../assets/logo-mark.svg" data-resource-id="logoMark" />
+<style>
+  html,body{height:100%}
+  body{margin:0;background:var(--surface-canvas,#f8f9fb);color:var(--text-body,#0a0a0a)}
+</style>
+</head>
+<body>
+<template id="__bundler_thumbnail" data-bg-color="#0b3558"><svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="800" fill="#0b3558"></rect><circle cx="600" cy="356" r="150" fill="none" stroke="#ffffff" stroke-width="28"></circle><path d="M538 360 L585 407 L672 308" fill="none" stroke="#ffffff" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="726" cy="242" r="38" fill="#006bff"></circle></svg></template>
+<div id="root"></div>
+<script type="text/babel" src="../_shared/member-shell.js" data-presets="react"></script>
+<script type="text/babel" data-presets="react">
+const NS = "HealthkeeperDS_31e44b";
+const { Icon, Header, Footer, boot, addMin } = window.MemberUI;
+const { useState } = React;
+
+function SubNav({ active }) {
+  const items = [["res", "예약 내역", "마이페이지-예약내역.html"], ["profile", "계정", "마이페이지-내정보.html"]];
+  return (
+    <div style={{ display: "flex", gap: 4, borderBottom: "1px solid var(--border-default)", marginBottom: 28 }}>
+      {items.map(([k, l, href]) => (
+        <a key={k} href={href} style={{ padding: "12px 4px", marginRight: 20, textDecoration: "none", fontSize: 15.5, fontWeight: 600,
+          color: active === k ? "var(--color-signal-blue)" : "var(--text-secondary)",
+          borderBottom: "2px solid " + (active === k ? "var(--color-signal-blue)" : "transparent"), marginBottom: -1 }}>{l}</a>
+      ))}
+    </div>
+  );
+}
+
+const INIT = [
+  { id: 1, day: "월", date: "6/22", time: "13:30", type: "general", status: "신청" },
+  { id: 2, day: "화", date: "6/23", time: "15:30", type: "general", status: "확정" },
+  { id: 3, day: "목", date: "6/25", time: "14:30", type: "reapply", status: "확정" },
+  { id: 4, day: "금", date: "6/26", time: "16:30", type: "general", status: "탈락" },
+  { id: 5, day: "월", date: "6/15", time: "14:30", type: "general", status: "취소" },
+];
+
+function Page() {
+  const { Button, Card, Badge, StatusBadge, Alert, Dialog, Toast, EmptyState } = window[NS];
+  const [list, setList] = useState(INIT);
+  const [cancel, setCancel] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const doCancel = () => {
+    setList(l => l.map(r => r.id === cancel.id ? { ...r, status: "취소" } : r));
+    setToast("신청이 취소되었습니다 · 우선권에는 영향이 없습니다");
+    setCancel(null);
+    setTimeout(() => setToast(null), 3200);
+  };
+
+  const sub = (r) =>
+    r.status === "탈락" ? "탈락 — 재신청 가능"
+    : r.type === "reapply" ? "재신청 · 즉시 확정 (취소 불가)"
+    : r.status === "확정" ? "일반 신청 · 예약 확정"
+    : r.status === "취소" ? "취소됨"
+    : "일반 신청 · 확정 대기";
+
+  return (
+    <>
+      <Header active="mypage" loggedIn={true} />
+      <main style={{ maxWidth: 880, margin: "0 auto", padding: "40px 32px 72px" }}>
+        <h1 style={{ fontSize: 34, marginBottom: 4 }}>마이페이지</h1>
+        <p style={{ fontSize: 16, color: "var(--text-secondary)", marginTop: 0, marginBottom: 24 }}>김민수님의 예약 신청 내역입니다.</p>
+        <SubNav active="res" />
+
+        <Card padded flat style={{ marginBottom: 20, background: "var(--color-mist)" }}>
+          <div style={{ display: "flex", gap: 48, flexWrap: "wrap" }}>
+            <KV k="마지막 이용일" v="2025.04.18" />
+            <KV k="우선권" v={<Badge variant="info">보유 O</Badge>} />
+            <KV k="이번 주 신청" v={`${list.filter(r => r.date.startsWith("6/2")).length}건`} />
+          </div>
+        </Card>
+
+        <div style={{ marginBottom: 18 }}>
+          <Alert variant="info" title="예약 상태 안내">
+            <b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b>
+          </Alert>
+        </div>
+
+        {list.length === 0 ? (
+          <Card padded><EmptyState icon={<Icon name="calendar-x" />} title="신청 내역이 없습니다"
+            description="예약하기에서 차주 안마서비스를 신청해 보세요."
+            action={<a href="예약하기.html"><Button variant="primary">예약하러 가기</Button></a>} /></Card>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {list.map(r => {
+              const cancellable = r.status === "신청";
+              const muted = r.status === "취소";
+              return (
+                <Card key={r.id} padded style={{ opacity: muted ? 0.7 : 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                    <div style={{ width: 50, height: 50, borderRadius: 10, background: muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)",
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      <span style={{ fontSize: 16, fontWeight: 700, color: muted ? "var(--text-muted)" : "var(--color-info-blue)", lineHeight: 1 }}>{r.date.split("/")[1]}</span>
+                      <span style={{ fontSize: 11, color: muted ? "var(--text-muted)" : "var(--color-slate-blue)" }}>{r.day}</span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 17, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{r.time} – {addMin(r.time)}</div>
+                      <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                        {r.type === "reapply" && <Badge variant="info">재신청</Badge>}{sub(r)}
+                      </div>
+                    </div>
+                    <StatusBadge status={r.status} />
+                    {cancellable
+                      ? <Button variant="secondary" size="sm" onClick={() => setCancel(r)}>취소</Button>
+                      : r.status === "탈락"
+                        ? <a href="재신청.html"><Button variant="primary" size="sm">재신청</Button></a>
+                        : <span style={{ width: 1 }} />}
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </main>
+      <Footer />
+
+      <Dialog open={!!cancel} title="신청을 취소할까요?" confirmLabel="취소하기" confirmVariant="danger" cancelLabel="닫기"
+        onConfirm={doCancel} onCancel={() => setCancel(null)}>
+        {cancel && <>{cancel.date}({cancel.day}) <b>{cancel.time}</b> 신청을 취소합니다. 마감 전 취소는 <b>우선권에 영향을 주지 않습니다.</b></>}
+      </Dialog>
+
+      {toast && (
+        <div style={{ position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 200 }}>
+          <Toast variant="success">{toast}</Toast>
+        </div>
+      )}
+    </>
+  );
+}
+function KV({ k, v }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>{k}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: "var(--color-midnight-navy)" }}>{v}</div>
+    </div>
+  );
+}
+boot(() => <Page />);
+</script>
+</body>
+</html>

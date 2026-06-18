@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_active_member
-from app.core.time import format_kst_iso
+from app.core.time import format_deadline_relative_ko, format_kst_iso
 from app.database import get_db
 from app.models import Member
 from app.services.cycle import resolve_system_state
@@ -17,10 +17,16 @@ system_router = APIRouter(prefix="/system", tags=["system"])
 @system_router.get("/state")
 async def system_state(db: AsyncSession = Depends(get_db)):
     state, cycle = await resolve_system_state(db)
+    open_msg = "차주 예약 신청이 가능합니다."
+    if cycle and state.value == "OPEN":
+        open_msg = f"차주 예약 신청이 가능합니다. ({format_deadline_relative_ko(cycle.close_at)} 마감)"
+    reapply_msg = "탈락자 재신청 기간입니다."
+    if cycle and state.value == "REAPPLY":
+        reapply_msg = f"탈락자 재신청 기간입니다. ({format_deadline_relative_ko(cycle.reapply_close_at)}까지)"
     banners = {
         "BEFORE_OPEN": "이번 주 예약은 수요일 09:00에 오픈됩니다.",
-        "OPEN": "차주 예약 신청이 가능합니다. (오늘 17:00 마감)",
-        "REAPPLY": "탈락자 재신청 기간입니다. (내일 17:00까지)",
+        "OPEN": open_msg,
+        "REAPPLY": reapply_msg,
         "CLOSED": "현재 예약 접수 기간이 아닙니다. 다음 오픈: 수요일 09:00",
     }
     return {
