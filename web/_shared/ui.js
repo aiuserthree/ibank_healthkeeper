@@ -472,6 +472,97 @@ window.HKUI = (function () {
     </div>`;
   }
 
+  function mailPreviewVars(origin) {
+    const base = origin || (typeof window !== "undefined" ? window.location.origin : "");
+    const chip =
+      "display:inline-block;margin:0 6px 6px 0;padding:6px 12px;background:#ffffff;border:1px solid #d4e0ed;border-radius:999px;font-size:13px;color:#0b3558;";
+    return {
+      이름: "김민수",
+      name: "김민수",
+      날짜: "6월 23일 (화)",
+      slotDate: "6월 23일 (화)",
+      시간: "15:30 – 16:00",
+      slotTime: "15:30 – 16:00",
+      logoUrl: base + "/assets/logo-lockup.svg",
+      mypageUrl: base + "/api/mypage/enter",
+      reapplyUrl: base + "/api/reapply/enter",
+      재신청시작: "목요일 09:00",
+      reapplyOpenAt: "목요일 09:00",
+      재신청마감: "목요일 17:00",
+      reapplyDeadline: "목요일 17:00",
+      빈슬롯목록: "화 6/23 · 13:30, 목 6/25 · 14:30",
+      emptySlots: "화 6/23 · 13:30, 목 6/25 · 14:30",
+      빈슬롯목록Html:
+        `<span style="${chip}">화 6/23 · 13:30</span>` +
+        `<span style="${chip}">목 6/25 · 14:30</span>`,
+      emptySlotsHtml:
+        `<span style="${chip}">화 6/23 · 13:30</span>` +
+        `<span style="${chip}">목 6/25 · 14:30</span>`,
+    };
+  }
+
+  function applyMailPreviewVars(html, origin) {
+    let out = html;
+    Object.entries(mailPreviewVars(origin)).forEach(([key, value]) => {
+      out = out.split("{" + key + "}").join(value);
+    });
+    return out;
+  }
+
+  /** 미리보기 HTML — 링크 절대화 + 새 탭 강제 (srcdoc iframe 기준 URL 오류 방지) */
+  function prepareMailPreviewHtml(html, origin) {
+    const base = origin || window.location.origin;
+    const tgt = ' target="_blank" rel="noopener noreferrer"';
+    let out = applyMailPreviewVars(html, base);
+
+    const appLinks = {
+      "/mypage": base + "/api/mypage/enter",
+      "/reapply": base + "/api/reapply/enter",
+    };
+    Object.entries(appLinks).forEach(([path, abs]) => {
+      [path, abs].forEach((href) => {
+        const esc = href.replace(/\//g, "\\/");
+        out = out.replace(new RegExp(`href="${esc}"(?![^>]*target=)`, "gi"), `href="${abs}"${tgt}`);
+        out = out.replace(new RegExp(`href='${esc}'(?![^>]*target=)`, "gi"), `href="${abs}"${tgt}`);
+      });
+    });
+
+    out = out.replace(
+      /<a href="#"([^>]*>)([^<]*(?:내 예약|재신청|빈 슬롯)[^<]*)<\/a>/gi,
+      (_m, attrs, text) => {
+        const dest = /재신청|빈 슬롯/.test(text) ? base + "/api/reapply/enter" : base + "/api/mypage/enter";
+        return `<a href="${dest}"${tgt}${attrs}${text}</a>`;
+      }
+    );
+
+    const linkScript = `<script>(function(){document.addEventListener("click",function(e){var a=e.target.closest("a[href]");if(!a)return;var raw=a.getAttribute("href");if(!raw||raw==="#")return;e.preventDefault();e.stopPropagation();var top=window.top||window;var opened=top.open(a.href,"_blank","noopener,noreferrer");if(!opened){top.location.href=a.href;}},true);})();<\/script>`;
+    out = out.includes("</body>") ? out.replace(/<\/body>/i, linkScript + "</body>") : out + linkScript;
+
+    return out;
+  }
+
+  function mountMailPreviewIframe(wrap, html, origin) {
+    const prepared = prepareMailPreviewHtml(html, origin);
+    const iframe = document.createElement("iframe");
+    iframe.title = "메일 미리보기";
+    iframe.style.cssText = "width:100%;height:760px;border:none;display:block";
+    iframe.sandbox = "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin";
+    const blob = new Blob([prepared], { type: "text/html;charset=utf-8" });
+    const blobUrl = URL.createObjectURL(blob);
+    iframe.src = blobUrl;
+    wrap.replaceChildren(iframe);
+    return () => URL.revokeObjectURL(blobUrl);
+  }
+
+  function openMailPreviewHtml(html, origin) {
+    const prepared = prepareMailPreviewHtml(html, origin);
+    const blob = new Blob([prepared], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank", "noopener,noreferrer");
+    if (win) win.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+    else URL.revokeObjectURL(url);
+  }
+
   return {
     STATE_BANNER,
     STATUS_LABEL,
@@ -520,5 +611,10 @@ window.HKUI = (function () {
     WEEKDAY_OPTIONS,
     stepper,
     reservationCard,
+    mailPreviewVars,
+    applyMailPreviewVars,
+    prepareMailPreviewHtml,
+    mountMailPreviewIframe,
+    openMailPreviewHtml,
   };
 })();

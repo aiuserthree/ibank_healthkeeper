@@ -19,6 +19,7 @@
     let view = "loading";
     let apiState = "CLOSED";
     let reapplyCloseAt = null;
+    let reapplyOpenAt = null;
     let slots = [];
     let confirmedSlotId = null;
     let confirmedSlot = null;
@@ -118,28 +119,30 @@
         const sys = await HKApi.systemState();
         apiState = sys.state;
         reapplyCloseAt = sys.reapplyCloseAt || null;
-
-        if (apiState !== "REAPPLY") {
-          view = "closed";
-          renderContent();
-          return;
-        }
-
-        await loadConfirmedReapply();
+        reapplyOpenAt = sys.reapplyOpenAt || null;
 
         try {
+          if (apiState === "REAPPLY") {
+            await loadConfirmedReapply();
+          }
           const data = await HKApi.reapplySlots();
           slots = data.slots || [];
-          view = "eligible";
+          if (apiState === "REAPPLY") {
+            view = "eligible";
+          } else {
+            view = "closed";
+          }
         } catch (e) {
           if (
             e.code === "NOT_DROPPED_USER" ||
             (e.status === 403 && /재신청 대상/.test(e.message || ""))
           ) {
             view = "ineligible";
-          } else {
+          } else if (apiState === "REAPPLY") {
             view = "closed";
             HKUI.toast(e.message || "재신청 정보를 불러오지 못했습니다.", "danger");
+          } else {
+            view = "closed";
           }
         }
       } catch (e) {
@@ -276,8 +279,15 @@
         let title = "재신청 기간이 아닙니다";
         let desc = `재신청 창은 ${reapplyDeadlineLabel()}에 마감됩니다. 다음 차주 일정은 다음 주 수요일 09:00에 새로 오픈됩니다.`;
         if (apiState === "CLOSED") {
-          title = "재신청 기간이 종료되었습니다";
-          desc = `재신청 창은 ${reapplyDeadlineLabel()}에 마감되었습니다. 다음 차주 일정은 다음 주 수요일 09:00에 새로 오픈됩니다.`;
+          const now = Date.now();
+          const openAt = reapplyOpenAt ? new Date(reapplyOpenAt).getTime() : 0;
+          if (openAt && now < openAt) {
+            title = "재신청 시작 전입니다";
+            desc = `재신청은 ${HKUI.formatDeadlineRelative(reapplyOpenAt)}부터 시작됩니다. 탈락 안내를 받으신 회원만 선착순으로 신청할 수 있어요.`;
+          } else {
+            title = "재신청 기간이 종료되었습니다";
+            desc = `재신청 창은 ${reapplyDeadlineLabel()}에 마감되었습니다. 다음 차주 일정은 다음 주 수요일 09:00에 새로 오픈됩니다.`;
+          }
         } else if (apiState === "OPEN") {
           desc = "일반 예약 신청 기간입니다. 탈락 안내를 받으신 경우 마감 후 재신청 창이 열립니다.";
         } else if (apiState === "BEFORE_OPEN") {

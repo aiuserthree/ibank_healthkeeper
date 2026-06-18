@@ -1,14 +1,23 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from typing import Optional
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, Cookie, Depends, Request
+from fastapi.responses import RedirectResponse
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_active_member
+from app.config import get_settings
+from app.core.deps import get_current_active_member, get_redis_client
+from app.core.session import get_member_session
 from app.core.time import format_deadline_relative_ko, format_kst_iso
 from app.database import get_db
 from app.models import Member
 from app.services.cycle import resolve_system_state
 from app.services import reservation as reservation_service
+
+settings = get_settings()
 
 router = APIRouter(tags=["reservation"])
 system_router = APIRouter(prefix="/system", tags=["system"])
@@ -75,6 +84,46 @@ async def cancel_reservation(
 ):
     await reservation_service.cancel_reservation(db, member, reservation_id)
     return {"data": {"message": "신청이 취소되었습니다."}}
+
+
+@router.get("/mypage/enter")
+async def mypage_enter(
+    request: Request,
+    redis: Redis = Depends(get_redis_client),
+    hk_session: Optional[str] = Cookie(alias=settings.session_cookie_name, default=None),
+):
+    """예약 완료 메일 CTA — 미로그인 시 로그인으로, 로그인 시 마이페이지 예약 내역으로."""
+    session_id = hk_session or request.headers.get("X-Session-Id")
+    logged_in = False
+    if session_id:
+        logged_in = bool(await get_member_session(redis, session_id))
+
+    base = settings.app_base_url.rstrip("/")
+    if logged_in:
+        return RedirectResponse(url=f"{base}/mypage", status_code=302)
+
+    params = urlencode({"returnTo": "/mypage"})
+    return RedirectResponse(url=f"{base}/login?{params}", status_code=302)
+
+
+@router.get("/reapply/enter")
+async def reapply_enter(
+    request: Request,
+    redis: Redis = Depends(get_redis_client),
+    hk_session: Optional[str] = Cookie(alias=settings.session_cookie_name, default=None),
+):
+    """탈락 안내 메일 CTA — 미로그인 시 로그인으로, 로그인 시 재신청 화면으로."""
+    session_id = hk_session or request.headers.get("X-Session-Id")
+    logged_in = False
+    if session_id:
+        logged_in = bool(await get_member_session(redis, session_id))
+
+    base = settings.app_base_url.rstrip("/")
+    if logged_in:
+        return RedirectResponse(url=f"{base}/reapply", status_code=302)
+
+    params = urlencode({"returnTo": "/reapply"})
+    return RedirectResponse(url=f"{base}/login?{params}", status_code=302)
 
 
 @router.get("/reservation/reapply/slots")

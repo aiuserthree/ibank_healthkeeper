@@ -162,66 +162,36 @@
           HKUI.toast("기본 문구로 복원했습니다");
         };
 
-        function mailPreviewVars() {
-          const origin = window.location.origin;
-          const chip = "display:inline-block;margin:0 6px 6px 0;padding:6px 12px;background:#ffffff;border:1px solid #d4e0ed;border-radius:999px;font-size:13px;color:#0b3558;";
-          return {
-            이름: "김민수",
-            name: "김민수",
-            날짜: "6월 23일 (화)",
-            slotDate: "6월 23일 (화)",
-            시간: "15:30 – 16:00",
-            slotTime: "15:30 – 16:00",
-            logoUrl: origin + "/assets/logo-lockup.svg",
-            mypageUrl: origin + "/mypage",
-            reapplyUrl: origin + "/reapply",
-            재신청시작: "목요일 09:00",
-            reapplyOpenAt: "목요일 09:00",
-            재신청마감: "목요일 17:00",
-            reapplyDeadline: "목요일 17:00",
-            빈슬롯목록: "화 6/23 · 13:30, 목 6/25 · 14:30",
-            emptySlots: "화 6/23 · 13:30, 목 6/25 · 14:30",
-            빈슬롯목록Html:
-              `<span style="${chip}">화 6/23 · 13:30</span>` +
-              `<span style="${chip}">목 6/25 · 14:30</span>`,
-            emptySlotsHtml:
-              `<span style="${chip}">화 6/23 · 13:30</span>` +
-              `<span style="${chip}">목 6/25 · 14:30</span>`,
-          };
-        }
-
-        function applyMailPreviewVars(html) {
-          let out = html;
-          Object.entries(mailPreviewVars()).forEach(([key, value]) => {
-            out = out.split("{" + key + "}").join(value);
-          });
-          return out;
-        }
+        let revokePreviewBlob = null;
 
         document.getElementById("preview-btn").onclick = async () => {
           const t = MAIL_TPL[tplKey];
           const overlay = document.getElementById("preview-overlay");
+          if (revokePreviewBlob) revokePreviewBlob();
           overlay.style.display = "flex";
           overlay.innerHTML = `<div style="width:660px;max-width:100%;max-height:88vh;background:var(--surface-card);border-radius:var(--radius-md,8px);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow-lg)" onclick="event.stopPropagation()">
             <div style="display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--border-default)">
               ${HKUI.icon("mail", 18, "var(--color-signal-blue)")}
-              <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(subjectEl.value || t.label)}</div><div style="font-size:12px;color:var(--text-muted)">${t.label} · 미리보기</div></div>
-              <a href="${t.file}" target="_blank" style="font-size:13px;font-weight:600;color:var(--color-signal-blue);text-decoration:none;display:inline-flex;align-items:center;gap:4px">새 창 ${HKUI.icon("external-link", 14, "var(--color-signal-blue)")}</a>
+              <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(subjectEl.value || t.label)}</div><div style="font-size:12px;color:var(--text-muted)">${t.label} · 미리보기 (버튼은 새 탭에서 열립니다)</div></div>
+              <button type="button" id="open-preview-tab" style="font-size:13px;font-weight:600;color:var(--color-signal-blue);background:none;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px;padding:0">새 창 ${HKUI.icon("external-link", 14, "var(--color-signal-blue)")}</button>
               <button type="button" id="close-preview" aria-label="닫기" style="border:none;background:transparent;cursor:pointer;padding:6px;display:flex">${HKUI.icon("x", 20, "var(--color-slate-blue)")}</button>
             </div>
             <div id="preview-frame-wrap" style="background:#eef1f6;overflow:auto;flex:1;min-height:760px"></div>
           </div>`;
-          overlay.onclick = () => { overlay.style.display = "none"; };
-          document.getElementById("close-preview").onclick = () => { overlay.style.display = "none"; };
+          overlay.onclick = () => {
+            overlay.style.display = "none";
+            if (revokePreviewBlob) {
+              revokePreviewBlob();
+              revokePreviewBlob = null;
+            }
+          };
+          document.getElementById("close-preview").onclick = () => overlay.click();
           const wrap = document.getElementById("preview-frame-wrap");
           try {
-            const res = await fetch(t.file);
-            const html = applyMailPreviewVars(await res.text());
-            const iframe = document.createElement("iframe");
-            iframe.title = "메일 미리보기";
-            iframe.style.cssText = "width:100%;height:760px;border:none;display:block";
-            iframe.srcdoc = html;
-            wrap.appendChild(iframe);
+            const res = await fetch(t.file + "?preview=" + Date.now());
+            const rawHtml = await res.text();
+            document.getElementById("open-preview-tab").onclick = () => HKUI.openMailPreviewHtml(rawHtml);
+            revokePreviewBlob = HKUI.mountMailPreviewIframe(wrap, rawHtml);
           } catch (_) {
             wrap.innerHTML = `<p style="padding:24px;color:var(--text-muted)">미리보기를 불러올 수 없습니다.</p>`;
           }

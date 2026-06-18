@@ -106,8 +106,8 @@ def expand_mail_context(context: dict) -> dict:
     out = dict(context)
     out.setdefault("appBaseUrl", base_url)
     out.setdefault("logoUrl", f"{base_url}/assets/logo-lockup.svg")
-    out.setdefault("mypageUrl", f"{base_url}/mypage")
-    out.setdefault("reapplyUrl", f"{base_url}/reapply")
+    out.setdefault("mypageUrl", f"{base_url}/api/mypage/enter")
+    out.setdefault("reapplyUrl", f"{base_url}/api/reapply/enter")
 
     if out.get("slotDate"):
         out["slotDate"] = format_slot_date_kr(out["slotDate"])
@@ -158,11 +158,20 @@ def render_template(subject_tpl: str, body_tpl: str, context: dict) -> tuple[str
 
 
 def absolutize_html_assets(html: str) -> str:
-    """메일 클라이언트용 — 상대 /assets 경로를 절대 URL로."""
+    """메일 클라이언트용 — 상대 /assets·앱 링크 경로를 절대 URL로."""
     base = settings.app_base_url.rstrip("/")
-    return html.replace('src="/assets/', f'src="{base}/assets/').replace(
+    reapply_enter_url = f"{base}/api/reapply/enter"
+    mypage_enter_url = f"{base}/api/mypage/enter"
+    html = html.replace('src="/assets/', f'src="{base}/assets/').replace(
         "src='/assets/", f"src='{base}/assets/"
     )
+    html = html.replace('href="/reapply"', f'href="{reapply_enter_url}"').replace(
+        "href='/reapply'", f"href='{reapply_enter_url}'"
+    )
+    html = html.replace('href="/mypage"', f'href="{mypage_enter_url}"').replace(
+        "href='/mypage'", f"href='{mypage_enter_url}'"
+    )
+    return html
 
 
 def resolve_template_parts(
