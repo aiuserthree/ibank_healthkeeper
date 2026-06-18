@@ -33,6 +33,33 @@ DEFAULT_SUBJECTS: dict[MailType, str] = {
     MailType.DROP_REAPPLY_NOTICE: "[헬스키퍼] 탈락 안내 및 재신청 가능 슬롯 안내",
 }
 
+# 관리자 화면 편집용 plain text (실제 발송 본문은 web/이메일/*.html 디자인 템플릿)
+PLAIN_BODY_DEFAULTS: dict[MailType, str] = {
+    MailType.EMAIL_VERIFY: (
+        "안녕하세요 {이름}님,\n\n아래 링크를 클릭해 이메일 인증을 완료해 주세요.\n{인증링크}\n\n24시간 내에 인증해 주세요."
+    ),
+    MailType.RESERVE_DONE_NORMAL: (
+        "안녕하세요, {이름}님.\n"
+        "신청하신 안마서비스 예약이 관리자 확정으로 완료되었습니다.\n\n"
+        "날짜: {날짜}\n시간: {시간}\n\n"
+        "· 일반 신청 취소는 마감(수요일 17:00) 전까지 가능합니다."
+    ),
+    MailType.RESERVE_DONE_REAPPLY: (
+        "안녕하세요, {이름}님.\n"
+        "선착순 재신청이 즉시 확정되었습니다.\n\n"
+        "날짜: {날짜}\n시간: {시간}\n\n"
+        "· 재신청 건은 취소할 수 없습니다."
+    ),
+    MailType.DROP_REAPPLY_NOTICE: (
+        "안녕하세요, {이름}님.\n"
+        "신청하신 시간대는 우선권에 따라 탈락 처리되었습니다.\n\n"
+        "비어있는 슬롯: {빈슬롯목록}\n"
+        "재신청 시작: {재신청시작}\n"
+        "재신청 마감: {재신청마감}\n\n"
+        "· 재신청 건은 취소할 수 없습니다."
+    ),
+}
+
 CONTEXT_ALIASES: dict[str, str] = {
     "name": "이름",
     "slotDate": "날짜",
@@ -107,6 +134,11 @@ def load_design_html(mail_type: MailType) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def editor_body_template(stored_body: str, mail_type: MailType) -> str:
+    """관리자 편집 화면용 — 항상 기본 plain text 요약."""
+    return PLAIN_BODY_DEFAULTS.get(mail_type, "")
+
+
 async def get_template(db: AsyncSession, mail_type: MailType) -> Optional[MailTemplate]:
     result = await db.execute(select(MailTemplate).where(MailTemplate.type == mail_type))
     return result.scalar_one_or_none()
@@ -123,6 +155,14 @@ def render_template(subject_tpl: str, body_tpl: str, context: dict) -> tuple[str
         return out
 
     return substitute(subject_tpl), substitute(body_tpl)
+
+
+def absolutize_html_assets(html: str) -> str:
+    """메일 클라이언트용 — 상대 /assets 경로를 절대 URL로."""
+    base = settings.app_base_url.rstrip("/")
+    return html.replace('src="/assets/', f'src="{base}/assets/').replace(
+        "src='/assets/", f"src='{base}/assets/"
+    )
 
 
 def resolve_template_parts(
@@ -195,7 +235,8 @@ async def send_smtp(msg: MailMessage) -> None:
     email["Message-ID"] = make_msgid(domain=domain)
 
     if _is_html_template(msg.body):
-        email.set_content(msg.body, subtype="html", charset="utf-8")
+        body = absolutize_html_assets(msg.body)
+        email.set_content(body, subtype="html", charset="utf-8")
     else:
         email.set_content(msg.body)
 

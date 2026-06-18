@@ -68,26 +68,40 @@
               ${HKUI.fieldSelect("템플릿 선택", "tpl-select", Object.entries(MAIL_TPL).map(([k, t]) => [k, t.label]), { value: tplKey })}
               <div class="hk-field"><label class="hk-field__label">메일 제목</label><input class="hk-input" id="tpl-subject"></div>
             </div>
-            <div class="hk-field"><label class="hk-field__label">메일 내용</label><textarea class="hk-textarea" id="tpl-body" rows="8"></textarea></div>
+            <div class="hk-field"><label class="hk-field__label">메일 내용 (텍스트 요약)</label><textarea class="hk-textarea" id="tpl-body" rows="8"></textarea></div>
           </div>
+          <p id="tpl-design-note" style="margin:10px 0 0;font-size:12.5px;color:var(--text-muted);line-height:1.6"></p>
           <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
             <button type="button" class="hk-btn hk-btn--primary hk-btn--sm" id="preview-btn">${HKUI.icon("eye", 16, "#fff")} 미리보기</button>
             <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" id="save-tpl">템플릿 저장</button>
             <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" id="restore-tpl">기본값 복원</button>
-            <span style="font-size:12.5px;color:var(--text-muted)">· {이름} {날짜} {인증코드} 등 변수는 발송 시 치환됩니다</span>
+            <span style="font-size:12.5px;color:var(--text-muted)">· {이름} {날짜} {시간} 등 변수는 발송 시 치환됩니다 · 실제 발송 레이아웃은 미리보기 HTML 기준</span>
           </div>`);
 
         const subjectEl = document.getElementById("tpl-subject");
         const bodyEl = document.getElementById("tpl-body");
+        const designNoteEl = document.getElementById("tpl-design-note");
+
+        function updateDesignNote(t, data) {
+          if (!designNoteEl) return;
+          if (data?.usesDesignHtml) {
+            designNoteEl.textContent =
+              "실제 발송 메일은 디자인 HTML 템플릿으로 전송됩니다. 아래 텍스트는 문구 참고용이며, 미리보기에서 최종 화면을 확인하세요.";
+          } else {
+            designNoteEl.textContent = "발송 시 아래 텍스트가 그대로 사용됩니다.";
+          }
+        }
+
         async function loadTpl() {
           const t = MAIL_TPL[tplKey];
+          subjectEl.value = t.subject || "";
+          bodyEl.value = t.body || "";
           try {
             const data = await HKApi.mailTemplate(t.apiType);
-            subjectEl.value = data.subjectTemplate || t.subject || "";
-            bodyEl.value = data.bodyTemplate || t.body || "";
+            if (data.subjectTemplate) subjectEl.value = data.subjectTemplate;
+            updateDesignNote(t, data);
           } catch (_) {
-            subjectEl.value = t.subject || "";
-            bodyEl.value = t.body || "";
+            updateDesignNote(t, { usesDesignHtml: true });
           }
         }
         document.getElementById("tpl-select").onchange = async (e) => { tplKey = e.target.value; await loadTpl(); };
@@ -148,7 +162,43 @@
           HKUI.toast("기본 문구로 복원했습니다");
         };
 
-        document.getElementById("preview-btn").onclick = () => {
+        function mailPreviewVars() {
+          const origin = window.location.origin;
+          const chip = "display:inline-block;margin:0 6px 6px 0;padding:6px 12px;background:#ffffff;border:1px solid #d4e0ed;border-radius:999px;font-size:13px;color:#0b3558;";
+          return {
+            이름: "김민수",
+            name: "김민수",
+            날짜: "6월 23일 (화)",
+            slotDate: "6월 23일 (화)",
+            시간: "15:30 – 16:00",
+            slotTime: "15:30 – 16:00",
+            logoUrl: origin + "/assets/logo-lockup.svg",
+            mypageUrl: origin + "/mypage",
+            reapplyUrl: origin + "/reapply",
+            재신청시작: "목요일 09:00",
+            reapplyOpenAt: "목요일 09:00",
+            재신청마감: "목요일 17:00",
+            reapplyDeadline: "목요일 17:00",
+            빈슬롯목록: "화 6/23 · 13:30, 목 6/25 · 14:30",
+            emptySlots: "화 6/23 · 13:30, 목 6/25 · 14:30",
+            빈슬롯목록Html:
+              `<span style="${chip}">화 6/23 · 13:30</span>` +
+              `<span style="${chip}">목 6/25 · 14:30</span>`,
+            emptySlotsHtml:
+              `<span style="${chip}">화 6/23 · 13:30</span>` +
+              `<span style="${chip}">목 6/25 · 14:30</span>`,
+          };
+        }
+
+        function applyMailPreviewVars(html) {
+          let out = html;
+          Object.entries(mailPreviewVars()).forEach(([key, value]) => {
+            out = out.split("{" + key + "}").join(value);
+          });
+          return out;
+        }
+
+        document.getElementById("preview-btn").onclick = async () => {
           const t = MAIL_TPL[tplKey];
           const overlay = document.getElementById("preview-overlay");
           overlay.style.display = "flex";
@@ -159,10 +209,22 @@
               <a href="${t.file}" target="_blank" style="font-size:13px;font-weight:600;color:var(--color-signal-blue);text-decoration:none;display:inline-flex;align-items:center;gap:4px">새 창 ${HKUI.icon("external-link", 14, "var(--color-signal-blue)")}</a>
               <button type="button" id="close-preview" aria-label="닫기" style="border:none;background:transparent;cursor:pointer;padding:6px;display:flex">${HKUI.icon("x", 20, "var(--color-slate-blue)")}</button>
             </div>
-            <div style="background:#eef1f6;overflow:auto;flex:1"><iframe src="${t.file}" title="메일 미리보기" style="width:100%;height:760px;border:none;display:block"></iframe></div>
+            <div id="preview-frame-wrap" style="background:#eef1f6;overflow:auto;flex:1;min-height:760px"></div>
           </div>`;
           overlay.onclick = () => { overlay.style.display = "none"; };
           document.getElementById("close-preview").onclick = () => { overlay.style.display = "none"; };
+          const wrap = document.getElementById("preview-frame-wrap");
+          try {
+            const res = await fetch(t.file);
+            const html = applyMailPreviewVars(await res.text());
+            const iframe = document.createElement("iframe");
+            iframe.title = "메일 미리보기";
+            iframe.style.cssText = "width:100%;height:760px;border:none;display:block";
+            iframe.srcdoc = html;
+            wrap.appendChild(iframe);
+          } catch (_) {
+            wrap.innerHTML = `<p style="padding:24px;color:var(--text-muted)">미리보기를 불러올 수 없습니다.</p>`;
+          }
           HKUI.refreshIcons();
         };
 

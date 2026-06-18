@@ -200,20 +200,28 @@ async def get_mail_template(
     db: AsyncSession = Depends(get_db),
     _: AdminUser = Depends(get_current_admin),
 ):
-    from app.services.mail import DEFAULT_SUBJECTS, get_template, load_design_html, _is_html_template
+    from app.services.mail import (
+        DEFAULT_SUBJECTS,
+        MAIL_HTML_FILES,
+        editor_body_template,
+        get_template,
+        load_design_html,
+    )
 
     tpl = await get_template(db, mail_type)
     subject = (tpl.subject_template if tpl else "") or DEFAULT_SUBJECTS.get(mail_type, "")
-    body = (tpl.body_template if tpl else "") or ""
-    if not _is_html_template(body):
-        design = load_design_html(mail_type)
-        if design:
-            body = design
+    stored_body = (tpl.body_template if tpl else "") or ""
+    body = editor_body_template(stored_body, mail_type)
+
     return {
         "data": {
             "type": mail_type.value,
             "subjectTemplate": subject,
             "bodyTemplate": body,
+            "usesDesignHtml": bool(load_design_html(mail_type)),
+            "designPreviewPath": f"/이메일/{MAIL_HTML_FILES[mail_type]}"
+            if mail_type in MAIL_HTML_FILES
+            else None,
         }
     }
 

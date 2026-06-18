@@ -3,7 +3,15 @@
   const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
   let calendar = null;
   let systemState = "BEFORE_OPEN";
+  let systemInfo = null;
   let selected = null;
+  let myReservations = [];
+
+  function hasDroppedThisCycle() {
+    if (!calendar?.slots?.length) return false;
+    const dates = new Set(calendar.slots.map((s) => s.slotDate));
+    return myReservations.some((r) => r.status === "DROPPED" && dates.has(r.slotDate));
+  }
 
   function groupSlots(slots) {
     const byDate = {};
@@ -57,10 +65,14 @@
       el.style.display = "none";
     } else {
       el.style.display = "";
-      const banner = HKUI.STATE_BANNER[systemState] || HKUI.STATE_BANNER.CLOSED;
+      const banner = HKUI.getStateBanner(systemState, {
+        reapplyCloseAt: systemInfo?.reapplyCloseAt,
+        closeAt: systemInfo?.closeAt,
+      });
       el.innerHTML = HKUI.alertBox(banner.variant, banner.title, banner.body);
     }
-    document.getElementById("reapply-link").style.display = systemState === "REAPPLY" ? "block" : "none";
+    document.getElementById("reapply-link").style.display =
+      systemState === "REAPPLY" && hasDroppedThisCycle() ? "block" : "none";
   }
 
   function renderGrid() {
@@ -224,8 +236,14 @@
       const gridEl = document.getElementById("calendar-grid");
       const summaryEl = document.getElementById("summary");
       try {
-        const [sys, cal] = await Promise.all([HKApi.systemState(), HKApi.calendar()]);
+        const [sys, cal, mine] = await Promise.all([
+          HKApi.systemState(),
+          HKApi.calendar(),
+          HKApi.myReservations().catch(() => ({ items: [] })),
+        ]);
         systemState = sys.state;
+        systemInfo = sys;
+        myReservations = mine.items || [];
         calendar = {
           ...cal,
           slots: (cal.slots || []).map((s) => ({ ...s })),

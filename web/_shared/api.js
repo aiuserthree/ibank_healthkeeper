@@ -13,8 +13,9 @@ window.HKApi = (function () {
       /* empty */
     }
     if (!res.ok) {
-      const err = new Error(body.error?.message || res.statusText || "요청 실패");
-      err.code = body.error?.code;
+      const apiErr = body.error || body.detail?.error || {};
+      const err = new Error(apiErr.message || res.statusText || "요청 실패");
+      err.code = apiErr.code;
       err.status = res.status;
       throw err;
     }

@@ -12,7 +12,7 @@ window.HKUI = (function () {
     },
     REAPPLY: {
       variant: "warning",
-      title: "탈락자 재신청 기간 · 내일 17:00까지",
+      title: "탈락자 재신청 기간",
       body: "비어있는 슬롯에 선착순·즉시 확정으로 재신청할 수 있어요. 재신청 건은 취소할 수 없습니다.",
     },
     CLOSED: {
@@ -62,6 +62,52 @@ window.HKUI = (function () {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "-";
     return d.toLocaleTimeString("ko-KR", { timeZone: KST, hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+
+  /** ISO datetime → KST YYYY-MM-DD */
+  function kstDateKey(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("sv-SE", { timeZone: KST });
+  }
+
+  function kstDayName(iso) {
+    const key = kstDateKey(iso);
+    if (!key) return "";
+    const [y, m, day] = key.split("-").map(Number);
+    return DAY_NAMES[new Date(y, m - 1, day).getDay()];
+  }
+
+  /** 마감 시각을 오늘/내일/요일 기준으로 표시 (예: 오늘 17:00) */
+  function formatDeadlineRelative(iso, fallbackTime = "17:00") {
+    if (!iso) return `목요일 ${fallbackTime}`;
+    const time = formatTimeKst(iso);
+    const target = kstDateKey(iso);
+    const now = nowKst();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    if (target === todayKey) return `오늘 ${time}`;
+    const tomorrow = nowKst();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowKey = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+    if (target === tomorrowKey) return `내일 ${time}`;
+    const dow = kstDayName(iso);
+    return dow ? `${dow}요일 ${time}` : time;
+  }
+
+  function getStateBanner(state, opts = {}) {
+    const base = { ...(STATE_BANNER[state] || STATE_BANNER.CLOSED) };
+    if (state === "REAPPLY") {
+      const until = formatDeadlineRelative(opts.reapplyCloseAt);
+      base.title = `탈락자 재신청 기간 · ${until}까지`;
+    } else if (state === "OPEN" && opts.closeAt) {
+      const close = new Date(opts.closeAt);
+      if (!Number.isNaN(close.getTime())) {
+        close.setMinutes(close.getMinutes() - 1);
+        base.title = `예약 가능 · ${formatDeadlineRelative(close.toISOString(), "16:59")} 마감`;
+      }
+    }
+    return base;
   }
 
   /** ISO datetime → KST YYYY-MM-DD HH:MM */
@@ -430,6 +476,8 @@ window.HKUI = (function () {
     nowKst,
     formatTimeKst,
     formatDateTimeKst,
+    formatDeadlineRelative,
+    getStateBanner,
     formatDateDotKst,
     addMin,
     endT,
