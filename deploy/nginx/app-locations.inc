@@ -14,6 +14,13 @@ location /api/ {
     proxy_read_timeout 120s;
 }
 
+location = /favicon.ico {
+    alias /opt/healthkeeper/app/web/assets/logo-mark.svg;
+    default_type image/svg+xml;
+    expires 30d;
+    add_header Cache-Control "public, immutable";
+}
+
 location = / {
     return 301 /index;
 }

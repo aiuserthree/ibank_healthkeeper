@@ -4,7 +4,7 @@ window.HKUI = (function () {
   let lucidePromise = null;
 
   const STATE_BANNER = {
-    BEFORE_OPEN: { variant: "info", title: "예약 오픈 전", body: "이번 주 예약은 수요일 09:00에 오픈됩니다." },
+    BEFORE_OPEN: { variant: "info", title: "예약 오픈 전", body: "다음 예약은 수요일 09:00에 오픈됩니다." },
     OPEN: {
       variant: "info",
       title: "예약 가능 · 오늘 16:59 마감",
@@ -18,7 +18,7 @@ window.HKUI = (function () {
     CLOSED: {
       variant: "danger",
       title: "예약 마감",
-      body: "현재 예약 접수 기간이 아닙니다. 다음 오픈: 수요일 09:00",
+      body: "다음 예약은 수요일 09:00에 오픈됩니다.",
     },
   };
 
@@ -268,6 +268,108 @@ window.HKUI = (function () {
 
   function kv(k, v) {
     return `<div><div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">${escapeHtml(k)}</div><div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${v}</div></div>`;
+  }
+
+  const PRIORITY_TOOLTIP_HTML =
+    "<b>이력 없음 · 최우선</b> — 안마서비스 이용 이력이 없어, 같은 시간에 신청이 겹치면 가장 유리합니다.<br><br>" +
+    "<b>이용 이력 있음</b> — 마지막 이용일이 있으며, <b>오래 전에 받은 분</b>일수록 우선순위가 높습니다. 마지막 이용일이 같으면 먼저 신청한 분이 우선합니다.";
+
+  const APPLY_TOTAL_TOOLTIP_HTML =
+    "지금까지 <b>예약을 신청하신 횟수</b>예요.<br><br>" +
+    "확정·탈락·대기 중인 신청까지 모두 포함하고, <b>취소한 건은 빼고</b> 계산합니다. 아직 확정되지 않은 신청도 여기에 포함돼요.";
+
+  const USAGE_TOTAL_TOOLTIP_HTML =
+    "실제로 <b>예약이 확정되어 안마서비스를 받으신 횟수</b>예요.<br><br>" +
+    "신청만 하고 대기 중이거나 탈락한 건은 포함되지 않습니다.<br>재신청으로 확정된 이용도 포함돼요.";
+
+  function kvTooltip(key, valueHtml, tooltipHtml) {
+    const panelId = `hk-tt-${Math.random().toString(36).slice(2, 9)}`;
+    return `<div class="hk-kv-tooltip" data-tooltip-root>
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;display:flex;align-items:center;gap:5px">
+        <span>${escapeHtml(key)}</span>
+        <button type="button" class="hk-tooltip-btn" aria-expanded="false" aria-controls="${panelId}" aria-label="${escapeHtml(key)} 안내" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer;border-radius:999px;color:var(--color-slate-blue)">${icon("circle-help", 15, "currentColor")}</button>
+      </div>
+      <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${valueHtml}</div>
+      <div id="${panelId}" class="hk-tooltip-panel" role="tooltip" hidden>${tooltipHtml}</div>
+    </div>`;
+  }
+
+  function resetTooltipPanel(panel) {
+    panel.style.top = "";
+    panel.style.left = "";
+    panel.style.right = "";
+    panel.style.width = "";
+    panel.style.maxWidth = "";
+    if (panel._tooltipWrap && panel.parentElement === document.body) {
+      panel._tooltipWrap.appendChild(panel);
+    }
+  }
+
+  function positionTooltipPanel(btn, panel) {
+    if (panel.parentElement !== document.body) {
+      document.body.appendChild(panel);
+    }
+    panel.hidden = false;
+
+    const margin = 18;
+    const maxW = 420;
+    const vw = window.innerWidth;
+    const width = Math.min(maxW, vw - margin * 2);
+    const rect = btn.getBoundingClientRect();
+
+    panel.style.left = `${Math.max(margin, Math.min(rect.left, vw - margin - width))}px`;
+    panel.style.right = "auto";
+    panel.style.width = `${width}px`;
+    panel.style.maxWidth = `${width}px`;
+
+    const ph = panel.offsetHeight;
+    const gap = 8;
+    let top = rect.bottom + gap;
+    if (top + ph > window.innerHeight - 12) {
+      top = Math.max(12, rect.top - ph - gap);
+    }
+    panel.style.top = `${top}px`;
+  }
+
+  function closeAllTooltips() {
+    document.querySelectorAll(".hk-tooltip-panel").forEach((p) => {
+      p.hidden = true;
+      resetTooltipPanel(p);
+      const btn = p._tooltipBtn;
+      if (btn) btn.setAttribute("aria-expanded", "false");
+    });
+  }
+
+  function bindTooltips(root) {
+    const scope = root || document;
+    scope.querySelectorAll("[data-tooltip-root]").forEach((wrap) => {
+      const btn = wrap.querySelector(".hk-tooltip-btn");
+      const panel = wrap.querySelector(".hk-tooltip-panel");
+      if (!btn || !panel || btn.dataset.bound) return;
+      btn.dataset.bound = "1";
+      panel._tooltipWrap = wrap;
+      panel._tooltipBtn = btn;
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const willOpen = panel.hidden;
+        closeAllTooltips();
+        if (willOpen) {
+          positionTooltipPanel(btn, panel);
+          btn.setAttribute("aria-expanded", "true");
+          refreshIcons();
+        }
+      });
+    });
+    if (!document.documentElement.dataset.hkTooltipDocBound) {
+      document.documentElement.dataset.hkTooltipDocBound = "1";
+      document.addEventListener("click", (e) => {
+        if (e.target.closest(".hk-tooltip-btn") || e.target.closest(".hk-tooltip-panel")) return;
+        closeAllTooltips();
+      });
+      window.addEventListener("resize", closeAllTooltips);
+      window.addEventListener("scroll", closeAllTooltips, true);
+    }
   }
 
   function teamsBadge() {
@@ -646,6 +748,11 @@ window.HKUI = (function () {
     queryParam,
     msLogo,
     kv,
+    kvTooltip,
+    bindTooltips,
+    PRIORITY_TOOLTIP_HTML,
+    APPLY_TOTAL_TOOLTIP_HTML,
+    USAGE_TOTAL_TOOLTIP_HTML,
     teamsBadge,
     demoToggle,
     subNav,

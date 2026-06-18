@@ -33,10 +33,10 @@ async def system_state(db: AsyncSession = Depends(get_db)):
     if cycle and state.value == "REAPPLY":
         reapply_msg = f"탈락자 재신청 기간입니다. ({format_deadline_relative_ko(cycle.reapply_close_at)}까지)"
     banners = {
-        "BEFORE_OPEN": "이번 주 예약은 수요일 09:00에 오픈됩니다.",
+        "BEFORE_OPEN": "다음 예약은 수요일 09:00에 오픈됩니다.",
         "OPEN": open_msg,
         "REAPPLY": reapply_msg,
-        "CLOSED": "현재 예약 접수 기간이 아닙니다. 다음 오픈: 수요일 09:00",
+        "CLOSED": "다음 예약은 수요일 09:00에 오픈됩니다.",
     }
     return {
         "data": {

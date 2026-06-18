@@ -119,9 +119,32 @@ async def get_admin_view_cycle(db: AsyncSession) -> Optional[ReservationCycle]:
 
 
 async def resolve_system_state(db: AsyncSession) -> tuple[CycleState, Optional[ReservationCycle]]:
+    """사용자 화면용 — 현재 시각(KST) 기준 표시 상태·대상 사이클."""
     cycle = await get_active_cycle(db)
-    if not cycle:
-        cycle = await get_vacation_cycle(db)
+    if cycle:
+        state = await sync_cycle_state_if_due(db, cycle)
+        return state, cycle
+
+    now = now_kst()
+    next_result = await db.execute(
+        select(ReservationCycle)
+        .where(ReservationCycle.open_at > now)
+        .order_by(ReservationCycle.open_at.asc())
+        .limit(1)
+    )
+    next_cycle = next_result.scalar_one_or_none()
+    if next_cycle:
+        prev_result = await db.execute(
+            select(ReservationCycle)
+            .where(ReservationCycle.target_week_start < next_cycle.target_week_start)
+            .order_by(ReservationCycle.target_week_start.desc())
+            .limit(1)
+        )
+        prev_cycle = prev_result.scalar_one_or_none()
+        if prev_cycle is None or now >= to_kst(prev_cycle.reapply_close_at):
+            return CycleState.CLOSED, next_cycle
+
+    cycle = await get_vacation_cycle(db)
     if not cycle:
         result = await db.execute(
             select(ReservationCycle)
@@ -169,12 +192,8 @@ async def get_vacation_cycle(db: AsyncSession) -> Optional[ReservationCycle]:
     return result.scalar_one_or_none()
 
 
-async def create_cycle_for_week(
-    db: AsyncSession,
-    target_monday: date,
-    state: CycleState = CycleState.BEFORE_OPEN,
-) -> ReservationCycle:
-    settings = await get_settings_map(db)
+def compute_cycle_times(target_monday: date, settings: dict[str, str]) -> dict[str, datetime]:
+    """operation_setting 기준 해당 주차 오픈/마감/재신청 시각."""
     open_dow = DOW_MAP.get(settings.get("open.dow", "WED"), 2)
     reapply_start_dow = DOW_MAP.get(settings.get("reapply.start.dow", "THU"), 3)
     reapply_dow = DOW_MAP.get(settings.get("reapply.close.dow", "THU"), 3)
@@ -188,24 +207,39 @@ async def create_cycle_for_week(
         prev_wed -= timedelta(days=7)
     open_at = datetime.combine(prev_wed, open_time, tzinfo=KST)
     close_at = datetime.combine(prev_wed, close_time, tzinfo=KST)
-    reapply_open = datetime.combine(
+    reapply_open_at = datetime.combine(
         prev_wed + timedelta(days=(reapply_start_dow - open_dow) % 7 or 1),
         reapply_start_time,
         tzinfo=KST,
     )
-    reapply_close = datetime.combine(
+    reapply_close_at = datetime.combine(
         prev_wed + timedelta(days=(reapply_dow - open_dow) % 7 or 1),
         reapply_time,
         tzinfo=KST,
     )
+    return {
+        "open_at": open_at,
+        "close_at": close_at,
+        "reapply_open_at": reapply_open_at,
+        "reapply_close_at": reapply_close_at,
+    }
+
+
+async def create_cycle_for_week(
+    db: AsyncSession,
+    target_monday: date,
+    state: CycleState = CycleState.BEFORE_OPEN,
+) -> ReservationCycle:
+    settings = await get_settings_map(db)
+    times = compute_cycle_times(target_monday, settings)
 
     cycle = ReservationCycle(
         target_week_start=target_monday,
         target_week_end=week_friday(target_monday),
-        open_at=open_at,
-        close_at=close_at,
-        reapply_open_at=reapply_open,
-        reapply_close_at=reapply_close,
+        open_at=times["open_at"],
+        close_at=times["close_at"],
+        reapply_open_at=times["reapply_open_at"],
+        reapply_close_at=times["reapply_close_at"],
         state=state,
     )
     db.add(cycle)

@@ -22,8 +22,8 @@ from app.services.confirm import confirm_reservation
 from app.services.cycle import (
     apply_vacations_to_slots,
     create_cycle_for_week,
+    get_active_cycle,
     get_setting,
-    resolve_system_state,
     week_monday,
 )
 from app.services.mail import drain_pending_mails, process_one_mail, retry_failed_mails
@@ -69,7 +69,7 @@ async def job_open_cycle(db: AsyncSession) -> None:
 
 
 async def job_close_batch(db: AsyncSession) -> None:
-    _, cycle = await resolve_system_state(db)
+    cycle = await get_active_cycle(db)
     if not cycle or cycle.batch_close_done:
         return
 
@@ -127,8 +127,10 @@ async def job_reapply_open(db: AsyncSession) -> None:
 
 
 async def job_reapply_close(db: AsyncSession) -> None:
-    _, cycle = await resolve_system_state(db)
+    cycle = await get_active_cycle(db)
     if not cycle or cycle.state == CycleState.CLOSED:
+        return
+    if now_kst() < to_kst(cycle.reapply_close_at):
         return
     cycle.state = CycleState.CLOSED
     cycle.reapply_closed_at = now_kst()

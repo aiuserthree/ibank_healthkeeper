@@ -74,8 +74,8 @@
     if (!calendar?.slots?.length) {
       const desc =
         systemState === "BEFORE_OPEN"
-          ? "수요일 09:00에 차주 예약이 오픈됩니다."
-          : "다음 오픈을 기다려 주세요.";
+          ? "다음 예약은 수요일 09:00에 오픈됩니다."
+          : "다음 예약 오픈을 기다려 주세요.";
       el.innerHTML = HKUI.emptyState({
         iconName: "calendar-x",
         title: "예약 가능한 슬롯이 없습니다",
@@ -147,10 +147,10 @@
         : isOpen()
           ? "캘린더에서 원하는 날짜·시간을 선택하세요."
           : systemState === "BEFORE_OPEN"
-            ? "현재 예약 오픈 전입니다.<br>수요일 09:00에 차주 예약이 시작됩니다."
+            ? "현재 예약 오픈 전입니다.<br>다음 예약은 수요일 09:00에 시작됩니다."
             : systemState === "REAPPLY"
               ? "재신청 기간에는 전용 재신청 화면을 이용해 주세요."
-              : "현재 예약 신청 기간이 아닙니다.";
+              : "다음 예약은 수요일 09:00에 오픈됩니다.";
       el.innerHTML = `<div style="color:var(--text-secondary);font-size:14px;line-height:1.6;padding:8px 0 4px">${hint}</div>`;
       HKUI.refreshIcons();
       return;
