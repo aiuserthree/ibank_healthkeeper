@@ -15,6 +15,7 @@ window.HKMember = (function () {
   function renderHeader(active, profile) {
     const loggedIn = !!profile;
     const name = profile?.name || "";
+    const avatarUrl = profile?.avatarUrl || "";
     const navStyle = (id) =>
       `text-decoration:none;font-size:15px;font-weight:600;padding:8px 4px;white-space:nowrap;color:${active === id ? "var(--color-signal-blue)" : "var(--color-midnight-navy)"}`;
     return `<header style="background:var(--surface-card);border-bottom:1px solid var(--border-default);position:sticky;top:0;z-index:50">
@@ -30,7 +31,7 @@ window.HKMember = (function () {
           loggedIn
             ? `<div class="hk-mactions" style="display:flex;align-items:center;gap:14px">
                 <a href="${R.mypage}" style="display:flex;align-items:center;gap:10px;text-decoration:none">
-                  ${HKUI.avatar(name, "sm")}<span class="hk-uname" style="font-size:14px;font-weight:600;color:var(--color-midnight-navy)">${HKUI.escapeHtml(name)}님</span>
+                  ${HKUI.avatar(name, "sm", avatarUrl)}<span class="hk-uname" style="font-size:14px;font-weight:600;color:var(--color-midnight-navy)">${HKUI.escapeHtml(name)}님</span>
                 </a>
                 <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" id="hk-logout">로그아웃</button>
               </div>`
@@ -52,7 +53,7 @@ window.HKMember = (function () {
             ${[[R.home, "home", "서비스 소개"], [R.reserve, "reserve", "예약하기"]].concat(loggedIn ? [[R.mypage, "mypage", "마이페이지"]] : []).map(([h, id, l]) => `<a href="${h}" style="display:block;padding:14px 4px;font-size:16px;font-weight:600;text-decoration:none;border-bottom:1px solid var(--color-mist);color:${active === id ? "var(--color-signal-blue)" : "var(--color-midnight-navy)"}">${l}</a>`).join("")}
           </nav>
         </div>
-        ${loggedIn ? `<div style="border-top:1px solid var(--border-default);padding:14px 18px;display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:10px">${HKUI.avatar(name, "sm")}<span style="font-size:14px;font-weight:600;color:var(--color-midnight-navy)">${HKUI.escapeHtml(name)}님</span></div><button type="button" class="hk-btn hk-btn--secondary hk-btn--block" id="hk-logout-mobile">로그아웃</button></div>` : ""}
+        ${loggedIn ? `<div style="border-top:1px solid var(--border-default);padding:14px 18px;display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:10px">${HKUI.avatar(name, "sm", avatarUrl)}<span style="font-size:14px;font-weight:600;color:var(--color-midnight-navy)">${HKUI.escapeHtml(name)}님</span></div><button type="button" class="hk-btn hk-btn--secondary hk-btn--block" id="hk-logout-mobile">로그아웃</button></div>` : ""}
       </aside>
     </div>`;
   }

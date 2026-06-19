@@ -7,7 +7,7 @@ from urllib.parse import urlencode
 
 import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,6 +24,12 @@ from app.services.legacy_usage import (
     list_member_usage_history,
 )
 from app.services import account as account_service
+from app.services.avatar import (
+    avatar_path,
+    avatar_public_url,
+    fetch_and_store_from_graph,
+    has_avatar,
+)
 from app.services.sso import (
     STATE_PREFIX,
     SSOAuthError,
@@ -194,6 +200,12 @@ async def sso_callback(
         msg = detail.get("error", {}).get("message", "로그인에 실패했습니다.")
         return _login_error_redirect(msg)
 
+    if claims.access_token:
+        try:
+            await fetch_and_store_from_graph(claims.access_token, member.id)
+        except Exception:
+            logger.exception("Microsoft profile photo fetch failed for member %s", member.id)
+
     session_id = await create_member_session(redis, member.id)
     redirect = RedirectResponse(
         url=f"{settings.app_base_url}{return_to}",
@@ -257,6 +269,7 @@ async def profile(
             "email": member.email,
             "department": member.department,
             "position": member.position,
+            "avatarUrl": avatar_public_url(member.id),
             "lastLoginAt": format_kst_iso(member.last_login_at),
             "lastUsedDate": member.last_used_date.isoformat() if member.last_used_date else None,
             "totalUses": total_uses,
@@ -265,6 +278,18 @@ async def profile(
             "createdAt": format_kst_iso(member.created_at),
         }
     }
+
+
+@me_router.get("/avatar")
+async def member_avatar(member: Member = Depends(get_current_active_member)):
+    if not has_avatar(member.id):
+        raise HTTPException(status_code=404, detail="Not found")
+    path = avatar_path(member.id)
+    return FileResponse(
+        path,
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @me_router.get("/usage-history")

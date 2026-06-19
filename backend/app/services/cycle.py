@@ -141,7 +141,12 @@ async def resolve_system_state(db: AsyncSession) -> tuple[CycleState, Optional[R
             .limit(1)
         )
         prev_cycle = prev_result.scalar_one_or_none()
-        if prev_cycle is None or now >= to_kst(prev_cycle.reapply_close_at):
+        if prev_cycle is None:
+            return CycleState.CLOSED, next_cycle
+        if now >= to_kst(prev_cycle.reapply_close_at):
+            # 재신청 마감 ~ 다음 수요일 09:00 전: 직전 신청 주차 캘린더 유지
+            if now < to_kst(next_cycle.open_at):
+                return CycleState.CLOSED, prev_cycle
             return CycleState.CLOSED, next_cycle
 
     cycle = await get_vacation_cycle(db)

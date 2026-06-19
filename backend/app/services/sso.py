@@ -195,6 +195,7 @@ class SSOClaims:
     name: str
     department: str | None = None
     position: str | None = None
+    access_token: str | None = None
 
 
 def _b64url(data: bytes) -> str:
@@ -456,6 +457,7 @@ class EntraSSOProvider(SSOProvider):
             name=name,
             department=department,
             position=position,
+            access_token=access_token,
         )
 
 

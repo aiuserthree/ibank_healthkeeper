@@ -281,8 +281,11 @@ window.HKUI = (function () {
     return { overlay, bodyEl, footerEl, close };
   }
 
-  function avatar(name, size = "sm") {
+  function avatar(name, size = "sm", src = "") {
     const initial = (name || "?").charAt(0);
+    if (src) {
+      return `<span class="hk-avatar hk-avatar--${size}"><img src="${escapeHtml(src)}" alt="${escapeHtml(name || "")}" loading="lazy" referrerpolicy="no-referrer"></span>`;
+    }
     return `<span class="hk-avatar hk-avatar--${size}">${escapeHtml(initial)}</span>`;
   }
 
@@ -310,11 +313,11 @@ window.HKUI = (function () {
     "<b>이용 이력 있음</b> — 마지막 이용일이 있으며, <b>오래 전에 받은 분</b>일수록 우선순위가 높습니다. 마지막 이용일이 같으면 먼저 신청한 분이 우선합니다.";
 
   const APPLY_TOTAL_TOOLTIP_HTML =
-    "지금까지 <b>예약을 신청하신 횟수</b>예요.(2026년 1월 1일부터 산정)<br><br>" +
+    "지금까지 <b>예약을 신청하신 횟수</b>예요.(2026년 기준)<br><br>" +
     "과거 이용 이력과 사이트에서 신청한 건(확정·탈락·대기)을 합산하고, <b>취소한 건은 빼고</b> 계산합니다.";
 
   const USAGE_TOTAL_TOOLTIP_HTML =
-    "실제로 <b>안마서비스를 이용하신 횟수</b>예요.(2026년 1월 1일부터 산정)<br><br>" +
+    "실제로 <b>안마서비스를 이용하신 횟수</b>예요.(2026년 기준)<br><br>" +
     "과거 이용 이력과 사이트에서 <b>확정된</b> 예약을 합산합니다. 신청만 한 건·탈락한 건은 포함되지 않습니다.";
 
   function kvTooltip(key, valueHtml, tooltipHtml) {
