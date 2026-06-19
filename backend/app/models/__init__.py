@@ -15,6 +15,7 @@ from app.models.enums import (
     ReservationType,
     SlotStatus,
 )
+from app.models.legacy_usage import LegacyUsage
 from app.models.mail import MailMessage, MailTemplate
 from app.models.member import Member
 from app.models.reservation import Reservation
@@ -28,6 +29,7 @@ __all__ = [
     "AdminRole",
     "Member",
     "MemberStatus",
+    "LegacyUsage",
     "EmailVerificationToken",
     "ReservationCycle",
     "CycleState",

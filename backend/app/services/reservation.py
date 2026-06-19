@@ -19,6 +19,7 @@ from app.models import (
     MailType,
 )
 from app.services.cycle import get_active_cycle, resolve_system_state
+from app.services.legacy_usage import get_member_apply_total
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 
 ACTIVE_APPLY_STATUSES = (ReservationStatus.REQUESTED, ReservationStatus.CONFIRMED)
@@ -253,13 +254,7 @@ async def list_my_reservations(
     )
     total = int(total_result.scalar_one())
 
-    active_result = await db.execute(
-        select(func.count())
-        .select_from(Reservation)
-        .where(Reservation.member_id == member.id)
-        .where(Reservation.status != ReservationStatus.CANCELLED)
-    )
-    active_total = int(active_result.scalar_one())
+    active_total = await get_member_apply_total(db, member)
 
     result = await db.execute(
         select(Reservation, Slot)

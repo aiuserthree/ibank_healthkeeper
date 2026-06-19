@@ -10,8 +10,19 @@
 
 ## Local development
 
+개발 DB는 세 가지 방식 중 선택합니다.
+
+| 방식 | Docker | 운영 DB 영향 |
+|------|--------|-------------|
+| **서버 dev DB** (`remote-dev`) | 불필요 | 없음 — `healthkeeper_dev` |
+| 로컬 Docker (`local`) | 필요 | 없음 |
+| 운영 DB 직접 (`USE_REMOTE_DB=1`) | 불필요 | **있음** |
+
+**권장 — 서버 개발 DB (Docker 없음):**
+
 ```bash
-cp .env.example .env   # DB/SSO 값 설정
+./scripts/setup-server-dev-db.sh      # 최초 1회
+./scripts/switch-to-remote-dev-db.sh
 ./scripts/dev.sh
 ```
 
@@ -19,6 +30,8 @@ cp .env.example .env   # DB/SSO 값 설정
 - API: http://localhost:8100
 
 ## Deploy
+
+**운영 반영은 deploy 시에만** 이루어집니다 (코드 + 원격 DB 마이그레이션).
 
 ```bash
 ./scripts/deploy.sh

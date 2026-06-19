@@ -1,0 +1,38 @@
+# 로컬 개발 전용 PostgreSQL + Redis (운영 서버와 데이터·포트 분리)
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: healthkeeper-postgres-local
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-healthkeeper}
+      POSTGRES_PASSWORD: ${LOCAL_POSTGRES_PASSWORD:-localdev}
+      POSTGRES_DB: ${POSTGRES_DB:-healthkeeper}
+      TZ: Asia/Seoul
+    ports:
+      - "127.0.0.1:54321:5432"
+    volumes:
+      - pgdata_local:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-healthkeeper} -d ${POSTGRES_DB:-healthkeeper}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    container_name: healthkeeper-redis-local
+    command: redis-server --requirepass ${LOCAL_REDIS_PASSWORD:-localdev} --appendonly yes
+    ports:
+      - "127.0.0.1:63791:6379"
+    volumes:
+      - redisdata_local:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${LOCAL_REDIS_PASSWORD:-localdev}", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  pgdata_local:
+  redisdata_local:

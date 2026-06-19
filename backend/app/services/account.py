@@ -18,6 +18,10 @@ from app.models import (
     Reservation,
     ReservationStatus,
 )
+from app.services.legacy_usage import (
+    apply_legacy_last_used_to_member,
+    find_member_by_email_local,
+)
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 
 settings = get_settings()
@@ -58,6 +62,9 @@ async def upsert_member_from_sso(
         )
         member = result.scalar_one_or_none()
 
+    if not member:
+        member = await find_member_by_email_local(db, email)
+
     if member:
         member.entra_oid = oid
         member.name = name.strip()
@@ -83,6 +90,8 @@ async def upsert_member_from_sso(
             position=position.strip() if position else None,
         )
         db.add(member)
+
+    await apply_legacy_last_used_to_member(db, member, email=email, name=name)
 
     await db.commit()
     await db.refresh(member)

@@ -9,7 +9,6 @@ import httpx
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from redis.asyncio import Redis
-from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import format_kst_iso
@@ -17,7 +16,13 @@ from app.config import get_settings
 from app.core.deps import get_current_active_member, get_redis_client
 from app.core.session import create_member_session, delete_member_session
 from app.database import get_db
-from app.models import Member, Reservation, ReservationStatus
+from app.models import Member
+from app.services.legacy_usage import (
+    get_member_apply_total,
+    get_member_total_uses,
+    count_member_usage_history,
+    list_member_usage_history,
+)
 from app.services import account as account_service
 from app.services.sso import (
     STATE_PREFIX,
@@ -242,13 +247,9 @@ async def profile(
     member: Member = Depends(get_current_active_member),
     db: AsyncSession = Depends(get_db),
 ):
-    total_result = await db.execute(
-        select(func.count())
-        .select_from(Reservation)
-        .where(Reservation.member_id == member.id)
-        .where(Reservation.status == ReservationStatus.CONFIRMED)
-    )
-    total_uses = total_result.scalar_one()
+    total_uses = await get_member_total_uses(db, member)
+    apply_total = await get_member_apply_total(db, member)
+    usage_history_total = await count_member_usage_history(db, member)
 
     return {
         "data": {
@@ -259,9 +260,34 @@ async def profile(
             "lastLoginAt": format_kst_iso(member.last_login_at),
             "lastUsedDate": member.last_used_date.isoformat() if member.last_used_date else None,
             "totalUses": total_uses,
+            "applyTotal": apply_total,
+            "usageHistoryTotal": usage_history_total,
             "createdAt": format_kst_iso(member.created_at),
         }
     }
+
+
+@me_router.get("/usage-history")
+async def usage_history(
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    data = await list_member_usage_history(db, member, page=page, page_size=pageSize)
+    return {"data": data}
+
+
+@me_router.get("/legacy-usages")
+async def legacy_usages(
+    page: int = Query(1, ge=1),
+    pageSize: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """@deprecated — /me/usage-history 사용"""
+    data = await list_member_usage_history(db, member, page=page, page_size=pageSize)
+    return {"data": data}
 
 
 @me_router.delete("")

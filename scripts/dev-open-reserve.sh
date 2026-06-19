@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# 로컬 테스트용 예약 OPEN + 신청 데이터 초기화 (원격 DB SSH 터널 필요)
+# 로컬 테스트용 예약 OPEN + 신청 데이터 (기본: 로컬 Docker DB)
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/backend"
+export DEV_ENV_ROOT="$ROOT"
 
 if [[ ! -d .venv ]]; then
   echo "Missing backend/.venv — run ./scripts/dev.sh once first."
@@ -12,21 +13,18 @@ fi
 
 # shellcheck disable=SC1091
 source "$ROOT/.env" 2>/dev/null || true
-REMOTE_HOST="${REMOTE_HOST:-115.68.221.73}"
-REMOTE_USER="${REMOTE_USER:-root}"
+# shellcheck source=scripts/lib/dev-env.sh
+source "$ROOT/scripts/lib/dev-env.sh"
 
-if ! nc -z 127.0.0.1 15432 2>/dev/null; then
-  echo "Starting SSH tunnel to ${REMOTE_USER}@${REMOTE_HOST} ..."
-  ssh -f -N \
-    -L 15432:127.0.0.1:5432 \
-    -L 16379:127.0.0.1:6379 \
-    "${REMOTE_USER}@${REMOTE_HOST}"
-  sleep 1
+if ! dev_db_ready; then
+  if dev_is_remote_db; then
+    dev_start_tunnel
+  else
+    dev_start_local_db
+  fi
 fi
 
-if ! nc -z 127.0.0.1 15432 2>/dev/null; then
-  echo "PostgreSQL tunnel failed — check SSH access."
-  exit 1
-fi
+dev_assert_local_db_config
+dev_sync_backend_env
 
 .venv/bin/python "$ROOT/scripts/dev-open-reserve.py" "$@"

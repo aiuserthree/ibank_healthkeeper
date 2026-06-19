@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# DB 마이그레이션 — 기본은 로컬 Docker DB, USE_REMOTE_DB=1 일 때만 운영 터널
+# 2026 예약현황 → legacy_usage 이관 및 회원 last_used_date 반영
 set -euo pipefail
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT/backend"
 export DEV_ENV_ROOT="$ROOT"
@@ -11,8 +12,8 @@ source "$ROOT/.env" 2>/dev/null || true
 source "$ROOT/scripts/lib/dev-env.sh"
 
 if [[ ! -d .venv ]]; then
-  python3 -m venv .venv
-  .venv/bin/pip install -q -r requirements.txt
+  echo "Missing backend/.venv — run ./scripts/dev.sh once first."
+  exit 1
 fi
 
 if ! dev_db_ready; then
@@ -27,5 +28,4 @@ fi
 dev_assert_local_db_config
 dev_sync_backend_env
 
-.venv/bin/alembic upgrade head
-echo "Migration complete ($(dev_is_remote_db && echo remote || echo local) DB)."
+.venv/bin/python "$ROOT/scripts/import-legacy-usage-2026.py" "$@"

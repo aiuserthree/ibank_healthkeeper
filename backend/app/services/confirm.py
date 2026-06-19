@@ -15,6 +15,7 @@ from app.models import (
     Slot,
     SlotStatus,
 )
+from app.services.legacy_usage import get_member_total_uses
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 from app.services.priority import rank_applicants
 
@@ -95,6 +96,9 @@ async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
     if not slot:
         raise_app_error("NOT_FOUND", 404)
     applicants = await rank_applicants(db, slot_id, requested_only=False)
+    for applicant in applicants:
+        member = await db.get(Member, applicant["member_id"])
+        applicant["total_uses"] = await get_member_total_uses(db, member) if member else 0
     no_history_cnt = sum(1 for a in applicants if a["no_history"])
     needs_manual = len(applicants) >= 2 and no_history_cnt >= 2
     return {

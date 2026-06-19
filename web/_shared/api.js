@@ -42,6 +42,10 @@ window.HKApi = (function () {
     reapplySlot: (slotId) => request(`/reservation/reapply/slots/${slotId}`, { method: "POST" }),
     myReservations: (page = 1, pageSize = 10) =>
       request(`/me/reservations?page=${page}&pageSize=${pageSize}`),
+    myUsageHistory: (page = 1, pageSize = 10) =>
+      request(`/me/usage-history?page=${page}&pageSize=${pageSize}`),
+    myLegacyUsages: (page = 1, pageSize = 10) =>
+      request(`/me/usage-history?page=${page}&pageSize=${pageSize}`),
 
     adminLogin: (loginId, password, rememberMe = false) =>
       request("/admin/login", {

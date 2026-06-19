@@ -1,30 +1,22 @@
 #!/usr/bin/env bash
-# 로컬 개발 환경 안내 (PostgreSQL/Redis는 원격 전용)
 set -euo pipefail
 
 cat <<'EOF'
 헬스키퍼 개발 환경
 ==================
 
-아키텍처
-  로컬  : Vite(5173) + FastAPI(8100)
-  원격  : nginx + API + PostgreSQL(pgvector) + Redis  @ healthkeeper.ibank.co.kr (115.68.221.73)
+★ 서버 개발 DB (Docker 없음, 운영과 분리) — 권장
+  1. .env 에 POSTGRES_PASSWORD / REDIS_PASSWORD (deploy용) 설정
+  2. ./scripts/setup-server-dev-db.sh   # 서버에 healthkeeper_dev 최초 1회
+  3. ./scripts/switch-to-remote-dev-db.sh
+  4. ./scripts/dev.sh
 
-로컬 개발 시작
-  1. .env.example → .env 복사 (이미 생성됨)
-  2. 터미널 1: ./scripts/dev-tunnel.sh   # 원격 DB/Redis SSH 터널
-  3. 터미널 2: cd backend && .venv/bin/python run.py
-  4. 터미널 3: cd frontend && npm run dev
+  → 같은 서버 Postgres, DB 이름만 healthkeeper_dev (운영 healthkeeper 와 분리)
+  → Redis는 db index 1 사용 (운영은 0)
 
-  또는: ./scripts/dev.sh (터널+API+Vite 일괄)
+로컬 Docker DB
+  ./scripts/switch-to-local-db.sh && ./scripts/dev.sh
 
-원격 배포
+운영 배포 (코드 + 운영 DB 마이그레이션)
   ./scripts/deploy.sh
-
-헬스체크
-  로컬 API : http://localhost:8100/api/health
-  원격     : https://healthkeeper.ibank.co.kr/api/health
-  원격 웹  : https://healthkeeper.ibank.co.kr/
-
-주의: PostgreSQL·Redis·pgvector는 로컬에 설치하지 않습니다.
 EOF

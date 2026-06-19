@@ -65,6 +65,10 @@ location = /admin/reapply-mail.html { return 301 /admin/reapply-mail; }
 location = /admin/vacation.html { return 301 /admin/vacation; }
 location = /admin/settings.html { return 301 /admin/settings; }
 
+location /_shared/ {
+    add_header Cache-Control "no-cache, must-revalidate";
+}
+
 location /_ds/ {
     expires 7d;
     add_header Cache-Control "public, immutable";

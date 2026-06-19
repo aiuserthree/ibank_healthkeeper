@@ -26,6 +26,11 @@ if [[ -z "$NEO4J_PASSWORD" && -f backend/.env ]]; then
 fi
 NEO4J_PASSWORD="${NEO4J_PASSWORD:-CHANGE_ME}"
 
+echo "=========================================="
+echo "  운영 배포 → ${DOMAIN:-healthkeeper.ibank.co.kr}"
+echo "  로컬 변경은 deploy 전까지 production 미반영"
+echo "=========================================="
+echo ""
 echo "==> Sync to $USER@$HOST"
 rsync -avz --delete --exclude '.env' deploy/ "$USER@$HOST:/opt/healthkeeper/deploy/"
 rsync -avz --delete \
@@ -150,6 +155,11 @@ else
   exit 1
 fi
 .venv/bin/alembic upgrade head
+
+if [[ -f import_legacy_usage_2026.py && -f data/legacy_usage_2026.md ]]; then
+  echo "==> Import 2026 legacy usage"
+  .venv/bin/python import_legacy_usage_2026.py || echo "WARN: legacy usage import failed"
+fi
 
 cp /opt/healthkeeper/deploy/systemd/healthkeeper-api.service /etc/systemd/system/
 systemctl daemon-reload

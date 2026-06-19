@@ -246,6 +246,41 @@ window.HKUI = (function () {
     });
   }
 
+  function layerModal(title, onMount, opts = {}) {
+    const fixedHeight = opts.fixedHeight
+      ? "height:min(680px, 85vh);"
+      : "max-height:85vh;";
+    const overlay = document.createElement("div");
+    overlay.className = "hk-dialog__overlay";
+    overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:560px;width:calc(100% - 32px);${fixedHeight}display:flex;flex-direction:column;padding:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-shrink:0">
+        <div class="hk-dialog__title" style="margin:0">${escapeHtml(title)}</div>
+        <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" data-close aria-label="닫기">${icon("x", 18, "currentColor")}</button>
+      </div>
+      <div class="hk-dialog__body" style="flex:1;min-height:0;overflow-y:auto;margin:0;padding-right:2px" id="hk-layer-body"></div>
+      <div id="hk-layer-footer" style="margin-top:16px;flex-shrink:0"></div>
+    </div>`;
+    const close = () => overlay.remove();
+    overlay.querySelector("[data-close]").onclick = close;
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) close();
+    });
+    document.body.appendChild(overlay);
+    const bodyEl = overlay.querySelector("#hk-layer-body");
+    const footerEl = overlay.querySelector("#hk-layer-footer");
+    bodyEl.innerHTML = `<div style="text-align:center;padding:32px"><span class="hk-spin"></span></div>`;
+    loadLucide().then(() => refreshIcons(overlay));
+    if (onMount) {
+      const ret = onMount(bodyEl, footerEl, close);
+      if (ret && typeof ret.then === "function") {
+        ret.catch((e) => {
+          bodyEl.innerHTML = `<div class="hk-empty" style="padding:24px 8px;text-align:center">${escapeHtml(e.message || "오류가 발생했습니다.")}</div>`;
+        });
+      }
+    }
+    return { overlay, bodyEl, footerEl, close };
+  }
+
   function avatar(name, size = "sm") {
     const initial = (name || "?").charAt(0);
     return `<span class="hk-avatar hk-avatar--${size}">${escapeHtml(initial)}</span>`;
@@ -275,12 +310,12 @@ window.HKUI = (function () {
     "<b>이용 이력 있음</b> — 마지막 이용일이 있으며, <b>오래 전에 받은 분</b>일수록 우선순위가 높습니다. 마지막 이용일이 같으면 먼저 신청한 분이 우선합니다.";
 
   const APPLY_TOTAL_TOOLTIP_HTML =
-    "지금까지 <b>예약을 신청하신 횟수</b>예요.<br><br>" +
-    "확정·탈락·대기 중인 신청까지 모두 포함하고, <b>취소한 건은 빼고</b> 계산합니다. 아직 확정되지 않은 신청도 여기에 포함돼요.";
+    "지금까지 <b>예약을 신청하신 횟수</b>예요.(2026년 1월 1일부터 산정)<br><br>" +
+    "과거 이용 이력과 사이트에서 신청한 건(확정·탈락·대기)을 합산하고, <b>취소한 건은 빼고</b> 계산합니다.";
 
   const USAGE_TOTAL_TOOLTIP_HTML =
-    "실제로 <b>예약이 확정되어 안마서비스를 받으신 횟수</b>예요.<br><br>" +
-    "신청만 하고 대기 중이거나 탈락한 건은 포함되지 않습니다.<br>재신청으로 확정된 이용도 포함돼요.";
+    "실제로 <b>안마서비스를 이용하신 횟수</b>예요.(2026년 1월 1일부터 산정)<br><br>" +
+    "과거 이용 이력과 사이트에서 <b>확정된</b> 예약을 합산합니다. 신청만 한 건·탈락한 건은 포함되지 않습니다.";
 
   function kvTooltip(key, valueHtml, tooltipHtml) {
     const panelId = `hk-tt-${Math.random().toString(36).slice(2, 9)}`;
@@ -550,6 +585,27 @@ window.HKUI = (function () {
         return `<div style="display:flex;align-items:center;gap:9px"><div style="width:30px;height:30px;border-radius:999px;display:flex;align-items:center;justify-content:center;background:${bg};color:${color};font-weight:700;font-size:13px">${done ? icon("check", 16, "#fff") : i + 1}</div><span style="font-size:14px;font-weight:600;color:${labelColor}">${label}</span></div>${line}`;
       })
       .join("")}</div>`;
+  }
+
+  function legacyUsageCard(r) {
+    const d = new Date(r.usageDate + "T12:00:00");
+    const dow = DAY_NAMES[d.getDay()];
+    const month = d.getMonth() + 1;
+    const dayNum = d.getDate();
+    const end = r.endTime || r.startTime;
+    return `<div class="hk-card hk-card--pad" style="padding:11px 14px">
+      <div style="display:flex;align-items:center;gap:14px">
+        <div style="width:50px;min-width:50px;padding:7px 0;border-radius:10px;background:var(--color-fog);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;text-align:center">
+          <div style="font-size:10px;font-weight:600;color:var(--color-slate-blue);line-height:1">${month}월</div>
+          <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy);line-height:1.05;margin:4px 0 3px;font-variant-numeric:tabular-nums">${dayNum}</div>
+          <div style="font-size:10px;font-weight:600;color:var(--text-muted);line-height:1">${dow}</div>
+        </div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy);line-height:1.3">${escapeHtml(r.startTime)} – ${escapeHtml(end)}</div>
+        </div>
+        ${badge("이용 완료", "soft")}
+      </div>
+    </div>`;
   }
 
   function reservationCard(r, opts = {}) {
@@ -846,6 +902,7 @@ window.HKUI = (function () {
     alertBox,
     toast,
     confirmDialog,
+    layerModal,
     avatar,
     statusBadge,
     queryParam,
@@ -875,6 +932,7 @@ window.HKUI = (function () {
     dowToApi,
     WEEKDAY_OPTIONS,
     stepper,
+    legacyUsageCard,
     reservationCard,
     mailPreviewVars,
     applyMailPreviewVars,
