@@ -72,9 +72,64 @@
     let year = kstNow.getFullYear();
     let month = kstNow.getMonth() + 1;
     let weeks = [];
-    let offMap = {};
     let dayMeta = {};
     let summary = { vacationDays: 0, editableDays: 0, lockedDays: 0 };
+    /** 월별 수정 초안 — dirty 월만 사용 (다른 월과 격리) */
+    let draftByMonth = {};
+    /** 서버와 다르게 수정한 월 — "YYYY-MM" */
+    let dirtyMonths = new Set();
+
+    function monthKey(y, m) {
+      return `${y}-${String(m).padStart(2, "0")}`;
+    }
+
+    function parseMonthKey(key) {
+      const [y, m] = key.split("-");
+      return { year: Number(y), month: Number(m) };
+    }
+
+    function isoParts(iso) {
+      const [y, m, d] = iso.split("-").map(Number);
+      return { y, m, d };
+    }
+
+    function isServiceDate(iso) {
+      const dow = new Date(iso + "T12:00:00").getDay();
+      return dow >= 1 && dow <= 5;
+    }
+
+    function ensureDraft(y, m) {
+      const key = monthKey(y, m);
+      if (draftByMonth[key]) return draftByMonth[key];
+      draftByMonth[key] = new Set(
+        weeks.flat()
+          .filter((c) => c.inMonth && c.isServiceDay && c.isVacation)
+          .map((c) => c.date)
+      );
+      return draftByMonth[key];
+    }
+
+    function draftDatesInMonth(y, m) {
+      const key = monthKey(y, m);
+      const draft = draftByMonth[key];
+      if (!draft) return [];
+      return [...draft].filter((iso) => {
+        const p = isoParts(iso);
+        return p.y === y && p.m === m && isServiceDate(iso);
+      });
+    }
+
+    function isVacationCell(cell) {
+      const key = monthKey(year, month);
+      if (dirtyMonths.has(key)) {
+        return !!draftByMonth[key]?.has(cell.date);
+      }
+      return !!cell.isVacation;
+    }
+
+    function markMonthDirty(y, m) {
+      dirtyMonths.add(monthKey(y, m));
+    }
 
     function monthLabel(y, m) {
       return `${y}년 ${m}월`;
@@ -104,9 +159,14 @@
     }
 
     function updateSummary() {
-      const vac = Object.keys(offMap).filter((d) => dayMeta[d]?.inMonth && dayMeta[d]?.isServiceDay).length;
+      const vac = weeks.flat().filter((c) => c.inMonth && c.isServiceDay && isVacationCell(c)).length;
+      const dirtyNote = dirtyMonths.size ? ` · 저장 대기 ${dirtyMonths.size}개월` : "";
       document.getElementById("summary").textContent =
-        `휴가 ${vac}일 · 수정 가능 ${summary.editableDays}일 · 잠김 ${summary.lockedDays}일`;
+        `휴가 ${vac}일 · 수정 가능 ${summary.editableDays}일 · 잠김 ${summary.lockedDays}일${dirtyNote}`;
+      const saveBtn = document.getElementById("save-btn");
+      const resetBtn = document.getElementById("reset-btn");
+      if (saveBtn) saveBtn.disabled = summary.editableDays === 0 && dirtyMonths.size === 0;
+      if (resetBtn) resetBtn.disabled = summary.editableDays === 0 && !dirtyMonths.has(monthKey(year, month));
     }
 
     function renderLegend() {
@@ -134,7 +194,7 @@
           if (!cell.isServiceDay) {
             return `<div class="hk-vac-cell--weekend"><div class="hk-vac-cell__date">${label}</div></div>`;
           }
-          const isOff = !!offMap[cell.date];
+          const isOff = isVacationCell(cell);
           const lk = cell.locked;
           return `<div class="hk-vac-cell${isOff ? " hk-vac-cell--off" : ""}${lk ? " hk-vac-cell--locked" : ""}">
             <div class="hk-vac-cell__top">
@@ -161,8 +221,10 @@
             inp.checked = !inp.checked;
             return;
           }
-          if (inp.checked) offMap[inp.dataset.date] = true;
-          else delete offMap[inp.dataset.date];
+          const draft = ensureDraft(year, month);
+          if (inp.checked) draft.add(inp.dataset.date);
+          else draft.delete(inp.dataset.date);
+          markMonthDirty(year, month);
           renderCalendar();
           updateSummary();
         };
@@ -176,17 +238,13 @@
       month = data.month;
       weeks = data.weeks || [];
       summary = data.summary || { vacationDays: 0, editableDays: 0, lockedDays: 0 };
-      offMap = {};
       dayMeta = {};
       for (const row of weeks) {
         for (const cell of row) {
           dayMeta[cell.date] = cell;
-          if (cell.isVacation) offMap[cell.date] = true;
         }
       }
       document.getElementById("month-label").textContent = monthLabel(year, month);
-      document.getElementById("save-btn").disabled = summary.editableDays === 0;
-      document.getElementById("reset-btn").disabled = summary.editableDays === 0;
       renderBanner();
       renderLegend();
       renderCalendar();
@@ -228,20 +286,35 @@
           loadMonth(y, m).catch((e) => HKUI.toast(e.message, "danger"));
         };
         document.getElementById("save-btn").onclick = async () => {
-          const dates = Object.keys(offMap).filter((d) => dayMeta[d]?.isServiceDay && dayMeta[d]?.inMonth);
-          const vacCount = dates.length;
+          if (dirtyMonths.size === 0) {
+            HKUI.toast("변경된 휴가 일정이 없습니다.", "info");
+            return;
+          }
+          const keys = [...dirtyMonths].sort();
+          const parts = keys.map((k) => {
+            const { year: y, month: m } = parseMonthKey(k);
+            const n = draftDatesInMonth(y, m).length;
+            return `${y}년 ${m}월 · 휴가 ${n}일`;
+          });
           const ok = await HKUI.confirmDialog(
             "휴가 일정을 저장할까요?",
-            `${monthLabel(year, month)} 기준 <b>휴가 ${vacCount}일</b>로 저장합니다.<br>잠긴 주차(이번 주·과거·오픈됨)는 변경되지 않습니다.`,
+            `${keys.length > 1 ? `<b>${keys.length}개월</b> 일정을 한 번에 저장합니다.<br>` : ""}${parts.join("<br>")}<br><br>잠긴 주차(이번 주·과거·오픈됨)는 변경되지 않습니다.`,
             { confirmLabel: "저장하기" }
           );
           if (!ok) return;
+          const saved = [];
           try {
-            await HKApi.saveVacationMonth(year, month, dates);
+            for (const k of keys) {
+              const { year: y, month: m } = parseMonthKey(k);
+              await HKApi.saveVacationMonth(y, m, draftDatesInMonth(y, m));
+              dirtyMonths.delete(k);
+              delete draftByMonth[k];
+              saved.push(k);
+            }
             await loadMonth(year, month);
             await HKUI.confirmDialog(
               "저장되었습니다",
-              "휴가 일정이 저장되었습니다.",
+              saved.length > 1 ? `${saved.length}개월 휴가 일정이 저장되었습니다.` : "휴가 일정이 저장되었습니다.",
               { confirmLabel: "확인", hideCancel: true }
             );
           } catch (e) {
@@ -253,6 +326,13 @@
           }
         };
         document.getElementById("reset-btn").onclick = () => {
+          const key = monthKey(year, month);
+          if (!dirtyMonths.has(key)) {
+            HKUI.toast("이 달에는 변경 사항이 없습니다.", "info");
+            return;
+          }
+          dirtyMonths.delete(key);
+          delete draftByMonth[key];
           loadMonth(year, month).catch((e) => HKUI.toast(e.message, "danger"));
         };
         try {

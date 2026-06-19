@@ -615,7 +615,18 @@ async def sync_vacations_month(
             continue
 
         week_end = week_friday(mon)
-        week_target = sorted(d for d in target_vacations if mon <= d <= week_end)
+        in_month_target = {
+            d for d in target_vacations if mon <= d <= week_end and month_start <= d <= month_end
+        }
+        existing_result = await db.execute(
+            select(Vacation.vacation_date).where(Vacation.cycle_id == cycle.id)
+        )
+        existing_dates = set(existing_result.scalars().all())
+        outside_month_keep = {
+            d for d in existing_dates
+            if mon <= d <= week_end and not (month_start <= d <= month_end)
+        }
+        week_target = sorted(in_month_target | outside_month_keep)
         await sync_vacations(db, admin, cycle.id, week_target)
 
 
