@@ -80,5 +80,7 @@ window.HKApi = (function () {
     mailTemplate: (type) => request(`/admin/mail-templates/${type}`),
     updateMailTemplate: (type, tpl) =>
       request(`/admin/mail-templates/${type}`, { method: "PUT", body: JSON.stringify(tpl) }),
+    previewMailTemplate: (type, tpl) =>
+      request(`/admin/mail-templates/${type}/preview`, { method: "POST", body: JSON.stringify(tpl) }),
   };
 })();

@@ -219,7 +219,7 @@ async def get_mail_template(
             "subjectTemplate": subject,
             "bodyTemplate": body,
             "usesDesignHtml": bool(load_design_html(mail_type)),
-            "designPreviewPath": f"/이메일/{MAIL_HTML_FILES[mail_type]}"
+            "designPreviewPath": f"/이메일/preview/{MAIL_HTML_FILES[mail_type]}"
             if mail_type in MAIL_HTML_FILES
             else None,
         }
@@ -244,6 +244,22 @@ async def update_mail_template(
     tpl.body_template = body.get("bodyTemplate") or body.get("body") or tpl.body_template
     await db.commit()
     return {"data": {"type": mail_type.value}}
+
+
+@router.post("/mail-templates/{mail_type}/preview")
+async def preview_mail_template_api(
+    mail_type: MailType,
+    body: dict,
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.mail import preview_mail_template
+
+    subject, html = preview_mail_template(
+        mail_type,
+        body.get("subjectTemplate") or body.get("subject") or "",
+        body.get("bodyTemplate") or body.get("body") or "",
+    )
+    return {"data": {"subject": subject, "html": html}}
 
 
 @router.post("/mail/{mail_id}/resend")

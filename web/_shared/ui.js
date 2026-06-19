@@ -501,6 +501,7 @@ window.HKUI = (function () {
       ? Array.from({ length: 60 }, (_, i) => i)
       : [0, 30];
     const hiddenName = opts.readonly ? "" : ` name="${name}"`;
+    const hiddenDisabled = opts.disabled ? " disabled" : "";
     return `<div class="hk-field hk-time-field" data-time-field="${opts.readonly ? "" : name}">
       <label class="hk-field__label">${escapeHtml(label)}</label>
       <div class="hk-time-field__parts">
@@ -515,7 +516,7 @@ window.HKUI = (function () {
           ${minutes.map((m) => `<option value="${m}"${m === minute ? " selected" : ""}>${String(m).padStart(2, "0")}</option>`).join("")}
         </select>
       </div>
-      <input type="hidden"${hiddenName} value="${escapeHtml(toTime24(period, hour, minute))}" data-time-hidden>
+      <input type="hidden"${hiddenName} value="${escapeHtml(toTime24(period, hour, minute))}" data-time-hidden${hiddenDisabled}>
       ${hint}
     </div>`;
   }
@@ -581,48 +582,141 @@ window.HKUI = (function () {
     </div>`;
   }
 
-  function mailPreviewVars(origin) {
+  function mailPreviewVars(origin, mailType) {
     const base = origin || (typeof window !== "undefined" ? window.location.origin : "");
     const chip =
-      "display:inline-block;margin:0 6px 6px 0;padding:6px 12px;background:#ffffff;border:1px solid #d4e0ed;border-radius:999px;font-size:13px;color:#0b3558;";
-    return {
+      "display:inline-block; margin:0 6px 6px 0; padding:6px 12px; background:#ffffff; border:1px solid #d4e0ed; border-radius:999px; font-size:13px; color:#0b3558;";
+    const slots =
+      `<span style="${chip}">화 6/23 · 13:30</span>` +
+      `<span style="${chip}">화 6/23 · 15:30</span>` +
+      `<span style="${chip}">목 6/25 · 14:30</span>` +
+      `<span style="${chip}">목 6/25 · 16:30</span>` +
+      `<span style="${chip}">금 6/26 · 13:30</span>` +
+      `<span style="${chip}">금 6/26 · 15:30</span>`;
+    const common = {
       이름: "김민수",
       name: "김민수",
-      날짜: "6월 23일 (화)",
-      slotDate: "6월 23일 (화)",
-      시간: "15:30 – 16:00",
-      slotTime: "15:30 – 16:00",
       logoUrl: base + "/assets/logo-lockup.svg",
       mypageUrl: base + "/api/mypage/enter",
       reapplyUrl: base + "/api/reapply/enter",
       재신청시작: "목요일 09:00",
       reapplyOpenAt: "목요일 09:00",
-      재신청마감: "목요일 17:00",
-      reapplyDeadline: "목요일 17:00",
+      재신청마감: "내일(목요일) 17:00",
+      reapplyDeadline: "내일(목요일) 17:00",
       빈슬롯목록: "화 6/23 · 13:30, 목 6/25 · 14:30",
       emptySlots: "화 6/23 · 13:30, 목 6/25 · 14:30",
-      빈슬롯목록Html:
-        `<span style="${chip}">화 6/23 · 13:30</span>` +
-        `<span style="${chip}">목 6/25 · 14:30</span>`,
-      emptySlotsHtml:
-        `<span style="${chip}">화 6/23 · 13:30</span>` +
-        `<span style="${chip}">목 6/25 · 14:30</span>`,
+      빈슬롯목록Html: slots,
+      emptySlotsHtml: slots,
+    };
+    if (mailType === "RESERVE_DONE_REAPPLY") {
+      return {
+        ...common,
+        날짜: "6월 25일 (목)",
+        slotDate: "6월 25일 (목)",
+        시간: "14:30 – 15:00",
+        slotTime: "14:30 – 15:00",
+      };
+    }
+    return {
+      ...common,
+      날짜: "6월 23일 (화)",
+      slotDate: "6월 23일 (화)",
+      시간: "15:30 – 16:00",
+      slotTime: "15:30 – 16:00",
     };
   }
 
-  function applyMailPreviewVars(html, origin) {
+  function _normalizeMailPlain(text) {
+    return (text || "").replace(/\r\n/g, "\n").trim().replace(/\s+/g, " ");
+  }
+
+  const MAIL_STRUCTURAL_PREFIXES = [
+    "날짜:",
+    "시간:",
+    "일시:",
+    "비어있는 슬롯:",
+    "재신청 시작:",
+    "재신청 마감:",
+  ];
+
+  /** 편집 가능 본문(HK_INTRO)만 추출 — · 안내 줄·구조 줄 제외 */
+  function _mailIntroOnly(text) {
+    const intro = [];
+    (text || "").replace(/\r\n/g, "\n").split("\n").forEach((ln) => {
+      const s = ln.trim();
+      if (!s) return;
+      if (s.startsWith("·")) return;
+      if (MAIL_STRUCTURAL_PREFIXES.some((p) => s.startsWith(p))) return;
+      intro.push(ln.trimEnd());
+    });
+    return intro.join("\n").trim();
+  }
+
+  function _plainToBodyHtml(text) {
+    const lines = (text || "").replace(/\r\n/g, "\n").trim().split("\n").map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) return "";
+    const parts = [];
+    lines.forEach((line, idx) => {
+      const m = line.match(/^(안녕하세요,?\s*)\{이름\}(님\.?)$/);
+      if (idx === 0 && m) {
+        parts.push(
+          `<p style="margin:0 0 8px;font-size:16px;line-height:1.7;color:#0a0a0a;">${escapeHtml(m[1])}<strong style="color:#0b3558;">{이름}${escapeHtml(m[2])}</strong></p>`
+        );
+        return;
+      }
+      const esc = escapeHtml(line);
+      const color = idx === 0 ? "#0a0a0a" : "#476788";
+      const margin = idx < lines.length - 1 ? "0 0 8px" : "0";
+      parts.push(`<p style="margin:${margin};font-size:16px;line-height:1.7;color:${color};">${esc}</p>`);
+    });
+    return parts.join("");
+  }
+
+  function isMailIntroDefault(plain, defaultPlain) {
+    return _normalizeMailPlain(_mailIntroOnly(plain)) === _normalizeMailPlain(_mailIntroOnly(defaultPlain));
+  }
+
+  function shouldUseExportPreview(plain, defaultPlain) {
+    return isMailIntroDefault(plain, defaultPlain);
+  }
+
+  function isMailBodyDefault(plain, defaultPlain) {
+    return shouldUseExportPreview(plain, defaultPlain);
+  }
+
+  /** DB·구버전 본문 → 본문(HK_INTRO)만 */
+  function normalizeMailBodyForEditor(plain, defaultPlain) {
+    const intro = _mailIntroOnly(plain);
+    if (isMailIntroDefault(intro, defaultPlain)) return defaultPlain;
+    return intro || defaultPlain;
+  }
+
+  /** export 디자인 HTML + 본문 plain → 미리보기 (안내 박스는 HTML 고정) */
+  function applyMailBodyPlainToDesign(html, plain, defaultPlain) {
+    if (!html || html.indexOf("<!--HK_INTRO-->") === -1) return html;
+    const defIntro = _mailIntroOnly(defaultPlain || "");
+    const intro = _mailIntroOnly(plain || "");
     let out = html;
-    Object.entries(mailPreviewVars(origin)).forEach(([key, value]) => {
+
+    if (intro && _normalizeMailPlain(intro) !== _normalizeMailPlain(defIntro)) {
+      out = out.replace(/<!--HK_INTRO-->[\s\S]*?<!--HK_INTRO_END-->/, _plainToBodyHtml(intro));
+    }
+    return out.replace(/<!--HK_[A-Z_]+(?:_END)?-->/g, "");
+  }
+
+  function applyMailPreviewVars(html, origin, mailType) {
+    let out = html;
+    Object.entries(mailPreviewVars(origin, mailType)).forEach(([key, value]) => {
       out = out.split("{" + key + "}").join(value);
     });
     return out;
   }
 
   /** 미리보기 HTML — 링크·에셋 절대화 + 새 탭 강제 (blob iframe 기준 URL 오류 방지) */
-  function prepareMailPreviewHtml(html, origin) {
+  function prepareMailPreviewHtml(html, origin, mailType, skipVars) {
     const base = origin || window.location.origin;
     const tgt = ' target="_blank" rel="noopener noreferrer"';
-    let out = applyMailPreviewVars(html, base);
+    let out = skipVars ? html : applyMailPreviewVars(html, base, mailType);
 
     out = out.replace(/src="\/assets\//g, `src="${base}/assets/`).replace(
       /src='\/assets\//g,
@@ -655,12 +749,17 @@ window.HKUI = (function () {
     return out;
   }
 
-  function mountMailPreviewIframe(wrap, html, origin) {
-    const prepared = prepareMailPreviewHtml(html, origin);
+  function mountMailPreviewIframe(wrap, html, origin, mailType, skipVars, directSrc) {
     const iframe = document.createElement("iframe");
     iframe.title = "메일 미리보기";
-    iframe.style.cssText = "width:100%;height:760px;border:none;display:block";
+    iframe.style.cssText = "width:100%;height:100%;border:none;display:block";
     iframe.sandbox = "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-same-origin";
+    if (directSrc) {
+      iframe.src = directSrc + (directSrc.includes("?") ? "&" : "?") + "t=" + Date.now();
+      wrap.replaceChildren(iframe);
+      return () => {};
+    }
+    const prepared = prepareMailPreviewHtml(html, origin, mailType, skipVars);
     const blob = new Blob([prepared], { type: "text/html;charset=utf-8" });
     const blobUrl = URL.createObjectURL(blob);
     iframe.src = blobUrl;
@@ -668,8 +767,12 @@ window.HKUI = (function () {
     return () => URL.revokeObjectURL(blobUrl);
   }
 
-  function openMailPreviewHtml(html, origin) {
-    const prepared = prepareMailPreviewHtml(html, origin);
+  function openMailPreviewHtml(html, origin, mailType, skipVars, directSrc) {
+    if (directSrc) {
+      window.open(directSrc + (directSrc.includes("?") ? "&" : "?") + "t=" + Date.now(), "_blank", "noopener,noreferrer");
+      return;
+    }
+    const prepared = prepareMailPreviewHtml(html, origin, mailType, skipVars);
     const blob = new Blob([prepared], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const win = window.open(url, "_blank", "noopener,noreferrer");
@@ -775,6 +878,10 @@ window.HKUI = (function () {
     reservationCard,
     mailPreviewVars,
     applyMailPreviewVars,
+    applyMailBodyPlainToDesign,
+    isMailBodyDefault,
+    shouldUseExportPreview,
+    normalizeMailBodyForEditor,
     prepareMailPreviewHtml,
     mountMailPreviewIframe,
     openMailPreviewHtml,
