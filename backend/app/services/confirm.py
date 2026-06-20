@@ -7,14 +7,15 @@ from app.core.errors import raise_app_error
 from app.core.time import now_kst
 from app.models import (
     ConfirmedBy,
-    CycleState,
     MailType,
     Member,
     Reservation,
+    ReservationCycle,
     ReservationStatus,
     Slot,
     SlotStatus,
 )
+from app.services.cycle import can_admin_confirm
 from app.services.legacy_usage import get_member_total_uses
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 from app.services.priority import rank_applicants
@@ -38,6 +39,14 @@ async def confirm_reservation(
         raise_app_error("NOT_FOUND", 404)
     if reservation.status != ReservationStatus.REQUESTED:
         raise_app_error("SLOT_ALREADY_CONFIRMED")
+
+    cycle = await db.get(ReservationCycle, reservation.cycle_id)
+    if (
+        confirmed_by != ConfirmedBy.SYSTEM
+        and cycle
+        and not can_admin_confirm(cycle)
+    ):
+        raise_app_error("NOT_CONFIRMABLE_BEFORE_CLOSE")
 
     reservation.status = ReservationStatus.CONFIRMED
     reservation.confirmed_at = now_kst()
@@ -101,7 +110,9 @@ async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
         applicant["total_uses"] = await get_member_total_uses(db, member) if member else 0
     no_history_cnt = sum(1 for a in applicants if a["no_history"])
     needs_manual = len(applicants) >= 2 and no_history_cnt >= 2
+    cycle = await db.get(ReservationCycle, slot.cycle_id)
     return {
+        "canConfirm": can_admin_confirm(cycle) if cycle else False,
         "slot": {
             "id": slot.id,
             "slotDate": slot.slot_date.isoformat(),

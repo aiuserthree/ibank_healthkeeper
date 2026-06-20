@@ -41,6 +41,7 @@
           const applicants = (data.applicants || []).slice().sort((a, b) => (a.priority_rank || 99) - (b.priority_rank || 99));
           const allNoHistory = applicants.length > 0 && applicants.every((a) => a.no_history || !a.last_used_date);
           const decided = slot.status === "CONFIRMED" || applicants.some((a) => a.status === "CONFIRMED");
+          const canConfirm = data.canConfirm !== false;
 
           el.innerHTML = `
             <div class="hk-card hk-card--pad" style="margin-bottom:16px">
@@ -51,6 +52,9 @@
                 ${decided ? HKUI.badge("확정 완료", "success", true) : ""}
               </div>
             </div>
+            ${!canConfirm && !decided
+              ? `<div style="margin-bottom:16px">${HKUI.alertBox("info", "확정은 마감 후 가능", "일반 신청은 우선권(마지막 이용일) 기반이므로 <b>수요일 17:00 마감 후</b> 확정할 수 있습니다. 지금은 우선권 순서만 미리 확인할 수 있어요.")}</div>`
+              : ""}
             ${data.needsManual || allNoHistory
               ? `<div style="margin-bottom:16px">${HKUI.alertBox("warning", "자동 우선권 판단 불가 · 수동 확정 필요", "신청자 전원이 <b>이력 없음</b>입니다. 우선권을 자동으로 정할 수 없으니 관리자가 직접 1명을 확정해 주세요. (동률 기준은 신청 시각)")}</div>`
               : applicants.length
@@ -86,7 +90,7 @@
                   ${field("누적 이용", a.total_uses != null ? `${a.total_uses}회` : "-")}
                   <div style="flex:1"></div>
                   <div style="min-width:96px;display:flex;justify-content:flex-end">
-                    ${decided && a.status === "CONFIRMED" ? HKUI.statusBadge("CONFIRMED") : decided ? HKUI.statusBadge(a.status) : `<button type="button" class="hk-btn hk-btn--${isTop && !allNoHistory ? "primary" : "secondary"} hk-btn--sm" data-rid="${a.reservation_id}">확정</button>`}
+                    ${decided && a.status === "CONFIRMED" ? HKUI.statusBadge("CONFIRMED") : decided ? HKUI.statusBadge(a.status) : canConfirm ? `<button type="button" class="hk-btn hk-btn--${isTop && !allNoHistory ? "primary" : "secondary"} hk-btn--sm" data-rid="${a.reservation_id}">확정</button>` : `<span style="font-size:13px;color:var(--text-muted);white-space:nowrap">마감 후 확정</span>`}
                   </div>
                 </div>
               </div>`;

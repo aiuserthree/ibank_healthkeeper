@@ -57,6 +57,12 @@ def week_friday(monday: date) -> date:
     return monday + timedelta(days=4)
 
 
+def can_admin_confirm(cycle: ReservationCycle, now: datetime | None = None) -> bool:
+    """일반 신청 마감(close_at) 이후에만 관리자 확정 허용."""
+    now = now or now_kst()
+    return now >= to_kst(cycle.close_at)
+
+
 def compute_cycle_state(cycle: ReservationCycle, now: datetime | None = None) -> CycleState:
     """open_at/close_at 등 시각 기준 런타임 상태 (DB cycle.state 와 다를 수 있음)."""
     now = now or now_kst()

@@ -28,6 +28,7 @@ from app.models import (
 from app.services.confirm import get_slot_detail
 from app.services.cycle import (
     apply_vacations_to_slots,
+    can_admin_confirm,
     compute_cycle_state,
     create_cycle_for_week,
     get_active_cycle,
@@ -316,6 +317,8 @@ async def dashboard(db: AsyncSession) -> dict:
         payload["weekEnd"] = view_cycle.target_week_end.isoformat()
         payload["weekLabel"] = _week_label(view_cycle.target_week_start, view_cycle.target_week_end)
         payload["openAt"] = format_kst_iso(view_cycle.open_at)
+        payload["closeAt"] = format_kst_iso(view_cycle.close_at)
+        payload["canConfirm"] = can_admin_confirm(view_cycle)
         payload["cycleState"] = compute_cycle_state(view_cycle).value
         payload["pendingSlots"] = await _pending_confirmation_slots(db, view_cycle.id)
 
@@ -405,6 +408,9 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
         "weekDates": week_dates(cycle.target_week_start),
         "weekStart": cycle.target_week_start.isoformat(),
         "weekEnd": cycle.target_week_end.isoformat(),
+        "closeAt": format_kst_iso(cycle.close_at),
+        "canConfirm": can_admin_confirm(cycle),
+        "cycleState": compute_cycle_state(cycle).value,
         "slots": board_slots,
         "items": flat_items,
     }
