@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     sso_success_path: str = "/reserve"
 
     teams_reminder_enabled: bool = True
-    teams_reminder_minutes_before: int = 10
+    teams_reminder_minutes_before: int = 5
     teams_reminder_retry_max: int = 3
     teams_reminder_retry_backoff_seconds: list[int] = [60, 300, 900]
     teams_sender_email: str = "healthkeeper@ibank.co.kr"

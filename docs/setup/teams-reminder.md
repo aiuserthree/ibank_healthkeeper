@@ -1,6 +1,6 @@
-# Teams 예약 리마인더 (10분 전 1:1 채팅)
+# Teams 예약 리마인더 (5분 전 1:1 채팅)
 
-확정된 예약 시작 **10분 전**(기본값)에 예약자에게 **Microsoft Teams 1:1 채팅**으로 알림을 보냅니다.
+확정된 예약 시작 **5분 전**(기본값)에 예약자에게 **Microsoft Teams 1:1 채팅**으로 알림을 보냅니다.
 
 발송 주체는 **`healthkeeper@ibank.co.kr`** (발송용 M365 계정)이며, Graph **위임 권한**으로 메시지를 보냅니다.
 
@@ -71,7 +71,7 @@ dev 서버를 **끈 상태**에서 URL 붙여넣기 + **Enter** 필수.
 TEAMS_SENDER_EMAIL=healthkeeper@ibank.co.kr
 TEAMS_SENDER_REFRESH_TOKEN=0.AX...
 TEAMS_REMINDER_ENABLED=true
-TEAMS_REMINDER_MINUTES_BEFORE=10
+TEAMS_REMINDER_MINUTES_BEFORE=5
 ```
 
 서버 재시작 후 적용됩니다.
@@ -83,7 +83,7 @@ TEAMS_REMINDER_MINUTES_BEFORE=10
 | `TEAMS_SENDER_EMAIL` | `healthkeeper@ibank.co.kr` | 발송 계정 |
 | `TEAMS_SENDER_REFRESH_TOKEN` | (없음) | 1회 발급 refresh token |
 | `TEAMS_REMINDER_ENABLED` | `true` | `false`면 잡 스킵 |
-| `TEAMS_REMINDER_MINUTES_BEFORE` | `10` | 시작 몇 분 전 |
+| `TEAMS_REMINDER_MINUTES_BEFORE` | `5` | 시작 몇 분 전 |
 
 `TEAMS_SENDER_REFRESH_TOKEN`이 없으면 알림을 보내지 않습니다.
 
@@ -125,7 +125,7 @@ POST /api/admin/jobs/teams-reminder/run
 
 ## 메시지 예시
 
-> **[헬스키퍼]** 안마 예약 10분 전 알림  
+> **[헬스키퍼]** 안마 예약 5분 전 알림  
 > 홍길동님, **6/24(화) 14:00** 예약 시간이 곧 시작됩니다.  
 > 헬스키퍼 공간으로 이동해 주세요.
 
