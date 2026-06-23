@@ -61,6 +61,13 @@ class Settings(BaseSettings):
     sso_allowed_domain: str = ""
     sso_success_path: str = "/reserve"
 
+    teams_reminder_enabled: bool = True
+    teams_reminder_minutes_before: int = 10
+    teams_reminder_retry_max: int = 3
+    teams_reminder_retry_backoff_seconds: list[int] = [60, 300, 900]
+    teams_sender_email: str = "healthkeeper@ibank.co.kr"
+    teams_sender_refresh_token: str = ""
+
     def allowed_email_domains(self) -> list[str]:
         """SSO_ALLOWED_DOMAIN — 쉼표 구분 (예: ibank.co.kr,digitalworks.co.kr)."""
         return [d.strip().lower() for d in self.sso_allowed_domain.split(",") if d.strip()]
@@ -85,6 +92,15 @@ class Settings(BaseSettings):
 
     def sso_ready(self) -> bool:
         return not self.sso_missing_fields()
+
+    def teams_sender_ready(self) -> bool:
+        if not self.teams_reminder_enabled or self.sso_provider != "entra":
+            return False
+        if not self.sso_ready():
+            return False
+        return bool(
+            self.teams_sender_email.strip() and self.teams_sender_refresh_token.strip()
+        )
 
 
 @lru_cache

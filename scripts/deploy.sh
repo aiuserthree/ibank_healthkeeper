@@ -35,6 +35,7 @@ echo "==> Sync to $USER@$HOST"
 rsync -avz --delete --exclude '.env' deploy/ "$USER@$HOST:/opt/healthkeeper/deploy/"
 rsync -avz --delete \
   --exclude '.venv' --exclude '__pycache__' --exclude '.env' \
+  --exclude 'data/avatars/' \
   backend/ "$USER@$HOST:/opt/healthkeeper/app/backend/"
 rsync -avz --delete web/ "$USER@$HOST:/opt/healthkeeper/app/web/"
 
@@ -56,7 +57,7 @@ DEPLOY_ENV
 
 echo "==> Remote setup"
 ssh "$USER@$HOST" \
-  "DOMAIN='${DOMAIN}' HOST='${HOST}' CERTBOT_EMAIL='${EMAIL}' SSO_PROVIDER='${SSO_PROVIDER:-mock}' ENTRA_TENANT_ID='${ENTRA_TENANT_ID:-}' ENTRA_CLIENT_ID='${ENTRA_CLIENT_ID:-}' ENTRA_CLIENT_SECRET='${ENTRA_CLIENT_SECRET:-}' SSO_ALLOWED_DOMAIN='${SSO_ALLOWED_DOMAIN:-}' SSO_SUCCESS_PATH='${SSO_SUCCESS_PATH:-/reserve}' SECRET_KEY='${SECRET_KEY}' ENABLE_NEO4J='${ENABLE_NEO4J:-false}' SMTP_HOST='${SMTP_HOST:-smtp.office365.com}' SMTP_PORT='${SMTP_PORT:-587}' SMTP_USER='${SMTP_USER:-}' SMTP_PASSWORD='${SMTP_PASSWORD:-}' SMTP_FROM='${SMTP_FROM:-}' SMTP_FROM_NAME='${SMTP_FROM_NAME:-헬스키퍼}' SMTP_USE_TLS='${SMTP_USE_TLS:-true}'" \
+  "DOMAIN='${DOMAIN}' HOST='${HOST}' CERTBOT_EMAIL='${EMAIL}' SSO_PROVIDER='${SSO_PROVIDER:-mock}' ENTRA_TENANT_ID='${ENTRA_TENANT_ID:-}' ENTRA_CLIENT_ID='${ENTRA_CLIENT_ID:-}' ENTRA_CLIENT_SECRET='${ENTRA_CLIENT_SECRET:-}' SSO_ALLOWED_DOMAIN='${SSO_ALLOWED_DOMAIN:-}' SSO_SUCCESS_PATH='${SSO_SUCCESS_PATH:-/reserve}' SECRET_KEY='${SECRET_KEY}' ENABLE_NEO4J='${ENABLE_NEO4J:-false}' SMTP_HOST='${SMTP_HOST:-smtp.office365.com}' SMTP_PORT='${SMTP_PORT:-587}' SMTP_USER='${SMTP_USER:-}' SMTP_PASSWORD='${SMTP_PASSWORD:-}' SMTP_FROM='${SMTP_FROM:-}' SMTP_FROM_NAME='${SMTP_FROM_NAME:-헬스키퍼}' SMTP_USE_TLS='${SMTP_USE_TLS:-true}' TEAMS_REMINDER_ENABLED='${TEAMS_REMINDER_ENABLED:-true}' TEAMS_REMINDER_MINUTES_BEFORE='${TEAMS_REMINDER_MINUTES_BEFORE:-10}' TEAMS_SENDER_EMAIL='${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}' TEAMS_SENDER_REFRESH_TOKEN='${TEAMS_SENDER_REFRESH_TOKEN:-}'" \
   bash -s <<'REMOTE'
 set -euo pipefail
 if [[ ! -f /opt/healthkeeper/deploy/.env ]]; then
@@ -140,9 +141,14 @@ SMTP_PASSWORD=${SMTP_PASSWORD:-}
 SMTP_FROM=${SMTP_FROM:-healthkeeper@ibank.co.kr}
 SMTP_FROM_NAME=${SMTP_FROM_NAME:-헬스키퍼}
 SMTP_USE_TLS=${SMTP_USE_TLS:-true}
+TEAMS_REMINDER_ENABLED=${TEAMS_REMINDER_ENABLED:-true}
+TEAMS_REMINDER_MINUTES_BEFORE=${TEAMS_REMINDER_MINUTES_BEFORE:-10}
+TEAMS_SENDER_EMAIL=${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}
+TEAMS_SENDER_REFRESH_TOKEN=${TEAMS_SENDER_REFRESH_TOKEN:-}
 EOF
 
 cd /opt/healthkeeper/app/backend
+mkdir -p data/avatars
 if [[ ! -d .venv ]]; then
   python3 -m venv .venv
 fi

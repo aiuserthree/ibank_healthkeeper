@@ -27,6 +27,7 @@ from app.services.cycle import (
     week_monday,
 )
 from app.services.mail import drain_pending_mails, process_one_mail, retry_failed_mails
+from app.services.teams import enqueue_due_reminders, process_pending_teams_messages
 from app.services.priority import needs_manual, rank_applicants
 
 
@@ -144,3 +145,9 @@ async def job_mail_retry(db: AsyncSession) -> None:
     )
     for (mail_id,) in result.all():
         await process_one_mail(db, mail_id)
+
+
+async def job_teams_reminder(db: AsyncSession) -> None:
+    """확정 예약 시작 N분 전 Teams 1:1 채팅 알림."""
+    await enqueue_due_reminders(db)
+    await process_pending_teams_messages(db)

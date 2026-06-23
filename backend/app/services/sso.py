@@ -461,6 +461,51 @@ class EntraSSOProvider(SSOProvider):
         )
 
 
+TEAMS_SENDER_STATE_PREFIX = "teams_sender:state:"
+TEAMS_SENDER_SCOPES = "Chat.Create ChatMessage.Send offline_access"
+
+
+def teams_sender_redirect_uri() -> str:
+    base = get_settings().app_base_url.rstrip("/")
+    return f"{base}/api/auth/teams-sender/callback"
+
+
+async def build_teams_sender_authorize_url(state: str, code_challenge: str) -> str:
+    settings = get_settings()
+    params = {
+        "client_id": settings.entra_client_id,
+        "response_type": "code",
+        "redirect_uri": teams_sender_redirect_uri(),
+        "response_mode": "query",
+        "scope": TEAMS_SENDER_SCOPES,
+        "state": state,
+        "code_challenge": code_challenge,
+        "code_challenge_method": "S256",
+        "login_hint": settings.teams_sender_email or "healthkeeper@ibank.co.kr",
+    }
+    tenant = settings.entra_tenant_id
+    return f"https://login.microsoftonline.com/{tenant}/oauth2/v2.0/authorize?{urlencode(params)}"
+
+
+async def exchange_teams_sender_code(code: str, verifier: str) -> dict[str, Any]:
+    settings = get_settings()
+    token_url = f"https://login.microsoftonline.com/{settings.entra_tenant_id}/oauth2/v2.0/token"
+    data = {
+        "client_id": settings.entra_client_id,
+        "client_secret": settings.entra_client_secret,
+        "code": code,
+        "redirect_uri": teams_sender_redirect_uri(),
+        "grant_type": "authorization_code",
+        "code_verifier": verifier,
+        "scope": TEAMS_SENDER_SCOPES,
+    }
+    status, tokens = await _microsoft_post(token_url, data)
+    if status != 200:
+        detail = tokens.get("error_description") or tokens.get("error") or str(tokens)
+        raise SSOAuthError("Teams sender token exchange failed", detail=str(detail))
+    return tokens
+
+
 def get_sso_provider() -> SSOProvider:
     settings = get_settings()
     if settings.sso_provider == "entra":

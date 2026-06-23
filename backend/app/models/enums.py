@@ -51,6 +51,10 @@ class MailType(str, enum.Enum):
     DROP_REAPPLY_NOTICE = "DROP_REAPPLY_NOTICE"
 
 
+class TeamsMessageType(str, enum.Enum):
+    RESERVE_REMINDER = "RESERVE_REMINDER"
+
+
 class MailStatus(str, enum.Enum):
     PENDING = "PENDING"
     SENDING = "SENDING"

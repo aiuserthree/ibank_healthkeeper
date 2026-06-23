@@ -295,6 +295,7 @@ async def run_job_manual(
         "reapply-open": sched.job_reapply_open,
         "reapply-close": sched.job_reapply_close,
         "mail-retry": sched.job_mail_retry,
+        "teams-reminder": sched.job_teams_reminder,
     }
     fn = jobs.get(job_name)
     if not fn:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 from typing import Annotated, Optional
@@ -34,6 +35,9 @@ from app.services.sso import (
     STATE_PREFIX,
     SSOAuthError,
     SSOClaims,
+    TEAMS_SENDER_STATE_PREFIX,
+    build_teams_sender_authorize_url,
+    exchange_teams_sender_code,
     generate_pkce,
     get_sso_provider,
     pop_sso_code,
@@ -220,6 +224,69 @@ async def sso_callback(
         max_age=settings.session_max_age,
     )
     return redirect
+
+
+@router.get("/teams-sender/setup")
+async def teams_sender_setup(redis: Redis = Depends(get_redis_client)):
+    """healthkeeper@ refresh token 1회 발급 — dev 서버 켠 상태에서 브라우저로 접속."""
+    if settings.sso_provider != "entra" or not settings.sso_ready():
+        return HTMLResponse("Entra SSO 설정이 필요합니다 (.env 확인)", status_code=503)
+
+    state = secrets.token_urlsafe(32)
+    verifier, challenge = generate_pkce()
+    await redis.setex(
+        f"{TEAMS_SENDER_STATE_PREFIX}{state}",
+        600,
+        json.dumps({"verifier": verifier}),
+    )
+    url = await build_teams_sender_authorize_url(state, challenge)
+    return RedirectResponse(url=url, status_code=302)
+
+
+@router.get("/teams-sender/callback")
+async def teams_sender_callback(
+    code: str = Query(...),
+    state: str = Query(...),
+    redis: Redis = Depends(get_redis_client),
+):
+    key = f"{TEAMS_SENDER_STATE_PREFIX}{state}"
+    raw = await redis.get(key)
+    if not raw:
+        return HTMLResponse(
+            "<h2>세션 만료</h2><p><a href='/api/auth/teams-sender/setup'>다시 시도</a></p>",
+            status_code=400,
+        )
+    await redis.delete(key)
+    verifier = json.loads(raw).get("verifier", "")
+    try:
+        tokens = await exchange_teams_sender_code(code, verifier)
+    except SSOAuthError as exc:
+        return HTMLResponse(
+            f"<h2>토큰 교환 실패</h2><pre>{exc.message}\n{exc.detail}</pre>",
+            status_code=400,
+        )
+
+    refresh = tokens.get("refresh_token")
+    if not refresh:
+        return HTMLResponse(
+            f"<h2>refresh_token 없음</h2><pre>{json.dumps(tokens, indent=2)}</pre>",
+            status_code=400,
+        )
+
+    sender = settings.teams_sender_email or "healthkeeper@ibank.co.kr"
+    return HTMLResponse(
+        f"""<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><title>Teams sender token</title>
+<style>body{{font-family:system-ui;max-width:720px;margin:40px auto;padding:0 16px}}
+pre{{background:#f1f5f9;padding:12px;border-radius:8px;word-break:break-all;font-size:13px}}</style>
+</head><body>
+<h2>Teams 발송 계정 설정 완료</h2>
+<p><code>{sender}</code> 계정 refresh token 입니다. <code>.env</code>에 추가하세요.</p>
+<pre>TEAMS_SENDER_EMAIL={sender}
+TEAMS_SENDER_REFRESH_TOKEN={refresh}</pre>
+<p>추가 후 dev 서버를 재시작하고 <code>./scripts/test-teams-chat.py</code> 로 테스트하세요.</p>
+</body></html>"""
+    )
 
 
 @router.get("/sso/status")

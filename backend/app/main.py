@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -26,41 +25,54 @@ async def _run_job(name: str, fn) -> None:
             logger.exception("Scheduler job %s failed", name)
 
 
+def _async_job(name: str, fn):
+    async def _job() -> None:
+        await _run_job(name, fn)
+
+    return _job
+
+
 def _schedule_jobs() -> None:
     scheduler.add_job(
-        lambda: asyncio.create_task(_run_job("precreate", sched.job_precreate_cycle)),
+        _async_job("precreate", sched.job_precreate_cycle),
         CronTrigger(day_of_week="mon-sat", hour=0, minute=0),
         id="j0_precreate",
         replace_existing=True,
     )
     scheduler.add_job(
-        lambda: asyncio.create_task(_run_job("open", sched.job_open_cycle)),
+        _async_job("open", sched.job_open_cycle),
         CronTrigger(day_of_week="wed", hour=9, minute=0),
         id="j1_open",
         replace_existing=True,
     )
     scheduler.add_job(
-        lambda: asyncio.create_task(_run_job("close", sched.job_close_batch)),
+        _async_job("close", sched.job_close_batch),
         CronTrigger(day_of_week="wed", hour=17, minute=0),
         id="j2_close",
         replace_existing=True,
     )
     scheduler.add_job(
-        lambda: asyncio.create_task(_run_job("reapply_open", sched.job_reapply_open)),
+        _async_job("reapply_open", sched.job_reapply_open),
         CronTrigger(day_of_week="thu", hour=9, minute=0),
         id="j3_reapply_open",
         replace_existing=True,
     )
     scheduler.add_job(
-        lambda: asyncio.create_task(_run_job("reapply_close", sched.job_reapply_close)),
+        _async_job("reapply_close", sched.job_reapply_close),
         CronTrigger(day_of_week="thu", hour=17, minute=0),
         id="j4_reapply_close",
         replace_existing=True,
     )
     scheduler.add_job(
-        lambda: asyncio.create_task(_run_job("mail_retry", sched.job_mail_retry)),
+        _async_job("mail_retry", sched.job_mail_retry),
         CronTrigger(minute="*/5"),
         id="j5_mail_retry",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _async_job("teams_reminder", sched.job_teams_reminder),
+        CronTrigger(minute="*"),
+        id="j6_teams_reminder",
         replace_existing=True,
     )
 

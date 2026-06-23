@@ -34,6 +34,9 @@
 
 **관리자 동의 허용**이 필요한 테넌트면 동의를 진행합니다.
 
+예약 **10분 전 Teams 1:1 알림**을 쓰려면 애플리케이션 권한 `Chat.Create`, `ChatMessage.Send` 가 추가로 필요합니다.  
+→ [teams-reminder.md](./teams-reminder.md)
+
 ## 2. `.env` 설정
 
 프로젝트 루트 `.env` ( `scripts/dev.sh` 가 `backend/.env` 로 동기화):

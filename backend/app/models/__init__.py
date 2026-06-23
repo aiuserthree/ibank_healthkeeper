@@ -14,6 +14,7 @@ from app.models.enums import (
     ReservationStatus,
     ReservationType,
     SlotStatus,
+    TeamsMessageType,
 )
 from app.models.legacy_usage import LegacyUsage
 from app.models.mail import MailMessage, MailTemplate
@@ -21,6 +22,7 @@ from app.models.member import Member
 from app.models.reservation import Reservation
 from app.models.setting import OperationSetting
 from app.models.slot import Slot
+from app.models.teams import TeamsMessage
 from app.models.vacation import Vacation
 
 __all__ = [
@@ -44,5 +46,7 @@ __all__ = [
     "MailTemplate",
     "MailType",
     "MailStatus",
+    "TeamsMessage",
+    "TeamsMessageType",
     "OperationSetting",
 ]
