@@ -21,6 +21,7 @@ from app.models import (
     Reservation,
     ReservationCycle,
     ReservationStatus,
+    ReservationType,
     Slot,
     SlotStatus,
     Vacation,
@@ -39,9 +40,13 @@ from app.services.cycle import (
     week_friday,
     week_monday,
 )
+from app.services.admin_assign import admin_assign_meta, admin_assign_mail_status
+from app.services.avatar import admin_member_avatar_url
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 from app.services.priority import needs_manual, rank_applicants
 from app.services.reservation import get_empty_slots
+
+DASHBOARD_PENDING_SLOT_LIMIT = 5
 
 
 def _weekday_ko(d: date) -> str:
@@ -169,6 +174,7 @@ async def get_reapply_mail_targets(db: AsyncSession, cycle_id: int) -> dict:
                 "id": member.id,
                 "name": member.name,
                 "email": member.email,
+                "avatarUrl": admin_member_avatar_url(member.id),
                 "slotLabel": _slot_label(slot),
                 "mailStatus": mail_status,
             }
@@ -182,29 +188,36 @@ async def get_reapply_mail_targets(db: AsyncSession, cycle_id: int) -> dict:
     }
 
 
-async def _pending_confirmation_slots(db: AsyncSession, cycle_id: int) -> list[dict]:
+async def _pending_confirmation_slots(
+    db: AsyncSession, cycle_id: int, *, limit: int = DASHBOARD_PENDING_SLOT_LIMIT
+) -> dict:
     slots = await db.execute(
         select(Slot)
         .where(Slot.cycle_id == cycle_id)
         .where(Slot.status != SlotStatus.CONFIRMED)
         .where(Slot.is_vacation.is_(False))
-        .order_by(Slot.slot_date, Slot.time_index)
     )
-    pending: list[dict] = []
+    pending: list[tuple[tuple[str, str, int], dict]] = []
     for slot in slots.scalars().all():
         applicants = await rank_applicants(db, slot.id, requested_only=True)
         if not applicants:
             continue
-        pending.append(
-            {
-                "slotId": slot.id,
-                "label": _slot_label(slot),
-                "count": len(applicants),
-                "noHistory": await needs_manual(db, slot.id),
-                "applicants": applicants,
-            }
-        )
-    return pending
+        top = applicants[0]
+        latest_applied = max((a.get("applied_at") or "" for a in applicants), default="")
+        item = {
+            "slotId": slot.id,
+            "label": _slot_label(slot),
+            "count": len(applicants),
+            "noHistory": await needs_manual(db, slot.id),
+            "applicants": [top],
+        }
+        sort_key = (latest_applied, slot.slot_date.isoformat(), slot.time_index)
+        pending.append((sort_key, item))
+    pending.sort(key=lambda x: x[0], reverse=True)
+    return {
+        "items": [item for _, item in pending[:limit]],
+        "total": len(pending),
+    }
 
 
 async def _mail_breakdown(db: AsyncSession) -> dict:
@@ -320,7 +333,10 @@ async def dashboard(db: AsyncSession) -> dict:
         payload["closeAt"] = format_kst_iso(view_cycle.close_at)
         payload["canConfirm"] = can_admin_confirm(view_cycle)
         payload["cycleState"] = compute_cycle_state(view_cycle).value
-        payload["pendingSlots"] = await _pending_confirmation_slots(db, view_cycle.id)
+        pending_summary = await _pending_confirmation_slots(db, view_cycle.id)
+        payload["pendingSlots"] = pending_summary["items"]
+        payload["pendingSlotsTotal"] = pending_summary["total"]
+        payload.update(admin_assign_meta(view_cycle))
 
     if vacation_cycle:
         payload["vacationWeekDates"] = week_dates(vacation_cycle.target_week_start)
@@ -373,6 +389,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
             applicant = {
                 "id": reservation.id,
                 "reservation_id": reservation.id,
+                "member_id": member.id,
                 "slotId": slot.id,
                 "slotDate": slot.slot_date.isoformat(),
                 "timeIndex": slot.time_index,
@@ -380,6 +397,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
                 "endTime": slot.end_time.strftime("%H:%M"),
                 "member_name": member.name,
                 "member_email": member.email,
+                "avatarUrl": admin_member_avatar_url(member.id),
                 "last_used_date": member.last_used_date.isoformat() if member.last_used_date else None,
                 "no_history": member.last_used_date is None,
                 "type": reservation.type.value,
@@ -388,6 +406,11 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
                 "priority_rank": rank_info.get("priority_rank"),
                 "is_priority": reservation.is_priority,
             }
+            if (
+                reservation.type == ReservationType.ADMIN_ASSIGN
+                and reservation.status == ReservationStatus.CONFIRMED
+            ):
+                applicant["mailStatus"] = await admin_assign_mail_status(db, reservation.id)
             applicants.append(applicant)
             flat_items.append(applicant)
 
@@ -413,6 +436,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
         "cycleState": compute_cycle_state(cycle).value,
         "slots": board_slots,
         "items": flat_items,
+        **admin_assign_meta(cycle),
     }
 
 

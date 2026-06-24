@@ -63,6 +63,20 @@ def can_admin_confirm(cycle: ReservationCycle, now: datetime | None = None) -> b
     return now >= to_kst(cycle.close_at)
 
 
+def admin_assign_window(cycle: ReservationCycle) -> tuple[datetime, datetime]:
+    """관리자 빈 슬롯 지정 가능 구간: 수요일 마감(close_at) ~ 차주 전 일요일 23:59."""
+    start = to_kst(cycle.close_at)
+    sunday = cycle.target_week_start - timedelta(days=1)
+    end = datetime.combine(sunday, time(23, 59, 59), tzinfo=KST)
+    return start, end
+
+
+def can_admin_assign(cycle: ReservationCycle, now: datetime | None = None) -> bool:
+    now = now or now_kst()
+    start, end = admin_assign_window(cycle)
+    return start <= now <= end
+
+
 def compute_cycle_state(cycle: ReservationCycle, now: datetime | None = None) -> CycleState:
     """open_at/close_at 등 시각 기준 런타임 상태 (DB cycle.state 와 다를 수 있음)."""
     now = now or now_kst()

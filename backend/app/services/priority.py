@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import format_kst_iso
 from app.models import Member, Reservation, ReservationStatus
+from app.services.avatar import admin_member_avatar_url
 
 
 async def rank_applicants(
@@ -53,6 +54,7 @@ async def rank_applicants(
                 "priority_rank": row.priority_rank,
                 "type": row.type.value,
                 "status": row.status.value,
+                "avatarUrl": admin_member_avatar_url(row.member_id),
             }
         )
     return rows

@@ -34,7 +34,7 @@
       const top = applicants[0];
       const applicantHtml = top
         ? `<div style="display:flex;align-items:center;gap:10px;min-width:0;flex:1">
-            ${HKUI.avatar(top.member_name, "sm")}
+            ${HKUI.avatar(top.member_name, "sm", top.avatarUrl || "")}
             <div style="min-width:0">
               <div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(top.member_name)}</div>
               <div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(top.member_email || "")}${top.no_history ? " · 이력 없음" : ""}</div>
@@ -69,6 +69,7 @@
         const r = d.reservations || {};
         const m = d.mail || {};
         const pending = d.pendingSlots || [];
+        const pendingTotal = d.pendingSlotsTotal ?? pending.length;
 
         document.querySelector(".hk-amain").firstElementChild.outerHTML = HKAdmin.pageHead(
           "대시보드",
@@ -76,7 +77,7 @@
           stateBadge(d)
         );
 
-        const pendingAlert = (r.requested || pending.length)
+        const pendingAlert = (r.requested || pendingTotal)
           ? (d.canConfirm === false
               ? HKUI.alertBox(
                   "info",
@@ -109,8 +110,8 @@
           </div>
           <div class="hk-dash-split">
             <div class="hk-card hk-card--pad">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-                <h2 style="font-size:20px;margin:0">확정 대기 슬롯</h2>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+                <h2 style="font-size:20px;margin:0">확정 대기 슬롯${pendingTotal ? ` <span style="font-size:14px;font-weight:600;color:var(--text-muted)">(${pendingTotal}건)</span>` : ""}</h2>
                 <a href="${HKAdminRoutes.reservations}"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm">예약 관리로 ${HKUI.icon("arrow-right", 16, "var(--color-midnight-navy)")}</button></a>
               </div>
               <div class="hk-dash-pending">${pendingListHtml}</div>

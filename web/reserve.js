@@ -22,32 +22,40 @@
     return !!calendar?.weekApplied;
   }
 
+  function isMySlot(s) {
+    if (s.mine) return true;
+    if (!hasWeekApplied()) return false;
+    const appliedId = calendar?.appliedSlotId;
+    return appliedId != null && Number(s.id) === Number(appliedId);
+  }
+
   function syncAppliedSelection() {
     if (!hasWeekApplied()) return;
     const applied =
-      (calendar.appliedSlotId && calendar.slots.find((s) => s.id === calendar.appliedSlotId)) ||
-      calendar.slots.find((s) => s.mine) ||
+      (calendar.appliedSlotId != null &&
+        calendar.slots.find((s) => Number(s.id) === Number(calendar.appliedSlotId))) ||
+      calendar.slots.find((s) => isMySlot(s)) ||
       null;
     if (applied) selected = applied;
   }
 
   function slotClass(s, sel) {
     if (s.isVacation || s.confirmed) return "disabled";
-    if (s.mine) return "selected";
+    if (isMySlot(s)) return "mine";
     if (hasWeekApplied()) return "disabled";
     if (sel && sel.id === s.id) return "selected";
     if (!isOpen()) return "disabled";
     return "available";
   }
 
-  function slotMeta(s) {
+  function slotMeta(s, sel) {
     if (s.isVacation) return "휴가";
     if (s.confirmed) return "확정됨";
-    if (s.mine) return "내 신청";
+    if (isMySlot(s)) return "내 신청";
     if (hasWeekApplied() && isOpen()) return "신청 불가";
     if (!isOpen()) return "신청 불가";
-    if (s.requestCount > 0) return `신청자 ${s.requestCount}명`;
-    return "예약 가능";
+    if (sel && sel.id === s.id) return "선택 중";
+    return `신청자 ${s.requestCount || 0}명`;
   }
 
   function renderBanner() {
@@ -102,10 +110,14 @@
                 : day.slots
                     .map((s) => {
                       const cls = slotClass(s, selected);
-                      const disabled = cls === "disabled" || s.mine || s.confirmed || (hasWeekApplied() && !s.mine);
-                      return `<button type="button" class="hk-slot${cls === "selected" ? " hk-slot--selected" : ""}${cls === "disabled" ? " hk-slot--disabled" : ""}${s.confirmed ? " hk-slot--confirmed" : ""}" data-id="${s.id}" ${disabled ? "disabled" : ""} style="width:100%">
+                      const disableClick =
+                        s.isVacation ||
+                        s.confirmed ||
+                        cls === "mine" ||
+                        (hasWeekApplied() && cls !== "mine");
+                      return `<button type="button" class="hk-slot${cls === "selected" ? " hk-slot--picking" : ""}${cls === "disabled" ? " hk-slot--disabled" : ""}${cls === "mine" ? " hk-slot--mine" : ""}${s.confirmed ? " hk-slot--confirmed" : ""}" data-id="${s.id}" ${disableClick ? "disabled" : ""} style="width:100%">
                         <span class="hk-slot__time">${s.startTime}</span>
-                        <span class="hk-slot__meta">${slotMeta(s)}</span>
+                        <span class="hk-slot__meta">${slotMeta(s, selected)}</span>
                       </button>`;
                     })
                     .join("")
@@ -116,8 +128,9 @@
       .join("")}</div>
       <div style="display:flex;gap:18px;margin-top:16px;padding-top:14px;border-top:1px solid var(--color-mist);flex-wrap:wrap">
         ${HKUI.legend("var(--surface-card)", "var(--border-default)", "예약 가능")}
-        ${HKUI.legend("var(--color-signal-blue)", "var(--color-signal-blue)", "선택")}
-        ${HKUI.legend("", "", "휴가 · 신청 불가", true)}
+        ${HKUI.legend("var(--action)", "var(--action)", "내 신청")}
+        ${HKUI.legend("var(--color-midnight-navy)", "var(--color-midnight-navy)", "선택 중")}
+        ${HKUI.legend("", "", "안마사님 휴가 · 신청 불가", true)}
         <span style="font-size:12.5px;color:var(--text-secondary);display:flex;align-items:center;gap:6px">${HKUI.icon("users", 14, "var(--color-warning)")} 신청자 n명 = 우선권 경합</span>
       </div>`;
 
@@ -127,7 +140,7 @@
         const id = Number(btn.dataset.id);
         const slot = calendar.slots.find((s) => s.id === id);
         if (!slot || slot.isVacation || slot.confirmed) return;
-        if (hasWeekApplied() && !slot.mine) return;
+        if (hasWeekApplied() && !slot.mine && !isMySlot(slot)) return;
         if (!isOpen()) return;
         selected = slot;
         renderGrid();
@@ -157,7 +170,7 @@
     }
     const d = new Date(selected.slotDate + "T12:00:00");
     const dow = DAY_NAMES[d.getDay()];
-    if (selected.mine || hasWeekApplied()) {
+    if (selected.mine || isMySlot(selected) || hasWeekApplied()) {
       el.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">${HKUI.icon("calendar-days", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.formatDateShort(selected.slotDate)} (${dow})</span></div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">${HKUI.icon("clock", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${selected.startTime} – ${selected.endTime}</span></div>
@@ -189,11 +202,13 @@
       if (!ok) return;
       try {
         await HKApi.applySlot(selected.id);
-        calendar.weekApplied = true;
-        calendar.appliedSlotId = selected.id;
-        calendar.slots = calendar.slots.map((s) => ({ ...s, mine: s.id === selected.id }));
-        selected = calendar.slots.find((s) => s.id === calendar.appliedSlotId) || null;
-        HKUI.toast("예약 신청이 완료되었습니다");
+        const cal = await HKApi.calendar();
+        calendar = {
+          ...cal,
+          slots: (cal.slots || []).map((s) => ({ ...s })),
+        };
+        syncAppliedSelection();
+        HKUI.toast("예약이 완료되었습니다", "success", { prominent: true });
         renderBanner();
         renderGrid();
         renderSummary();

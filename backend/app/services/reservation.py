@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
@@ -247,10 +247,13 @@ async def list_my_reservations(
     page_size = min(max(1, page_size), 50)
     offset = (page - 1) * page_size
 
+    visible = Reservation.status != ReservationStatus.CANCELLED
+
     total_result = await db.execute(
         select(func.count())
         .select_from(Reservation)
         .where(Reservation.member_id == member.id)
+        .where(visible)
     )
     total = int(total_result.scalar_one())
 
@@ -260,7 +263,13 @@ async def list_my_reservations(
         select(Reservation, Slot)
         .join(Slot, Slot.id == Reservation.slot_id)
         .where(Reservation.member_id == member.id)
-        .order_by(Slot.slot_date.desc(), Slot.time_index.desc())
+        .where(visible)
+        .order_by(
+            case((Reservation.status == ReservationStatus.REQUESTED, 0), else_=1),
+            Reservation.applied_at.desc(),
+            Slot.slot_date.desc(),
+            Slot.time_index.desc(),
+        )
         .offset(offset)
         .limit(page_size)
     )

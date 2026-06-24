@@ -208,12 +208,23 @@ window.HKUI = (function () {
     </div>`;
   }
 
-  function toast(message, variant = "success") {
+  function toast(message, variant = "success", opts = {}) {
+    const icons = { success: "circle-check", danger: "circle-x", info: "info" };
+    const prominent = !!opts.prominent;
+    const duration = opts.duration || (prominent ? 4800 : 3400);
     const el = document.createElement("div");
-    el.className = "hk-toast-wrap";
-    el.innerHTML = `<div class="hk-toast hk-toast--${variant}">${escapeHtml(message)}</div>`;
+    el.className = `hk-toast-wrap${prominent ? " hk-toast-wrap--prominent" : ""}`;
+    el.innerHTML = `<div class="hk-toast hk-toast--${variant}${prominent ? " hk-toast--prominent" : ""}" role="status">
+      <span class="hk-toast__icon" aria-hidden="true">${icon(icons[variant] || "info", prominent ? 22 : 20, "currentColor")}</span>
+      <span class="hk-toast__text">${escapeHtml(message)}</span>
+    </div>`;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 3400);
+    refreshIcons(el);
+    requestAnimationFrame(() => el.classList.add("hk-toast-wrap--visible"));
+    setTimeout(() => {
+      el.classList.add("hk-toast-wrap--hide");
+      setTimeout(() => el.remove(), 280);
+    }, duration);
   }
 
   function confirmDialog(title, body, opts = {}) {
@@ -284,7 +295,9 @@ window.HKUI = (function () {
   function avatar(name, size = "sm", src = "") {
     const initial = (name || "?").charAt(0);
     if (src) {
-      return `<span class="hk-avatar hk-avatar--${size}"><img src="${escapeHtml(src)}" alt="${escapeHtml(name || "")}" loading="lazy" referrerpolicy="no-referrer"></span>`;
+      const safeName = escapeHtml(name || "");
+      const safeInitial = escapeHtml(initial);
+      return `<span class="hk-avatar hk-avatar--${size}"><img src="${escapeHtml(src)}" alt="${safeName}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.textContent='${safeInitial}'"></span>`;
     }
     return `<span class="hk-avatar hk-avatar--${size}">${escapeHtml(initial)}</span>`;
   }
@@ -614,8 +627,10 @@ window.HKUI = (function () {
   function reservationCard(r, opts = {}) {
     const reapplyAvailable = !!opts.reapplyAvailable;
     const muted = r.status === "CANCELLED";
-    const dow = DAY_NAMES[new Date(r.slotDate + "T12:00:00").getDay()];
-    const dayNum = formatDateShort(r.slotDate).split("/")[1] || formatDateShort(r.slotDate);
+    const d = new Date(r.slotDate + "T12:00:00");
+    const dow = DAY_NAMES[d.getDay()];
+    const month = d.getMonth() + 1;
+    const dayNum = d.getDate();
     let sub = "일반 신청 · 확정 대기";
     if (r.status === "DROPPED") sub = reapplyAvailable ? "탈락 — 재신청 가능" : "탈락";
     else if (r.type === "REAPPLY") sub = "재신청 · 즉시 확정 (취소 불가)";
@@ -625,11 +640,16 @@ window.HKUI = (function () {
     let action = `<span style="width:1px"></span>`;
     if (r.cancelable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel="${r.id}">취소</button>`;
     else if (r.status === "DROPPED" && reapplyAvailable) action = `<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`;
+    const dateBg = muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)";
+    const monthColor = muted ? "var(--text-muted)" : "var(--color-slate-blue)";
+    const dayColor = muted ? "var(--text-muted)" : "var(--color-midnight-navy)";
+    const dowColor = "var(--text-muted)";
     return `<div class="hk-card hk-card--pad" style="opacity:${muted ? 0.7 : 1}">
       <div style="display:flex;align-items:center;gap:16px">
-        <div style="width:50px;height:50px;border-radius:10px;background:${muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)"};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0">
-          <span style="font-size:16px;font-weight:700;color:${muted ? "var(--text-muted)" : "var(--color-info-blue)"};line-height:1">${dayNum}</span>
-          <span style="font-size:11px;color:${muted ? "var(--text-muted)" : "var(--color-slate-blue)"}">${dow}</span>
+        <div style="width:50px;min-width:50px;padding:7px 0;border-radius:10px;background:${dateBg};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;text-align:center">
+          <div style="font-size:10px;font-weight:600;color:${monthColor};line-height:1">${month}월</div>
+          <div style="font-size:20px;font-weight:700;color:${dayColor};line-height:1.05;margin:4px 0 3px;font-variant-numeric:tabular-nums">${dayNum}</div>
+          <div style="font-size:10px;font-weight:600;color:${dowColor};line-height:1">${dow}</div>
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-size:17px;font-weight:700;color:var(--color-midnight-navy)">${escapeHtml(r.startTime)} – ${escapeHtml(r.endTime)}</div>

@@ -45,6 +45,15 @@ class ConfirmRequest(BaseModel):
     reservationId: int
 
 
+class AdminAssignRequest(BaseModel):
+    memberId: int
+
+
+class AdminAssignChangeRequest(BaseModel):
+    memberId: Optional[int] = None
+    slotId: Optional[int] = None
+
+
 class VacationRequest(BaseModel):
     cycleId: int
     dates: list[str]

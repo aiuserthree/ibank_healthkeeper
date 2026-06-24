@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body, Cookie, Depends, Query, Response
+from fastapi import APIRouter, Body, Cookie, Depends, HTTPException, Query, Response
+from fastapi.responses import FileResponse
 from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +14,18 @@ from app.core.deps import get_current_admin, get_redis_client
 from app.core.session import create_admin_session, delete_admin_session
 from app.database import get_db
 from app.models import AdminUser, MailMessage, MailTemplate, MailType
-from app.schemas.common import AdminLoginRequest, ConfirmRequest, ReapplyMailSendRequest, SettingsUpdateRequest, VacationMonthRequest, VacationRequest
+from app.schemas.common import AdminLoginRequest, AdminAssignChangeRequest, AdminAssignRequest, ConfirmRequest, ReapplyMailSendRequest, SettingsUpdateRequest, VacationMonthRequest, VacationRequest
 from app.services import admin as admin_service
+from app.services.admin_assign import (
+    assign_empty_slot,
+    admin_assign_mail_status,
+    cancel_admin_assign,
+    change_admin_assign,
+    search_assignable_members,
+    send_admin_assign_mail,
+)
 from app.services.confirm import confirm_reservation, get_slot_detail
+from app.services.avatar import avatar_path, has_avatar
 from app.services.mail import drain_pending_mails, process_one_mail
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -101,6 +111,89 @@ async def confirm_slot(
     for mail_id in drain_pending_mails():
         await process_one_mail(db, mail_id)
     return {"data": {"reservationId": reservation.id, "message": "예약이 확정되었습니다."}}
+
+
+@router.get("/members/assignable")
+async def assignable_members(
+    cycle_id: int = Query(..., alias="cycleId"),
+    q: str = Query("", max_length=100),
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    members = await search_assignable_members(db, cycle_id, q=q)
+    return {"data": {"members": members}}
+
+
+@router.get("/members/{member_id}/avatar")
+async def member_avatar(
+    member_id: int,
+    _: AdminUser = Depends(get_current_admin),
+):
+    if not has_avatar(member_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(
+        avatar_path(member_id),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
+
+
+@router.post("/reservations/slots/{slot_id}/assign")
+async def assign_slot(
+    slot_id: int,
+    body: AdminAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    reservation = await assign_empty_slot(db, slot_id, body.memberId)
+    return {
+        "data": {
+            "reservationId": reservation.id,
+            "message": "관리자 지정으로 예약이 확정되었습니다.",
+        }
+    }
+
+
+@router.post("/reservations/{reservation_id}/admin-assign/cancel")
+async def cancel_assign(
+    reservation_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    await cancel_admin_assign(db, reservation_id)
+    return {"data": {"message": "관리자 지정 예약이 취소되었습니다."}}
+
+
+@router.post("/reservations/{reservation_id}/admin-assign/change")
+async def change_assign(
+    reservation_id: int,
+    body: AdminAssignChangeRequest,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    reservation = await change_admin_assign(
+        db,
+        reservation_id,
+        member_id=body.memberId,
+        slot_id=body.slotId,
+    )
+    return {
+        "data": {
+            "reservationId": reservation.id,
+            "message": "관리자 지정 예약이 변경되었습니다.",
+        }
+    }
+
+
+@router.post("/reservations/{reservation_id}/admin-assign/send-mail")
+async def send_assign_mail(
+    reservation_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    mail_id = await send_admin_assign_mail(db, reservation_id)
+    await process_one_mail(db, mail_id)
+    return {"data": {"message": "완료 메일이 발송되었습니다."}}
 
 
 @router.get("/reapply-mail/targets")

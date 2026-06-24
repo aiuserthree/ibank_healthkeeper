@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>예약 내역 예시 — 헬스키퍼</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <style>
+    .hk-preview-note {
+      max-width: 1200px;
+      margin: 0 auto 16px;
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: #fff8e6;
+      border: 1px solid #f0d98c;
+      color: #5c4a12;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .hk-preview-note strong { color: #3d3208; }
+  </style>
+</head>
+<body>
+  <div class="hk-preview-note" style="margin-top:24px">
+    <strong>예시 화면</strong> — 실제 데이터가 아닌 mock입니다.
+    지난 주·이전 <strong>확정·탈락·취소</strong> 신청이 예약 내역 탭에 계속 쌓여 보이는 모습입니다.
+    (과거 <strong>확정</strong> 이용만 별도로 「과거 이용 내역」 모달에도 나타납니다.)
+  </div>
+  <main style="max-width:1200px;margin:0 auto;padding:0 32px 72px">
+    <h1 style="font-size:34px;margin-bottom:4px">마이페이지</h1>
+    <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">조준형님의 예약 신청 내역입니다.</p>
+    <div style="display:flex;gap:24px;border-bottom:1px solid var(--border-default);margin-bottom:24px">
+      <span style="padding:12px 4px;font-size:15px;font-weight:600;color:var(--color-signal-blue);border-bottom:2px solid var(--color-signal-blue)">예약 내역</span>
+      <span style="padding:12px 4px;font-size:15px;font-weight:600;color:var(--text-muted)">내 정보</span>
+    </div>
+    <div id="stats-wrap"></div>
+    <div id="alert-wrap"></div>
+    <div style="margin-top:18px;display:flex;flex-direction:column;gap:12px" id="list"></div>
+    <p style="margin:20px 0 0;font-size:13px;color:var(--text-muted);text-align:center">총 15건 · 10건씩 표시 (2페이지)</p>
+  </main>
+  <script>
+    const mock = [
+      { id: 1, slotDate: "2026-06-30", startTime: "14:00", endTime: "14:30", type: "NORMAL", status: "CONFIRMED", cancelable: false },
+      { id: 2, slotDate: "2026-06-27", startTime: "15:30", endTime: "16:00", type: "NORMAL", status: "CONFIRMED", cancelable: false },
+      { id: 3, slotDate: "2026-06-20", startTime: "14:00", endTime: "14:30", type: "NORMAL", status: "CONFIRMED", cancelable: false },
+      { id: 4, slotDate: "2026-06-13", startTime: "14:00", endTime: "14:30", type: "NORMAL", status: "DROPPED", cancelable: false },
+      { id: 5, slotDate: "2026-06-06", startTime: "16:00", endTime: "16:30", type: "NORMAL", status: "CANCELLED", cancelable: false },
+    ];
+
+    document.getElementById("stats-wrap").innerHTML = `<div class="hk-card hk-card--pad hk-card--flat" style="margin-bottom:20px;background:var(--color-mist)">
+      <div style="display:flex;gap:48px;flex-wrap:wrap">
+        ${HKUI.kv("마지막 이용일", "2026.06.20")}
+        ${HKUI.kvTooltip("우선권", HKUI.badge("이용 이력 있음", "info"), HKUI.PRIORITY_TOOLTIP_HTML)}
+        ${HKUI.kvTooltip("누적 신청", "8건", HKUI.APPLY_TOTAL_TOOLTIP_HTML)}
+      </div>
+    </div>`;
+    document.getElementById("alert-wrap").innerHTML = HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b>");
+    document.getElementById("list").innerHTML = mock.map((r) => HKUI.reservationCard(r)).join("");
+    HKUI.bindTooltips(document.querySelector("main"));
+    HKUI.refreshIcons();
+  </script>
+</body>
+</html>

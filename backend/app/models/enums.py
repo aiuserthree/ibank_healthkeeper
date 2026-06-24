@@ -29,6 +29,7 @@ class SlotStatus(str, enum.Enum):
 class ReservationType(str, enum.Enum):
     NORMAL = "NORMAL"
     REAPPLY = "REAPPLY"
+    ADMIN_ASSIGN = "ADMIN_ASSIGN"
 
 
 class ReservationStatus(str, enum.Enum):

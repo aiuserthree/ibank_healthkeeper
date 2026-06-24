@@ -14,7 +14,7 @@ from sqlalchemy import delete, func, select
 
 from app.core.time import now_kst, now_utc, to_kst
 from app.database import AsyncSessionLocal
-from app.models import CycleState, Reservation, ReservationCycle, Slot, SlotStatus
+from app.models import CycleState, Member, Reservation, ReservationCycle, ReservationStatus, Slot, SlotStatus
 from app.services.cycle import (
     apply_vacations_to_slots,
     create_cycle_for_week,
@@ -67,6 +67,25 @@ async def force_open_cycle(db) -> ReservationCycle:
     return cycle
 
 
+async def recompute_member_last_used_dates(db) -> int:
+    result = await db.execute(
+        select(Reservation.member_id, func.max(Slot.slot_date).label("max_date"))
+        .join(Slot, Slot.id == Reservation.slot_id)
+        .where(Reservation.status == ReservationStatus.CONFIRMED)
+        .group_by(Reservation.member_id)
+    )
+    confirmed_map = {row.member_id: row.max_date for row in result.all()}
+
+    members = await db.execute(select(Member))
+    updated = 0
+    for member in members.scalars().all():
+        new_date = confirmed_map.get(member.id)
+        if member.last_used_date != new_date:
+            member.last_used_date = new_date
+            updated += 1
+    return updated
+
+
 async def reset_active_cycle() -> None:
     async with AsyncSessionLocal() as db:
         cycle = await get_active_cycle(db)
@@ -83,6 +102,7 @@ async def reset_active_cycle() -> None:
             return
 
         removed = await clear_cycle_reservations(db, cycle.id)
+        updated = await recompute_member_last_used_dates(db)
         await db.commit()
 
         print(
@@ -90,6 +110,7 @@ async def reset_active_cycle() -> None:
             f"({cycle.target_week_start} ~ {cycle.target_week_end}) state={cycle.state.value}"
         )
         print(f"  · 삭제한 예약: {removed}건")
+        print(f"  · 마지막 이용일 재계산: {updated}명")
 
 
 async def open_and_reset() -> None:

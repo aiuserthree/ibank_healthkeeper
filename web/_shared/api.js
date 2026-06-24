@@ -64,6 +64,25 @@ window.HKApi = (function () {
         method: "POST",
         body: JSON.stringify({ reservationId }),
       }),
+    assignableMembers: (cycleId, q = "") => {
+      const params = new URLSearchParams({ cycleId: String(cycleId) });
+      if (q) params.set("q", q);
+      return request(`/admin/members/assignable?${params}`);
+    },
+    assignSlot: (slotId, memberId) =>
+      request(`/admin/reservations/slots/${slotId}/assign`, {
+        method: "POST",
+        body: JSON.stringify({ memberId }),
+      }),
+    cancelAdminAssign: (reservationId) =>
+      request(`/admin/reservations/${reservationId}/admin-assign/cancel`, { method: "POST" }),
+    changeAdminAssign: (reservationId, payload) =>
+      request(`/admin/reservations/${reservationId}/admin-assign/change`, {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }),
+    sendAdminAssignMail: (reservationId) =>
+      request(`/admin/reservations/${reservationId}/admin-assign/send-mail`, { method: "POST" }),
     reapplyTargets: (cycleId) => request(`/admin/reapply-mail/targets?cycleId=${cycleId}`),
     sendReapplyMail: (cycleId, memberIds) =>
       request(`/admin/reapply-mail/send?cycleId=${cycleId}`, {

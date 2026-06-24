@@ -10,7 +10,7 @@ _(존칭생략)_
 | --- | --- | --- | --- | --- | --- |
 | 13:00~13:30 | 주민규 (mkjoo@3ibank.com) | 정여진 (yjjung@3ibank.com) | 김관홍 (khkim@3ibank.com) | 정세환 (jsh@3ibank.com) | 문영배 (breezy@3ibank.com) |
 | 14:00~14:30 | 최민아 (mina@3ibank.com) | 정왕구 (wangkoo@3ibank.com) | 최지혜 (jhchoi@3ibank.com) | 최민아 (mina@3ibank.com) | 이호민 (lhm@3ibank.com) |
-| 15:00~15:30 | 한예성 (yshan@3ibank.com) | 조은봄 (ebcho@3ibank.com) | 김나영 (nykim@3ibank.com / nykim2@3ibank.com) | 박석민 (psm@3ibank.com) | 정용관 (yg@3ibank.com) |
+| 15:00~15:30 | 한예성 (yshan@3ibank.com) | 조은봄 (ebcho@3ibank.com) | 김나영 (nykim@3ibank.com) | 박석민 (psm@3ibank.com) | 정용관 (yg@3ibank.com) |
 | 16:00~16:30 | 장보윤 (byjang@3ibank.com) | 양도경 (dkyang@3ibank.com) | 이지원 (leejw@3ibank.com) | 김상대 (klux9717@3ibank.com) | 국순호 (shgook@3ibank.com) |
 
 ## 1-2
@@ -35,7 +35,7 @@ _(존칭생략)_
 
 | 시간 | 1월26일 | 1월27일 | 1월28일 | 1월29일 | 1월30일 |
 | --- | --- | --- | --- | --- | --- |
-| 13:00~13:30 | 정세환 (jsh@3ibank.com) | 김윤나 (ynkim@3ibank.com) | 이미소 (mslee@3ibank.com) | 정지나 (jnjung@3ibank.com) | 김나영 (nykim@3ibank.com / nykim2@3ibank.com) |
+| 13:00~13:30 | 정세환 (jsh@3ibank.com) | 김윤나 (ynkim@3ibank.com) | 이미소 (mslee@3ibank.com) | 정지나 (jnjung@3ibank.com) | 김나영 (nykim@3ibank.com) |
 | 14:00~14:30 | 최민아 (mina@3ibank.com) | 이은선 (eslee@3ibank.com) | 조은봄 (ebcho@3ibank.com) | 김가은 (kekim2@3ibank.com) | 최지혜 (jhchoi@3ibank.com) |
 | 15:00~15:30 | 우슬비 (sbwoo@3ibank.com) | 김정미 (jmkim2@3ibank.com) | 공유미 (ymgong@3ibank.com) | 이은정 (ejlee2@3ibank.com) | 미정 |
 | 16:00~16:30 | 양지우 (jwyang@3ibank.com) | 안예지 (yjahn@3ibank.com) | 박석민 (psm@3ibank.com) | 김상대 (klux9717@3ibank.com) | 미정 |
@@ -82,7 +82,7 @@ _(존칭생략)_
 | --- | --- | --- | --- | --- | --- |
 | 13:00~13:30 | 휴무 | 미정 | 우해인 (hiwoo@3ibank.com) | 조준형 (jhcho@3ibank.com) | 여도희 (dhyeo@3ibank.com) |
 | 14:00~14:30 |  | 최민아 (mina@3ibank.com) | 정왕구 (wangkoo@3ibank.com) | 장보윤 (byjang@3ibank.com) | 우수정 (sjwoo@3ibank.com) |
-| 15:00~15:30 |  | 정세환 (jsh@3ibank.com) | 김정미 (jmkim2@3ibank.com) | 김다솜 | 김나영 (nykim@3ibank.com / nykim2@3ibank.com) |
+| 15:00~15:30 |  | 정세환 (jsh@3ibank.com) | 김정미 (jmkim2@3ibank.com) | 김다솜 | 김나영 (nykim@3ibank.com) |
 | 16:00~16:30 |  | 박석민 (psm@3ibank.com) | 김나율 (nykim3@3ibank.com) | 강민아 (makang@3ibank.com) | 김주은 (jekim2@3ibank.com) |
 
 ## 3-2
@@ -110,7 +110,7 @@ _(존칭생략)_
 | 13:00~13:30 | 우해인 (hiwoo@3ibank.com) | 정세환 (jsh@3ibank.com) | 조은봄 (ebcho@3ibank.com) | 조아름 (archo@3ibank.com) | 미정 |
 | 14:00~14:30 | 최민아 (mina@3ibank.com) | 한예성 (yshan@3ibank.com) | 김소윤 (sykim@3ibank.com) | 이은선 (eslee@3ibank.com) | 미정 |
 | 15:00~15:30 | 공석 | 우수정 (sjwoo@3ibank.com) | 김윤나 (ynkim@3ibank.com) | 강규림 (krkang@3ibank.com) | 미정 |
-| 16:00~16:30 | 김지혜 (jhkim2@3ibank.com) | 김나영 (nykim@3ibank.com / nykim2@3ibank.com) | 박석민 (psm@3ibank.com) | 문정원 (hazzi77@3ibank.com) | 미정 |
+| 16:00~16:30 | 김지혜 (jhkim2@3ibank.com) | 김나영 (nykim@3ibank.com) | 박석민 (psm@3ibank.com) | 문정원 (hazzi77@3ibank.com) | 미정 |
 
 ## 4-1
 
@@ -127,7 +127,7 @@ _(존칭생략)_
 | --- | --- | --- | --- | --- | --- |
 | 13:00~13:30 | 안예지 (yjahn@3ibank.com) | 우해인 (hiwoo@3ibank.com) | 박예솔 (yspark@3ibank.com) | 박승하 (shpark3@3ibank.com) | 김지희 (jhkim3@3ibank.com) |
 | 14:00~14:30 | 최민아 (mina@3ibank.com) | 이은지 (ejlee@3ibank.com) | 김다솜 | 김경은 (kekim@3ibank.com) | 이미소 (mslee@3ibank.com) |
-| 15:00~15:30 | 이희권 (hklee@3ibank.com) | 우수정 (sjwoo@3ibank.com) | 모예림 (yrmo@3ibank.com) | 진미연 (myjin@3ibank.com) | 김나영 (nykim@3ibank.com / nykim2@3ibank.com) |
+| 15:00~15:30 | 이희권 (hklee@3ibank.com) | 우수정 (sjwoo@3ibank.com) | 모예림 (yrmo@3ibank.com) | 진미연 (myjin@3ibank.com) | 김나영 (nykim@3ibank.com) |
 | 16:00~16:30 | 조은봄 (ebcho@3ibank.com) | 이은정 (ejlee2@3ibank.com) | 이단비 (dblee@3ibank.com) | 강민아 (makang@3ibank.com) | 김나율 (nykim3@3ibank.com) |
 
 ## 4-3
@@ -144,7 +144,7 @@ _(존칭생략)_
 | 시간 | 4월20일 | 4월21일 | 4월22일 | 4월23일 | 4월24일 |
 | --- | --- | --- | --- | --- | --- |
 | 13:00~13:30 | 정세환 (jsh@3ibank.com) | 이희권 (hklee@3ibank.com) | 미정 | 미정 | 주민규 (mkjoo@3ibank.com) |
-| 14:00~14:30 | 조은봄 (ebcho@3ibank.com) | 김윤나 (ynkim@3ibank.com) | 미정 | 김나영 (nykim@3ibank.com / nykim2@3ibank.com) | 여도희 (dhyeo@3ibank.com) |
+| 14:00~14:30 | 조은봄 (ebcho@3ibank.com) | 김윤나 (ynkim@3ibank.com) | 미정 | 김나영 (nykim@3ibank.com) | 여도희 (dhyeo@3ibank.com) |
 | 15:00~15:30 | 최민아 (mina@3ibank.com) | 유하나 (hnyoo@3ibank.com) | 미정 | 조민희 (mhcho@3ibank.com) | 우수정 (sjwoo@3ibank.com) |
 | 16:00~16:30 | 박석민 (psm@3ibank.com) | 김지혜 (jhkim2@3ibank.com) | 미정 | 문정원 (hazzi77@3ibank.com) | 미정 |
 
@@ -209,7 +209,7 @@ _(존칭생략)_
 | 13:30~14:00 | 최지혜 (jhchoi@3ibank.com) | 주민규 (mkjoo@3ibank.com) | 김윤나 (ynkim@3ibank.com) | 박석민 (psm@3ibank.com) | 정세환 (jsh@3ibank.com) |
 | 14:30~15:00 | 정용관 (yg@3ibank.com) | 진은미 (gottagirl@3ibank.com) | 진미연 (myjin@3ibank.com) | 김주은 (jekim2@3ibank.com) | 최민아 (mina@3ibank.com) |
 | 15:30~16:00 | 최민아 (mina@3ibank.com) | 이은지 (ejlee@3ibank.com) | 미정 | 김나율 (nykim3@3ibank.com) | 최민아 (mina@3ibank.com) |
-| 16:30~17:00 | 강규림 (krkang@3ibank.com) | 여도희 (dhyeo@3ibank.com) | 미정 | 김나영 (nykim@3ibank.com / nykim2@3ibank.com) | 정용관 (yg@3ibank.com) |
+| 16:30~17:00 | 강규림 (krkang@3ibank.com) | 여도희 (dhyeo@3ibank.com) | 미정 | 김나영 (nykim@3ibank.com) | 정용관 (yg@3ibank.com) |
 
 ## 6-3
 

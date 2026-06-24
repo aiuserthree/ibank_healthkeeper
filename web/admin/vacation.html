@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
   <style>
-    .hk-vac-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; width: 100%; }
+    .hk-vac-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; width: 100%; min-width: 0; }
     .hk-vac-head { text-align: center; font-size: 12px; font-weight: 700; color: var(--text-muted); padding: 4px 0 6px; }
     .hk-vac-legend { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 24px; margin-bottom: 16px; font-size: 12.5px; color: var(--text-secondary); }
     .hk-vac-legend__item { display: inline-flex; align-items: center; gap: 8px; }
@@ -24,7 +24,8 @@
     }
     .hk-vac-cell {
       padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-default);
-      background: var(--surface-card); min-height: 78px; display: flex; flex-direction: column; justify-content: space-between;
+      background: var(--surface-card); min-height: 78px; min-width: 0;
+      display: flex; flex-direction: column; justify-content: space-between;
       box-shadow: inset 0 2px 0 var(--color-signal-blue);
     }
     .hk-vac-cell--off { border-color: var(--color-danger); background: var(--color-danger-soft); box-shadow: none; }
@@ -50,6 +51,7 @@
       font-size: 10.5px; font-weight: 700; color: #fff; background: var(--color-slate-blue);
       padding: 3px 8px; border-radius: 999px; white-space: nowrap;
     }
+    .hk-vac-cell__lock-label { margin-left: 0; }
     .hk-vac-cell__bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
     .hk-vac-cell__status { font-size: 12px; font-weight: 700; color: var(--color-success); white-space: nowrap; }
     .hk-vac-cell__status--off { color: var(--color-danger); }
@@ -58,6 +60,56 @@
     .hk-vac-cell__locked-icon {
       display: inline-flex; align-items: center; justify-content: center;
       width: 34px; height: 20px; color: var(--color-slate-blue); opacity: 0.85;
+    }
+    #day-grid {
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    @media (max-width: 640px) {
+      .hk-vac-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 4px;
+        min-width: 0;
+      }
+      /* 일·토 열 숨김 (운영일 월~금만 표시) */
+      .hk-vac-grid > :nth-child(7n + 1),
+      .hk-vac-grid > :nth-child(7n) {
+        display: none;
+      }
+      .hk-vac-head { font-size: 11px; padding: 2px 0 4px; }
+      .hk-vac-cell,
+      .hk-vac-cell--weekend,
+      .hk-vac-cell--empty {
+        min-height: 58px;
+        padding: 6px 3px;
+      }
+      .hk-vac-cell__top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        min-height: auto;
+      }
+      .hk-vac-cell__date { font-size: 9px; line-height: 1.15; }
+      .hk-vac-cell__date b { font-size: 11px; }
+      .hk-vac-cell__lock {
+        align-self: flex-end;
+        padding: 2px 5px;
+      }
+      .hk-vac-cell__lock-label { display: none; }
+      .hk-vac-cell__bottom {
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+        margin-top: 4px;
+      }
+      .hk-vac-cell__status {
+        font-size: 10px;
+        white-space: normal;
+        text-align: center;
+      }
+      .hk-vac-cell__locked-icon { width: auto; height: auto; }
+      .hk-vac-cell .hk-switch { transform: scale(0.82); transform-origin: center; }
     }
   </style>
   <script src="/_shared/ui.js"></script>
@@ -204,7 +256,7 @@
           return `<div class="hk-vac-cell${isOff ? " hk-vac-cell--off" : ""}${lk ? " hk-vac-cell--locked" : ""}">
             <div class="hk-vac-cell__top">
               <span class="hk-vac-cell__date">${label} <b>${DOW[d.getDay()]}</b></span>
-              ${lk ? `<span class="hk-vac-cell__lock">${HKUI.icon("lock", 11, "#fff")} 잠김</span>` : ""}
+              ${lk ? `<span class="hk-vac-cell__lock">${HKUI.icon("lock", 11, "#fff")}<span class="hk-vac-cell__lock-label">잠김</span></span>` : ""}
             </div>
             <div class="hk-vac-cell__bottom">
               <span class="hk-vac-cell__status${isOff ? " hk-vac-cell__status--off" : ""}">${isOff ? "휴가" : "운영"}</span>

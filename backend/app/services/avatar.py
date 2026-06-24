@@ -40,6 +40,13 @@ def avatar_public_url(member_id: int) -> str | None:
     return f"/api/me/avatar?v={int(path.stat().st_mtime)}"
 
 
+def admin_member_avatar_url(member_id: int) -> str | None:
+    path = _avatar_path(member_id)
+    if not path.is_file():
+        return None
+    return f"/api/admin/members/{member_id}/avatar?v={int(path.stat().st_mtime)}"
+
+
 def save_avatar(member_id: int, data: bytes) -> None:
     AVATAR_DIR.mkdir(parents=True, exist_ok=True)
     _avatar_path(member_id).write_bytes(data)
