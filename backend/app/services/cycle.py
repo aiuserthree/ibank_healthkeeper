@@ -64,8 +64,8 @@ def can_admin_confirm(cycle: ReservationCycle, now: datetime | None = None) -> b
 
 
 def admin_assign_window(cycle: ReservationCycle) -> tuple[datetime, datetime]:
-    """관리자 빈 슬롯 지정 가능 구간: 수요일 마감(close_at) ~ 차주 전 일요일 23:59."""
-    start = to_kst(cycle.close_at)
+    """관리자 빈 슬롯 지정 가능 구간: 재신청 마감(reapply_close_at, 기본 목 17:00) ~ 차주 전 일요일 23:59."""
+    start = to_kst(cycle.reapply_close_at)
     sunday = cycle.target_week_start - timedelta(days=1)
     end = datetime.combine(sunday, time(23, 59, 59), tzinfo=KST)
     return start, end

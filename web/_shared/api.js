@@ -76,6 +76,8 @@ window.HKApi = (function () {
       }),
     cancelAdminAssign: (reservationId) =>
       request(`/admin/reservations/${reservationId}/admin-assign/cancel`, { method: "POST" }),
+    cancelConfirmedReservation: (reservationId) =>
+      request(`/admin/reservations/${reservationId}/cancel-confirmed`, { method: "POST" }),
     changeAdminAssign: (reservationId, payload) =>
       request(`/admin/reservations/${reservationId}/admin-assign/change`, {
         method: "POST",

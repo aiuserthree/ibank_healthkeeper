@@ -20,12 +20,12 @@
     const FILTERS = [["all", "전체"], ["REQUESTED", "신청"], ["CONFIRMED", "확정"], ["DROPPED", "탈락"], ["CANCELLED", "취소"]];
     const GRID = "28px minmax(150px,1.5fr) 84px 110px 78px 78px 84px";
     let dashData = null;
-    let boardMeta = { canAdminAssign: false, adminAssignUntil: null };
+    let boardMeta = { canAdminAssign: false, adminAssignFrom: null, adminAssignUntil: null };
     let allSlots = [];
     let dates = [];
     let vacationDates = new Set();
     let selectedDate = null;
-    let filter = "all";
+    let filter = "REQUESTED";
 
     function weekSub(d) {
       if (d.weekStart && d.weekEnd) {
@@ -57,10 +57,13 @@
         return `<div style="margin-bottom:20px">${HKUI.alertBox("info", `차주 일정 · ${HKUI.formatDate(d.weekStart)} – ${HKUI.formatDate(d.weekEnd)}`, `수요일 09:00 오픈 예정입니다. (${openText})`)}</div>`;
       }
       if (boardMeta.canAdminAssign) {
+        const from = boardMeta.adminAssignFrom
+          ? HKUI.formatDateTimeKst(boardMeta.adminAssignFrom)
+          : "목요일 17:00";
         const until = boardMeta.adminAssignUntil
           ? HKUI.formatDateTimeKst(boardMeta.adminAssignUntil)
           : "일요일 23:59";
-        return `<div style="margin-bottom:20px">${HKUI.alertBox("info", "빈 슬롯 관리자 지정 가능", `신청·확정이 없는 빈 시간대에 회원을 지정할 수 있습니다. (<b>${until}</b>까지 · 지정 시 즉시 확정 · <b>완료 메일은 [완료 메일 발송] 버튼으로 수동 발송</b>)`)}</div>`;
+        return `<div style="margin-bottom:20px">${HKUI.alertBox("info", "확정 취소 슬롯 · 인원 지정 가능", `관리자가 <b>확정 취소</b>한 시간대에 회원을 지정할 수 있습니다. (<b>${from}</b> ~ <b>${until}</b> · 지정 시 즉시 확정 · <b>완료 메일은 [완료 메일 발송] 버튼으로 수동 발송</b>)`)}</div>`;
       }
       return "";
     }
@@ -76,6 +79,26 @@
       if (slot.isVacation || vacationDates.has(slot.slotDate)) return false;
       if (all.some((x) => x.status === "CONFIRMED" || x.status === "REQUESTED")) return false;
       return true;
+    }
+
+    function isAdminAssignTarget(slot) {
+      return isEmptyForAssign(slot) && slot.adminCancelVacancy === true;
+    }
+
+    function assignSlotHint(slot) {
+      if (boardMeta.canAdminAssign && isAdminAssignTarget(slot)) {
+        return assignBtnHtml(slot.slotId);
+      }
+      if (!boardMeta.canAdminAssign && isAdminAssignTarget(slot)) {
+        const from = boardMeta.adminAssignFrom
+          ? HKUI.formatDateTimeKst(boardMeta.adminAssignFrom)
+          : "목요일 17:00";
+        return `<span style="font-size:13px;color:var(--text-muted)">${from} 이후 지정 가능</span>`;
+      }
+      if (isEmptyForAssign(slot)) {
+        return `<span style="font-size:13px;color:var(--text-muted)">신청 없음</span>`;
+      }
+      return "";
     }
 
     function getAdminAssign(slot) {
@@ -97,7 +120,7 @@
         <div style="font-size:13px;color:${noHist ? "var(--color-warning)" : "var(--text-secondary)"};font-weight:${noHist ? 700 : 400}">${noHist ? "이력 없음" : a.last_used_date ? HKUI.formatDate(a.last_used_date) : "-"}</div>
         <div>${typeBadge(a.type)}</div>
         <div>${a.priority_rank === 1 || isTop ? HKUI.badge("O", "info") : HKUI.badge("X", "neutral")}</div>
-        <div>${HKUI.statusBadge(a.status)}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">${HKUI.statusBadge(a.status)}${adminCancelConfirmedBtn(a)}</div>
       </div>`;
     }
 
@@ -118,6 +141,25 @@
 
     function confirmBtnHtml(slotId) {
       return `<button type="button" class="hk-btn hk-btn--primary hk-btn--sm" data-confirm-slot="${slotId}">우선권 확인 · 확정</button>`;
+    }
+
+    function canAdminCancelConfirmed() {
+      return dashData?.canConfirm === true;
+    }
+
+    function adminCancelConfirmedBtn(a) {
+      if (a.status !== "CONFIRMED" || a.type !== "NORMAL" || !canAdminCancelConfirmed()) return "";
+      return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-confirmed="${a.reservation_id}">확정 취소</button>`;
+    }
+
+    function decidedStatusHtml(a, canConfirm) {
+      if (a.status === "CONFIRMED") {
+        const cancelBtn = a.type === "NORMAL" && canConfirm
+          ? `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-confirmed="${a.reservation_id}">확정 취소</button>`
+          : "";
+        return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${HKUI.statusBadge("CONFIRMED")}${cancelBtn}</div>`;
+      }
+      return HKUI.statusBadge(a.status);
     }
 
     function assignBtnHtml(slotId) {
@@ -185,7 +227,7 @@
           ${field("누적 이용", a.total_uses != null ? `${a.total_uses}회` : "-")}
           <div style="flex:1"></div>
           <div style="min-width:96px;display:flex;justify-content:flex-end">
-            ${decided && a.status === "CONFIRMED" ? HKUI.statusBadge("CONFIRMED") : decided ? HKUI.statusBadge(a.status) : canConfirm ? `<button type="button" class="hk-btn hk-btn--${isTop && !allNoHistory ? "primary" : "secondary"} hk-btn--sm" data-rid="${a.reservation_id}">확정</button>` : `<span style="font-size:13px;color:var(--text-muted);white-space:nowrap">마감 후 확정</span>`}
+            ${decided && a.status === "CONFIRMED" ? decidedStatusHtml(a, canConfirm) : decided ? decidedStatusHtml(a, canConfirm) : canConfirm ? `<button type="button" class="hk-btn hk-btn--${isTop && !allNoHistory ? "primary" : "secondary"} hk-btn--sm" data-rid="${a.reservation_id}">확정</button>` : `<span style="font-size:13px;color:var(--text-muted);white-space:nowrap">마감 후 확정</span>`}
           </div>
         </div>
       </div>`;
@@ -196,6 +238,7 @@
       allSlots = board.slots || [];
       boardMeta = {
         canAdminAssign: board.canAdminAssign === true,
+        adminAssignFrom: board.adminAssignFrom || null,
         adminAssignUntil: board.adminAssignUntil || null,
       };
       renderTabs();
@@ -204,7 +247,7 @@
 
     function emptyAssignableSlots(excludeSlotId) {
       return allSlots
-        .filter((s) => s.slotId !== excludeSlotId && isEmptyForAssign(s))
+        .filter((s) => s.slotId !== excludeSlotId && isAdminAssignTarget(s))
         .sort((a, b) => a.slotDate.localeCompare(b.slotDate) || a.timeIndex - b.timeIndex);
     }
 
@@ -476,6 +519,7 @@
           };
         });
         HKUI.refreshIcons(body);
+        bindCancelConfirmed(body);
       } catch (e) {
         body.innerHTML = HKUI.alertBox("danger", "오류", HKUI.escapeHtml(e.message));
         HKUI.refreshIcons(body);
@@ -485,6 +529,28 @@
     function bindConfirmButtons(root) {
       root.querySelectorAll("[data-confirm-slot]").forEach((btn) => {
         btn.onclick = () => openConfirmModal(Number(btn.dataset.confirmSlot));
+      });
+    }
+
+    function bindCancelConfirmed(root) {
+      root.querySelectorAll("[data-cancel-confirmed]").forEach((btn) => {
+        btn.onclick = async () => {
+          const ok = await HKUI.confirmDialog(
+            "확정을 취소할까요?",
+            "슬롯이 다시 빈 상태로 돌아갑니다. 회원의 <b>마지막 이용일</b>이 재계산됩니다."
+          );
+          if (!ok) return;
+          btn.disabled = true;
+          try {
+            await HKApi.cancelConfirmedReservation(Number(btn.dataset.cancelConfirmed));
+            HKUI.toast("확정 예약이 취소되었습니다");
+            closeConfirmModal();
+            await reloadBoard();
+          } catch (e) {
+            btn.disabled = false;
+            HKUI.toast(e.message, "danger");
+          }
+        };
       });
     }
 
@@ -578,9 +644,8 @@
       const adminAssign = getAdminAssign(slot);
       const reapply = all.some((x) => x.type === "REAPPLY");
       const off = slot.isVacation || vacationDates.has(slot.slotDate);
-      const emptyLabel = isEmptyForAssign(slot)
-        ? (boardMeta.canAdminAssign ? assignBtnHtml(slot.slotId) : `<span style="font-size:13px;color:var(--text-muted)">신청 없음</span>`)
-        : "";
+      const emptyLabel = assignSlotHint(slot);
+      const cancelVacancy = slot.adminCancelVacancy === true;
       const head = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         ${HKUI.icon("clock", 18, "var(--color-slate-blue)")}
         <span style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">${slot.startTime || ""} – ${slot.endTime || ""}</span>
@@ -588,6 +653,7 @@
         ${adminAssign ? HKUI.badge("관리자 지정", "warning") : ""}
         ${pending.length > 1 ? HKUI.badge(`중복 ${pending.length}명`, "warning") : ""}
         ${reapply ? HKUI.badge("재신청 포함", "info") : ""}
+        ${cancelVacancy && !adminAssign ? HKUI.badge("확정 취소 · 지정 가능", "warning") : ""}
         ${confirmed && !adminAssign ? HKUI.badge("확정 완료", "success", true) : ""}
         <div style="flex:1"></div>
         ${showConfirmBtn(slot) ? confirmBtnHtml(slot.slotId) : ""}
@@ -598,7 +664,7 @@
       if (!all.length) {
         return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--border-default);border-radius:var(--radius-sm);flex-wrap:wrap;${off ? "opacity:0.85" : ""}">${head}</div>`;
       }
-      if (!list.length && !showConfirmBtn(slot) && !adminAssign) return "";
+      if (!list.length && !showConfirmBtn(slot) && !adminAssign && !cancelVacancy) return "";
       const tableHtml = list.length
         ? `<div style="overflow-x:auto;margin-top:16px">${applicantRow(null, 0, true)}${list.map((a, i) => applicantRow(a, i)).join("")}</div>`
         : "";
@@ -638,6 +704,7 @@
         .join("")}</div>`;
       bindConfirmButtons(el);
       bindAssignButtons(el);
+      bindCancelConfirmed(el);
       HKUI.refreshIcons();
     }
 
@@ -679,6 +746,7 @@
         allSlots = board.slots || [];
         boardMeta = {
           canAdminAssign: board.canAdminAssign === true || dashData.canAdminAssign === true,
+          adminAssignFrom: board.adminAssignFrom || dashData.adminAssignFrom || null,
           adminAssignUntil: board.adminAssignUntil || dashData.adminAssignUntil || null,
         };
         dates = board.weekDates?.length ? board.weekDates : dashData.weekDates || [];

@@ -61,6 +61,34 @@ async def _slot_has_active_reservations(db: AsyncSession, slot_id: int) -> bool:
     return result.scalar_one_or_none() is not None
 
 
+async def slot_has_admin_released_vacancy(db: AsyncSession, slot_id: int) -> bool:
+    """관리자가 확정·지정을 취소해 비워진 슬롯(취소 이력에 confirmed_at 존재)."""
+    result = await db.execute(
+        select(Reservation.id)
+        .where(Reservation.slot_id == slot_id)
+        .where(Reservation.status == ReservationStatus.CANCELLED)
+        .where(Reservation.confirmed_at.isnot(None))
+        .where(
+            Reservation.type.in_(
+                (ReservationType.NORMAL, ReservationType.ADMIN_ASSIGN)
+            )
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
+async def _assert_slot_assignable(db: AsyncSession, slot: Slot) -> None:
+    if slot.is_vacation:
+        raise_app_error("VACATION_SLOT")
+    if slot.status == SlotStatus.CONFIRMED:
+        raise_app_error("SLOT_ALREADY_CONFIRMED")
+    if await _slot_has_active_reservations(db, slot.id):
+        raise_app_error("SLOT_NOT_ASSIGNABLE")
+    if not await slot_has_admin_released_vacancy(db, slot.id):
+        raise_app_error("SLOT_NOT_ADMIN_CANCEL_VACANCY")
+
+
 async def _get_assignable_slot(
     db: AsyncSession, slot_id: int, cycle_id: int, *, for_update: bool = False
 ) -> Slot:
@@ -71,12 +99,7 @@ async def _get_assignable_slot(
     slot = result.scalar_one_or_none()
     if not slot or slot.cycle_id != cycle_id:
         raise_app_error("NOT_FOUND", 404)
-    if slot.is_vacation:
-        raise_app_error("VACATION_SLOT")
-    if slot.status == SlotStatus.CONFIRMED:
-        raise_app_error("SLOT_ALREADY_CONFIRMED")
-    if await _slot_has_active_reservations(db, slot.id):
-        raise_app_error("SLOT_NOT_ASSIGNABLE")
+    await _assert_slot_assignable(db, slot)
     return slot
 
 
@@ -162,12 +185,7 @@ async def assign_empty_slot(
         raise_app_error("NOT_FOUND", 404)
 
     cycle = await _require_assign_window(db, slot.cycle_id)
-    if slot.is_vacation:
-        raise_app_error("VACATION_SLOT")
-    if slot.status == SlotStatus.CONFIRMED:
-        raise_app_error("SLOT_ALREADY_CONFIRMED")
-    if await _slot_has_active_reservations(db, slot.id):
-        raise_app_error("SLOT_NOT_ASSIGNABLE")
+    await _assert_slot_assignable(db, slot)
 
     member = await _get_assignable_member(db, member_id, cycle.id)
 

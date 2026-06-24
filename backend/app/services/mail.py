@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import re
 from datetime import date
 from pathlib import Path
@@ -19,6 +20,16 @@ settings = get_settings()
 _pending_after_commit: list[int] = []
 
 WEB_ROOT = Path(__file__).resolve().parents[2].parent / "web"
+EMAIL_ASSETS_DIR = WEB_ROOT / "assets" / "email"
+
+_EMAIL_ASSET_PATHS: dict[str, Path] = {
+    "logoUrl": WEB_ROOT / "assets" / "logo-lockup.png",
+    "iconLockUrl": EMAIL_ASSETS_DIR / "icon-lock-blue.png",
+    "iconCheckGreenUrl": EMAIL_ASSETS_DIR / "icon-check-green.png",
+    "iconCheckBlueUrl": EMAIL_ASSETS_DIR / "icon-check-blue.png",
+    "iconClockAmberUrl": EMAIL_ASSETS_DIR / "icon-clock-amber.png",
+    "iconWarnRedUrl": EMAIL_ASSETS_DIR / "icon-warn-red.png",
+}
 
 MAIL_HTML_FILES: dict[MailType, str] = {
     MailType.EMAIL_VERIFY: "01-이메일인증.html",
@@ -82,6 +93,11 @@ CONTEXT_ALIASES: dict[str, str] = {
     "mypageUrl": "mypageUrl",
     "reapplyUrl": "reapplyUrl",
     "logoUrl": "logoUrl",
+    "iconLockUrl": "iconLockUrl",
+    "iconCheckGreenUrl": "iconCheckGreenUrl",
+    "iconCheckBlueUrl": "iconCheckBlueUrl",
+    "iconClockAmberUrl": "iconClockAmberUrl",
+    "iconWarnRedUrl": "iconWarnRedUrl",
     "appBaseUrl": "appBaseUrl",
 }
 
@@ -111,11 +127,28 @@ def format_slot_date_kr(value: object) -> str:
     return f"{d.month}월 {d.day}일 ({_weekday_ko(d)})"
 
 
+def _png_data_uri(path: Path) -> str:
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
+def email_asset_data_uris() -> dict[str, str]:
+    """Outlook-safe PNG data URIs (SVG data URIs are not rendered in Outlook desktop)."""
+    base_url = settings.app_base_url.rstrip("/")
+    out: dict[str, str] = {}
+    for key, path in _EMAIL_ASSET_PATHS.items():
+        if path.is_file():
+            out[key] = _png_data_uri(path)
+        elif key == "logoUrl":
+            out[key] = f"{base_url}/assets/logo-lockup.png"
+    return out
+
+
 def expand_mail_context(context: dict) -> dict:
     base_url = settings.app_base_url.rstrip("/")
     out = dict(context)
     out.setdefault("appBaseUrl", base_url)
-    out.setdefault("logoUrl", f"{base_url}/assets/logo-lockup.svg")
+    for key, uri in email_asset_data_uris().items():
+        out.setdefault(key, uri)
     out.setdefault("mypageUrl", f"{base_url}/api/mypage/enter")
     out.setdefault("reapplyUrl", f"{base_url}/api/reapply/enter")
 
@@ -310,6 +343,42 @@ def render_template(subject_tpl: str, body_tpl: str, context: dict) -> tuple[str
     return substitute(subject_tpl), substitute(body_tpl)
 
 
+def _sanitize_outlook_images(html: str) -> str:
+    """Legacy templates may still embed SVG data URIs — swap to embedded PNG."""
+    if "data:image/svg+xml" not in html:
+        return html
+    assets = email_asset_data_uris()
+    logo_uri = assets.get("logoUrl", "")
+    html = re.sub(
+        r'<img src="data:image/svg\+xml[^"]*" alt="헬스키퍼"[^>]*>',
+        (
+            f'<img src="{logo_uri}" alt="헬스키퍼" height="30" '
+            'style="display:block;border:0;height:30px;width:auto;max-width:216px;">'
+        ),
+        html,
+    )
+    icon_rules: tuple[tuple[str, str, int, str], ...] = (
+        (r"rect width='18' height='11'", "iconLockUrl", 28, "margin:0 auto;border:0;"),
+        (r"stroke='%231f8a5b'", "iconCheckGreenUrl", 28, "margin:0 auto;border:0;"),
+        (r"stroke='%23006bff'[^\"]*path d='M21.801", "iconCheckBlueUrl", 28, "margin:0 auto;border:0;"),
+        (r"stroke='%23c2780c'", "iconClockAmberUrl", 28, "margin:0 auto;border:0;"),
+        (r"stroke='%23d23f3f'", "iconWarnRedUrl", 20, "border:0;"),
+    )
+    for needle, key, size, extra in icon_rules:
+        uri = assets.get(key, "")
+        repl = (
+            f'<img src="{uri}" alt="" width="{size}" height="{size}" '
+            f'style="display:block;{extra}">'
+        )
+        html = re.sub(
+            rf'<img src="data:image/svg\+xml;utf8,[^"]*{needle}[^"]*" '
+            rf'alt="" width="{size}" height="{size}"[^>]*>',
+            repl,
+            html,
+        )
+    return html
+
+
 def absolutize_html_assets(html: str) -> str:
     """메일 클라이언트용 — 상대 /assets·앱 링크 경로를 절대 URL로."""
     base = settings.app_base_url.rstrip("/")
@@ -325,6 +394,10 @@ def absolutize_html_assets(html: str) -> str:
         "href='/mypage'", f"href='{mypage_enter_url}'"
     )
     return html
+
+
+def prepare_html_for_email(html: str) -> str:
+    return absolutize_html_assets(_sanitize_outlook_images(html))
 
 
 def resolve_template_parts(
@@ -481,7 +554,7 @@ async def send_smtp(msg: MailMessage) -> None:
     email["Message-ID"] = make_msgid(domain=domain)
 
     if _is_html_template(msg.body):
-        body = absolutize_html_assets(msg.body)
+        body = prepare_html_for_email(msg.body)
         email.set_content(body, subtype="html", charset="utf-8")
     else:
         email.set_content(msg.body)

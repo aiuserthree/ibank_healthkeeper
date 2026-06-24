@@ -6,7 +6,6 @@ import json
 import re
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPORT_DIR = ROOT / "export" / "이메일"
@@ -41,19 +40,43 @@ def find_export_file(prefix: str, directory: Path) -> Path:
     raise FileNotFoundError(prefix)
 
 
-def logo_data_uri() -> str:
-    svg = (ROOT / "web" / "assets" / "logo-lockup.svg").read_text(encoding="utf-8")
-    return "data:image/svg+xml," + quote(svg)
+LOGO_IMG_PROD = (
+    '<img src="{logoUrl}" alt="헬스키퍼" height="30" '
+    'style="display:block;border:0;height:30px;width:auto;max-width:216px;">'
+)
+LOGO_IMG_PREVIEW = (
+    '<img src="/assets/logo-lockup.png" alt="헬스키퍼" height="30" '
+    'style="display:block;border:0;height:30px;width:auto;max-width:216px;">'
+)
+
+ICON_RULES: tuple[tuple[str, str, str, int, str], ...] = (
+    (r"rect width='18' height='11'", "{iconLockUrl}", "/assets/email/icon-lock-blue.png", 28, "margin:0 auto;border:0;"),
+    (r"stroke='%231f8a5b'", "{iconCheckGreenUrl}", "/assets/email/icon-check-green.png", 28, "margin:0 auto;border:0;"),
+    (r"stroke='%23006bff'[^\"]*path d='M21.801", "{iconCheckBlueUrl}", "/assets/email/icon-check-blue.png", 28, "margin:0 auto;border:0;"),
+    (r"stroke='%23c2780c'", "{iconClockAmberUrl}", "/assets/email/icon-clock-amber.png", 28, "margin:0 auto;border:0;"),
+    (r"stroke='%23d23f3f'", "{iconWarnRedUrl}", "/assets/email/icon-warn-red.png", 20, "border:0;"),
+)
 
 
-def logo_img_tag() -> str:
-    return f'<img src="{logo_data_uri()}" alt="헬스키퍼"'
+def fix_logo(html: str, *, preview: bool = False) -> str:
+    tag = LOGO_IMG_PREVIEW if preview else LOGO_IMG_PROD
+    html = re.sub(r'<img src="[0-9a-f-]{36}" alt="헬스키퍼"[^>]*>', tag, html)
+    html = html.replace('<img src="/assets/logo-lockup.svg" alt="헬스키퍼"', tag)
+    html = re.sub(r'<img src="data:image/svg\+xml[^"]*" alt="헬스키퍼"[^>]*>', tag, html)
+    return html
 
 
-def fix_logo(html: str) -> str:
-    tag = logo_img_tag()
-    html = re.sub(r'<img src="[0-9a-f-]{36}" alt="헬스키퍼"', tag, html)
-    return html.replace('<img src="/assets/logo-lockup.svg" alt="헬스키퍼"', tag)
+def fix_icons(html: str, *, preview: bool = False) -> str:
+    for needle, prod_src, preview_src, size, extra in ICON_RULES:
+        src = preview_src if preview else prod_src
+        repl = f'<img src="{src}" alt="" width="{size}" height="{size}" style="display:block;{extra}">'
+        html = re.sub(
+            rf'<img src="data:image/svg\+xml;utf8,[^"]*{needle}[^"]*" '
+            rf'alt="" width="{size}" height="{size}"[^>]*>',
+            repl,
+            html,
+        )
+    return html
 
 
 def fix_links(html: str, reapply: bool = False) -> str:
@@ -75,7 +98,7 @@ def wrap_intro(html: str) -> str:
 
 
 def fix_02(html: str) -> str:
-    html = fix_logo(html)
+    html = fix_icons(fix_logo(html))
     html = wrap_intro(html)
     html = re.sub(r">6월 23일 \(화\)<", ">{날짜}<", html)
     html = re.sub(r">15:30 – 16:00 ", ">{시간} ", html)
@@ -104,7 +127,7 @@ def fix_02(html: str) -> str:
 
 
 def fix_03(html: str) -> str:
-    html = fix_logo(html)
+    html = fix_icons(fix_logo(html))
     html = wrap_intro(html)
     html = re.sub(r">6월 25일 \(목\)<", ">{날짜}<", html)
     html = re.sub(r">14:30 – 15:00 ", ">{시간} ", html)
@@ -125,7 +148,7 @@ def fix_03(html: str) -> str:
 
 
 def fix_04(html: str) -> str:
-    html = fix_logo(html)
+    html = fix_icons(fix_logo(html))
     html = wrap_intro(html)
     html = re.sub(
         r"(<p style=\"margin:0 0 12px; font-size:13px; font-weight:700; color:#004eba; letter-spacing:0\.02em;\">비어있는 슬롯</p>\s*)"
@@ -161,7 +184,7 @@ def fix_04(html: str) -> str:
 
 
 def fix_01(html: str) -> str:
-    html = fix_logo(html)
+    html = fix_icons(fix_logo(html))
     html = re.sub(
         r"(<h1[^>]*>이메일 인증코드 안내</h1>\s*)((?:<p[^>]*>.*?</p>\s*)+)",
         r"\1<!--HK_INTRO-->\n\2<!--HK_INTRO_END-->",
@@ -219,8 +242,8 @@ def wrap_preview_intro(html: str) -> str:
 
 
 def fix_preview(html: str, *, reapply: bool = False) -> str:
-    """export 원본 그대로 — 로고(data URI)·링크·HK_INTRO 마커 (미리보기 전용)."""
-    html = fix_links(fix_logo(html), reapply=reapply)
+    """export 원본 그대로 — 로고(PNG)·아이콘(PNG)·링크·HK_INTRO 마커 (미리보기 전용)."""
+    html = fix_links(fix_icons(fix_logo(html, preview=True), preview=True), reapply=reapply)
     html = wrap_preview_intro(html)
     if "</body>" in html:
         html = html.replace("</body>", PREVIEW_LINK_SCRIPT + "</body>")

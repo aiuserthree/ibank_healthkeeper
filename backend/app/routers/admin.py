@@ -24,7 +24,7 @@ from app.services.admin_assign import (
     search_assignable_members,
     send_admin_assign_mail,
 )
-from app.services.confirm import confirm_reservation, get_slot_detail
+from app.services.confirm import cancel_confirmed_reservation, confirm_reservation, get_slot_detail
 from app.services.avatar import avatar_path, has_avatar
 from app.services.mail import drain_pending_mails, process_one_mail
 
@@ -111,6 +111,16 @@ async def confirm_slot(
     for mail_id in drain_pending_mails():
         await process_one_mail(db, mail_id)
     return {"data": {"reservationId": reservation.id, "message": "예약이 확정되었습니다."}}
+
+
+@router.post("/reservations/{reservation_id}/cancel-confirmed")
+async def cancel_confirmed(
+    reservation_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    await cancel_confirmed_reservation(db, reservation_id)
+    return {"data": {"message": "확정 예약이 취소되었습니다."}}
 
 
 @router.get("/members/assignable")

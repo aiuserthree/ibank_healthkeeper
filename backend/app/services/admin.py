@@ -40,7 +40,7 @@ from app.services.cycle import (
     week_friday,
     week_monday,
 )
-from app.services.admin_assign import admin_assign_meta, admin_assign_mail_status
+from app.services.admin_assign import admin_assign_meta, admin_assign_mail_status, slot_has_admin_released_vacancy
 from app.services.avatar import admin_member_avatar_url
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 from app.services.priority import needs_manual, rank_applicants
@@ -414,6 +414,18 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
             applicants.append(applicant)
             flat_items.append(applicant)
 
+        has_active = any(
+            reservation.status
+            in (ReservationStatus.REQUESTED, ReservationStatus.CONFIRMED)
+            for reservation, _ in pairs
+        )
+        admin_cancel_vacancy = (
+            not slot.is_vacation
+            and slot.status == SlotStatus.OPEN
+            and not has_active
+            and await slot_has_admin_released_vacancy(db, slot.id)
+        )
+
         board_slots.append(
             {
                 "slotId": slot.id,
@@ -423,6 +435,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
                 "endTime": slot.end_time.strftime("%H:%M"),
                 "isVacation": slot.is_vacation,
                 "status": slot.status.value,
+                "adminCancelVacancy": admin_cancel_vacancy,
                 "applicants": applicants,
             }
         )

@@ -12,6 +12,7 @@ from app.models import (
     Reservation,
     ReservationCycle,
     ReservationStatus,
+    ReservationType,
     Slot,
     SlotStatus,
 )
@@ -19,6 +20,7 @@ from app.services.cycle import can_admin_confirm
 from app.services.legacy_usage import get_member_total_uses
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 from app.services.priority import rank_applicants
+from app.services.admin_assign import recompute_member_last_used_date
 
 
 async def confirm_reservation(
@@ -98,6 +100,42 @@ async def confirm_reservation(
     await db.commit()
     await db.refresh(reservation)
     return reservation
+
+
+async def cancel_confirmed_reservation(db: AsyncSession, reservation_id: int) -> None:
+    """관리자 — 일반 신청 마감(close_at) 이후 확정(NORMAL) 예약 취소."""
+    reservation = await db.get(Reservation, reservation_id)
+    if not reservation:
+        raise_app_error("NOT_FOUND", 404)
+    if reservation.status != ReservationStatus.CONFIRMED:
+        raise_app_error("NOT_CANCELABLE")
+    if reservation.type == ReservationType.ADMIN_ASSIGN:
+        raise_app_error("NOT_ADMIN_ASSIGN")
+    if reservation.type == ReservationType.REAPPLY:
+        raise_app_error("NOT_ADMIN_CANCEL_REAPPLY")
+
+    cycle = await db.get(ReservationCycle, reservation.cycle_id)
+    if not cycle or not can_admin_confirm(cycle):
+        raise_app_error("NOT_ADMIN_CANCEL_BEFORE_CLOSE")
+
+    slot_result = await db.execute(
+        select(Slot).where(Slot.id == reservation.slot_id).with_for_update()
+    )
+    slot = slot_result.scalar_one_or_none()
+    if not slot or slot.confirmed_reservation_id != reservation.id:
+        raise_app_error("NOT_FOUND", 404)
+
+    member = await db.get(Member, reservation.member_id)
+    if not member:
+        raise_app_error("NOT_FOUND", 404)
+
+    reservation.status = ReservationStatus.CANCELLED
+    reservation.cancelled_at = now_kst()
+    slot.status = SlotStatus.OPEN
+    slot.confirmed_reservation_id = None
+
+    await recompute_member_last_used_date(db, member)
+    await db.commit()
 
 
 async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
