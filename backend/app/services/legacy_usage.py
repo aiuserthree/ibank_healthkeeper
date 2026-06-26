@@ -340,5 +340,19 @@ async def sync_all_members_legacy_last_used(db: AsyncSession) -> int:
     return updated
 
 
+async def recompute_all_members_last_used_date(db: AsyncSession) -> int:
+    """legacy + 사이트 확정 이용일 기준으로 회원 last_used_date 전원 재계산."""
+    from app.services.admin_assign import recompute_member_last_used_date
+
+    result = await db.execute(
+        select(Member).where(Member.status != MemberStatus.WITHDRAWN)
+    )
+    members = list(result.scalars().all())
+    before = {m.id: m.last_used_date for m in members}
+    for member in members:
+        await recompute_member_last_used_date(db, member)
+    return sum(1 for m in members if before[m.id] != m.last_used_date)
+
+
 def load_schedule_file(path: Path) -> list[ParsedLegacyUsage]:
     return parse_schedule_markdown(path.read_text(encoding="utf-8"))

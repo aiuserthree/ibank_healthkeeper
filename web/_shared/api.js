@@ -58,6 +58,41 @@ window.HKApi = (function () {
       const q = cycleId ? `?cycleId=${cycleId}` : "";
       return request("/admin/reservations" + q);
     },
+    downloadConfirmedExport: async (cycleId) => {
+      const q = cycleId ? `?cycleId=${cycleId}` : "";
+      const res = await fetch("/api/admin/reservations/export" + q, { credentials: "include" });
+      if (!res.ok) {
+        let body = {};
+        try {
+          body = await res.json();
+        } catch (_) {
+          /* empty */
+        }
+        const apiErr = body.error || body.detail?.error || {};
+        const err = new Error(apiErr.message || res.statusText || "다운로드 실패");
+        err.code = apiErr.code;
+        err.status = res.status;
+        throw err;
+      }
+      const blob = await res.blob();
+      const disposition = res.headers.get("Content-Disposition") || "";
+      let filename = "헬스키퍼_신청자 목록.xlsx";
+      const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      if (utfMatch) {
+        filename = decodeURIComponent(utfMatch[1]);
+      } else {
+        const plainMatch = disposition.match(/filename="?([^";]+)"?/i);
+        if (plainMatch) filename = plainMatch[1];
+      }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    },
     slotDetail: (slotId) => request(`/admin/reservations/slots/${slotId}`),
     confirmSlot: (slotId, reservationId) =>
       request(`/admin/reservations/slots/${slotId}/confirm`, {

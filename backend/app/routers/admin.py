@@ -25,6 +25,7 @@ from app.services.admin_assign import (
     send_admin_assign_mail,
 )
 from app.services.confirm import cancel_confirmed_reservation, confirm_reservation, get_slot_detail
+from app.services.applicant_export import export_confirmed_applicants_xlsx
 from app.services.avatar import avatar_path, has_avatar
 from app.services.mail import drain_pending_mails, process_one_mail
 
@@ -87,6 +88,25 @@ async def list_reservations(
     _: AdminUser = Depends(get_current_admin),
 ):
     return {"data": await admin_service.list_reservations(db, cycle_id)}
+
+
+@router.get("/reservations/export")
+async def export_reservations(
+    cycle_id: Optional[int] = Query(None, alias="cycleId"),
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from urllib.parse import quote
+
+    content, filename = await export_confirmed_applicants_xlsx(db, cycle_id)
+    encoded = quote(filename)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded}",
+        },
+    )
 
 
 @router.get("/reservations/slots/{slot_id}")

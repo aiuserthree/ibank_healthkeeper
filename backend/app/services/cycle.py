@@ -130,11 +130,40 @@ async def get_active_cycle(db: AsyncSession) -> Optional[ReservationCycle]:
     return result.scalar_one_or_none()
 
 
+async def get_prev_cycle_until_next_open(db: AsyncSession) -> Optional[ReservationCycle]:
+    """재신청 마감 ~ 다음 오픈 전: 직전 신청 주차 (회원·관리자 공통)."""
+    now = now_kst()
+    next_result = await db.execute(
+        select(ReservationCycle)
+        .where(ReservationCycle.open_at > now)
+        .order_by(ReservationCycle.open_at.asc())
+        .limit(1)
+    )
+    next_cycle = next_result.scalar_one_or_none()
+    if not next_cycle:
+        return None
+    prev_result = await db.execute(
+        select(ReservationCycle)
+        .where(ReservationCycle.target_week_start < next_cycle.target_week_start)
+        .order_by(ReservationCycle.target_week_start.desc())
+        .limit(1)
+    )
+    prev_cycle = prev_result.scalar_one_or_none()
+    if prev_cycle is None:
+        return None
+    if now >= to_kst(prev_cycle.reapply_close_at) and now < to_kst(next_cycle.open_at):
+        return prev_cycle
+    return None
+
+
 async def get_admin_view_cycle(db: AsyncSession) -> Optional[ReservationCycle]:
-    """관리자 예약/휴가 화면용 — OPEN/REAPPLY 중이면 해당 주차, 아니면 다음 오픈 예정 주차."""
+    """관리자 예약/재신청 화면용 — 진행 중 주차, 없으면 재신청 마감~다음 오픈 전 직전 주차."""
     cycle = await get_active_cycle(db)
     if cycle:
         return cycle
+    gap_cycle = await get_prev_cycle_until_next_open(db)
+    if gap_cycle:
+        return gap_cycle
     return await get_vacation_cycle(db)
 
 
@@ -146,6 +175,10 @@ async def resolve_system_state(db: AsyncSession) -> tuple[CycleState, Optional[R
         return state, cycle
 
     now = now_kst()
+    gap_cycle = await get_prev_cycle_until_next_open(db)
+    if gap_cycle:
+        return CycleState.CLOSED, gap_cycle
+
     next_result = await db.execute(
         select(ReservationCycle)
         .where(ReservationCycle.open_at > now)
@@ -154,20 +187,7 @@ async def resolve_system_state(db: AsyncSession) -> tuple[CycleState, Optional[R
     )
     next_cycle = next_result.scalar_one_or_none()
     if next_cycle:
-        prev_result = await db.execute(
-            select(ReservationCycle)
-            .where(ReservationCycle.target_week_start < next_cycle.target_week_start)
-            .order_by(ReservationCycle.target_week_start.desc())
-            .limit(1)
-        )
-        prev_cycle = prev_result.scalar_one_or_none()
-        if prev_cycle is None:
-            return CycleState.CLOSED, next_cycle
-        if now >= to_kst(prev_cycle.reapply_close_at):
-            # 재신청 마감 ~ 다음 수요일 09:00 전: 직전 신청 주차 캘린더 유지
-            if now < to_kst(next_cycle.open_at):
-                return CycleState.CLOSED, prev_cycle
-            return CycleState.CLOSED, next_cycle
+        return CycleState.CLOSED, next_cycle
 
     cycle = await get_vacation_cycle(db)
     if not cycle:

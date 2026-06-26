@@ -38,6 +38,7 @@
       const state = d.state || d.cycleState;
       return `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         ${HKUI.badge(STATE_LABEL[state] || state || "-", "info", true)}
+        <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" id="export-confirmed-btn">${HKUI.icon("download", 16, "var(--color-midnight-navy)")} 확정자 다운로드</button>
         <a href="${HKAdminRoutes.reapplyMail}"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm">${HKUI.icon("mail", 16, "var(--color-midnight-navy)")} 탈락자 안내 메일</button></a>
       </div>`;
     }
@@ -756,6 +757,21 @@
           weekSub(dashData),
           headRight(dashData)
         );
+
+        const exportBtn = document.getElementById("export-confirmed-btn");
+        if (exportBtn) {
+          exportBtn.onclick = async () => {
+            exportBtn.disabled = true;
+            try {
+              await HKApi.downloadConfirmedExport(dashData.cycleId);
+              HKUI.toast("확정자 목록을 다운로드했습니다");
+            } catch (e) {
+              HKUI.toast(e.message, "danger");
+            } finally {
+              exportBtn.disabled = false;
+            }
+          };
+        }
 
         document.getElementById("content").innerHTML = `${topAlert(dashData)}
           <div id="date-tabs" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap"></div>
