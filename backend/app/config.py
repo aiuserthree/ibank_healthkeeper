@@ -65,6 +65,8 @@ class Settings(BaseSettings):
     teams_reminder_minutes_before: int = 5
     teams_reminder_retry_max: int = 3
     teams_reminder_retry_backoff_seconds: list[int] = [60, 300, 900]
+    teams_open_notice_enabled: bool = True
+    teams_open_notice_url: str = "https://healthkeeper.ibank.co.kr/index"
     teams_sender_email: str = "healthkeeper@ibank.co.kr"
     teams_sender_refresh_token: str = ""
 
@@ -93,14 +95,20 @@ class Settings(BaseSettings):
     def sso_ready(self) -> bool:
         return not self.sso_missing_fields()
 
-    def teams_sender_ready(self) -> bool:
-        if not self.teams_reminder_enabled or self.sso_provider != "entra":
+    def teams_graph_sender_ready(self) -> bool:
+        if self.sso_provider != "entra":
             return False
         if not self.sso_ready():
             return False
         return bool(
             self.teams_sender_email.strip() and self.teams_sender_refresh_token.strip()
         )
+
+    def teams_sender_ready(self) -> bool:
+        return self.teams_reminder_enabled and self.teams_graph_sender_ready()
+
+    def teams_open_notice_ready(self) -> bool:
+        return self.teams_open_notice_enabled and self.teams_graph_sender_ready()
 
 
 @lru_cache

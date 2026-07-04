@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -12,11 +12,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.core.time import KST, now_kst
+from app.core.time import KST, now_kst, to_kst
 from app.models import (
     MailStatus,
     Member,
+    MemberStatus,
     Reservation,
+    ReservationCycle,
     ReservationStatus,
     Slot,
     TeamsMessage,
@@ -176,6 +178,12 @@ def _slot_label(slot: Slot) -> str:
     return f"{slot.slot_date.month}/{slot.slot_date.day}({dow}) {slot.start_time.strftime('%H:%M')}"
 
 
+def _datetime_label(dt: datetime) -> str:
+    kst = to_kst(dt)
+    dow = _WEEKDAY_KO[kst.weekday()]
+    return f"{kst.month}/{kst.day}({dow}) {kst.strftime('%H:%M')}"
+
+
 def render_reminder_body(*, name: str, slot: Slot, minutes_before: int) -> str:
     slot_text = _slot_label(slot)
     return (
@@ -183,6 +191,171 @@ def render_reminder_body(*, name: str, slot: Slot, minutes_before: int) -> str:
         f"<p>{name}님, <strong>{slot_text}</strong> 예약 시간이 곧 시작됩니다.</p>"
         f"<p>헬스키퍼 공간으로 이동해 주세요.</p>"
     )
+
+
+def open_notice_site_url() -> str:
+    return get_settings().teams_open_notice_url.strip()
+
+
+def _open_close_labels(open_at: datetime, close_at: datetime) -> tuple[str, str]:
+    """일반 신청 시작·마감 — 같은 날짜(수요일) + 각각 시각."""
+    open_kst = to_kst(open_at)
+    close_kst = to_kst(close_at)
+    dow = _WEEKDAY_KO[open_kst.weekday()]
+    day = f"{open_kst.month}/{open_kst.day}({dow})"
+    return (
+        f"{day} {open_kst.strftime('%H:%M')}",
+        f"{day} {close_kst.strftime('%H:%M')}",
+    )
+
+
+def render_open_notice_body(
+    *,
+    name: str,
+    open_at: datetime,
+    close_at: datetime,
+    week_start: date,
+    week_end: date,
+    site_url: str | None = None,
+) -> str:
+    week_label = f"{week_start.month}/{week_start.day}~{week_end.month}/{week_end.day}"
+    open_label, close_label = _open_close_labels(open_at, close_at)
+    url = (site_url or open_notice_site_url()).strip()
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 차주 안마 예약 신청 안내</p>"
+        f"<p>{name}님, {week_label} 주간 예약 신청이 {open_label}에 시작됩니다.</p>"
+        f"<p>마감: {close_label}</p>"
+        f'<p><a href="{url}">{url}</a></p>'
+    )
+
+
+def open_notice_dedupe_key(cycle_id: int, member_id: int, notice_date: date) -> str:
+    """발송일(KST)별 중복 방지 — 조기 수동 발송과 정규 수 08:55 발송을 구분."""
+    return f"teams-open-notice:{cycle_id}:{notice_date.isoformat()}:{member_id}"
+
+
+async def resolve_open_notice_cycle(
+    db: AsyncSession, *, cycle_id: int | None = None
+) -> ReservationCycle | None:
+    if cycle_id is not None:
+        return await db.get(ReservationCycle, cycle_id)
+
+    now = now_kst()
+    today = now.date()
+    today_start = datetime.combine(today, time.min, tzinfo=KST)
+    today_end = today_start + timedelta(days=1)
+
+    # 1) 현재 일반 신청 기간(오픈~마감) — 수동 발송 시 '오늘' 사이클
+    result = await db.execute(
+        select(ReservationCycle)
+        .where(ReservationCycle.open_at <= now)
+        .where(ReservationCycle.close_at >= now)
+        .order_by(ReservationCycle.open_at.desc())
+        .limit(1)
+    )
+    cycle = result.scalar_one_or_none()
+    if cycle:
+        return cycle
+
+    # 2) 오늘(KST) 오픈한 사이클 — 08:55 놓친 당일 catch-up
+    result = await db.execute(
+        select(ReservationCycle)
+        .where(ReservationCycle.open_at >= today_start)
+        .where(ReservationCycle.open_at < today_end)
+        .order_by(ReservationCycle.open_at.asc())
+        .limit(1)
+    )
+    cycle = result.scalar_one_or_none()
+    if cycle:
+        return cycle
+
+    # 3) 다음 오픈 예정
+    result = await db.execute(
+        select(ReservationCycle)
+        .where(ReservationCycle.open_at >= now)
+        .order_by(ReservationCycle.open_at.asc())
+        .limit(1)
+    )
+    cycle = result.scalar_one_or_none()
+    if cycle:
+        return cycle
+
+    result = await db.execute(
+        select(ReservationCycle).order_by(ReservationCycle.open_at.desc()).limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def resolve_scheduled_open_notice_cycle(db: AsyncSession) -> ReservationCycle | None:
+    """수 08:55 잡 — 당일 09:00 전후 오픈 예정 사이클."""
+    now = now_kst()
+    window_start = now - timedelta(minutes=10)
+    window_end = now + timedelta(minutes=15)
+    result = await db.execute(
+        select(ReservationCycle)
+        .where(ReservationCycle.open_at >= window_start)
+        .where(ReservationCycle.open_at <= window_end)
+        .order_by(ReservationCycle.open_at.asc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+async def load_open_notice_recipients(
+    db: AsyncSession, *, limit: int | None = None
+) -> list[Member]:
+    query = (
+        select(Member)
+        .where(Member.entra_oid.isnot(None))
+        .where(Member.status != MemberStatus.WITHDRAWN)
+        .order_by(Member.id)
+    )
+    if limit is not None:
+        query = query.limit(limit)
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+async def enqueue_open_notice_broadcast(
+    db: AsyncSession,
+    cycle: ReservationCycle,
+    *,
+    limit: int | None = None,
+    notice_date: date | None = None,
+) -> tuple[int, int]:
+    """Returns (enqueued, skipped_dedupe).
+
+    notice_date: 중복 방지 기준일. 스케줄러는 open_at 날짜(수요일), 수동 발송은 당일.
+    """
+    members = await load_open_notice_recipients(db, limit=limit)
+    enqueued = 0
+    skipped = 0
+    site_url = open_notice_site_url()
+    send_date = notice_date or now_kst().date()
+    for member in members:
+        body = render_open_notice_body(
+            name=member.name,
+            open_at=cycle.open_at,
+            close_at=cycle.close_at,
+            week_start=cycle.target_week_start,
+            week_end=cycle.target_week_end,
+            site_url=site_url,
+        )
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.RESERVE_OPEN_NOTICE,
+            to_member_id=member.id,
+            to_entra_oid=member.entra_oid,
+            body=body,
+            dedupe_key=open_notice_dedupe_key(cycle.id, member.id, send_date),
+        )
+        if msg:
+            enqueued += 1
+        else:
+            skipped += 1
+    if enqueued:
+        await db.commit()
+    return enqueued, skipped
 
 
 def _slot_starts_in_minutes(slot: Slot, now: datetime, target_minutes: int) -> bool:

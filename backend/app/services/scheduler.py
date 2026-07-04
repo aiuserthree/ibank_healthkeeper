@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 from sqlalchemy import select
@@ -27,8 +28,15 @@ from app.services.cycle import (
     week_monday,
 )
 from app.services.mail import drain_pending_mails, process_one_mail, retry_failed_mails
-from app.services.teams import enqueue_due_reminders, process_pending_teams_messages
+from app.services.teams import (
+    enqueue_due_reminders,
+    enqueue_open_notice_broadcast,
+    process_pending_teams_messages,
+    resolve_scheduled_open_notice_cycle,
+)
 from app.services.priority import needs_manual, rank_applicants
+
+logger = logging.getLogger(__name__)
 
 
 async def job_precreate_cycle(db: AsyncSession) -> None:
@@ -151,3 +159,34 @@ async def job_teams_reminder(db: AsyncSession) -> None:
     """확정 예약 시작 N분 전 Teams 1:1 채팅 알림."""
     await enqueue_due_reminders(db)
     await process_pending_teams_messages(db)
+
+
+async def job_teams_open_notice(db: AsyncSession) -> None:
+    """매주 수 08:55 — 차주 예약 오픈 5분 전 전체 회원 Teams 1:1 안내."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    if not settings.teams_open_notice_ready():
+        return
+
+    cycle = await resolve_scheduled_open_notice_cycle(db)
+    if not cycle:
+        return
+
+    from app.core.time import to_kst
+
+    notice_date = to_kst(cycle.open_at).date()
+    enqueued, skipped = await enqueue_open_notice_broadcast(
+        db, cycle, notice_date=notice_date
+    )
+    if enqueued or skipped:
+        logger.info(
+            "Teams open notice cycle=%s enqueued=%s skipped=%s",
+            cycle.id,
+            enqueued,
+            skipped,
+        )
+    for _ in range(100):
+        sent = await process_pending_teams_messages(db, limit=50)
+        if sent == 0:
+            break

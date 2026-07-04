@@ -237,28 +237,43 @@ async def get_vacation_cycle(db: AsyncSession) -> Optional[ReservationCycle]:
     return result.scalar_one_or_none()
 
 
+def _setting_dow(settings: dict[str, str], key: str, default: str) -> int:
+    raw = str(settings.get(key, default)).strip().upper()
+    return DOW_MAP.get(raw, DOW_MAP[default])
+
+
+def _application_open_date(target_monday: date, open_dow: int) -> date:
+    """대상 주 월요일 직전쪽 신청 오픈일 (예: 차주 월~금 → 직전 수요일)."""
+    days_back = (target_monday.weekday() - open_dow) % 7
+    if days_back == 0:
+        days_back = 7
+    open_date = target_monday - timedelta(days=days_back)
+    if open_date >= target_monday:
+        open_date -= timedelta(days=7)
+    return open_date
+
+
 def compute_cycle_times(target_monday: date, settings: dict[str, str]) -> dict[str, datetime]:
     """operation_setting 기준 해당 주차 오픈/마감/재신청 시각."""
-    open_dow = DOW_MAP.get(settings.get("open.dow", "WED"), 2)
-    reapply_start_dow = DOW_MAP.get(settings.get("reapply.start.dow", "THU"), 3)
-    reapply_dow = DOW_MAP.get(settings.get("reapply.close.dow", "THU"), 3)
+    open_dow = _setting_dow(settings, "open.dow", "WED")
+    reapply_start_dow = _setting_dow(settings, "reapply.start.dow", "THU")
+    reapply_dow = _setting_dow(settings, "reapply.close.dow", "THU")
     open_time = parse_time(settings.get("open.time", "09:00"))
     close_time = parse_time(settings.get("close.time", "17:00"))
     reapply_start_time = parse_time(settings.get("reapply.start.time", "09:00"))
     reapply_time = parse_time(settings.get("reapply.close.time", "17:00"))
 
-    prev_wed = target_monday - timedelta(days=(target_monday.weekday() - open_dow) % 7)
-    if prev_wed >= target_monday:
-        prev_wed -= timedelta(days=7)
-    open_at = datetime.combine(prev_wed, open_time, tzinfo=KST)
-    close_at = datetime.combine(prev_wed, close_time, tzinfo=KST)
+    open_date = _application_open_date(target_monday, open_dow)
+    open_at = datetime.combine(open_date, open_time, tzinfo=KST)
+    # 일반 신청 마감 = 오픈일과 같은 날 (수 09:00~17:00)
+    close_at = datetime.combine(open_date, close_time, tzinfo=KST)
     reapply_open_at = datetime.combine(
-        prev_wed + timedelta(days=(reapply_start_dow - open_dow) % 7 or 1),
+        open_date + timedelta(days=(reapply_start_dow - open_dow) % 7 or 1),
         reapply_start_time,
         tzinfo=KST,
     )
     reapply_close_at = datetime.combine(
-        prev_wed + timedelta(days=(reapply_dow - open_dow) % 7 or 1),
+        open_date + timedelta(days=(reapply_dow - open_dow) % 7 or 1),
         reapply_time,
         tzinfo=KST,
     )

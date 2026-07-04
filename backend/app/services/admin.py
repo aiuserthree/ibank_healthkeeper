@@ -48,6 +48,12 @@ from app.services.reservation import get_empty_slots
 
 DASHBOARD_PENDING_SLOT_LIMIT = 5
 
+_CYCLE_MAIL_TYPES = (
+    MailType.RESERVE_DONE_NORMAL,
+    MailType.RESERVE_DONE_REAPPLY,
+    MailType.DROP_REAPPLY_NOTICE,
+)
+
 
 def _weekday_ko(d: date) -> str:
     return ["월", "화", "수", "목", "금", "토", "일"][d.weekday()]
@@ -220,11 +226,14 @@ async def _pending_confirmation_slots(
     }
 
 
-async def _mail_breakdown(db: AsyncSession) -> dict:
-    rows = await db.execute(
-        select(MailMessage.type, MailMessage.status, func.count())
-        .group_by(MailMessage.type, MailMessage.status)
-    )
+async def _mail_breakdown(db: AsyncSession, cycle_id: int | None = None) -> dict:
+    query = select(MailMessage.type, MailMessage.status, func.count())
+    if cycle_id is not None:
+        query = query.where(MailMessage.cycle_id == cycle_id).where(
+            MailMessage.type.in_(_CYCLE_MAIL_TYPES)
+        )
+    query = query.group_by(MailMessage.type, MailMessage.status)
+    rows = await db.execute(query)
     stats = {
         "confirmSent": 0,
         "confirmFail": 0,
@@ -297,13 +306,28 @@ async def dashboard(db: AsyncSession) -> dict:
             1 for s in slot_list if s.status != SlotStatus.CONFIRMED and not s.is_vacation
         )
 
-    mail_counts = await db.execute(
-        select(MailMessage.status, func.count()).group_by(MailMessage.status)
-    )
-    for status, cnt in mail_counts.all():
-        mail_stats[status.value.lower()] = cnt
+        mail_counts = await db.execute(
+            select(MailMessage.status, func.count())
+            .where(MailMessage.cycle_id == view_cycle.id)
+            .where(MailMessage.type.in_(_CYCLE_MAIL_TYPES))
+            .group_by(MailMessage.status)
+        )
+        for status, cnt in mail_counts.all():
+            mail_stats[status.value.lower()] = cnt
 
-    mail_breakdown = await _mail_breakdown(db)
+        mail_breakdown = await _mail_breakdown(db, view_cycle.id)
+    else:
+        mail_breakdown = {
+            "confirmSent": 0,
+            "confirmFail": 0,
+            "confirmReapplySent": 0,
+            "confirmReapplyFail": 0,
+            "reapplySent": 0,
+            "reapplyFail": 0,
+            "verifySent": 0,
+            "verifyFail": 0,
+        }
+
     mail_stats = {**mail_stats, **mail_breakdown}
 
     vacation_cycle = await get_vacation_cycle(db)

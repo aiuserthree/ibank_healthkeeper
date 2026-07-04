@@ -54,6 +54,7 @@ class MailType(str, enum.Enum):
 
 class TeamsMessageType(str, enum.Enum):
     RESERVE_REMINDER = "RESERVE_REMINDER"
+    RESERVE_OPEN_NOTICE = "RESERVE_OPEN_NOTICE"
 
 
 class MailStatus(str, enum.Enum):

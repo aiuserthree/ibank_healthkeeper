@@ -38,6 +38,13 @@ rsync -avz --delete \
   --exclude 'data/avatars/' \
   backend/ "$USER@$HOST:/opt/healthkeeper/app/backend/"
 rsync -avz --delete web/ "$USER@$HOST:/opt/healthkeeper/app/web/"
+rsync -avz \
+  --include 'broadcast-teams-open-notice.py' \
+  --include 'broadcast-teams-open-notice.sh' \
+  --include 'recompute-cycle-times.py' \
+  --include 'recompute-cycle-times.sh' \
+  --exclude '*' \
+  scripts/ "$USER@$HOST:/opt/healthkeeper/app/scripts/"
 
 echo "==> Upload deploy/.env (docker compose)"
 ssh "$USER@$HOST" "cat > /opt/healthkeeper/deploy/.env" <<DEPLOY_ENV
@@ -57,7 +64,7 @@ DEPLOY_ENV
 
 echo "==> Remote setup"
 ssh "$USER@$HOST" \
-  "DOMAIN='${DOMAIN}' HOST='${HOST}' CERTBOT_EMAIL='${EMAIL}' SSO_PROVIDER='${SSO_PROVIDER:-mock}' ENTRA_TENANT_ID='${ENTRA_TENANT_ID:-}' ENTRA_CLIENT_ID='${ENTRA_CLIENT_ID:-}' ENTRA_CLIENT_SECRET='${ENTRA_CLIENT_SECRET:-}' SSO_ALLOWED_DOMAIN='${SSO_ALLOWED_DOMAIN:-}' SSO_SUCCESS_PATH='${SSO_SUCCESS_PATH:-/reserve}' SECRET_KEY='${SECRET_KEY}' ENABLE_NEO4J='${ENABLE_NEO4J:-false}' SMTP_HOST='${SMTP_HOST:-smtp.office365.com}' SMTP_PORT='${SMTP_PORT:-587}' SMTP_USER='${SMTP_USER:-}' SMTP_PASSWORD='${SMTP_PASSWORD:-}' SMTP_FROM='${SMTP_FROM:-}' SMTP_FROM_NAME='${SMTP_FROM_NAME:-헬스키퍼}' SMTP_USE_TLS='${SMTP_USE_TLS:-true}' TEAMS_REMINDER_ENABLED='${TEAMS_REMINDER_ENABLED:-true}' TEAMS_REMINDER_MINUTES_BEFORE='${TEAMS_REMINDER_MINUTES_BEFORE:-5}' TEAMS_SENDER_EMAIL='${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}' TEAMS_SENDER_REFRESH_TOKEN='${TEAMS_SENDER_REFRESH_TOKEN:-}'" \
+  "DOMAIN='${DOMAIN}' HOST='${HOST}' CERTBOT_EMAIL='${EMAIL}' SSO_PROVIDER='${SSO_PROVIDER:-mock}' ENTRA_TENANT_ID='${ENTRA_TENANT_ID:-}' ENTRA_CLIENT_ID='${ENTRA_CLIENT_ID:-}' ENTRA_CLIENT_SECRET='${ENTRA_CLIENT_SECRET:-}' SSO_ALLOWED_DOMAIN='${SSO_ALLOWED_DOMAIN:-}' SSO_SUCCESS_PATH='${SSO_SUCCESS_PATH:-/reserve}' SECRET_KEY='${SECRET_KEY}' ENABLE_NEO4J='${ENABLE_NEO4J:-false}' SMTP_HOST='${SMTP_HOST:-smtp.office365.com}' SMTP_PORT='${SMTP_PORT:-587}' SMTP_USER='${SMTP_USER:-}' SMTP_PASSWORD='${SMTP_PASSWORD:-}' SMTP_FROM='${SMTP_FROM:-}' SMTP_FROM_NAME='${SMTP_FROM_NAME:-헬스키퍼}' SMTP_USE_TLS='${SMTP_USE_TLS:-true}' TEAMS_REMINDER_ENABLED='${TEAMS_REMINDER_ENABLED:-true}' TEAMS_REMINDER_MINUTES_BEFORE='${TEAMS_REMINDER_MINUTES_BEFORE:-5}' TEAMS_OPEN_NOTICE_ENABLED='${TEAMS_OPEN_NOTICE_ENABLED:-true}' TEAMS_OPEN_NOTICE_URL='${TEAMS_OPEN_NOTICE_URL:-https://healthkeeper.ibank.co.kr/index}' TEAMS_SENDER_EMAIL='${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}' TEAMS_SENDER_REFRESH_TOKEN='${TEAMS_SENDER_REFRESH_TOKEN:-}'" \
   bash -s <<'REMOTE'
 set -euo pipefail
 if [[ ! -f /opt/healthkeeper/deploy/.env ]]; then
@@ -143,6 +150,8 @@ SMTP_FROM_NAME=${SMTP_FROM_NAME:-헬스키퍼}
 SMTP_USE_TLS=${SMTP_USE_TLS:-true}
 TEAMS_REMINDER_ENABLED=${TEAMS_REMINDER_ENABLED:-true}
 TEAMS_REMINDER_MINUTES_BEFORE=${TEAMS_REMINDER_MINUTES_BEFORE:-5}
+TEAMS_OPEN_NOTICE_ENABLED=${TEAMS_OPEN_NOTICE_ENABLED:-true}
+TEAMS_OPEN_NOTICE_URL=${TEAMS_OPEN_NOTICE_URL:-https://healthkeeper.ibank.co.kr/index}
 TEAMS_SENDER_EMAIL=${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}
 TEAMS_SENDER_REFRESH_TOKEN=${TEAMS_SENDER_REFRESH_TOKEN:-}
 EOF
@@ -161,6 +170,13 @@ else
   exit 1
 fi
 .venv/bin/alembic upgrade head
+
+echo "==> Recompute reservation cycle open/close times"
+if [[ -f /opt/healthkeeper/app/scripts/recompute-cycle-times.py ]]; then
+  .venv/bin/python /opt/healthkeeper/app/scripts/recompute-cycle-times.py || echo "WARN: recompute-cycle-times failed"
+else
+  echo "WARN: recompute-cycle-times.py not found — skip"
+fi
 
 if [[ -f import_legacy_usage_2026.py && -f data/legacy_usage_2026.md ]]; then
   echo "==> Import 2026 legacy usage"
