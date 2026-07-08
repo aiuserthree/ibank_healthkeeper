@@ -97,9 +97,19 @@ def wrap_intro(html: str) -> str:
     return html
 
 
+def _fix_preheader(html: str, text: str) -> str:
+    return re.sub(
+        r'(<div style="display:none; max-height:0; overflow:hidden; opacity:0; color:#eef1f6; font-size:1px; line-height:1px;">)[^<]+(</div>)',
+        rf"\1{text}\2",
+        html,
+        count=1,
+    )
+
+
 def fix_02(html: str) -> str:
     html = fix_icons(fix_logo(html))
     html = wrap_intro(html)
+    html = _fix_preheader(html, "안마서비스 예약이 확정되었습니다 · {날짜} {시간}")
     html = re.sub(r">6월 23일 \(화\)<", ">{날짜}<", html)
     html = re.sub(r">15:30 – 16:00 ", ">{시간} ", html)
     html = fix_links(html)
@@ -129,6 +139,7 @@ def fix_02(html: str) -> str:
 def fix_03(html: str) -> str:
     html = fix_icons(fix_logo(html))
     html = wrap_intro(html)
+    html = _fix_preheader(html, "재신청 예약이 즉시 확정되었습니다 · {날짜} {시간} · 취소 불가")
     html = re.sub(r">6월 25일 \(목\)<", ">{날짜}<", html)
     html = re.sub(r">14:30 – 15:00 ", ">{시간} ", html)
     html = fix_links(html)
@@ -150,6 +161,10 @@ def fix_03(html: str) -> str:
 def fix_04(html: str) -> str:
     html = fix_icons(fix_logo(html))
     html = wrap_intro(html)
+    html = _fix_preheader(
+        html,
+        "우선권에 따라 탈락 처리되었습니다 · {재신청마감}까지 빈 슬롯에 선착순 재신청하세요.",
+    )
     html = re.sub(
         r"(<p style=\"margin:0 0 12px; font-size:13px; font-weight:700; color:#004eba; letter-spacing:0\.02em;\">비어있는 슬롯</p>\s*)"
         r"(?:<span style=\"display:inline-block;[^>]+>[^<]+</span>\s*)+",

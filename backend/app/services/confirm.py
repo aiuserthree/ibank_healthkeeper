@@ -149,6 +149,50 @@ async def cancel_confirmed_reservation(db: AsyncSession, reservation_id: int) ->
     await db.commit()
 
 
+async def restore_cancelled_reservation(db: AsyncSession, reservation_id: int) -> Reservation:
+    """관리자 — 실수로 확정 취소한 일반(NORMAL) 예약 복구."""
+    reservation = await db.get(Reservation, reservation_id)
+    if not reservation:
+        raise_app_error("NOT_FOUND", 404)
+    if reservation.status != ReservationStatus.CANCELLED:
+        raise_app_error("NOT_CANCELABLE")
+    if reservation.type != ReservationType.NORMAL:
+        raise_app_error("NOT_CANCELABLE")
+    if not reservation.confirmed_at:
+        raise_app_error("NOT_CANCELABLE")
+
+    cycle = await db.get(ReservationCycle, reservation.cycle_id)
+    if not cycle or not can_admin_confirm(cycle):
+        raise_app_error("NOT_ADMIN_CANCEL_BEFORE_CLOSE")
+
+    slot_result = await db.execute(
+        select(Slot).where(Slot.id == reservation.slot_id).with_for_update()
+    )
+    slot = slot_result.scalar_one_or_none()
+    if not slot:
+        raise_app_error("NOT_FOUND", 404)
+    if slot.status == SlotStatus.CONFIRMED:
+        raise_app_error("SLOT_ALREADY_CONFIRMED")
+
+    slot_start = datetime.combine(slot.slot_date, slot.start_time, tzinfo=KST)
+    if now_kst() >= slot_start:
+        raise_app_error("NOT_ADMIN_CANCEL_SLOT_PAST")
+
+    reservation.status = ReservationStatus.CONFIRMED
+    reservation.cancelled_at = None
+
+    slot.status = SlotStatus.CONFIRMED
+    slot.confirmed_reservation_id = reservation.id
+
+    member = await db.get(Member, reservation.member_id)
+    if member and (member.last_used_date is None or slot.slot_date > member.last_used_date):
+        member.last_used_date = slot.slot_date
+
+    await db.commit()
+    await db.refresh(reservation)
+    return reservation
+
+
 async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
     slot = await db.get(Slot, slot_id)
     if not slot:
