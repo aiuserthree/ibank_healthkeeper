@@ -19,6 +19,7 @@ from app.models.enums import (
 from app.models.legacy_usage import LegacyUsage
 from app.models.mail import MailMessage, MailTemplate
 from app.models.member import Member
+from app.models.public_holiday import KoreanPublicHoliday
 from app.models.reservation import Reservation
 from app.models.setting import OperationSetting
 from app.models.slot import Slot
@@ -32,6 +33,7 @@ __all__ = [
     "Member",
     "MemberStatus",
     "LegacyUsage",
+    "KoreanPublicHoliday",
     "EmailVerificationToken",
     "ReservationCycle",
     "CycleState",

@@ -22,11 +22,17 @@
       return `<div style="min-width:84px"><div style="font-size:11px;color:var(--text-muted);margin-bottom:3px">${label}</div><div style="font-size:14px;font-weight:${warn ? 700 : 600};color:${warn ? "var(--color-warning)" : "var(--color-midnight-navy)"};font-variant-numeric:${tabular ? "tabular-nums" : "normal"}">${value}</div></div>`;
     }
 
-    function decidedStatusHtml(a, canConfirm) {
+    function adminCancelConfirmedBtnHtml(a, canConfirm, slot) {
+      if (a.status !== "CONFIRMED" || a.type !== "NORMAL" || !canConfirm) return "";
+      if (HKUI.isSlotPastKst(slot?.slotDate, slot?.startTime)) {
+        return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="예약 시간이 지나 취소할 수 없습니다">확정 취소</button>`;
+      }
+      return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-confirmed="${a.reservation_id}">확정 취소</button>`;
+    }
+
+    function decidedStatusHtml(a, canConfirm, slot) {
       if (a.status === "CONFIRMED") {
-        const cancelBtn = a.type === "NORMAL" && canConfirm
-          ? `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-confirmed="${a.reservation_id}">확정 취소</button>`
-          : "";
+        const cancelBtn = adminCancelConfirmedBtnHtml(a, canConfirm, slot);
         return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${HKUI.statusBadge("CONFIRMED")}${cancelBtn}</div>`;
       }
       return HKUI.statusBadge(a.status);
@@ -100,7 +106,7 @@
                   ${field("누적 이용", a.total_uses != null ? `${a.total_uses}회` : "-")}
                   <div style="flex:1"></div>
                   <div style="min-width:96px;display:flex;justify-content:flex-end">
-                    ${decided && a.status === "CONFIRMED" ? decidedStatusHtml(a, canConfirm) : decided ? decidedStatusHtml(a, canConfirm) : canConfirm ? `<button type="button" class="hk-btn hk-btn--${isTop && !allNoHistory ? "primary" : "secondary"} hk-btn--sm" data-rid="${a.reservation_id}">확정</button>` : `<span style="font-size:13px;color:var(--text-muted);white-space:nowrap">마감 후 확정</span>`}
+                    ${decided && a.status === "CONFIRMED" ? decidedStatusHtml(a, canConfirm, slot) : decided ? decidedStatusHtml(a, canConfirm, slot) : canConfirm ? `<button type="button" class="hk-btn hk-btn--${isTop && !allNoHistory ? "primary" : "secondary"} hk-btn--sm" data-rid="${a.reservation_id}">확정</button>` : `<span style="font-size:13px;color:var(--text-muted);white-space:nowrap">마감 후 확정</span>`}
                   </div>
                 </div>
               </div>`;

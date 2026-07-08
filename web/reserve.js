@@ -39,8 +39,12 @@
     if (applied) selected = applied;
   }
 
+  function isSlotClosed(s) {
+    return s.isVacation || s.isHoliday || s.confirmed;
+  }
+
   function slotClass(s, sel) {
-    if (s.isVacation || s.confirmed) return "disabled";
+    if (isSlotClosed(s)) return "disabled";
     if (isMySlot(s)) return "mine";
     if (hasWeekApplied()) return "disabled";
     if (sel && sel.id === s.id) return "selected";
@@ -49,6 +53,7 @@
   }
 
   function slotMeta(s, sel) {
+    if (s.isHoliday) return "공휴일";
     if (s.isVacation) return "휴가";
     if (s.confirmed) return "확정됨";
     if (isMySlot(s)) return "내 신청";
@@ -97,22 +102,22 @@
         const d = new Date(day.date + "T12:00:00");
         const label = `${d.getMonth() + 1}/${d.getDate()}`;
         const dow = DAY_NAMES[d.getDay()];
-        const allVacation = day.slots.every((s) => s.isVacation);
+        const allClosed = day.slots.every((s) => s.isVacation || s.isHoliday);
+        const allHoliday = day.slots.every((s) => s.isHoliday);
         return `<div>
           <div style="text-align:center;margin-bottom:10px">
-            <div style="font-size:15px;font-weight:700;color:${allVacation ? "var(--text-muted)" : "var(--color-midnight-navy)"}">${dow}</div>
+            <div style="font-size:15px;font-weight:700;color:${allClosed ? "var(--text-muted)" : "var(--color-midnight-navy)"}">${dow}</div>
             <div style="font-size:12px;color:var(--text-muted)">${label}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:8px">
             ${
-              allVacation
-                ? `<div style="text-align:center;padding:30px 0;border:1.5px dashed var(--border-default);border-radius:var(--radius-sm);color:var(--text-muted);font-size:13">${HKUI.icon("palmtree", 18, "var(--color-steel-blue)")}<div style="margin-top:4px">휴가</div></div>`
+              allClosed
+                ? `<div style="text-align:center;padding:30px 0;border:1.5px dashed var(--border-default);border-radius:var(--radius-sm);color:var(--text-muted);font-size:13">${HKUI.icon(allHoliday ? "calendar-x" : "palmtree", 18, "var(--color-steel-blue)")}<div style="margin-top:4px">${allHoliday ? "공휴일" : "휴가"}</div></div>`
                 : day.slots
                     .map((s) => {
                       const cls = slotClass(s, selected);
                       const disableClick =
-                        s.isVacation ||
-                        s.confirmed ||
+                        isSlotClosed(s) ||
                         cls === "mine" ||
                         (hasWeekApplied() && cls !== "mine");
                       return `<button type="button" class="hk-slot${cls === "selected" ? " hk-slot--picking" : ""}${cls === "disabled" ? " hk-slot--disabled" : ""}${cls === "mine" ? " hk-slot--mine" : ""}${s.confirmed ? " hk-slot--confirmed" : ""}" data-id="${s.id}" ${disableClick ? "disabled" : ""} style="width:100%">
@@ -130,7 +135,7 @@
         ${HKUI.legend("var(--surface-card)", "var(--border-default)", "예약 가능")}
         ${HKUI.legend("var(--action)", "var(--action)", "내 신청")}
         ${HKUI.legend("var(--color-midnight-navy)", "var(--color-midnight-navy)", "선택 중")}
-        ${HKUI.legend("", "", "안마사님 휴가 · 신청 불가", true)}
+        ${HKUI.legend("", "", "안마사님 휴가 · 공휴일 · 신청 불가", true)}
         <span style="font-size:12.5px;color:var(--text-secondary);display:flex;align-items:center;gap:6px">${HKUI.icon("users", 14, "var(--color-warning)")} 신청자 n명 = 우선권 경합</span>
       </div>`;
 
@@ -139,7 +144,7 @@
         if (btn.disabled) return;
         const id = Number(btn.dataset.id);
         const slot = calendar.slots.find((s) => s.id === id);
-        if (!slot || slot.isVacation || slot.confirmed) return;
+        if (!slot || isSlotClosed(slot)) return;
         if (hasWeekApplied() && !slot.mine && !isMySlot(slot)) return;
         if (!isOpen()) return;
         selected = slot;

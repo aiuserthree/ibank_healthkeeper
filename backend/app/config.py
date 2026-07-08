@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -69,6 +69,8 @@ class Settings(BaseSettings):
     teams_open_notice_url: str = "https://healthkeeper.ibank.co.kr/index"
     teams_sender_email: str = "healthkeeper@ibank.co.kr"
     teams_sender_refresh_token: str = ""
+
+    public_data_portal_service_key: str = ""
 
     def allowed_email_domains(self) -> list[str]:
         """SSO_ALLOWED_DOMAIN — 쉼표 구분 (예: ibank.co.kr,digitalworks.co.kr)."""

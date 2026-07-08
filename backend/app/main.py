@@ -81,6 +81,12 @@ def _schedule_jobs() -> None:
         id="j7_teams_open_notice",
         replace_existing=True,
     )
+    scheduler.add_job(
+        _async_job("sync_public_holidays", sched.job_sync_public_holidays),
+        CronTrigger(day_of_week="tue", hour=6, minute=0),
+        id="j8_sync_public_holidays",
+        replace_existing=True,
+    )
 
 
 @asynccontextmanager
@@ -106,6 +112,10 @@ async def lifespan(app: FastAPI):
             await sched.job_open_cycle(db)
         except Exception:
             logger.exception("Startup open-cycle sync failed")
+        try:
+            await sched.bootstrap_public_holidays(db)
+        except Exception:
+            logger.exception("Startup public holiday bootstrap failed")
     yield
     scheduler.shutdown(wait=False)
     await close_redis()

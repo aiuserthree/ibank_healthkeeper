@@ -167,6 +167,39 @@ async def get_admin_view_cycle(db: AsyncSession) -> Optional[ReservationCycle]:
     return await get_vacation_cycle(db)
 
 
+async def get_admin_reservation_cycles(db: AsyncSession) -> list[ReservationCycle]:
+    """관리자 예약관리 화면에 표시할 사이클 (1~2개).
+
+    신규 사이클 오픈(수 09:00) 후 대상 주 월요일 전까지: [신규 주차, 직전 주차]
+    그 외: 단일 주차 (get_admin_view_cycle 과 동일)
+    """
+    now = now_kst()
+    today = now.date()
+
+    result = await db.execute(
+        select(ReservationCycle)
+        .where(ReservationCycle.open_at <= now)
+        .where(ReservationCycle.target_week_start > today)
+        .order_by(ReservationCycle.target_week_start.asc())
+        .limit(1)
+    )
+    upcoming = result.scalar_one_or_none()
+    if upcoming:
+        prev_monday = upcoming.target_week_start - timedelta(days=7)
+        prev_result = await db.execute(
+            select(ReservationCycle)
+            .where(ReservationCycle.target_week_start == prev_monday)
+            .limit(1)
+        )
+        prev = prev_result.scalar_one_or_none()
+        if prev:
+            return [upcoming, prev]
+        return [upcoming]
+
+    single = await get_admin_view_cycle(db)
+    return [single] if single else []
+
+
 async def resolve_system_state(db: AsyncSession) -> tuple[CycleState, Optional[ReservationCycle]]:
     """사용자 화면용 — 현재 시각(KST) 기준 표시 상태·대상 사이클."""
     cycle = await get_active_cycle(db)

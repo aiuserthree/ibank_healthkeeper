@@ -27,7 +27,13 @@ from app.services.cycle import (
     get_setting,
     week_monday,
 )
+from app.services.korean_holidays import is_public_holiday
 from app.services.mail import drain_pending_mails, process_one_mail, retry_failed_mails
+from app.services.public_holiday_sync import (
+    default_sync_years,
+    load_holiday_cache_from_db,
+    sync_public_holidays_from_api,
+)
 from app.services.teams import (
     enqueue_due_reminders,
     enqueue_open_notice_broadcast,
@@ -90,7 +96,7 @@ async def job_close_batch(db: AsyncSession) -> None:
 
     slots = await db.execute(select(Slot).where(Slot.cycle_id == cycle.id))
     for slot in slots.scalars().all():
-        if slot.status == SlotStatus.CONFIRMED or slot.is_vacation:
+        if slot.status == SlotStatus.CONFIRMED or slot.is_vacation or is_public_holiday(slot.slot_date):
             continue
         applicants = await rank_applicants(db, slot.id)
         if not applicants:
@@ -190,3 +196,45 @@ async def job_teams_open_notice(db: AsyncSession) -> None:
         sent = await process_pending_teams_messages(db, limit=50)
         if sent == 0:
             break
+
+
+async def job_sync_public_holidays(db: AsyncSession) -> None:
+    """매주 화요일 — 공공데이터포털 공휴일 API 동기화."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    service_key = settings.public_data_portal_service_key.strip()
+    if not service_key:
+        logger.warning(
+            "PUBLIC_DATA_PORTAL_SERVICE_KEY not set; skip public holiday sync"
+        )
+        await load_holiday_cache_from_db(db)
+        return
+
+    years = default_sync_years()
+    try:
+        count = await sync_public_holidays_from_api(db, service_key, years)
+        logger.info("Public holiday sync complete years=%s count=%s", years, count)
+    except Exception:
+        logger.exception("Public holiday sync failed; keeping existing cache")
+        await load_holiday_cache_from_db(db)
+
+
+async def bootstrap_public_holidays(db: AsyncSession) -> None:
+    """기동 시 DB 캐시 로드, 비어 있으면 API 초기 동기화."""
+    from app.config import get_settings
+
+    count = await load_holiday_cache_from_db(db)
+    if count > 0:
+        logger.info("Loaded %s public holidays from DB", count)
+        return
+
+    settings = get_settings()
+    if not settings.public_data_portal_service_key.strip():
+        logger.warning(
+            "Public holiday DB empty and PUBLIC_DATA_PORTAL_SERVICE_KEY not set; "
+            "using fallback holiday rules"
+        )
+        return
+
+    await job_sync_public_holidays(db)

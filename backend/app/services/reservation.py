@@ -19,6 +19,7 @@ from app.models import (
     MailType,
 )
 from app.services.cycle import get_active_cycle, resolve_system_state
+from app.services.korean_holidays import is_public_holiday
 from app.services.legacy_usage import get_member_apply_total
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 
@@ -78,6 +79,7 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
                 "startTime": slot.start_time.strftime("%H:%M"),
                 "endTime": slot.end_time.strftime("%H:%M"),
                 "isVacation": slot.is_vacation,
+                "isHoliday": is_public_holiday(slot.slot_date),
                 "status": slot.status.value,
                 "requestCount": request_cnt,
                 "mine": mine,
@@ -103,6 +105,8 @@ async def apply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reservat
         raise_app_error("NOT_FOUND", 404)
     if slot.is_vacation:
         raise_app_error("VACATION_SLOT")
+    if is_public_holiday(slot.slot_date):
+        raise_app_error("HOLIDAY_SLOT")
     if slot.status == SlotStatus.CONFIRMED:
         raise_app_error("SLOT_ALREADY_CONFIRMED")
 
@@ -168,7 +172,11 @@ async def get_empty_slots(db: AsyncSession, cycle_id: int) -> list[Slot]:
         .where(Slot.status != SlotStatus.CONFIRMED)
         .order_by(Slot.slot_date, Slot.time_index)
     )
-    return list(result.scalars().all())
+    return [
+        s
+        for s in list(result.scalars().all())
+        if not is_public_holiday(s.slot_date)
+    ]
 
 
 async def reapply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reservation:
@@ -184,7 +192,11 @@ async def reapply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reserv
     slot = slot_result.scalar_one_or_none()
     if not slot or slot.cycle_id != cycle.id:
         raise_app_error("NOT_FOUND", 404)
-    if slot.is_vacation or slot.status == SlotStatus.CONFIRMED:
+    if slot.is_vacation:
+        raise_app_error("VACATION_SLOT")
+    if is_public_holiday(slot.slot_date):
+        raise_app_error("HOLIDAY_SLOT")
+    if slot.status == SlotStatus.CONFIRMED:
         raise_app_error("SLOT_ALREADY_CONFIRMED")
 
     if await _member_cycle_active_apply(db, member.id, cycle.id):

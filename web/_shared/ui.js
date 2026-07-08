@@ -61,6 +61,14 @@ window.HKUI = (function () {
     return new Date().toLocaleDateString("sv-SE", { timeZone: KST });
   }
 
+  /** 슬롯 시작 시각(slotDate + HH:MM)이 KST 기준으로 지났는지 */
+  function isSlotPastKst(slotDate, startTime) {
+    if (!slotDate || !startTime) return false;
+    const slotDt = new Date(`${slotDate}T${startTime}:00+09:00`);
+    if (Number.isNaN(slotDt.getTime())) return false;
+    return Date.now() >= slotDt.getTime();
+  }
+
   function addDaysToDateKey(key, days) {
     const [y, m, d] = key.split("-").map(Number);
     const dt = new Date(Date.UTC(y, m - 1, d + days));
@@ -911,6 +919,7 @@ window.HKUI = (function () {
     formatDateLong,
     formatDateShort,
     nowKst,
+    isSlotPastKst,
     formatTimeKst,
     formatDateTimeKst,
     formatDeadlineRelative,

@@ -33,6 +33,7 @@ from app.services.cycle import (
     compute_cycle_state,
     create_cycle_for_week,
     get_active_cycle,
+    get_admin_reservation_cycles,
     get_admin_view_cycle,
     get_vacation_cycle,
     resolve_system_state,
@@ -42,6 +43,7 @@ from app.services.cycle import (
 )
 from app.services.admin_assign import admin_assign_meta, admin_assign_mail_status, slot_has_admin_released_vacancy
 from app.services.avatar import admin_member_avatar_url
+from app.services.korean_holidays import is_public_holiday, is_slot_closed
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 from app.services.priority import needs_manual, rank_applicants
 from app.services.reservation import get_empty_slots
@@ -64,6 +66,18 @@ def _week_label(week_start: date, week_end: date) -> str:
         f"이번 주 예약 현황 요약 · {week_start.month}/{week_start.day}({_weekday_ko(week_start)})"
         f" – {week_end.month}/{week_end.day}({_weekday_ko(week_end)})"
     )
+
+
+def _reservation_board_label(
+    cycle: ReservationCycle, index: int, total: int
+) -> str:
+    ws = cycle.target_week_start
+    we = cycle.target_week_end
+    if total == 1:
+        return f"차주 {ws.month}/{ws.day} – {we.month}/{we.day} · 날짜별 신청 현황"
+    if index == 0:
+        return f"차주 {ws.month}/{ws.day} – {we.month}/{we.day} · 신청 현황"
+    return f"이번 주 {ws.month}/{ws.day} – {we.month}/{we.day} · 신청 현황"
 
 
 def _slot_chip_label(slot_date: date, start_time) -> str:
@@ -205,6 +219,8 @@ async def _pending_confirmation_slots(
     )
     pending: list[tuple[tuple[str, str, int], dict]] = []
     for slot in slots.scalars().all():
+        if is_public_holiday(slot.slot_date):
+            continue
         applicants = await rank_applicants(db, slot.id, requested_only=True)
         if not applicants:
             continue
@@ -303,7 +319,9 @@ async def dashboard(db: AsyncSession) -> dict:
         slot_stats["total"] = len(slot_list)
         slot_stats["confirmed"] = sum(1 for s in slot_list if s.status == SlotStatus.CONFIRMED)
         slot_stats["empty"] = sum(
-            1 for s in slot_list if s.status != SlotStatus.CONFIRMED and not s.is_vacation
+            1
+            for s in slot_list
+            if s.status != SlotStatus.CONFIRMED and not is_slot_closed(s.slot_date, s.is_vacation)
         )
 
         mail_counts = await db.execute(
@@ -444,7 +462,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
             for reservation, _ in pairs
         )
         admin_cancel_vacancy = (
-            not slot.is_vacation
+            not is_slot_closed(slot.slot_date, slot.is_vacation)
             and slot.status == SlotStatus.OPEN
             and not has_active
             and await slot_has_admin_released_vacancy(db, slot.id)
@@ -458,6 +476,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
                 "startTime": slot.start_time.strftime("%H:%M"),
                 "endTime": slot.end_time.strftime("%H:%M"),
                 "isVacation": slot.is_vacation,
+                "isHoliday": is_public_holiday(slot.slot_date),
                 "status": slot.status.value,
                 "adminCancelVacancy": admin_cancel_vacancy,
                 "applicants": applicants,
@@ -468,6 +487,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
         "weekDates": week_dates(cycle.target_week_start),
         "weekStart": cycle.target_week_start.isoformat(),
         "weekEnd": cycle.target_week_end.isoformat(),
+        "openAt": format_kst_iso(cycle.open_at),
         "closeAt": format_kst_iso(cycle.close_at),
         "canConfirm": can_admin_confirm(cycle),
         "cycleState": compute_cycle_state(cycle).value,
@@ -478,7 +498,25 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
 
 
 async def list_reservations(db: AsyncSession, cycle_id: Optional[int] = None) -> dict:
-    return await reservation_board(db, cycle_id)
+    if cycle_id:
+        return await reservation_board(db, cycle_id)
+
+    cycles = await get_admin_reservation_cycles(db)
+    if not cycles:
+        return {"boards": []}
+
+    boards = []
+    total = len(cycles)
+    for index, cycle in enumerate(cycles):
+        board = await reservation_board(db, cycle.id)
+        boards.append(
+            {
+                "cycleId": cycle.id,
+                "boardLabel": _reservation_board_label(cycle, index, total),
+                **board,
+            }
+        )
+    return {"boards": boards}
 
 
 async def sync_vacations(

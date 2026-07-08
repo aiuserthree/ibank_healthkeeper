@@ -25,6 +25,7 @@ DATA_FIRST_COL = 2  # B
 DATA_LAST_COL = 7  # G
 
 CENTER_ALIGN = Alignment(horizontal="center", vertical="center")
+TOP_ALIGN = Alignment(horizontal="center", vertical="top")
 
 
 def _date_header_label(d: date) -> str:
@@ -47,10 +48,14 @@ async def _build_time_row_map(db: AsyncSession) -> dict[str, int]:
     }
 
 
-def _apply_center_alignment(ws) -> None:
+def _apply_cell_alignment(ws, dates_count: int, time_rows: set[int]) -> None:
     for row in range(DATA_FIRST_ROW, DATA_LAST_ROW + 1):
         for col in range(DATA_FIRST_COL, DATA_LAST_COL + 1):
             ws.cell(row=row, column=col).alignment = CENTER_ALIGN
+
+    for row in time_rows:
+        for day_idx in range(dates_count):
+            ws.cell(row=row, column=FIRST_DATE_COL + day_idx).alignment = TOP_ALIGN
 
 
 async def export_confirmed_applicants_xlsx(
@@ -117,7 +122,7 @@ async def export_confirmed_applicants_xlsx(
             if name:
                 ws.cell(row=row, column=col, value=name)
 
-    _apply_center_alignment(ws)
+    _apply_cell_alignment(ws, len(dates), set(row_map.values()))
 
     buf = io.BytesIO()
     wb.save(buf)

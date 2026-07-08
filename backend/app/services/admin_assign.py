@@ -23,6 +23,7 @@ from app.models import (
 )
 from app.services.cycle import admin_assign_window, can_admin_assign
 from app.services.avatar import admin_member_avatar_url
+from app.services.korean_holidays import is_public_holiday
 from app.services.legacy_usage import resolve_legacy_last_used_date
 from app.services.reservation import ACTIVE_APPLY_STATUSES, _member_cycle_active_apply
 
@@ -81,6 +82,8 @@ async def slot_has_admin_released_vacancy(db: AsyncSession, slot_id: int) -> boo
 async def _assert_slot_assignable(db: AsyncSession, slot: Slot) -> None:
     if slot.is_vacation:
         raise_app_error("VACATION_SLOT")
+    if is_public_holiday(slot.slot_date):
+        raise_app_error("HOLIDAY_SLOT")
     if slot.status == SlotStatus.CONFIRMED:
         raise_app_error("SLOT_ALREADY_CONFIRMED")
     if await _slot_has_active_reservations(db, slot.id):

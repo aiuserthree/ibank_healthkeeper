@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
-from app.core.time import now_kst
+from app.core.time import KST, now_kst
 from app.models import (
     ConfirmedBy,
     MailType,
@@ -17,6 +19,7 @@ from app.models import (
     SlotStatus,
 )
 from app.services.cycle import can_admin_confirm
+from app.services.korean_holidays import is_public_holiday
 from app.services.legacy_usage import get_member_total_uses
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 from app.services.priority import rank_applicants
@@ -35,6 +38,10 @@ async def confirm_reservation(
         raise_app_error("NOT_FOUND", 404)
     if slot.status == SlotStatus.CONFIRMED:
         raise_app_error("SLOT_ALREADY_CONFIRMED")
+    if slot.is_vacation:
+        raise_app_error("VACATION_SLOT")
+    if is_public_holiday(slot.slot_date):
+        raise_app_error("HOLIDAY_SLOT")
 
     reservation = await db.get(Reservation, reservation_id)
     if not reservation or reservation.slot_id != slot_id:
@@ -125,6 +132,10 @@ async def cancel_confirmed_reservation(db: AsyncSession, reservation_id: int) ->
     if not slot or slot.confirmed_reservation_id != reservation.id:
         raise_app_error("NOT_FOUND", 404)
 
+    slot_start = datetime.combine(slot.slot_date, slot.start_time, tzinfo=KST)
+    if now_kst() >= slot_start:
+        raise_app_error("NOT_ADMIN_CANCEL_SLOT_PAST")
+
     member = await db.get(Member, reservation.member_id)
     if not member:
         raise_app_error("NOT_FOUND", 404)
@@ -159,6 +170,7 @@ async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
             "endTime": slot.end_time.strftime("%H:%M"),
             "status": slot.status.value,
             "isVacation": slot.is_vacation,
+            "isHoliday": is_public_holiday(slot.slot_date),
         },
         "applicants": applicants,
         "needsManual": needs_manual,
