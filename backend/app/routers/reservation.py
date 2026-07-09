@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Cookie, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Query, Request
 from fastapi.responses import RedirectResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,7 @@ from app.core.session import get_member_session
 from app.core.time import format_deadline_relative_ko, format_kst_iso
 from app.database import get_db
 from app.models import Member
+from app.schemas.common import TransferRequestBody
 from app.services.cycle import resolve_system_state
 from app.services import reservation as reservation_service
 
@@ -186,3 +187,41 @@ async def my_reservations(
         db, member, page=page, page_size=pageSize
     )
     return {"data": data}
+
+
+@router.get("/reservation/{reservation_id}/transfer/recipients")
+async def transfer_recipients(
+    reservation_id: int,
+    q: str = Query("", max_length=100),
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.services.transfer import search_transfer_recipients
+
+    members = await search_transfer_recipients(
+        db, member, reservation_id, q=q
+    )
+    return {"data": {"members": members}}
+
+
+@router.post("/reservation/{reservation_id}/transfer")
+async def request_transfer(
+    reservation_id: int,
+    body: TransferRequestBody,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.services.transfer import request_transfer as do_request_transfer
+    from app.services.teams import deliver_teams_messages
+
+    transfer, teams_message_ids = await do_request_transfer(
+        db, member, reservation_id, body.recipientId
+    )
+    background_tasks.add_task(deliver_teams_messages, teams_message_ids)
+    return {
+        "data": {
+            "transferId": transfer.id,
+            "message": "양도 신청이 접수되었습니다. 관리자 승인 후 완료됩니다.",
+        }
+    }

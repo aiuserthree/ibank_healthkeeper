@@ -3,6 +3,7 @@ window.HKAdminRoutes = {
   login: "/admin/login",
   dashboard: "/admin/dashboard",
   reservations: "/admin/reservations",
+  transfers: "/admin/transfers",
   applicant: "/admin/applicant",
   reapplyMail: "/admin/reapply-mail",
   vacation: "/admin/vacation",
@@ -15,17 +16,28 @@ window.HKAdmin = (function () {
   const NAV = [
     { k: "dashboard", label: "대시보드", href: R.dashboard, icon: "layout-dashboard" },
     { k: "reservations", label: "예약 관리", href: R.reservations, icon: "calendar-check" },
+    { k: "transfers", label: "양도 신청", href: R.transfers, icon: "arrow-left-right", badge: "transfers" },
     { k: "reapply", label: "재신청 안내 메일", href: R.reapplyMail, icon: "mail" },
     { k: "vacation", label: "휴가 관리", href: R.vacation, icon: "palmtree" },
     { k: "settings", label: "운영 설정", href: R.settings, icon: "settings" },
   ];
 
-  function navLink(it, active) {
-    const a = active === it.k;
-    return `<a href="${it.href}" style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--radius-sm);text-decoration:none;font-size:15px;font-weight:600;background:${a ? "var(--color-signal-blue-soft)" : "transparent"};color:${a ? "var(--color-info-blue)" : "var(--color-slate-blue)"}">${HKUI.icon(it.icon, 19, a ? "var(--color-signal-blue)" : "var(--color-slate-blue)")}${it.label}</a>`;
+  function navBadgeHtml(count) {
+    const n = Number(count) || 0;
+    if (n <= 0) return "";
+    const label = n > 99 ? "99+" : String(n);
+    return `<span style="min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--color-warning);color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;line-height:1">${label}</span>`;
   }
 
-  function sidebar(active) {
+  function navLink(it, active, badges = {}) {
+    const a = active === it.k;
+    const badgePart = it.badge
+      ? `<span data-nav-badge="${it.badge}" style="margin-left:auto;display:inline-flex">${navBadgeHtml(badges[it.badge])}</span>`
+      : "";
+    return `<a href="${it.href}" style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-radius:var(--radius-sm);text-decoration:none;font-size:15px;font-weight:600;background:${a ? "var(--color-signal-blue-soft)" : "transparent"};color:${a ? "var(--color-info-blue)" : "var(--color-slate-blue)"}">${HKUI.icon(it.icon, 19, a ? "var(--color-signal-blue)" : "var(--color-slate-blue)")}<span style="flex:1">${it.label}</span>${badgePart}</a>`;
+  }
+
+  function sidebar(active, badges = {}) {
     return `<aside class="hk-asidebar" style="width:240px;background:var(--surface-card);border-right:1px solid var(--border-default);display:flex;flex-direction:column;position:sticky;top:0;height:100vh">
       <div class="hk-abrand" style="display:flex;align-items:center;border-bottom:1px solid var(--border-default)">
         <a href="${R.dashboard}" style="padding:22px 20px;display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;min-width:0">
@@ -35,7 +47,7 @@ window.HKAdmin = (function () {
         </a>
         <button type="button" class="hk-hamburger" id="hk-admin-menu-btn" aria-label="메뉴" style="display:none;align-items:center;justify-content:center;width:42px;height:42px;margin-right:14px;border:1px solid var(--border-default);border-radius:8px;background:var(--surface-card);cursor:pointer;padding:0">${HKUI.icon("menu", 22, "var(--color-midnight-navy)")}</button>
       </div>
-      <nav class="hk-anav" style="padding:12px;display:flex;flex-direction:column;gap:2px;flex:1">${NAV.map((it) => navLink(it, active)).join("")}</nav>
+      <nav class="hk-anav" style="padding:12px;display:flex;flex-direction:column;gap:2px;flex:1">${NAV.map((it) => navLink(it, active, badges)).join("")}</nav>
       <div class="hk-auser" style="padding:16px;border-top:1px solid var(--border-default);display:flex;align-items:center;gap:10px">
         ${HKUI.avatar("관리자", "sm")}
         <div style="flex:1;min-width:0">
@@ -58,7 +70,10 @@ window.HKAdmin = (function () {
         <div style="flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column">
           <nav style="display:flex;flex-direction:column;gap:2px">${NAV.map((it) => {
             const a = active === it.k;
-            return `<a href="${it.href}" style="display:flex;align-items:center;gap:12px;padding:13px 12px;border-radius:var(--radius-sm);text-decoration:none;font-size:15.5px;font-weight:600;background:${a ? "var(--color-signal-blue-soft)" : "transparent"};color:${a ? "var(--color-info-blue)" : "var(--color-slate-blue)"}">${HKUI.icon(it.icon, 20, a ? "var(--color-signal-blue)" : "var(--color-slate-blue)")}${it.label}</a>`;
+            const badgePart = it.badge
+              ? `<span data-nav-badge="${it.badge}" style="margin-left:auto;display:inline-flex">${navBadgeHtml(badges[it.badge])}</span>`
+              : "";
+            return `<a href="${it.href}" style="display:flex;align-items:center;gap:12px;padding:13px 12px;border-radius:var(--radius-sm);text-decoration:none;font-size:15.5px;font-weight:600;background:${a ? "var(--color-signal-blue-soft)" : "transparent"};color:${a ? "var(--color-info-blue)" : "var(--color-slate-blue)"}">${HKUI.icon(it.icon, 20, a ? "var(--color-signal-blue)" : "var(--color-slate-blue)")}<span style="flex:1">${it.label}</span>${badgePart}</a>`;
           }).join("")}</nav>
         </div>
         <div style="border-top:1px solid var(--border-default);padding:14px 18px;display:flex;flex-direction:column;gap:10px">
@@ -67,6 +82,27 @@ window.HKAdmin = (function () {
         </div>
       </aside>
     </div>`;
+  }
+
+  async function fetchTransferPendingCount() {
+    try {
+      const data = await HKApi.pendingTransfers();
+      return (data.items || []).length;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  function updateTransferNavBadge(count) {
+    document.querySelectorAll('[data-nav-badge="transfers"]').forEach((el) => {
+      el.innerHTML = navBadgeHtml(count);
+    });
+  }
+
+  async function refreshTransferNavBadge() {
+    const count = await fetchTransferPendingCount();
+    updateTransferNavBadge(count);
+    return count;
   }
 
   async function requireAuth() {
@@ -88,8 +124,9 @@ window.HKAdmin = (function () {
       const ok = await requireAuth();
       if (!ok) return;
     }
+    const transferPendingCount = auth ? await fetchTransferPendingCount() : 0;
     const root = document.getElementById("app");
-    root.innerHTML = `<div class="hk-ashell" style="display:flex;min-height:100vh">${sidebar(active)}<main class="hk-amain" style="flex:1;padding:32px 40px;max-width:1120px;box-sizing:border-box">${render()}</main></div>`;
+    root.innerHTML = `<div class="hk-ashell" style="display:flex;min-height:100vh">${sidebar(active, { transfers: transferPendingCount })}<main class="hk-amain" style="flex:1;padding:32px 40px;max-width:1120px;box-sizing:border-box">${render()}</main></div>`;
     const logout = async () => {
       try { await HKApi.adminLogout(); } catch (_) {}
       window.location.href = R.login;
@@ -131,5 +168,5 @@ window.HKAdmin = (function () {
     </div>`;
   }
 
-  return { mountPage, pageHead, datePill, filterPill, sectionCard, requireAuth, ROUTES: R, NAV };
+  return { mountPage, pageHead, datePill, filterPill, sectionCard, requireAuth, refreshTransferNavBadge, ROUTES: R, NAV };
 })();

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
+  <title>헬스키퍼 관리자 — 양도 신청</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/admin-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    function renderTransferPanel(items) {
+      if (!items.length) {
+        return HKUI.alertBox("info", "대기 중인 양도 신청이 없습니다", "회원이 마이페이지에서 양도를 신청하면 이 화면에 표시됩니다.");
+      }
+      const rows = items.map((t) => {
+        const d = new Date(t.slotDate + "T12:00:00");
+        const dow = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+        const dateLabel = `${HKUI.formatDate(t.slotDate)}(${dow}) ${t.startTime}`;
+        const typeLabel = t.reservationType === "REAPPLY" ? "재신청 확정" : "일반 확정";
+        return `<div class="hk-card hk-card--pad" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+          <div style="min-width:0;flex:1">
+            <div style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">${dateLabel} · ${typeLabel}</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">
+              <b>${HKUI.escapeHtml(t.donor.name)}</b> → <b>${HKUI.escapeHtml(t.recipient.name)}</b>
+              <span style="color:var(--text-muted)"> · 신청 ${HKUI.escapeHtml(HKUI.formatDateTimeSecKst(t.requestedAt))}</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);margin-top:4px">
+              ${HKUI.escapeHtml(t.donor.department || "-")} · ${HKUI.escapeHtml(t.recipient.department || "-")}
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button type="button" class="hk-btn hk-btn--primary hk-btn--sm" data-approve-transfer="${t.id}">승인</button>
+            <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-reject-transfer="${t.id}">반려</button>
+          </div>
+        </div>`;
+      }).join("");
+      return `<div style="display:flex;flex-direction:column;gap:10px" id="transfer-pending-list">${rows}</div>`;
+    }
+
+    function bindTransferActions(reloadAll) {
+      document.querySelectorAll("[data-approve-transfer]").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = Number(btn.dataset.approveTransfer);
+          const ok = await HKUI.confirmDialog("양도를 승인할까요?", "승인 시 양도인 예약이 취소되고 양수인에게 예약이 이전됩니다. 양도인·양수인에게 Teams 알림이 발송됩니다.");
+          if (!ok) return;
+          btn.disabled = true;
+          const prevLabel = btn.textContent;
+          btn.textContent = "승인 중…";
+          try {
+            await HKApi.approveTransfer(id);
+            HKUI.toast("양도가 승인되어 완료되었습니다");
+            await reloadAll();
+          } catch (e) {
+            btn.disabled = false;
+            btn.textContent = prevLabel;
+            HKUI.toast(e.message, "danger");
+          }
+        };
+      });
+      document.querySelectorAll("[data-reject-transfer]").forEach((btn) => {
+        btn.onclick = async () => {
+          const id = Number(btn.dataset.rejectTransfer);
+          const ok = await HKUI.confirmDialog("양도 신청을 반려할까요?", "양도인의 예약은 그대로 유지됩니다.");
+          if (!ok) return;
+          btn.disabled = true;
+          try {
+            await HKApi.rejectTransfer(id);
+            HKUI.toast("양도 신청이 반려되었습니다");
+            await reloadAll();
+          } catch (e) {
+            btn.disabled = false;
+            HKUI.toast(e.message, "danger");
+          }
+        };
+      });
+    }
+
+    HKAdmin.mountPage({
+      active: "transfers",
+      render() {
+        return `${HKAdmin.pageHead("양도 신청", "회원 양도 신청을 검토하고 승인·반려합니다", HKUI.badge("로딩…", "soft"))}<div id="content"></div>`;
+      },
+      afterMount: async () => {
+        const content = document.getElementById("content");
+
+        async function renderPage() {
+          try {
+            const data = await HKApi.pendingTransfers();
+            const items = data.items || [];
+            document.querySelector(".hk-amain").firstElementChild.outerHTML = HKAdmin.pageHead(
+              "양도 신청",
+              "회원 양도 신청을 검토하고 승인·반려합니다",
+              items.length ? HKUI.badge(items.length + "건 대기", "warning", true) : HKUI.badge("대기 없음", "soft", true)
+            );
+            content.innerHTML = renderTransferPanel(items);
+            bindTransferActions(renderPage);
+            await HKAdmin.refreshTransferNavBadge();
+            HKUI.refreshIcons();
+          } catch (e) {
+            content.innerHTML = HKUI.alertBox("danger", "불러오기 실패", HKUI.escapeHtml(e.message || "양도 신청 목록을 불러오지 못했습니다."));
+            HKUI.refreshIcons();
+          }
+        }
+
+        await renderPage();
+      },
+    });
+  </script>
+</body>
+</html>

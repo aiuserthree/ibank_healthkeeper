@@ -23,10 +23,17 @@ from app.models import (
     Slot,
     TeamsMessage,
     TeamsMessageType,
+    TransferRequest,
 )
 from app.services.sso import _microsoft_post
 
 logger = logging.getLogger(__name__)
+
+# 양도 알림은 재시도 시 Teams 채팅에 중복 메시지가 쌓일 수 있어 1회만 시도
+_TRANSFER_NOTIFY_TYPES = frozenset({
+    TeamsMessageType.TRANSFER_REQUEST_ADMIN,
+    TeamsMessageType.TRANSFER_APPROVED,
+})
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 MICROSOFT_TIMEOUT = httpx.Timeout(connect=15.0, read=30.0, write=15.0, pool=15.0)
@@ -234,6 +241,134 @@ def open_notice_dedupe_key(cycle_id: int, member_id: int, notice_date: date) -> 
     return f"teams-open-notice:{cycle_id}:{notice_date.isoformat()}:{member_id}"
 
 
+def render_transfer_request_admin_body(
+    *,
+    donor_name: str,
+    recipient_name: str,
+    slot: Slot,
+) -> str:
+    slot_text = _slot_label(slot)
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 예약 양도 신청</p>"
+        f"<p><b>{donor_name}</b>님이 <b>{recipient_name}</b>님에게 "
+        f"<strong>{slot_text}</strong> 예약 양도를 신청했습니다.</p>"
+        f"<p>관리자 화면에서 승인해 주세요.</p>"
+    )
+
+
+def render_transfer_approved_body(
+    *,
+    name: str,
+    role: str,
+    other_name: str,
+    slot: Slot,
+) -> str:
+    slot_text = _slot_label(slot)
+    if role == "donor":
+        detail = f"<b>{other_name}</b>님에게 양도가 완료되었습니다."
+    else:
+        detail = f"<b>{other_name}</b>님으로부터 예약을 양도받았습니다."
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 예약 양도 완료</p>"
+        f"<p>{name}님, <strong>{slot_text}</strong> 예약 양도가 승인되었습니다.</p>"
+        f"<p>{detail}</p>"
+    )
+
+
+async def _lookup_members_by_emails(
+    db: AsyncSession, emails: tuple[str, ...]
+) -> list[Member]:
+    if not emails:
+        return []
+    result = await db.execute(
+        select(Member)
+        .where(Member.email.in_(emails))
+        .where(Member.entra_oid.isnot(None))
+        .where(Member.status != MemberStatus.WITHDRAWN)
+    )
+    return list(result.scalars().all())
+
+
+async def enqueue_transfer_request_admin_notices(
+    db: AsyncSession,
+    *,
+    transfer: TransferRequest,
+    donor: Member,
+    recipient: Member,
+    slot: Slot,
+) -> list[int]:
+    from app.services.transfer import TRANSFER_ADMIN_NOTIFY_EMAILS
+
+    body = render_transfer_request_admin_body(
+        donor_name=donor.name,
+        recipient_name=recipient.name,
+        slot=slot,
+    )
+    admins = await _lookup_members_by_emails(db, TRANSFER_ADMIN_NOTIFY_EMAILS)
+    message_ids: list[int] = []
+    for admin in admins:
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.TRANSFER_REQUEST_ADMIN,
+            to_member_id=admin.id,
+            to_entra_oid=admin.entra_oid,
+            body=body,
+            dedupe_key=f"transfer-request-admin:{transfer.id}:{admin.id}",
+            reservation_id=transfer.reservation_id,
+        )
+        if msg:
+            message_ids.append(msg.id)
+    return message_ids
+
+
+async def enqueue_transfer_approved_notices(
+    db: AsyncSession,
+    *,
+    transfer: TransferRequest,
+    donor: Member,
+    recipient: Member,
+    slot: Slot,
+) -> list[int]:
+    message_ids: list[int] = []
+    if donor.entra_oid:
+        body = render_transfer_approved_body(
+            name=donor.name,
+            role="donor",
+            other_name=recipient.name,
+            slot=slot,
+        )
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.TRANSFER_APPROVED,
+            to_member_id=donor.id,
+            to_entra_oid=donor.entra_oid,
+            body=body,
+            dedupe_key=f"transfer-approved-donor:{transfer.id}",
+            reservation_id=transfer.new_reservation_id,
+        )
+        if msg:
+            message_ids.append(msg.id)
+    if recipient.entra_oid:
+        body = render_transfer_approved_body(
+            name=recipient.name,
+            role="recipient",
+            other_name=donor.name,
+            slot=slot,
+        )
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.TRANSFER_APPROVED,
+            to_member_id=recipient.id,
+            to_entra_oid=recipient.entra_oid,
+            body=body,
+            dedupe_key=f"transfer-approved-recipient:{transfer.id}",
+            reservation_id=transfer.new_reservation_id,
+        )
+        if msg:
+            message_ids.append(msg.id)
+    return message_ids
+
+
 async def resolve_open_notice_cycle(
     db: AsyncSession, *, cycle_id: int | None = None
 ) -> ReservationCycle | None:
@@ -413,6 +548,8 @@ async def process_one_teams_message(db: AsyncSession, message_id: int) -> bool:
     msg = result.scalar_one_or_none()
     if not msg:
         return False
+    if msg.status == MailStatus.SENT:
+        return True
 
     msg.status = MailStatus.SENDING
     msg.last_tried_at = now_kst()
@@ -428,7 +565,9 @@ async def process_one_teams_message(db: AsyncSession, message_id: int) -> bool:
         msg.status = MailStatus.FAILED
         msg.retry_count += 1
         msg.last_error = str(exc)[:2000]
-        if msg.retry_count >= settings.teams_reminder_retry_max:
+        if msg.type in _TRANSFER_NOTIFY_TYPES:
+            msg.status = MailStatus.DEAD
+        elif msg.retry_count >= settings.teams_reminder_retry_max:
             msg.status = MailStatus.DEAD
         logger.warning("Teams message %s failed: %s", msg.id, exc)
     await db.commit()
@@ -444,6 +583,8 @@ async def retry_failed_teams_messages(db: AsyncSession) -> int:
     )
     retried = 0
     for msg in result.scalars().all():
+        if msg.type in _TRANSFER_NOTIFY_TYPES:
+            continue
         if msg.retry_count >= settings.teams_reminder_retry_max:
             msg.status = MailStatus.DEAD
             continue
@@ -515,6 +656,17 @@ async def process_pending_teams_messages(db: AsyncSession, limit: int = 20) -> i
         if await process_one_teams_message(db, message_id):
             sent += 1
     return sent
+
+
+async def deliver_teams_messages(message_ids: list[int]) -> None:
+    """API 응답 후 백그라운드 발송 — 대기 없이 Teams 전달."""
+    if not message_ids:
+        return
+    from app.database import AsyncSessionLocal
+
+    async with AsyncSessionLocal() as db:
+        for message_id in message_ids:
+            await process_one_teams_message(db, message_id)
 
 
 async def send_test_chat_to_member(

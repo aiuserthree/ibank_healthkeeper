@@ -30,6 +30,7 @@ class ReservationType(str, enum.Enum):
     NORMAL = "NORMAL"
     REAPPLY = "REAPPLY"
     ADMIN_ASSIGN = "ADMIN_ASSIGN"
+    TRANSFER = "TRANSFER"
 
 
 class ReservationStatus(str, enum.Enum):
@@ -43,6 +44,7 @@ class ConfirmedBy(str, enum.Enum):
     ADMIN = "ADMIN"
     SYSTEM = "SYSTEM"
     REAPPLY = "REAPPLY"
+    TRANSFER = "TRANSFER"
 
 
 class MailType(str, enum.Enum):
@@ -55,6 +57,14 @@ class MailType(str, enum.Enum):
 class TeamsMessageType(str, enum.Enum):
     RESERVE_REMINDER = "RESERVE_REMINDER"
     RESERVE_OPEN_NOTICE = "RESERVE_OPEN_NOTICE"
+    TRANSFER_REQUEST_ADMIN = "TRANSFER_REQUEST_ADMIN"
+    TRANSFER_APPROVED = "TRANSFER_APPROVED"
+
+
+class TransferRequestStatus(str, enum.Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
 
 
 class MailStatus(str, enum.Enum):

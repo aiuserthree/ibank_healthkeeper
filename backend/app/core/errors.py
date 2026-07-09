@@ -52,6 +52,10 @@ ERROR_MESSAGES = {
     "INVALID_CURRENT_PASSWORD": "현재 비밀번호가 올바르지 않습니다.",
     "NOT_FOUND": "요청한 리소스를 찾을 수 없습니다.",
     "SSO_NOT_CONFIGURED": "Microsoft SSO 설정이 완료되지 않았습니다.",
+    "NOT_TRANSFER_PERIOD": "양도 가능 시간(목요일 17:00 이후 ~ 예약 시작 전)이 아닙니다.",
+    "NOT_TRANSFERABLE": "양도할 수 없는 예약입니다.",
+    "MEMBER_NOT_TRANSFERABLE": "양도받을 수 없는 회원입니다. (이번 주 확정·신청 대기 중이거나 Teams 로그인 필요)",
+    "TRANSFER_ALREADY_PENDING": "이미 양도 신청이 진행 중입니다.",
 }
 
 
@@ -82,6 +86,10 @@ def raise_app_error(code: str, http_status: Optional[int] = None) -> None:
         "NOT_VERIFIED": 403,
         "NOT_DROPPED_USER": 403,
         "FORBIDDEN": 403,
+        "NOT_TRANSFER_PERIOD": 409,
+        "NOT_TRANSFERABLE": 409,
+        "MEMBER_NOT_TRANSFERABLE": 409,
+        "TRANSFER_ALREADY_PENDING": 409,
         "AUTH_FAILED": 401,
         "UNAUTHORIZED": 401,
         "TOKEN_EXPIRED": 410,

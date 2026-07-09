@@ -42,6 +42,17 @@ window.HKApi = (function () {
     reapplySlot: (slotId) => request(`/reservation/reapply/slots/${slotId}`, { method: "POST" }),
     myReservations: (page = 1, pageSize = 10) =>
       request(`/me/reservations?page=${page}&pageSize=${pageSize}`),
+    transferRecipients: (reservationId, q = "") => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      const qs = params.toString();
+      return request(`/reservation/${reservationId}/transfer/recipients${qs ? `?${qs}` : ""}`);
+    },
+    requestTransfer: (reservationId, recipientId) =>
+      request(`/reservation/${reservationId}/transfer`, {
+        method: "POST",
+        body: JSON.stringify({ recipientId }),
+      }),
     myUsageHistory: (page = 1, pageSize = 10) =>
       request(`/me/usage-history?page=${page}&pageSize=${pageSize}`),
     myLegacyUsages: (page = 1, pageSize = 10) =>
@@ -120,6 +131,14 @@ window.HKApi = (function () {
       }),
     sendAdminAssignMail: (reservationId) =>
       request(`/admin/reservations/${reservationId}/admin-assign/send-mail`, { method: "POST" }),
+    pendingTransfers: (cycleId) => {
+      const q = cycleId ? `?cycleId=${cycleId}` : "";
+      return request(`/admin/transfers${q}`);
+    },
+    approveTransfer: (transferId) =>
+      request(`/admin/transfers/${transferId}/approve`, { method: "POST" }),
+    rejectTransfer: (transferId) =>
+      request(`/admin/transfers/${transferId}/reject`, { method: "POST" }),
     reapplyTargets: (cycleId) => request(`/admin/reapply-mail/targets?cycleId=${cycleId}`),
     sendReapplyMail: (cycleId, memberIds) =>
       request(`/admin/reapply-mail/send?cycleId=${cycleId}`, {

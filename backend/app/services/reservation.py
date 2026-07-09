@@ -12,6 +12,7 @@ from app.models import (
     CycleState,
     Member,
     Reservation,
+    ReservationCycle,
     ReservationStatus,
     ReservationType,
     Slot,
@@ -272,8 +273,9 @@ async def list_my_reservations(
     active_total = await get_member_apply_total(db, member)
 
     result = await db.execute(
-        select(Reservation, Slot)
+        select(Reservation, Slot, ReservationCycle)
         .join(Slot, Slot.id == Reservation.slot_id)
+        .join(ReservationCycle, ReservationCycle.id == Reservation.cycle_id)
         .where(Reservation.member_id == member.id)
         .where(visible)
         .order_by(
@@ -285,13 +287,30 @@ async def list_my_reservations(
         .offset(offset)
         .limit(page_size)
     )
+    rows = result.all()
+    confirmed_ids = [
+        r.id
+        for r, _, _ in rows
+        if r.status == ReservationStatus.CONFIRMED
+        and r.type in (ReservationType.NORMAL, ReservationType.REAPPLY)
+    ]
+    from app.services.transfer import can_transfer_slot, get_pending_transfer_map
+
+    pending_map = await get_pending_transfer_map(db, confirmed_ids)
     items = []
     state, _ = await resolve_system_state(db)
-    for reservation, slot in result.all():
+    for reservation, slot, cycle in rows:
         cancelable = (
             state == CycleState.OPEN
             and reservation.status == ReservationStatus.REQUESTED
             and reservation.type == ReservationType.NORMAL
+        )
+        pending = pending_map.get(reservation.id)
+        transferable = (
+            reservation.status == ReservationStatus.CONFIRMED
+            and reservation.type in (ReservationType.NORMAL, ReservationType.REAPPLY)
+            and can_transfer_slot(cycle, slot)
+            and not pending
         )
         items.append(
             {
@@ -303,6 +322,9 @@ async def list_my_reservations(
                 "type": reservation.type.value,
                 "status": reservation.status.value,
                 "cancelable": cancelable,
+                "transferable": transferable,
+                "transferPending": bool(pending),
+                "transferRecipientName": pending["recipientName"] if pending else None,
             }
         )
 

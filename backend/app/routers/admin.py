@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Body, Cookie, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Body, Cookie, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 from redis.asyncio import Redis
 from sqlalchemy import select
@@ -23,6 +23,11 @@ from app.services.admin_assign import (
     change_admin_assign,
     search_assignable_members,
     send_admin_assign_mail,
+)
+from app.services.transfer import (
+    approve_transfer,
+    list_pending_transfers,
+    reject_transfer,
 )
 from app.services.confirm import (
     cancel_confirmed_reservation,
@@ -244,6 +249,50 @@ async def send_assign_mail(
     mail_id = await send_admin_assign_mail(db, reservation_id)
     await process_one_mail(db, mail_id)
     return {"data": {"message": "완료 메일이 발송되었습니다."}}
+
+
+@router.get("/transfers")
+async def pending_transfers(
+    cycle_id: Optional[int] = Query(None, alias="cycleId"),
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    items = await list_pending_transfers(db, cycle_id)
+    return {"data": {"items": items}}
+
+
+@router.post("/transfers/{transfer_id}/approve")
+async def approve_transfer_request(
+    transfer_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    from app.services.teams import deliver_teams_messages
+
+    transfer, teams_message_ids = await approve_transfer(db, admin, transfer_id)
+    background_tasks.add_task(deliver_teams_messages, teams_message_ids)
+    return {
+        "data": {
+            "transferId": transfer.id,
+            "message": "양도가 승인되어 완료되었습니다.",
+        }
+    }
+
+
+@router.post("/transfers/{transfer_id}/reject")
+async def reject_transfer_request(
+    transfer_id: int,
+    db: AsyncSession = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
+    transfer = await reject_transfer(db, admin, transfer_id)
+    return {
+        "data": {
+            "transferId": transfer.id,
+            "message": "양도 신청이 반려되었습니다.",
+        }
+    }
 
 
 @router.get("/reapply-mail/targets")

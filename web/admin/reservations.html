@@ -86,18 +86,32 @@
           );
 
           const content = document.getElementById("content");
-          content.innerHTML = dualBoardNotice(boards) + `<div id="boards-root"></div>`;
-          const root = document.getElementById("boards-root");
 
-          for (let i = 0; i < boards.length; i++) {
-            const board = boards[i];
-            const vacationDates = await loadVacationDates(board.cycleId, board.slots);
-            const section = document.createElement("section");
-            section.style.marginBottom = i < boards.length - 1 ? "40px" : "0";
-            root.appendChild(section);
-            HKReservationBoard.mount(section, board, vacationDates, boards.length > 1);
+          async function renderPage(refetchBoards = false) {
+            if (refetchBoards) {
+              const resData = await HKApi.adminReservations();
+              boards.length = 0;
+              const next = Array.isArray(resData.boards) && resData.boards.length
+                ? resData.boards
+                : resData.slots || resData.weekDates
+                  ? [resData]
+                  : [];
+              boards.push(...next);
+            }
+            content.innerHTML = dualBoardNotice(boards) + `<div id="boards-root"></div>`;
+            const root = document.getElementById("boards-root");
+            for (let i = 0; i < boards.length; i++) {
+              const board = boards[i];
+              const vacationDates = await loadVacationDates(board.cycleId, board.slots);
+              const section = document.createElement("section");
+              section.style.marginBottom = i < boards.length - 1 ? "40px" : "0";
+              root.appendChild(section);
+              HKReservationBoard.mount(section, board, vacationDates, boards.length > 1);
+            }
+            HKUI.refreshIcons();
           }
-          HKUI.refreshIcons();
+
+          await renderPage();
         } catch (e) {
           const content = document.getElementById("content");
           if (content) {

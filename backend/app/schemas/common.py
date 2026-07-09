@@ -54,6 +54,10 @@ class AdminAssignChangeRequest(BaseModel):
     slotId: Optional[int] = None
 
 
+class TransferRequestBody(BaseModel):
+    recipientId: int
+
+
 class VacationRequest(BaseModel):
     cycleId: int
     dates: list[str]
