@@ -77,9 +77,20 @@ window.HKReservationBoard = (function () {
       return isEmptyForAssign(slot) && slot.adminCancelVacancy === true;
     }
 
+    function isSlotPastForAssign(slot) {
+      return HKUI.isSlotPastKst(slot?.slotDate, slot?.startTime);
+    }
+
+    function canAssignToSlot(slot) {
+      return boardMeta.canAdminAssign && isAdminAssignTarget(slot) && !isSlotPastForAssign(slot);
+    }
+
     function assignSlotHint(slot) {
-      if (boardMeta.canAdminAssign && isAdminAssignTarget(slot)) {
+      if (canAssignToSlot(slot)) {
         return assignBtnHtml(slot.slotId);
+      }
+      if (isAdminAssignTarget(slot) && isSlotPastForAssign(slot)) {
+        return `<span style="font-size:13px;color:var(--text-muted)">예약 시간이 지나 지정할 수 없습니다</span>`;
       }
       if (!boardMeta.canAdminAssign && isAdminAssignTarget(slot)) {
         const from = boardMeta.adminAssignFrom
@@ -118,8 +129,8 @@ window.HKReservationBoard = (function () {
           : "목요일 17:00";
         const until = boardMeta.adminAssignUntil
           ? HKUI.formatDateTimeKst(boardMeta.adminAssignUntil)
-          : "일요일 23:59";
-        return `<div style="margin-bottom:20px">${HKUI.alertBox("info", "확정 취소 슬롯 · 인원 지정 가능", `관리자가 <b>확정 취소</b>한 시간대에 회원을 지정할 수 있습니다. (<b>${from}</b> ~ <b>${until}</b> · 지정 시 즉시 확정 · <b>완료 메일은 [완료 메일 발송] 버튼으로 수동 발송</b>)`)}</div>`;
+          : "금요일 16:30";
+        return `<div style="margin-bottom:20px">${HKUI.alertBox("info", "확정 취소 슬롯 · 인원 지정 가능", `관리자가 <b>확정 취소</b>한 시간대에 회원을 지정할 수 있습니다. (<b>${from}</b> ~ <b>${until}</b> · 각 시간대 시작 시각 이후에는 지정 불가 · 지정 시 즉시 확정 · <b>완료 메일은 [완료 메일 발송] 버튼으로 수동 발송</b>)`)}</div>`;
       }
       return "";
     }
@@ -688,7 +699,7 @@ window.HKReservationBoard = (function () {
         ${adminAssign ? HKUI.badge("관리자 지정", "warning") : ""}
         ${pending.length > 1 ? HKUI.badge(`중복 ${pending.length}명`, "warning") : ""}
         ${reapply ? HKUI.badge("재신청 포함", "info") : ""}
-        ${cancelVacancy && !adminAssign ? HKUI.badge("확정 취소 · 지정 가능", "warning") : ""}
+        ${cancelVacancy && !adminAssign ? HKUI.badge(isSlotPastForAssign(slot) ? "확정 취소 · 지정 불가" : "확정 취소 · 지정 가능", isSlotPastForAssign(slot) ? "neutral" : "warning") : ""}
         ${confirmed && !adminAssign ? HKUI.badge("확정 완료", "success", true) : ""}
         <div style="flex:1"></div>
         ${showConfirmBtn(slot) ? confirmBtnHtml(slot.slotId) : ""}

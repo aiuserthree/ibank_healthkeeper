@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
-from app.core.time import format_kst_iso, now_kst
+from app.core.time import KST, format_kst_iso, now_kst
 from app.models import (
     ConfirmedBy,
     MailMessage,
@@ -79,6 +80,12 @@ async def slot_has_admin_released_vacancy(db: AsyncSession, slot_id: int) -> boo
     return result.scalar_one_or_none() is not None
 
 
+def _assert_slot_not_past_for_assign(slot: Slot) -> None:
+    slot_start = datetime.combine(slot.slot_date, slot.start_time, tzinfo=KST)
+    if now_kst() >= slot_start:
+        raise_app_error("NOT_ADMIN_ASSIGN_SLOT_PAST")
+
+
 async def _assert_slot_assignable(db: AsyncSession, slot: Slot) -> None:
     if slot.is_vacation:
         raise_app_error("VACATION_SLOT")
@@ -90,6 +97,7 @@ async def _assert_slot_assignable(db: AsyncSession, slot: Slot) -> None:
         raise_app_error("SLOT_NOT_ASSIGNABLE")
     if not await slot_has_admin_released_vacancy(db, slot.id):
         raise_app_error("SLOT_NOT_ADMIN_CANCEL_VACANCY")
+    _assert_slot_not_past_for_assign(slot)
 
 
 async def _get_assignable_slot(
