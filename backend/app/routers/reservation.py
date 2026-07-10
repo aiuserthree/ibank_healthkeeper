@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, Query, Request
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Query, Request
+from fastapi.responses import FileResponse, RedirectResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +15,7 @@ from app.core.time import format_deadline_relative_ko, format_kst_iso
 from app.database import get_db
 from app.models import Member
 from app.schemas.common import TransferRequestBody
+from app.services.avatar import avatar_path, has_avatar
 from app.services.cycle import resolve_system_state
 from app.services import reservation as reservation_service
 
@@ -187,6 +188,21 @@ async def my_reservations(
         db, member, page=page, page_size=pageSize
     )
     return {"data": data}
+
+
+@router.get("/members/{member_id}/avatar")
+async def member_avatar(
+    member_id: int,
+    _: Member = Depends(get_current_active_member),
+):
+    """로그인 회원이 다른 회원 아바타를 조회 (양도 후보 목록 등)."""
+    if not has_avatar(member_id):
+        raise HTTPException(status_code=404, detail="Not found")
+    return FileResponse(
+        avatar_path(member_id),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=3600"},
+    )
 
 
 @router.get("/reservation/{reservation_id}/transfer/recipients")

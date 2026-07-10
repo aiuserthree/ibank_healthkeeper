@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import collate, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.core.errors import raise_app_error
 from app.core.time import KST, format_kst_iso, now_kst, to_kst
 from app.models import (
@@ -23,8 +24,11 @@ from app.models import (
     TransferRequestStatus,
 )
 from app.services.admin_assign import recompute_member_last_used_date
-from app.services.avatar import avatar_public_url
+from app.services.avatar import member_avatar_url
 from app.services.reservation import ACTIVE_APPLY_STATUSES, _member_cycle_active_apply
+
+# DB 기본 collation(en_US)은 한글 가나다 순이 깨지므로 ICU 한국어 정렬 사용
+_NAME_COLLATION = "ko-KR-x-icu"
 
 TRANSFERABLE_TYPES = (ReservationType.NORMAL, ReservationType.REAPPLY)
 
@@ -32,6 +36,76 @@ TRANSFER_ADMIN_NOTIFY_EMAILS = (
     "yshong@3ibank.com",
     "jhcho@3ibank.com",
 )
+
+# Teams/SMTP 발송용 시스템 계정 — 양도 수신자로 노출·선택되지 않도록 제외
+_TRANSFER_EXCLUDED_EMAIL_LOCAL = "healthkeeper"
+# 로컬 시드/데모 계정 도메인 (scripts/dev-seed-reservations.py 등)
+_TRANSFER_EXCLUDED_EMAIL_DOMAINS = frozenset({"healthkeeper.local"})
+
+
+def _transfer_excluded_emails() -> set[str]:
+    settings = get_settings()
+    emails = {
+        (settings.teams_sender_email or "").strip().lower(),
+        (settings.smtp_user or "").strip().lower(),
+        (settings.smtp_from or "").strip().lower(),
+    }
+    return {e for e in emails if e and "@" in e}
+
+
+def _email_domain(email: str | None) -> str:
+    value = (email or "").strip().lower()
+    if "@" not in value:
+        return ""
+    return value.rsplit("@", 1)[-1]
+
+
+def _is_mock_entra_oid(entra_oid: str | None) -> bool:
+    """MockSSOProvider(mock-001 …) — 실제 Entra OID가 아님."""
+    return bool(entra_oid) and entra_oid.lower().startswith("mock-")
+
+
+def _is_allowed_org_email(email: str | None) -> bool:
+    """SSO_ALLOWED_DOMAIN에 맞는 실제 조직 이메일만 허용.
+
+    도메인이 비어 있으면(미설정) 도메인 제한은 건너뛰고,
+    mock OID / healthkeeper.local 제외는 별도 검사한다.
+    """
+    value = (email or "").strip().lower()
+    if not value or "@" not in value:
+        return False
+    domain = _email_domain(value)
+    if domain in _TRANSFER_EXCLUDED_EMAIL_DOMAINS:
+        return False
+    allowed = get_settings().allowed_email_domains()
+    if not allowed:
+        return True
+    return domain in allowed
+
+
+def _is_transfer_excluded_email(email: str | None) -> bool:
+    value = (email or "").strip().lower()
+    if not value or "@" not in value:
+        return False
+    local, _, domain = value.partition("@")
+    if local == _TRANSFER_EXCLUDED_EMAIL_LOCAL:
+        return True
+    if domain in _TRANSFER_EXCLUDED_EMAIL_DOMAINS:
+        return True
+    return value in _transfer_excluded_emails()
+
+
+def _is_transfer_org_member(member: Member) -> bool:
+    """양도 후보로 쓸 수 있는 실제 iBank(허용 도메인) SSO 회원인지."""
+    if member.status != MemberStatus.ACTIVE:
+        return False
+    if not member.entra_oid or _is_mock_entra_oid(member.entra_oid):
+        return False
+    if _is_transfer_excluded_email(member.email):
+        return False
+    if not _is_allowed_org_email(member.email):
+        return False
+    return True
 
 
 def transfer_window_start(cycle: ReservationCycle) -> datetime:
@@ -102,11 +176,7 @@ async def _get_recipient_member(
     donor_id: int,
 ) -> Member:
     member = await db.get(Member, recipient_id)
-    if (
-        not member
-        or member.status != MemberStatus.ACTIVE
-        or not member.entra_oid
-    ):
+    if not member or not _is_transfer_org_member(member):
         raise_app_error("MEMBER_NOT_TRANSFERABLE")
     if member.id == donor_id:
         raise_app_error("MEMBER_NOT_TRANSFERABLE")
@@ -133,15 +203,36 @@ async def search_transfer_recipients(
         Reservation.status.in_(ACTIVE_APPLY_STATUSES),
     )
 
+    excluded_emails = _transfer_excluded_emails()
+    allowed_domains = get_settings().allowed_email_domains()
     stmt = (
         select(Member)
         .where(Member.status == MemberStatus.ACTIVE)
+        # 실제 Teams SSO(Entra) 로그인 회원만 — mock-* OID·시드 계정 제외
         .where(Member.entra_oid.isnot(None))
+        .where(~func.lower(Member.entra_oid).like("mock-%"))
         .where(Member.id != member.id)
         .where(Member.id.not_in(confirmed_member_ids))
-        .order_by(Member.name)
+        # Teams/SMTP 발송 계정(healthkeeper@…)·로컬 시드 도메인 제외
+        .where(
+            func.lower(func.split_part(Member.email, "@", 1))
+            != _TRANSFER_EXCLUDED_EMAIL_LOCAL
+        )
+        .where(
+            ~func.lower(func.split_part(Member.email, "@", 2)).in_(
+                list(_TRANSFER_EXCLUDED_EMAIL_DOMAINS)
+            )
+        )
+        .order_by(collate(Member.name, _NAME_COLLATION), Member.id)
         .limit(min(max(limit, 1), 200))
     )
+    if excluded_emails:
+        stmt = stmt.where(func.lower(Member.email).not_in(excluded_emails))
+    # SSO_ALLOWED_DOMAIN(ibank.co.kr, 3ibank.com, …) — 조직 외 이메일 제외
+    if allowed_domains:
+        stmt = stmt.where(
+            func.lower(func.split_part(Member.email, "@", 2)).in_(allowed_domains)
+        )
     query = q.strip()
     if query:
         from sqlalchemy import or_
@@ -163,8 +254,7 @@ async def search_transfer_recipients(
             "email": m.email,
             "department": m.department,
             "position": m.position,
-            "lastUsedDate": m.last_used_date.isoformat() if m.last_used_date else None,
-            "avatarUrl": avatar_public_url(m.id),
+            "avatarUrl": member_avatar_url(m.id),
         }
         for m in result.scalars().all()
     ]

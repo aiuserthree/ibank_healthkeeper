@@ -34,10 +34,19 @@ def has_avatar(member_id: int) -> bool:
 
 
 def avatar_public_url(member_id: int) -> str | None:
+    """로그인한 본인 프로필용 — /api/me/avatar 는 세션 회원 사진만 반환한다."""
     path = _avatar_path(member_id)
     if not path.is_file():
         return None
     return f"/api/me/avatar?v={int(path.stat().st_mtime)}"
+
+
+def member_avatar_url(member_id: int) -> str | None:
+    """다른 회원 아바타(양도 후보 등) — member_id 별 공개 URL."""
+    path = _avatar_path(member_id)
+    if not path.is_file():
+        return None
+    return f"/api/members/{member_id}/avatar?v={int(path.stat().st_mtime)}"
 
 
 def admin_member_avatar_url(member_id: int) -> str | None:
