@@ -283,8 +283,8 @@ window.HKUI = (function () {
 
   function layerModal(title, onMount, opts = {}) {
     const fixedHeight = opts.fixedHeight
-      ? "height:min(680px, 85vh);"
-      : "max-height:85vh;";
+      ? "height:min(680px, 85dvh, 85vh);"
+      : "max-height:min(85dvh, 85vh);";
     const overlay = document.createElement("div");
     overlay.className = "hk-dialog__overlay";
     overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:560px;width:calc(100% - 32px);${fixedHeight}display:flex;flex-direction:column;padding:24px">

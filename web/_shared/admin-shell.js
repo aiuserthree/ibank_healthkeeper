@@ -38,7 +38,7 @@ window.HKAdmin = (function () {
   }
 
   function sidebar(active, badges = {}) {
-    return `<aside class="hk-asidebar" style="width:240px;background:var(--surface-card);border-right:1px solid var(--border-default);display:flex;flex-direction:column;position:sticky;top:0;height:100vh">
+    return `<aside class="hk-asidebar" style="width:240px;background:var(--surface-card);border-right:1px solid var(--border-default);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;height:100dvh">
       <div class="hk-abrand" style="display:flex;align-items:center;border-bottom:1px solid var(--border-default)">
         <a href="${R.dashboard}" style="padding:22px 20px;display:flex;align-items:center;gap:10px;text-decoration:none;flex:1;min-width:0">
           <img src="/assets/logo-mark.svg" width="34" height="34" alt="">
@@ -126,7 +126,7 @@ window.HKAdmin = (function () {
     }
     const transferPendingCount = auth ? await fetchTransferPendingCount() : 0;
     const root = document.getElementById("app");
-    root.innerHTML = `<div class="hk-ashell" style="display:flex;min-height:100vh">${sidebar(active, { transfers: transferPendingCount })}<main class="hk-amain" style="flex:1;padding:32px 40px;max-width:1120px;box-sizing:border-box">${render()}</main></div>`;
+    root.innerHTML = `<div class="hk-ashell" style="display:flex;min-height:100vh;min-height:100dvh">${sidebar(active, { transfers: transferPendingCount })}<main class="hk-amain" style="flex:1;padding:32px 40px;max-width:1120px;box-sizing:border-box;min-width:0">${render()}</main></div>`;
     const logout = async () => {
       try { await HKApi.adminLogout(); } catch (_) {}
       window.location.href = R.login;

@@ -3,7 +3,12 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 img, svg, iframe { max-width: 100%; }
-html, body { overflow-x: hidden; }
+
+/* overflow-x만 숨기면 일부 엔진에서 overflow-y가 auto로 강제되며
+   height:100%와 겹치면 iOS에서 화면이 잘린 것처럼 보일 수 있다.
+   body는 문서 스크롤을 유지하고, 가로 넘침만 clip 한다. */
+html { overflow-x: hidden; overflow-x: clip; }
+body { overflow-x: hidden; overflow-x: clip; min-width: 0; }
 
 /* 햄버거 버튼 — 기본(데스크톱) 숨김 */
 .hk-hamburger { display: none; }
@@ -13,9 +18,24 @@ html, body { overflow-x: hidden; }
 .hk-drawer-backdrop { position: absolute; inset: 0; background: rgba(11, 53, 88, 0.42); opacity: 0; transition: opacity .25s ease; }
 .hk-drawer {
   position: absolute; top: 0; right: 0; height: 100%; width: 290px; max-width: 86vw;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--surface-card); box-shadow: var(--shadow-lg);
   display: flex; flex-direction: column;
   transform: translateX(100%); transition: transform .28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 모달: 짧은 뷰포트(모바일 브라우저 크롬)에서 잘리지 않게 */
+.hk-dialog__overlay {
+  align-items: flex-start;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: max(16px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+}
+.hk-dialog__overlay .hk-dialog {
+  margin: auto;
+  width: min(100%, 560px);
+  max-height: min(90dvh, 90vh);
 }
 
 /* ───────── ≤ 860px : 드로어 활성 + 관리자 사이드바 → 상단바 ───────── */
@@ -30,7 +50,7 @@ html, body { overflow-x: hidden; }
                 border-right: none !important; border-bottom: 1px solid var(--border-default) !important; }
   .hk-anav    { display: none !important; }
   .hk-auser   { display: none !important; }
-  .hk-amain   { padding: 22px 16px !important; max-width: 100% !important; }
+  .hk-amain   { padding: 22px 16px !important; max-width: 100% !important; min-width: 0 !important; }
   .hk-asidebar .hk-hamburger,
   .hk-abrand .hk-hamburger { display: inline-flex !important; }
 
@@ -39,6 +59,23 @@ html, body { overflow-x: hidden; }
   [style*="1fr 1fr"],
   [style*="1.5fr 1fr"],
   [style*="1.1fr 1fr"] { grid-template-columns: 1fr !important; }
+
+  /* 고정폭 카드/폼 — 인라인이 `width:420px`(공백 없음)인 경우가 대부분 */
+  [style*="width:360px"],
+  [style*="width: 360px"],
+  [style*="width:420px"],
+  [style*="width: 420px"],
+  [style*="width:440px"],
+  [style*="width: 440px"],
+  [style*="width:460px"],
+  [style*="width: 460px"] { width: 100% !important; max-width: 100% !important; }
+
+  footer [style*="padding:28px 32px"],
+  footer [style*="padding: 28px 32px"] {
+    padding-left: 18px !important;
+    padding-right: 18px !important;
+    flex-wrap: wrap !important;
+  }
 }
 
 /* ───────── ≤ 640px : 회원 헤더 → 로고 + 햄버거, 그리드 collapse ───────── */
@@ -49,11 +86,6 @@ html, body { overflow-x: hidden; }
   [style*="repeat(4"] { grid-template-columns: 1fr 1fr !important; }
   .hk-cycle-steps { grid-template-columns: 1fr !important; }
 
-  [style*="width: 360px"],
-  [style*="width: 420px"],
-  [style*="width: 440px"],
-  [style*="width: 460px"] { width: 100% !important; max-width: 100% !important; }
-
   .hk-mheader { padding: 0 16px !important; gap: 12px !important; }
   .hk-mnav    { display: none !important; }
   .hk-mactions{ display: none !important; }
@@ -63,5 +95,10 @@ html, body { overflow-x: hidden; }
   h1 { font-size: 28px !important; line-height: 1.22 !important; }
   h2 { font-size: 22px !important; }
 
+  /* sticky 사이드 요약 등 — 공백 유무 모두 매칭 */
+  [style*="position:sticky"],
   [style*="position: sticky"] { position: static !important; }
+
+  /* 히어로 장식 blob이 뷰포트 밖으로 밀려 가로 잘림처럼 보이는 것 방지 */
+  [style*="filter:blur"] { max-width: 100% !important; }
 }
