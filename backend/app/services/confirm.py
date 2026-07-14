@@ -115,8 +115,16 @@ async def confirm_reservation(
     return reservation
 
 
+# 관리자 확정취소 허용 타입 (ADMIN_ASSIGN는 별도 cancel_admin_assign 경로)
+_ADMIN_CANCEL_CONFIRMED_TYPES = (
+    ReservationType.NORMAL,
+    ReservationType.REAPPLY,
+    ReservationType.TRANSFER,
+)
+
+
 async def cancel_confirmed_reservation(db: AsyncSession, reservation_id: int) -> None:
-    """관리자 — 일반 신청 마감(close_at) 이후 확정(NORMAL) 예약 취소."""
+    """관리자 — 일반 신청 마감(close_at) 이후 확정 예약 취소 (NORMAL/REAPPLY/TRANSFER)."""
     reservation = await db.get(Reservation, reservation_id)
     if not reservation:
         raise_app_error("NOT_FOUND", 404)
@@ -124,8 +132,8 @@ async def cancel_confirmed_reservation(db: AsyncSession, reservation_id: int) ->
         raise_app_error("NOT_CANCELABLE")
     if reservation.type == ReservationType.ADMIN_ASSIGN:
         raise_app_error("NOT_ADMIN_ASSIGN")
-    if reservation.type == ReservationType.REAPPLY:
-        raise_app_error("NOT_ADMIN_CANCEL_REAPPLY")
+    if reservation.type not in _ADMIN_CANCEL_CONFIRMED_TYPES:
+        raise_app_error("NOT_CANCELABLE")
 
     cycle = await db.get(ReservationCycle, reservation.cycle_id)
     if not cycle or not can_admin_confirm(cycle):

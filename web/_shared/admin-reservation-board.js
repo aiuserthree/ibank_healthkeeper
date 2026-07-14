@@ -58,8 +58,14 @@ window.HKReservationBoard = (function () {
 
     function typeBadge(type) {
       if (type === "REAPPLY") return HKUI.badge("재신청", "info");
+      if (type === "TRANSFER") return HKUI.badge("양도", "info");
       if (type === "ADMIN_ASSIGN") return HKUI.badge("관리자 지정", "warning");
       return HKUI.badge("일반", "soft");
+    }
+
+    /** 관리자 확정취소 가능 타입 (ADMIN_ASSIGN는 별도 지정 취소) */
+    function isAdminCancelConfirmedType(type) {
+      return type === "NORMAL" || type === "REAPPLY" || type === "TRANSFER";
     }
 
     function isSlotOff(slot) {
@@ -216,7 +222,7 @@ window.HKReservationBoard = (function () {
     }
 
     function adminCancelConfirmedBtn(a, slot) {
-      if (a.status !== "CONFIRMED" || a.type !== "NORMAL" || !canAdminCancelConfirmed()) return "";
+      if (a.status !== "CONFIRMED" || !isAdminCancelConfirmedType(a.type) || !canAdminCancelConfirmed()) return "";
       if (isSlotPastForCancel(slot)) {
         return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="예약 시간이 지나 취소할 수 없습니다">확정 취소</button>`;
       }
@@ -225,7 +231,7 @@ window.HKReservationBoard = (function () {
 
     function decidedStatusHtml(a, canConfirm, slot) {
       if (a.status === "CONFIRMED") {
-        const cancelBtn = a.type === "NORMAL" && canConfirm ? adminCancelConfirmedBtn(a, slot) : "";
+        const cancelBtn = isAdminCancelConfirmedType(a.type) && canConfirm ? adminCancelConfirmedBtn(a, slot) : "";
         return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${HKUI.statusBadge("CONFIRMED")}${cancelBtn}</div>`;
       }
       return HKUI.statusBadge(a.status);

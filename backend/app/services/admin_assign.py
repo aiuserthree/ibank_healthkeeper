@@ -72,7 +72,12 @@ async def slot_has_admin_released_vacancy(db: AsyncSession, slot_id: int) -> boo
         .where(Reservation.confirmed_at.isnot(None))
         .where(
             Reservation.type.in_(
-                (ReservationType.NORMAL, ReservationType.ADMIN_ASSIGN)
+                (
+                    ReservationType.NORMAL,
+                    ReservationType.REAPPLY,
+                    ReservationType.TRANSFER,
+                    ReservationType.ADMIN_ASSIGN,
+                )
             )
         )
         .limit(1)
