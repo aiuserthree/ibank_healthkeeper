@@ -757,10 +757,14 @@ async def send_reapply_notice(
     db: AsyncSession, cycle_id: int, member_ids: Optional[list[int]] = None
 ) -> int:
     from app.models import Member
+    from app.services.designated_slot import drop_undesignated_confirm_slot_requests
 
     cycle = await db.get(ReservationCycle, cycle_id)
     if not cycle:
         raise_app_error("NOT_FOUND", 404)
+
+    # 월요일 15:30 미지정 신청 → 탈락 (이미 지정·확정된 경우 no-op)
+    await drop_undesignated_confirm_slot_requests(db, cycle_id)
 
     empty = await get_empty_slots(db, cycle_id)
     empty_text = ", ".join(_slot_chip_label(s.slot_date, s.start_time) for s in empty)

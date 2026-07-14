@@ -2,7 +2,8 @@
 
 회원 화면에는 노출하지 않고, 신청은 누구나 받되 확정은 관리자가
 Teams SSO 로그인 회원 중에서 지정한 인원만 처리한다.
-미신청자도 지정 가능하며, 지정 시 같은 슬롯의 다른 신청자는 탈락 처리한다.
+미신청·탈락자도 지정 가능하며, 지정 시 같은 슬롯의 다른 신청자는 탈락 처리한다.
+재신청 기간에는 회원 재신청이 불가하며, 목 09:00에 미지정 신청은 자동 탈락된다.
 """
 
 from __future__ import annotations
@@ -47,6 +48,39 @@ def is_designated_confirm_slot(slot: Slot) -> bool:
         slot.slot_date.weekday() == DESIGNATED_CONFIRM_DOW
         and slot.start_time == DESIGNATED_CONFIRM_START
     )
+
+
+async def drop_undesignated_confirm_slot_requests(
+    db: AsyncSession, cycle_id: int
+) -> int:
+    """미지정 월요일 15:30 신청(REQUESTED)을 탈락 처리.
+
+    관리자가 이미 지정·확정한 슬롯은 건너뛴다.
+    목 09:00 재신청 오픈 전 호출해 탈락 안내 메일 대상에 포함시킨다.
+    """
+    slots = await db.execute(select(Slot).where(Slot.cycle_id == cycle_id))
+    now = now_kst()
+    dropped = 0
+    for slot in slots.scalars().all():
+        if not is_designated_confirm_slot(slot):
+            continue
+        if slot.status == SlotStatus.CONFIRMED or slot.is_vacation:
+            continue
+        if is_public_holiday(slot.slot_date):
+            continue
+        result = await db.execute(
+            select(Reservation)
+            .where(Reservation.slot_id == slot.id)
+            .where(Reservation.status == ReservationStatus.REQUESTED)
+        )
+        for res in result.scalars().all():
+            res.status = ReservationStatus.DROPPED
+            res.dropped_at = now
+            res.is_priority = False
+            dropped += 1
+    if dropped:
+        await db.flush()
+    return dropped
 
 
 def _is_mock_entra_oid(entra_oid: str | None) -> bool:
@@ -97,6 +131,13 @@ async def search_designatable_members(
             else:
                 requested_elsewhere_ids.add(member_id)
 
+    dropped_on_slot = await db.execute(
+        select(Reservation.member_id)
+        .where(Reservation.slot_id == slot.id)
+        .where(Reservation.status == ReservationStatus.DROPPED)
+    )
+    dropped_ids = {row[0] for row in dropped_on_slot.all()}
+
     excluded = _excluded_system_emails()
     allowed_domains = get_settings().allowed_email_domains()
 
@@ -145,6 +186,7 @@ async def search_designatable_members(
             "lastUsedDate": m.last_used_date.isoformat() if m.last_used_date else None,
             "avatarUrl": admin_member_avatar_url(m.id),
             "appliedToSlot": m.id in applied_ids,
+            "droppedOnSlot": m.id in dropped_ids,
             "confirmedThisWeek": m.id in confirmed_ids,
             "requestedElsewhere": m.id in requested_elsewhere_ids,
             "selectable": m.id not in confirmed_ids and m.id not in requested_elsewhere_ids,
@@ -158,7 +200,12 @@ async def designate_confirm_slot(
     slot_id: int,
     member_id: int,
 ) -> Reservation:
-    """지정 인원 확정. 신청자면 NORMAL 확정, 미신청자면 ADMIN_ASSIGN 확정."""
+    """지정 인원 확정.
+
+    - 같은 슬롯 REQUESTED/DROPPED 예약이 있으면 해당 예약을 확정
+    - 없으면 ADMIN_ASSIGN 로 신규 확정
+    - 같은 슬롯의 다른 REQUESTED 신청자는 탈락
+    """
     slot_result = await db.execute(
         select(Slot).where(Slot.id == slot_id).with_for_update()
     )
@@ -185,22 +232,28 @@ async def designate_confirm_slot(
     if not member.entra_oid or _is_mock_entra_oid(member.entra_oid):
         raise_app_error("MEMBER_NOT_SSO")
 
+    # 같은 슬롯에 REQUESTED 또는 DROPPED 가 있으면 그 행을 확정
+    # (DROPPED 는 unique(slot, member) 때문에 신규 INSERT 불가)
     existing = await db.execute(
         select(Reservation)
         .where(Reservation.slot_id == slot.id)
         .where(Reservation.member_id == member.id)
-        .where(Reservation.status == ReservationStatus.REQUESTED)
+        .where(
+            Reservation.status.in_(
+                [ReservationStatus.REQUESTED, ReservationStatus.DROPPED]
+            )
+        )
         .limit(1)
     )
-    requested = existing.scalar_one_or_none()
+    existing_res = existing.scalar_one_or_none()
 
-    if requested:
+    if existing_res:
         from app.services.confirm import confirm_reservation
 
         return await confirm_reservation(
             db,
             slot.id,
-            requested.id,
+            existing_res.id,
             ConfirmedBy.ADMIN,
             force_designated=True,
         )

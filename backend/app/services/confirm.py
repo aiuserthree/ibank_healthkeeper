@@ -52,7 +52,11 @@ async def confirm_reservation(
     reservation = await db.get(Reservation, reservation_id)
     if not reservation or reservation.slot_id != slot_id:
         raise_app_error("NOT_FOUND", 404)
-    if reservation.status != ReservationStatus.REQUESTED:
+    # 지정 확정: 같은 슬롯 탈락자(DROPPED)도 확정 가능
+    # (unique(slot, member) 때문에 신규 ADMIN_ASSIGN INSERT 불가)
+    if reservation.status == ReservationStatus.DROPPED and force_designated:
+        pass
+    elif reservation.status != ReservationStatus.REQUESTED:
         raise_app_error("SLOT_ALREADY_CONFIRMED")
 
     cycle = await db.get(ReservationCycle, reservation.cycle_id)
@@ -66,6 +70,7 @@ async def confirm_reservation(
     reservation.status = ReservationStatus.CONFIRMED
     reservation.confirmed_at = now_kst()
     reservation.confirmed_by = confirmed_by
+    reservation.dropped_at = None
     reservation.is_priority = True
 
     slot.status = SlotStatus.CONFIRMED

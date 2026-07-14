@@ -127,7 +127,10 @@ async def job_close_batch(db: AsyncSession) -> None:
 
 
 async def job_reapply_open(db: AsyncSession) -> None:
-    """목 09:00 — 재신청 기간 오픈 + 탈락자 안내 메일 자동 발송."""
+    """목 09:00 — 재신청 기간 오픈 + 탈락자 안내 메일 자동 발송.
+
+    send_reapply_notice 가 월요일 15:30 미지정 REQUESTED 를 먼저 탈락 처리한다.
+    """
     from app.services.cycle import get_active_cycle
 
     cycle = await get_active_cycle(db)

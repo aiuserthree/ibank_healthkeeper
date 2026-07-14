@@ -351,6 +351,8 @@ window.HKReservationBoard = (function () {
           statusBadge = ` ${HKUI.badge("다른 슬롯 신청", "neutral", true)}`;
         } else if (opts.showApplied && m.appliedToSlot) {
           statusBadge = ` ${HKUI.badge("신청함", "info", true)}`;
+        } else if (opts.showApplied && m.droppedOnSlot) {
+          statusBadge = ` ${HKUI.badge("탈락", "danger", true)}`;
         }
         const locked = opts.showWeekStatus && m.selectable === false;
         const disabled = opts.disabled || locked;
@@ -374,9 +376,14 @@ window.HKReservationBoard = (function () {
       if (!slot) return;
 
       const applicants = (slot.applicants || [])
-        .filter((a) => a.status === "REQUESTED")
+        .filter((a) => a.status === "REQUESTED" || a.status === "DROPPED")
         .slice()
-        .sort((a, b) => (a.priority_rank || 99) - (b.priority_rank || 99));
+        .sort((a, b) => {
+          const rank = (s) => (s === "REQUESTED" ? 0 : 1);
+          const byStatus = rank(a.status) - rank(b.status);
+          if (byStatus !== 0) return byStatus;
+          return (a.priority_rank || 99) - (b.priority_rank || 99);
+        });
       const canPick = canConfirm && !isSlotPastForAssign(slot);
 
       const overlay = document.createElement("div");
@@ -392,11 +399,11 @@ window.HKReservationBoard = (function () {
         </div>
         <div style="padding:20px 24px;overflow-y:auto;flex:1">
           ${canPick
-            ? `<div style="margin-bottom:16px">${HKUI.alertBox("warning", "관리자 지정 전용", "Teams SSO 로그인 직원 중 1명을 지정하면 즉시 확정됩니다. <b>미신청자도 지정 가능</b>하며, 같은 슬롯의 다른 신청자는 <b>탈락</b> 처리되고 완료 메일이 발송됩니다.")}</div>`
+            ? `<div style="margin-bottom:16px">${HKUI.alertBox("warning", "관리자 지정 전용", "Teams SSO 로그인 직원 중 1명을 지정하면 즉시 확정됩니다. <b>미신청·탈락자도 지정 가능</b>하며, 같은 슬롯의 다른 신청자는 <b>탈락</b> 처리되고 완료 메일이 발송됩니다. 재신청 기간에는 이 슬롯을 회원 재신청할 수 없습니다.")}</div>`
             : `<div style="margin-bottom:16px">${HKUI.alertBox("info", "확정은 마감 후 가능", "지금은 신청 현황만 확인할 수 있습니다. <b>수요일 17:00 마감 후</b> Teams SSO 직원 중 지정해 확정하세요.")}</div>`}
           ${applicants.length
             ? `<div style="margin-bottom:20px">
-                <div style="font-size:13px;font-weight:700;color:var(--color-midnight-navy);margin-bottom:8px">현재 신청자 (${applicants.length}명)</div>
+                <div style="font-size:13px;font-weight:700;color:var(--color-midnight-navy);margin-bottom:8px">신청·탈락 현황 (${applicants.length}명)</div>
                 <div style="display:flex;flex-direction:column;gap:8px">${applicants.map((a) => {
                   const dept = a.department || a.dept || "";
                   return `<div class="hk-card hk-card--pad" style="border:1px solid var(--border-default)">
@@ -406,12 +413,12 @@ window.HKReservationBoard = (function () {
                         <div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}</div>
                         <div style="font-size:12px;color:var(--text-muted)">${HKUI.escapeHtml(dept ? `${dept} · ${a.member_email || ""}` : a.member_email || "")}</div>
                       </div>
-                      ${HKUI.statusBadge("REQUESTED")}
+                      ${HKUI.statusBadge(a.status)}
                     </div>
                   </div>`;
                 }).join("")}</div>
               </div>`
-            : `<div style="margin-bottom:16px"><div style="font-size:13px;color:var(--text-muted)">아직 신청자가 없습니다. 미신청자도 지정할 수 있습니다.</div></div>`}
+            : `<div style="margin-bottom:16px"><div style="font-size:13px;color:var(--text-muted)">아직 신청·탈락자가 없습니다. 미신청자도 지정할 수 있습니다.</div></div>`}
           ${canPick
             ? `<div style="border-top:1px solid var(--border-default);padding-top:20px">
                 <label style="display:block;font-size:13px;font-weight:600;color:var(--color-midnight-navy);margin-bottom:8px">Teams SSO 직원 검색 · 지정</label>
@@ -457,9 +464,13 @@ window.HKReservationBoard = (function () {
               }
               const name = member.name || "선택한 회원";
               const applied = member.appliedToSlot;
+              const dropped = member.droppedOnSlot;
+              let note = " (미신청 · 관리자 지정)";
+              if (applied) note = "";
+              else if (dropped) note = " (탈락자 · 지정 확정)";
               const ok = await HKUI.confirmDialog(
                 "이 직원을 지정 확정할까요?",
-                `<b>${HKUI.escapeHtml(name)}</b>님을 ${HKUI.formatDateLong(slot.slotDate)} 15:30에 확정합니다.${applied ? "" : " (미신청 · 관리자 지정)"} 다른 신청자는 <b>탈락</b> 처리되고 완료 메일이 발송됩니다.`
+                `<b>${HKUI.escapeHtml(name)}</b>님을 ${HKUI.formatDateLong(slot.slotDate)} 15:30에 확정합니다.${note} 다른 신청자는 <b>탈락</b> 처리되고 완료 메일이 발송됩니다.`
               );
               if (!ok) return;
               btn.disabled = true;

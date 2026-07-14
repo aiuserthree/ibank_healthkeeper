@@ -166,6 +166,9 @@ async def is_dropped_member(db: AsyncSession, member_id: int, cycle_id: int) -> 
 
 
 async def get_empty_slots(db: AsyncSession, cycle_id: int) -> list[Slot]:
+    """재신청 가능 빈 슬롯. 월요일 15:30 지정 확정 전용은 제외."""
+    from app.services.designated_slot import is_designated_confirm_slot
+
     result = await db.execute(
         select(Slot)
         .where(Slot.cycle_id == cycle_id)
@@ -176,11 +179,13 @@ async def get_empty_slots(db: AsyncSession, cycle_id: int) -> list[Slot]:
     return [
         s
         for s in list(result.scalars().all())
-        if not is_public_holiday(s.slot_date)
+        if not is_public_holiday(s.slot_date) and not is_designated_confirm_slot(s)
     ]
 
 
 async def reapply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reservation:
+    from app.services.designated_slot import is_designated_confirm_slot
+
     state, cycle = await resolve_system_state(db)
     if state != CycleState.REAPPLY or not cycle:
         raise_app_error("NOT_REAPPLY_PERIOD")
@@ -193,6 +198,8 @@ async def reapply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reserv
     slot = slot_result.scalar_one_or_none()
     if not slot or slot.cycle_id != cycle.id:
         raise_app_error("NOT_FOUND", 404)
+    if is_designated_confirm_slot(slot):
+        raise_app_error("DESIGNATED_SLOT_CONFIRM_ONLY")
     if slot.is_vacation:
         raise_app_error("VACATION_SLOT")
     if is_public_holiday(slot.slot_date):
