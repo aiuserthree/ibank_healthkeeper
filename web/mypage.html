@@ -28,7 +28,7 @@
           <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">${HKUI.escapeHtml(profile.name)}님의 예약 신청 내역입니다.</p>
           ${HKUI.subNav("res")}
           <div class="hk-card hk-card--pad hk-card--flat" style="margin-bottom:20px;background:var(--color-mist)" id="stats"></div>
-          <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b> 확정 후 못 가시면 <b>목 17:00 이후</b> 양도 신청이 가능합니다.")}</div>
+          <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b> 확정 후 못 가시면 <b>목 17:00 이후</b> 다른 회원에게 바로 양도할 수 있습니다.")}</div>
           <div id="list"></div>
           <div id="pager"></div>`;
       },
@@ -114,20 +114,20 @@
           overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:560px;max-height:min(90dvh,90vh);width:calc(100% - 32px);overflow:hidden;display:flex;flex-direction:column;padding:0">
             <div style="padding:20px 24px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
               <div>
-                <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy)">예약 양도 신청</div>
+                <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy)">예약 양도</div>
                 <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">${dateLabel} ${r.startTime} – ${r.endTime}</div>
               </div>
               <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" data-modal-close aria-label="닫기">${HKUI.icon("x", 18, "var(--color-slate-blue)")}</button>
             </div>
             <div style="padding:20px 24px;overflow-y:auto;flex:1">
-              <div style="margin-bottom:16px">${HKUI.alertBox("info", "관리자 승인 필요", "양도받을 분을 선택한 뒤 신청해 주세요. <b>관리자 승인 후</b> 양도가 완료되며, 승인 시 본인 예약은 취소되고 양수인에게 예약이 이전됩니다.")}</div>
+              <div style="margin-bottom:16px">${HKUI.alertBox("info", "즉시 양도 완료", "양도받을 분을 선택한 뒤 양도하면 <b>바로 완료</b>됩니다. 본인 예약은 취소되고 양수인에게 예약이 이전됩니다.")}</div>
               <label style="display:block;font-size:13px;font-weight:600;color:var(--color-midnight-navy);margin-bottom:8px">양도받을 회원 (Teams 로그인 회원)</label>
               <input type="search" class="hk-input" id="transfer-member-search" placeholder="이름, 이메일, 부서로 검색" style="width:100%;margin-bottom:16px">
               <div id="transfer-member-list"><div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center"><span class="hk-spin"></span></div></div>
             </div>
             <div style="padding:16px 24px;border-top:1px solid var(--border-default);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
               <button type="button" class="hk-btn hk-btn--secondary" data-modal-close>닫기</button>
-              <button type="button" class="hk-btn hk-btn--primary" id="transfer-submit-btn" disabled>양도 신청</button>
+              <button type="button" class="hk-btn hk-btn--primary" id="transfer-submit-btn" disabled>양도하기</button>
             </div>
           </div>`;
           overlay.addEventListener("click", (e) => { if (e.target === overlay) closeTransferModal(); });
@@ -174,16 +174,16 @@
             if (!selectedId) return;
             const picked = members.find((m) => m.id === selectedId);
             const ok = await HKUI.confirmDialog(
-              "양도를 신청할까요?",
-              `<b>${HKUI.escapeHtml(picked?.name || "선택한 회원")}</b>님에게 ${dateLabel} <b>${r.startTime}</b> 예약 양도를 신청합니다. 관리자 승인 후 완료됩니다.`
+              "양도할까요?",
+              `<b>${HKUI.escapeHtml(picked?.name || "선택한 회원")}</b>님에게 ${dateLabel} <b>${r.startTime}</b> 예약을 양도합니다. <b>즉시 완료</b>되며 본인 예약은 취소됩니다.`
             );
             if (!ok) return;
             const prevLabel = submitBtn.textContent;
             submitBtn.disabled = true;
-            submitBtn.textContent = "신청 중…";
+            submitBtn.textContent = "양도 중…";
             try {
               await HKApi.requestTransfer(reservationId, selectedId);
-              HKUI.toast("양도 신청이 접수되었습니다 · 관리자 승인을 기다려 주세요");
+              HKUI.toast("양도가 완료되었습니다");
               closeTransferModal();
               await loadPage(currentPage);
             } catch (e) {

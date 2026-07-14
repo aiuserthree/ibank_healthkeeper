@@ -401,6 +401,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
         return {"weekDates": [], "slots": [], "items": []}
 
     from app.models import Member
+    from app.services.designated_slot import is_designated_confirm_slot
 
     slots_result = await db.execute(
         select(Slot)
@@ -479,6 +480,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
                 "isHoliday": is_public_holiday(slot.slot_date),
                 "status": slot.status.value,
                 "adminCancelVacancy": admin_cancel_vacancy,
+                "isDesignatedConfirmSlot": is_designated_confirm_slot(slot),
                 "applicants": applicants,
             }
         )

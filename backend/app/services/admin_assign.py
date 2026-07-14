@@ -223,6 +223,9 @@ async def assign_empty_slot(
 async def _get_admin_assign_reservation(
     db: AsyncSession, reservation_id: int
 ) -> tuple[Reservation, Slot, Member]:
+    from app.services.cycle import can_admin_confirm
+    from app.services.designated_slot import is_designated_confirm_slot
+
     reservation = await db.get(Reservation, reservation_id)
     if not reservation:
         raise_app_error("NOT_FOUND", 404)
@@ -242,7 +245,14 @@ async def _get_admin_assign_reservation(
     if not member:
         raise_app_error("NOT_FOUND", 404)
 
-    await _require_assign_window(db, reservation.cycle_id)
+    # 월 15:30 지정 확정건은 마감 이후~슬롯 시작 전까지 취소 가능
+    if is_designated_confirm_slot(slot):
+        cycle = await db.get(ReservationCycle, reservation.cycle_id)
+        if not cycle or not can_admin_confirm(cycle):
+            raise_app_error("NOT_CONFIRMABLE_BEFORE_CLOSE")
+        _assert_slot_not_past_for_assign(slot)
+    else:
+        await _require_assign_window(db, reservation.cycle_id)
     return reservation, slot, member
 
 
@@ -266,12 +276,18 @@ async def change_admin_assign(
     member_id: Optional[int] = None,
     slot_id: Optional[int] = None,
 ) -> Reservation:
+    from app.services.designated_slot import is_designated_confirm_slot
+
     if member_id is None and slot_id is None:
         raise_app_error("INVALID_CHANGE")
 
     reservation, old_slot, old_member = await _get_admin_assign_reservation(
         db, reservation_id
     )
+    # 월 15:30 지정 확정은 변경 대신 취소 후 재지정
+    if is_designated_confirm_slot(old_slot):
+        raise_app_error("DESIGNATED_SLOT_CONFIRM_ONLY")
+
     cycle_id = reservation.cycle_id
 
     new_member_id = member_id if member_id is not None else old_member.id

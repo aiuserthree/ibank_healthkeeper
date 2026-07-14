@@ -238,6 +238,8 @@ async def request_transfer(
     return {
         "data": {
             "transferId": transfer.id,
-            "message": "양도 신청이 접수되었습니다. 관리자 승인 후 완료됩니다.",
+            "newReservationId": transfer.new_reservation_id,
+            "message": "양도가 완료되었습니다.",
         }
     }
+

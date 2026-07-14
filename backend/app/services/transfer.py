@@ -260,17 +260,92 @@ async def search_transfer_recipients(
     ]
 
 
+async def _complete_transfer(
+    db: AsyncSession,
+    *,
+    transfer: TransferRequest,
+    reservation: Reservation,
+    slot: Slot,
+    cycle: ReservationCycle,
+    donor: Member,
+    recipient: Member,
+    admin: AdminUser | None = None,
+) -> list[int]:
+    """양도인 예약 취소 → 양수인 TRANSFER 확정 생성 → Teams 완료 알림."""
+    from app.services.teams import enqueue_transfer_completed_notices
+
+    now = now_kst()
+    reservation.status = ReservationStatus.CANCELLED
+    reservation.cancelled_at = now
+    await recompute_member_last_used_date(db, donor)
+
+    new_reservation = Reservation(
+        slot_id=slot.id,
+        member_id=recipient.id,
+        cycle_id=cycle.id,
+        type=ReservationType.TRANSFER,
+        status=ReservationStatus.CONFIRMED,
+        applied_at=now,
+        confirmed_at=now,
+        confirmed_by=ConfirmedBy.TRANSFER,
+    )
+    db.add(new_reservation)
+    await db.flush()
+
+    slot.confirmed_reservation_id = new_reservation.id
+    slot.status = SlotStatus.CONFIRMED
+
+    if recipient.last_used_date is None or slot.slot_date > recipient.last_used_date:
+        recipient.last_used_date = slot.slot_date
+
+    transfer.status = TransferRequestStatus.APPROVED
+    transfer.new_reservation_id = new_reservation.id
+    transfer.resolved_by_admin_id = admin.id if admin else None
+    transfer.resolved_at = now
+
+    return await enqueue_transfer_completed_notices(
+        db,
+        transfer=transfer,
+        donor=donor,
+        recipient=recipient,
+        slot=slot,
+    )
+
+
 async def request_transfer(
     db: AsyncSession,
     member: Member,
     reservation_id: int,
     recipient_id: int,
 ) -> tuple[TransferRequest, list[int]]:
-    reservation, slot, cycle = await _get_transferable_reservation(
-        db, member, reservation_id
-    )
-    if await _has_pending_transfer(db, reservation.id):
+    """회원 양도 — 관리자 승인 없이 즉시 완료."""
+    if await _has_pending_transfer(db, reservation_id):
         raise_app_error("TRANSFER_ALREADY_PENDING")
+
+    reservation_result = await db.execute(
+        select(Reservation, Slot, ReservationCycle)
+        .join(Slot, Slot.id == Reservation.slot_id)
+        .join(ReservationCycle, ReservationCycle.id == Reservation.cycle_id)
+        .where(Reservation.id == reservation_id)
+        .where(Reservation.member_id == member.id)
+        .with_for_update(of=Reservation)
+    )
+    row = reservation_result.one_or_none()
+    if not row:
+        raise_app_error("NOT_FOUND", 404)
+    reservation, slot, cycle = row
+
+    slot_result = await db.execute(
+        select(Slot).where(Slot.id == slot.id).with_for_update()
+    )
+    slot = slot_result.scalar_one()
+
+    if reservation.status != ReservationStatus.CONFIRMED:
+        raise_app_error("NOT_TRANSFERABLE")
+    if reservation.type not in TRANSFERABLE_TYPES:
+        raise_app_error("NOT_TRANSFERABLE")
+    if not can_transfer_slot(cycle, slot):
+        raise_app_error("NOT_TRANSFER_PERIOD")
 
     recipient = await _get_recipient_member(
         db,
@@ -290,14 +365,15 @@ async def request_transfer(
     db.add(transfer)
     await db.flush()
 
-    from app.services.teams import enqueue_transfer_request_admin_notices
-
-    teams_message_ids = await enqueue_transfer_request_admin_notices(
+    teams_message_ids = await _complete_transfer(
         db,
         transfer=transfer,
+        reservation=reservation,
+        slot=slot,
+        cycle=cycle,
         donor=member,
         recipient=recipient,
-        slot=slot,
+        admin=None,
     )
     await db.commit()
     await db.refresh(transfer)
@@ -307,6 +383,7 @@ async def request_transfer(
 async def list_pending_transfers(
     db: AsyncSession, cycle_id: Optional[int] = None
 ) -> list[dict]:
+    """레거시 PENDING 양도(승인제 시절) 조회 — 신규 흐름에서는 보통 비어 있음."""
     from sqlalchemy.orm import aliased
 
     Donor = aliased(Member)
@@ -356,8 +433,7 @@ async def list_pending_transfers(
 async def approve_transfer(
     db: AsyncSession, admin: AdminUser, transfer_id: int
 ) -> tuple[TransferRequest, list[int]]:
-    from app.services.teams import enqueue_transfer_approved_notices
-
+    """레거시 PENDING 양도 수동 승인(신규 흐름에서는 사용하지 않음)."""
     result = await db.execute(
         select(TransferRequest)
         .where(TransferRequest.id == transfer_id)
@@ -402,41 +478,15 @@ async def approve_transfer(
     if not donor:
         raise_app_error("NOT_FOUND", 404)
 
-    now = now_kst()
-    reservation.status = ReservationStatus.CANCELLED
-    reservation.cancelled_at = now
-    await recompute_member_last_used_date(db, donor)
-
-    new_reservation = Reservation(
-        slot_id=slot.id,
-        member_id=recipient.id,
-        cycle_id=cycle.id,
-        type=ReservationType.TRANSFER,
-        status=ReservationStatus.CONFIRMED,
-        applied_at=now,
-        confirmed_at=now,
-        confirmed_by=ConfirmedBy.TRANSFER,
-    )
-    db.add(new_reservation)
-    await db.flush()
-
-    slot.confirmed_reservation_id = new_reservation.id
-    slot.status = SlotStatus.CONFIRMED
-
-    if recipient.last_used_date is None or slot.slot_date > recipient.last_used_date:
-        recipient.last_used_date = slot.slot_date
-
-    transfer.status = TransferRequestStatus.APPROVED
-    transfer.new_reservation_id = new_reservation.id
-    transfer.resolved_by_admin_id = admin.id
-    transfer.resolved_at = now
-
-    teams_message_ids = await enqueue_transfer_approved_notices(
+    teams_message_ids = await _complete_transfer(
         db,
         transfer=transfer,
+        reservation=reservation,
+        slot=slot,
+        cycle=cycle,
         donor=donor,
         recipient=recipient,
-        slot=slot,
+        admin=admin,
     )
     await db.commit()
     await db.refresh(transfer)
@@ -446,6 +496,7 @@ async def approve_transfer(
 async def reject_transfer(
     db: AsyncSession, admin: AdminUser, transfer_id: int
 ) -> TransferRequest:
+    """레거시 PENDING 양도 반려(신규 흐름에서는 사용하지 않음)."""
     result = await db.execute(
         select(TransferRequest)
         .where(TransferRequest.id == transfer_id)
@@ -467,6 +518,7 @@ async def reject_transfer(
 async def get_pending_transfer_map(
     db: AsyncSession, reservation_ids: list[int]
 ) -> dict[int, dict]:
+    """레거시 PENDING 표시용 — 즉시 완료 흐름에서는 보통 비어 있음."""
     if not reservation_ids:
         return {}
     from sqlalchemy.orm import aliased

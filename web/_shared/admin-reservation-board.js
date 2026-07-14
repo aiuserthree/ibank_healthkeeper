@@ -66,6 +66,10 @@ window.HKReservationBoard = (function () {
       return slot.isVacation || slot.isHoliday || offDates.has(slot.slotDate);
     }
 
+    function isDesignatedConfirmSlot(slot) {
+      return slot.isDesignatedConfirmSlot === true;
+    }
+
     function isEmptyForAssign(slot) {
       const all = slot.applicants || [];
       if (isSlotOff(slot)) return false;
@@ -106,12 +110,23 @@ window.HKReservationBoard = (function () {
 
     function topAlert() {
       let requested = 0;
+      let designatedPending = 0;
       for (const slot of allSlots) {
         for (const a of slot.applicants || []) {
           if (a.status === "REQUESTED") requested++;
         }
+        if (
+          isDesignatedConfirmSlot(slot)
+          && !isSlotOff(slot)
+          && !(slot.applicants || []).some((x) => x.status === "CONFIRMED")
+        ) {
+          designatedPending++;
+        }
       }
       const state = meta.cycleState;
+      if (designatedPending > 0 && canConfirm) {
+        return `<div style="margin-bottom:20px">${HKUI.alertBox("warning", "월요일 15:30 · 지정 확정 대기", "월요일 15:30은 <b>관리자 지정</b>으로만 확정합니다. Teams SSO 로그인 직원 중 선택하세요. 미신청자도 지정 가능하며, 지정 시 다른 신청자는 탈락 처리됩니다.")}</div>`;
+      }
       if (requested > 0 && state !== "BEFORE_OPEN") {
         if (!canConfirm) {
           const closeText = meta.closeAt ? HKUI.formatDeadlineRelative(meta.closeAt, "17:00") : "수요일 17:00";
@@ -163,10 +178,25 @@ window.HKReservationBoard = (function () {
     }
 
     function showConfirmBtn(slot) {
+      if (isDesignatedConfirmSlot(slot)) return false;
       if (!canConfirm) return false;
       const all = slot.applicants || [];
       if (all.some((x) => x.status === "CONFIRMED")) return false;
       return all.some((x) => x.status === "REQUESTED");
+    }
+
+    function showDesignateBtn(slot) {
+      if (!isDesignatedConfirmSlot(slot) || isSlotOff(slot)) return false;
+      if ((slot.applicants || []).some((x) => x.status === "CONFIRMED")) return false;
+      if (isSlotPastForAssign(slot)) return false;
+      return true;
+    }
+
+    function designateBtnHtml(slotId, enabled) {
+      if (enabled) {
+        return `<button type="button" class="hk-btn hk-btn--primary hk-btn--sm" data-designate-slot="${slotId}">지정 확정</button>`;
+      }
+      return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-designate-slot="${slotId}">지정 확정 · 신청자 보기</button>`;
     }
 
     function previewBtnHtml(slotId) {
@@ -218,6 +248,13 @@ window.HKReservationBoard = (function () {
       const aa = getAdminAssign(slot);
       if (!aa) return "";
       const mailPart = adminAssignMailBtn(aa);
+      const designated = isDesignatedConfirmSlot(slot);
+      // 월 15:30 지정 확정: 마감 후 취소만 (변경은 취소 후 재지정)
+      if (designated) {
+        if (!canConfirm || isSlotPastForAssign(slot)) return mailPart;
+        return `${mailPart}
+        <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-assign="${aa.reservation_id}">취소</button>`;
+      }
       if (!boardMeta.canAdminAssign) return mailPart;
       return `${mailPart}
         <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-assign="${aa.reservation_id}">취소</button>
@@ -293,24 +330,155 @@ window.HKReservationBoard = (function () {
         .sort((a, b) => a.slotDate.localeCompare(b.slotDate) || a.timeIndex - b.timeIndex);
     }
 
-    function renderMemberPickList(members, onPick) {
+    function renderMemberPickList(members, onPick, opts) {
+      opts = opts || {};
       if (!members.length) {
         return `<div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center">검색 결과가 없습니다.</div>`;
       }
       return `<div style="display:flex;flex-direction:column;gap:8px">${members.map((m) => {
         const dept = m.department ? `${HKUI.escapeHtml(m.department)} · ` : "";
         const last = m.lastUsedDate ? HKUI.formatDate(m.lastUsedDate) : "이력 없음";
-        return `<button type="button" class="hk-card hk-card--pad" data-member-id="${m.id}" style="text-align:left;cursor:pointer;border:1px solid var(--border-default);background:var(--surface-card);width:100%">
+        let statusBadge = "";
+        if (opts.showWeekStatus && m.confirmedThisWeek) {
+          statusBadge = ` ${HKUI.badge("확정됨", "success", true)}`;
+        } else if (opts.showWeekStatus && m.requestedElsewhere) {
+          statusBadge = ` ${HKUI.badge("다른 슬롯 신청", "neutral", true)}`;
+        } else if (opts.showApplied && m.appliedToSlot) {
+          statusBadge = ` ${HKUI.badge("신청함", "info", true)}`;
+        }
+        const locked = opts.showWeekStatus && m.selectable === false;
+        const disabled = opts.disabled || locked;
+        return `<button type="button" class="hk-card hk-card--pad" data-member-id="${m.id}" data-selectable="${locked ? "0" : "1"}" style="text-align:left;cursor:${disabled ? "not-allowed" : "pointer"};border:1px solid var(--border-default);background:${locked ? "var(--color-fog)" : "var(--surface-card)"};width:100%;opacity:${locked ? "0.85" : "1"}" ${disabled ? "disabled" : ""}>
           <div style="display:flex;align-items:center;gap:12px">
             ${HKUI.avatar(m.name, "sm", m.avatarUrl || "")}
             <div style="min-width:0;flex:1">
-              <div style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(m.name)}${m.position ? ` <span style="font-size:12px;font-weight:600;color:var(--color-slate-blue)">${HKUI.escapeHtml(m.position)}</span>` : ""}</div>
+              <div style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(m.name)}${m.position ? ` <span style="font-size:12px;font-weight:600;color:var(--color-slate-blue)">${HKUI.escapeHtml(m.position)}</span>` : ""}${statusBadge}</div>
               <div style="font-size:12px;color:var(--text-muted)">${dept}${HKUI.escapeHtml(m.email || "")}</div>
               <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">마지막 이용: ${last}</div>
             </div>
           </div>
         </button>`;
       }).join("")}</div>`;
+    }
+
+    async function openDesignateModal(slotId) {
+      closeAssignModal();
+      closeConfirmModal();
+      const slot = allSlots.find((s) => s.slotId === slotId);
+      if (!slot) return;
+
+      const applicants = (slot.applicants || [])
+        .filter((a) => a.status === "REQUESTED")
+        .slice()
+        .sort((a, b) => (a.priority_rank || 99) - (b.priority_rank || 99));
+      const canPick = canConfirm && !isSlotPastForAssign(slot);
+
+      const overlay = document.createElement("div");
+      overlay.id = "assign-modal-overlay";
+      overlay.className = "hk-dialog__overlay";
+      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:640px;max-height:min(90dvh,90vh);width:calc(100% - 32px);overflow:hidden;display:flex;flex-direction:column;padding:0">
+        <div style="padding:20px 24px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
+          <div>
+            <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy)">월요일 15:30 · 지정 확정</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">${HKUI.formatDateLong(slot.slotDate)} ${slot.startTime} – ${slot.endTime}</div>
+          </div>
+          <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" data-modal-close aria-label="닫기">${HKUI.icon("x", 18, "var(--color-slate-blue)")}</button>
+        </div>
+        <div style="padding:20px 24px;overflow-y:auto;flex:1">
+          ${canPick
+            ? `<div style="margin-bottom:16px">${HKUI.alertBox("warning", "관리자 지정 전용", "Teams SSO 로그인 직원 중 1명을 지정하면 즉시 확정됩니다. <b>미신청자도 지정 가능</b>하며, 같은 슬롯의 다른 신청자는 <b>탈락</b> 처리되고 완료 메일이 발송됩니다.")}</div>`
+            : `<div style="margin-bottom:16px">${HKUI.alertBox("info", "확정은 마감 후 가능", "지금은 신청 현황만 확인할 수 있습니다. <b>수요일 17:00 마감 후</b> Teams SSO 직원 중 지정해 확정하세요.")}</div>`}
+          ${applicants.length
+            ? `<div style="margin-bottom:20px">
+                <div style="font-size:13px;font-weight:700;color:var(--color-midnight-navy);margin-bottom:8px">현재 신청자 (${applicants.length}명)</div>
+                <div style="display:flex;flex-direction:column;gap:8px">${applicants.map((a) => {
+                  const dept = a.department || a.dept || "";
+                  return `<div class="hk-card hk-card--pad" style="border:1px solid var(--border-default)">
+                    <div style="display:flex;align-items:center;gap:12px">
+                      ${HKUI.avatar(a.member_name, "sm", a.avatarUrl || "")}
+                      <div style="min-width:0;flex:1">
+                        <div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}</div>
+                        <div style="font-size:12px;color:var(--text-muted)">${HKUI.escapeHtml(dept ? `${dept} · ${a.member_email || ""}` : a.member_email || "")}</div>
+                      </div>
+                      ${HKUI.statusBadge("REQUESTED")}
+                    </div>
+                  </div>`;
+                }).join("")}</div>
+              </div>`
+            : `<div style="margin-bottom:16px"><div style="font-size:13px;color:var(--text-muted)">아직 신청자가 없습니다. 미신청자도 지정할 수 있습니다.</div></div>`}
+          ${canPick
+            ? `<div style="border-top:1px solid var(--border-default);padding-top:20px">
+                <label style="display:block;font-size:13px;font-weight:600;color:var(--color-midnight-navy);margin-bottom:8px">Teams SSO 직원 검색 · 지정</label>
+                <input type="search" class="hk-input" id="designate-member-search" placeholder="이름, 이메일, 부서" style="width:100%;margin-bottom:16px">
+                <div id="designate-member-list"><div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center">불러오는 중…</div></div>
+              </div>`
+            : ""}
+        </div>
+      </div>`;
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) closeAssignModal(); });
+      overlay.querySelector("[data-modal-close]").onclick = closeAssignModal;
+      document.body.appendChild(overlay);
+      HKUI.refreshIcons(overlay);
+
+      if (!canPick) return;
+
+      const listEl = overlay.querySelector("#designate-member-list");
+      const searchEl = overlay.querySelector("#designate-member-search");
+      let searchTimer = null;
+
+      async function runSearch(q) {
+        listEl.innerHTML = `<div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center">검색 중…</div>`;
+        try {
+          const data = await HKApi.designatableMembers(slotId, q);
+          listEl.innerHTML = renderMemberPickList(data.members || [], null, {
+            showApplied: true,
+            showWeekStatus: true,
+          });
+          HKUI.refreshIcons(listEl);
+          listEl.querySelectorAll("[data-member-id]").forEach((btn) => {
+            btn.onclick = async () => {
+              if (btn.dataset.selectable === "0" || btn.disabled) return;
+              const memberId = Number(btn.dataset.memberId);
+              const member = (data.members || []).find((m) => m.id === memberId);
+              if (!member || member.selectable === false) {
+                HKUI.toast(
+                  member?.confirmedThisWeek
+                    ? "이미 이번 주 예약이 확정된 직원입니다."
+                    : "다른 슬롯에 신청 중인 직원입니다.",
+                  "danger"
+                );
+                return;
+              }
+              const name = member.name || "선택한 회원";
+              const applied = member.appliedToSlot;
+              const ok = await HKUI.confirmDialog(
+                "이 직원을 지정 확정할까요?",
+                `<b>${HKUI.escapeHtml(name)}</b>님을 ${HKUI.formatDateLong(slot.slotDate)} 15:30에 확정합니다.${applied ? "" : " (미신청 · 관리자 지정)"} 다른 신청자는 <b>탈락</b> 처리되고 완료 메일이 발송됩니다.`
+              );
+              if (!ok) return;
+              btn.disabled = true;
+              try {
+                await HKApi.designateConfirmSlot(slotId, memberId);
+                HKUI.toast("지정 인원으로 예약이 확정되었습니다 · 완료 메일 발송");
+                closeAssignModal();
+                await reloadBoard();
+              } catch (e) {
+                btn.disabled = false;
+                HKUI.toast(e.message, "danger");
+              }
+            };
+          });
+        } catch (e) {
+          listEl.innerHTML = HKUI.alertBox("danger", "오류", HKUI.escapeHtml(e.message));
+        }
+      }
+
+      searchEl.addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => runSearch(searchEl.value.trim()), 280);
+      });
+      await runSearch("");
+      searchEl.focus();
     }
 
     async function openAssignModal(slotId) {
@@ -321,7 +489,7 @@ window.HKReservationBoard = (function () {
       const overlay = document.createElement("div");
       overlay.id = "assign-modal-overlay";
       overlay.className = "hk-dialog__overlay";
-      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:560px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;padding:0">
+      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:560px;max-height:min(90dvh,90vh);width:calc(100% - 32px);overflow:hidden;display:flex;flex-direction:column;padding:0">
         <div style="padding:20px 24px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
           <div>
             <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy)">빈 슬롯 · 인원 지정</div>
@@ -399,7 +567,7 @@ window.HKReservationBoard = (function () {
       const overlay = document.createElement("div");
       overlay.id = "assign-modal-overlay";
       overlay.className = "hk-dialog__overlay";
-      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:560px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;padding:0">
+      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:560px;max-height:min(90dvh,90vh);width:calc(100% - 32px);overflow:hidden;display:flex;flex-direction:column;padding:0">
         <div style="padding:20px 24px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
           <div>
             <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy)">관리자 지정 · 변경</div>
@@ -498,7 +666,7 @@ window.HKReservationBoard = (function () {
       const overlay = document.createElement("div");
       overlay.id = "confirm-modal-overlay";
       overlay.className = "hk-dialog__overlay";
-      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:720px;max-height:90vh;overflow:hidden;display:flex;flex-direction:column;padding:0">
+      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:720px;max-height:min(90dvh,90vh);width:calc(100% - 32px);overflow:hidden;display:flex;flex-direction:column;padding:0">
         <div style="padding:20px 24px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
           <div>
             <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy)">우선권 확인 · 확정</div>
@@ -571,6 +739,9 @@ window.HKReservationBoard = (function () {
     function bindConfirmButtons(root) {
       root.querySelectorAll("[data-confirm-slot]").forEach((btn) => {
         btn.onclick = () => openConfirmModal(Number(btn.dataset.confirmSlot));
+      });
+      root.querySelectorAll("[data-designate-slot]").forEach((btn) => {
+        btn.onclick = () => openDesignateModal(Number(btn.dataset.designateSlot));
       });
     }
 
@@ -690,27 +861,33 @@ window.HKReservationBoard = (function () {
       const reapply = all.some((x) => x.type === "REAPPLY");
       const off = isSlotOff(slot);
       const offLabel = slot.isHoliday ? "공휴일" : "휴가";
-      const emptyLabel = assignSlotHint(slot);
+      const designated = isDesignatedConfirmSlot(slot);
+      const emptyLabel = designated ? "" : assignSlotHint(slot);
       const cancelVacancy = slot.adminCancelVacancy === true;
       const head = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         ${HKUI.icon("clock", 18, "var(--color-slate-blue)")}
         <span style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">${slot.startTime || ""} – ${slot.endTime || ""}</span>
         ${off ? HKUI.badge(offLabel, "danger") : ""}
+        ${designated && !confirmed ? HKUI.badge("지정 확정", "warning") : ""}
         ${adminAssign ? HKUI.badge("관리자 지정", "warning") : ""}
         ${pending.length > 1 ? HKUI.badge(`중복 ${pending.length}명`, "warning") : ""}
         ${reapply ? HKUI.badge("재신청 포함", "info") : ""}
         ${cancelVacancy && !adminAssign ? HKUI.badge(isSlotPastForAssign(slot) ? "확정 취소 · 지정 불가" : "확정 취소 · 지정 가능", isSlotPastForAssign(slot) ? "neutral" : "warning") : ""}
         ${confirmed && !adminAssign ? HKUI.badge("확정 완료", "success", true) : ""}
         <div style="flex:1"></div>
+        ${showDesignateBtn(slot) ? designateBtnHtml(slot.slotId, canConfirm) : ""}
         ${showConfirmBtn(slot) ? confirmBtnHtml(slot.slotId) : ""}
-        ${!showConfirmBtn(slot) && !canConfirm && (slot.applicants || []).some((x) => x.status === "REQUESTED") ? previewBtnHtml(slot.slotId) : ""}
+        ${!showConfirmBtn(slot) && !showDesignateBtn(slot) && !canConfirm && (slot.applicants || []).some((x) => x.status === "REQUESTED") ? previewBtnHtml(slot.slotId) : ""}
         ${emptyLabel}
         ${adminAssignActionsHtml(slot)}
       </div>`;
       if (!all.length) {
+        if (designated && !off) {
+          return `${showDate ? dateHeading(slot.slotDate) : ""}<div class="hk-card hk-card--pad" style="${showDate ? "margin-top:8px" : ""}">${head}</div>`;
+        }
         return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--border-default);border-radius:var(--radius-sm);flex-wrap:wrap;${off ? "opacity:0.85" : ""}">${head}</div>`;
       }
-      if (!list.length && !showConfirmBtn(slot) && !adminAssign && !cancelVacancy) return "";
+      if (!list.length && !showConfirmBtn(slot) && !showDesignateBtn(slot) && !adminAssign && !cancelVacancy) return "";
       const tableHtml = list.length
         ? `<div style="overflow-x:auto;margin-top:16px">${applicantRow(null, 0, true, slot)}${list.map((a, i) => applicantRow(a, i, false, slot)).join("")}</div>`
         : "";
@@ -731,6 +908,12 @@ window.HKReservationBoard = (function () {
       if (filter !== "all") {
         daySlots = daySlots.filter((slot) =>
           (slot.applicants || []).some((a) => a.status === filter)
+          || (
+            filter === "REQUESTED"
+            && isDesignatedConfirmSlot(slot)
+            && !isSlotOff(slot)
+            && !(slot.applicants || []).some((a) => a.status === "CONFIRMED")
+          )
         );
       }
 

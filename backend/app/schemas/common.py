@@ -49,6 +49,10 @@ class AdminAssignRequest(BaseModel):
     memberId: int
 
 
+class DesignateConfirmRequest(BaseModel):
+    memberId: int
+
+
 class AdminAssignChangeRequest(BaseModel):
     memberId: Optional[int] = None
     slotId: Optional[int] = None

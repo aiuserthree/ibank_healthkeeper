@@ -33,6 +33,9 @@ ERROR_MESSAGES = {
     "SLOT_NOT_ASSIGNABLE": "신청 대기 중이거나 확정된 슬롯은 지정할 수 없습니다.",
     "SLOT_NOT_ADMIN_CANCEL_VACANCY": "확정·지정 취소로 비워진 슬롯만 인원 지정할 수 있습니다.",
     "MEMBER_NOT_ASSIGNABLE": "이번 주에 이미 신청·확정된 회원은 지정할 수 없습니다.",
+    "MEMBER_NOT_SSO": "Teams SSO로 로그인한 직원만 지정할 수 있습니다.",
+    "NOT_DESIGNATED_CONFIRM_SLOT": "지정 확정 전용 슬롯이 아닙니다.",
+    "DESIGNATED_SLOT_CONFIRM_ONLY": "월요일 15:30은 관리자 지정으로만 확정할 수 있습니다.",
     "NOT_ADMIN_ASSIGN": "관리자 지정 예약만 취소·변경할 수 있습니다.",
     "INVALID_CHANGE": "변경할 회원 또는 시간대를 선택해 주세요.",
     "MAIL_ALREADY_SENT": "이미 발송된 완료 메일입니다.",
@@ -55,7 +58,7 @@ ERROR_MESSAGES = {
     "NOT_TRANSFER_PERIOD": "양도 가능 시간(목요일 17:00 이후 ~ 예약 시작 전)이 아닙니다.",
     "NOT_TRANSFERABLE": "양도할 수 없는 예약입니다.",
     "MEMBER_NOT_TRANSFERABLE": "양도받을 수 없는 회원입니다. (이번 주 확정·신청 대기 중이거나 Teams 로그인 필요)",
-    "TRANSFER_ALREADY_PENDING": "이미 양도 신청이 진행 중입니다.",
+    "TRANSFER_ALREADY_PENDING": "이미 양도 처리가 진행 중입니다.",
 }
 
 
@@ -73,6 +76,9 @@ def raise_app_error(code: str, http_status: Optional[int] = None) -> None:
         "SLOT_NOT_ASSIGNABLE": 409,
         "SLOT_NOT_ADMIN_CANCEL_VACANCY": 409,
         "MEMBER_NOT_ASSIGNABLE": 409,
+        "MEMBER_NOT_SSO": 409,
+        "NOT_DESIGNATED_CONFIRM_SLOT": 409,
+        "DESIGNATED_SLOT_CONFIRM_ONLY": 409,
         "NOT_ADMIN_ASSIGN": 409,
         "INVALID_CHANGE": 400,
         "MAIL_ALREADY_SENT": 409,

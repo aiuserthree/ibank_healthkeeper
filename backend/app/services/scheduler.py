@@ -84,6 +84,8 @@ async def job_open_cycle(db: AsyncSession) -> None:
 
 
 async def job_close_batch(db: AsyncSession) -> None:
+    from app.services.designated_slot import is_designated_confirm_slot
+
     cycle = await get_active_cycle(db)
     if not cycle or cycle.batch_close_done:
         return
@@ -97,6 +99,9 @@ async def job_close_batch(db: AsyncSession) -> None:
     slots = await db.execute(select(Slot).where(Slot.cycle_id == cycle.id))
     for slot in slots.scalars().all():
         if slot.status == SlotStatus.CONFIRMED or slot.is_vacation or is_public_holiday(slot.slot_date):
+            continue
+        # 월요일 15:30 — 자동 확정/탈락 없이 관리자 지정 대기
+        if is_designated_confirm_slot(slot):
             continue
         applicants = await rank_applicants(db, slot.id)
         if not applicants:

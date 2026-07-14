@@ -660,12 +660,12 @@ window.HKUI = (function () {
     else if (r.type === "REAPPLY") sub = "재신청 · 즉시 확정 (취소 불가)";
     else if (r.status === "CONFIRMED") sub = "일반 신청 · 예약 확정";
     else if (r.status === "CANCELLED") sub = "취소됨";
-    if (r.transferPending) sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `양도 신청 중 → ${escapeHtml(r.transferRecipientName || "")}`;
+    if (r.transferPending) sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `양도 처리 중 → ${escapeHtml(r.transferRecipientName || "")}`;
     const reapplyBadge = r.type === "REAPPLY" && !r.transferPending ? badge("재신청", "info") + " " : "";
     let action = `<span style="width:1px"></span>`;
     if (r.cancelable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel="${r.id}">취소</button>`;
-    else if (r.transferable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-transfer="${r.id}">양도 신청</button>`;
-    else if (r.transferPending) action = badge("양도 대기", "warning");
+    else if (r.transferable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-transfer="${r.id}">양도하기</button>`;
+    else if (r.transferPending) action = badge("양도 처리 중", "warning");
     else if (r.status === "DROPPED" && reapplyAvailable) action = `<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`;
     const dateBg = muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)";
     const monthColor = muted ? "var(--text-muted)" : "var(--color-slate-blue)";

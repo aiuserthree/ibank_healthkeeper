@@ -256,7 +256,7 @@ def render_transfer_request_admin_body(
     )
 
 
-def render_transfer_approved_body(
+def render_transfer_completed_body(
     *,
     name: str,
     role: str,
@@ -270,9 +270,13 @@ def render_transfer_approved_body(
         detail = f"<b>{other_name}</b>님으로부터 예약을 양도받았습니다."
     return (
         f"<p><strong>[헬스키퍼]</strong> 예약 양도 완료</p>"
-        f"<p>{name}님, <strong>{slot_text}</strong> 예약 양도가 승인되었습니다.</p>"
+        f"<p>{name}님, <strong>{slot_text}</strong> 예약 양도가 완료되었습니다.</p>"
         f"<p>{detail}</p>"
     )
+
+
+# 하위 호환 별칭
+render_transfer_approved_body = render_transfer_completed_body
 
 
 async def _lookup_members_by_emails(
@@ -321,7 +325,7 @@ async def enqueue_transfer_request_admin_notices(
     return message_ids
 
 
-async def enqueue_transfer_approved_notices(
+async def enqueue_transfer_completed_notices(
     db: AsyncSession,
     *,
     transfer: TransferRequest,
@@ -331,7 +335,7 @@ async def enqueue_transfer_approved_notices(
 ) -> list[int]:
     message_ids: list[int] = []
     if donor.entra_oid:
-        body = render_transfer_approved_body(
+        body = render_transfer_completed_body(
             name=donor.name,
             role="donor",
             other_name=recipient.name,
@@ -343,13 +347,13 @@ async def enqueue_transfer_approved_notices(
             to_member_id=donor.id,
             to_entra_oid=donor.entra_oid,
             body=body,
-            dedupe_key=f"transfer-approved-donor:{transfer.id}",
+            dedupe_key=f"transfer-completed-donor:{transfer.id}",
             reservation_id=transfer.new_reservation_id,
         )
         if msg:
             message_ids.append(msg.id)
     if recipient.entra_oid:
-        body = render_transfer_approved_body(
+        body = render_transfer_completed_body(
             name=recipient.name,
             role="recipient",
             other_name=donor.name,
@@ -361,12 +365,16 @@ async def enqueue_transfer_approved_notices(
             to_member_id=recipient.id,
             to_entra_oid=recipient.entra_oid,
             body=body,
-            dedupe_key=f"transfer-approved-recipient:{transfer.id}",
+            dedupe_key=f"transfer-completed-recipient:{transfer.id}",
             reservation_id=transfer.new_reservation_id,
         )
         if msg:
             message_ids.append(msg.id)
     return message_ids
+
+
+# 하위 호환 별칭
+enqueue_transfer_approved_notices = enqueue_transfer_completed_notices
 
 
 async def resolve_open_notice_cycle(

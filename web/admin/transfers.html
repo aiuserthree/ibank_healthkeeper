@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
-  <title>헬스키퍼 관리자 — 양도 신청</title>
+  <title>헬스키퍼 관리자 — 양도</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -16,9 +16,18 @@
 <body>
   <div id="app"></div>
   <script>
+    /**
+     * 양도는 회원이 마이페이지에서 즉시 완료합니다.
+     * 이 화면은 승인제 시절에 남은 레거시 PENDING 건만 처리합니다.
+     */
     function renderTransferPanel(items) {
+      const notice = HKUI.alertBox(
+        "info",
+        "즉시 양도로 변경됨",
+        "신규 양도는 회원이 마이페이지에서 <b>바로 완료</b>합니다. 관리자 승인이 필요하지 않습니다. 아래에 표시되는 건은 승인제 시절에 남은 대기 건입니다."
+      );
       if (!items.length) {
-        return HKUI.alertBox("info", "대기 중인 양도 신청이 없습니다", "회원이 마이페이지에서 양도를 신청하면 이 화면에 표시됩니다.");
+        return `${notice}<div style="margin-top:16px">${HKUI.alertBox("info", "대기 중인 레거시 양도 없음", "처리할 대기 건이 없습니다.")}</div>`;
       }
       const rows = items.map((t) => {
         const d = new Date(t.slotDate + "T12:00:00");
@@ -42,7 +51,7 @@
           </div>
         </div>`;
       }).join("");
-      return `<div style="display:flex;flex-direction:column;gap:10px" id="transfer-pending-list">${rows}</div>`;
+      return `${notice}<div style="margin-top:16px;display:flex;flex-direction:column;gap:10px" id="transfer-pending-list">${rows}</div>`;
     }
 
     function bindTransferActions(reloadAll) {
@@ -84,9 +93,9 @@
     }
 
     HKAdmin.mountPage({
-      active: "transfers",
+      active: "dashboard",
       render() {
-        return `${HKAdmin.pageHead("양도 신청", "회원 양도 신청을 검토하고 승인·반려합니다", HKUI.badge("로딩…", "soft"))}<div id="content"></div>`;
+        return `${HKAdmin.pageHead("양도 (레거시)", "신규 양도는 회원이 즉시 완료합니다. 아래는 승인제 시절 대기 건만 표시됩니다.", HKUI.badge("로딩…", "soft"))}<div id="content"></div>`;
       },
       afterMount: async () => {
         const content = document.getElementById("content");
@@ -96,16 +105,15 @@
             const data = await HKApi.pendingTransfers();
             const items = data.items || [];
             document.querySelector(".hk-amain").firstElementChild.outerHTML = HKAdmin.pageHead(
-              "양도 신청",
-              "회원 양도 신청을 검토하고 승인·반려합니다",
+              "양도 (레거시)",
+              "신규 양도는 회원이 즉시 완료합니다. 아래는 승인제 시절 대기 건만 표시됩니다.",
               items.length ? HKUI.badge(items.length + "건 대기", "warning", true) : HKUI.badge("대기 없음", "soft", true)
             );
             content.innerHTML = renderTransferPanel(items);
             bindTransferActions(renderPage);
-            await HKAdmin.refreshTransferNavBadge();
             HKUI.refreshIcons();
           } catch (e) {
-            content.innerHTML = HKUI.alertBox("danger", "불러오기 실패", HKUI.escapeHtml(e.message || "양도 신청 목록을 불러오지 못했습니다."));
+            content.innerHTML = HKUI.alertBox("danger", "불러오기 실패", HKUI.escapeHtml(e.message || "양도 목록을 불러오지 못했습니다."));
             HKUI.refreshIcons();
           }
         }

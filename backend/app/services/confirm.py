@@ -31,7 +31,11 @@ async def confirm_reservation(
     slot_id: int,
     reservation_id: int,
     confirmed_by: ConfirmedBy = ConfirmedBy.ADMIN,
+    *,
+    force_designated: bool = False,
 ) -> Reservation:
+    from app.services.designated_slot import is_designated_confirm_slot
+
     slot_result = await db.execute(select(Slot).where(Slot.id == slot_id).with_for_update())
     slot = slot_result.scalar_one_or_none()
     if not slot:
@@ -42,6 +46,8 @@ async def confirm_reservation(
         raise_app_error("VACATION_SLOT")
     if is_public_holiday(slot.slot_date):
         raise_app_error("HOLIDAY_SLOT")
+    if is_designated_confirm_slot(slot) and not force_designated:
+        raise_app_error("DESIGNATED_SLOT_CONFIRM_ONLY")
 
     reservation = await db.get(Reservation, reservation_id)
     if not reservation or reservation.slot_id != slot_id:
@@ -203,9 +209,13 @@ async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
         applicant["total_uses"] = await get_member_total_uses(db, member) if member else 0
     no_history_cnt = sum(1 for a in applicants if a["no_history"])
     needs_manual = len(applicants) >= 2 and no_history_cnt >= 2
+    from app.services.designated_slot import is_designated_confirm_slot
+
     cycle = await db.get(ReservationCycle, slot.cycle_id)
+    designated = is_designated_confirm_slot(slot)
     return {
         "canConfirm": can_admin_confirm(cycle) if cycle else False,
+        "isDesignatedConfirmSlot": designated,
         "slot": {
             "id": slot.id,
             "slotDate": slot.slot_date.isoformat(),
@@ -215,6 +225,7 @@ async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
             "status": slot.status.value,
             "isVacation": slot.is_vacation,
             "isHoliday": is_public_holiday(slot.slot_date),
+            "isDesignatedConfirmSlot": designated,
         },
         "applicants": applicants,
         "needsManual": needs_manual,

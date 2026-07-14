@@ -14,7 +14,7 @@ from app.core.deps import get_current_admin, get_redis_client
 from app.core.session import create_admin_session, delete_admin_session
 from app.database import get_db
 from app.models import AdminUser, MailMessage, MailTemplate, MailType
-from app.schemas.common import AdminLoginRequest, AdminAssignChangeRequest, AdminAssignRequest, ConfirmRequest, ReapplyMailSendRequest, SettingsUpdateRequest, VacationMonthRequest, VacationRequest
+from app.schemas.common import AdminLoginRequest, AdminAssignChangeRequest, AdminAssignRequest, ConfirmRequest, DesignateConfirmRequest, ReapplyMailSendRequest, SettingsUpdateRequest, VacationMonthRequest, VacationRequest
 from app.services import admin as admin_service
 from app.services.admin_assign import (
     assign_empty_slot,
@@ -23,6 +23,10 @@ from app.services.admin_assign import (
     change_admin_assign,
     search_assignable_members,
     send_admin_assign_mail,
+)
+from app.services.designated_slot import (
+    designate_confirm_slot,
+    search_designatable_members,
 )
 from app.services.transfer import (
     approve_transfer,
@@ -141,6 +145,35 @@ async def confirm_slot(
     for mail_id in drain_pending_mails():
         await process_one_mail(db, mail_id)
     return {"data": {"reservationId": reservation.id, "message": "예약이 확정되었습니다."}}
+
+
+@router.get("/reservations/slots/{slot_id}/designatable-members")
+async def designatable_members(
+    slot_id: int,
+    q: str = Query("", max_length=100),
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    members = await search_designatable_members(db, slot_id, q=q)
+    return {"data": {"members": members}}
+
+
+@router.post("/reservations/slots/{slot_id}/designate-confirm")
+async def designate_confirm(
+    slot_id: int,
+    body: DesignateConfirmRequest,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    reservation = await designate_confirm_slot(db, slot_id, body.memberId)
+    for mail_id in drain_pending_mails():
+        await process_one_mail(db, mail_id)
+    return {
+        "data": {
+            "reservationId": reservation.id,
+            "message": "지정 인원으로 예약이 확정되었습니다.",
+        }
+    }
 
 
 @router.post("/reservations/{reservation_id}/cancel-confirmed")
@@ -270,12 +303,13 @@ async def approve_transfer_request(
 ):
     from app.services.teams import deliver_teams_messages
 
+    # 레거시 PENDING 수동 승인 — 신규 양도는 회원이 즉시 완료함
     transfer, teams_message_ids = await approve_transfer(db, admin, transfer_id)
     background_tasks.add_task(deliver_teams_messages, teams_message_ids)
     return {
         "data": {
             "transferId": transfer.id,
-            "message": "양도가 승인되어 완료되었습니다.",
+            "message": "양도가 완료되었습니다.",
         }
     }
 

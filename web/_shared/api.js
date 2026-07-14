@@ -110,6 +110,17 @@ window.HKApi = (function () {
         method: "POST",
         body: JSON.stringify({ reservationId }),
       }),
+    designatableMembers: (slotId, q = "") => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      const qs = params.toString();
+      return request(`/admin/reservations/slots/${slotId}/designatable-members${qs ? `?${qs}` : ""}`);
+    },
+    designateConfirmSlot: (slotId, memberId) =>
+      request(`/admin/reservations/slots/${slotId}/designate-confirm`, {
+        method: "POST",
+        body: JSON.stringify({ memberId }),
+      }),
     assignableMembers: (cycleId, q = "") => {
       const params = new URLSearchParams({ cycleId: String(cycleId) });
       if (q) params.set("q", q);
