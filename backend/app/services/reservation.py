@@ -41,6 +41,9 @@ async def _member_cycle_active_apply(
 
 
 async def get_calendar(db: AsyncSession, member: Member) -> dict:
+    from app.services.cycle import can_admin_confirm
+    from app.services.designated_slot import is_designated_confirm_slot
+
     state, cycle = await resolve_system_state(db)
     if not cycle:
         return {"state": state.value, "cycleId": None, "weekApplied": False, "appliedSlotId": None, "slots": []}
@@ -60,6 +63,8 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
     reservations = list(res_result.scalars().all())
 
     active_apply = await _member_cycle_active_apply(db, member.id, cycle.id)
+    # 월 15:30 지정확정 슬롯: 수 17:00 마감 후에는 미지정이어도 캘린더에 확정됨으로 표시
+    after_close = can_admin_confirm(cycle)
 
     by_slot: dict[int, list[Reservation]] = {}
     for r in reservations:
@@ -72,6 +77,16 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
         mine = any(
             r.member_id == member.id and r.status in ACTIVE_APPLY_STATUSES for r in slot_res
         )
+        holiday = is_public_holiday(slot.slot_date)
+        confirmed = slot.status == SlotStatus.CONFIRMED
+        if (
+            not confirmed
+            and after_close
+            and is_designated_confirm_slot(slot)
+            and not slot.is_vacation
+            and not holiday
+        ):
+            confirmed = True
         items.append(
             {
                 "id": slot.id,
@@ -80,11 +95,11 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
                 "startTime": slot.start_time.strftime("%H:%M"),
                 "endTime": slot.end_time.strftime("%H:%M"),
                 "isVacation": slot.is_vacation,
-                "isHoliday": is_public_holiday(slot.slot_date),
+                "isHoliday": holiday,
                 "status": slot.status.value,
                 "requestCount": request_cnt,
                 "mine": mine,
-                "confirmed": slot.status == SlotStatus.CONFIRMED,
+                "confirmed": confirmed,
             }
         )
     return {
