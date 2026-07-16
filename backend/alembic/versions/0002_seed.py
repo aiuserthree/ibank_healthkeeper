@@ -33,7 +33,7 @@ SETTINGS = [
         '[{"i":1,"s":"13:30","e":"14:00"},{"i":2,"s":"14:30","e":"15:00"},{"i":3,"s":"15:30","e":"16:00"},{"i":4,"s":"16:30","e":"17:00"}]',
         "슬롯 구성 JSON",
     ),
-    ("confirm.mode", "MANUAL", "확정 모드 MANUAL|AUTO"),
+    ("confirm.mode", "AUTO", "확정 모드 MANUAL|AUTO"),
     ("verify.token.ttlHours", "24", "인증 토큰 TTL"),
     ("mail.retry.max", "3", "메일 최대 재시도"),
 ]

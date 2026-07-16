@@ -94,7 +94,7 @@ async def job_close_batch(db: AsyncSession) -> None:
     cycle.closed_at = now_kst()
     cycle.batch_close_done = True
 
-    confirm_mode = await get_setting(db, "confirm.mode", "MANUAL")
+    confirm_mode = await get_setting(db, "confirm.mode", "AUTO")
 
     slots = await db.execute(select(Slot).where(Slot.cycle_id == cycle.id))
     for slot in slots.scalars().all():

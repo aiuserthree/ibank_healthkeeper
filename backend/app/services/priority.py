@@ -27,7 +27,11 @@ async def rank_applicants(
             func.row_number()
             .over(
                 partition_by=Reservation.slot_id,
-                order_by=(Member.last_used_date.asc().nulls_first(), Reservation.applied_at.asc()),
+                order_by=(
+                    Member.last_used_date.asc().nulls_first(),
+                    Reservation.applied_at.asc(),
+                    Reservation.id.asc(),
+                ),
             )
             .label("priority_rank"),
         )
@@ -61,8 +65,10 @@ async def rank_applicants(
 
 
 async def needs_manual(db: AsyncSession, slot_id: int) -> bool:
-    applicants = await rank_applicants(db, slot_id)
-    if len(applicants) <= 1:
-        return False
-    no_history = sum(1 for a in applicants if a["no_history"])
-    return no_history >= 2
+    """이력 없음 복수 경합도 applied_at(·id)로 자동 순위 결정 — 수동 확정 불필요.
+
+    월요일 15:30 지정 슬롯은 스케줄러/확정 API에서 별도 처리한다.
+    시그니처는 호출부 호환용으로 유지한다.
+    """
+    _ = (db, slot_id)
+    return False

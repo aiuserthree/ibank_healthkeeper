@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     mail_retry_max: int = 3
     mail_retry_backoff_seconds: list[int] = [60, 300, 1800]
 
-    confirm_mode: str = "MANUAL"  # MANUAL | AUTO
+    confirm_mode: str = "AUTO"  # MANUAL | AUTO
 
     app_base_url: str = "http://localhost:5173"
 

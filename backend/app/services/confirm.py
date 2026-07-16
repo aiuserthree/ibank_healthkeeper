@@ -220,8 +220,6 @@ async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
     for applicant in applicants:
         member = await db.get(Member, applicant["member_id"])
         applicant["total_uses"] = await get_member_total_uses(db, member) if member else 0
-    no_history_cnt = sum(1 for a in applicants if a["no_history"])
-    needs_manual = len(applicants) >= 2 and no_history_cnt >= 2
     from app.services.designated_slot import is_designated_confirm_slot
 
     cycle = await db.get(ReservationCycle, slot.cycle_id)
@@ -241,5 +239,6 @@ async def get_slot_detail(db: AsyncSession, slot_id: int) -> dict:
             "isDesignatedConfirmSlot": designated,
         },
         "applicants": applicants,
-        "needsManual": needs_manual,
+        # 이력 없음 복수 경합도 applied_at 순으로 자동 순위 — 수동 강제 없음
+        "needsManual": False,
     }
