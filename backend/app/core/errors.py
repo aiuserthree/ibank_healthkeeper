@@ -28,7 +28,7 @@ ERROR_MESSAGES = {
     "NOT_ADMIN_CANCEL_BEFORE_CLOSE": "일반 신청 마감(수요일 17:00) 이후에만 확정 취소할 수 있습니다.",
     "NOT_ADMIN_CANCEL_SLOT_PAST": "예약 시간이 지난 슬롯은 확정 취소할 수 없습니다.",
     "NOT_ADMIN_CANCEL_REAPPLY": "재신청 확정 건은 취소할 수 없습니다.",
-    "NOT_ADMIN_ASSIGN_PERIOD": "관리자 지정 가능 시간(목요일 17:00 ~ 금요일 16:30)이 아닙니다.",
+    "NOT_ADMIN_ASSIGN_PERIOD": "관리자 지정 가능 시간(수요일 17:00 이후 ~ 각 슬롯 시작 전)이 아닙니다.",
     "NOT_ADMIN_ASSIGN_SLOT_PAST": "예약 시간이 지난 슬롯은 인원 지정할 수 없습니다.",
     "SLOT_NOT_ASSIGNABLE": "신청 대기 중이거나 확정된 슬롯은 지정할 수 없습니다.",
     "SLOT_NOT_ADMIN_CANCEL_VACANCY": "확정·지정 취소로 비워진 슬롯만 인원 지정할 수 있습니다.",

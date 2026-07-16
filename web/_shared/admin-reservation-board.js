@@ -105,7 +105,7 @@ window.HKReservationBoard = (function () {
       if (!boardMeta.canAdminAssign && isAdminAssignTarget(slot)) {
         const from = boardMeta.adminAssignFrom
           ? HKUI.formatDateTimeKst(boardMeta.adminAssignFrom)
-          : "목요일 17:00";
+          : (meta.closeAt ? HKUI.formatDateTimeKst(meta.closeAt) : "수요일 17:00");
         return `<span style="font-size:13px;color:var(--text-muted)">${from} 이후 지정 가능</span>`;
       }
       if (isEmptyForAssign(slot)) {
@@ -147,11 +147,8 @@ window.HKReservationBoard = (function () {
       if (boardMeta.canAdminAssign) {
         const from = boardMeta.adminAssignFrom
           ? HKUI.formatDateTimeKst(boardMeta.adminAssignFrom)
-          : "목요일 17:00";
-        const until = boardMeta.adminAssignUntil
-          ? HKUI.formatDateTimeKst(boardMeta.adminAssignUntil)
-          : "금요일 16:30";
-        return `<div style="margin-bottom:20px">${HKUI.alertBox("info", "확정 취소 슬롯 · 인원 지정 가능", `관리자가 <b>확정 취소</b>한 시간대에 회원을 지정할 수 있습니다. (<b>${from}</b> ~ <b>${until}</b> · 각 시간대 시작 시각 이후에는 지정 불가 · 지정 시 즉시 확정 · <b>완료 메일은 [완료 메일 발송] 버튼으로 수동 발송</b>)`)}</div>`;
+          : (meta.closeAt ? HKUI.formatDateTimeKst(meta.closeAt) : "수요일 17:00");
+        return `<div style="margin-bottom:20px">${HKUI.alertBox("info", "확정 취소 슬롯 · 인원 지정 가능", `관리자가 <b>확정 취소</b>한 시간대에 회원을 지정할 수 있습니다. (<b>${from}</b> 이후 · 각 시간대 <b>시작 시각 전</b>까지 · 지정 시 즉시 확정 · <b>완료 메일은 [완료 메일 발송] 버튼으로 수동 발송</b>)`)}</div>`;
       }
       return "";
     }
