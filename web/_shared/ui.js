@@ -649,7 +649,7 @@ window.HKUI = (function () {
   }
 
   function reservationCard(r, opts = {}) {
-    const reapplyAvailable = !!opts.reapplyAvailable;
+    const reapplyAvailable = !!(opts.reapplyAvailable ?? r.reapplyAvailable);
     const muted = r.status === "CANCELLED";
     const d = new Date(r.slotDate + "T12:00:00");
     const dow = DAY_NAMES[d.getDay()];

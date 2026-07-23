@@ -320,7 +320,9 @@ async def list_my_reservations(
 
     pending_map = await get_pending_transfer_map(db, confirmed_ids)
     items = []
-    state, _ = await resolve_system_state(db)
+    state, active_cycle = await resolve_system_state(db)
+    in_reapply = state == CycleState.REAPPLY
+    active_cycle_id = active_cycle.id if active_cycle else None
     for reservation, slot, cycle in rows:
         cancelable = (
             state == CycleState.OPEN
@@ -333,6 +335,12 @@ async def list_my_reservations(
             and reservation.type in (ReservationType.NORMAL, ReservationType.REAPPLY)
             and can_transfer_slot(cycle, slot)
             and not pending
+        )
+        reapply_available = (
+            in_reapply
+            and reservation.status == ReservationStatus.DROPPED
+            and active_cycle_id is not None
+            and reservation.cycle_id == active_cycle_id
         )
         items.append(
             {
@@ -347,6 +355,7 @@ async def list_my_reservations(
                 "transferable": transferable,
                 "transferPending": bool(pending),
                 "transferRecipientName": pending["recipientName"] if pending else None,
+                "reapplyAvailable": reapply_available,
             }
         )
 

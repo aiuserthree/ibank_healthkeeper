@@ -47,13 +47,7 @@
         const listEl = document.getElementById("list");
         const pagerEl = document.getElementById("pager");
         let currentPage = 1;
-        let reapplyAvailable = false;
         let listMeta = { page: 1, pageSize: PAGE_SIZE, total: 0, totalPages: 0 };
-
-        try {
-          const sys = await HKApi.systemState();
-          reapplyAvailable = sys.state === "REAPPLY";
-        } catch (_) {}
 
         function bindCancelButtons(items) {
           listEl.querySelectorAll("[data-cancel]").forEach((btn) => {
@@ -237,7 +231,7 @@
               return;
             }
 
-            listEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${items.map((r) => HKUI.reservationCard(r, { reapplyAvailable })).join("")}</div>`;
+            listEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:12px">${items.map((r) => HKUI.reservationCard(r, { reapplyAvailable: !!r.reapplyAvailable })).join("")}</div>`;
             pagerEl.innerHTML = HKUI.paginationBar(listMeta);
             bindCancelButtons(items);
             bindTransferButtons(items);
