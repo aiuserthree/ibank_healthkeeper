@@ -6,7 +6,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
-from app.core.time import now_kst
+from app.core.time import format_kst_iso, now_kst
 from app.models import (
     ConfirmedBy,
     CycleState,
@@ -316,13 +316,19 @@ async def list_my_reservations(
         if r.status == ReservationStatus.CONFIRMED
         and r.type in (ReservationType.NORMAL, ReservationType.REAPPLY)
     ]
-    from app.services.transfer import can_transfer_slot, get_pending_transfer_map
+    from app.services.transfer import (
+        can_transfer_slot,
+        get_pending_transfer_map,
+        slot_start_dt,
+        transfer_window_start,
+    )
 
     pending_map = await get_pending_transfer_map(db, confirmed_ids)
     items = []
     state, active_cycle = await resolve_system_state(db)
     in_reapply = state == CycleState.REAPPLY
     active_cycle_id = active_cycle.id if active_cycle else None
+    now = now_kst()
     for reservation, slot, cycle in rows:
         cancelable = (
             state == CycleState.OPEN
@@ -330,12 +336,23 @@ async def list_my_reservations(
             and reservation.type == ReservationType.NORMAL
         )
         pending = pending_map.get(reservation.id)
-        transferable = (
+        # 양도 가능 대상(확정 + 일반/재신청 + 대기중인 양도 없음) — 시점(양도 창) 무관
+        transfer_candidate = (
             reservation.status == ReservationStatus.CONFIRMED
             and reservation.type in (ReservationType.NORMAL, ReservationType.REAPPLY)
-            and can_transfer_slot(cycle, slot)
             and not pending
         )
+        transferable = (
+            transfer_candidate
+            and can_transfer_slot(cycle, slot, now)
+        )
+        # 확정되었지만 양도 창(목 17:00)이 아직 열리지 않은 경우 —
+        # 버튼은 노출하되 비활성 + 안내 문구로 언제부터 가능한지 보여준다 (정책 변경 없음, UX만)
+        transfer_opens_at = None
+        if transfer_candidate and not transferable:
+            window_start = transfer_window_start(cycle)
+            if now < window_start and now < slot_start_dt(slot):
+                transfer_opens_at = format_kst_iso(window_start)
         reapply_available = (
             in_reapply
             and reservation.status == ReservationStatus.DROPPED
@@ -353,6 +370,7 @@ async def list_my_reservations(
                 "status": reservation.status.value,
                 "cancelable": cancelable,
                 "transferable": transferable,
+                "transferOpensAt": transfer_opens_at,
                 "transferPending": bool(pending),
                 "transferRecipientName": pending["recipientName"] if pending else None,
                 "reapplyAvailable": reapply_available,

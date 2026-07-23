@@ -660,12 +660,17 @@ window.HKUI = (function () {
     else if (r.type === "REAPPLY") sub = "재신청 · 즉시 확정 (취소 불가)";
     else if (r.status === "CONFIRMED") sub = "일반 신청 · 예약 확정";
     else if (r.status === "CANCELLED") sub = "취소됨";
+    // 확정됐지만 양도 창(목 17:00 등)이 아직 열리지 않은 경우 — 정책은 그대로, 안내만 미리 노출
+    const transferNotYetOpen = !r.transferable && !r.transferPending && r.transferOpensAt;
     if (r.transferPending) sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `양도 처리 중 → ${escapeHtml(r.transferRecipientName || "")}`;
+    else if (transferNotYetOpen) sub += ` · ${formatDeadlineRelative(r.transferOpensAt)} 이후 양도 가능`;
     const reapplyBadge = r.type === "REAPPLY" && !r.transferPending ? badge("재신청", "info") + " " : "";
     let action = `<span style="width:1px"></span>`;
     if (r.cancelable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel="${r.id}">취소</button>`;
     else if (r.transferable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-transfer="${r.id}">양도하기</button>`;
     else if (r.transferPending) action = badge("양도 처리 중", "warning");
+    else if (transferNotYetOpen)
+      action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="${escapeHtml(formatDeadlineRelative(r.transferOpensAt))} 이후 양도할 수 있어요">양도하기</button>`;
     else if (r.status === "DROPPED" && reapplyAvailable) action = `<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`;
     const dateBg = muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)";
     const monthColor = muted ? "var(--text-muted)" : "var(--color-slate-blue)";
