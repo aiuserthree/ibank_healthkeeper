@@ -221,7 +221,8 @@ window.HKReservationBoard = (function () {
     function adminCancelConfirmedBtn(a, slot) {
       if (a.status !== "CONFIRMED" || !isAdminCancelConfirmedType(a.type) || !canAdminCancelConfirmed()) return "";
       if (isSlotPastForCancel(slot)) {
-        return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="예약 시간이 지나 취소할 수 없습니다">확정 취소</button>`;
+        // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
+        return `<span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>확정 취소</button></span>`;
       }
       return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-confirmed="${a.reservation_id}">확정 취소</button>`;
     }
@@ -256,8 +257,9 @@ window.HKReservationBoard = (function () {
       if (designated) {
         // 시작 시각 경과 시 canConfirm 여부와 무관하게 비활성 버튼 + 툴팁을 항상 노출
         if (isSlotPastForAssign(slot)) {
+          // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
           return `${mailPart}
-          <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="예약 시간이 지나 취소할 수 없습니다">취소</button>`;
+          <span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>취소</button></span>`;
         }
         if (!canConfirm) return mailPart;
         return `${mailPart}
@@ -265,9 +267,10 @@ window.HKReservationBoard = (function () {
       }
       // 시작 시각 경과 시 canAdminAssign 여부와 무관하게 비활성 버튼 + 툴팁을 항상 노출
       if (isSlotPastForAssign(slot)) {
+        // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
         return `${mailPart}
-        <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="예약 시간이 지나 취소할 수 없습니다">취소</button>
-        <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="예약 시간이 지나 변경할 수 없습니다">변경</button>`;
+        <span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>취소</button></span>
+        <span title="예약 시간이 지나 변경할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>변경</button></span>`;
       }
       if (!boardMeta.canAdminAssign) return mailPart;
       return `${mailPart}
