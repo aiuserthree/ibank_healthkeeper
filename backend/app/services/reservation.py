@@ -348,11 +348,16 @@ async def list_my_reservations(
         )
         # 확정되었지만 양도 창(목 17:00)이 아직 열리지 않은 경우 —
         # 버튼은 노출하되 비활성 + 안내 문구로 언제부터 가능한지 보여준다 (정책 변경 없음, UX만)
+        # 반대로 양도 창(또는 예약 시작)이 이미 지난 경우도 버튼을 숨기지 않고 비활성 + 이유를 보여준다.
         transfer_opens_at = None
+        transfer_ended = False
         if transfer_candidate and not transferable:
             window_start = transfer_window_start(cycle)
-            if now < window_start and now < slot_start_dt(slot):
+            slot_start = slot_start_dt(slot)
+            if now < window_start and now < slot_start:
                 transfer_opens_at = format_kst_iso(window_start)
+            elif now >= slot_start:
+                transfer_ended = True
         reapply_available = (
             in_reapply
             and reservation.status == ReservationStatus.DROPPED
@@ -371,6 +376,7 @@ async def list_my_reservations(
                 "cancelable": cancelable,
                 "transferable": transferable,
                 "transferOpensAt": transfer_opens_at,
+                "transferEnded": transfer_ended,
                 "transferPending": bool(pending),
                 "transferRecipientName": pending["recipientName"] if pending else None,
                 "reapplyAvailable": reapply_available,
