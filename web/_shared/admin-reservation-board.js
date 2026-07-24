@@ -259,6 +259,11 @@ window.HKReservationBoard = (function () {
         <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-assign="${aa.reservation_id}">취소</button>`;
       }
       if (!boardMeta.canAdminAssign) return mailPart;
+      if (isSlotPastForAssign(slot)) {
+        return `${mailPart}
+        <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="예약 시간이 지나 취소할 수 없습니다">취소</button>
+        <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled title="예약 시간이 지나 변경할 수 없습니다">변경</button>`;
+      }
       return `${mailPart}
         <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-assign="${aa.reservation_id}">취소</button>
         <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-change-assign="${aa.reservation_id}" data-slot-id="${slot.slotId}">변경</button>`;
