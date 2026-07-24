@@ -26,11 +26,16 @@
       return type === "NORMAL" || type === "REAPPLY" || type === "TRANSFER";
     }
 
+    /** 비활성 버튼의 이유를 native title 뒤에 숨기지 않고 항상 보이는 텍스트로 노출한다. */
+    function disabledActionHint(text) {
+      return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--color-warning);white-space:nowrap">${HKUI.icon("info", 13, "var(--color-warning)")}${HKUI.escapeHtml(text)}</span>`;
+    }
+
     function adminCancelConfirmedBtnHtml(a, canConfirm, slot) {
       if (a.status !== "CONFIRMED" || !isAdminCancelConfirmedType(a.type) || !canConfirm) return "";
       if (HKUI.isSlotPastKst(slot?.slotDate, slot?.startTime)) {
-        // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
-        return `<span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>확정 취소</button></span>`;
+        // disabled 버튼의 title은 native 툴팁이라 잘 안 보이므로, span으로 감싸고 항상 보이는 안내 문구를 함께 노출한다.
+        return `<span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>확정 취소</button></span>${disabledActionHint("예약 시간이 지나 취소할 수 없습니다")}`;
       }
       return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-confirmed="${a.reservation_id}">확정 취소</button>`;
     }

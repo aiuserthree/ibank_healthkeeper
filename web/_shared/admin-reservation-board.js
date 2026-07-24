@@ -68,6 +68,11 @@ window.HKReservationBoard = (function () {
       return type === "NORMAL" || type === "REAPPLY" || type === "TRANSFER";
     }
 
+    /** 비활성 버튼의 이유를 native title 뒤에 숨기지 않고 항상 보이는 텍스트로 노출한다. */
+    function disabledActionHint(text) {
+      return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:12.5px;color:var(--color-warning);white-space:nowrap">${HKUI.icon("info", 13, "var(--color-warning)")}${HKUI.escapeHtml(text)}</span>`;
+    }
+
     function isSlotOff(slot) {
       return slot.isVacation || slot.isHoliday || offDates.has(slot.slotDate);
     }
@@ -221,8 +226,8 @@ window.HKReservationBoard = (function () {
     function adminCancelConfirmedBtn(a, slot) {
       if (a.status !== "CONFIRMED" || !isAdminCancelConfirmedType(a.type) || !canAdminCancelConfirmed()) return "";
       if (isSlotPastForCancel(slot)) {
-        // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
-        return `<span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>확정 취소</button></span>`;
+        // disabled 버튼의 title은 native 툴팁이라 잘 안 보이므로, span으로 감싸고 항상 보이는 안내 문구를 함께 노출한다.
+        return `<span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>확정 취소</button></span>${disabledActionHint("예약 시간이 지나 취소할 수 없습니다")}`;
       }
       return `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-confirmed="${a.reservation_id}">확정 취소</button>`;
     }
@@ -255,22 +260,24 @@ window.HKReservationBoard = (function () {
       const designated = isDesignatedConfirmSlot(slot);
       // 월 15:30 지정 확정: 마감 후 취소만 (변경은 취소 후 재지정)
       if (designated) {
-        // 시작 시각 경과 시 canConfirm 여부와 무관하게 비활성 버튼 + 툴팁을 항상 노출
+        // 시작 시각 경과 시 canConfirm 여부와 무관하게 비활성 버튼 + 항상 보이는 안내 문구를 노출
         if (isSlotPastForAssign(slot)) {
-          // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
+          // disabled 버튼의 title은 native 툴팁이라 잘 안 보이므로, span으로 감싸고 항상 보이는 안내 문구를 함께 노출한다.
           return `${mailPart}
-          <span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>취소</button></span>`;
+          <span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>취소</button></span>
+          ${disabledActionHint("예약 시간이 지나 취소할 수 없습니다")}`;
         }
         if (!canConfirm) return mailPart;
         return `${mailPart}
         <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel-assign="${aa.reservation_id}">취소</button>`;
       }
-      // 시작 시각 경과 시 canAdminAssign 여부와 무관하게 비활성 버튼 + 툴팁을 항상 노출
+      // 시작 시각 경과 시 canAdminAssign 여부와 무관하게 비활성 버튼 + 항상 보이는 안내 문구를 노출
       if (isSlotPastForAssign(slot)) {
-        // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
+        // disabled 버튼의 title은 native 툴팁이라 잘 안 보이므로, span으로 감싸고 항상 보이는 안내 문구를 함께 노출한다.
         return `${mailPart}
         <span title="예약 시간이 지나 취소할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>취소</button></span>
-        <span title="예약 시간이 지나 변경할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>변경</button></span>`;
+        <span title="예약 시간이 지나 변경할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>변경</button></span>
+        ${disabledActionHint("예약 시간이 지나 취소·변경할 수 없습니다")}`;
       }
       if (!boardMeta.canAdminAssign) return mailPart;
       return `${mailPart}
