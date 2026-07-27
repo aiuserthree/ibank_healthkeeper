@@ -710,25 +710,25 @@ window.HKUI = (function () {
         actions.push(`<span title="예약 시간이 지나 양도할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>양도하기</button></span>`);
       }
     }
-    const action = actions.length
-      ? `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center">${actions.join("")}</div>`
-      : `<span style="width:1px"></span>`;
+    const action = `<div class="hk-rsv-card__actions">${actions.join("")}</div>`;
     const dateBg = muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)";
     const monthColor = muted ? "var(--text-muted)" : "var(--color-slate-blue)";
     const dayColor = muted ? "var(--text-muted)" : "var(--color-midnight-navy)";
     const dowColor = "var(--text-muted)";
-    return `<div class="hk-card hk-card--pad" style="opacity:${muted ? 0.7 : 1}">
-      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        <div style="width:50px;min-width:50px;padding:7px 0;border-radius:10px;background:${dateBg};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;text-align:center">
-          <div style="font-size:10px;font-weight:600;color:${monthColor};line-height:1">${month}월</div>
-          <div style="font-size:20px;font-weight:700;color:${dayColor};line-height:1.05;margin:4px 0 3px;font-variant-numeric:tabular-nums">${dayNum}</div>
-          <div style="font-size:10px;font-weight:600;color:${dowColor};line-height:1">${dow}</div>
+    return `<div class="hk-card hk-card--pad hk-rsv-card" style="opacity:${muted ? 0.7 : 1}">
+      <div class="hk-rsv-card__inner">
+        <div class="hk-rsv-card__main">
+          <div class="hk-rsv-card__date" style="background:${dateBg}">
+            <div class="hk-rsv-card__month" style="color:${monthColor}">${month}월</div>
+            <div class="hk-rsv-card__day" style="color:${dayColor}">${dayNum}</div>
+            <div class="hk-rsv-card__dow" style="color:${dowColor}">${dow}</div>
+          </div>
+          <div class="hk-rsv-card__body">
+            <div class="hk-rsv-card__time">${escapeHtml(r.startTime)} – ${escapeHtml(r.endTime)}</div>
+            <div class="hk-rsv-card__sub">${reapplyBadge}<span class="hk-rsv-card__sub-text">${sub}</span></div>
+          </div>
+          <div class="hk-rsv-card__status">${statusBadge(r.status)}</div>
         </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:17px;font-weight:700;color:var(--color-midnight-navy)">${escapeHtml(r.startTime)} – ${escapeHtml(r.endTime)}</div>
-          <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${reapplyBadge}${sub}</div>
-        </div>
-        ${statusBadge(r.status)}
         ${action}
       </div>
     </div>`;
