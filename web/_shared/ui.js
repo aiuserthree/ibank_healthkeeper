@@ -727,9 +727,11 @@ window.HKUI = (function () {
             <div class="hk-rsv-card__time">${escapeHtml(r.startTime)} – ${escapeHtml(r.endTime)}</div>
             <div class="hk-rsv-card__sub">${reapplyBadge}<span class="hk-rsv-card__sub-text">${sub}</span></div>
           </div>
-          <div class="hk-rsv-card__status">${statusBadge(r.status)}</div>
         </div>
-        ${action}
+        <div class="hk-rsv-card__aside">
+          <div class="hk-rsv-card__status">${statusBadge(r.status)}</div>
+          ${action}
+        </div>
       </div>
     </div>`;
   }
