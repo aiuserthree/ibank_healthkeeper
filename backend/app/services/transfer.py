@@ -109,8 +109,24 @@ def _is_transfer_org_member(member: Member) -> bool:
 
 
 def transfer_window_start(cycle: ReservationCycle) -> datetime:
-    """양도 가능 시작: 재신청 마감(목 17:00) 이후."""
-    return to_kst(cycle.reapply_close_at)
+    """양도/교환 가능 시작: 일반 신청 마감(수 17:00, close_at) 이후."""
+    return to_kst(cycle.close_at)
+
+
+def transfer_window_bypassed() -> bool:
+    """DEBUG + TRANSFER_WINDOW_BYPASS=1 일 때만 창 검사 생략 (로컬 수동 테스트)."""
+    settings = get_settings()
+    return bool(settings.debug and settings.transfer_window_bypass)
+
+
+def is_transfer_window_open(
+    cycle: ReservationCycle, now: datetime | None = None
+) -> bool:
+    """수 17:00(close_at) 이후인지. 로컬 bypass 시 항상 True."""
+    now = now or now_kst()
+    if transfer_window_bypassed():
+        return True
+    return transfer_window_start(cycle) <= now
 
 
 def slot_start_dt(slot: Slot) -> datetime:
@@ -120,9 +136,9 @@ def slot_start_dt(slot: Slot) -> datetime:
 def can_transfer_slot(
     cycle: ReservationCycle, slot: Slot, now: datetime | None = None
 ) -> bool:
-    """목 17:00 이후 ~ 해당 슬롯 시작 전까지 양도 가능."""
+    """수 17:00 이후 ~ 해당 슬롯 시작 전까지 양도 가능."""
     now = now or now_kst()
-    return transfer_window_start(cycle) <= now < slot_start_dt(slot)
+    return is_transfer_window_open(cycle, now) and now < slot_start_dt(slot)
 
 
 def transfer_meta(cycle: ReservationCycle, slot: Slot) -> dict:
@@ -321,6 +337,11 @@ async def request_transfer(
     """회원 양도 — 관리자 승인 없이 즉시 완료."""
     if await _has_pending_transfer(db, reservation_id):
         raise_app_error("TRANSFER_ALREADY_PENDING")
+
+    from app.services.swap import has_pending_swap_involving
+
+    if await has_pending_swap_involving(db, reservation_id):
+        raise_app_error("SWAP_IN_PROGRESS")
 
     reservation_result = await db.execute(
         select(Reservation, Slot, ReservationCycle)

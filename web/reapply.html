@@ -183,7 +183,14 @@
         HKUI.toast(`${label} ${slot.startTime} 예약이 확정되었습니다 · 완료 메일 발송 (취소 불가)`);
         renderContent();
       } catch (e) {
-        if (e.code === "WEEK_APPLY_LIMIT") {
+        if (e.code === "TRANSFER_RECIPIENT_NO_REAPPLY") {
+          await HKUI.confirmDialog(
+            "재신청할 수 없습니다",
+            "양도로 받은 예약이 있어 <b>같은 주 재신청은 불가</b>합니다. 마이페이지에서 확정 내역을 확인하세요.",
+            { confirmLabel: "내 예약 내역 보기", hideCancel: true }
+          );
+          window.location.href = HKRoutes.mypage;
+        } else if (e.code === "WEEK_APPLY_LIMIT") {
           await loadConfirmedReapply();
           await HKUI.confirmDialog(
             "재신청을 완료했습니다",
@@ -221,7 +228,7 @@
     function renderEligibleContent(el) {
       const deadline = reapplyDeadlineLabel();
       const doneAlert = hasReapplyDone()
-        ? `<div style="margin-bottom:20px">${HKUI.alertBox("info", "재신청 완료", "이번 주 재신청은 <b>한 타임만</b> 가능합니다. 다른 슬롯은 더 이상 신청할 수 없어요.")}</div>`
+        ? `<div style="margin-bottom:20px">${HKUI.alertBox("info", "재신청 완료", "이번 주 확정 예약이 있어 다른 슬롯은 더 이상 신청할 수 없어요. (양도 수령·재신청 포함)")}</div>`
         : `<div style="margin-bottom:20px">${HKUI.alertBox("warning", `재신청 안내 · ${deadline}까지`, "재신청은 <b>선착순으로 즉시 확정</b>되며, <b>취소할 수 없습니다.</b> 이미 확정된 슬롯은 신청이 거절됩니다.")}</div>`;
 
       el.innerHTML = `${doneAlert}

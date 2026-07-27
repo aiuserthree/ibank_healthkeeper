@@ -21,6 +21,7 @@ from app.models import (
     ReservationCycle,
     ReservationStatus,
     Slot,
+    SwapProposal,
     TeamsMessage,
     TeamsMessageType,
     TransferRequest,
@@ -29,10 +30,15 @@ from app.services.sso import _microsoft_post
 
 logger = logging.getLogger(__name__)
 
-# 양도 알림은 재시도 시 Teams 채팅에 중복 메시지가 쌓일 수 있어 1회만 시도
+# 양도·교환 알림은 재시도 시 Teams 채팅에 중복 메시지가 쌓일 수 있어 1회만 시도
 _TRANSFER_NOTIFY_TYPES = frozenset({
     TeamsMessageType.TRANSFER_REQUEST_ADMIN,
     TeamsMessageType.TRANSFER_APPROVED,
+    TeamsMessageType.SWAP_PROPOSED,
+    TeamsMessageType.SWAP_REJECTED,
+    TeamsMessageType.SWAP_ACCEPTED,
+    TeamsMessageType.SWAP_ACCEPT_FAILED,
+    TeamsMessageType.SWAP_CANCELLED,
 })
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
@@ -375,6 +381,243 @@ async def enqueue_transfer_completed_notices(
 
 # 하위 호환 별칭
 enqueue_transfer_approved_notices = enqueue_transfer_completed_notices
+
+
+def render_swap_proposed_body(
+    *,
+    target_name: str,
+    proposer_name: str,
+    target_slot: Slot,
+    proposer_slot: Slot,
+) -> str:
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 예약 교환 제안</p>"
+        f"<p>{target_name}님, <b>{proposer_name}</b>님이 슬롯 교환을 제안했습니다.</p>"
+        f"<p>내 예약: <strong>{_slot_label(target_slot)}</strong></p>"
+        f"<p>상대 예약: <strong>{_slot_label(proposer_slot)}</strong></p>"
+        f"<p>마이페이지에서 수락 또는 거절해 주세요.</p>"
+    )
+
+
+def render_swap_rejected_body(
+    *,
+    proposer_name: str,
+    target_name: str,
+    proposer_slot: Slot,
+    target_slot: Slot,
+) -> str:
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 교환 제안 거절</p>"
+        f"<p>{proposer_name}님, <b>{target_name}</b>님이 교환 제안을 거절했습니다.</p>"
+        f"<p>내 예약: <strong>{_slot_label(proposer_slot)}</strong> / "
+        f"상대: <strong>{_slot_label(target_slot)}</strong></p>"
+        f"<p>예약은 그대로 유지됩니다.</p>"
+    )
+
+
+def render_swap_accepted_body(
+    *,
+    name: str,
+    other_name: str,
+    new_slot: Slot,
+) -> str:
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 예약 교환 완료</p>"
+        f"<p>{name}님, <b>{other_name}</b>님과 예약 교환이 완료되었습니다.</p>"
+        f"<p>변경 후 예약: <strong>{_slot_label(new_slot)}</strong></p>"
+    )
+
+
+def render_swap_accept_failed_body(
+    *,
+    proposer_name: str,
+    target_name: str,
+    proposer_slot: Slot,
+    fail_reason_ko: str,
+) -> str:
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 교환 진행 실패</p>"
+        f"<p>{proposer_name}님, <b>{target_name}</b>님과의 교환을 진행할 수 없어 "
+        f"제안이 종료되었습니다.</p>"
+        f"<p>사유: {fail_reason_ko}</p>"
+        f"<p>내 예약: <strong>{_slot_label(proposer_slot)}</strong> (변동 없음)</p>"
+    )
+
+
+def render_swap_cancelled_body(
+    *,
+    target_name: str,
+    proposer_name: str,
+    target_slot: Slot,
+) -> str:
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 교환 제안 취소</p>"
+        f"<p>{target_name}님, <b>{proposer_name}</b>님의 교환 제안이 취소됐어요.</p>"
+        f"<p>내 예약: <strong>{_slot_label(target_slot)}</strong> (변동 없음)</p>"
+    )
+
+
+async def enqueue_swap_proposed_notice(
+    db: AsyncSession,
+    *,
+    swap: SwapProposal,
+    proposer: Member,
+    target: Member,
+    proposer_slot: Slot,
+    target_slot: Slot,
+) -> list[int]:
+    if not target.entra_oid:
+        return []
+    body = render_swap_proposed_body(
+        target_name=target.name,
+        proposer_name=proposer.name,
+        target_slot=target_slot,
+        proposer_slot=proposer_slot,
+    )
+    msg = await enqueue_teams_message(
+        db,
+        message_type=TeamsMessageType.SWAP_PROPOSED,
+        to_member_id=target.id,
+        to_entra_oid=target.entra_oid,
+        body=body,
+        dedupe_key=f"swap-proposed:{swap.id}",
+        reservation_id=swap.target_reservation_id,
+    )
+    return [msg.id] if msg else []
+
+
+async def enqueue_swap_rejected_notice(
+    db: AsyncSession,
+    *,
+    swap: SwapProposal,
+    proposer: Member,
+    target: Member,
+    proposer_slot: Slot,
+    target_slot: Slot,
+) -> list[int]:
+    if not proposer.entra_oid:
+        return []
+    body = render_swap_rejected_body(
+        proposer_name=proposer.name,
+        target_name=target.name,
+        proposer_slot=proposer_slot,
+        target_slot=target_slot,
+    )
+    msg = await enqueue_teams_message(
+        db,
+        message_type=TeamsMessageType.SWAP_REJECTED,
+        to_member_id=proposer.id,
+        to_entra_oid=proposer.entra_oid,
+        body=body,
+        dedupe_key=f"swap-rejected:{swap.id}",
+        reservation_id=swap.proposer_reservation_id,
+    )
+    return [msg.id] if msg else []
+
+
+async def enqueue_swap_accepted_notices(
+    db: AsyncSession,
+    *,
+    swap: SwapProposal,
+    proposer: Member,
+    target: Member,
+    new_proposer_slot: Slot,
+    new_target_slot: Slot,
+) -> list[int]:
+    message_ids: list[int] = []
+    if proposer.entra_oid:
+        body = render_swap_accepted_body(
+            name=proposer.name,
+            other_name=target.name,
+            new_slot=new_proposer_slot,
+        )
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.SWAP_ACCEPTED,
+            to_member_id=proposer.id,
+            to_entra_oid=proposer.entra_oid,
+            body=body,
+            dedupe_key=f"swap-accepted-proposer:{swap.id}",
+            reservation_id=swap.proposer_reservation_id,
+        )
+        if msg:
+            message_ids.append(msg.id)
+    if target.entra_oid:
+        body = render_swap_accepted_body(
+            name=target.name,
+            other_name=proposer.name,
+            new_slot=new_target_slot,
+        )
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.SWAP_ACCEPTED,
+            to_member_id=target.id,
+            to_entra_oid=target.entra_oid,
+            body=body,
+            dedupe_key=f"swap-accepted-target:{swap.id}",
+            reservation_id=swap.target_reservation_id,
+        )
+        if msg:
+            message_ids.append(msg.id)
+    return message_ids
+
+
+async def enqueue_swap_accept_failed_notice(
+    db: AsyncSession,
+    *,
+    swap: SwapProposal,
+    proposer: Member,
+    target: Member,
+    proposer_slot: Slot,
+    fail_reason: str,
+) -> list[int]:
+    from app.services.swap import FAIL_REASON_KO
+
+    if not proposer.entra_oid:
+        return []
+    body = render_swap_accept_failed_body(
+        proposer_name=proposer.name,
+        target_name=target.name,
+        proposer_slot=proposer_slot,
+        fail_reason_ko=FAIL_REASON_KO.get(fail_reason, "교환할 수 없는 상태입니다."),
+    )
+    msg = await enqueue_teams_message(
+        db,
+        message_type=TeamsMessageType.SWAP_ACCEPT_FAILED,
+        to_member_id=proposer.id,
+        to_entra_oid=proposer.entra_oid,
+        body=body,
+        dedupe_key=f"swap-accept-failed:{swap.id}",
+        reservation_id=swap.proposer_reservation_id,
+    )
+    return [msg.id] if msg else []
+
+
+async def enqueue_swap_cancelled_notice(
+    db: AsyncSession,
+    *,
+    swap: SwapProposal,
+    proposer: Member,
+    target: Member,
+    target_slot: Slot,
+) -> list[int]:
+    if not target.entra_oid:
+        return []
+    body = render_swap_cancelled_body(
+        target_name=target.name,
+        proposer_name=proposer.name,
+        target_slot=target_slot,
+    )
+    msg = await enqueue_teams_message(
+        db,
+        message_type=TeamsMessageType.SWAP_CANCELLED,
+        to_member_id=target.id,
+        to_entra_oid=target.entra_oid,
+        body=body,
+        dedupe_key=f"swap-cancelled:{swap.id}",
+        reservation_id=swap.target_reservation_id,
+    )
+    return [msg.id] if msg else []
 
 
 async def resolve_open_notice_cycle(

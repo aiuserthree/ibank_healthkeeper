@@ -62,6 +62,10 @@ class TransferRequestBody(BaseModel):
     recipientId: int
 
 
+class SwapRequestBody(BaseModel):
+    targetReservationId: int
+
+
 class VacationRequest(BaseModel):
     cycleId: int
     dates: list[str]

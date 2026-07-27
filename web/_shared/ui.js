@@ -658,32 +658,67 @@ window.HKUI = (function () {
     let sub = "일반 신청 · 확정 대기";
     if (r.status === "DROPPED") sub = reapplyAvailable ? "탈락 — 재신청 가능" : "탈락";
     else if (r.type === "REAPPLY") sub = "재신청 · 즉시 확정 (취소 불가)";
+    else if (r.type === "TRANSFER" && r.status === "CONFIRMED") sub = "양도 수령 · 예약 확정";
+    else if (r.type === "ADMIN_ASSIGN" && r.status === "CONFIRMED") sub = "관리자 지정 · 예약 확정";
     else if (r.status === "CONFIRMED") sub = "일반 신청 · 예약 확정";
     else if (r.status === "CANCELLED") sub = "취소됨";
-    // 확정됐지만 양도 창(목 17:00 등)이 아직 열리지 않은 경우 — 정책은 그대로, 안내만 미리 노출
-    const transferNotYetOpen = !r.transferable && !r.transferPending && !!r.transferOpensAt;
-    // 양도 가능 대상이었지만 예약 시간이 지나 창이 닫힌 경우 — 버튼을 숨기지 않고 비활성 + 이유로 노출
-    const transferEnded = !r.transferable && !r.transferPending && !r.transferOpensAt && !!r.transferEnded;
-    if (r.transferPending) sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `양도 처리 중 → ${escapeHtml(r.transferRecipientName || "")}`;
-    else if (transferNotYetOpen) sub += ` · ${formatDeadlineRelative(r.transferOpensAt)} 이후 양도 가능`;
-    const reapplyBadge = r.type === "REAPPLY" && !r.transferPending ? badge("재신청", "info") + " " : "";
-    let action = `<span style="width:1px"></span>`;
-    if (r.cancelable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel="${r.id}">취소</button>`;
-    else if (r.transferable) action = `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-transfer="${r.id}">양도하기</button>`;
-    else if (r.transferPending) action = badge("양도 처리 중", "warning");
-    else if (transferNotYetOpen)
-      // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
-      action = `<span title="${escapeHtml(formatDeadlineRelative(r.transferOpensAt))} 이후 양도할 수 있어요" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>양도하기</button></span>`;
-    else if (transferEnded)
-      // disabled 버튼은 브라우저에 따라 title 툴팁이 뜨지 않아 span으로 감싼다.
-      action = `<span title="예약 시간이 지나 양도할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>양도하기</button></span>`;
-    else if (r.status === "DROPPED" && reapplyAvailable) action = `<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`;
+    // 확정됐지만 양도/교환 창(수 17:00 등)이 아직 열리지 않은 경우 — 정책은 그대로, 안내만 미리 노출
+    const busyPending = !!(r.transferPending || r.swapPending);
+    const transferNotYetOpen = !r.transferable && !busyPending && !!r.transferOpensAt;
+    const transferEnded = !r.transferable && !busyPending && !r.transferOpensAt && !!r.transferEnded;
+    const swapNotYetOpen = !r.swappable && !busyPending && !!r.swapOpensAt;
+    const swapEnded = !r.swappable && !busyPending && !r.swapOpensAt && !!r.swapEnded;
+    if (r.swapPending && r.swapRole === "proposer") {
+      sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `교환 제안 중 → ${escapeHtml(r.swapCounterpartName || "")}`;
+    } else if (r.swapPending && r.swapRole === "target") {
+      sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `교환 제안 받음 ← ${escapeHtml(r.swapCounterpartName || "")}`;
+    } else if (r.transferPending) {
+      sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `양도 처리 중 → ${escapeHtml(r.transferRecipientName || "")}`;
+    } else if (swapNotYetOpen || transferNotYetOpen) {
+      const opens = r.swapOpensAt || r.transferOpensAt;
+      sub += ` · ${formatDeadlineRelative(opens)} 이후 교환·양도 가능`;
+    }
+    const reapplyBadge = r.type === "REAPPLY" && !busyPending ? badge("재신청", "info") + " " : "";
+
+    const actions = [];
+    if (r.cancelable) {
+      actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-cancel="${r.id}">취소</button>`);
+    } else if (r.swapPending && r.swapRole === "proposer" && r.swapId) {
+      actions.push(badge("교환 제안 중", "warning"));
+      actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-swap-cancel="${r.swapId}">제안 취소</button>`);
+    } else if (r.swapPending && r.swapRole === "target") {
+      actions.push(badge("교환 제안 받음", "warning"));
+    } else if (r.transferPending) {
+      actions.push(badge("양도 처리 중", "warning"));
+    } else if (r.status === "DROPPED" && reapplyAvailable) {
+      actions.push(`<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`);
+    } else {
+      // 교환하기 (우선) + 양도하기 — 가능/대기/종료 상태를 나란히 노출
+      if (r.swappable) {
+        actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-swap="${r.id}">교환하기</button>`);
+      } else if (swapNotYetOpen) {
+        const opensLabel = formatDeadlineRelative(r.swapOpensAt, "17:00");
+        actions.push(`<span title="${escapeHtml(opensLabel)} 이후 교환할 수 있어요" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>교환하기</button></span>`);
+      } else if (swapEnded) {
+        actions.push(`<span title="예약 시간이 지나 교환할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>교환하기</button></span>`);
+      }
+      if (r.transferable) {
+        actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-transfer="${r.id}">양도하기</button>`);
+      } else if (transferNotYetOpen) {
+        actions.push(`<span title="${escapeHtml(formatDeadlineRelative(r.transferOpensAt))} 이후 양도할 수 있어요" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>양도하기</button></span>`);
+      } else if (transferEnded) {
+        actions.push(`<span title="예약 시간이 지나 양도할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>양도하기</button></span>`);
+      }
+    }
+    const action = actions.length
+      ? `<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;align-items:center">${actions.join("")}</div>`
+      : `<span style="width:1px"></span>`;
     const dateBg = muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)";
     const monthColor = muted ? "var(--text-muted)" : "var(--color-slate-blue)";
     const dayColor = muted ? "var(--text-muted)" : "var(--color-midnight-navy)";
     const dowColor = "var(--text-muted)";
     return `<div class="hk-card hk-card--pad" style="opacity:${muted ? 0.7 : 1}">
-      <div style="display:flex;align-items:center;gap:16px">
+      <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
         <div style="width:50px;min-width:50px;padding:7px 0;border-radius:10px;background:${dateBg};display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;text-align:center">
           <div style="font-size:10px;font-weight:600;color:${monthColor};line-height:1">${month}월</div>
           <div style="font-size:20px;font-weight:700;color:${dayColor};line-height:1.05;margin:4px 0 3px;font-variant-numeric:tabular-nums">${dayNum}</div>
@@ -691,7 +726,7 @@ window.HKUI = (function () {
         </div>
         <div style="flex:1;min-width:0">
           <div style="font-size:17px;font-weight:700;color:var(--color-midnight-navy)">${escapeHtml(r.startTime)} – ${escapeHtml(r.endTime)}</div>
-          <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;display:flex;align-items:center;gap:6px">${reapplyBadge}${sub}</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">${reapplyBadge}${sub}</div>
         </div>
         ${statusBadge(r.status)}
         ${action}

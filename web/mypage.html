@@ -17,6 +17,14 @@
   <div id="app"></div>
   <script>
     const PAGE_SIZE = 10;
+    const DAY_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
+    function slotLabel(slot) {
+      if (!slot) return "";
+      const d = new Date(slot.slotDate + "T12:00:00");
+      const dow = DAY_NAMES[d.getDay()];
+      return `${HKUI.formatDateShort(slot.slotDate)}(${dow}) ${slot.startTime}–${slot.endTime}`;
+    }
 
     HKMember.mountPage({
       active: "mypage",
@@ -28,7 +36,8 @@
           <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">${HKUI.escapeHtml(profile.name)}님의 예약 신청 내역입니다.</p>
           ${HKUI.subNav("res")}
           <div class="hk-card hk-card--pad hk-card--flat" style="margin-bottom:20px;background:var(--color-mist)" id="stats"></div>
-          <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b> 확정 후 못 가시면 <b>목 17:00 이후</b> 다른 회원에게 바로 양도할 수 있습니다.")}</div>
+          <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b> 확정 후 <b>수 17:00 이후</b> 다른 확정 회원과 <b>슬롯 교환</b>을 제안하거나, 예약이 필요 없으면 <b>양도</b>할 수 있습니다. 양도로 받은 예약이 있으면 같은 주 <b>재신청은 불가</b>합니다.")}</div>
+          <div id="swap-inbox" style="display:none;margin-bottom:20px"></div>
           <div id="list"></div>
           <div id="pager"></div>`;
       },
@@ -44,6 +53,7 @@
         HKUI.bindTooltips(statsEl);
         HKUI.refreshIcons();
 
+        const inboxEl = document.getElementById("swap-inbox");
         const listEl = document.getElementById("list");
         const pagerEl = document.getElementById("pager");
         let currentPage = 1;
@@ -54,14 +64,14 @@
             btn.onclick = async () => {
               const r = items.find((x) => x.id === Number(btn.dataset.cancel));
               const d = new Date(r.slotDate + "T12:00:00");
-              const dow = ["일","월","화","수","목","금","토"][d.getDay()];
+              const dow = DAY_NAMES[d.getDay()];
               const dateLabel = `${HKUI.formatDateShort(r.slotDate)}(${dow})`;
               const ok = await HKUI.confirmDialog("신청을 취소할까요?", `${dateLabel} <b>${r.startTime}</b> 신청을 취소합니다. 마감 전 취소는 <b>우선권에 영향을 주지 않습니다.</b>`, { confirmLabel: "취소하기", confirmVariant: "danger" });
               if (!ok) return;
               try {
                 await HKApi.cancelReservation(Number(btn.dataset.cancel));
                 HKUI.toast("신청이 취소되었습니다 · 우선권에는 영향이 없습니다");
-                await loadPage(currentPage);
+                await refreshAll();
               } catch (e) {
                 HKUI.toast(e.message, "danger");
               }
@@ -89,17 +99,50 @@
           }).join("")}</div>`;
         }
 
+        function renderSwapTargetList(members, selectedReservationId, { searched = false } = {}) {
+          if (!members.length) {
+            const msg = searched
+              ? "검색 결과가 없습니다."
+              : "이름을 검색하세요";
+            return `<div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center">${msg}</div>`;
+          }
+          return `<div style="display:flex;flex-direction:column;gap:8px">${members.map((m) => {
+            const dept = m.department ? HKUI.escapeHtml(m.department) : "";
+            const selected = selectedReservationId === m.reservationId;
+            const d = new Date(m.slotDate + "T12:00:00");
+            const dow = DAY_NAMES[d.getDay()];
+            const slotText = `${dow} ${m.startTime}–${m.endTime}`;
+            return `<button type="button" class="hk-card hk-card--pad" data-target-reservation-id="${m.reservationId}" style="text-align:left;cursor:pointer;border:1px solid ${selected ? "var(--color-signal-blue)" : "var(--border-default)"};background:${selected ? "var(--color-signal-blue-soft)" : "var(--surface-card)"};width:100%">
+              <div style="display:flex;align-items:center;gap:12px">
+                ${HKUI.avatar(m.name, "sm", m.avatarUrl || "")}
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(m.name)}${dept ? ` · <span style="font-size:12px;font-weight:600;color:var(--color-slate-blue)">${dept}</span>` : ""}</div>
+                  <div style="font-size:13px;color:var(--color-midnight-navy);margin-top:2px;font-weight:600">${HKUI.escapeHtml(slotText)}</div>
+                  <div style="font-size:12px;color:var(--text-muted)">${HKUI.formatDateShort(m.slotDate)} · ${HKUI.escapeHtml(m.email || "")}</div>
+                </div>
+                ${selected ? HKUI.badge("선택됨", "info") : ""}
+              </div>
+            </button>`;
+          }).join("")}</div>`;
+        }
+
         function closeTransferModal() {
           const el = document.getElementById("transfer-modal-overlay");
           if (el) el.remove();
         }
 
+        function closeSwapModal() {
+          const el = document.getElementById("swap-modal-overlay");
+          if (el) el.remove();
+        }
+
         async function openTransferModal(reservationId, items) {
           closeTransferModal();
+          closeSwapModal();
           const r = items.find((x) => x.id === reservationId);
           if (!r) return;
           const d = new Date(r.slotDate + "T12:00:00");
-          const dow = ["일","월","화","수","목","금","토"][d.getDay()];
+          const dow = DAY_NAMES[d.getDay()];
           const dateLabel = `${HKUI.formatDateShort(r.slotDate)}(${dow})`;
 
           const overlay = document.createElement("div");
@@ -129,17 +172,17 @@
           document.body.appendChild(overlay);
           HKUI.refreshIcons(overlay);
 
-          const listEl = overlay.querySelector("#transfer-member-list");
+          const modalListEl = overlay.querySelector("#transfer-member-list");
           const searchEl = overlay.querySelector("#transfer-member-search");
           const submitBtn = overlay.querySelector("#transfer-submit-btn");
           let selectedId = null;
           let members = [];
 
           function bindRecipientClicks() {
-            listEl.querySelectorAll("[data-recipient-id]").forEach((btn) => {
+            modalListEl.querySelectorAll("[data-recipient-id]").forEach((btn) => {
               btn.onclick = () => {
                 selectedId = Number(btn.dataset.recipientId);
-                listEl.innerHTML = renderRecipientList(members, selectedId);
+                modalListEl.innerHTML = renderRecipientList(members, selectedId);
                 bindRecipientClicks();
                 submitBtn.disabled = !selectedId;
               };
@@ -147,14 +190,14 @@
           }
 
           async function loadRecipients(q = "") {
-            listEl.innerHTML = `<div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center"><span class="hk-spin"></span></div>`;
+            modalListEl.innerHTML = `<div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center"><span class="hk-spin"></span></div>`;
             try {
               const data = await HKApi.transferRecipients(reservationId, q);
               members = data.members || [];
-              listEl.innerHTML = renderRecipientList(members, selectedId);
+              modalListEl.innerHTML = renderRecipientList(members, selectedId);
               bindRecipientClicks();
             } catch (e) {
-              listEl.innerHTML = HKUI.alertBox("danger", "오류", HKUI.escapeHtml(e.message));
+              modalListEl.innerHTML = HKUI.alertBox("danger", "오류", HKUI.escapeHtml(e.message));
             }
           }
 
@@ -179,7 +222,7 @@
               await HKApi.requestTransfer(reservationId, selectedId);
               HKUI.toast("양도가 완료되었습니다");
               closeTransferModal();
-              await loadPage(currentPage);
+              await refreshAll();
             } catch (e) {
               submitBtn.disabled = false;
               submitBtn.textContent = prevLabel;
@@ -191,10 +234,225 @@
           searchEl.focus();
         }
 
+        async function openSwapModal(reservationId, items) {
+          closeSwapModal();
+          closeTransferModal();
+          const r = items.find((x) => x.id === reservationId);
+          if (!r) return;
+          const myLabel = slotLabel(r);
+
+          const overlay = document.createElement("div");
+          overlay.id = "swap-modal-overlay";
+          overlay.className = "hk-dialog__overlay";
+          overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:560px;max-height:min(90dvh,90vh);width:calc(100% - 32px);overflow:hidden;display:flex;flex-direction:column;padding:0">
+            <div style="padding:20px 24px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
+              <div>
+                <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy)">교환하기</div>
+                <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">내 예약 · ${HKUI.escapeHtml(myLabel)}</div>
+              </div>
+              <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" data-modal-close aria-label="닫기">${HKUI.icon("x", 18, "var(--color-slate-blue)")}</button>
+            </div>
+            <div style="padding:20px 24px;overflow-y:auto;flex:1">
+              <div style="margin-bottom:16px">${HKUI.alertBox("info", "교환하기", "같은 주 <b>확정 예약</b> 회원을 검색해 슬롯 교환을 제안합니다. 상대가 <b>수락</b>하면 서로 시간이 바뀌고, <b>거절·실패 시</b> Teams로 알려 드립니다. 관리자 승인 없음.")}</div>
+              <label style="display:block;font-size:13px;font-weight:600;color:var(--color-midnight-navy);margin-bottom:8px">교환할 확정 회원</label>
+              <input type="search" class="hk-input" id="swap-member-search" placeholder="이름, 이메일, 부서로 검색" style="width:100%;margin-bottom:16px">
+              <div id="swap-member-list"><div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center">이름을 검색하세요</div></div>
+            </div>
+            <div style="padding:16px 24px;border-top:1px solid var(--border-default);display:flex;justify-content:flex-end;gap:10px;flex-shrink:0">
+              <button type="button" class="hk-btn hk-btn--secondary" data-modal-close>닫기</button>
+              <button type="button" class="hk-btn hk-btn--primary" id="swap-submit-btn" disabled>교환하기</button>
+            </div>
+          </div>`;
+          overlay.addEventListener("click", (e) => { if (e.target === overlay) closeSwapModal(); });
+          overlay.querySelectorAll("[data-modal-close]").forEach((btn) => { btn.onclick = closeSwapModal; });
+          document.body.appendChild(overlay);
+          HKUI.refreshIcons(overlay);
+
+          const modalListEl = overlay.querySelector("#swap-member-list");
+          const searchEl = overlay.querySelector("#swap-member-search");
+          const submitBtn = overlay.querySelector("#swap-submit-btn");
+          let selectedReservationId = null;
+          let members = [];
+          let hasSearched = false;
+
+          function bindTargetClicks() {
+            modalListEl.querySelectorAll("[data-target-reservation-id]").forEach((btn) => {
+              btn.onclick = () => {
+                selectedReservationId = Number(btn.dataset.targetReservationId);
+                modalListEl.innerHTML = renderSwapTargetList(members, selectedReservationId, { searched: hasSearched });
+                bindTargetClicks();
+                submitBtn.disabled = !selectedReservationId;
+              };
+            });
+          }
+
+          async function loadTargets(q = "") {
+            const query = (q || "").trim();
+            if (!query) {
+              hasSearched = false;
+              members = [];
+              selectedReservationId = null;
+              submitBtn.disabled = true;
+              modalListEl.innerHTML = renderSwapTargetList([], null, { searched: false });
+              return;
+            }
+            hasSearched = true;
+            modalListEl.innerHTML = `<div style="font-size:14px;color:var(--text-muted);padding:16px 0;text-align:center"><span class="hk-spin"></span></div>`;
+            try {
+              const data = await HKApi.swapTargets(reservationId, query);
+              members = data.members || [];
+              if (selectedReservationId && !members.some((m) => m.reservationId === selectedReservationId)) {
+                selectedReservationId = null;
+              }
+              submitBtn.disabled = !selectedReservationId;
+              modalListEl.innerHTML = renderSwapTargetList(members, selectedReservationId, { searched: true });
+              bindTargetClicks();
+            } catch (e) {
+              modalListEl.innerHTML = HKUI.alertBox("danger", "오류", HKUI.escapeHtml(e.message));
+            }
+          }
+
+          let searchTimer = null;
+          searchEl.addEventListener("input", () => {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => loadTargets(searchEl.value.trim()), 280);
+          });
+
+          submitBtn.onclick = async () => {
+            if (!selectedReservationId) return;
+            const picked = members.find((m) => m.reservationId === selectedReservationId);
+            const otherLabel = slotLabel(picked);
+            const ok = await HKUI.confirmDialog(
+              "교환할까요?",
+              `<b>${HKUI.escapeHtml(picked?.name || "선택한 회원")}</b>님의 <b>${HKUI.escapeHtml(otherLabel)}</b>과 내 예약 <b>${HKUI.escapeHtml(myLabel)}</b>을 맞바꾸자고 제안합니다. 상대 수락 전까지 양도·다른 교환은 할 수 없습니다.`
+            );
+            if (!ok) return;
+            const prevLabel = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = "교환 중…";
+            try {
+              await HKApi.createSwap(reservationId, selectedReservationId);
+              HKUI.toast("교환 제안을 보냈습니다");
+              closeSwapModal();
+              await refreshAll();
+            } catch (e) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = prevLabel;
+              HKUI.toast(e.message, "danger");
+            }
+          };
+
+          searchEl.focus();
+        }
+
         function bindTransferButtons(items) {
           listEl.querySelectorAll("[data-transfer]").forEach((btn) => {
             btn.onclick = () => openTransferModal(Number(btn.dataset.transfer), items);
           });
+        }
+
+        function bindSwapButtons(items) {
+          listEl.querySelectorAll("[data-swap]").forEach((btn) => {
+            btn.onclick = () => openSwapModal(Number(btn.dataset.swap), items);
+          });
+          listEl.querySelectorAll("[data-swap-cancel]").forEach((btn) => {
+            btn.onclick = async () => {
+              const ok = await HKUI.confirmDialog(
+                "제안을 취소할까요?",
+                "피제안자에게 Teams로 취소 안내가 전달됩니다. 예약은 그대로 유지됩니다."
+              );
+              if (!ok) return;
+              try {
+                await HKApi.cancelSwap(Number(btn.dataset.swapCancel));
+                HKUI.toast("제안이 취소되었습니다");
+                await refreshAll();
+              } catch (e) {
+                HKUI.toast(e.message, "danger");
+              }
+            };
+          });
+        }
+
+        function bindInboxActions() {
+          inboxEl.querySelectorAll("[data-swap-accept]").forEach((btn) => {
+            btn.onclick = async () => {
+              const ok = await HKUI.confirmDialog(
+                "교환을 수락할까요?",
+                "수락 즉시 슬롯이 바뀌며 Teams로 안내됩니다."
+              );
+              if (!ok) return;
+              btn.disabled = true;
+              try {
+                await HKApi.acceptSwap(Number(btn.dataset.swapAccept));
+                HKUI.toast("교환이 완료되었습니다");
+                await refreshAll();
+              } catch (e) {
+                btn.disabled = false;
+                HKUI.toast(e.message || "교환할 수 없는 상태입니다. 제안자에게 안내를 보냈습니다.", "danger");
+                await refreshAll();
+              }
+            };
+          });
+          inboxEl.querySelectorAll("[data-swap-reject]").forEach((btn) => {
+            btn.onclick = async () => {
+              const ok = await HKUI.confirmDialog(
+                "제안을 거절할까요?",
+                "제안자에게 Teams로 거절이 전달됩니다."
+              );
+              if (!ok) return;
+              btn.disabled = true;
+              try {
+                await HKApi.rejectSwap(Number(btn.dataset.swapReject));
+                HKUI.toast("제안을 거절했습니다");
+                await refreshAll();
+              } catch (e) {
+                btn.disabled = false;
+                HKUI.toast(e.message, "danger");
+              }
+            };
+          });
+        }
+
+        async function loadSwapInbox() {
+          try {
+            const data = await HKApi.mySwapProposals("received", "PENDING");
+            const items = data.items || [];
+            if (!items.length) {
+              inboxEl.style.display = "none";
+              inboxEl.innerHTML = "";
+              return;
+            }
+            const cards = items.map((item) => {
+              const title = `${HKUI.escapeHtml(item.proposer?.name || "상대")}님의 교환 제안`;
+              const body = `내 예약 <b>${HKUI.escapeHtml(slotLabel(item.mySlot))}</b> ↔ 상대 <b>${HKUI.escapeHtml(slotLabel(item.otherSlot))}</b>`;
+              return `<div class="hk-card hk-card--pad">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                  <div style="min-width:0;flex:1">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+                      <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${title}</div>
+                      ${HKUI.badge("PENDING", "warning")}
+                    </div>
+                    <div style="font-size:13px;color:var(--text-secondary);line-height:1.5">${body}</div>
+                  </div>
+                  <div style="display:flex;gap:8px;flex-shrink:0">
+                    <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-swap-reject="${item.id}">거절</button>
+                    <button type="button" class="hk-btn hk-btn--primary hk-btn--sm" data-swap-accept="${item.id}">수락</button>
+                  </div>
+                </div>
+              </div>`;
+            }).join("");
+            inboxEl.style.display = "block";
+            inboxEl.innerHTML = `
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px">
+                <div style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">받은 교환 제안</div>
+                ${HKUI.badge(String(items.length), "info")}
+              </div>
+              <div style="display:flex;flex-direction:column;gap:10px">${cards}</div>`;
+            bindInboxActions();
+          } catch (_) {
+            inboxEl.style.display = "none";
+            inboxEl.innerHTML = "";
+          }
         }
 
         async function loadPage(page) {
@@ -235,6 +493,7 @@
             pagerEl.innerHTML = HKUI.paginationBar(listMeta);
             bindCancelButtons(items);
             bindTransferButtons(items);
+            bindSwapButtons(items);
             HKUI.bindPagination(pagerEl, listMeta, loadPage);
             HKUI.refreshIcons();
           } catch (e) {
@@ -242,8 +501,13 @@
           }
         }
 
+        async function refreshAll() {
+          await Promise.all([loadSwapInbox(), loadPage(currentPage)]);
+        }
+
         const initialPage = Math.max(1, parseInt(HKUI.queryParam("page") || "1", 10) || 1);
-        await loadPage(initialPage);
+        currentPage = initialPage;
+        await refreshAll();
       },
     });
   </script>

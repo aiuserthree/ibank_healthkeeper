@@ -53,6 +53,30 @@ window.HKApi = (function () {
         method: "POST",
         body: JSON.stringify({ recipientId }),
       }),
+    swapTargets: (reservationId, q = "") => {
+      const params = new URLSearchParams();
+      if (q) params.set("q", q);
+      const qs = params.toString();
+      return request(`/reservation/${reservationId}/swap/targets${qs ? `?${qs}` : ""}`);
+    },
+    createSwap: (reservationId, targetReservationId) =>
+      request(`/reservation/${reservationId}/swap`, {
+        method: "POST",
+        body: JSON.stringify({ targetReservationId }),
+      }),
+    mySwapProposals: (role = "received", status = "PENDING") => {
+      const params = new URLSearchParams();
+      if (role) params.set("role", role);
+      if (status) params.set("status", status);
+      const qs = params.toString();
+      return request(`/me/swap-proposals${qs ? `?${qs}` : ""}`);
+    },
+    acceptSwap: (swapId) =>
+      request(`/swap-proposals/${swapId}/accept`, { method: "POST" }),
+    rejectSwap: (swapId) =>
+      request(`/swap-proposals/${swapId}/reject`, { method: "POST" }),
+    cancelSwap: (swapId) =>
+      request(`/swap-proposals/${swapId}/cancel`, { method: "POST" }),
     myUsageHistory: (page = 1, pageSize = 10) =>
       request(`/me/usage-history?page=${page}&pageSize=${pageSize}`),
     myLegacyUsages: (page = 1, pageSize = 10) =>

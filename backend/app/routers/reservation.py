@@ -14,7 +14,7 @@ from app.core.session import get_member_session
 from app.core.time import format_deadline_relative_ko, format_kst_iso
 from app.database import get_db
 from app.models import Member
-from app.schemas.common import TransferRequestBody
+from app.schemas.common import SwapRequestBody, TransferRequestBody
 from app.services.avatar import avatar_path, has_avatar
 from app.services.cycle import resolve_system_state
 from app.services import reservation as reservation_service
@@ -240,6 +240,130 @@ async def request_transfer(
             "transferId": transfer.id,
             "newReservationId": transfer.new_reservation_id,
             "message": "양도가 완료되었습니다.",
+        }
+    }
+
+
+@router.get("/reservation/{reservation_id}/swap/targets")
+async def swap_targets(
+    reservation_id: int,
+    q: str = Query("", max_length=100),
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.services.swap import search_swap_targets
+
+    members = await search_swap_targets(db, member, reservation_id, q=q)
+    return {"data": {"members": members}}
+
+
+@router.post("/reservation/{reservation_id}/swap")
+async def create_swap(
+    reservation_id: int,
+    body: SwapRequestBody,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.services.swap import create_swap_proposal
+    from app.services.teams import deliver_teams_messages
+
+    swap, teams_message_ids = await create_swap_proposal(
+        db, member, reservation_id, body.targetReservationId
+    )
+    background_tasks.add_task(deliver_teams_messages, teams_message_ids)
+    return {
+        "data": {
+            "swapId": swap.id,
+            "status": swap.status.value,
+            "message": "교환 제안을 보냈습니다.",
+        }
+    }
+
+
+@router.get("/me/swap-proposals")
+async def my_swap_proposals(
+    role: str = Query("received", pattern="^(received|sent)$"),
+    status: Optional[str] = Query("PENDING"),
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.services.swap import list_my_swap_proposals
+
+    items = await list_my_swap_proposals(
+        db, member, role=role, status=status or None  # type: ignore[arg-type]
+    )
+    return {"data": {"items": items}}
+
+
+@router.post("/swap-proposals/{swap_id}/accept")
+async def accept_swap(
+    swap_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.core.errors import raise_app_error
+    from app.services.swap import SwapAcceptFailedError, accept_swap_proposal
+    from app.services.teams import deliver_teams_messages
+
+    try:
+        swap, teams_message_ids, my_reservation = await accept_swap_proposal(
+            db, member, swap_id
+        )
+    except SwapAcceptFailedError as exc:
+        background_tasks.add_task(deliver_teams_messages, exc.teams_message_ids)
+        raise_app_error("SWAP_ACCEPT_FAILED")
+
+    background_tasks.add_task(deliver_teams_messages, teams_message_ids)
+    return {
+        "data": {
+            "swapId": swap.id,
+            "status": swap.status.value,
+            "message": "교환이 완료되었습니다.",
+            "myReservation": my_reservation,
+        }
+    }
+
+
+@router.post("/swap-proposals/{swap_id}/reject")
+async def reject_swap(
+    swap_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.services.swap import reject_swap_proposal
+    from app.services.teams import deliver_teams_messages
+
+    swap, teams_message_ids = await reject_swap_proposal(db, member, swap_id)
+    background_tasks.add_task(deliver_teams_messages, teams_message_ids)
+    return {
+        "data": {
+            "swapId": swap.id,
+            "status": swap.status.value,
+            "message": "제안을 거절했습니다.",
+        }
+    }
+
+
+@router.post("/swap-proposals/{swap_id}/cancel")
+async def cancel_swap(
+    swap_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.services.swap import cancel_swap_proposal
+    from app.services.teams import deliver_teams_messages
+
+    swap, teams_message_ids = await cancel_swap_proposal(db, member, swap_id)
+    background_tasks.add_task(deliver_teams_messages, teams_message_ids)
+    return {
+        "data": {
+            "swapId": swap.id,
+            "status": swap.status.value,
+            "message": "제안이 취소되었습니다.",
         }
     }
 

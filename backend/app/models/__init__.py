@@ -14,6 +14,7 @@ from app.models.enums import (
     ReservationStatus,
     ReservationType,
     SlotStatus,
+    SwapProposalStatus,
     TeamsMessageType,
     TransferRequestStatus,
 )
@@ -24,6 +25,7 @@ from app.models.public_holiday import KoreanPublicHoliday
 from app.models.reservation import Reservation
 from app.models.setting import OperationSetting
 from app.models.slot import Slot
+from app.models.swap_proposal import SwapProposal
 from app.models.teams import TeamsMessage
 from app.models.transfer_request import TransferRequest
 from app.models.vacation import Vacation
@@ -54,5 +56,7 @@ __all__ = [
     "TeamsMessageType",
     "TransferRequest",
     "TransferRequestStatus",
+    "SwapProposal",
+    "SwapProposalStatus",
     "OperationSetting",
 ]

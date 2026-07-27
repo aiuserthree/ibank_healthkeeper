@@ -222,7 +222,11 @@ async def reapply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reserv
     if slot.status == SlotStatus.CONFIRMED:
         raise_app_error("SLOT_ALREADY_CONFIRMED")
 
-    if await _member_cycle_active_apply(db, member.id, cycle.id):
+    # 양도로 받은 확정(및 기타 주간 확정/신청)이 있으면 재신청 불가
+    active = await _member_cycle_active_apply(db, member.id, cycle.id)
+    if active:
+        if active.type == ReservationType.TRANSFER:
+            raise_app_error("TRANSFER_RECIPIENT_NO_REAPPLY")
         raise_app_error("WEEK_APPLY_LIMIT")
 
     reservation = Reservation(
@@ -314,9 +318,14 @@ async def list_my_reservations(
         r.id
         for r, _, _ in rows
         if r.status == ReservationStatus.CONFIRMED
-        and r.type in (ReservationType.NORMAL, ReservationType.REAPPLY)
     ]
+    from app.services.swap import (
+        SWAPPABLE_TYPES,
+        count_incoming_pending_swaps,
+        get_pending_swap_map,
+    )
     from app.services.transfer import (
+        TRANSFERABLE_TYPES,
         can_transfer_slot,
         get_pending_transfer_map,
         slot_start_dt,
@@ -324,10 +333,18 @@ async def list_my_reservations(
     )
 
     pending_map = await get_pending_transfer_map(db, confirmed_ids)
+    swap_pending_map = await get_pending_swap_map(db, confirmed_ids)
+    incoming_swap_count = await count_incoming_pending_swaps(db, member.id)
     items = []
     state, active_cycle = await resolve_system_state(db)
     in_reapply = state == CycleState.REAPPLY
     active_cycle_id = active_cycle.id if active_cycle else None
+    # 양도 수령(TRANSFER 확정) 등으로 이미 주간 예약이 있으면 재신청 CTA 숨김
+    week_active_apply = (
+        await _member_cycle_active_apply(db, member.id, active_cycle_id)
+        if active_cycle_id
+        else None
+    )
     now = now_kst()
     for reservation, slot, cycle in rows:
         cancelable = (
@@ -336,17 +353,19 @@ async def list_my_reservations(
             and reservation.type == ReservationType.NORMAL
         )
         pending = pending_map.get(reservation.id)
-        # 양도 가능 대상(확정 + 일반/재신청 + 대기중인 양도 없음) — 시점(양도 창) 무관
+        swap_pending = swap_pending_map.get(reservation.id)
+        # 양도 가능 대상(확정 + 일반/재신청 + 대기중인 양도·교환 없음) — 시점(양도 창) 무관
         transfer_candidate = (
             reservation.status == ReservationStatus.CONFIRMED
-            and reservation.type in (ReservationType.NORMAL, ReservationType.REAPPLY)
+            and reservation.type in TRANSFERABLE_TYPES
             and not pending
+            and not swap_pending
         )
         transferable = (
             transfer_candidate
             and can_transfer_slot(cycle, slot, now)
         )
-        # 확정되었지만 양도 창(목 17:00)이 아직 열리지 않은 경우 —
+        # 확정되었지만 양도 창(수 17:00)이 아직 열리지 않은 경우 —
         # 버튼은 노출하되 비활성 + 안내 문구로 언제부터 가능한지 보여준다 (정책 변경 없음, UX만)
         # 반대로 양도 창(또는 예약 시작)이 이미 지난 경우도 버튼을 숨기지 않고 비활성 + 이유를 보여준다.
         transfer_opens_at = None
@@ -358,11 +377,30 @@ async def list_my_reservations(
                 transfer_opens_at = format_kst_iso(window_start)
             elif now >= slot_start:
                 transfer_ended = True
+
+        swap_candidate = (
+            reservation.status == ReservationStatus.CONFIRMED
+            and reservation.type in SWAPPABLE_TYPES
+            and not pending
+            and not swap_pending
+        )
+        swappable = swap_candidate and can_transfer_slot(cycle, slot, now)
+        swap_opens_at = None
+        swap_ended = False
+        if swap_candidate and not swappable:
+            window_start = transfer_window_start(cycle)
+            slot_start = slot_start_dt(slot)
+            if now < window_start and now < slot_start:
+                swap_opens_at = format_kst_iso(window_start)
+            elif now >= slot_start:
+                swap_ended = True
+
         reapply_available = (
             in_reapply
             and reservation.status == ReservationStatus.DROPPED
             and active_cycle_id is not None
             and reservation.cycle_id == active_cycle_id
+            and week_active_apply is None
         )
         items.append(
             {
@@ -379,6 +417,16 @@ async def list_my_reservations(
                 "transferEnded": transfer_ended,
                 "transferPending": bool(pending),
                 "transferRecipientName": pending["recipientName"] if pending else None,
+                "swappable": swappable,
+                "swapOpensAt": swap_opens_at,
+                "swapEnded": swap_ended,
+                "swapPending": bool(swap_pending),
+                "swapRole": swap_pending["swapRole"] if swap_pending else None,
+                "swapId": swap_pending["swapId"] if swap_pending else None,
+                "swapCounterpartName": (
+                    swap_pending["counterpartName"] if swap_pending else None
+                ),
+                "incomingSwapCount": incoming_swap_count,
                 "reapplyAvailable": reapply_available,
             }
         )

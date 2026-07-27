@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     sso_allowed_domain: str = ""
     sso_success_path: str = "/reserve"
 
+    # 로컬 수동 테스트용 — DEBUG=true 일 때만 수 17:00(close_at) 양도/교환 창을 건너뜀
+    transfer_window_bypass: bool = False
+
     teams_reminder_enabled: bool = True
     teams_reminder_minutes_before: int = 5
     teams_reminder_retry_max: int = 3

@@ -146,8 +146,10 @@ async def setup_transfer_test(db, *, donor_email: str) -> dict:
 
     now = now_kst()
 
-    # 양도 가능 시간대: 재신청 마감을 1시간 전으로 (목 17:00 이후 시뮬레이션)
-    cycle.reapply_close_at = (now - timedelta(hours=1)).astimezone(now_utc().tzinfo)
+    # 양도 가능 시간대: 일반 신청 마감(close_at)을 1시간 전으로 (수 17:00 이후 시뮬레이션)
+    cycle.close_at = (now - timedelta(hours=1)).astimezone(now_utc().tzinfo)
+    if cycle.reapply_close_at > now:
+        cycle.reapply_close_at = (now - timedelta(minutes=30)).astimezone(now_utc().tzinfo)
     cycle.state = CycleState.CLOSED
     cycle.reapply_closed_at = cycle.reapply_closed_at or now_utc()
 
