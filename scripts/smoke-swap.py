@@ -178,11 +178,13 @@ async def main() -> None:
         a, b, ra, rb, sa, sb = await prepare(db)
         print(f"prepared A#{ra.id}@{sa.start_time} B#{rb.id}@{sb.start_time}")
 
-        assert await search_swap_targets(db, a, ra.id) == [], "empty query must return no targets"
+        all_targets = await search_swap_targets(db, a, ra.id)
+        all_ids = {t["reservationId"] for t in all_targets}
+        assert rb.id in all_ids, f"target missing from full list: {all_targets}"
         targets = await search_swap_targets(db, a, ra.id, q=b.name)
         ids = {t["reservationId"] for t in targets}
         assert rb.id in ids, f"target missing from candidates: {targets}"
-        print("search_ok", len(targets))
+        print("search_ok", len(all_targets), "filtered", len(targets))
 
         swap, _ = await create_swap_proposal(db, a, ra.id, rb.id)
         assert swap.status == SwapProposalStatus.PENDING

@@ -210,6 +210,11 @@ def open_notice_site_url() -> str:
     return get_settings().teams_open_notice_url.strip()
 
 
+def mypage_enter_url() -> str:
+    """FO 마이페이지 진입 URL (미로그인 시 로그인 → /mypage)."""
+    return f"{get_settings().app_base_url.rstrip('/')}/api/mypage/enter"
+
+
 def _open_close_labels(open_at: datetime, close_at: datetime) -> tuple[str, str]:
     """일반 신청 시작·마감 — 같은 날짜(수요일) + 각각 시각."""
     open_kst = to_kst(open_at)
@@ -389,13 +394,15 @@ def render_swap_proposed_body(
     proposer_name: str,
     target_slot: Slot,
     proposer_slot: Slot,
+    mypage_url: str | None = None,
 ) -> str:
+    url = (mypage_url or mypage_enter_url()).strip()
     return (
         f"<p><strong>[헬스키퍼]</strong> 예약 교환 제안</p>"
         f"<p>{target_name}님, <b>{proposer_name}</b>님이 슬롯 교환을 제안했습니다.</p>"
         f"<p>내 예약: <strong>{_slot_label(target_slot)}</strong></p>"
         f"<p>상대 예약: <strong>{_slot_label(proposer_slot)}</strong></p>"
-        f"<p>마이페이지에서 수락 또는 거절해 주세요.</p>"
+        f'<p><a href="{url}">마이페이지</a>에서 수락 또는 거절해 주세요.</p>'
     )
 
 

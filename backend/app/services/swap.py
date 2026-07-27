@@ -230,11 +230,6 @@ async def search_swap_targets(
     if now >= slot_start_dt(proposer_slot):
         raise_app_error("SLOT_ALREADY_STARTED")
 
-    # FO는 검색어 입력 후에만 후보를 보여 줌 — 빈 쿼리면 전체 목록을 내려주지 않음
-    query = q.strip()
-    if not query:
-        return []
-
     pending_proposer_res = select(SwapProposal.proposer_reservation_id).where(
         SwapProposal.status == SwapProposalStatus.PENDING
     )
@@ -250,7 +245,6 @@ async def search_swap_targets(
     excluded_emails = _transfer_excluded_emails()
     allowed_domains = get_settings().allowed_email_domains()
     allow_mock = get_settings().sso_provider == "mock"
-    pattern = f"%{query}%"
 
     stmt = (
         select(Reservation, Slot, Member)
@@ -275,14 +269,13 @@ async def search_swap_targets(
                 list(_TRANSFER_EXCLUDED_EMAIL_DOMAINS)
             )
         )
-        .where(
-            or_(
-                Member.name.ilike(pattern),
-                Member.email.ilike(pattern),
-                Member.department.ilike(pattern),
-            )
+        # 양도와 동일 — ICU 한국어 가나다 순 (Member.name)
+        .order_by(
+            collate(Member.name, _NAME_COLLATION),
+            Member.id,
+            Slot.slot_date,
+            Slot.start_time,
         )
-        .order_by(Slot.slot_date, Slot.start_time, collate(Member.name, _NAME_COLLATION))
         .limit(min(max(limit, 1), 200))
     )
     if not allow_mock:
@@ -292,6 +285,16 @@ async def search_swap_targets(
     if allowed_domains:
         stmt = stmt.where(
             func.lower(func.split_part(Member.email, "@", 2)).in_(allowed_domains)
+        )
+    query = q.strip()
+    if query:
+        pattern = f"%{query}%"
+        stmt = stmt.where(
+            or_(
+                Member.name.ilike(pattern),
+                Member.email.ilike(pattern),
+                Member.department.ilike(pattern),
+            )
         )
 
     result = await db.execute(stmt)
