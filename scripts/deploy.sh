@@ -17,12 +17,26 @@ DOMAIN="${APP_DOMAIN:-healthkeeper.ibank.co.kr}"
 USER="${REMOTE_USER:-root}"
 EMAIL="${CERTBOT_EMAIL:-}"
 
-# docker compose용 NEO4J (루트 .env에 없으면 backend/.env에서 보충)
+# docker compose용 NEO4J — 루트 .env에 없으면 backend/.env에서 해당 키만 읽음
+# (backend/.env 전체를 source 하면 로컬 SSO_PROVIDER=mock / DEBUG / TRANSFER_WINDOW_BYPASS 가
+#  운영 배포 payload 로 새어 나가므로 절대 source 하지 않음)
+env_file_get() {
+  local file="$1" key="$2" line
+  [[ -f "$file" ]] || return 0
+  line="$(grep -E "^${key}=" "$file" | tail -n1 || true)"
+  [[ -n "$line" ]] || return 0
+  printf '%s\n' "${line#*=}"
+}
+
 NEO4J_USER="${NEO4J_USER:-neo4j}"
 NEO4J_PASSWORD="${NEO4J_PASSWORD:-}"
-if [[ -z "$NEO4J_PASSWORD" && -f backend/.env ]]; then
-  # shellcheck disable=SC1091
-  source backend/.env
+if [[ -z "$NEO4J_PASSWORD" ]]; then
+  NEO4J_PASSWORD="$(env_file_get backend/.env NEO4J_PASSWORD)"
+fi
+if [[ -z "${NEO4J_USER}" || "${NEO4J_USER}" == "neo4j" ]]; then
+  _neo4j_user="$(env_file_get backend/.env NEO4J_USER)"
+  [[ -n "${_neo4j_user}" ]] && NEO4J_USER="${_neo4j_user}"
+  unset _neo4j_user
 fi
 NEO4J_PASSWORD="${NEO4J_PASSWORD:-CHANGE_ME}"
 
@@ -63,8 +77,10 @@ SMTP_USE_TLS=${SMTP_USE_TLS:-true}
 DEPLOY_ENV
 
 echo "==> Remote setup"
+# 로컬 SSO_PROVIDER=mock / DEBUG=true 등은 운영에 전달하지 않음.
+# ENTRA_*·SMTP·TEAMS 등은 최초 설치 fallback 용으로만 넘기고, 서버에 기존 값이 있으면 그쪽을 우선한다.
 ssh "$USER@$HOST" \
-  "DOMAIN='${DOMAIN}' HOST='${HOST}' CERTBOT_EMAIL='${EMAIL}' SSO_PROVIDER='${SSO_PROVIDER:-mock}' ENTRA_TENANT_ID='${ENTRA_TENANT_ID:-}' ENTRA_CLIENT_ID='${ENTRA_CLIENT_ID:-}' ENTRA_CLIENT_SECRET='${ENTRA_CLIENT_SECRET:-}' SSO_ALLOWED_DOMAIN='${SSO_ALLOWED_DOMAIN:-}' SSO_SUCCESS_PATH='${SSO_SUCCESS_PATH:-/reserve}' SECRET_KEY='${SECRET_KEY}' ENABLE_NEO4J='${ENABLE_NEO4J:-false}' SMTP_HOST='${SMTP_HOST:-smtp.office365.com}' SMTP_PORT='${SMTP_PORT:-587}' SMTP_USER='${SMTP_USER:-}' SMTP_PASSWORD='${SMTP_PASSWORD:-}' SMTP_FROM='${SMTP_FROM:-}' SMTP_FROM_NAME='${SMTP_FROM_NAME:-헬스키퍼}' SMTP_USE_TLS='${SMTP_USE_TLS:-true}' TEAMS_REMINDER_ENABLED='${TEAMS_REMINDER_ENABLED:-true}' TEAMS_REMINDER_MINUTES_BEFORE='${TEAMS_REMINDER_MINUTES_BEFORE:-5}' TEAMS_OPEN_NOTICE_ENABLED='${TEAMS_OPEN_NOTICE_ENABLED:-true}' TEAMS_OPEN_NOTICE_URL='${TEAMS_OPEN_NOTICE_URL:-https://healthkeeper.ibank.co.kr/index}' TEAMS_SENDER_EMAIL='${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}' TEAMS_SENDER_REFRESH_TOKEN='${TEAMS_SENDER_REFRESH_TOKEN:-}' PUBLIC_DATA_PORTAL_SERVICE_KEY='${PUBLIC_DATA_PORTAL_SERVICE_KEY:-}'" \
+  "DOMAIN='${DOMAIN}' HOST='${HOST}' CERTBOT_EMAIL='${EMAIL}' ENTRA_TENANT_ID='${ENTRA_TENANT_ID:-}' ENTRA_CLIENT_ID='${ENTRA_CLIENT_ID:-}' ENTRA_CLIENT_SECRET='${ENTRA_CLIENT_SECRET:-}' SSO_ALLOWED_DOMAIN='${SSO_ALLOWED_DOMAIN:-ibank.co.kr,digitalworks.co.kr}' SSO_SUCCESS_PATH='${SSO_SUCCESS_PATH:-/reserve}' SECRET_KEY='${SECRET_KEY}' ENABLE_NEO4J='${ENABLE_NEO4J:-false}' SMTP_HOST='${SMTP_HOST:-smtp.office365.com}' SMTP_PORT='${SMTP_PORT:-587}' SMTP_USER='${SMTP_USER:-}' SMTP_PASSWORD='${SMTP_PASSWORD:-}' SMTP_FROM='${SMTP_FROM:-}' SMTP_FROM_NAME='${SMTP_FROM_NAME:-헬스키퍼}' SMTP_USE_TLS='${SMTP_USE_TLS:-true}' TEAMS_REMINDER_ENABLED='${TEAMS_REMINDER_ENABLED:-true}' TEAMS_REMINDER_MINUTES_BEFORE='${TEAMS_REMINDER_MINUTES_BEFORE:-5}' TEAMS_OPEN_NOTICE_ENABLED='${TEAMS_OPEN_NOTICE_ENABLED:-true}' TEAMS_OPEN_NOTICE_URL='${TEAMS_OPEN_NOTICE_URL:-https://healthkeeper.ibank.co.kr/index}' TEAMS_SENDER_EMAIL='${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}' TEAMS_SENDER_REFRESH_TOKEN='${TEAMS_SENDER_REFRESH_TOKEN:-}' PUBLIC_DATA_PORTAL_SERVICE_KEY='${PUBLIC_DATA_PORTAL_SERVICE_KEY:-}'" \
   bash -s <<'REMOTE'
 set -euo pipefail
 if [[ ! -f /opt/healthkeeper/deploy/.env ]]; then
@@ -123,8 +139,55 @@ fi
 
 SCHEME=https
 BASE_URL="${SCHEME}://${DOMAIN}"
+APP_ENV="/opt/healthkeeper/app/backend/.env"
 
-cat > /opt/healthkeeper/app/backend/.env <<EOF
+# 서버에 이미 있는 앱 설정(SSO/시크릿 등)을 우선 보존. 로컬 mock/debug 로 덮어쓰지 않음.
+preserve_or() {
+  local key="$1" fallback="${2:-}" line val
+  if [[ -f "$APP_ENV" ]]; then
+    line="$(grep -E "^${key}=" "$APP_ENV" | tail -n1 || true)"
+    if [[ -n "$line" ]]; then
+      val="${line#*=}"
+      if [[ -n "$val" ]]; then
+        printf '%s\n' "$val"
+        return
+      fi
+    fi
+  fi
+  printf '%s\n' "$fallback"
+}
+
+# 인프라 URL은 deploy/.env(서버) 기준으로 갱신. SSO/DEBUG/시크릿은 기존 운영값 유지.
+SECRET_KEY="$(preserve_or SECRET_KEY "${SECRET_KEY:-}")"
+SSO_PROVIDER="$(preserve_or SSO_PROVIDER entra)"
+# 로컬 개발용 mock 이 서버에 남아 있으면 운영 기본값(entra)으로 교정
+if [[ "${SSO_PROVIDER}" == "mock" ]]; then
+  echo "WARN: server SSO_PROVIDER=mock — forcing entra for production"
+  SSO_PROVIDER=entra
+fi
+ENTRA_TENANT_ID="$(preserve_or ENTRA_TENANT_ID "${ENTRA_TENANT_ID:-}")"
+ENTRA_CLIENT_ID="$(preserve_or ENTRA_CLIENT_ID "${ENTRA_CLIENT_ID:-}")"
+ENTRA_CLIENT_SECRET="$(preserve_or ENTRA_CLIENT_SECRET "${ENTRA_CLIENT_SECRET:-}")"
+SSO_ALLOWED_DOMAIN="$(preserve_or SSO_ALLOWED_DOMAIN "${SSO_ALLOWED_DOMAIN:-ibank.co.kr,digitalworks.co.kr}")"
+SSO_SUCCESS_PATH="$(preserve_or SSO_SUCCESS_PATH "${SSO_SUCCESS_PATH:-/reserve}")"
+SMTP_HOST="$(preserve_or SMTP_HOST "${SMTP_HOST:-smtp.office365.com}")"
+SMTP_PORT="$(preserve_or SMTP_PORT "${SMTP_PORT:-587}")"
+SMTP_USER="$(preserve_or SMTP_USER "${SMTP_USER:-healthkeeper@ibank.co.kr}")"
+SMTP_PASSWORD="$(preserve_or SMTP_PASSWORD "${SMTP_PASSWORD:-}")"
+SMTP_FROM="$(preserve_or SMTP_FROM "${SMTP_FROM:-healthkeeper@ibank.co.kr}")"
+SMTP_FROM_NAME="$(preserve_or SMTP_FROM_NAME "${SMTP_FROM_NAME:-헬스키퍼}")"
+SMTP_USE_TLS="$(preserve_or SMTP_USE_TLS "${SMTP_USE_TLS:-true}")"
+TEAMS_REMINDER_ENABLED="$(preserve_or TEAMS_REMINDER_ENABLED "${TEAMS_REMINDER_ENABLED:-true}")"
+TEAMS_REMINDER_MINUTES_BEFORE="$(preserve_or TEAMS_REMINDER_MINUTES_BEFORE "${TEAMS_REMINDER_MINUTES_BEFORE:-5}")"
+TEAMS_OPEN_NOTICE_ENABLED="$(preserve_or TEAMS_OPEN_NOTICE_ENABLED "${TEAMS_OPEN_NOTICE_ENABLED:-true}")"
+TEAMS_OPEN_NOTICE_URL="$(preserve_or TEAMS_OPEN_NOTICE_URL "${TEAMS_OPEN_NOTICE_URL:-https://healthkeeper.ibank.co.kr/index}")"
+TEAMS_SENDER_EMAIL="$(preserve_or TEAMS_SENDER_EMAIL "${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}")"
+TEAMS_SENDER_REFRESH_TOKEN="$(preserve_or TEAMS_SENDER_REFRESH_TOKEN "${TEAMS_SENDER_REFRESH_TOKEN:-}")"
+PUBLIC_DATA_PORTAL_SERVICE_KEY="$(preserve_or PUBLIC_DATA_PORTAL_SERVICE_KEY "${PUBLIC_DATA_PORTAL_SERVICE_KEY:-}")"
+
+# TRANSFER_WINDOW_BYPASS 등 로컬 전용 플래그는 운영 .env 에 쓰지 않음
+mkdir -p /opt/healthkeeper/app/backend
+cat > "$APP_ENV" <<EOF
 DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@127.0.0.1:5432/${POSTGRES_DB}
 REDIS_URL=redis://:${REDIS_PASSWORD}@127.0.0.1:6379/0
 NEO4J_URI=bolt://127.0.0.1:7687
@@ -141,21 +204,22 @@ ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET}
 ENTRA_REDIRECT_URI=${BASE_URL}/api/auth/sso/callback
 SSO_ALLOWED_DOMAIN=${SSO_ALLOWED_DOMAIN}
 SSO_SUCCESS_PATH=${SSO_SUCCESS_PATH}
-SMTP_HOST=${SMTP_HOST:-smtp.office365.com}
-SMTP_PORT=${SMTP_PORT:-587}
-SMTP_USER=${SMTP_USER:-healthkeeper@ibank.co.kr}
-SMTP_PASSWORD=${SMTP_PASSWORD:-}
-SMTP_FROM=${SMTP_FROM:-healthkeeper@ibank.co.kr}
-SMTP_FROM_NAME=${SMTP_FROM_NAME:-헬스키퍼}
-SMTP_USE_TLS=${SMTP_USE_TLS:-true}
-TEAMS_REMINDER_ENABLED=${TEAMS_REMINDER_ENABLED:-true}
-TEAMS_REMINDER_MINUTES_BEFORE=${TEAMS_REMINDER_MINUTES_BEFORE:-5}
-TEAMS_OPEN_NOTICE_ENABLED=${TEAMS_OPEN_NOTICE_ENABLED:-true}
-TEAMS_OPEN_NOTICE_URL=${TEAMS_OPEN_NOTICE_URL:-https://healthkeeper.ibank.co.kr/index}
-TEAMS_SENDER_EMAIL=${TEAMS_SENDER_EMAIL:-healthkeeper@ibank.co.kr}
-TEAMS_SENDER_REFRESH_TOKEN=${TEAMS_SENDER_REFRESH_TOKEN:-}
-PUBLIC_DATA_PORTAL_SERVICE_KEY=${PUBLIC_DATA_PORTAL_SERVICE_KEY:-}
+SMTP_HOST=${SMTP_HOST}
+SMTP_PORT=${SMTP_PORT}
+SMTP_USER=${SMTP_USER}
+SMTP_PASSWORD=${SMTP_PASSWORD}
+SMTP_FROM=${SMTP_FROM}
+SMTP_FROM_NAME=${SMTP_FROM_NAME}
+SMTP_USE_TLS=${SMTP_USE_TLS}
+TEAMS_REMINDER_ENABLED=${TEAMS_REMINDER_ENABLED}
+TEAMS_REMINDER_MINUTES_BEFORE=${TEAMS_REMINDER_MINUTES_BEFORE}
+TEAMS_OPEN_NOTICE_ENABLED=${TEAMS_OPEN_NOTICE_ENABLED}
+TEAMS_OPEN_NOTICE_URL=${TEAMS_OPEN_NOTICE_URL}
+TEAMS_SENDER_EMAIL=${TEAMS_SENDER_EMAIL}
+TEAMS_SENDER_REFRESH_TOKEN=${TEAMS_SENDER_REFRESH_TOKEN}
+PUBLIC_DATA_PORTAL_SERVICE_KEY=${PUBLIC_DATA_PORTAL_SERVICE_KEY}
 EOF
+echo "==> backend/.env: SSO_PROVIDER=${SSO_PROVIDER} DEBUG=false (local mock/debug not applied)"
 
 cd /opt/healthkeeper/app/backend
 mkdir -p data/avatars
