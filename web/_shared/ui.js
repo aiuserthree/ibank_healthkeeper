@@ -694,20 +694,23 @@ window.HKUI = (function () {
       actions.push(`<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`);
     } else {
       // 교환하기 (우선) + 양도하기 — 가능/대기/종료 상태를 나란히 노출
+      // 라벨: 데스크톱 전체형 / 모바일(≤640px) 짧은형 (CSS .hk-btn-label-*)
+      const swapLabel = `<span class="hk-btn-label-full">교환하기</span><span class="hk-btn-label-short" aria-hidden="true">교환</span>`;
+      const transferLabel = `<span class="hk-btn-label-full">양도하기</span><span class="hk-btn-label-short" aria-hidden="true">양도</span>`;
       if (r.swappable) {
-        actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-swap="${r.id}">교환하기</button>`);
+        actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-swap="${r.id}" aria-label="교환하기">${swapLabel}</button>`);
       } else if (swapNotYetOpen) {
         const opensLabel = formatDeadlineRelative(r.swapOpensAt, "17:00");
-        actions.push(`<span title="${escapeHtml(opensLabel)} 이후 교환할 수 있어요" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>교환하기</button></span>`);
+        actions.push(`<span title="${escapeHtml(opensLabel)} 이후 교환할 수 있어요" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="교환하기">${swapLabel}</button></span>`);
       } else if (swapEnded) {
-        actions.push(`<span title="예약 시간이 지나 교환할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>교환하기</button></span>`);
+        actions.push(`<span title="예약 시간이 지나 교환할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="교환하기">${swapLabel}</button></span>`);
       }
       if (r.transferable) {
-        actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-transfer="${r.id}">양도하기</button>`);
+        actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-transfer="${r.id}" aria-label="양도하기">${transferLabel}</button>`);
       } else if (transferNotYetOpen) {
-        actions.push(`<span title="${escapeHtml(formatDeadlineRelative(r.transferOpensAt))} 이후 양도할 수 있어요" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>양도하기</button></span>`);
+        actions.push(`<span title="${escapeHtml(formatDeadlineRelative(r.transferOpensAt))} 이후 양도할 수 있어요" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="양도하기">${transferLabel}</button></span>`);
       } else if (transferEnded) {
-        actions.push(`<span title="예약 시간이 지나 양도할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled>양도하기</button></span>`);
+        actions.push(`<span title="예약 시간이 지나 양도할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="양도하기">${transferLabel}</button></span>`);
       }
     }
     const action = `<div class="hk-rsv-card__actions">${actions.join("")}</div>`;
