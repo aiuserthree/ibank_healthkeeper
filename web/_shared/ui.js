@@ -675,8 +675,6 @@ window.HKUI = (function () {
       sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `교환 제안 받음 ← ${escapeHtml(r.swapCounterpartName || "")}`;
     } else if (r.transferPending) {
       sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `양도 처리 중 → ${escapeHtml(r.transferRecipientName || "")}`;
-    } else if (transferMonthlyLimit) {
-      sub += " · 이번 달 양도 한도(1회)를 모두 사용함";
     } else if (swapNotYetOpen || transferNotYetOpen) {
       const opens = r.swapOpensAt || r.transferOpensAt;
       sub += ` · ${formatDeadlineRelative(opens)} 이후 교환·양도 가능`;
