@@ -325,8 +325,10 @@ async def list_my_reservations(
         get_pending_swap_map,
     )
     from app.services.transfer import (
+        MONTHLY_TRANSFER_LIMIT,
         TRANSFERABLE_TYPES,
         can_transfer_slot,
+        count_donor_monthly_transfers,
         get_pending_transfer_map,
         slot_start_dt,
         transfer_window_start,
@@ -346,6 +348,8 @@ async def list_my_reservations(
         else None
     )
     now = now_kst()
+    monthly_transfer_used = await count_donor_monthly_transfers(db, member.id, now=now)
+    monthly_transfer_limit_reached = monthly_transfer_used >= MONTHLY_TRANSFER_LIMIT
     for reservation, slot, cycle in rows:
         cancelable = (
             state == CycleState.OPEN
@@ -364,19 +368,24 @@ async def list_my_reservations(
         transferable = (
             transfer_candidate
             and can_transfer_slot(cycle, slot, now)
+            and not monthly_transfer_limit_reached
         )
         # 확정되었지만 양도 창(수 17:00)이 아직 열리지 않은 경우 —
         # 버튼은 노출하되 비활성 + 안내 문구로 언제부터 가능한지 보여준다 (정책 변경 없음, UX만)
         # 반대로 양도 창(또는 예약 시작)이 이미 지난 경우도 버튼을 숨기지 않고 비활성 + 이유를 보여준다.
         transfer_opens_at = None
         transfer_ended = False
+        transfer_monthly_limit_reached = False
         if transfer_candidate and not transferable:
-            window_start = transfer_window_start(cycle)
-            slot_start = slot_start_dt(slot)
-            if now < window_start and now < slot_start:
-                transfer_opens_at = format_kst_iso(window_start)
-            elif now >= slot_start:
-                transfer_ended = True
+            if monthly_transfer_limit_reached:
+                transfer_monthly_limit_reached = True
+            else:
+                window_start = transfer_window_start(cycle)
+                slot_start = slot_start_dt(slot)
+                if now < window_start and now < slot_start:
+                    transfer_opens_at = format_kst_iso(window_start)
+                elif now >= slot_start:
+                    transfer_ended = True
 
         swap_candidate = (
             reservation.status == ReservationStatus.CONFIRMED
@@ -415,6 +424,7 @@ async def list_my_reservations(
                 "transferable": transferable,
                 "transferOpensAt": transfer_opens_at,
                 "transferEnded": transfer_ended,
+                "transferMonthlyLimitReached": transfer_monthly_limit_reached,
                 "transferPending": bool(pending),
                 "transferRecipientName": pending["recipientName"] if pending else None,
                 "swappable": swappable,
@@ -439,4 +449,7 @@ async def list_my_reservations(
         "total": total,
         "totalPages": total_pages,
         "activeTotal": active_total,
+        "transferMonthlyLimit": MONTHLY_TRANSFER_LIMIT,
+        "transferMonthlyUsed": monthly_transfer_used,
+        "transferMonthlyLimitReached": monthly_transfer_limit_reached,
     }

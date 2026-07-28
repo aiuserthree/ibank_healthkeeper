@@ -32,6 +32,9 @@ _NAME_COLLATION = "ko-KR-x-icu"
 
 TRANSFERABLE_TYPES = (ReservationType.NORMAL, ReservationType.REAPPLY)
 
+# 양도인(donor) 기준 — 캘린더 월(KST)당 완료·대기 양도 최대 횟수
+MONTHLY_TRANSFER_LIMIT = 1
+
 TRANSFER_ADMIN_NOTIFY_EMAILS = (
     "yshong@3ibank.com",
     "jhcho@3ibank.com",
@@ -184,6 +187,63 @@ async def _has_pending_transfer(db: AsyncSession, reservation_id: int) -> bool:
     return result.scalar_one_or_none() is not None
 
 
+def calendar_month_bounds_kst(
+    now: datetime | None = None,
+) -> tuple[datetime, datetime]:
+    """현재(또는 지정) 시각이 속한 캘린더 월 [start, end) — KST."""
+    now = to_kst(now or now_kst())
+    start = datetime(now.year, now.month, 1, tzinfo=KST)
+    if now.month == 12:
+        end = datetime(now.year + 1, 1, 1, tzinfo=KST)
+    else:
+        end = datetime(now.year, now.month + 1, 1, tzinfo=KST)
+    return start, end
+
+
+async def count_donor_monthly_transfers(
+    db: AsyncSession,
+    donor_member_id: int,
+    *,
+    now: datetime | None = None,
+    exclude_transfer_id: int | None = None,
+) -> int:
+    """양도인 기준 이번 달(KST) 양도 횟수 — APPROVED·PENDING만 집계(반려 제외)."""
+    start, end = calendar_month_bounds_kst(now)
+    stmt = (
+        select(func.count())
+        .select_from(TransferRequest)
+        .where(TransferRequest.donor_member_id == donor_member_id)
+        .where(
+            TransferRequest.status.in_(
+                (TransferRequestStatus.APPROVED, TransferRequestStatus.PENDING)
+            )
+        )
+        .where(TransferRequest.requested_at >= start)
+        .where(TransferRequest.requested_at < end)
+    )
+    if exclude_transfer_id is not None:
+        stmt = stmt.where(TransferRequest.id != exclude_transfer_id)
+    result = await db.execute(stmt)
+    return int(result.scalar_one() or 0)
+
+
+async def assert_donor_monthly_transfer_limit(
+    db: AsyncSession,
+    donor_member_id: int,
+    *,
+    now: datetime | None = None,
+    exclude_transfer_id: int | None = None,
+) -> None:
+    used = await count_donor_monthly_transfers(
+        db,
+        donor_member_id,
+        now=now,
+        exclude_transfer_id=exclude_transfer_id,
+    )
+    if used >= MONTHLY_TRANSFER_LIMIT:
+        raise_app_error("TRANSFER_MONTHLY_LIMIT")
+
+
 async def _get_recipient_member(
     db: AsyncSession,
     recipient_id: int,
@@ -209,6 +269,7 @@ async def search_transfer_recipients(
     q: str = "",
     limit: int = 100,
 ) -> list[dict]:
+    await assert_donor_monthly_transfer_limit(db, member.id)
     reservation, slot, cycle = await _get_transferable_reservation(
         db, member, reservation_id
     )
@@ -335,6 +396,8 @@ async def request_transfer(
     recipient_id: int,
 ) -> tuple[TransferRequest, list[int]]:
     """회원 양도 — 관리자 승인 없이 즉시 완료."""
+    await assert_donor_monthly_transfer_limit(db, member.id)
+
     if await _has_pending_transfer(db, reservation_id):
         raise_app_error("TRANSFER_ALREADY_PENDING")
 
@@ -488,6 +551,10 @@ async def approve_transfer(
         raise_app_error("NOT_TRANSFERABLE")
     if not can_transfer_slot(cycle, slot):
         raise_app_error("NOT_TRANSFER_PERIOD")
+
+    await assert_donor_monthly_transfer_limit(
+        db, transfer.donor_member_id, exclude_transfer_id=transfer.id
+    )
 
     donor = await db.get(Member, transfer.donor_member_id)
     recipient = await _get_recipient_member(

@@ -664,8 +664,9 @@ window.HKUI = (function () {
     else if (r.status === "CANCELLED") sub = "취소됨";
     // 확정됐지만 양도/교환 창(수 17:00 등)이 아직 열리지 않은 경우 — 정책은 그대로, 안내만 미리 노출
     const busyPending = !!(r.transferPending || r.swapPending);
-    const transferNotYetOpen = !r.transferable && !busyPending && !!r.transferOpensAt;
-    const transferEnded = !r.transferable && !busyPending && !r.transferOpensAt && !!r.transferEnded;
+    const transferMonthlyLimit = !r.transferable && !busyPending && !!r.transferMonthlyLimitReached;
+    const transferNotYetOpen = !r.transferable && !busyPending && !transferMonthlyLimit && !!r.transferOpensAt;
+    const transferEnded = !r.transferable && !busyPending && !transferMonthlyLimit && !r.transferOpensAt && !!r.transferEnded;
     const swapNotYetOpen = !r.swappable && !busyPending && !!r.swapOpensAt;
     const swapEnded = !r.swappable && !busyPending && !r.swapOpensAt && !!r.swapEnded;
     if (r.swapPending && r.swapRole === "proposer") {
@@ -674,6 +675,8 @@ window.HKUI = (function () {
       sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `교환 제안 받음 ← ${escapeHtml(r.swapCounterpartName || "")}`;
     } else if (r.transferPending) {
       sub = (r.type === "REAPPLY" ? "재신청 · " : "") + `양도 처리 중 → ${escapeHtml(r.transferRecipientName || "")}`;
+    } else if (transferMonthlyLimit) {
+      sub += " · 이번 달 양도 한도(1회)를 모두 사용함";
     } else if (swapNotYetOpen || transferNotYetOpen) {
       const opens = r.swapOpensAt || r.transferOpensAt;
       sub += ` · ${formatDeadlineRelative(opens)} 이후 교환·양도 가능`;
@@ -707,6 +710,8 @@ window.HKUI = (function () {
       }
       if (r.transferable) {
         actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-transfer="${r.id}" aria-label="양도하기">${transferLabel}</button>`);
+      } else if (transferMonthlyLimit) {
+        actions.push(`<span title="양도는 한 달에 1회까지 가능합니다. 이번 달 한도를 모두 사용했습니다." style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="양도하기">${transferLabel}</button></span>`);
       } else if (transferNotYetOpen) {
         actions.push(`<span title="${escapeHtml(formatDeadlineRelative(r.transferOpensAt))} 이후 양도할 수 있어요" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="양도하기">${transferLabel}</button></span>`);
       } else if (transferEnded) {
