@@ -56,8 +56,7 @@
     if (s.isHoliday) return "공휴일";
     if (s.isVacation) return "휴가";
     if (s.confirmed) return "확정됨";
-    if (isMySlot(s)) return "내 신청";
-    if (hasWeekApplied() && isOpen()) return "신청 불가";
+    if (isMySlot(s)) return `내 신청 · 신청자 ${s.requestCount || 0}명`;
     if (!isOpen()) return "신청 불가";
     if (sel && sel.id === s.id) return "선택 중";
     return `신청자 ${s.requestCount || 0}명`;
