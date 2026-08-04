@@ -155,7 +155,7 @@
                       // disabled 라서, 버튼 안에 넣으면 클릭이 전부 삼켜진다.
                       const trigger = faces
                         ? `<button type="button" class="hk-tooltip-btn hk-slot__faces-btn" aria-expanded="false" aria-controls="${panelId}" aria-label="${s.startTime} 신청자 ${applicantAvatars(s).length}명 보기"></button>
-                        <div id="${panelId}" class="hk-tooltip-panel" role="tooltip" hidden>${facesPanelHtml(s)}</div>`
+                        <div id="${panelId}" class="hk-tooltip-panel" role="tooltip" data-max-width="250" hidden>${facesPanelHtml(s)}</div>`
                         : "";
                       return `<div class="hk-slot-cell"${faces ? " data-tooltip-root" : ""}>
                         <button type="button" class="hk-slot${cls === "selected" ? " hk-slot--picking" : ""}${cls === "disabled" ? " hk-slot--disabled" : ""}${cls === "mine" ? " hk-slot--mine" : ""}${s.confirmed ? " hk-slot--confirmed" : ""}" data-id="${s.id}" ${disableClick ? "disabled" : ""} style="width:100%">

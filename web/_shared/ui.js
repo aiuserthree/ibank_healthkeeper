@@ -387,7 +387,8 @@ window.HKUI = (function () {
     panel.hidden = false;
 
     const margin = 18;
-    const maxW = 420;
+    // 패널별 폭 지정(data-max-width). 미지정 시 기존 설명형 툴팁 폭 유지.
+    const maxW = Number(panel.dataset.maxWidth) || 420;
     const vw = window.innerWidth;
     const width = Math.min(maxW, vw - margin * 2);
     const rect = btn.getBoundingClientRect();
