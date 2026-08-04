@@ -1016,6 +1016,7 @@ window.HKUI = (function () {
     kv,
     kvTooltip,
     bindTooltips,
+    closeAllTooltips,
     PRIORITY_TOOLTIP_HTML,
     APPLY_TOTAL_TOOLTIP_HTML,
     USAGE_TOTAL_TOOLTIP_HTML,

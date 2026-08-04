@@ -52,6 +52,34 @@
     return "available";
   }
 
+  function applicantAvatars(s) {
+    return Array.isArray(s.applicantAvatars) ? s.applicantAvatars : [];
+  }
+
+  /** slotMeta 가 「신청자 n명」을 노출하는 경우에만 얼굴 팝오버를 붙인다. */
+  function hasFacesPopover(s, sel) {
+    if (isSlotClosed(s)) return false;
+    if (!applicantAvatars(s).length) return false;
+    if (isMySlot(s)) return true;
+    if (!isOpen()) return false;
+    if (sel && sel.id === s.id) return false;
+    return true;
+  }
+
+  /** 얼굴만 보여준다 — 이름·부서는 API 응답에도 담기지 않는다. */
+  function facesPanelHtml(s) {
+    const faces = applicantAvatars(s)
+      .map((url) =>
+        url
+          ? `<span class="hk-avatar hk-avatar--sm"><img src="${url}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentElement.classList.add('hk-avatar--anon');this.remove()"></span>`
+          : `<span class="hk-avatar hk-avatar--sm hk-avatar--anon">${HKUI.icon("user", 15, "currentColor")}</span>`
+      )
+      .join("");
+    return `<div style="font-size:13px;font-weight:700;color:var(--color-midnight-navy);margin-bottom:10px">${s.startTime} 신청자 ${applicantAvatars(s).length}명</div>
+      <div class="hk-faces">${faces}</div>
+      <div style="font-size:11.5px;color:var(--text-muted);margin-top:11px;line-height:1.5;">마감 시점에 <b>우선권(마지막 이용일)</b>에 따라 확정됩니다.</div>`;
+  }
+
   function slotMeta(s, sel) {
     if (s.isHoliday) return "공휴일";
     if (s.isVacation) return "휴가";
@@ -83,6 +111,8 @@
 
   function renderGrid() {
     const el = document.getElementById("calendar-grid");
+    // 열린 팝오버는 body 로 옮겨져 있어, 다시 그리기 전에 닫아야 고아 패널이 남지 않는다.
+    HKUI.closeAllTooltips();
     if (!calendar?.slots?.length) {
       const desc =
         systemState === "BEFORE_OPEN"
@@ -119,10 +149,20 @@
                         isSlotClosed(s) ||
                         cls === "mine" ||
                         (hasWeekApplied() && cls !== "mine");
-                      return `<button type="button" class="hk-slot${cls === "selected" ? " hk-slot--picking" : ""}${cls === "disabled" ? " hk-slot--disabled" : ""}${cls === "mine" ? " hk-slot--mine" : ""}${s.confirmed ? " hk-slot--confirmed" : ""}" data-id="${s.id}" ${disableClick ? "disabled" : ""} style="width:100%">
-                        <span class="hk-slot__time">${s.startTime}</span>
-                        <span class="hk-slot__meta">${slotMeta(s, selected)}</span>
-                      </button>`;
+                      const faces = hasFacesPopover(s, selected);
+                      const panelId = `hk-faces-${s.id}`;
+                      // 트리거는 슬롯 버튼 "바깥" 형제여야 한다 — 신청 완료 후 다른 슬롯은
+                      // disabled 라서, 버튼 안에 넣으면 클릭이 전부 삼켜진다.
+                      const trigger = faces
+                        ? `<button type="button" class="hk-tooltip-btn hk-slot__faces-btn" aria-expanded="false" aria-controls="${panelId}" aria-label="${s.startTime} 신청자 ${applicantAvatars(s).length}명 보기"></button>
+                        <div id="${panelId}" class="hk-tooltip-panel" role="tooltip" hidden>${facesPanelHtml(s)}</div>`
+                        : "";
+                      return `<div class="hk-slot-cell"${faces ? " data-tooltip-root" : ""}>
+                        <button type="button" class="hk-slot${cls === "selected" ? " hk-slot--picking" : ""}${cls === "disabled" ? " hk-slot--disabled" : ""}${cls === "mine" ? " hk-slot--mine" : ""}${s.confirmed ? " hk-slot--confirmed" : ""}" data-id="${s.id}" ${disableClick ? "disabled" : ""} style="width:100%">
+                          <span class="hk-slot__time">${s.startTime}</span>
+                          <span class="hk-slot__meta${faces ? " hk-slot__meta--faces" : ""}">${slotMeta(s, selected)}</span>
+                        </button>${trigger}
+                      </div>`;
                     })
                     .join("")
             }
@@ -152,6 +192,7 @@
         HKUI.refreshIcons();
       });
     });
+    HKUI.bindTooltips(el);
     HKUI.refreshIcons();
   }
 
