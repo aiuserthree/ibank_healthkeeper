@@ -76,8 +76,7 @@
       )
       .join("");
     return `<div style="font-size:13px;font-weight:700;color:var(--color-midnight-navy);margin-bottom:10px">${s.startTime} 신청자 ${applicantAvatars(s).length}명</div>
-      <div class="hk-faces">${faces}</div>
-      <div style="font-size:11.5px;color:var(--text-muted);margin-top:11px;line-height:1.5;">마감 시점에 <b>우선권(마지막 이용일)</b>에 따라 확정됩니다.</div>`;
+      <div class="hk-faces">${faces}</div>`;
   }
 
   function slotMeta(s, sel) {
@@ -155,7 +154,7 @@
                       // disabled 라서, 버튼 안에 넣으면 클릭이 전부 삼켜진다.
                       const trigger = faces
                         ? `<button type="button" class="hk-tooltip-btn hk-slot__faces-btn" aria-expanded="false" aria-controls="${panelId}" aria-label="${s.startTime} 신청자 ${applicantAvatars(s).length}명 보기"></button>
-                        <div id="${panelId}" class="hk-tooltip-panel hk-faces-panel" role="tooltip" data-max-width="220" hidden>${facesPanelHtml(s)}</div>`
+                        <div id="${panelId}" class="hk-tooltip-panel hk-faces-panel" role="tooltip" data-max-width="220" data-fit-content hidden>${facesPanelHtml(s)}</div>`
                         : "";
                       return `<div class="hk-slot-cell"${faces ? " data-tooltip-root" : ""}>
                         <button type="button" class="hk-slot${cls === "selected" ? " hk-slot--picking" : ""}${cls === "disabled" ? " hk-slot--disabled" : ""}${cls === "mine" ? " hk-slot--mine" : ""}${s.confirmed ? " hk-slot--confirmed" : ""}" data-id="${s.id}" ${disableClick ? "disabled" : ""} style="width:100%">
