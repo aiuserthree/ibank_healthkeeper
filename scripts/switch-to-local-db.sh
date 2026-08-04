@@ -27,7 +27,8 @@ set_kv LOCAL_REDIS_PASSWORD localdev
 set_kv DATABASE_URL 'postgresql+asyncpg://healthkeeper:localdev@127.0.0.1:54321/healthkeeper'
 set_kv REDIS_URL 'redis://:localdev@127.0.0.1:63791/0'
 
-pkill -f "ssh -N -L 15432:127.0.0.1:5432" 2>/dev/null || true
+# dev_start_tunnel 은 ssh -f -N 순서로 띄우므로 플래그 순서에 무관한 패턴을 쓴다.
+pkill -f "ssh .*-L 15432:127.0.0.1:5432" 2>/dev/null || true
 
 echo "Done. .env now points to local Docker DB (54321/63791)."
 echo "Run: ./scripts/dev.sh"

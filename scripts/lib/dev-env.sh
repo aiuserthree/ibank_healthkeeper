@@ -103,7 +103,10 @@ dev_wait_port() {
 }
 
 dev_start_tunnel() {
-  pkill -f "ssh -N -L 15432:127.0.0.1:5432" 2>/dev/null || true
+  # 아래 ssh 는 -f -N 순서라 "ssh -N -L ..." 로는 매칭되지 않는다.
+  # 플래그 순서에 영향받지 않도록 ssh 로 시작하는 정규식을 쓴다.
+  # (패턴을 -L 로 시작하면 pkill 이 자기 옵션으로 해석한다)
+  pkill -f "ssh .*-L 15432:127.0.0.1:5432" 2>/dev/null || true
   if ! ssh -f -N \
     -L 15432:127.0.0.1:5432 \
     -L 16379:127.0.0.1:6379 \

@@ -64,7 +64,7 @@ echo ""
 echo "운영 반영: ./scripts/deploy.sh 실행 시에만 코드·DB 마이그레이션이 서버에 적용됩니다."
 echo "Stop: kill $API_PID $VITE_PID"
 if dev_is_remote_db; then
-  echo "      pkill -f 'ssh -N -L 15432'"
+  echo "      pkill -f 'ssh .*-L 15432:127.0.0.1:5432'"
 else
   echo "      ./scripts/dev-local-db.sh down  # optional — DB 컨테이너 종료"
 fi
