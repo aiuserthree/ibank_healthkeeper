@@ -19,7 +19,6 @@ from app.models import (
     SlotStatus,
     MailType,
 )
-from app.services.avatar import member_avatar_url
 from app.services.cycle import get_active_cycle, resolve_system_state
 from app.services.korean_holidays import is_public_holiday
 from app.services.legacy_usage import get_member_apply_total
@@ -74,13 +73,7 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
     items = []
     for slot in slots:
         slot_res = by_slot.get(slot.id, [])
-        requested = [r for r in slot_res if r.status == ReservationStatus.REQUESTED]
-        request_cnt = len(requested)
-        # 신청자 얼굴만 노출한다 — 이름·부서는 내려주지 않는다.
-        # 신청 순서는 우선권 동점 시 타이브레이커라, applied_at 이 아닌 member_id 순으로 정렬한다.
-        applicant_avatars = [
-            member_avatar_url(r.member_id) for r in sorted(requested, key=lambda r: r.member_id)
-        ]
+        request_cnt = sum(1 for r in slot_res if r.status == ReservationStatus.REQUESTED)
         mine = any(
             r.member_id == member.id and r.status in ACTIVE_APPLY_STATUSES for r in slot_res
         )
@@ -105,7 +98,6 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
                 "isHoliday": holiday,
                 "status": slot.status.value,
                 "requestCount": request_cnt,
-                "applicantAvatars": applicant_avatars,
                 "mine": mine,
                 "confirmed": confirmed,
             }

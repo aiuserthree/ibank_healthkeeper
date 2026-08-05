@@ -387,20 +387,9 @@ window.HKUI = (function () {
     panel.hidden = false;
 
     const margin = 18;
-    // 패널별 폭 지정(data-max-width). 미지정 시 기존 설명형 툴팁 폭 유지.
-    const maxW = Number(panel.dataset.maxWidth) || 420;
+    const maxW = 420;
     const vw = window.innerWidth;
-    const cap = Math.min(maxW, vw - margin * 2);
-    // data-fit-content: 상한 안에서 내용 폭에 맞춰 줄어든다(설명형 툴팁은 기존대로 고정 폭).
-    let width = cap;
-    if (panel.dataset.fitContent != null) {
-      // 이전 열림의 left 가 남아 있으면 가용 폭이 좁게 잡혀 오측정된다.
-      panel.style.left = "0px";
-      panel.style.right = "auto";
-      panel.style.width = "auto";
-      panel.style.maxWidth = `${cap}px`;
-      width = Math.min(cap, Math.ceil(panel.getBoundingClientRect().width));
-    }
+    const width = Math.min(maxW, vw - margin * 2);
     const rect = btn.getBoundingClientRect();
 
     panel.style.left = `${Math.max(margin, Math.min(rect.left, vw - margin - width))}px`;
@@ -1027,7 +1016,6 @@ window.HKUI = (function () {
     kv,
     kvTooltip,
     bindTooltips,
-    closeAllTooltips,
     PRIORITY_TOOLTIP_HTML,
     APPLY_TOTAL_TOOLTIP_HTML,
     USAGE_TOTAL_TOOLTIP_HTML,
