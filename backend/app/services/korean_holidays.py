@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import KoreanPublicHoliday
 
-# holidays 패키지가 아직 반영하지 않은 2026년 이후 법정 공휴일 (API 미동기화 시 폴백)
+# holidays 패키지가 다루지 않는 휴일 (API 미동기화 시 폴백).
+# 슬롯 판정은 2026년 이후만 다루므로 그 이전 연도는 기존 동작을 유지한다.
 _SUPPLEMENTAL_FROM_YEAR = 2026
 _SUPPLEMENTAL_FIXED: tuple[tuple[int, int], ...] = (
+    (5, 1),  # 노동절(근로자의 날)
     (7, 17),  # 제헌절
 )
 
