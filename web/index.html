@@ -206,6 +206,16 @@
       </div>`;
     }
 
+    function badgeGuide(total) {
+      const current = milestones.filter(([n]) => total >= n).pop();
+      return `<b>배지 안내</b> — 누적 이용 횟수에 따라 배지가 올라가요.
+        <ul class="hk-badge-guide">${milestones.map((m) => `
+          <li class="${total >= m[0] ? "is-reached" : ""}${m === current ? " is-current" : ""}">
+            <span>${HKUI.icon(total >= m[0] ? "award" : "lock-keyhole", 14, "currentColor")} ${m[1]}${m === current ? " · 현재" : ""}</span>
+            <span>${m[0]}회 이상</span>
+          </li>`).join("")}</ul>`;
+    }
+
     function myRecordCard(me) {
       const R = HKRoutes;
       const total = me.totalUses || 0;
@@ -227,7 +237,11 @@
             <div class="hk-fun-stat__icon" style="margin:0;background:var(--color-signal-blue-soft)">${HKUI.icon("medal", 19, "var(--color-signal-blue)")}</div>
             <b style="font-size:17px;color:var(--color-midnight-navy)">내 헬스키퍼 기록</b>
           </div>
-          ${reached ? `<span class="hk-badge hk-badge--soft">${HKUI.icon("award", 13, "currentColor")} ${reached[1]}</span>` : `<span class="hk-badge hk-badge--neutral">새싹</span>`}
+          <div data-tooltip-root style="display:flex;align-items:center;gap:4px">
+            ${reached ? `<span class="hk-badge hk-badge--soft">${HKUI.icon("award", 13, "currentColor")} ${reached[1]}</span>` : `<span class="hk-badge hk-badge--neutral">새싹</span>`}
+            <button type="button" class="hk-tooltip-btn" aria-expanded="false" aria-controls="hk-tt-badges" aria-label="배지 안내" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer;border-radius:999px;color:var(--color-slate-blue)">${HKUI.icon("circle-help", 15, "currentColor")}</button>
+            <div id="hk-tt-badges" class="hk-tooltip-panel" role="tooltip" hidden>${badgeGuide(total)}</div>
+          </div>
         </div>
         <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
           <span class="hk-fun-stat__num" data-count="${total}">0</span><span style="font-size:15px;color:var(--text-secondary)">회 이용</span>
@@ -290,6 +304,7 @@
           <div class="hk-fun-col">${rankingCard(stats, loggedIn)}</div>
         </div>`;
       el.hidden = false;
+      HKUI.bindTooltips(el);
       HKUI.refreshIcons();
       countUp(el);
       growBars(el);
