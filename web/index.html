@@ -190,10 +190,10 @@
       return `<div class="hk-card hk-card--pad">${head}
         <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px">색이 옅을수록 신청이 덜 몰려 확정될 가능성이 높아요</p>
         <table class="hk-heat">
-          <thead><tr><th></th>${heat.times.map((t) => `<th scope="col">${esc(t)}</th>`).join("")}</tr></thead>
-          <tbody>${heat.days.map((day, r) => `<tr><th scope="row">${esc(day)}</th>${heat.cells[r].map((v) =>
-            v == null ? `<td><span class="hk-heat__cell hk-heat__cell--empty">-</span></td>`
-              : `<td><span class="hk-heat__cell hk-heat__cell--${level(v)}">${v.toFixed(1)}</span></td>`).join("")}</tr>`).join("")}</tbody>
+          <thead><tr><th></th>${heat.days.map((day) => `<th scope="col">${esc(day)}</th>`).join("")}</tr></thead>
+          <tbody>${heat.times.map((t, c) => `<tr><th scope="row">${esc(t)}</th>${heat.cells.map((row) => row[c]).map((v) =>
+            v == null ? `<td class="hk-heat__cell hk-heat__cell--empty">-</td>`
+              : `<td class="hk-heat__cell hk-heat__cell--${level(v)}">${v.toFixed(1)}</td>`).join("")}</tr>`).join("")}</tbody>
         </table>
         <div class="hk-heat__legend" aria-hidden="true"><span>여유</span>${[0, 1, 2, 3, 4].map((n) => `<i class="hk-heat__cell--${n}"></i>`).join("")}<span>치열</span></div>
         <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border-default);font-size:14px;color:var(--color-midnight-navy);display:flex;align-items:flex-start;gap:8px">${HKUI.icon("lightbulb", 16, "var(--color-warning)", "flex-shrink:0;margin-top:2px")}<span>가장 여유로운 시간은 <b style="color:var(--color-signal-blue)">${esc(heat.calm.day)}요일 ${esc(heat.calm.time)}</b>, 가장 치열한 시간은 <b>${esc(heat.busy.day)}요일 ${esc(heat.busy.time)}</b>이에요.</span></div>
@@ -217,7 +217,7 @@
       const board = stats.departments;
       if (!loggedIn || !board) {
         const fake = ["가", "나", "다", "라", "마", "바", "사", "아"].map((n, i) => ({ rank: i + 1, name: `${n}부서`, uses: 40 - i * 4, isMine: false }));
-        return `<div class="hk-card hk-card--pad">${head}
+        return `<div class="hk-card hk-card--pad hk-rank-locked-card">${head}
           <div class="hk-rank-locked">
             <div aria-hidden="true">${deptRows(fake).replace(/data-width="([^"]+)"/g, 'style="width:$1"')}</div>
             <div class="hk-rank-locked__cta">
@@ -345,13 +345,13 @@
               ${funStat("flame", violet, peak, peakLabel)}
             </div>
             ${heatmapCard(stats.heatmap)}
+            ${tipCard()}
           </div>
           <div class="hk-fun-col">
             ${loggedIn && stats.me ? myRecordCard(stats.me) : ""}
             ${departmentCard(stats, loggedIn)}
           </div>
-        </div>
-        <div style="margin-top:20px">${tipCard()}</div>`;
+        </div>`;
       el.hidden = false;
       HKUI.bindTooltips(el);
       HKUI.refreshIcons();
