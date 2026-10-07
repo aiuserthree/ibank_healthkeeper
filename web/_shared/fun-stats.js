@@ -180,12 +180,12 @@ window.HKFun = (function () {
       waitLine = `마지막 이용 후 <b>${me.daysSinceLastUse}일</b> — 오래 기다릴수록 우선권이 높아져요.`;
     }
     return `<div class="hk-card hk-card--pad">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px;margin-bottom:14px">
         <div style="display:flex;align-items:center;gap:10px">
           <div class="hk-fun-stat__icon" style="margin:0;background:var(--color-signal-blue-soft)">${HKUI.icon("medal", 19, "var(--color-signal-blue)")}</div>
-          <b style="font-size:17px;color:var(--color-midnight-navy)">내 헬스키퍼 기록</b>
+          <b style="font-size:17px;color:var(--color-midnight-navy);white-space:nowrap">내 헬스키퍼 기록</b>
         </div>
-        <div data-tooltip-root style="display:flex;align-items:center;gap:4px">
+        <div data-tooltip-root style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${HKUI.usageBadgeChip(total)}
           <button type="button" class="hk-tooltip-btn" aria-expanded="false" aria-controls="hk-tt-badges" aria-label="배지 안내" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer;border-radius:999px;color:var(--color-slate-blue)">${HKUI.icon("circle-help", 15, "currentColor")}</button>
           <div id="hk-tt-badges" class="hk-tooltip-panel" role="tooltip" hidden>${badgeGuide(total)}</div>
