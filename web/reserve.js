@@ -179,7 +179,7 @@
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">${HKUI.icon("calendar-days", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.formatDateShort(selected.slotDate)} (${dow})</span></div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">${HKUI.icon("clock", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${selected.startTime} – ${selected.endTime}</span></div>
         ${HKUI.alertBox("info", "이번 주 신청 완료", "한 주에 한 타임만 신청할 수 있어요. 마감 전까지 마이페이지에서 취소 후 다른 시간으로 다시 신청할 수 있습니다.")}
-        <a href="${HKRoutes.mypage}" style="display:block;margin-top:16px"><button type="button" class="hk-btn hk-btn--secondary hk-btn--block">예약 내역 보기</button></a>`;
+        <a href="${HKRoutes.mypage}" style="display:block;margin-top:auto;padding-top:16px"><button type="button" class="hk-btn hk-btn--secondary hk-btn--block">예약 내역 보기</button></a>`;
       HKUI.refreshIcons();
       return;
     }
@@ -187,8 +187,10 @@
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">${HKUI.icon("calendar-days", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.formatDateShort(selected.slotDate)} (${dow})</span></div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">${HKUI.icon("clock", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${selected.startTime} – ${selected.endTime}</span></div>
       ${selected.requestCount > 0 ? `<div style="margin-bottom:16px">${HKUI.alertBox("warning", `다른 신청자 ${selected.requestCount}명`, "마감 시점에 <b>우선권(마지막 이용일)</b>에 따라 확정됩니다.")}</div>` : ""}
-      <button type="button" class="hk-btn hk-btn--primary hk-btn--block" id="apply-btn">예약 신청하기</button>
-      <p style="font-size:12px;color:var(--text-muted);margin-top:12px;line-height:1.5;margin-bottom:0">신청은 마감(수 17:00) 전까지 취소할 수 있어요. <b>신청 ≠ 확정</b> — 관리자 확정 후 완료됩니다.</p>`;
+      <div style="margin-top:auto">
+        <button type="button" class="hk-btn hk-btn--primary hk-btn--block" id="apply-btn">예약 신청하기</button>
+        <p style="font-size:12px;color:var(--text-muted);margin-top:12px;line-height:1.5;margin-bottom:0">신청은 마감(수 17:00) 전까지 취소할 수 있어요. <b>신청 ≠ 확정</b> — 관리자 확정 후 완료됩니다.</p>
+      </div>`;
     HKUI.refreshIcons();
     document.getElementById("apply-btn").onclick = async () => {
       if (!isOpen()) {
