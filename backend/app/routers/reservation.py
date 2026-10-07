@@ -59,7 +59,7 @@ async def fun_stats(
     db: AsyncSession = Depends(get_db),
     member: Optional[Member] = Depends(get_optional_active_member),
 ):
-    """메인 화면 재미 요소 — 누적 이용 통계(공개) · 최다 이용자 랭킹(로그인 회원)."""
+    """메인 화면 재미 요소 — 누적 이용 통계·꿀타임 히트맵(공개) · 부서 대항전·내 기록(로그인 회원)."""
     data = await fun_stats_service.get_fun_stats(db, member)
     return {"data": data}
 
