@@ -275,13 +275,6 @@ def _departments(snap: _Snapshot, usages: list[_Usage], me_key: str) -> dict:
     }
 
 
-def _peak(counter: Counter, label) -> dict | None:
-    if not counter:
-        return None
-    value, uses = sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))[0]
-    return {"label": label(value), "uses": uses}
-
-
 async def get_fun_stats(db: AsyncSession, member: Member | None) -> dict:
     snap = await _get_snapshot(db)
     today = snap.today
@@ -295,11 +288,6 @@ async def get_fun_stats(db: AsyncSession, member: Member | None) -> dict:
         "totalUsers": len({u.key for u in snap.usages}),
         "yearUses": len(year_usages),
         "monthUses": len(month_usages),
-        "peakTime": _peak(Counter(u.start for u in snap.usages if u.start), lambda v: v),
-        "peakWeekday": _peak(
-            Counter(u.usage_date.weekday() for u in snap.usages if u.usage_date.weekday() < 5),
-            lambda v: _WEEKDAY_KO[v],
-        ),
         "heatmap": snap.heatmap,
         "departments": None,
         "me": None,

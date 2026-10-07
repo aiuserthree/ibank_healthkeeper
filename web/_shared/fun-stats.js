@@ -230,10 +230,9 @@ window.HKFun = (function () {
     const green = { bg: "var(--color-success-soft)", fg: "var(--color-success)" };
     const amber = { bg: "var(--color-warning-soft)", fg: "var(--color-warning)" };
     const violet = { bg: "#efe8ff", fg: "var(--color-ultraviolet)" };
-    const peak = stats.peakTime ? HKUI.escapeHtml(stats.peakTime.label) : "-";
-    const peakLabel = stats.peakWeekday
-      ? `인기 시간 · ${HKUI.escapeHtml(stats.peakWeekday.label)}요일 최다`
-      : "인기 시간";
+    // 꿀타임 지도의 "가장 치열한 시간"과 같은 값
+    const busy = stats.heatmap?.busy;
+    const peak = busy ? `<small style="margin:0 4px 0 0">${HKUI.escapeHtml(busy.day)}</small>${HKUI.escapeHtml(busy.time)}` : "-";
     el.innerHTML = `
       <span class="hk-badge hk-badge--soft">숫자로 보는 헬스키퍼</span>
       <h2 style="font-size:34px;margin:14px 0 8px">지금까지 <span style="color:var(--color-signal-blue)" data-count="${stats.totalUses}">0</span>번, 뭉친 어깨가 풀렸어요</h2>
@@ -244,7 +243,7 @@ window.HKFun = (function () {
             ${funStat("hand-heart", blue, `<span data-count="${stats.totalUses}">0</span><small>회</small>`, "누적 이용")}
             ${funStat("users-round", green, `<span data-count="${stats.totalUsers}">0</span><small>명</small>`, "함께한 동료")}
             ${funStat("calendar-heart", amber, `<span data-count="${stats.monthUses}">0</span><small>회</small>`, `${stats.month}월 이용`)}
-            ${funStat("flame", violet, peak, peakLabel)}
+            ${funStat("flame", violet, peak, "가장 치열한 시간")}
           </div>
           ${heatmapCard(stats.heatmap)}
           ${tipCard()}
