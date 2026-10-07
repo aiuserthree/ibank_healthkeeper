@@ -357,6 +357,27 @@ window.HKUI = (function () {
     "실제로 <b>안마서비스를 이용하신 횟수</b>예요.(2026년~)<br><br>" +
     "과거 이용 이력과 사이트에서 <b>확정된</b> 예약을 합산합니다. 신청만 한 건·탈락한 건은 포함되지 않습니다.";
 
+  // 누적 이용 횟수 배지 — [기준 횟수, 이름, 아이콘, 글자색, 배경색]
+  const USAGE_BADGES = [
+    [1, "첫 안마", "hand-heart", "var(--color-signal-blue)", "var(--color-signal-blue-soft)"],
+    [5, "단골 입문", "footprints", "var(--color-success)", "var(--color-success-soft)"],
+    [10, "단골 손님", "heart", "#d6336c", "#fde7ef"],
+    [20, "VIP", "gem", "var(--color-ultraviolet)", "#efe8ff"],
+    [30, "헬스키퍼 마니아", "flame", "#d9480f", "#ffe8d9"],
+    [50, "레전드", "trophy", "var(--color-warning)", "var(--color-warning-soft)"],
+    [100, "명예의 전당", "crown", "#ffd666", "var(--color-midnight-navy)"],
+  ];
+  const USAGE_BADGE_SEEDLING = [0, "새싹", "sprout", "var(--color-success)", "var(--color-mist)"];
+
+  function usageBadge(total) {
+    return USAGE_BADGES.filter(([n]) => (total || 0) >= n).pop() || USAGE_BADGE_SEEDLING;
+  }
+
+  function usageBadgeChip(total) {
+    const [, label, iconName, fg, bg] = usageBadge(total);
+    return `<span class="hk-badge" style="color:${fg};background:${bg};white-space:nowrap">${icon(iconName, 13, "currentColor")} ${label}</span>`;
+  }
+
   function kvTooltip(key, valueHtml, tooltipHtml) {
     const panelId = `hk-tt-${Math.random().toString(36).slice(2, 9)}`;
     return `<div class="hk-kv-tooltip" data-tooltip-root>
@@ -1016,6 +1037,9 @@ window.HKUI = (function () {
     kv,
     kvTooltip,
     bindTooltips,
+    USAGE_BADGES,
+    usageBadge,
+    usageBadgeChip,
     PRIORITY_TOOLTIP_HTML,
     APPLY_TOTAL_TOOLTIP_HTML,
     USAGE_TOTAL_TOOLTIP_HTML,
