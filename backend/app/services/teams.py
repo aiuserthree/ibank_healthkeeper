@@ -27,6 +27,7 @@ from app.models import (
     TransferRequest,
 )
 from app.services.sso import _microsoft_post
+from app.services.stretch_tips import stretch_tip_for
 
 logger = logging.getLogger(__name__)
 
@@ -235,15 +236,19 @@ def render_open_notice_body(
     week_start: date,
     week_end: date,
     site_url: str | None = None,
+    notice_date: date | None = None,
 ) -> str:
     week_label = f"{week_start.month}/{week_start.day}~{week_end.month}/{week_end.day}"
     open_label, close_label = _open_close_labels(open_at, close_at)
     url = (site_url or open_notice_site_url()).strip()
+    tip_title, tip_body = stretch_tip_for(notice_date or now_kst().date())
     return (
         f"<p><strong>[헬스키퍼]</strong> 차주 안마 예약 신청 안내</p>"
         f"<p>{name}님, {week_label} 주간 예약 신청이 {open_label}에 시작됩니다.</p>"
         f"<p>마감: {close_label}</p>"
         f'<p><a href="{url}">{url}</a></p>'
+        f"<p>&nbsp;</p>"
+        f"<p><strong>오늘의 1분 스트레칭 · {tip_title}</strong><br>{tip_body}</p>"
     )
 
 
@@ -733,6 +738,7 @@ async def enqueue_open_notice_broadcast(
             week_start=cycle.target_week_start,
             week_end=cycle.target_week_end,
             site_url=site_url,
+            notice_date=send_date,
         )
         msg = await enqueue_teams_message(
             db,
