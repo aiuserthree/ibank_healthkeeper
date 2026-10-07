@@ -14,7 +14,7 @@ from app.core.time import now_kst
 from app.models import LegacyUsage, Member, MemberStatus, Reservation, ReservationStatus, Slot
 
 CACHE_TTL_SECONDS = 60
-RANKING_SIZE = 5
+RANKING_SIZE = 10
 _WEEKDAY_KO = ("월", "화", "수", "목", "금", "토", "일")
 
 
