@@ -185,10 +185,7 @@
           <div class="hk-fun-stat__icon" style="margin:0;background:var(--color-warning-soft)">${HKUI.icon("trophy", 19, "var(--color-warning)")}</div>
           <b style="font-size:17px;color:var(--color-midnight-navy)">최다 이용자 랭킹</b>
         </div>
-        ${loggedIn ? `<div class="hk-tabs hk-fun-tabs" role="tablist" style="border-bottom:none">
-          <button type="button" class="hk-tab hk-tab--active" data-rank-tab="month" role="tab">${stats.month}월</button>
-          <button type="button" class="hk-tab" data-rank-tab="year" role="tab">${stats.year}년</button>
-        </div>` : ""}
+        <span class="hk-badge hk-badge--soft">${stats.year}년</span>
       </div>`;
       if (!loggedIn || !stats.ranking) {
         const fake = [1, 2, 3, 4, 5].map((n) => ({ rank: n, name: "헬스키퍼", uses: 12 - n * 2, isMe: false }));
@@ -205,8 +202,7 @@
       }
       return `<div class="hk-card hk-card--pad">${head}
         <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px">동료 이름은 일부 가려서 보여드려요 · 동률은 같은 순위</p>
-        <div data-rank-panel="month">${rankPanel(stats.ranking.month, "이번 달")}</div>
-        <div data-rank-panel="year" hidden>${rankPanel(stats.ranking.year, "올해")}</div>
+        ${rankPanel(stats.ranking.year, "올해")}
       </div>`;
     }
 
@@ -279,7 +275,7 @@
       el.innerHTML = `
         <span class="hk-badge hk-badge--soft">숫자로 보는 헬스키퍼</span>
         <h2 style="font-size:34px;margin:14px 0 8px">지금까지 <span style="color:var(--color-signal-blue)" data-count="${stats.totalUses}">0</span>번, 뭉친 어깨가 풀렸어요</h2>
-        <p style="font-size:17px;color:var(--text-secondary);margin:0 0 28px">함께한 동료들의 기록이에요. 이번 달의 주인공은 누구일까요?</p>
+        <p style="font-size:17px;color:var(--text-secondary);margin:0 0 28px">함께한 동료들의 기록이에요. 올해의 주인공은 누구일까요?</p>
         <div class="hk-fun-grid">
           <div class="hk-fun-col">
             <div class="hk-fun-stats">
@@ -294,19 +290,6 @@
           <div class="hk-fun-col">${rankingCard(stats, loggedIn)}</div>
         </div>`;
       el.hidden = false;
-      el.querySelectorAll("[data-rank-tab]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const tab = btn.dataset.rankTab;
-          el.querySelectorAll("[data-rank-tab]").forEach((b) => b.classList.toggle("hk-tab--active", b === btn));
-          el.querySelectorAll("[data-rank-panel]").forEach((p) => {
-            p.hidden = p.dataset.rankPanel !== tab;
-            if (!p.hidden) {
-              p.querySelectorAll("[data-width]").forEach((bar) => { bar.style.width = "0"; });
-              growBars(p);
-            }
-          });
-        });
-      });
       HKUI.refreshIcons();
       countUp(el);
       growBars(el);

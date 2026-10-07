@@ -234,11 +234,7 @@ async def get_fun_stats(db: AsyncSession, member: Member | None) -> dict:
     if member is not None:
         me_key = member.email.strip().lower()
         year_top, year_me = _ranking(snap, year_usages, me_key)
-        month_top, month_me = _ranking(snap, month_usages, me_key)
-        data["ranking"] = {
-            "year": {"top": year_top, "me": year_me},
-            "month": {"top": month_top, "me": month_me},
-        }
+        data["ranking"] = {"year": {"top": year_top, "me": year_me}}
         my_dates = [u.usage_date for u in snap.usages if u.key == me_key]
         last_used = max(my_dates) if my_dates else None
         data["me"] = {
