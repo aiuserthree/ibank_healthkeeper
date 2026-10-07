@@ -25,7 +25,9 @@ location = / {
     return 301 /index;
 }
 
+# HTML·페이지 스크립트는 매번 재검증 — 배포 직후 로그인 리다이렉트 등에서 옛 페이지가 캐시로 뜨지 않게 함
 location / {
+    add_header Cache-Control "no-cache, must-revalidate";
     try_files $uri $uri/ $uri.html =404;
 }
 
