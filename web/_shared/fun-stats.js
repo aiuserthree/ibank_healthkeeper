@@ -22,10 +22,21 @@ window.HKFun = (function () {
     ["깊은 호흡", "4초 들이쉬고 4초 멈추고 6초 내쉬기를 3번. 긴장이 스르르.",
       '<circle cx="26" cy="18" r="9"/><path d="M8 58V46c0-5 4-9 9-9h18c5 0 9 4 9 9v12"/><path class="a" d="M42 14c3-3 6 3 9 0s6 3 9 0M42 23c3-3 6 3 9 0s6 3 9 0"/>'],
   ];
+  // [기준 횟수, 이름, 아이콘, 글자색, 배경색]
   const milestones = [
-    [1, "첫 안마"], [5, "단골 입문"], [10, "단골 손님"], [20, "VIP"],
-    [30, "헬스키퍼 마니아"], [50, "레전드"], [100, "명예의 전당"],
+    [1, "첫 안마", "hand-heart", "var(--color-signal-blue)", "var(--color-signal-blue-soft)"],
+    [5, "단골 입문", "footprints", "var(--color-success)", "var(--color-success-soft)"],
+    [10, "단골 손님", "heart", "#d6336c", "#fde7ef"],
+    [20, "VIP", "gem", "var(--color-ultraviolet)", "#efe8ff"],
+    [30, "헬스키퍼 마니아", "flame", "#d9480f", "#ffe8d9"],
+    [50, "레전드", "trophy", "var(--color-warning)", "var(--color-warning-soft)"],
+    [100, "명예의 전당", "crown", "#ffd666", "var(--color-midnight-navy)"],
   ];
+  const seedling = [0, "새싹", "sprout", "var(--color-success)", "var(--color-mist)"];
+
+  function badgeChip([, name, iconName, fg, bg]) {
+    return `<span class="hk-badge" style="color:${fg};background:${bg}">${HKUI.icon(iconName, 13, "currentColor")} ${name}</span>`;
+  }
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
   function todayTip() {
@@ -161,7 +172,7 @@ window.HKFun = (function () {
     return `<b>배지 안내</b> — 누적 이용 횟수에 따라 배지가 올라가요.
       <ul class="hk-badge-guide">${milestones.map((m) => `
         <li class="${total >= m[0] ? "is-reached" : ""}${m === current ? " is-current" : ""}">
-          <span>${HKUI.icon(total >= m[0] ? "award" : "lock-keyhole", 14, "currentColor")} ${m[1]}${m === current ? " · 현재" : ""}</span>
+          <span><i class="hk-badge-guide__icon" style="color:${m[3]};background:${m[4]}">${HKUI.icon(m[2], 14, "currentColor")}</i> ${m[1]}${m === current ? " · 현재" : ""}</span>
           <span>${m[0]}회 이상</span>
         </li>`).join("")}</ul>`;
   }
@@ -188,7 +199,7 @@ window.HKFun = (function () {
           <b style="font-size:17px;color:var(--color-midnight-navy)">내 헬스키퍼 기록</b>
         </div>
         <div data-tooltip-root style="display:flex;align-items:center;gap:4px">
-          ${reached ? `<span class="hk-badge hk-badge--soft">${HKUI.icon("award", 13, "currentColor")} ${reached[1]}</span>` : `<span class="hk-badge hk-badge--neutral">새싹</span>`}
+          ${badgeChip(reached || seedling)}
           <button type="button" class="hk-tooltip-btn" aria-expanded="false" aria-controls="hk-tt-badges" aria-label="배지 안내" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer;border-radius:999px;color:var(--color-slate-blue)">${HKUI.icon("circle-help", 15, "currentColor")}</button>
           <div id="hk-tt-badges" class="hk-tooltip-panel" role="tooltip" hidden>${badgeGuide(total)}</div>
         </div>
