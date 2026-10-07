@@ -95,6 +95,223 @@
       }
       HKUI.refreshIcons();
     }
+    const stretchTips = [
+      ["목 옆 늘리기", "오른손으로 머리 왼쪽을 감싸 오른쪽으로 천천히 당겨 15초. 반대쪽도 똑같이."],
+      ["어깨 으쓱 털기", "숨을 들이쉬며 어깨를 귀까지 올리고, 내쉬며 툭 떨어뜨리기를 5번."],
+      ["가슴 열기", "양손을 등 뒤로 깍지 끼고 가슴을 앞으로 내밀며 10초 유지."],
+      ["손목 풀기", "팔을 앞으로 뻗어 손등을 반대 손으로 몸 쪽으로 당겨 10초씩."],
+      ["등 고양이 자세", "의자에 앉아 등을 둥글게 말았다가 펴기를 천천히 5번."],
+      ["눈 쉬어주기", "20분마다 6m 이상 먼 곳을 20초 바라보는 20-20-20 규칙."],
+      ["허리 비틀기", "의자에 앉아 상체를 좌우로 천천히 비틀어 각 10초씩."],
+      ["턱 당기기", "턱을 뒤로 당겨 이중턱을 만들듯 5초 유지, 거북목 예방에 좋아요."],
+      ["종아리 펌프", "앉은 채로 발뒤꿈치 들었다 내리기 20번, 다리 붓기를 줄여요."],
+      ["깊은 호흡", "4초 들이쉬고 4초 멈추고 6초 내쉬기를 3번. 긴장이 스르르."],
+    ];
+    const milestones = [
+      [1, "첫 안마"], [5, "단골 입문"], [10, "단골 손님"], [20, "VIP"],
+      [30, "헬스키퍼 마니아"], [50, "레전드"], [100, "명예의 전당"],
+    ];
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+    function todayTip() {
+      const key = HKUI.nowKst ? HKUI.nowKst() : new Date();
+      const start = new Date(key.getFullYear(), 0, 0);
+      const dayOfYear = Math.floor((key - start) / 86400000);
+      return stretchTips[dayOfYear % stretchTips.length];
+    }
+
+    function countUp(root) {
+      root.querySelectorAll("[data-count]").forEach((el) => {
+        const target = Number(el.dataset.count) || 0;
+        if (prefersReducedMotion || target <= 0) {
+          el.textContent = target.toLocaleString("ko-KR");
+          return;
+        }
+        const duration = 1100;
+        const t0 = performance.now();
+        const tick = (now) => {
+          const p = Math.min(1, (now - t0) / duration);
+          const eased = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(target * eased).toLocaleString("ko-KR");
+          if (p < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+      });
+    }
+
+    function growBars(root) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        root.querySelectorAll("[data-width]").forEach((el) => { el.style.width = el.dataset.width; });
+      }));
+    }
+
+    function funStat(iconName, tint, numHtml, label) {
+      return `<div class="hk-fun-stat">
+        <div class="hk-fun-stat__icon" style="background:${tint.bg}">${HKUI.icon(iconName, 19, tint.fg)}</div>
+        <div class="hk-fun-stat__num">${numHtml}</div>
+        <div class="hk-fun-stat__label">${label}</div>
+      </div>`;
+    }
+
+    function rankRows(top) {
+      const max = Math.max(1, ...top.map((r) => r.uses));
+      return `<ol class="hk-rank-list">${top.map((r) => `
+        <li class="hk-rank-row${r.isMe ? " hk-rank-row--me" : ""}">
+          <span class="hk-rank-medal${r.rank <= 3 ? ` hk-rank-medal--${r.rank}` : ""}">${r.rank === 1 ? HKUI.icon("crown", 15, "#7a4d00") : r.rank}</span>
+          <span class="hk-rank-name">${HKUI.escapeHtml(r.name)}${r.isMe ? ' <span class="hk-badge hk-badge--soft" style="padding:1px 7px;font-size:11px;background:#fff">나</span>' : ""}</span>
+          <span class="hk-rank-bar"><span data-width="${Math.round((r.uses / max) * 100)}%"></span></span>
+          <span class="hk-rank-uses">${r.uses}회</span>
+        </li>`).join("")}</ol>`;
+    }
+
+    function rankPanel(board, periodLabel) {
+      if (!board.top.length) {
+        return `<div style="padding:28px 8px;text-align:center;color:var(--text-secondary);font-size:14.5px;line-height:1.6">
+          ${HKUI.icon("sparkles", 26, "var(--color-steel-blue)")}<br>${periodLabel} 이용 기록이 아직 없어요.<br>첫 번째 주인공이 되어 보세요!
+        </div>`;
+      }
+      const me = board.me;
+      const meLine = me && me.rank
+        ? `${periodLabel} 나는 <b style="color:var(--color-signal-blue)">${me.rank}위</b> · ${me.uses}회 <span style="color:var(--text-muted)">(참여 ${me.participants}명)</span>`
+        : `${periodLabel} 아직 기록이 없어요. 이번 주에 신청해 보세요!`;
+      return rankRows(board.top) +
+        `<div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border-default);font-size:14px;color:var(--color-midnight-navy);display:flex;align-items:center;gap:8px">${HKUI.icon("user-round", 16, "var(--color-slate-blue)")}<span>${meLine}</span></div>`;
+    }
+
+    function rankingCard(stats, loggedIn) {
+      const R = HKRoutes;
+      const head = `<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 12px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="hk-fun-stat__icon" style="margin:0;background:var(--color-warning-soft)">${HKUI.icon("trophy", 19, "var(--color-warning)")}</div>
+          <b style="font-size:17px;color:var(--color-midnight-navy)">최다 이용자 랭킹</b>
+        </div>
+        ${loggedIn ? `<div class="hk-tabs hk-fun-tabs" role="tablist" style="border-bottom:none">
+          <button type="button" class="hk-tab hk-tab--active" data-rank-tab="month" role="tab">${stats.month}월</button>
+          <button type="button" class="hk-tab" data-rank-tab="year" role="tab">${stats.year}년</button>
+        </div>` : ""}
+      </div>`;
+      if (!loggedIn || !stats.ranking) {
+        const fake = [1, 2, 3, 4, 5].map((n) => ({ rank: n, name: "헬스키퍼", uses: 12 - n * 2, isMe: false }));
+        return `<div class="hk-card hk-card--pad">${head}
+          <div class="hk-rank-locked">
+            <div aria-hidden="true">${rankRows(fake).replace(/data-width="([^"]+)"/g, 'style="width:$1"')}</div>
+            <div class="hk-rank-locked__cta">
+              ${HKUI.icon("lock-keyhole", 24, "var(--color-midnight-navy)")}
+              <div style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">로그인하면 랭킹과 내 순위를 볼 수 있어요</div>
+              <a href="${R.login}?returnTo=${encodeURIComponent("/index")}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">로그인</button></a>
+            </div>
+          </div>
+        </div>`;
+      }
+      return `<div class="hk-card hk-card--pad">${head}
+        <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px">동료 이름은 일부 가려서 보여드려요 · 동률은 같은 순위</p>
+        <div data-rank-panel="month">${rankPanel(stats.ranking.month, "이번 달")}</div>
+        <div data-rank-panel="year" hidden>${rankPanel(stats.ranking.year, "올해")}</div>
+      </div>`;
+    }
+
+    function myRecordCard(me) {
+      const R = HKRoutes;
+      const total = me.totalUses || 0;
+      const reached = milestones.filter(([n]) => total >= n).pop();
+      const next = milestones.find(([n]) => total < n);
+      const prevN = reached ? reached[0] : 0;
+      const pct = next ? Math.round(((total - prevN) / (next[0] - prevN)) * 100) : 100;
+      let waitLine;
+      if (me.daysSinceLastUse == null) {
+        waitLine = `아직 이용 기록이 없어요. 지금 신청하면 <b>우선권 최상위</b>예요!`;
+      } else if (me.daysSinceLastUse === 0) {
+        waitLine = `오늘 안마 받으셨네요. 개운한 하루 되세요!`;
+      } else {
+        waitLine = `마지막 이용 후 <b>${me.daysSinceLastUse}일</b> — 오래 기다릴수록 우선권이 높아져요.`;
+      }
+      return `<div class="hk-card hk-card--pad">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="hk-fun-stat__icon" style="margin:0;background:var(--color-signal-blue-soft)">${HKUI.icon("medal", 19, "var(--color-signal-blue)")}</div>
+            <b style="font-size:17px;color:var(--color-midnight-navy)">내 헬스키퍼 기록</b>
+          </div>
+          ${reached ? `<span class="hk-badge hk-badge--soft">${HKUI.icon("award", 13, "currentColor")} ${reached[1]}</span>` : `<span class="hk-badge hk-badge--neutral">새싹</span>`}
+        </div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
+          <span class="hk-fun-stat__num" data-count="${total}">0</span><span style="font-size:15px;color:var(--text-secondary)">회 이용</span>
+        </div>
+        <div class="hk-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span data-width="${pct}%"></span></div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:8px">${next ? `다음 배지 <b style="color:var(--color-midnight-navy)">${next[1]}</b>까지 ${next[0] - total}회 남았어요` : "모든 배지를 모았어요. 진정한 헬스키퍼 마스터!"}</div>
+        <div style="margin-top:14px;padding:12px 14px;border-radius:8px;background:var(--color-mist);font-size:14px;color:var(--color-midnight-navy);line-height:1.55;display:flex;gap:10px;align-items:flex-start">
+          ${HKUI.icon("hourglass", 17, "var(--color-slate-blue)", "margin-top:2px;flex-shrink:0")}<span>${waitLine} <a href="${R.reserve}" style="color:var(--color-signal-blue);font-weight:600;text-decoration:none;white-space:nowrap">예약하기 →</a></span>
+        </div>
+      </div>`;
+    }
+
+    function tipCard() {
+      const [title, body] = todayTip();
+      return `<div class="hk-card hk-card--pad hk-card--flat" style="background:var(--surface-soft-blue, var(--color-signal-blue-soft))">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          ${HKUI.icon("person-standing", 22, "var(--color-signal-blue)", "flex-shrink:0;margin-top:1px")}
+          <div>
+            <div style="font-size:12.5px;font-weight:700;color:var(--color-signal-blue);letter-spacing:0.02em">오늘의 1분 스트레칭</div>
+            <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy);margin:2px 0 4px">${title}</div>
+            <div style="font-size:14.5px;color:var(--text-secondary);line-height:1.6">${body}</div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    async function refreshFunStats(profile) {
+      const el = document.getElementById("fun-section");
+      if (!el) return;
+      let stats;
+      try {
+        stats = await HKApi.funStats();
+      } catch (_) {
+        return;
+      }
+      const loggedIn = !!profile;
+      const blue = { bg: "var(--color-signal-blue-soft)", fg: "var(--color-signal-blue)" };
+      const green = { bg: "var(--color-success-soft)", fg: "var(--color-success)" };
+      const amber = { bg: "var(--color-warning-soft)", fg: "var(--color-warning)" };
+      const violet = { bg: "#efe8ff", fg: "var(--color-ultraviolet)" };
+      const peak = stats.peakTime ? HKUI.escapeHtml(stats.peakTime.label) : "-";
+      const peakLabel = stats.peakWeekday
+        ? `인기 시간 · ${HKUI.escapeHtml(stats.peakWeekday.label)}요일 최다`
+        : "인기 시간";
+      el.innerHTML = `
+        <span class="hk-badge hk-badge--soft">숫자로 보는 헬스키퍼</span>
+        <h2 style="font-size:34px;margin:14px 0 8px">지금까지 <span style="color:var(--color-signal-blue)" data-count="${stats.totalUses}">0</span>번, 뭉친 어깨가 풀렸어요</h2>
+        <p style="font-size:17px;color:var(--text-secondary);margin:0 0 28px">함께한 동료들의 기록이에요. 이번 달의 주인공은 누구일까요?</p>
+        <div class="hk-fun-grid">
+          <div class="hk-fun-col">
+            <div class="hk-fun-stats">
+              ${funStat("hand-heart", blue, `<span data-count="${stats.totalUses}">0</span><small>회</small>`, "누적 이용")}
+              ${funStat("users-round", green, `<span data-count="${stats.totalUsers}">0</span><small>명</small>`, "함께한 동료")}
+              ${funStat("calendar-heart", amber, `<span data-count="${stats.monthUses}">0</span><small>회</small>`, `${stats.month}월 이용`)}
+              ${funStat("flame", violet, peak, peakLabel)}
+            </div>
+            ${loggedIn && stats.me ? myRecordCard(stats.me) : ""}
+            ${tipCard()}
+          </div>
+          <div class="hk-fun-col">${rankingCard(stats, loggedIn)}</div>
+        </div>`;
+      el.hidden = false;
+      el.querySelectorAll("[data-rank-tab]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const tab = btn.dataset.rankTab;
+          el.querySelectorAll("[data-rank-tab]").forEach((b) => b.classList.toggle("hk-tab--active", b === btn));
+          el.querySelectorAll("[data-rank-panel]").forEach((p) => {
+            p.hidden = p.dataset.rankPanel !== tab;
+            if (!p.hidden) {
+              p.querySelectorAll("[data-width]").forEach((bar) => { bar.style.width = "0"; });
+              growBars(p);
+            }
+          });
+        });
+      });
+      HKUI.refreshIcons();
+      countUp(el);
+      growBars(el);
+    }
+
     function featureCard([ic, t, d]) {
       return `<div style="display:flex;gap:16px">
         <div style="flex-shrink:0;width:44px;height:44px;border-radius:10px;background:var(--color-signal-blue-soft);display:flex;align-items:center;justify-content:center">${HKUI.icon(ic, 22, "var(--color-signal-blue)")}</div>
@@ -157,6 +374,7 @@
                 .map(([n, l]) => `<div><div style="font-size:32px;font-weight:700;color:var(--color-midnight-navy);letter-spacing:-0.01em">${n}</div><div style="font-size:14px;color:var(--text-secondary);margin-top:2px">${l}</div></div>`).join("")}
             </div>
           </section>
+          <section id="fun-section" style="max-width:1200px;margin:0 auto;padding:64px 32px 0" hidden></section>
           <section style="max-width:1200px;margin:0 auto;padding:64px 32px 24px">
             <h2 style="font-size:34px;margin-bottom:8px">예약은 이렇게 진행돼요</h2>
             <p style="font-size:17px;color:var(--text-secondary);margin-bottom:40px">신청 → 확정 → 안내 메일까지, 공정하고 투명하게.</p>
@@ -175,7 +393,7 @@
           </section>
         </main>`;
       },
-      afterMount: () => refreshHeroState(),
+      afterMount: (profile) => Promise.all([refreshHeroState(), refreshFunStats(profile)]),
     });
   </script>
 </body>

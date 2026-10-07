@@ -9,7 +9,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.core.deps import get_current_active_member, get_redis_client
+from app.core.deps import get_current_active_member, get_optional_active_member, get_redis_client
 from app.core.session import get_member_session
 from app.core.time import format_deadline_relative_ko, format_kst_iso
 from app.database import get_db
@@ -17,6 +17,7 @@ from app.models import Member
 from app.schemas.common import SwapRequestBody, TransferRequestBody
 from app.services.avatar import avatar_path, has_avatar
 from app.services.cycle import resolve_system_state
+from app.services import fun_stats as fun_stats_service
 from app.services import reservation as reservation_service
 
 settings = get_settings()
@@ -51,6 +52,16 @@ async def system_state(db: AsyncSession = Depends(get_db)):
             "reapplyCloseAt": format_kst_iso(cycle.reapply_close_at) if cycle else None,
         }
     }
+
+
+@system_router.get("/fun-stats")
+async def fun_stats(
+    db: AsyncSession = Depends(get_db),
+    member: Optional[Member] = Depends(get_optional_active_member),
+):
+    """메인 화면 재미 요소 — 누적 이용 통계(공개) · 최다 이용자 랭킹(로그인 회원)."""
+    data = await fun_stats_service.get_fun_stats(db, member)
+    return {"data": data}
 
 
 @router.get("/reservation/calendar")

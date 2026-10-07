@@ -64,3 +64,23 @@ async def get_current_admin(
     if not admin or not admin.is_active:
         raise_app_error("FORBIDDEN", 403)
     return admin
+
+
+async def get_optional_active_member(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    redis: Annotated[Redis, Depends(get_redis_client)],
+    hk_session: Annotated[Optional[str], Cookie(alias=settings.session_cookie_name)] = None,
+) -> Optional[Member]:
+    """비로그인 허용 엔드포인트용 — 인증된 활성 회원이면 반환, 아니면 None."""
+    session_id = hk_session or request.headers.get("X-Session-Id")
+    if not session_id:
+        return None
+    data = await get_member_session(redis, session_id)
+    if not data:
+        return None
+    result = await db.execute(select(Member).where(Member.id == data["member_id"]))
+    member = result.scalar_one_or_none()
+    if not member or member.status != MemberStatus.ACTIVE:
+        return None
+    return member

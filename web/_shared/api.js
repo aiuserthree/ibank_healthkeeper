@@ -31,6 +31,7 @@ window.HKApi = (function () {
     delete: (path) => request(path, { method: "DELETE" }),
 
     systemState: () => request("/system/state"),
+    funStats: () => request("/system/fun-stats"),
     profile: () => request("/me/profile"),
     logout: () => request("/auth/logout", { method: "POST" }),
     withdraw: () => request("/me", { method: "DELETE" }),
