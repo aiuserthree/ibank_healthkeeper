@@ -25,11 +25,15 @@ window.HKFun = (function () {
   const milestones = HKUI.USAGE_BADGES;
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-  function todayTip() {
+  const STRETCH_ROLL_COUNT = 3;
+  const STRETCH_ROLL_MS = 5000;
+
+  /** 오늘의 스트레칭부터 순서대로 N개 — 첫 번째가 팀즈 오픈 안내에 나가는 것과 같다. */
+  function todayTips() {
     const key = HKUI.nowKst ? HKUI.nowKst() : new Date();
     const start = new Date(key.getFullYear(), 0, 0);
     const dayOfYear = Math.floor((key - start) / 86400000);
-    return stretchTips[dayOfYear % stretchTips.length];
+    return Array.from({ length: STRETCH_ROLL_COUNT }, (_, i) => stretchTips[(dayOfYear + i) % stretchTips.length]);
   }
 
   function countUp(root) {
@@ -204,17 +208,49 @@ window.HKFun = (function () {
   }
 
   function tipCard() {
-    const [title, body, art] = todayTip();
-    return `<div class="hk-card hk-card--pad hk-card--flat" style="background:var(--surface-soft-blue, var(--color-signal-blue-soft));display:flex;align-items:center">
-      <div style="display:flex;gap:16px;align-items:center">
-        <div class="hk-stretch-art"><svg viewBox="0 0 64 64" role="img" aria-label="${title} 동작 그림">${art}</svg></div>
-        <div>
-          <div style="font-size:12.5px;font-weight:700;color:var(--color-signal-blue);letter-spacing:0.02em">오늘의 1분 스트레칭</div>
-          <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy);margin:2px 0 4px">${title}</div>
-          <div style="font-size:14.5px;color:var(--text-secondary);line-height:1.6">${body}</div>
-        </div>
+    const tips = todayTips();
+    return `<div class="hk-card hk-card--pad hk-card--flat hk-stretch" data-stretch>
+      <div class="hk-stretch__slides">${tips.map(([title, body, art], i) => `
+        <div class="hk-stretch__slide${i === 0 ? " is-active" : ""}" data-stretch-slide${i === 0 ? "" : ' aria-hidden="true"'}>
+          <div class="hk-stretch-art"><svg viewBox="0 0 64 64" role="img" aria-label="${title} 동작 그림">${art}</svg></div>
+          <div>
+            <div style="font-size:12.5px;font-weight:700;color:var(--color-signal-blue);letter-spacing:0.02em">오늘의 1분 스트레칭</div>
+            <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy);margin:2px 0 4px">${title}</div>
+            <div style="font-size:14.5px;color:var(--text-secondary);line-height:1.6">${body}</div>
+          </div>
+        </div>`).join("")}
       </div>
+      <div class="hk-stretch__dots">${tips.map(([title], i) => `<button type="button" class="hk-stretch__dot${i === 0 ? " is-active" : ""}" data-stretch-dot="${i}" aria-label="${i + 1}번째 스트레칭: ${title}"></button>`).join("")}</div>
     </div>`;
+  }
+
+  function bindStretchRoll(root) {
+    const card = root.querySelector("[data-stretch]");
+    if (!card) return;
+    const slides = [...card.querySelectorAll("[data-stretch-slide]")];
+    const dots = [...card.querySelectorAll("[data-stretch-dot]")];
+    let current = 0;
+    let timer = null;
+    const show = (index) => {
+      current = (index + slides.length) % slides.length;
+      slides.forEach((slide, i) => {
+        slide.classList.toggle("is-active", i === current);
+        if (i === current) slide.removeAttribute("aria-hidden");
+        else slide.setAttribute("aria-hidden", "true");
+      });
+      dots.forEach((dot, i) => dot.classList.toggle("is-active", i === current));
+    };
+    const stop = () => { clearInterval(timer); timer = null; };
+    const start = () => {
+      if (prefersReducedMotion || timer || slides.length < 2) return;
+      timer = setInterval(() => show(current + 1), STRETCH_ROLL_MS);
+    };
+    dots.forEach((dot, i) => dot.addEventListener("click", () => { stop(); show(i); start(); }));
+    card.addEventListener("mouseenter", stop);
+    card.addEventListener("mouseleave", start);
+    card.addEventListener("focusin", stop);
+    card.addEventListener("focusout", start);
+    start();
   }
 
   async function render(el, profile) {
@@ -255,6 +291,7 @@ window.HKFun = (function () {
       </div>`;
     el.hidden = false;
     HKUI.bindTooltips(el);
+    bindStretchRoll(el);
     HKUI.refreshIcons();
     countUp(el);
     growBars(el);
