@@ -86,6 +86,22 @@
     }
 
     function previewHtml(t) {
+      // 빈 슬롯이 없으면 재신청 안내 없이 탈락 안내만 발송된다 (05-탈락안내.html).
+      if (!(t.emptySlots || []).length) {
+        return `
+        <div class="hk-reapply-preview">
+          <div class="hk-reapply-preview-head">
+            <div style="font-size:12px;color:var(--text-muted)">제목</div>
+            <div style="font-size:14.5px;font-weight:700;color:var(--color-midnight-navy)">[헬스키퍼] 탈락 안내</div>
+          </div>
+          <div class="hk-reapply-preview-body">
+            <p style="margin:0 0 10px">안녕하세요, OOO님.</p>
+            <p style="margin:0 0 10px">신청하신 시간대는 우선권에 따라 다른 분께 확정되어 <b>탈락</b> 처리되었습니다. 이번 주는 남은 빈 슬롯이 없어 재신청은 진행되지 않아요.</p>
+            <p style="margin:0 0 4px">· 다음 주 예약은 <b>수요일 09:00</b>에 열립니다.</p>
+            <p style="margin:0">· 우선권은 마지막 이용일 기준이라, 이용 기록이 오래될수록 다음 신청에서 유리해요.</p>
+          </div>
+        </div>`;
+      }
       const deadline = t.reapplyDeadline || "내일(목) 17:00";
       const subject = t.mailSubject || "[헬스키퍼] 탈락 안내 및 재신청 가능 슬롯 안내";
       return `
@@ -115,7 +131,7 @@
           HKUI.toast("발송할 대상을 선택해 주세요.", "danger");
           return;
         }
-        const ok = await HKUI.confirmDialog("메일 발송", `선택한 ${selected.size}명에게 재신청 안내 메일을 발송할까요?`);
+        const ok = await HKUI.confirmDialog("메일 발송", `선택한 ${selected.size}명에게 ${(targets.emptySlots || []).length ? "재신청 안내" : "탈락 안내"} 메일을 발송할까요?`);
         if (!ok) return;
         const memberIds = members.filter((m) => selected.has(m.email)).map((m) => m.id);
         try {

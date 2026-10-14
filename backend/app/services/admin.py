@@ -803,6 +803,8 @@ async def send_reapply_notice(
                 "emptySlotsHtml": empty_html,
                 "reapplyOpenAt": reapply_open,
                 "reapplyDeadline": deadline,
+                # 빈 슬롯이 없으면 재신청 안내 없이 탈락 안내만 보낸다.
+                "dropOnly": not empty,
             },
             dedupe_key=f"drop:{cycle_id}:{member_id}",
         )

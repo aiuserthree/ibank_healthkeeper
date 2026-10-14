@@ -38,6 +38,11 @@ MAIL_HTML_FILES: dict[MailType, str] = {
     MailType.DROP_REAPPLY_NOTICE: "04-탈락-재신청안내.html",
 }
 
+# 빈 슬롯이 없는 주차의 탈락자 — DROP_REAPPLY_NOTICE 타입 그대로(발송 이력·중복 방지 공유),
+# 재신청 안내를 뺀 전용 디자인으로 보낸다. 관리자 템플릿 편집 대상 아님.
+DROP_ONLY_HTML_FILE = "05-탈락안내.html"
+DROP_ONLY_SUBJECT = "[헬스키퍼] 탈락 안내"
+
 DEFAULT_SUBJECTS: dict[MailType, str] = {
     MailType.EMAIL_VERIFY: "[헬스키퍼] 이메일 인증코드 안내",
     MailType.RESERVE_DONE_NORMAL: "[헬스키퍼] 예약이 확정되었습니다",
@@ -167,14 +172,16 @@ def _is_html_template(text: str) -> bool:
     return sample.startswith("<!doctype") or "<html" in sample
 
 
-def load_design_html(mail_type: MailType) -> str:
-    rel = MAIL_HTML_FILES.get(mail_type)
-    if not rel:
-        return ""
+def _load_mail_html(rel: str) -> str:
     path = WEB_ROOT / "이메일" / rel
     if not path.is_file():
         return ""
     return path.read_text(encoding="utf-8")
+
+
+def load_design_html(mail_type: MailType) -> str:
+    rel = MAIL_HTML_FILES.get(mail_type)
+    return _load_mail_html(rel) if rel else ""
 
 
 def editor_body_template(stored_body: str, mail_type: MailType) -> str:
@@ -466,6 +473,11 @@ def render_mail_message(
     template: Optional[MailTemplate],
     context: dict,
 ) -> tuple[str, str]:
+    if mail_type == MailType.DROP_REAPPLY_NOTICE and context.get("dropOnly"):
+        body_tpl = _load_mail_html(DROP_ONLY_HTML_FILE)
+        if body_tpl:
+            return render_template(DROP_ONLY_SUBJECT, body_tpl, context)
+
     subject_tpl, body_tpl = resolve_template_parts(mail_type, template)
     render_ctx = dict(context)
     plain = resolve_admin_body_plain(template, mail_type)
