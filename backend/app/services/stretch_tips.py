@@ -17,6 +17,26 @@ STRETCH_TIPS: tuple[tuple[str, str], ...] = (
 )
 
 
+def stretch_tip_index(day: date) -> int:
+    """화면과 같은 날 같은 스트레칭이 나오도록 연중 일수로 고른다."""
+    return day.timetuple().tm_yday % len(STRETCH_TIPS)
+
+
 def stretch_tip_for(day: date) -> tuple[str, str]:
-    """해당 날짜의 (제목, 설명) — 화면과 같은 날 같은 스트레칭이 나오도록 연중 일수로 고른다."""
-    return STRETCH_TIPS[day.timetuple().tm_yday % len(STRETCH_TIPS)]
+    """해당 날짜의 (제목, 설명)."""
+    return STRETCH_TIPS[stretch_tip_index(day)]
+
+
+# 예약하기 화면에서 롤링되는 개수 (web/_shared/fun-stats.js STRETCH_ROLL_COUNT)
+STRETCH_ROLL_COUNT = 3
+
+
+def stretch_roll_indexes(day: date, count: int = STRETCH_ROLL_COUNT) -> list[int]:
+    """화면 롤링과 같은 순서 — 오늘의 스트레칭부터 count개."""
+    start = stretch_tip_index(day)
+    return [(start + i) % len(STRETCH_TIPS) for i in range(count)]
+
+
+def stretch_image_name(index: int) -> str:
+    """메일용 PNG(web/assets/email/stretch-NN.png) — 화면 SVG를 그대로 렌더한 것."""
+    return f"stretch-{index + 1:02d}.png"

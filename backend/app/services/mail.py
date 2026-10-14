@@ -167,6 +167,36 @@ def expand_mail_context(context: dict) -> dict:
     return out
 
 
+def stretch_list_html(day: date) -> str:
+    """오늘의 1분 스트레칭 — 예약하기 화면에서 롤링되는 3개를 메일에 나란히.
+    그림은 Outlook 호환을 위해 PNG data URI."""
+    from app.services.stretch_tips import STRETCH_TIPS, stretch_image_name, stretch_roll_indexes
+
+    rows = []
+    for n, index in enumerate(stretch_roll_indexes(day)):
+        title, body = STRETCH_TIPS[index]
+        image = EMAIL_ASSETS_DIR / stretch_image_name(index)
+        img = (
+            f'<img src="{_png_data_uri(image)}" alt="{title} 동작 그림" width="64" height="64" '
+            'style="display:block;border:0;width:64px;height:64px;">'
+            if image.is_file()
+            else ""
+        )
+        divider = "border-top:1px solid #cfe0f5;" if n else ""
+        rows.append(
+            f'<tr><td width="64" style="width:64px; padding:12px 0; vertical-align:middle; {divider}">{img}</td>'
+            f'<td style="padding:12px 0 12px 14px; vertical-align:middle; {divider}">'
+            f'<p style="margin:0 0 2px; font-size:15px; font-weight:700; color:#0b3558;">{title}</p>'
+            f'<p style="margin:0; font-size:13.5px; line-height:1.55; color:#476788;">{body}</p>'
+            "</td></tr>"
+        )
+    return (
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tbody>'
+        + "".join(rows)
+        + "</tbody></table>"
+    )
+
+
 def _is_html_template(text: str) -> bool:
     sample = text.lstrip()[:300].lower()
     return sample.startswith("<!doctype") or "<html" in sample
@@ -473,6 +503,8 @@ def render_mail_message(
     template: Optional[MailTemplate],
     context: dict,
 ) -> tuple[str, str]:
+    if mail_type == MailType.DROP_REAPPLY_NOTICE:
+        context = {"stretchListHtml": stretch_list_html(now_kst().date()), **context}
     if mail_type == MailType.DROP_REAPPLY_NOTICE and context.get("dropOnly"):
         body_tpl = _load_mail_html(DROP_ONLY_HTML_FILE)
         if body_tpl:
