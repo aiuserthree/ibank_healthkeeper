@@ -67,7 +67,11 @@ async def main() -> int:
                 return 1
             members = [member]
         else:
-            members = await load_open_notice_recipients(db)
+            # 로컬 개발용 mock 계정(entra_oid "mock-…")은 실제 Teams 사용자가 아니므로 제외
+            members = [
+                m for m in await load_open_notice_recipients(db)
+                if not (m.entra_oid or "").lower().startswith("mock-")
+            ]
 
         sample = render_service_notice_body(
             name=members[0].name if members else "홍길동", title=notice.title, body=notice.body, url=url
