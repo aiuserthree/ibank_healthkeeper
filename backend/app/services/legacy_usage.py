@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from sqlalchemy import delete, func, and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.time import KST, now_kst
 from app.models import LegacyUsage, Member, MemberStatus, Reservation, ReservationStatus, Slot
-from app.services.cycle import resolve_system_state
 
 SKIP_CELL = re.compile(
     r"^(미정|휴무|공석|설|부서장|안마사님\s*휴가)$",
@@ -180,10 +180,12 @@ def _end_time_from_start(start: str | None) -> str | None:
 
 
 async def _gather_usage_history_items(db: AsyncSession, member: Member) -> list[dict]:
-    """과거 스케줄 + 사이트 확정 이용(차주 제외), 날짜·시간 중복 제외."""
-    _, cycle = await resolve_system_state(db)
-    exclude_start = cycle.target_week_start if cycle else None
-    exclude_end = cycle.target_week_end if cycle else None
+    """과거 스케줄 + 사이트 확정 이용 중 이미 끝난 것만, 날짜·시간 중복 제외.
+
+    차주 예약뿐 아니라 이번 주에 확정됐지만 아직 시간이 안 된 예약(교환·양도 포함)도
+    '이용 완료'로 보이지 않게 슬롯 종료 시각이 지난 것만 넣는다.
+    """
+    now = now_kst()
 
     legacy_rows = await db.execute(
         select(LegacyUsage.usage_date, LegacyUsage.usage_start_time)
@@ -197,10 +199,7 @@ async def _gather_usage_history_items(db: AsyncSession, member: Member) -> list[
         .where(Reservation.member_id == member.id)
         .where(Reservation.status == ReservationStatus.CONFIRMED)
     )
-    if exclude_start is not None and exclude_end is not None:
-        site_stmt = site_stmt.where(
-            or_(Slot.slot_date < exclude_start, Slot.slot_date > exclude_end)
-        )
+    site_stmt = site_stmt.where(Slot.slot_date <= now.date())
     site_rows = await db.execute(site_stmt)
 
     merged: dict[tuple[date, str], dict] = {}
@@ -212,6 +211,11 @@ async def _gather_usage_history_items(db: AsyncSession, member: Member) -> list[
             "endTime": _end_time_from_start(start_time),
         }
     for slot_date, start_time, end_time in site_rows.all():
+        ends_at = datetime.combine(slot_date, end_time or start_time, tzinfo=KST)
+        if end_time is None:
+            ends_at += timedelta(minutes=30)
+        if ends_at > now:
+            continue
         start = start_time.strftime("%H:%M")
         merged[(slot_date, start)] = {
             "usageDate": slot_date.isoformat(),
