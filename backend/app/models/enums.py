@@ -64,6 +64,7 @@ class TeamsMessageType(str, enum.Enum):
     SWAP_ACCEPTED = "SWAP_ACCEPTED"
     SWAP_ACCEPT_FAILED = "SWAP_ACCEPT_FAILED"
     SWAP_CANCELLED = "SWAP_CANCELLED"
+    SERVICE_NOTICE = "SERVICE_NOTICE"
 
 
 class TransferRequestStatus(str, enum.Enum):

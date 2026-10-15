@@ -55,6 +55,8 @@ rsync -avz --delete web/ "$USER@$HOST:/opt/healthkeeper/app/web/"
 rsync -avz \
   --include 'broadcast-teams-open-notice.py' \
   --include 'broadcast-teams-open-notice.sh' \
+  --include 'broadcast-teams-service-notice.py' \
+  --include 'broadcast-teams-service-notice.sh' \
   --include 'recompute-cycle-times.py' \
   --include 'recompute-cycle-times.sh' \
   --exclude '*' \

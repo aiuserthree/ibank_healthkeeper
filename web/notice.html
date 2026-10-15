@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
+  <title>헬스키퍼 — 공지사항</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    function dateLabel(iso) {
+      if (!iso) return "";
+      const d = new Date(iso);
+      return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    function listHtml(items, activeId) {
+      if (!items.length) {
+        return HKUI.emptyState({ iconName: "megaphone", title: "등록된 공지가 없어요", desc: "새 소식이 생기면 이곳에 알려드릴게요." });
+      }
+      return `<ul class="hk-notice-list">${items.map((n) => `
+        <li><a href="${HKRoutes.notice}?id=${n.id}" class="${n.id === activeId ? "is-active" : ""}">
+          ${n.pinned ? '<span class="hk-badge hk-badge--soft">공지</span>' : ""}
+          <span class="hk-notice-list__title">${HKUI.escapeHtml(n.title)}</span>
+          <span class="hk-notice-list__date">${dateLabel(n.publishedAt)}</span>
+        </a></li>`).join("")}</ul>`;
+    }
+
+    function detailHtml(n) {
+      return `<article class="hk-card hk-card--pad hk-notice-article">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          ${n.pinned ? '<span class="hk-badge hk-badge--soft">공지</span>' : ""}
+          <span style="font-size:13px;color:var(--text-muted)">${dateLabel(n.publishedAt)}</span>
+        </div>
+        <h2 class="hk-notice-article__title">${HKUI.escapeHtml(n.title)}</h2>
+        <div class="hk-notice-body">${HKUI.noticeBodyHtml(n.body)}</div>
+      </article>`;
+    }
+
+    HKMember.mountPage({
+      active: "notice",
+      mainStyle: "max-width:1200px;margin:0 auto;padding:36px 32px 72px",
+      render() {
+        return `
+          <h1 style="font-size:34px;margin:0 0 20px">공지사항</h1>
+          <div id="notice-root">${HKUI.spinner ? HKUI.spinner() : ""}</div>`;
+      },
+      afterMount: async () => {
+        const root = document.getElementById("notice-root");
+        try {
+          const items = await HKApi.notices();
+          const wanted = Number(new URLSearchParams(location.search).get("id"));
+          const current = items.find((n) => n.id === wanted) || items[0];
+          root.innerHTML = current
+            ? `<div class="hk-notice-layout">${detailHtml(current)}<aside class="hk-card hk-card--pad"><div style="font-size:13px;font-weight:700;color:var(--text-muted);margin-bottom:10px">전체 공지</div>${listHtml(items, current.id)}</aside></div>`
+            : listHtml(items, null);
+        } catch (e) {
+          root.innerHTML = HKUI.alertBox("danger", "공지를 불러오지 못했습니다", HKUI.escapeHtml(e.message || "잠시 후 다시 시도해 주세요."));
+        }
+        HKUI.refreshIcons();
+      },
+    });
+  </script>
+</body>
+</html>

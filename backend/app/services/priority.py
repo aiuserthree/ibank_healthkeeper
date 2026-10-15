@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import format_kst_iso
@@ -24,10 +24,16 @@ async def rank_applicants(
             Member.name.label("member_name"),
             Member.email.label("member_email"),
             Member.last_used_date,
+            Reservation.coupon_id,
             func.row_number()
             .over(
                 partition_by=Reservation.slot_id,
                 order_by=(
+                    # 무적 쿠폰 신청이 1순위, 쿠폰끼리는 신청 시각순
+                    Reservation.coupon_id.is_(None).asc(),
+                    case((Reservation.coupon_id.isnot(None), Reservation.applied_at), else_=None)
+                    .asc()
+                    .nulls_last(),
                     Member.last_used_date.asc().nulls_first(),
                     Reservation.applied_at.asc(),
                     Reservation.id.asc(),
@@ -56,6 +62,7 @@ async def rank_applicants(
                 "last_used_date": row.last_used_date.isoformat() if row.last_used_date else None,
                 "no_history": row.last_used_date is None,
                 "priority_rank": row.priority_rank,
+                "used_coupon": row.coupon_id is not None,
                 "type": row.type.value,
                 "status": row.status.value,
                 "avatarUrl": admin_member_avatar_url(row.member_id),

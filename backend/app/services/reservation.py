@@ -74,6 +74,9 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
     for slot in slots:
         slot_res = by_slot.get(slot.id, [])
         request_cnt = sum(1 for r in slot_res if r.status == ReservationStatus.REQUESTED)
+        coupon_cnt = sum(
+            1 for r in slot_res if r.status == ReservationStatus.REQUESTED and r.coupon_id
+        )
         mine = any(
             r.member_id == member.id and r.status in ACTIVE_APPLY_STATUSES for r in slot_res
         )
@@ -98,20 +101,31 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
                 "isHoliday": holiday,
                 "status": slot.status.value,
                 "requestCount": request_cnt,
+                "couponCount": coupon_cnt,
                 "mine": mine,
                 "confirmed": confirmed,
             }
         )
+    from app.services.coupon import coupon_summary
+
+    coupons = await coupon_summary(db, member)
+    await db.commit()
     return {
         "state": state.value,
         "cycleId": cycle.id,
         "weekApplied": active_apply is not None,
         "appliedSlotId": active_apply.slot_id if active_apply else None,
+        "appliedWithCoupon": bool(active_apply and active_apply.coupon_id),
+        "couponAvailable": coupons["available"],
         "slots": items,
     }
 
 
-async def apply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reservation:
+async def apply_slot(
+    db: AsyncSession, member: Member, slot_id: int, *, use_coupon: bool = False
+) -> Reservation:
+    from app.services.designated_slot import is_designated_confirm_slot
+
     state, cycle = await resolve_system_state(db)
     if state != CycleState.OPEN:
         raise_app_error("NOT_OPEN")
@@ -138,6 +152,15 @@ async def apply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reservat
     if await _member_cycle_active_apply(db, member.id, cycle.id):
         raise_app_error("WEEK_APPLY_LIMIT")
 
+    if use_coupon:
+        from app.services.coupon import has_available_coupon
+
+        if is_designated_confirm_slot(slot):
+            raise_app_error("COUPON_NOT_ALLOWED_SLOT")
+        # 신청 기록을 만들기 전에 확인 — 쿠폰이 없으면 아무것도 남기지 않는다.
+        if not await has_available_coupon(db, member):
+            raise_app_error("NO_COUPON")
+
     reservation = Reservation(
         slot_id=slot_id,
         member_id=member.id,
@@ -147,6 +170,11 @@ async def apply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reservat
         applied_at=now_kst(),
     )
     db.add(reservation)
+    if use_coupon:
+        from app.services.coupon import attach_coupon
+
+        await db.flush()
+        await attach_coupon(db, member, reservation)
     await db.commit()
     await db.refresh(reservation)
     return reservation
@@ -165,8 +193,11 @@ async def cancel_reservation(db: AsyncSession, member: Member, reservation_id: i
     if reservation.type == ReservationType.REAPPLY:
         raise_app_error("NOT_CANCELABLE")
 
+    from app.services.coupon import settle_coupon
+
     reservation.status = ReservationStatus.CANCELLED
     reservation.cancelled_at = now_kst()
+    await settle_coupon(db, reservation, confirmed=False)
     await db.commit()
 
 
@@ -359,9 +390,14 @@ async def list_my_reservations(
         pending = pending_map.get(reservation.id)
         swap_pending = swap_pending_map.get(reservation.id)
         # 양도 가능 대상(확정 + 일반/재신청 + 대기중인 양도·교환 없음) — 시점(양도 창) 무관
+        # 무적 쿠폰으로 얻은 예약은 양도·교환 불가
+        coupon_locked = (
+            reservation.status == ReservationStatus.CONFIRMED and reservation.coupon_id is not None
+        )
         transfer_candidate = (
             reservation.status == ReservationStatus.CONFIRMED
             and reservation.type in TRANSFERABLE_TYPES
+            and not coupon_locked
             and not pending
             and not swap_pending
         )
@@ -390,6 +426,7 @@ async def list_my_reservations(
         swap_candidate = (
             reservation.status == ReservationStatus.CONFIRMED
             and reservation.type in SWAPPABLE_TYPES
+            and not coupon_locked
             and not pending
             and not swap_pending
         )
@@ -421,6 +458,8 @@ async def list_my_reservations(
                 "type": reservation.type.value,
                 "status": reservation.status.value,
                 "cancelable": cancelable,
+                "usedCoupon": reservation.coupon_id is not None,
+                "couponLocked": coupon_locked,
                 "transferable": transferable,
                 "transferOpensAt": transfer_opens_at,
                 "transferEnded": transfer_ended,

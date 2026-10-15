@@ -172,6 +172,8 @@ async def _get_transferable_reservation(
         raise_app_error("NOT_TRANSFERABLE")
     if reservation.type not in TRANSFERABLE_TYPES:
         raise_app_error("NOT_TRANSFERABLE")
+    if reservation.coupon_id is not None:
+        raise_app_error("NOT_TRANSFERABLE_COUPON")
     if not can_transfer_slot(cycle, slot):
         raise_app_error("NOT_TRANSFER_PERIOD")
     return reservation, slot, cycle
@@ -428,6 +430,8 @@ async def request_transfer(
         raise_app_error("NOT_TRANSFERABLE")
     if reservation.type not in TRANSFERABLE_TYPES:
         raise_app_error("NOT_TRANSFERABLE")
+    if reservation.coupon_id is not None:
+        raise_app_error("NOT_TRANSFERABLE_COUPON")
     if not can_transfer_slot(cycle, slot):
         raise_app_error("NOT_TRANSFER_PERIOD")
 

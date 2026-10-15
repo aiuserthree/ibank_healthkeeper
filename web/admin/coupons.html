@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
+  <title>헬스키퍼 관리자 — 무적 쿠폰</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/admin-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const SOURCE_LABEL = { DROP: "탈락 5주", BADGE: "등급 혜택", ADMIN: "관리자 지급" };
+    const STATUS_LABEL = {
+      AVAILABLE: ["보유", "info"],
+      RESERVED: ["신청에 사용 중", "warning"],
+      USED: ["사용 완료", "success"],
+      EXPIRED: ["만료", "neutral"],
+      REVOKED: ["회수", "neutral"],
+    };
+
+    function row(m) {
+      return `<tr>
+        <td><div style="display:flex;align-items:center;gap:10px">${HKUI.avatar(m.name, "sm", m.avatarUrl || "")}<div><div style="font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(m.name)}</div><div style="font-size:12px;color:var(--text-muted)">${HKUI.escapeHtml(m.department || m.email || "")}</div></div></div></td>
+        <td style="text-align:right">${m.totalUses}회</td>
+        <td style="text-align:right">${m.dropWeeks}주 <span style="color:var(--text-muted)">(${m.dropProgress}/5)</span></td>
+        <td style="text-align:right">${m.badgeMonthlyQuota ? `월 ${m.badgeMonthlyQuota}장` : "-"}</td>
+        <td style="text-align:right;font-weight:700;color:var(--color-ultraviolet)">${m.available}</td>
+        <td style="text-align:right">${m.reserved}</td>
+        <td style="text-align:right">${m.used}</td>
+        <td style="text-align:right;white-space:nowrap">
+          <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-detail="${m.memberId}" data-name="${HKUI.escapeHtml(m.name)}">내역</button>
+          <button type="button" class="hk-btn hk-btn--primary hk-btn--sm" data-grant="${m.memberId}" data-name="${HKUI.escapeHtml(m.name)}">지급</button>
+        </td>
+      </tr>`;
+    }
+
+    function tableHtml(rows) {
+      if (!rows.length) {
+        return HKUI.emptyState({ iconName: "ticket", title: "쿠폰 대상자가 없어요", desc: "탈락이 쌓이거나 등급 혜택 대상이 되면 이곳에 표시됩니다." });
+      }
+      return `<div class="hk-card" style="overflow-x:auto"><table class="hk-table" style="width:100%;min-width:820px;border-collapse:collapse">
+        <thead><tr>${["회원", "누적 이용", "탈락 주", "등급 혜택", "보유", "사용 중", "사용 완료", ""].map((h, i) => `<th style="text-align:${i && i < 7 ? "right" : "left"};font-size:12px;color:var(--text-muted);padding:12px 14px;border-bottom:1px solid var(--border-default)">${h}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map(row).join("")}</tbody></table></div>`;
+    }
+
+    async function openDetail(memberId, name, reload) {
+      const coupons = await HKApi.adminMemberCoupons(memberId);
+      const body = coupons.length
+        ? `<div style="display:flex;flex-direction:column;gap:8px;max-height:360px;overflow:auto">${coupons.map((c) => {
+            const [label, variant] = STATUS_LABEL[c.status] || [c.status, "neutral"];
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--border-default);border-radius:8px">
+              ${HKUI.badge(label, variant)}
+              <div style="flex:1;min-width:0;font-size:13px"><b>${SOURCE_LABEL[c.source] || c.source}</b>${c.grantMonth ? ` · ${c.grantMonth}` : ""}${c.note ? ` · ${HKUI.escapeHtml(c.note)}` : ""}<div style="color:var(--text-muted);font-size:12px">지급 ${HKUI.formatDate(String(c.issuedAt).slice(0, 10))}${c.expiresAt ? ` · 만료 ${HKUI.formatDate(String(c.expiresAt).slice(0, 10))}` : ""}${c.usedAt ? ` · 사용 ${HKUI.formatDate(String(c.usedAt).slice(0, 10))}` : ""}</div></div>
+              ${c.status === "AVAILABLE" ? `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-revoke="${c.id}">회수</button>` : ""}
+            </div>`;
+          }).join("")}</div>`
+        : `<div style="color:var(--text-muted);font-size:14px">지급된 쿠폰이 없어요.</div>`;
+      const promise = HKUI.confirmDialog(`${name}님 쿠폰 내역`, body, { hideCancel: true, confirmLabel: "닫기" });
+      document.querySelectorAll("[data-revoke]").forEach((btn) => {
+        btn.onclick = async () => {
+          btn.disabled = true;
+          try {
+            await HKApi.adminRevokeCoupon(Number(btn.dataset.revoke));
+            HKUI.toast("쿠폰을 회수했습니다");
+            btn.closest("div").querySelector(".hk-badge").outerHTML = HKUI.badge("회수", "neutral");
+            btn.remove();
+            reload();
+          } catch (e) {
+            btn.disabled = false;
+            HKUI.toast(e.message || "회수하지 못했습니다", "danger");
+          }
+        };
+      });
+      await promise;
+    }
+
+    HKAdmin.mountPage({
+      active: "coupons",
+      render() {
+        return `${HKAdmin.pageHead("무적 쿠폰", "탈락 5주마다 1장 · 명예의 전당 매월 1장(매월 초기화)")}
+          <div style="margin-bottom:16px">${HKUI.alertBox("info", "쿠폰 규칙", "쿠폰 신청은 우선권과 관계없이 1순위, 쿠폰끼리는 신청 시각순입니다. 경합에서 지거나 마감 전 취소하면 반환, 확정되면 소멸합니다. 탈락 주는 재신청 마감(목 17:00) 후 확정되며, 그 주에 확정 예약이 있으면 제외됩니다.")}</div>
+          <div id="content"></div>`;
+      },
+      afterMount: async () => {
+        const content = document.getElementById("content");
+        async function load() {
+          try {
+            const rows = await HKApi.adminCoupons();
+            content.innerHTML = tableHtml(rows);
+            content.querySelectorAll("[data-detail]").forEach((b) => (b.onclick = () => openDetail(Number(b.dataset.detail), b.dataset.name, load)));
+            content.querySelectorAll("[data-grant]").forEach((b) => (b.onclick = async () => {
+              const memberId = Number(b.dataset.grant);
+              const name = b.dataset.name;
+              const pending = HKUI.confirmDialog(`${name}님에게 무적 쿠폰 지급`, `<label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">지급 장수</label>
+                <input type="number" class="hk-input" id="grant-count" min="1" max="10" value="1" style="width:100%;margin-bottom:12px">
+                <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">메모 (선택)</label>
+                <input type="text" class="hk-input" id="grant-note" maxlength="200" placeholder="예: 시스템 오류 보상" style="width:100%">`, { confirmLabel: "지급" });
+              // 입력값은 다이얼로그가 닫히기 전에 읽어 둔다
+              let count = 1;
+              let note = "";
+              const countEl = document.getElementById("grant-count");
+              const noteEl = document.getElementById("grant-note");
+              countEl.oninput = () => (count = Number(countEl.value) || 1);
+              noteEl.oninput = () => (note = noteEl.value);
+              if (!(await pending)) return;
+              try {
+                await HKApi.adminGrantCoupons(memberId, Math.max(1, Math.min(10, count)), note);
+                HKUI.toast(`${name}님에게 ${count}장을 지급했습니다`);
+                load();
+              } catch (e) {
+                HKUI.toast(e.message || "지급하지 못했습니다", "danger");
+              }
+            }));
+            HKUI.refreshIcons();
+          } catch (e) {
+            content.innerHTML = HKUI.alertBox("danger", "불러오기 실패", HKUI.escapeHtml(e.message || "쿠폰 현황을 불러오지 못했습니다."));
+          }
+        }
+        await load();
+      },
+    });
+  </script>
+</body>
+</html>

@@ -252,6 +252,39 @@ def render_open_notice_body(
     )
 
 
+def notice_page_url(notice_id: int) -> str:
+    return f"{get_settings().app_base_url.rstrip('/')}/notice?id={notice_id}"
+
+
+def _notice_intro_html(body: str) -> str:
+    """공지 본문의 첫 문단 → Teams 메시지용 HTML (**굵게** 만 반영)."""
+    import html
+    import re
+
+    first = ""
+    for block in (body or "").strip().split("\n\n"):
+        block = block.strip()
+        if block and not block.startswith(("## ", "- ", ":::", "|", "> ")):
+            first = " ".join(line.strip() for line in block.split("\n"))
+            break
+    escaped = html.escape(first)
+    return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
+
+
+def render_service_notice_body(*, name: str, title: str, body: str, url: str) -> str:
+    import html
+
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 새 공지 — {html.escape(title)}</p>"
+        f"<p>{html.escape(name)}님, {_notice_intro_html(body)}</p>"
+        f'<p>자세한 내용은 공지사항에서 확인해 주세요.<br><a href="{url}">{url}</a></p>'
+    )
+
+
+def service_notice_dedupe_key(notice_id: int, member_id: int) -> str:
+    return f"service-notice:{notice_id}:{member_id}"
+
+
 def open_notice_dedupe_key(cycle_id: int, member_id: int, notice_date: date) -> str:
     """발송일(KST)별 중복 방지 — 조기 수동 발송과 정규 수 08:55 발송을 구분."""
     return f"teams-open-notice:{cycle_id}:{notice_date.isoformat()}:{member_id}"

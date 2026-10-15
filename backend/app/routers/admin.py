@@ -14,7 +14,7 @@ from app.core.deps import get_current_admin, get_redis_client
 from app.core.session import create_admin_session, delete_admin_session
 from app.database import get_db
 from app.models import AdminUser, MailMessage, MailTemplate, MailType
-from app.schemas.common import AdminLoginRequest, AdminAssignChangeRequest, AdminAssignRequest, ConfirmRequest, DesignateConfirmRequest, ReapplyMailSendRequest, SettingsUpdateRequest, VacationMonthRequest, VacationRequest
+from app.schemas.common import AdminLoginRequest, CouponGrantRequest, NoticeSaveRequest, AdminAssignChangeRequest, AdminAssignRequest, ConfirmRequest, DesignateConfirmRequest, ReapplyMailSendRequest, SettingsUpdateRequest, VacationMonthRequest, VacationRequest
 from app.services import admin as admin_service
 from app.services.admin_assign import (
     assign_empty_slot,
@@ -327,6 +327,96 @@ async def reject_transfer_request(
             "message": "양도 신청이 반려되었습니다.",
         }
     }
+
+
+@router.get("/notices")
+async def admin_notices(
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.notice import list_notices
+
+    return {"data": await list_notices(db, include_unpublished=True)}
+
+
+@router.post("/notices")
+async def create_notice(
+    body: NoticeSaveRequest,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.notice import save_notice
+
+    return {"data": await save_notice(db, notice_id=None, **body.model_dump())}
+
+
+@router.put("/notices/{notice_id}")
+async def update_notice(
+    notice_id: int,
+    body: NoticeSaveRequest,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.notice import save_notice
+
+    return {"data": await save_notice(db, notice_id=notice_id, **body.model_dump())}
+
+
+@router.delete("/notices/{notice_id}")
+async def remove_notice(
+    notice_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.notice import delete_notice
+
+    await delete_notice(db, notice_id)
+    return {"data": {"deleted": True}}
+
+
+@router.get("/coupons")
+async def coupon_overview(
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.coupon import admin_coupon_overview
+
+    return {"data": await admin_coupon_overview(db)}
+
+
+@router.get("/coupons/members/{member_id}")
+async def member_coupons(
+    member_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.coupon import admin_member_coupons
+
+    return {"data": await admin_member_coupons(db, member_id)}
+
+
+@router.post("/coupons/grant")
+async def grant_coupons(
+    body: CouponGrantRequest,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.coupon import admin_grant_coupons
+
+    count = await admin_grant_coupons(db, body.memberId, body.count, body.note)
+    return {"data": {"granted": count}}
+
+
+@router.post("/coupons/{coupon_id}/revoke")
+async def revoke_coupon(
+    coupon_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.coupon import admin_revoke_coupon
+
+    await admin_revoke_coupon(db, coupon_id)
+    return {"data": {"revoked": True}}
 
 
 @router.get("/reapply-mail/targets")

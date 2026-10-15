@@ -8,6 +8,8 @@ window.HKAdminRoutes = {
   reapplyMail: "/admin/reapply-mail",
   vacation: "/admin/vacation",
   settings: "/admin/settings",
+  coupons: "/admin/coupons",
+  notices: "/admin/notices",
 };
 
 window.HKAdmin = (function () {
@@ -19,6 +21,8 @@ window.HKAdmin = (function () {
     { k: "reservations", label: "예약 관리", href: R.reservations, icon: "calendar-check" },
     { k: "reapply", label: "재신청 안내 메일", href: R.reapplyMail, icon: "mail" },
     { k: "vacation", label: "휴가 관리", href: R.vacation, icon: "palmtree" },
+    { k: "coupons", label: "무적 쿠폰", href: R.coupons, icon: "ticket" },
+    { k: "notices", label: "공지사항", href: R.notices, icon: "megaphone" },
     { k: "settings", label: "운영 설정", href: R.settings, icon: "settings" },
   ];
 

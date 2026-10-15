@@ -49,6 +49,10 @@ class Reservation(Base):
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     confirmed_by: Mapped[Optional[ConfirmedBy]] = mapped_column(nullable=True)
     is_priority: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    # 무적 쿠폰을 걸고 신청한 경우 — 경합에서 지면 쿠폰은 반환되고 기록은 남는다.
+    coupon_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("coupon.id", ondelete="SET NULL"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -79,4 +83,5 @@ class Reservation(Base):
         Index("ix_reservation_cycle_status", "cycle_id", "status"),
         Index("ix_reservation_member_status", "member_id", "status"),
         Index("ix_reservation_applied_at", "applied_at"),
+        Index("ix_reservation_coupon", "coupon_id"),
     )

@@ -353,6 +353,12 @@ window.HKUI = (function () {
     "지금까지 <b>예약을 신청하신 횟수</b>예요.(2026년~)<br><br>" +
     "과거 이용 이력과 사이트에서 신청한 건(확정·탈락·대기)을 합산하고, <b>취소한 건은 빼고</b> 계산합니다.";
 
+  const COUPON_TOOLTIP_HTML =
+    "<b>무적 쿠폰</b>을 쓰면 그 시간대는 우선권과 관계없이 1순위예요. 쿠폰끼리는 먼저 신청한 순서이고, 경합에서 지면 쿠폰은 돌아와요.<br><br>" +
+    "· 탈락한 주가 <b>5번 쌓일 때마다 1장</b> (그 주에 재신청으로 이용하면 제외)<br>" +
+    "· 명예의 전당(누적 100회) 매월 1장 (매월 초기화)<br>" +
+    "· 쿠폰으로 확정된 예약은 양도·교환 불가";
+
   const USAGE_TOTAL_TOOLTIP_HTML =
     "실제로 <b>안마서비스를 이용하신 횟수</b>예요.(2026년~)<br><br>" +
     "과거 이용 이력과 사이트에서 <b>확정된</b> 예약을 합산합니다. 신청만 한 건·탈락한 건은 포함되지 않습니다.";
@@ -371,6 +377,143 @@ window.HKUI = (function () {
 
   function usageBadge(total) {
     return USAGE_BADGES.filter(([n]) => (total || 0) >= n).pop() || USAGE_BADGE_SEEDLING;
+  }
+
+  // 배지 등급 혜택 — 백엔드 coupon.BADGE_MONTHLY_QUOTA 와 같다.
+  const USAGE_BADGE_BENEFITS = {
+    100: "무적 쿠폰 매월 1장",
+  };
+
+  /**
+   * 공지 본문 표기 → HTML
+   * - "## 아이콘 | 소제목" (아이콘 생략 가능), "- 목록", "> 강조 박스", 빈 줄로 문단
+   * - "| 표 | 머리 |" 다음 줄 "|---|---|" 로 표
+   * - ":::cards" / ":::flow" … ":::"  — 각 줄 "아이콘 | 제목 | 설명"
+   * - ":::stamps 전체 채움" … ":::" — 도장 진행 그림 (다음 줄은 설명)
+   * - 인라인: **굵게**, {icon:이름}, {badge:누적횟수}, {br} 줄바꿈
+   */
+  function noticeBodyHtml(text) {
+    const safeIcon = (name) => (/^[a-z0-9-]+$/.test(name || "") ? name : "sparkles");
+    const inline = (t) =>
+      escapeHtml(t)
+        .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
+        .replace(/\{icon:([a-z0-9-]+)\}/g, (_, n) => icon(safeIcon(n), 16, "currentColor", "vertical-align:-3px"))
+        .replace(/\{badge:(\d+)\}/g, (_, n) => usageBadgeChip(Number(n)))
+        .replace(/\{br\}/g, "<br>");
+    const cells = (line) => line.replace(/^\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
+    const parts = (line) => {
+      const [ic, title, ...rest] = line.split("|").map((x) => x.trim());
+      return { ic: safeIcon(ic), title: title || "", desc: rest.join(" | ") };
+    };
+    const lines = String(text || "").split("\n");
+    const out = [];
+    let para = [];
+    let list = null;
+    let quote = null;
+    const flush = () => {
+      if (para.length) out.push(`<p>${para.map(inline).join("<br>")}</p>`);
+      if (list) out.push(`<ul>${list.map((li) => `<li>${inline(li)}</li>`).join("")}</ul>`);
+      if (quote) out.push(`<div class="hk-nb-callout">${icon("info", 18, "currentColor", "flex-shrink:0;margin-top:2px")}<div>${quote.map(inline).join("<br>")}</div></div>`);
+      para = [];
+      list = null;
+      quote = null;
+    };
+    for (let k = 0; k < lines.length; k++) {
+      const line = lines[k].trim();
+      if (!line) { flush(); continue; }
+      const block = line.match(/^:::(cards|flow|stamps)\s*(.*)$/);
+      if (block) {
+        flush();
+        const body = [];
+        for (k += 1; k < lines.length && lines[k].trim() !== ":::"; k++) {
+          if (lines[k].trim()) body.push(lines[k].trim());
+        }
+        const kind = block[1];
+        if (kind === "cards") {
+          out.push(`<div class="hk-nb-cards">${body.map(parts).map((c) => `
+            <div class="hk-nb-card"><div class="hk-nb-card__icon">${icon(c.ic, 22, "currentColor")}</div>
+            <div class="hk-nb-card__title">${inline(c.title)}</div><div class="hk-nb-card__desc">${inline(c.desc)}</div></div>`).join("")}</div>`);
+        } else if (kind === "flow") {
+          out.push(`<div class="hk-nb-flow">${body.map(parts).map((c, n) => `
+            ${n ? `<div class="hk-nb-flow__arrow" aria-hidden="true">${icon("chevron-right", 22, "currentColor")}</div>` : ""}
+            <div class="hk-nb-step"><div class="hk-nb-step__no">${n + 1}</div><div class="hk-nb-step__icon">${icon(c.ic, 22, "currentColor")}</div>
+            <div class="hk-nb-step__title">${inline(c.title)}</div><div class="hk-nb-step__desc">${inline(c.desc)}</div></div>`).join("")}</div>`);
+        } else {
+          const [total, filled] = block[2].split(/\s+/).map((x) => Math.max(0, Math.min(10, Number(x) || 0)));
+          const dots = Array.from({ length: total }, (_, n) =>
+            `<span class="hk-nb-stamp${n < filled ? " is-on" : ""}">${n < filled ? icon("check", 16, "currentColor") : n + 1}</span>`).join("");
+          out.push(`<div class="hk-nb-stamps"><div class="hk-nb-stamps__row">${dots}
+            <span class="hk-nb-stamps__arrow">${icon("arrow-right", 20, "currentColor")}</span>
+            <span class="hk-nb-stamps__prize">${icon("ticket", 22, "currentColor")}</span></div>
+            ${body.length ? `<div class="hk-nb-stamps__caption">${body.map(inline).join("<br>")}</div>` : ""}</div>`);
+        }
+        continue;
+      }
+      if (line.startsWith("## ")) {
+        flush();
+        const h = line.slice(3);
+        const m = h.match(/^([a-z0-9-]+)\s*\|\s*(.+)$/);
+        out.push(m
+          ? `<h2><span class="hk-nb-h-icon">${icon(safeIcon(m[1]), 18, "currentColor")}</span>${inline(m[2])}</h2>`
+          : `<h2>${inline(h)}</h2>`);
+        continue;
+      }
+      if (line.startsWith("|")) {
+        flush();
+        const rows = [];
+        for (; k < lines.length && lines[k].trim().startsWith("|"); k++) rows.push(lines[k].trim());
+        k -= 1;
+        const head = cells(rows[0]);
+        const bodyRows = rows.slice(rows[1] && /^\|[\s|:-]+\|?$/.test(rows[1]) ? 2 : 1).map(cells);
+        out.push(`<div class="hk-nb-table-wrap"><table class="hk-nb-table"><thead><tr>${head.map((c) => `<th>${inline(c)}</th>`).join("")}</tr></thead>
+          <tbody>${bodyRows.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`);
+        continue;
+      }
+      if (line.startsWith("> ")) {
+        if (para.length || list) { const q = quote; quote = null; flush(); quote = q; }
+        (quote ||= []).push(line.slice(2));
+        continue;
+      }
+      if (line.startsWith("- ")) {
+        if (para.length || quote) { const l = list; list = null; flush(); list = l; }
+        (list ||= []).push(line.slice(2));
+        continue;
+      }
+      if (list || quote) flush();
+      para.push(line);
+    }
+    flush();
+    return out.join("");
+  }
+
+  /** 내 등급 안내 — 등급별 기준·혜택, 현재 등급 강조 (마이페이지 툴팁) */
+  function tierGuideHtml(total) {
+    const current = usageBadge(total);
+    const rows = [USAGE_BADGE_SEEDLING].concat(USAGE_BADGES).map((b) => {
+      const [min, label, iconName, fg, bg] = b;
+      const reached = (total || 0) >= min;
+      const isCurrent = b === current;
+      const benefit = USAGE_BADGE_BENEFITS[min] || "";
+      return `<li class="${reached ? "is-reached" : ""}${isCurrent ? " is-current" : ""}">
+        <span><i class="hk-badge-guide__icon" style="color:${fg};background:${bg}">${icon(iconName, 14, "currentColor")}</i> <span>${label}${isCurrent ? " · 현재" : ""}${benefit ? `<small class="hk-badge-guide__benefit">${benefit}</small>` : ""}</span></span>
+        <span>${min ? `${min}회 이상` : "시작"}</span>
+      </li>`;
+    });
+    return `<b>등급 안내</b> — 누적 이용 횟수에 따라 등급이 올라가요. 명예의 전당에 오르면 매월 무적 쿠폰을 드려요.<ul class="hk-badge-guide">${rows.join("")}</ul>`;
+  }
+
+  /** 지금 받고 있는 등급 혜택 요약 (없으면 빈 문자열) */
+  function tierBenefitsText(total) {
+    const t = total || 0;
+    const quota = t >= 100 ? 1 : 0;
+    return quota ? `무적 쿠폰 매월 ${quota}장` : "";
+  }
+
+  /** 관리자 신청자 목록 — 무적 쿠폰 신청 표시 */
+  function couponApplicantTag(a) {
+    return a && a.used_coupon
+      ? ` <span class="hk-badge" style="color:var(--color-ultraviolet);background:#efe8ff;font-size:11px;padding:1px 7px;vertical-align:middle">무적 쿠폰</span>`
+      : "";
   }
 
   function usageBadgeChip(total) {
@@ -683,6 +826,9 @@ window.HKUI = (function () {
     else if (r.type === "ADMIN_ASSIGN" && r.status === "CONFIRMED") sub = "관리자 지정 · 예약 확정";
     else if (r.status === "CONFIRMED") sub = "일반 신청 · 예약 확정";
     else if (r.status === "CANCELLED") sub = "취소됨";
+    if (r.usedCoupon && r.status === "CONFIRMED") sub = "무적 쿠폰 · 예약 확정 (양도·교환 불가)";
+    else if (r.usedCoupon && r.status === "REQUESTED") sub = "무적 쿠폰 사용 · 확정 대기";
+    else if (r.usedCoupon && r.status === "DROPPED") sub += " · 쿠폰 반환됨";
     // 확정됐지만 양도/교환 창(수 17:00 등)이 아직 열리지 않은 경우 — 정책은 그대로, 안내만 미리 노출
     const busyPending = !!(r.transferPending || r.swapPending);
     const transferMonthlyLimit = !r.transferable && !busyPending && !!r.transferMonthlyLimitReached;
@@ -700,7 +846,11 @@ window.HKUI = (function () {
       const opens = r.swapOpensAt || r.transferOpensAt;
       sub += ` · ${formatDeadlineRelative(opens)} 이후 교환·양도 가능`;
     }
-    const reapplyBadge = r.type === "REAPPLY" && !busyPending ? badge("재신청", "info") + " " : "";
+    const reapplyBadge =
+      (r.type === "REAPPLY" && !busyPending ? badge("재신청", "info") + " " : "") +
+      (r.usedCoupon && r.status !== "CANCELLED"
+        ? `<span class="hk-badge" style="color:var(--color-ultraviolet);background:#efe8ff">무적 쿠폰</span> `
+        : "");
 
     const actions = [];
     if (r.cancelable) {
@@ -1040,9 +1190,15 @@ window.HKUI = (function () {
     USAGE_BADGES,
     usageBadge,
     usageBadgeChip,
+    couponApplicantTag,
+    tierGuideHtml,
+    tierBenefitsText,
+    USAGE_BADGE_BENEFITS,
+    noticeBodyHtml,
     PRIORITY_TOOLTIP_HTML,
     APPLY_TOTAL_TOOLTIP_HTML,
     USAGE_TOTAL_TOOLTIP_HTML,
+    COUPON_TOOLTIP_HTML,
     teamsBadge,
     demoToggle,
     subNav,

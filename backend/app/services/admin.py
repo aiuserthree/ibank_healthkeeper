@@ -786,11 +786,14 @@ async def send_reapply_notice(
     else:
         target_ids = eligible_ids
 
+    from app.services.coupon import drop_mail_coupon_line
+
     count = 0
     for member_id in sorted(target_ids):
         member = await db.get(Member, member_id)
         if not member:
             continue
+        coupon_line = await drop_mail_coupon_line(db, member.id, can_reapply=bool(empty))
         mail = await enqueue_mail(
             db,
             mail_type=MailType.DROP_REAPPLY_NOTICE,
@@ -805,6 +808,7 @@ async def send_reapply_notice(
                 "reapplyDeadline": deadline,
                 # 빈 슬롯이 없으면 재신청 안내 없이 탈락 안내만 보낸다.
                 "dropOnly": not empty,
+                "couponLineHtml": coupon_line,
             },
             dedupe_key=f"drop:{cycle_id}:{member_id}",
         )

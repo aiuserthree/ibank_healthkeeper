@@ -66,6 +66,23 @@ class SwapRequestBody(BaseModel):
     targetReservationId: int
 
 
+class ApplyRequestBody(BaseModel):
+    useCoupon: bool = False
+
+
+class NoticeSaveRequest(BaseModel):
+    title: str
+    body: str
+    pinned: bool = False
+    published: bool = True
+
+
+class CouponGrantRequest(BaseModel):
+    memberId: int
+    count: int = Field(default=1, ge=1, le=10)
+    note: Optional[str] = None
+
+
 class VacationRequest(BaseModel):
     cycleId: int
     dates: list[str]

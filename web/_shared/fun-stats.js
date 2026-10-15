@@ -182,9 +182,22 @@ window.HKFun = (function () {
     return `<b>배지 안내</b> — 누적 이용 횟수에 따라 배지가 올라가요.
       <ul class="hk-badge-guide">${milestones.map((m) => `
         <li class="${total >= m[0] ? "is-reached" : ""}${m === current ? " is-current" : ""}">
-          <span><i class="hk-badge-guide__icon" style="color:${m[3]};background:${m[4]}">${HKUI.icon(m[2], 14, "currentColor")}</i> ${m[1]}${m === current ? " · 현재" : ""}</span>
+          <span><i class="hk-badge-guide__icon" style="color:${m[3]};background:${m[4]}">${HKUI.icon(m[2], 14, "currentColor")}</i> <span>${m[1]}${m === current ? " · 현재" : ""}${HKUI.USAGE_BADGE_BENEFITS[m[0]] ? `<small class="hk-badge-guide__benefit">${HKUI.USAGE_BADGE_BENEFITS[m[0]]}</small>` : ""}</span></span>
           <span>${m[0]}회 이상</span>
         </li>`).join("")}</ul>`;
+  }
+
+  function couponLine(c) {
+    if (!c) return "";
+    const pct = Math.round((c.dropProgress / c.dropPerCoupon) * 100);
+    return `<div class="hk-coupon-line">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--color-ultraviolet)">${HKUI.icon("ticket", 16, "currentColor")} 무적 쿠폰 ${c.available}장</span>
+        <a href="${HKRoutes.notice}" style="font-size:12.5px;color:var(--color-slate-blue);text-decoration:none">쿠폰 안내 →</a>
+      </div>
+      <div class="hk-progress hk-progress--coupon" style="margin-top:8px" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span data-width="${pct}%"></span></div>
+      <div style="font-size:12.5px;color:var(--text-secondary);margin-top:6px">탈락 ${c.dropProgress}/${c.dropPerCoupon} · 다음 쿠폰까지 ${c.dropPerCoupon - c.dropProgress}회${c.badgeMonthlyQuota ? ` · 등급 혜택 매월 ${c.badgeMonthlyQuota}장` : ""}</div>
+    </div>`;
   }
 
   function myRecordCard(me, profile) {
@@ -221,6 +234,7 @@ window.HKFun = (function () {
       </div>
       <div class="hk-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span data-width="${pct}%"></span></div>
       <div style="font-size:13px;color:var(--text-secondary);margin-top:8px">${next ? `다음 배지 <b style="color:var(--color-midnight-navy)">${next[1]}</b>까지 ${next[0] - total}회 남았어요` : "모든 배지를 모았어요. 진정한 헬스키퍼 마스터!"}</div>
+      ${couponLine(profile?.coupons)}
       <div style="margin-top:14px;padding:12px 14px;border-radius:8px;background:var(--color-mist);font-size:14px;color:var(--color-midnight-navy);line-height:1.55;display:flex;gap:10px;align-items:flex-start">
         ${HKUI.icon("hourglass", 17, "var(--color-slate-blue)", "margin-top:2px;flex-shrink:0")}<span>${waitLine} <a href="${R.reserve}" style="color:var(--color-signal-blue);font-weight:600;text-decoration:none;white-space:nowrap">예약하기 →</a></span>
       </div>

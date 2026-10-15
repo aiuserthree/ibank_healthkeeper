@@ -62,6 +62,41 @@
     return `신청자 ${s.requestCount || 0}명`;
   }
 
+  function couponChip(text) {
+    return `<span class="hk-badge" style="color:var(--color-ultraviolet);background:#efe8ff">${HKUI.icon("ticket", 13, "currentColor")} ${HKUI.escapeHtml(text)}</span>`;
+  }
+
+  function competitorAlert(s) {
+    const coupon = s.couponCount || 0;
+    if (coupon > 0) {
+      return HKUI.alertBox(
+        "warning",
+        `다른 신청자 ${s.requestCount}명 · 무적 쿠폰 ${coupon}명`,
+        "무적 쿠폰 신청이 먼저 확정되고, 쿠폰끼리는 <b>먼저 신청한 순서</b>예요."
+      );
+    }
+    return HKUI.alertBox("warning", `다른 신청자 ${s.requestCount}명`, "마감 시점에 <b>우선권(마지막 이용일)</b>에 따라 확정됩니다.");
+  }
+
+  async function renderNoticeStrip() {
+    const el = document.getElementById("notice-strip");
+    if (!el) return;
+    try {
+      const notices = await HKApi.notices();
+      const top = (notices || []).find((n) => n.pinned) || (notices || [])[0];
+      if (!top) return;
+      el.innerHTML = `<a class="hk-notice-strip" href="${HKRoutes.notice}?id=${top.id}">
+        <span class="hk-badge hk-badge--soft" style="flex-shrink:0">공지</span>
+        <span class="hk-notice-strip__title">${HKUI.escapeHtml(top.title)}</span>
+        <span class="hk-notice-strip__more">자세히 보기 ${HKUI.icon("chevron-right", 15, "currentColor")}</span>
+      </a>`;
+      el.hidden = false;
+      HKUI.refreshIcons();
+    } catch (_) {
+      /* 공지는 부가 정보 — 실패해도 예약 화면은 그대로 */
+    }
+  }
+
   function renderBanner() {
     const el = document.getElementById("state-banner");
     if (isOpen() && hasWeekApplied()) {
@@ -178,6 +213,7 @@
       el.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">${HKUI.icon("calendar-days", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.formatDateShort(selected.slotDate)} (${dow})</span></div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">${HKUI.icon("clock", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${selected.startTime} – ${selected.endTime}</span></div>
+        ${calendar?.appliedWithCoupon ? `<div style="margin-bottom:12px">${couponChip("무적 쿠폰 사용 · 1순위")}</div>` : ""}
         ${HKUI.alertBox("info", "이번 주 신청 완료", "한 주에 한 타임만 신청할 수 있어요. 마감 전까지 마이페이지에서 취소 후 다른 시간으로 다시 신청할 수 있습니다.")}
         <a href="${HKRoutes.mypage}" style="display:block;margin-top:auto;padding-top:16px"><button type="button" class="hk-btn hk-btn--secondary hk-btn--block">예약 내역 보기</button></a>`;
       HKUI.refreshIcons();
@@ -186,8 +222,9 @@
     el.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">${HKUI.icon("calendar-days", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.formatDateShort(selected.slotDate)} (${dow})</span></div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">${HKUI.icon("clock", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${selected.startTime} – ${selected.endTime}</span></div>
-      ${selected.requestCount > 0 ? `<div style="margin-bottom:16px">${HKUI.alertBox("warning", `다른 신청자 ${selected.requestCount}명`, "마감 시점에 <b>우선권(마지막 이용일)</b>에 따라 확정됩니다.")}</div>` : ""}
+      ${selected.requestCount > 0 ? `<div style="margin-bottom:16px">${competitorAlert(selected)}</div>` : ""}
       <div style="margin-top:auto">
+        ${calendar?.couponAvailable > 0 ? `<div style="margin-bottom:10px">${couponChip(`무적 쿠폰 ${calendar.couponAvailable}장 보유`)}</div>` : ""}
         <button type="button" class="hk-btn hk-btn--primary hk-btn--block" id="apply-btn">예약 신청하기</button>
         <p style="font-size:12px;color:var(--text-muted);margin-top:12px;line-height:1.5;margin-bottom:0">신청은 마감(수 17:00) 전까지 취소할 수 있어요. <b>신청 ≠ 확정</b> — 관리자 확정 후 완료됩니다.</p>
       </div>`;
@@ -201,13 +238,22 @@
         HKUI.toast("이번 주는 한 타임만 신청할 수 있습니다.", "danger");
         return;
       }
+      // 무적 쿠폰 보유자는 사용 여부를 먼저 묻는다.
+      let useCoupon = false;
+      if (calendar?.couponAvailable > 0) {
+        useCoupon = await HKUI.confirmDialog(
+          "무적 쿠폰을 사용할까요?",
+          `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을 사용하면 이 시간대는 <b>우선권과 관계없이 1순위</b>예요. 쿠폰을 쓴 사람끼리는 먼저 신청한 순서로 확정되고, 경합에서 지면 쿠폰은 돌아와요.<br><span style="font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</span>`,
+          { confirmLabel: "쿠폰 사용", cancelLabel: "사용 안 함" }
+        );
+      }
       const ok = await HKUI.confirmDialog(
         "예약을 신청할까요?",
-        `${HKUI.formatDateShort(selected.slotDate)}(${dow}) <b>${selected.startTime} – ${selected.endTime}</b> 타임으로 신청합니다. 확정은 관리자 처리 후 완료되며, 완료 메일을 보내드려요.`
+        `${HKUI.formatDateShort(selected.slotDate)}(${dow}) <b>${selected.startTime} – ${selected.endTime}</b> 타임으로 신청합니다.${useCoupon ? " <b>무적 쿠폰</b>을 사용합니다." : ""} 확정은 관리자 처리 후 완료되며, 완료 메일을 보내드려요.`
       );
       if (!ok) return;
       try {
-        await HKApi.applySlot(selected.id);
+        await HKApi.applySlot(selected.id, useCoupon);
         const cal = await HKApi.calendar();
         calendar = {
           ...cal,
@@ -264,6 +310,7 @@
         renderGrid();
         renderSummary();
         HKUI.refreshIcons();
+        renderNoticeStrip();
       } catch (e) {
         if (bannerEl) {
           bannerEl.style.display = "";

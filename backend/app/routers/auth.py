@@ -329,6 +329,10 @@ async def profile(
     total_uses = await get_member_total_uses(db, member)
     apply_total = await get_member_apply_total(db, member)
     usage_history_total = await count_member_usage_history(db, member)
+    from app.services.coupon import coupon_summary
+
+    coupons = await coupon_summary(db, member, total_uses=total_uses)
+    await db.commit()
 
     return {
         "data": {
@@ -342,6 +346,7 @@ async def profile(
             "totalUses": total_uses,
             "applyTotal": apply_total,
             "usageHistoryTotal": usage_history_total,
+            "coupons": coupons,
             "createdAt": format_kst_iso(member.created_at),
         }
     }

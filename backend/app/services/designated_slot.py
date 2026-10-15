@@ -30,6 +30,7 @@ from app.models import (
 )
 from app.services.avatar import admin_member_avatar_url
 from app.services.cycle import can_admin_confirm
+from app.services.coupon import settle_coupon
 from app.services.korean_holidays import is_public_holiday
 from app.services.mail import enqueue_mail, queue_mail_after_commit
 from app.services.reservation import ACTIVE_APPLY_STATUSES, _member_cycle_active_apply
@@ -77,6 +78,7 @@ async def drop_undesignated_confirm_slot_requests(
             res.status = ReservationStatus.DROPPED
             res.dropped_at = now
             res.is_priority = False
+            await settle_coupon(db, res, confirmed=False)
             dropped += 1
     if dropped:
         await db.flush()
@@ -272,6 +274,7 @@ async def designate_confirm_slot(
         other.status = ReservationStatus.DROPPED
         other.dropped_at = now
         other.is_priority = False
+        await settle_coupon(db, other, confirmed=False)
 
     reservation = Reservation(
         slot_id=slot.id,

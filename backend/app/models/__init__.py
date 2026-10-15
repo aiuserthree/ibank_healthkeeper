@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.models.admin import AdminUser
 from app.models.base import Base
 from app.models.cycle import ReservationCycle
+from app.models.coupon import Coupon, CouponSource, CouponStatus
 from app.models.email_token import EmailVerificationToken
 from app.models.enums import (
     AdminRole,
@@ -21,6 +22,7 @@ from app.models.enums import (
 from app.models.legacy_usage import LegacyUsage
 from app.models.mail import MailMessage, MailTemplate
 from app.models.member import Member
+from app.models.notice import Notice
 from app.models.public_holiday import KoreanPublicHoliday
 from app.models.reservation import Reservation
 from app.models.setting import OperationSetting
@@ -59,4 +61,8 @@ __all__ = [
     "SwapProposal",
     "SwapProposalStatus",
     "OperationSetting",
+    "Notice",
+    "Coupon",
+    "CouponSource",
+    "CouponStatus",
 ]

@@ -167,6 +167,19 @@ def expand_mail_context(context: dict) -> dict:
     return out
 
 
+def coupon_block_html(line_html: str) -> str:
+    """탈락 메일의 무적 쿠폰 진행도 한 줄 (빈 문자열이면 블록 없음)."""
+    if not line_html:
+        return ""
+    return (
+        '<tr><td style="padding:0 40px 24px;">'
+        '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        'style="background:#efe8ff; border-radius:10px;"><tbody><tr>'
+        '<td style="padding:14px 18px; font-size:14px; line-height:1.7; color:#3d1d8f;">'
+        f"&#127903; {line_html}</td></tr></tbody></table></td></tr>"
+    )
+
+
 def stretch_list_html(day: date) -> str:
     """오늘의 1분 스트레칭 — 예약하기 화면에서 롤링되는 3개를 메일에 나란히.
     그림은 Outlook 호환을 위해 PNG data URI."""
@@ -494,6 +507,7 @@ PREVIEW_CONTEXT: dict[MailType, dict] = {
         ),
         "reapplyOpenAt": "목요일 09:00",
         "reapplyDeadline": "내일(목요일) 17:00",
+        "couponLineHtml": "탈락 3/5 · <b>무적 쿠폰</b>까지 2회 남았어요.",
     },
 }
 
@@ -504,7 +518,11 @@ def render_mail_message(
     context: dict,
 ) -> tuple[str, str]:
     if mail_type == MailType.DROP_REAPPLY_NOTICE:
-        context = {"stretchListHtml": stretch_list_html(now_kst().date()), **context}
+        context = {
+            "stretchListHtml": stretch_list_html(now_kst().date()),
+            "couponBlockHtml": coupon_block_html(context.get("couponLineHtml", "")),
+            **context,
+        }
     if mail_type == MailType.DROP_REAPPLY_NOTICE and context.get("dropOnly"):
         body_tpl = _load_mail_html(DROP_ONLY_HTML_FILE)
         if body_tpl:

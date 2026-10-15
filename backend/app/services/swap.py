@@ -219,6 +219,8 @@ async def search_swap_targets(
         raise_app_error("NOT_SWAPPABLE")
     if reservation.type not in SWAPPABLE_TYPES:
         raise_app_error("NOT_SWAPPABLE")
+    if reservation.coupon_id is not None:
+        raise_app_error("NOT_SWAPPABLE_COUPON")
     if await has_pending_swap_involving(db, reservation.id):
         raise_app_error("SWAP_ALREADY_PENDING")
     if await _has_pending_transfer(db, reservation.id):
@@ -253,6 +255,7 @@ async def search_swap_targets(
         .where(Reservation.cycle_id == cycle.id)
         .where(Reservation.status == ReservationStatus.CONFIRMED)
         .where(Reservation.type.in_(SWAPPABLE_TYPES))
+        .where(Reservation.coupon_id.is_(None))
         .where(Reservation.id != reservation.id)
         .where(Reservation.member_id != member.id)
         .where(Member.status == MemberStatus.ACTIVE)
@@ -352,9 +355,11 @@ async def create_swap_proposal(
         raise_app_error("NOT_SWAPPABLE")
     if proposer_res.type not in SWAPPABLE_TYPES:
         raise_app_error("NOT_SWAPPABLE")
+    if proposer_res.coupon_id is not None:
+        raise_app_error("NOT_SWAPPABLE_COUPON")
     if target_res.status != ReservationStatus.CONFIRMED:
         raise_app_error("TARGET_NOT_SWAPPABLE")
-    if target_res.type not in SWAPPABLE_TYPES:
+    if target_res.type not in SWAPPABLE_TYPES or target_res.coupon_id is not None:
         raise_app_error("TARGET_NOT_SWAPPABLE")
     if target_res.member_id == member.id:
         raise_app_error("TARGET_NOT_SWAPPABLE")

@@ -167,7 +167,7 @@ window.HKReservationBoard = (function () {
       const dept = a.department || a.dept || "";
       return `<div style="display:grid;grid-template-columns:${GRID};gap:12px;min-width:660px;padding:12px 8px;align-items:center;border-bottom:1px solid var(--color-mist)">
         <div style="font-size:13px;font-weight:700;color:${isTop ? "var(--color-signal-blue)" : "var(--text-muted)"}">${rank + 1}</div>
-        <div style="display:flex;align-items:center;gap:10px;min-width:0">${HKUI.avatar(a.member_name, "sm", a.avatarUrl || "")}<div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}${pos ? ` <span style="font-size:12px;font-weight:600;color:var(--color-slate-blue)">${HKUI.escapeHtml(pos)}</span>` : ""}</div><div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(dept ? `${dept} · ${a.member_email || ""}` : a.member_email || "")}</div></div></div>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">${HKUI.avatar(a.member_name, "sm", a.avatarUrl || "")}<div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}${HKUI.couponApplicantTag(a)}${pos ? ` <span style="font-size:12px;font-weight:600;color:var(--color-slate-blue)">${HKUI.escapeHtml(pos)}</span>` : ""}</div><div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(dept ? `${dept} · ${a.member_email || ""}` : a.member_email || "")}</div></div></div>
         <div style="font-size:14px;color:var(--text-secondary);font-variant-numeric:tabular-nums">${a.applied_at ? HKUI.formatTimeKst(a.applied_at) : "-"}</div>
         <div style="font-size:13px;color:${noHist ? "var(--color-warning)" : "var(--text-secondary)"};font-weight:${noHist ? 700 : 400}">${noHist ? "이력 없음" : a.last_used_date ? HKUI.formatDate(a.last_used_date) : "-"}</div>
         <div>${typeBadge(a.type)}</div>
@@ -306,7 +306,7 @@ window.HKReservationBoard = (function () {
           ${HKUI.avatar(a.member_name, "md", a.avatarUrl || "")}
           <div style="min-width:160px">
             <div style="display:flex;align-items:center;gap:8px">
-              <span style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}</span>
+              <span style="font-size:16px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}${HKUI.couponApplicantTag(a)}</span>
               ${isTop && !decided ? HKUI.badge("우선권 1순위", "info") : ""}
             </div>
             <div style="font-size:13px;color:var(--color-slate-blue);font-weight:600">${HKUI.escapeHtml(dept)}${pos ? ` · ${HKUI.escapeHtml(pos)}` : ""}</div>
@@ -418,7 +418,7 @@ window.HKReservationBoard = (function () {
                     <div style="display:flex;align-items:center;gap:12px">
                       ${HKUI.avatar(a.member_name, "sm", a.avatarUrl || "")}
                       <div style="min-width:0;flex:1">
-                        <div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}</div>
+                        <div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}${HKUI.couponApplicantTag(a)}</div>
                         <div style="font-size:12px;color:var(--text-muted)">${HKUI.escapeHtml(dept ? `${dept} · ${a.member_email || ""}` : a.member_email || "")}</div>
                       </div>
                       ${HKUI.statusBadge(a.status)}

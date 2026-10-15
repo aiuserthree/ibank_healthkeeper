@@ -20,6 +20,7 @@ from app.models import (
 )
 from app.services.admin import send_reapply_notice
 from app.services.confirm import confirm_reservation
+from app.services.coupon import release_unsettled_coupons, settle_coupon, sync_all_member_coupons
 from app.services.cycle import (
     apply_vacations_to_slots,
     create_cycle_for_week,
@@ -119,6 +120,7 @@ async def job_close_batch(db: AsyncSession) -> None:
             if res and res.status == ReservationStatus.REQUESTED:
                 res.status = ReservationStatus.DROPPED
                 res.dropped_at = now_kst()
+                await settle_coupon(db, res, confirmed=False)
 
     await db.commit()
 
@@ -157,7 +159,15 @@ async def job_reapply_close(db: AsyncSession) -> None:
         return
     cycle.state = CycleState.CLOSED
     cycle.reapply_closed_at = now_kst()
+    await release_unsettled_coupons(db, cycle.id)
     await db.commit()
+
+
+async def job_coupon_sync(db: AsyncSession) -> None:
+    """매일 00:05 · 목 17:01 — 월간 배지 쿠폰 지급·만료, 확정된 탈락 주 쿠폰 지급."""
+    issued = await sync_all_member_coupons(db)
+    if issued:
+        logger.info("Coupon sync issued=%s", issued)
 
 
 async def job_mail_retry(db: AsyncSession) -> None:

@@ -67,11 +67,14 @@ async def confirm_reservation(
     ):
         raise_app_error("NOT_CONFIRMABLE_BEFORE_CLOSE")
 
+    from app.services.coupon import settle_coupon
+
     reservation.status = ReservationStatus.CONFIRMED
     reservation.confirmed_at = now_kst()
     reservation.confirmed_by = confirmed_by
     reservation.dropped_at = None
     reservation.is_priority = True
+    await settle_coupon(db, reservation, confirmed=True)
 
     slot.status = SlotStatus.CONFIRMED
     slot.confirmed_reservation_id = reservation.id
@@ -90,6 +93,7 @@ async def confirm_reservation(
         other.status = ReservationStatus.DROPPED
         other.dropped_at = now_kst()
         other.is_priority = False
+        await settle_coupon(db, other, confirmed=False)
 
     mail_type = (
         MailType.RESERVE_DONE_REAPPLY

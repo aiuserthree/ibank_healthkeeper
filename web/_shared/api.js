@@ -37,7 +37,25 @@ window.HKApi = (function () {
     withdraw: () => request("/me", { method: "DELETE" }),
 
     calendar: () => request("/reservation/calendar"),
-    applySlot: (slotId) => request(`/reservation/slots/${slotId}/apply`, { method: "POST" }),
+    applySlot: (slotId, useCoupon = false) =>
+      request(`/reservation/slots/${slotId}/apply`, {
+        method: "POST",
+        body: JSON.stringify({ useCoupon: !!useCoupon }),
+      }),
+    notices: () => request("/system/notices"),
+    notice: (id) => request(`/system/notices/${id}`),
+    adminNotices: () => request("/admin/notices"),
+    adminSaveNotice: (id, notice) =>
+      request(id ? `/admin/notices/${id}` : "/admin/notices", {
+        method: id ? "PUT" : "POST",
+        body: JSON.stringify(notice),
+      }),
+    adminDeleteNotice: (id) => request(`/admin/notices/${id}`, { method: "DELETE" }),
+    adminCoupons: () => request("/admin/coupons"),
+    adminMemberCoupons: (memberId) => request(`/admin/coupons/members/${memberId}`),
+    adminGrantCoupons: (memberId, count, note) =>
+      request("/admin/coupons/grant", { method: "POST", body: JSON.stringify({ memberId, count, note }) }),
+    adminRevokeCoupon: (couponId) => request(`/admin/coupons/${couponId}/revoke`, { method: "POST" }),
     cancelReservation: (id) => request(`/reservation/${id}/cancel`, { method: "POST" }),
     reapplySlots: () => request("/reservation/reapply/slots"),
     reapplySlot: (slotId) => request(`/reservation/reapply/slots/${slotId}`, { method: "POST" }),

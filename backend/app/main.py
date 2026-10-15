@@ -76,6 +76,18 @@ def _schedule_jobs() -> None:
         replace_existing=True,
     )
     scheduler.add_job(
+        _async_job("coupon_sync", sched.job_coupon_sync),
+        CronTrigger(hour=0, minute=5),
+        id="j9_coupon_sync_daily",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        _async_job("coupon_sync", sched.job_coupon_sync),
+        CronTrigger(day_of_week="thu", hour=17, minute=1),
+        id="j10_coupon_sync_after_reapply",
+        replace_existing=True,
+    )
+    scheduler.add_job(
         _async_job("teams_open_notice", sched.job_teams_open_notice),
         CronTrigger(day_of_week="wed", hour=8, minute=55),
         id="j7_teams_open_notice",

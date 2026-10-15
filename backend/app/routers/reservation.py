@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, BackgroundTasks, Cookie, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Body, Cookie, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, RedirectResponse
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +14,7 @@ from app.core.session import get_member_session
 from app.core.time import format_deadline_relative_ko, format_kst_iso
 from app.database import get_db
 from app.models import Member
-from app.schemas.common import SwapRequestBody, TransferRequestBody
+from app.schemas.common import ApplyRequestBody, SwapRequestBody, TransferRequestBody
 from app.services.avatar import avatar_path, has_avatar
 from app.services.cycle import resolve_system_state
 from app.services import fun_stats as fun_stats_service
@@ -64,6 +64,20 @@ async def fun_stats(
     return {"data": data}
 
 
+@system_router.get("/notices")
+async def notices(db: AsyncSession = Depends(get_db)):
+    from app.services.notice import list_notices
+
+    return {"data": await list_notices(db)}
+
+
+@system_router.get("/notices/{notice_id}")
+async def notice_detail(notice_id: int, db: AsyncSession = Depends(get_db)):
+    from app.services.notice import get_notice
+
+    return {"data": await get_notice(db, notice_id)}
+
+
 @router.get("/reservation/calendar")
 async def calendar(
     db: AsyncSession = Depends(get_db),
@@ -76,14 +90,18 @@ async def calendar(
 @router.post("/reservation/slots/{slot_id}/apply")
 async def apply_slot(
     slot_id: int,
+    body: ApplyRequestBody = Body(default_factory=ApplyRequestBody),
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    reservation = await reservation_service.apply_slot(db, member, slot_id)
+    reservation = await reservation_service.apply_slot(
+        db, member, slot_id, use_coupon=body.useCoupon
+    )
     return {
         "data": {
             "reservationId": reservation.id,
             "status": reservation.status.value,
+            "usedCoupon": reservation.coupon_id is not None,
             "message": "신청이 접수되었습니다. (관리자 확정 후 예약이 완료됩니다.)",
         }
     }
