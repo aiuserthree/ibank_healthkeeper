@@ -268,12 +268,23 @@ async def list_member_usage_history(
 
 
 async def get_member_total_uses(db: AsyncSession, member: Member) -> int:
-    """확정 예약 + 과거 스케줄 이용 횟수."""
+    """누적 이용 — 이용이 끝난 확정 예약 + 과거 스케줄 이용 횟수.
+
+    아직 시간이 안 된 확정 예약은 세지 않는다 (과거 이용 내역·배지 등급과 같은 기준).
+    """
+    now = now_kst()
     confirmed_result = await db.execute(
         select(func.count())
         .select_from(Reservation)
+        .join(Slot, Slot.id == Reservation.slot_id)
         .where(Reservation.member_id == member.id)
         .where(Reservation.status == ReservationStatus.CONFIRMED)
+        .where(
+            or_(
+                Slot.slot_date < now.date(),
+                and_(Slot.slot_date == now.date(), Slot.end_time <= now.time().replace(tzinfo=None)),
+            )
+        )
     )
     confirmed = confirmed_result.scalar_one()
     legacy = await count_legacy_usages(db, email=member.email, name=member.name)
