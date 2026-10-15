@@ -62,6 +62,10 @@
     return `신청자 ${s.requestCount || 0}명`;
   }
 
+  function canUseCoupon(s) {
+    return calendar?.couponAvailable > 0 && s?.couponAllowed !== false;
+  }
+
   function couponChip(text) {
     return `<span class="hk-badge" style="color:var(--color-ultraviolet);background:#efe8ff">${HKUI.icon("ticket", 13, "currentColor")} ${HKUI.escapeHtml(text)}</span>`;
   }
@@ -224,7 +228,7 @@
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">${HKUI.icon("clock", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${selected.startTime} – ${selected.endTime}</span></div>
       ${selected.requestCount > 0 ? `<div style="margin-bottom:16px">${competitorAlert(selected)}</div>` : ""}
       <div style="margin-top:auto">
-        ${calendar?.couponAvailable > 0 ? `<div style="margin-bottom:10px">${couponChip(`무적 쿠폰 ${calendar.couponAvailable}장 보유`)}</div>` : ""}
+        ${canUseCoupon(selected) ? `<div style="margin-bottom:10px">${couponChip(`무적 쿠폰 ${calendar.couponAvailable}장 보유`)}</div>` : ""}
         <button type="button" class="hk-btn hk-btn--primary hk-btn--block" id="apply-btn">예약 신청하기</button>
         <p style="font-size:12px;color:var(--text-muted);margin-top:12px;line-height:1.5;margin-bottom:0">신청은 마감(수 17:00) 전까지 취소할 수 있어요. <b>신청 ≠ 확정</b> — 관리자 확정 후 완료됩니다.</p>
       </div>`;
@@ -240,7 +244,7 @@
       }
       // 무적 쿠폰 보유자는 사용 여부를 먼저 묻는다.
       let useCoupon = false;
-      if (calendar?.couponAvailable > 0) {
+      if (canUseCoupon(selected)) {
         useCoupon = await HKUI.confirmDialog(
           "무적 쿠폰을 사용할까요?",
           `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을 사용하면 이 시간대는 <b>우선권과 관계없이 1순위</b>예요. 쿠폰을 쓴 사람끼리는 먼저 신청한 순서로 확정되고, 경합에서 지면 쿠폰은 돌아와요.<br><span style="font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</span>`,

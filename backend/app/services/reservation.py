@@ -102,6 +102,8 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
                 "status": slot.status.value,
                 "requestCount": request_cnt,
                 "couponCount": coupon_cnt,
+                # 쿠폰을 쓸 수 없는 시간대 — 이유는 내보내지 않는다
+                "couponAllowed": not is_designated_confirm_slot(slot),
                 "mine": mine,
                 "confirmed": confirmed,
             }
