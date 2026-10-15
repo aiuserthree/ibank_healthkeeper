@@ -127,6 +127,9 @@ async def job_close_batch(db: AsyncSession) -> None:
     for mail_id in drain_pending_mails():
         await process_one_mail(db, mail_id)
 
+    # 재신청할 빈 슬롯이 없으면 이번 주 탈락이 바로 확정되므로 쿠폰도 바로 지급
+    await sync_all_member_coupons(db)
+
 
 async def job_reapply_open(db: AsyncSession) -> None:
     """목 09:00 — 재신청 기간 오픈 + 탈락자 안내 메일 자동 발송.
@@ -146,6 +149,8 @@ async def job_reapply_open(db: AsyncSession) -> None:
         await db.flush()
 
     await send_reapply_notice(db, cycle.id)
+    # 월요일 15:30 미지정 탈락까지 반영된 뒤 쿠폰 지급 (빈 슬롯이 없는 주)
+    await sync_all_member_coupons(db)
 
     for mail_id in drain_pending_mails():
         await process_one_mail(db, mail_id)

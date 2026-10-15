@@ -1,7 +1,8 @@
 """무적 쿠폰.
 
 - 탈락 주(그 주에 탈락이 있고 결국 확정 예약이 없는 주) 5회마다 1장. 지난 기록도 소급하며,
-  주차는 재신청 마감(목 17:00)이 지나야 확정된다. 월요일 15:30 미지정 자동 탈락도 포함.
+  주차는 재신청 마감(목 17:00)이 지나야 확정된다. 다만 마감 처리 후 재신청할 빈 슬롯이 없는 주는
+  더 바뀔 일이 없으므로 바로 확정한다. 월요일 15:30 미지정 자동 탈락도 포함.
 - 배지 등급 월간 지급: 명예의 전당(100회) 매월 1장.
   누적되지 않고 매월 초기화(말일까지 쓰지 않으면 만료).
 - 신청에 쓰면 그 시간대는 우선권 1순위, 쿠폰끼리는 신청 시각순.
@@ -66,9 +67,14 @@ async def _drop_weeks(db: AsyncSession, member_id: int, *, finalized_only: bool)
         .where(Reservation.status == ReservationStatus.DROPPED)
         .distinct()
     )
-    if finalized_only:
-        stmt = stmt.where(ReservationCycle.reapply_close_at <= now)
-    dropped = {row[0] for row in (await db.execute(stmt)).all()}
+    rows = (await db.execute(stmt.add_columns(ReservationCycle.reapply_close_at, ReservationCycle.batch_close_done))).all()
+    dropped = set()
+    for cycle_id, reapply_close_at, batch_close_done in rows:
+        if not finalized_only or reapply_close_at <= now:
+            dropped.add(cycle_id)
+        elif batch_close_done and not await _has_reapply_slots(db, cycle_id):
+            # 재신청할 빈 슬롯이 없으면 이 주의 탈락은 그대로 확정
+            dropped.add(cycle_id)
     if not dropped:
         return []
     confirmed = await db.execute(
@@ -81,8 +87,14 @@ async def _drop_weeks(db: AsyncSession, member_id: int, *, finalized_only: bool)
     return sorted(dropped - {row[0] for row in confirmed.all()})
 
 
+async def _has_reapply_slots(db: AsyncSession, cycle_id: int) -> bool:
+    from app.services.reservation import get_empty_slots
+
+    return bool(await get_empty_slots(db, cycle_id))
+
+
 async def count_drop_weeks(db: AsyncSession, member_id: int) -> int:
-    """확정된(재신청 마감이 지난) 탈락 주 수."""
+    """확정된 탈락 주 수 (재신청 마감이 지났거나, 마감 후 재신청할 빈 슬롯이 없는 주)."""
     return len(await _drop_weeks(db, member_id, finalized_only=True))
 
 
@@ -261,7 +273,7 @@ async def coupon_summary(db: AsyncSession, member: Member, *, total_uses: int | 
 
 async def drop_mail_coupon_line(db: AsyncSession, member_id: int, *, can_reapply: bool) -> str:
     """탈락 메일 한 줄 — 이번 주 탈락까지 반영한 진행도 (목 09:00 발송 기준)."""
-    projected = await count_drop_weeks(db, member_id) + 1
+    projected = len(await _drop_weeks(db, member_id, finalized_only=False))
     progress = projected % DROP_WEEKS_PER_COUPON
     if progress == 0:
         if can_reapply:
@@ -269,7 +281,7 @@ async def drop_mail_coupon_line(db: AsyncSession, member_id: int, *, can_reapply
                 "이번 탈락으로 <b>무적 쿠폰</b> 1장이 쌓일 차례예요. "
                 "이번 주에 재신청하지 않으면 재신청 마감(목 17:00) 후 지급돼요."
             )
-        return "이번 탈락으로 <b>무적 쿠폰</b> 1장이 지급돼요! (재신청 마감 목 17:00 이후) 다음 신청 때 써 보세요."
+        return "이번 탈락으로 <b>무적 쿠폰</b> 1장이 지급됐어요! 다음 신청 때 써 보세요."
     line = (
         f"탈락 {progress}/{DROP_WEEKS_PER_COUPON} · "
         f"<b>무적 쿠폰</b>까지 {DROP_WEEKS_PER_COUPON - progress}회 남았어요."
