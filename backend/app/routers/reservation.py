@@ -33,8 +33,13 @@ async def system_state(db: AsyncSession = Depends(get_db)):
     if cycle and state.value == "OPEN":
         open_msg = f"차주 예약 신청이 가능합니다. ({format_deadline_relative_ko(cycle.close_at)} 마감)"
     reapply_msg = "탈락자 재신청 기간입니다."
+    reapply_empty = None
     if cycle and state.value == "REAPPLY":
         reapply_msg = f"탈락자 재신청 기간입니다. ({format_deadline_relative_ko(cycle.reapply_close_at)}까지)"
+        reapply_empty = len(await reservation_service.get_empty_slots(db, cycle.id))
+        if reapply_empty == 0:
+            # 재신청할 빈 슬롯이 없으면 재신청 안내 대신 마감 안내
+            reapply_msg = "다음 예약은 수요일 09:00에 오픈됩니다."
     banners = {
         "BEFORE_OPEN": "다음 예약은 수요일 09:00에 오픈됩니다.",
         "OPEN": open_msg,
@@ -50,6 +55,7 @@ async def system_state(db: AsyncSession = Depends(get_db)):
             "closeAt": format_kst_iso(cycle.close_at) if cycle else None,
             "reapplyOpenAt": format_kst_iso(cycle.reapply_open_at) if cycle else None,
             "reapplyCloseAt": format_kst_iso(cycle.reapply_close_at) if cycle else None,
+            "reapplyEmptySlots": reapply_empty,
         }
     }
 

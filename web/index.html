@@ -34,7 +34,19 @@
       ["재신청 규칙", "재신청은 선착순·즉시 확정되며 취소할 수 없습니다.<br>이미 확정된 슬롯은 신청이 거절돼요."],
     ];
 
+    // 재신청 기간이라도 빈 슬롯이 없으면 마감으로 안내
+    function noReapplySlots(sys) {
+      return sys.state === "REAPPLY" && sys.reapplyEmptySlots === 0;
+    }
+
     function heroBannerFromState(sys) {
+      if (noReapplySlots(sys)) {
+        return {
+          variant: "danger",
+          title: "예약 마감",
+          body: "다음 예약은 수요일 09:00에 열립니다.<br class=\"hk-br-pc\"> 수요일 09:00~16:59 동안 신청할 수 있어요.",
+        };
+      }
       const banner = HKUI.getStateBanner(sys.state, {
         reapplyCloseAt: sys.reapplyCloseAt,
         closeAt: sys.closeAt,
@@ -82,7 +94,7 @@
         const banner = heroBannerFromState(sys);
         bannerEl.innerHTML = HKUI.alertBox(banner.variant, banner.title, banner.body);
         if (badgeEl) {
-          const [variant, text] = heroBadgeFromState(sys.state);
+          const [variant, text] = heroBadgeFromState(noReapplySlots(sys) ? "CLOSED" : sys.state);
           badgeEl.className = `hk-badge hk-badge--${variant}`;
           badgeEl.innerHTML = `<span class="hk-badge__dot"></span>${text}`;
         }
