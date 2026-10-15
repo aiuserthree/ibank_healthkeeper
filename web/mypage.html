@@ -44,11 +44,14 @@
       afterMount: async (profile) => {
         function couponKv(c) {
           if (!c) return "";
-          const expiring = (c.coupons || []).filter((x) => x.status === "AVAILABLE" && x.expiresAt);
+          const soonest = (c.coupons || [])
+            .filter((x) => x.status === "AVAILABLE" && x.expiresAt)
+            .map((x) => new Date(new Date(x.expiresAt).getTime() - 1))
+            .sort((a, b) => a - b)[0];
           const note = [
             `탈락 ${c.dropProgress}/${c.dropPerCoupon}`,
             c.reserved ? `신청에 사용 중 ${c.reserved}장` : "",
-            expiring.length ? `이번 달 소멸 ${expiring.length}장` : "",
+            soonest ? `${soonest.getMonth() + 1}/${soonest.getDate()}까지 사용` : "",
           ].filter(Boolean).join(" · ");
           return HKUI.kvTooltip(
             "무적 쿠폰",

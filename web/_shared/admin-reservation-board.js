@@ -695,7 +695,7 @@ window.HKReservationBoard = (function () {
         <div style="padding:20px 24px;border-bottom:1px solid var(--border-default);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0">
           <div>
             <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy)">우선권 확인 · 확정</div>
-            <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">마지막 이용일 오래된 순 → 동률 시 신청 시각</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">무적 쿠폰 신청 먼저 → 마지막 이용일 오래된 순 → 동률 시 신청 시각</div>
           </div>
           <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" data-modal-close aria-label="닫기">${HKUI.icon("x", 18, "var(--color-slate-blue)")}</button>
         </div>
@@ -721,7 +721,7 @@ window.HKReservationBoard = (function () {
         const rankAlert = applicants.length
           ? (allNoHistory
               ? HKUI.alertBox("info", "우선권 1순위가 자동 정렬되었습니다", `신청자 전원이 <b>이력 없음</b>이므로 신청 시각이 가장 빠른 <b>${topName}</b>님이 1순위입니다. 확정하면 나머지 신청자는 자동으로 <b>탈락</b> 처리됩니다.`)
-              : HKUI.alertBox("info", "우선권 1순위가 자동 정렬되었습니다", `마지막 이용일이 가장 오래된 <b>${topName}</b>님이 1순위입니다. 확정하면 나머지 신청자는 자동으로 <b>탈락</b> 처리됩니다.`))
+              : HKUI.alertBox("info", "우선권 1순위가 자동 정렬되었습니다", `${applicants[0] && applicants[0].used_coupon ? "무적 쿠폰 신청자 중 마지막 이용일이 가장 오래된" : "마지막 이용일이 가장 오래된"} <b>${topName}</b>님이 1순위입니다. 확정하면 나머지 신청자는 자동으로 <b>탈락</b> 처리됩니다.`))
           : "";
 
         body.innerHTML = `

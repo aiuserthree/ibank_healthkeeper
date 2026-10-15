@@ -5,14 +5,16 @@
   더 바뀔 일이 없으므로 바로 확정한다. 월요일 15:30 미지정 자동 탈락도 포함.
 - 배지 등급 월간 지급: 명예의 전당(100회) 매월 1장.
   누적되지 않고 매월 초기화(말일까지 쓰지 않으면 만료).
-- 신청에 쓰면 그 시간대는 우선권 1순위, 쿠폰끼리는 신청 시각순.
+- 탈락·관리자 지급 쿠폰은 지급일로부터 3개월 안에 써야 한다 (모아 두기 방지).
+- 신청에 쓰면 그 시간대는 1순위, 쿠폰끼리 겹치면 일반 신청과 같은 우선권(마지막 이용일) 순.
   경합에서 지거나 마감 전에 신청을 취소하면 반환, 확정되면 소멸(확정 후 취소해도 반환 없음).
 - 월요일 15:30 지정 슬롯과 재신청에는 쓸 수 없고, 쿠폰으로 얻은 예약은 양도·교환할 수 없다.
 """
 
 from __future__ import annotations
 
-from datetime import datetime
+import calendar
+from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,6 +33,7 @@ from app.models import (
 )
 
 DROP_WEEKS_PER_COUPON = 5
+COUPON_VALID_MONTHS = 3
 
 # (최소 누적 이용, 월간 지급 장수) — 배지 기준(web/_shared/ui.js USAGE_BADGES)과 같다.
 BADGE_MONTHLY_QUOTA = ((100, 1),)
@@ -51,6 +54,16 @@ def _next_month_start(now: datetime) -> datetime:
     if now.month == 12:
         return datetime(now.year + 1, 1, 1, tzinfo=KST)
     return datetime(now.year, now.month + 1, 1, tzinfo=KST)
+
+
+def coupon_expiry(issued_at: datetime) -> datetime:
+    """지급일로부터 3개월 되는 날 하루 끝까지 (예: 10/15 지급 → 1/15 23:59)."""
+    issued = issued_at.astimezone(KST)
+    month = issued.month - 1 + COUPON_VALID_MONTHS
+    year, month = issued.year + month // 12, month % 12 + 1
+    last_day = calendar.monthrange(year, month)[1]
+    day = min(issued.day, last_day)
+    return datetime(year, month, day, tzinfo=KST) + timedelta(days=1)
 
 
 def _is_expired(coupon: Coupon, now: datetime) -> bool:
@@ -115,6 +128,16 @@ async def sync_member_coupons(db: AsyncSession, member: Member, *, total_uses: i
     from app.services.legacy_usage import get_member_total_uses
 
     now = now_kst()
+    # 유효기간 도입 전에 지급된 쿠폰에도 기한을 붙인다 (지급일 기준 3개월)
+    unbounded = await db.execute(
+        select(Coupon)
+        .where(Coupon.member_id == member.id)
+        .where(Coupon.expires_at.is_(None))
+        .where(Coupon.source.in_((CouponSource.DROP, CouponSource.ADMIN)))
+    )
+    for coupon in unbounded.scalars().all():
+        coupon.expires_at = coupon_expiry(coupon.issued_at)
+    await db.flush()
     expired = await db.execute(
         select(Coupon)
         .where(Coupon.member_id == member.id)
@@ -128,7 +151,15 @@ async def sync_member_coupons(db: AsyncSession, member: Member, *, total_uses: i
     issued = 0
     earned = (await count_drop_weeks(db, member.id)) // DROP_WEEKS_PER_COUPON
     for _ in range(max(0, earned - await _count_issued(db, member.id, CouponSource.DROP))):
-        db.add(Coupon(member_id=member.id, source=CouponSource.DROP, status=CouponStatus.AVAILABLE, issued_at=now))
+        db.add(
+            Coupon(
+                member_id=member.id,
+                source=CouponSource.DROP,
+                status=CouponStatus.AVAILABLE,
+                issued_at=now,
+                expires_at=coupon_expiry(now),
+            )
+        )
         issued += 1
 
     if total_uses is None:
@@ -363,6 +394,7 @@ async def admin_grant_coupons(db: AsyncSession, member_id: int, count: int, note
                 status=CouponStatus.AVAILABLE,
                 note=(note or "").strip()[:200] or None,
                 issued_at=now,
+                expires_at=coupon_expiry(now),
             )
         )
     await db.commit()

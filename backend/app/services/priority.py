@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import case, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import format_kst_iso
@@ -29,11 +29,9 @@ async def rank_applicants(
             .over(
                 partition_by=Reservation.slot_id,
                 order_by=(
-                    # 무적 쿠폰 신청이 1순위, 쿠폰끼리는 신청 시각순
+                    # 무적 쿠폰 신청이 1순위, 쿠폰끼리는 일반 신청과 같은 우선권 순
+                    # (마지막 이용일이 오래된 사람 → 신청 시각) — 클릭 경쟁이 되지 않게
                     Reservation.coupon_id.is_(None).asc(),
-                    case((Reservation.coupon_id.isnot(None), Reservation.applied_at), else_=None)
-                    .asc()
-                    .nulls_last(),
                     Member.last_used_date.asc().nulls_first(),
                     Reservation.applied_at.asc(),
                     Reservation.id.asc(),

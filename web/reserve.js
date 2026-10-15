@@ -76,7 +76,7 @@
       return HKUI.alertBox(
         "warning",
         `다른 신청자 ${s.requestCount}명 · 무적 쿠폰 ${coupon}명`,
-        "무적 쿠폰 신청이 먼저 확정되고, 쿠폰끼리는 <b>먼저 신청한 순서</b>예요."
+        "무적 쿠폰 신청이 먼저 확정되고, 쿠폰끼리는 <b>우선권(마지막 이용일)</b> 순서예요."
       );
     }
     return HKUI.alertBox("warning", `다른 신청자 ${s.requestCount}명`, "마감 시점에 <b>우선권(마지막 이용일)</b>에 따라 확정됩니다.");
@@ -226,7 +226,7 @@
       el.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">${HKUI.icon("calendar-days", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.formatDateShort(selected.slotDate)} (${dow})</span></div>
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px">${HKUI.icon("clock", 20, "var(--color-signal-blue)")}<span style="font-size:18px;font-weight:700;color:var(--color-midnight-navy)">${selected.startTime} – ${selected.endTime}</span></div>
-        ${calendar?.appliedWithCoupon ? `<div style="margin-bottom:12px">${couponChip("무적 쿠폰 사용 · 1순위")}</div>` : ""}
+        ${calendar?.appliedWithCoupon ? `<div style="margin-bottom:12px">${couponChip("무적 쿠폰 사용 · 우선 확정 대상")}</div>` : ""}
         ${HKUI.alertBox("info", "이번 주 신청 완료", "한 주에 한 타임만 신청할 수 있어요. 마감 전까지 마이페이지에서 취소 후 다른 시간으로 다시 신청할 수 있습니다.")}
         <a href="${HKRoutes.mypage}" style="display:block;margin-top:auto;padding-top:16px"><button type="button" class="hk-btn hk-btn--secondary hk-btn--block">예약 내역 보기</button></a>`;
       HKUI.refreshIcons();
@@ -256,7 +256,7 @@
       if (canUseCoupon(selected)) {
         useCoupon = await HKUI.confirmDialog(
           "무적 쿠폰을 사용할까요?",
-          `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을 사용하면 이 시간대는 <b>우선권과 관계없이 1순위</b>예요. 쿠폰을 쓴 사람끼리는 먼저 신청한 순서로 확정되고, 경합에서 지면 쿠폰은 돌아와요.<br><span style="font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</span>`,
+          `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을 사용하면 이 시간대는 <b>일반 신청보다 먼저</b> 확정돼요. 쿠폰을 쓴 사람끼리 겹치면 <b>마지막 이용일이 오래된 분</b>이 확정되고, 지면 쿠폰은 돌아와요.<br><span style="font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</span>`,
           { confirmLabel: "쿠폰 사용", cancelLabel: "사용 안 함" }
         );
       }

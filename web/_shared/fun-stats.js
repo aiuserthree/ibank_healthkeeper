@@ -187,6 +187,14 @@ window.HKFun = (function () {
         </li>`).join("")}</ul>`;
   }
 
+  function couponDeadline(c) {
+    const soonest = (c.coupons || [])
+      .filter((x) => x.status === "AVAILABLE" && x.expiresAt)
+      .map((x) => new Date(new Date(x.expiresAt).getTime() - 1))
+      .sort((a, b) => a - b)[0];
+    return soonest ? ` · ${soonest.getMonth() + 1}/${soonest.getDate()}까지 사용` : "";
+  }
+
   function couponLine(c) {
     if (!c) return "";
     const pct = Math.round((c.dropProgress / c.dropPerCoupon) * 100);
@@ -196,7 +204,7 @@ window.HKFun = (function () {
         <a href="${HKRoutes.notice}" style="font-size:12.5px;color:var(--color-slate-blue);text-decoration:none">쿠폰 안내 →</a>
       </div>
       <div class="hk-progress hk-progress--coupon" style="margin-top:8px" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span data-width="${pct}%"></span></div>
-      <div style="font-size:12.5px;color:var(--text-secondary);margin-top:6px">탈락 ${c.dropProgress}/${c.dropPerCoupon} · 다음 쿠폰까지 ${c.dropPerCoupon - c.dropProgress}회${c.badgeMonthlyQuota ? ` · 등급 혜택 매월 ${c.badgeMonthlyQuota}장` : ""}</div>
+      <div style="font-size:12.5px;color:var(--text-secondary);margin-top:6px">탈락 ${c.dropProgress}/${c.dropPerCoupon} · 다음 쿠폰까지 ${c.dropPerCoupon - c.dropProgress}회${couponDeadline(c)}${c.badgeMonthlyQuota ? ` · 등급 혜택 매월 ${c.badgeMonthlyQuota}장` : ""}</div>
     </div>`;
   }
 
