@@ -265,6 +265,8 @@
       // 무적 쿠폰 보유자는 사용 여부를 먼저 묻는다.
       let useCoupon = false;
       if (canUseCoupon(selected)) {
+        // 안내창을 읽는 동안 최신 신청 현황을 미리 받아 둔다.
+        const latestCalendar = HKApi.calendar().catch(() => null);
         useCoupon = await HKUI.confirmDialog(
           "무적 쿠폰을 사용할까요?",
           `${calendar.couponAvailable > 1 ? `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을` : "보유한 무적 쿠폰 <b>1장</b>을"} 사용하면 이 시간대는 <b>일반 신청보다 먼저</b> 확정돼요. 쿠폰을 쓴 사람끼리 겹치면 <b>마지막 이용일이 오래된 분</b>이 확정되고, 지면 쿠폰은 돌아와요.${couponExpiryNote()}<br><span style="font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</span>`,
@@ -273,13 +275,10 @@
         // 이 시간대에 이미 쿠폰으로 신청한 사람이 있으면 한 번 더 확인 (최신 신청 현황 기준)
         if (useCoupon) {
           let couponRivals = selected.couponCount || 0;
-          try {
-            const latest = await HKApi.calendar();
-            const slot = (latest.slots || []).find((s) => Number(s.id) === Number(selected.id));
-            if (slot) couponRivals = slot.couponCount || 0;
-          } catch (_) {
-            /* 확인 실패 시 화면에 있던 값으로 판단 */
-          }
+          const latest = await latestCalendar;
+          // 확인 실패 시 화면에 있던 값으로 판단
+          const slot = (latest?.slots || []).find((s) => Number(s.id) === Number(selected.id));
+          if (slot) couponRivals = slot.couponCount || 0;
           if (couponRivals > 0) {
             useCoupon = await HKUI.confirmDialog(
               "이미 쿠폰을 쓴 신청자가 있어요",
