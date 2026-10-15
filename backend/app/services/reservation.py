@@ -121,6 +121,10 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
         "appliedSlotId": active_apply.slot_id if active_apply else None,
         "appliedWithCoupon": bool(active_apply and active_apply.coupon_id),
         "couponAvailable": coupons["available"],
+        # 신청에 쓰면 먼저 쓰이는(만료가 가장 빠른) 쿠폰의 만료 시각
+        "couponNextExpiresAt": next(
+            (c["expiresAt"] for c in coupons["coupons"] if c["status"] == "AVAILABLE"), None
+        ),
         "reapplyEmptySlots": reapply_empty,
         "slots": items,
     }

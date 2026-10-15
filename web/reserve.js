@@ -62,6 +62,17 @@
     return `신청자 ${s.requestCount || 0}명`;
   }
 
+  /** 이번에 쓰일 쿠폰(만료가 가장 빠른 것)의 사용 기한 안내 */
+  function couponExpiryNote() {
+    const iso = calendar?.couponNextExpiresAt;
+    if (!iso) return "";
+    // 만료 시각은 다음 날 00:00 — 하루 전 날짜가 마지막 사용일
+    const last = new Date(new Date(iso).getTime() - 1);
+    const dow = DAY_NAMES[last.getDay()];
+    const others = (calendar.couponAvailable || 0) - 1;
+    return `<div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:#f6f1ff;font-size:13.5px;color:var(--color-midnight-navy)">${HKUI.icon("calendar-clock", 15, "var(--color-ultraviolet)", "vertical-align:-3px;margin-right:4px")}이번에 쓰는 쿠폰은 <b>${last.getMonth() + 1}/${last.getDate()}(${dow})까지</b> 쓸 수 있어요.${others > 0 ? " 기한이 가장 빠른 쿠폰부터 써요." : ""}</div>`;
+  }
+
   function canUseCoupon(s) {
     return calendar?.couponAvailable > 0 && s?.couponAllowed !== false;
   }
@@ -256,9 +267,27 @@
       if (canUseCoupon(selected)) {
         useCoupon = await HKUI.confirmDialog(
           "무적 쿠폰을 사용할까요?",
-          `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을 사용하면 이 시간대는 <b>일반 신청보다 먼저</b> 확정돼요. 쿠폰을 쓴 사람끼리 겹치면 <b>마지막 이용일이 오래된 분</b>이 확정되고, 지면 쿠폰은 돌아와요.<br><span style="font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</span>`,
+          `${calendar.couponAvailable > 1 ? `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을` : "보유한 무적 쿠폰 <b>1장</b>을"} 사용하면 이 시간대는 <b>일반 신청보다 먼저</b> 확정돼요. 쿠폰을 쓴 사람끼리 겹치면 <b>마지막 이용일이 오래된 분</b>이 확정되고, 지면 쿠폰은 돌아와요.${couponExpiryNote()}<br><span style="font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</span>`,
           { confirmLabel: "쿠폰 사용", cancelLabel: "사용 안 함" }
         );
+        // 이 시간대에 이미 쿠폰으로 신청한 사람이 있으면 한 번 더 확인 (최신 신청 현황 기준)
+        if (useCoupon) {
+          let couponRivals = selected.couponCount || 0;
+          try {
+            const latest = await HKApi.calendar();
+            const slot = (latest.slots || []).find((s) => Number(s.id) === Number(selected.id));
+            if (slot) couponRivals = slot.couponCount || 0;
+          } catch (_) {
+            /* 확인 실패 시 화면에 있던 값으로 판단 */
+          }
+          if (couponRivals > 0) {
+            useCoupon = await HKUI.confirmDialog(
+              "이미 쿠폰을 쓴 신청자가 있어요",
+              `이 시간대에 <b>무적 쿠폰을 사용해 신청한 분이 ${couponRivals}명</b> 있어요. 쿠폰끼리는 <b>마지막 이용일이 오래된 분</b>이 확정되고, 지면 쿠폰은 돌아와요.<br>그래도 쿠폰을 사용할까요?`,
+              { confirmLabel: "그래도 사용", cancelLabel: "사용 안 함" }
+            );
+          }
+        }
       }
       const ok = await HKUI.confirmDialog(
         "예약을 신청할까요?",
