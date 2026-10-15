@@ -112,6 +112,8 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
 
     coupons = await coupon_summary(db, member)
     await db.commit()
+    # 재신청 기간에 빈 슬롯이 없으면 재신청 안내를 띄우지 않는다
+    reapply_empty = len(await get_empty_slots(db, cycle.id)) if state == CycleState.REAPPLY else None
     return {
         "state": state.value,
         "cycleId": cycle.id,
@@ -119,6 +121,7 @@ async def get_calendar(db: AsyncSession, member: Member) -> dict:
         "appliedSlotId": active_apply.slot_id if active_apply else None,
         "appliedWithCoupon": bool(active_apply and active_apply.coupon_id),
         "couponAvailable": coupons["available"],
+        "reapplyEmptySlots": reapply_empty,
         "slots": items,
     }
 
@@ -372,8 +375,13 @@ async def list_my_reservations(
     incoming_swap_count = await count_incoming_pending_swaps(db, member.id)
     items = []
     state, active_cycle = await resolve_system_state(db)
-    in_reapply = state == CycleState.REAPPLY
     active_cycle_id = active_cycle.id if active_cycle else None
+    # 빈 슬롯이 있어야 재신청 버튼을 보여준다
+    in_reapply = (
+        state == CycleState.REAPPLY
+        and active_cycle_id is not None
+        and bool(await get_empty_slots(db, active_cycle_id))
+    )
     # 양도 수령(TRANSFER 확정) 등으로 이미 주간 예약이 있으면 재신청 CTA 숨김
     week_active_apply = (
         await _member_cycle_active_apply(db, member.id, active_cycle_id)
