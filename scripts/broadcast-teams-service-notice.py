@@ -67,10 +67,12 @@ async def main() -> int:
                 return 1
             members = [member]
         else:
-            # 로컬 개발용 mock 계정(entra_oid "mock-…")은 실제 Teams 사용자가 아니므로 제외
+            # 로컬 개발용 mock 계정(entra_oid "mock-…")과 발신 계정 자신은 제외
+            sender = (settings.teams_sender_email or "").strip().lower()
             members = [
                 m for m in await load_open_notice_recipients(db)
                 if not (m.entra_oid or "").lower().startswith("mock-")
+                and (m.email or "").strip().lower() != sender
             ]
 
         sample = render_service_notice_body(
