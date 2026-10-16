@@ -280,39 +280,6 @@ window.HKFun = (function () {
     start();
   }
 
-  // 부서 대항전 — 모바일은 8위까지, PC는 왼쪽 열 높이에 맞는 만큼 보여준다.
-  const DEPT_MIN_ROWS = 8;
-  function fitDeptRows(root) {
-    const card = root.querySelector(".hk-dept-card");
-    if (!card) return;
-    const rows = [...card.querySelectorAll(".hk-rank-row")];
-    rows.forEach((row, i) => row.classList.toggle("is-cut", i >= DEPT_MIN_ROWS));
-    const heat = root.querySelector(".hk-heat-card");
-    if (!heat || window.matchMedia("(max-width: 860px)").matches) return;
-    // 오른쪽 열이 왼쪽보다 길어지면 꿀타임 지도가 늘어나므로, 그 직전까지 한 줄씩 늘린다.
-    const base = heat.getBoundingClientRect().height;
-    for (let i = DEPT_MIN_ROWS; i < rows.length; i++) {
-      rows[i].classList.remove("is-cut");
-      if (heat.getBoundingClientRect().height > base + 0.5) {
-        rows[i].classList.add("is-cut");
-        break;
-      }
-    }
-  }
-
-  let fitResizeBound = false;
-  function bindDeptFit(root) {
-    fitDeptRows(root);
-    document.fonts?.ready.then(() => fitDeptRows(root));
-    if (fitResizeBound) return;
-    fitResizeBound = true;
-    let timer = null;
-    window.addEventListener("resize", () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => fitDeptRows(root), 150);
-    });
-  }
-
   async function render(el, profile) {
     if (!el) return;
     let stats;
@@ -354,7 +321,6 @@ window.HKFun = (function () {
     HKUI.refreshIcons();
     countUp(el);
     growBars(el);
-    bindDeptFit(el);
   }
 
   /** 내 헬스키퍼 기록 카드만 (마이페이지) */

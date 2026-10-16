@@ -22,7 +22,7 @@ from app.models import (
 )
 
 CACHE_TTL_SECONDS = 60
-DEPARTMENT_RANKING_SIZE = 20  # PC는 화면 높이에 맞는 만큼만 보여준다 (모바일 8위까지)
+DEPARTMENT_RANKING_SIZE = 20  # PC는 전체, 모바일은 8위까지 (app.css)
 # 부서 대항전에서 뺄 부서 (회사명이 부서로 들어간 경영진 계정 등)
 DEPARTMENT_RANKING_EXCLUDED = frozenset({"(주)아이뱅크"})
 _WEEKDAY_KO = ("월", "화", "수", "목", "금", "토", "일")
