@@ -202,7 +202,7 @@ window.HKFun = (function () {
     </div>`;
   }
 
-  function myRecordCard(me, profile) {
+  function myRecordCard(me, profile, { showBadge = true } = {}) {
     const R = HKRoutes;
     // 헤더 배지·마이페이지 누적 이용과 같은 값을 쓴다.
     const total = (profile?.totalUses ?? me.totalUses) || 0;
@@ -224,11 +224,11 @@ window.HKFun = (function () {
           <div class="hk-fun-stat__icon" style="margin:0;background:var(--color-signal-blue-soft)">${HKUI.icon("medal", 19, "var(--color-signal-blue)")}</div>
           <b style="font-size:17px;color:var(--color-midnight-navy);white-space:nowrap">내 헬스키퍼 기록</b>
         </div>
-        <div data-tooltip-root style="display:flex;align-items:center;gap:4px;flex-shrink:0">
+        ${showBadge ? `<div data-tooltip-root style="display:flex;align-items:center;gap:4px;flex-shrink:0">
           ${HKUI.usageBadgeChip(total)}
           <button type="button" class="hk-tooltip-btn" aria-expanded="false" aria-controls="hk-tt-badges" aria-label="배지 안내" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer;border-radius:999px;color:var(--color-slate-blue)">${HKUI.icon("circle-help", 15, "currentColor")}</button>
           <div id="hk-tt-badges" class="hk-tooltip-panel" role="tooltip" hidden>${badgeGuide(total)}</div>
-        </div>
+        </div>` : ""}
       </div>
       <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
         <span class="hk-fun-stat__num" data-count="${total}">0</span><span style="font-size:15px;color:var(--text-secondary)">회 이용</span>
@@ -343,7 +343,8 @@ window.HKFun = (function () {
       return;
     }
     if (!stats.me) return;
-    el.innerHTML = myRecordCard(stats.me, profile);
+    // 계정 탭은 옆 '내 이용 현황'에 등급·안내가 있어 배지를 빼고 보여준다.
+    el.innerHTML = myRecordCard(stats.me, profile, { showBadge: false });
     el.hidden = false;
     HKUI.bindTooltips(el);
     HKUI.refreshIcons();
