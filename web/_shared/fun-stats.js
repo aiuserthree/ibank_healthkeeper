@@ -277,6 +277,23 @@ window.HKFun = (function () {
     card.addEventListener("mouseleave", start);
     card.addEventListener("focusin", stop);
     card.addEventListener("focusout", start);
+    // 모바일 — 좌우로 밀어 넘기기 (세로 스크롤은 그대로)
+    let touchX = null;
+    let touchY = null;
+    card.addEventListener("touchstart", (e) => {
+      touchX = e.touches[0].clientX;
+      touchY = e.touches[0].clientY;
+      stop();
+    }, { passive: true });
+    card.addEventListener("touchend", (e) => {
+      if (touchX == null) return;
+      const dx = e.changedTouches[0].clientX - touchX;
+      const dy = e.changedTouches[0].clientY - touchY;
+      touchX = null;
+      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) show(current + (dx < 0 ? 1 : -1));
+      start();
+    }, { passive: true });
+    card.addEventListener("touchcancel", () => { touchX = null; start(); }, { passive: true });
     start();
   }
 
