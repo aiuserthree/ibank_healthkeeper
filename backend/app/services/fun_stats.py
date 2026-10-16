@@ -22,7 +22,7 @@ from app.models import (
 )
 
 CACHE_TTL_SECONDS = 60
-DEPARTMENT_RANKING_SIZE = 8
+DEPARTMENT_RANKING_SIZE = 20  # PC는 화면 높이에 맞는 만큼만 보여준다 (모바일 8위까지)
 _WEEKDAY_KO = ("월", "화", "수", "목", "금", "토", "일")
 
 

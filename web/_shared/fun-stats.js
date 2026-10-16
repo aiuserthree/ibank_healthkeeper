@@ -170,15 +170,11 @@ window.HKFun = (function () {
     } else {
       mineLine = `부서 정보가 없어 우리 부서 순위를 표시할 수 없어요.`;
     }
-    return `<div class="hk-card hk-card--pad">${head}
+    return `<div class="hk-card hk-card--pad hk-dept-card">${head}
       <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px">부서별 올해 이용 횟수 합계예요 · 동률은 같은 순위</p>
       ${deptRows(board.top)}
       <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border-default);font-size:14px;color:var(--color-midnight-navy);display:flex;align-items:center;gap:8px">${HKUI.icon("users-round", 16, "var(--color-slate-blue)")}<span>${mineLine}</span></div>
     </div>`;
-  }
-
-  function badgeGuide(total) {
-    return `<b>배지 안내</b> — 누적 이용 횟수에 따라 배지가 올라가요.${HKUI.badgeGuideListHtml(total)}`;
   }
 
   function couponDeadline(c) {
@@ -202,7 +198,7 @@ window.HKFun = (function () {
     </div>`;
   }
 
-  function myRecordCard(me, profile, { showBadge = true } = {}) {
+  function myRecordCard(me, profile) {
     const R = HKRoutes;
     // 헤더 배지·마이페이지 누적 이용과 같은 값을 쓴다.
     const total = (profile?.totalUses ?? me.totalUses) || 0;
@@ -224,11 +220,6 @@ window.HKFun = (function () {
           <div class="hk-fun-stat__icon" style="margin:0;background:var(--color-signal-blue-soft)">${HKUI.icon("medal", 19, "var(--color-signal-blue)")}</div>
           <b style="font-size:17px;color:var(--color-midnight-navy);white-space:nowrap">내 헬스키퍼 기록</b>
         </div>
-        ${showBadge ? `<div data-tooltip-root style="display:flex;align-items:center;gap:4px;flex-shrink:0">
-          ${HKUI.usageBadgeChip(total)}
-          <button type="button" class="hk-tooltip-btn" aria-expanded="false" aria-controls="hk-tt-badges" aria-label="배지 안내" style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;padding:0;border:none;background:transparent;cursor:pointer;border-radius:999px;color:var(--color-slate-blue)">${HKUI.icon("circle-help", 15, "currentColor")}</button>
-          <div id="hk-tt-badges" class="hk-tooltip-panel" role="tooltip" hidden>${badgeGuide(total)}</div>
-        </div>` : ""}
       </div>
       <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
         <span class="hk-fun-stat__num" data-count="${total}">0</span><span style="font-size:15px;color:var(--text-secondary)">회 이용</span>
@@ -289,6 +280,39 @@ window.HKFun = (function () {
     start();
   }
 
+  // 부서 대항전 — 모바일은 8위까지, PC는 왼쪽 열 높이에 맞는 만큼 보여준다.
+  const DEPT_MIN_ROWS = 8;
+  function fitDeptRows(root) {
+    const card = root.querySelector(".hk-dept-card");
+    if (!card) return;
+    const rows = [...card.querySelectorAll(".hk-rank-row")];
+    rows.forEach((row, i) => row.classList.toggle("is-cut", i >= DEPT_MIN_ROWS));
+    const heat = root.querySelector(".hk-heat-card");
+    if (!heat || window.matchMedia("(max-width: 860px)").matches) return;
+    // 오른쪽 열이 왼쪽보다 길어지면 꿀타임 지도가 늘어나므로, 그 직전까지 한 줄씩 늘린다.
+    const base = heat.getBoundingClientRect().height;
+    for (let i = DEPT_MIN_ROWS; i < rows.length; i++) {
+      rows[i].classList.remove("is-cut");
+      if (heat.getBoundingClientRect().height > base + 0.5) {
+        rows[i].classList.add("is-cut");
+        break;
+      }
+    }
+  }
+
+  let fitResizeBound = false;
+  function bindDeptFit(root) {
+    fitDeptRows(root);
+    document.fonts?.ready.then(() => fitDeptRows(root));
+    if (fitResizeBound) return;
+    fitResizeBound = true;
+    let timer = null;
+    window.addEventListener("resize", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fitDeptRows(root), 150);
+    });
+  }
+
   async function render(el, profile) {
     if (!el) return;
     let stats;
@@ -321,7 +345,6 @@ window.HKFun = (function () {
           ${tipCard()}
         </div>
         <div class="hk-fun-col">
-          ${loggedIn && stats.me ? myRecordCard(stats.me, profile) : ""}
           ${departmentCard(stats, loggedIn)}
         </div>
       </div>`;
@@ -331,6 +354,7 @@ window.HKFun = (function () {
     HKUI.refreshIcons();
     countUp(el);
     growBars(el);
+    bindDeptFit(el);
   }
 
   /** 내 헬스키퍼 기록 카드만 (마이페이지) */
@@ -343,8 +367,8 @@ window.HKFun = (function () {
       return;
     }
     if (!stats.me) return;
-    // 계정 탭은 옆 '내 이용 현황'에 등급·안내가 있어 배지를 빼고 보여준다.
-    el.innerHTML = myRecordCard(stats.me, profile, { showBadge: false });
+    // 등급 배지·안내는 옆 '내 이용 현황'에 있어 이 카드에는 넣지 않는다.
+    el.innerHTML = myRecordCard(stats.me, profile);
     el.hidden = false;
     HKUI.bindTooltips(el);
     HKUI.refreshIcons();
