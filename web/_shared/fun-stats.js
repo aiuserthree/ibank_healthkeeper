@@ -237,8 +237,8 @@ window.HKFun = (function () {
   function tipCard() {
     const tips = todayTips();
     return `<div class="hk-card hk-card--pad hk-card--flat hk-stretch" data-stretch>
-      <div class="hk-stretch__slides">${tips.map(([title, body, art], i) => `
-        <div class="hk-stretch__slide${i === 0 ? " is-active" : ""}" data-stretch-slide${i === 0 ? "" : ' aria-hidden="true"'}>
+      <div class="hk-stretch__slides"><div class="hk-stretch__track">${tips.map(([title, body, art], i) => `
+        <div class="hk-stretch__slide" data-stretch-slide${i === 0 ? "" : ' aria-hidden="true"'}>
           <div class="hk-stretch-art"><svg viewBox="0 0 64 64" role="img" aria-label="${title} 동작 그림">${art}</svg></div>
           <div>
             <div style="font-size:12.5px;font-weight:700;color:var(--color-signal-blue);letter-spacing:0.02em">오늘의 1분 스트레칭</div>
@@ -246,7 +246,7 @@ window.HKFun = (function () {
             <div style="font-size:14.5px;color:var(--text-secondary);line-height:1.6">${body}</div>
           </div>
         </div>`).join("")}
-      </div>
+      </div></div>
       <div class="hk-stretch__dots">${tips.map(([title], i) => `<button type="button" class="hk-stretch__dot${i === 0 ? " is-active" : ""}" data-stretch-dot="${i}" aria-label="${i + 1}번째 스트레칭: ${title}"></button>`).join("")}</div>
     </div>`;
   }
@@ -254,46 +254,104 @@ window.HKFun = (function () {
   function bindStretchRoll(root) {
     const card = root.querySelector("[data-stretch]");
     if (!card) return;
+    const viewport = card.querySelector(".hk-stretch__slides");
+    const track = card.querySelector(".hk-stretch__track");
     const slides = [...card.querySelectorAll("[data-stretch-slide]")];
     const dots = [...card.querySelectorAll("[data-stretch-dot]")];
+    const n = slides.length;
+    // 끝에서 처음으로 자연스럽게 이어지도록 양 끝에 복제 카드를 둔다: [마지막 복제, 1, 2, 3, 첫 복제]
+    const offset = n > 1 ? 1 : 0;
+    if (n > 1) {
+      const head = slides[n - 1].cloneNode(true);
+      const tail = slides[0].cloneNode(true);
+      [head, tail].forEach((c) => {
+        c.removeAttribute("data-stretch-slide");
+        c.setAttribute("aria-hidden", "true");
+      });
+      track.prepend(head);
+      track.append(tail);
+    }
+    let pos = offset;
     let current = 0;
     let timer = null;
-    const show = (index) => {
-      current = (index + slides.length) % slides.length;
+    const setX = (px, animate) => {
+      track.style.transition = animate && !prefersReducedMotion ? "" : "none";
+      track.style.transform = `translate3d(${px}px, 0, 0)`;
+    };
+    const place = (animate) => setX(-pos * viewport.clientWidth, animate);
+    // 복제 카드에 멈췄으면 같은 모습의 진짜 카드로 순간 이동
+    const normalize = () => {
+      if (n < 2) return;
+      if (pos <= 0) pos = n;
+      else if (pos >= n + 1) pos = 1;
+      place(false);
+    };
+    const go = (nextPos) => {
+      pos = nextPos;
+      current = (((pos - offset) % n) + n) % n;
       slides.forEach((slide, i) => {
-        slide.classList.toggle("is-active", i === current);
         if (i === current) slide.removeAttribute("aria-hidden");
         else slide.setAttribute("aria-hidden", "true");
       });
       dots.forEach((dot, i) => dot.classList.toggle("is-active", i === current));
+      place(true);
+      if (prefersReducedMotion) normalize();
     };
+    track.addEventListener("transitionend", (e) => {
+      if (e.target === track) normalize();
+    });
     const stop = () => { clearInterval(timer); timer = null; };
     const start = () => {
-      if (prefersReducedMotion || timer || slides.length < 2) return;
-      timer = setInterval(() => show(current + 1), STRETCH_ROLL_MS);
+      if (prefersReducedMotion || timer || n < 2) return;
+      timer = setInterval(() => go(pos + 1), STRETCH_ROLL_MS);
     };
-    dots.forEach((dot, i) => dot.addEventListener("click", () => { stop(); show(i); start(); }));
+    dots.forEach((dot, i) => dot.addEventListener("click", () => { stop(); go(i + offset); start(); }));
     card.addEventListener("mouseenter", stop);
     card.addEventListener("mouseleave", start);
     card.addEventListener("focusin", stop);
     card.addEventListener("focusout", start);
-    // 모바일 — 좌우로 밀어 넘기기 (세로 스크롤은 그대로)
-    let touchX = null;
-    let touchY = null;
+
+    // 모바일 — 손가락을 따라 카드가 밀리고, 충분히 밀면 넘어간다 (세로 스크롤은 그대로)
+    let startX = null;
+    let startY = 0;
+    let dx = 0;
+    let dragging = null;
+    let baseX = 0;
     card.addEventListener("touchstart", (e) => {
-      touchX = e.touches[0].clientX;
-      touchY = e.touches[0].clientY;
+      if (n < 2) return;
       stop();
+      normalize();
+      startX = e.touches[0].clientX;
+      startY = e.touches[0].clientY;
+      dx = 0;
+      dragging = null;
+      baseX = -pos * viewport.clientWidth;
     }, { passive: true });
-    card.addEventListener("touchend", (e) => {
-      if (touchX == null) return;
-      const dx = e.changedTouches[0].clientX - touchX;
-      const dy = e.changedTouches[0].clientY - touchY;
-      touchX = null;
-      if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) show(current + (dx < 0 ? 1 : -1));
+    card.addEventListener("touchmove", (e) => {
+      if (startX == null) return;
+      dx = e.touches[0].clientX - startX;
+      const dy = e.touches[0].clientY - startY;
+      if (dragging == null && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) dragging = Math.abs(dx) > Math.abs(dy);
+      if (dragging) setX(baseX + dx, false);
+    }, { passive: true });
+    const endTouch = () => {
+      if (startX == null) return;
+      startX = null;
+      if (dragging) {
+        const threshold = Math.min(60, viewport.clientWidth * 0.2);
+        if (dx < -threshold) go(pos + 1);
+        else if (dx > threshold) go(pos - 1);
+        else place(true);
+      }
+      dragging = null;
       start();
-    }, { passive: true });
-    card.addEventListener("touchcancel", () => { touchX = null; start(); }, { passive: true });
+    };
+    card.addEventListener("touchend", endTouch, { passive: true });
+    card.addEventListener("touchcancel", endTouch, { passive: true });
+    // 화면 폭이 바뀌면 위치를 다시 맞춘다 (모바일 주소창이 접힐 때 등, 끄는 중에는 건드리지 않음)
+    window.addEventListener("resize", () => { if (startX == null) place(false); });
+
+    place(false);
     start();
   }
 
