@@ -23,6 +23,8 @@ from app.models import (
 
 CACHE_TTL_SECONDS = 60
 DEPARTMENT_RANKING_SIZE = 20  # PC는 화면 높이에 맞는 만큼만 보여준다 (모바일 8위까지)
+# 부서 대항전에서 뺄 부서 (회사명이 부서로 들어간 경영진 계정 등)
+DEPARTMENT_RANKING_EXCLUDED = frozenset({"(주)아이뱅크"})
 _WEEKDAY_KO = ("월", "화", "수", "목", "금", "토", "일")
 
 
@@ -246,11 +248,13 @@ def _departments(snap: _Snapshot, usages: list[_Usage], me_key: str) -> dict:
     uses: Counter[str] = Counter()
     for u in usages:
         dept = snap.departments_by_key.get(u.key)
-        if not dept:
+        if not dept or dept in DEPARTMENT_RANKING_EXCLUDED:
             continue
         uses[dept] += 1
 
     my_dept = snap.departments_by_key.get(me_key) or None
+    if my_dept in DEPARTMENT_RANKING_EXCLUDED:
+        my_dept = None
     ordered = sorted(uses, key=lambda d: (-uses[d], d))
     rows: list[dict] = []
     prev_count = None
