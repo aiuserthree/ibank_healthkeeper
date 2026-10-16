@@ -178,13 +178,7 @@ window.HKFun = (function () {
   }
 
   function badgeGuide(total) {
-    const current = milestones.filter(([n]) => total >= n).pop();
-    return `<b>배지 안내</b> — 누적 이용 횟수에 따라 배지가 올라가요.
-      <ul class="hk-badge-guide">${milestones.map((m) => `
-        <li class="${total >= m[0] ? "is-reached" : ""}${m === current ? " is-current" : ""}">
-          <span><i class="hk-badge-guide__icon" style="color:${m[3]};background:${m[4]}">${HKUI.icon(m[2], 14, "currentColor")}</i> <span>${m[1]}${m === current ? " · 현재" : ""}${HKUI.USAGE_BADGE_BENEFITS[m[0]] ? `<small class="hk-badge-guide__benefit">${HKUI.USAGE_BADGE_BENEFITS[m[0]]}</small>` : ""}</span></span>
-          <span>${m[0]}회 이상</span>
-        </li>`).join("")}</ul>`;
+    return `<b>배지 안내</b> — 누적 이용 횟수에 따라 배지가 올라가요.${HKUI.badgeGuideListHtml(total)}`;
   }
 
   function couponDeadline(c) {

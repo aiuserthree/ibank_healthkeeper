@@ -487,8 +487,8 @@ window.HKUI = (function () {
     return out.join("");
   }
 
-  /** 내 등급 안내 — 등급별 기준·혜택, 현재 등급 강조 (마이페이지 툴팁) */
-  function tierGuideHtml(total) {
+  /** 배지(등급) 목록 — 새싹부터 명예의 전당까지, 현재 등급 강조 */
+  function badgeGuideListHtml(total) {
     const current = usageBadge(total);
     const rows = [USAGE_BADGE_SEEDLING].concat(USAGE_BADGES).map((b) => {
       const [min, label, iconName, fg, bg] = b;
@@ -500,7 +500,12 @@ window.HKUI = (function () {
         <span>${min ? `${min}회 이상` : "시작"}</span>
       </li>`;
     });
-    return `<b>등급 안내</b> — 누적 이용 횟수에 따라 등급이 올라가요. 명예의 전당에 오르면 매월 무적 쿠폰을 드려요.<ul class="hk-badge-guide">${rows.join("")}</ul>`;
+    return `<ul class="hk-badge-guide">${rows.join("")}</ul>`;
+  }
+
+  /** 내 등급 안내 — 등급별 기준·혜택, 현재 등급 강조 (마이페이지 툴팁) */
+  function tierGuideHtml(total) {
+    return `<b>등급 안내</b> — 누적 이용 횟수에 따라 등급이 올라가요. 명예의 전당에 오르면 매월 무적 쿠폰을 드려요.${badgeGuideListHtml(total)}`;
   }
 
   /** 지금 받고 있는 등급 혜택 요약 (없으면 빈 문자열) */
@@ -1192,6 +1197,7 @@ window.HKUI = (function () {
     usageBadge,
     usageBadgeChip,
     couponApplicantTag,
+    badgeGuideListHtml,
     tierGuideHtml,
     tierBenefitsText,
     USAGE_BADGE_BENEFITS,
