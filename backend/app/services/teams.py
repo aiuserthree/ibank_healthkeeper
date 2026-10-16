@@ -264,7 +264,7 @@ def _notice_intro_html(body: str) -> str:
     first = ""
     for block in (body or "").strip().split("\n\n"):
         block = block.strip()
-        if block and not block.startswith(("## ", "- ", ":::", "|", "> ")):
+        if block and not block.startswith(("## ", "- ", ":::", "|", "> ", "[[")):
             first = " ".join(line.strip() for line in block.split("\n"))
             break
     escaped = html.escape(first)

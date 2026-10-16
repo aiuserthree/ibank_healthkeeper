@@ -391,6 +391,7 @@ window.HKUI = (function () {
    * - "| 표 | 머리 |" 다음 줄 "|---|---|" 로 표
    * - ":::cards" / ":::flow" … ":::"  — 각 줄 "아이콘 | 제목 | 설명"
    * - ":::stamps 전체 채움" … ":::" — 도장 진행 그림 (다음 줄은 설명)
+   * - "[[아이콘 | 버튼 글자 | /경로]]" — 바로가기 버튼 (사이트 안 경로만)
    * - 인라인: **굵게**, {icon:이름}, {badge:누적횟수}, {br} 줄바꿈
    */
   function noticeBodyHtml(text) {
@@ -447,6 +448,16 @@ window.HKUI = (function () {
             <span class="hk-nb-stamps__arrow">${icon("arrow-right", 20, "currentColor")}</span>
             <span class="hk-nb-stamps__prize">${icon("ticket", 22, "currentColor")}</span></div>
             ${body.length ? `<div class="hk-nb-stamps__caption">${body.map(inline).join("<br>")}</div>` : ""}</div>`);
+        }
+        continue;
+      }
+      const action = line.match(/^\[\[(.+)\]\]$/);
+      if (action) {
+        flush();
+        const [ic, label, path] = action[1].split("|").map((x) => x.trim());
+        // 다른 사이트로 나가는 주소는 받지 않는다 ("/경로"만, "//" 제외)
+        if (label && /^\/(?!\/)[A-Za-z0-9/_?=&#-]*$/.test(path || "")) {
+          out.push(`<div class="hk-nb-action"><a href="${escapeHtml(path)}"><button type="button" class="hk-btn hk-btn--primary">${icon(safeIcon(ic), 18, "currentColor")} ${inline(label)} ${icon("arrow-right", 18, "currentColor")}</button></a></div>`);
         }
         continue;
       }
