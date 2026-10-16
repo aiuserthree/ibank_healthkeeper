@@ -17,6 +17,7 @@ from app.models import (
     MailStatus,
     Member,
     MemberStatus,
+    Notice,
     Reservation,
     ReservationCycle,
     ReservationStatus,
@@ -237,19 +238,49 @@ def render_open_notice_body(
     week_end: date,
     site_url: str | None = None,
     notice_date: date | None = None,
+    notice: Notice | None = None,
 ) -> str:
+    import html
+
     week_label = f"{week_start.month}/{week_start.day}~{week_end.month}/{week_end.day}"
     open_label, close_label = _open_close_labels(open_at, close_at)
     url = (site_url or open_notice_site_url()).strip()
     tip_title, tip_body = stretch_tip_for(notice_date or now_kst().date())
+    notice_html = ""
+    if notice is not None:
+        notice_url = notice_page_url(notice.id)
+        notice_html = (
+            f"<p>&nbsp;</p>"
+            f"<p><strong>📢 새 공지 · {html.escape(notice.title)}</strong><br>"
+            f"{_notice_intro_html(notice.body)}<br>"
+            f'<a href="{notice_url}">{notice_url}</a></p>'
+        )
     return (
         f"<p><strong>[헬스키퍼]</strong> 차주 안마 예약 신청 안내</p>"
         f"<p>{name}님, {week_label} 주간 예약 신청이 {open_label}에 시작됩니다.</p>"
         f"<p>마감: {close_label}</p>"
         f'<p><a href="{url}">{url}</a></p>'
+        f"{notice_html}"
         f"<p>&nbsp;</p>"
         f"<p><strong>오늘의 1분 스트레칭 · {tip_title}</strong><br>{tip_body}</p>"
     )
+
+
+OPEN_NOTICE_RECENT_NOTICE_DAYS = 7
+
+
+async def recent_pinned_notice(db: AsyncSession, send_date: date) -> Notice | None:
+    """오픈 안내에 한 번 덧붙일 공지 — 발송일 기준 7일 안에 올라온 고정 공지 (가장 최근 것)."""
+    since = datetime.combine(send_date - timedelta(days=OPEN_NOTICE_RECENT_NOTICE_DAYS), time.min, tzinfo=KST)
+    result = await db.execute(
+        select(Notice)
+        .where(Notice.published.is_(True))
+        .where(Notice.pinned.is_(True))
+        .where(Notice.published_at >= since)
+        .order_by(Notice.published_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
 
 
 def notice_page_url(notice_id: int) -> str:
@@ -763,6 +794,7 @@ async def enqueue_open_notice_broadcast(
     skipped = 0
     site_url = open_notice_site_url()
     send_date = notice_date or now_kst().date()
+    notice = await recent_pinned_notice(db, send_date)
     for member in members:
         body = render_open_notice_body(
             name=member.name,
@@ -772,6 +804,7 @@ async def enqueue_open_notice_broadcast(
             week_end=cycle.target_week_end,
             site_url=site_url,
             notice_date=send_date,
+            notice=notice,
         )
         msg = await enqueue_teams_message(
             db,
