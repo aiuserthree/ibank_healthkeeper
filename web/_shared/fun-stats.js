@@ -113,7 +113,7 @@ window.HKFun = (function () {
     const max = Math.max(...values);
     const level = (v) => (max === min ? 2 : Math.min(4, Math.floor(((v - min) / (max - min)) * 5)));
     const esc = HKUI.escapeHtml;
-    return `<div class="hk-card hk-card--pad">${head}
+    return `<div class="hk-card hk-card--pad hk-heat-card">${head}
       <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px">색이 옅을수록 신청이 덜 몰려 확정될 가능성이 높아요</p>
       <table class="hk-heat">
         <thead><tr><th></th>${heat.days.map((day) => `<th scope="col">${esc(day)}</th>`).join("")}</tr></thead>
@@ -333,5 +333,23 @@ window.HKFun = (function () {
     growBars(el);
   }
 
-  return { render };
+  /** 내 헬스키퍼 기록 카드만 (마이페이지) */
+  async function renderMyRecord(el, profile) {
+    if (!el || !profile) return;
+    let stats;
+    try {
+      stats = await HKApi.funStats();
+    } catch (_) {
+      return;
+    }
+    if (!stats.me) return;
+    el.innerHTML = myRecordCard(stats.me, profile);
+    el.hidden = false;
+    HKUI.bindTooltips(el);
+    HKUI.refreshIcons();
+    countUp(el);
+    growBars(el);
+  }
+
+  return { render, renderMyRecord };
 })();

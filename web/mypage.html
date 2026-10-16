@@ -35,49 +35,12 @@
           <h1 style="font-size:34px;margin-bottom:4px">마이페이지</h1>
           <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">${HKUI.escapeHtml(profile.name)}님의 예약 신청 내역입니다.</p>
           ${HKUI.subNav("res")}
-          <div class="hk-card hk-card--pad hk-card--flat" style="margin-bottom:20px;background:var(--color-mist)" id="stats"></div>
           <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b> 확정 후 <b>수 17:00 이후</b> 다른 확정 회원과 <b>슬롯 교환</b>을 제안하거나, 예약이 필요 없으면 <b>양도</b>할 수 있습니다. 양도는 <b>1인당 한 달에 1회</b>까지 가능하고, <b>무적 쿠폰</b>으로 확정된 예약은 양도·교환할 수 없어요. 양도로 받은 예약이 있으면 같은 주 <b>재신청은 불가</b>합니다.")}</div>
           <div id="swap-inbox" style="display:none;margin-bottom:20px"></div>
           <div id="list"></div>
           <div id="pager"></div>`;
       },
       afterMount: async (profile) => {
-        function couponKv(c) {
-          if (!c) return "";
-          const soonest = (c.coupons || [])
-            .filter((x) => x.status === "AVAILABLE" && x.expiresAt)
-            .map((x) => new Date(new Date(x.expiresAt).getTime() - 1))
-            .sort((a, b) => a - b)[0];
-          const note = [
-            `탈락 ${c.dropProgress}/${c.dropPerCoupon}`,
-            c.reserved ? `신청에 사용 중 ${c.reserved}장` : "",
-            soonest ? `${soonest.getMonth() + 1}/${soonest.getDate()}까지 사용` : "",
-          ].filter(Boolean).join(" · ");
-          return HKUI.kvTooltip(
-            "무적 쿠폰",
-            `${c.available}장 <span style="font-size:12.5px;font-weight:500;color:var(--text-muted)">${HKUI.escapeHtml(note)}</span>`,
-            HKUI.COUPON_TOOLTIP_HTML
-          );
-        }
-        const statsEl = document.getElementById("stats");
-        const lastUsed = profile.lastUsedDate ? profile.lastUsedDate.replace(/-/g, ".") : "-";
-        const applyTotal = profile.applyTotal != null ? profile.applyTotal : profile.totalUses;
-        const total = profile.totalUses || 0;
-        const nextTier = HKUI.USAGE_BADGES.find(([n]) => total < n);
-        statsEl.innerHTML = `<div style="display:flex;gap:48px;flex-wrap:wrap">
-          ${HKUI.kvTooltip(
-            "내 등급",
-            `${HKUI.usageBadgeChip(total)} <span style="display:block;margin-top:6px;font-size:12.5px;font-weight:500;color:var(--text-muted)">${HKUI.escapeHtml([HKUI.tierBenefitsText(total), nextTier ? `${nextTier[1]}까지 ${nextTier[0] - total}회` : ""].filter(Boolean).join(" · "))}</span>`,
-            HKUI.tierGuideHtml(total)
-          )}
-          ${HKUI.kv("마지막 이용일", lastUsed)}
-          ${HKUI.kvTooltip("우선권", HKUI.badge(profile.lastUsedDate ? "이용 이력 있음" : "이력 없음 · 최우선", "info"), HKUI.PRIORITY_TOOLTIP_HTML)}
-          <div id="total-count">${HKUI.kvTooltip("누적 신청", applyTotal != null ? `${applyTotal}건` : "…", HKUI.APPLY_TOTAL_TOOLTIP_HTML)}</div>
-          ${couponKv(profile.coupons)}
-        </div>`;
-        HKUI.bindTooltips(statsEl);
-        HKUI.refreshIcons();
-
         const inboxEl = document.getElementById("swap-inbox");
         const listEl = document.getElementById("list");
         const pagerEl = document.getElementById("pager");
@@ -486,15 +449,6 @@
               total: data.total ?? 0,
               totalPages: data.totalPages ?? 0,
             };
-            const totalCountEl = document.getElementById("total-count");
-            if (totalCountEl) {
-              totalCountEl.innerHTML = HKUI.kvTooltip(
-                "누적 신청",
-                `${data.activeTotal ?? listMeta.total}건`,
-                HKUI.APPLY_TOTAL_TOOLTIP_HTML
-              );
-            }
-            HKUI.bindTooltips(statsEl);
 
             if (!listMeta.total) {
               listEl.innerHTML = `<div class="hk-card hk-card--pad">${HKUI.emptyState({

@@ -9,9 +9,10 @@
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
-  <script src="/_shared/ui.js?v=20260619"></script>
-  <script src="/_shared/api.js?v=20260619"></script>
-  <script src="/_shared/member-shell.js?v=20260619"></script>
+  <script src="/_shared/ui.js?v=20261016"></script>
+  <script src="/_shared/api.js?v=20261016"></script>
+  <script src="/_shared/member-shell.js?v=20261016"></script>
+  <script src="/_shared/fun-stats.js?v=20261016"></script>
 </head>
 <body>
   <div id="app"></div>
@@ -76,8 +77,11 @@
           <h1 style="font-size:34px;margin-bottom:4px">마이페이지</h1>
           <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">회원 정보를 확인하세요.</p>
           ${HKUI.subNav("profile")}
-          <div class="hk-card hk-card--pad" id="profile-card"></div>
-          <div class="hk-card hk-card--pad hk-card--flat" style="margin-top:16px;background:var(--color-mist)" id="usage-card"></div>`;
+          <div class="hk-mypage-top" id="mypage-top">
+            <div id="my-record" hidden></div>
+            <div class="hk-card hk-card--pad hk-sum" id="usage-card"></div>
+          </div>
+          <div class="hk-card hk-card--pad" id="profile-card"></div>`;
       },
       afterMount: async (profile) => {
         const pos = profile.position || profile.jobTitle || "";
@@ -101,22 +105,55 @@
             ${HKUI.readField("부서", dept)}
             ${HKUI.readField("직급", pos || "-")}
           </div>`;
-        document.getElementById("usage-card").innerHTML = `<div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap">
-          <div style="display:flex;gap:48px;flex-wrap:wrap;align-items:flex-end;flex:1;min-width:0">
-            ${HKUI.kv("최근 로그인", profile.lastLoginAt ? HKUI.formatDateTimeKst(profile.lastLoginAt) : "-")}
-            ${HKUI.kv("마지막 이용일", profile.lastUsedDate ? profile.lastUsedDate.replace(/-/g, ".") : "-")}
-            ${HKUI.kvTooltip(
-              "누적 이용",
-              profile.totalUses != null ? `${profile.totalUses}회` : "-",
-              HKUI.USAGE_TOTAL_TOOLTIP_HTML
-            )}
+        // 항목 이름 + 물음표 안내 (data-tooltip-root 하나에 안내 하나)
+        function tipLabel(label, tooltipHtml) {
+          const panelId = `hk-tt-${Math.random().toString(36).slice(2, 9)}`;
+          return `<span class="hk-sum__label">${HKUI.escapeHtml(label)}<button type="button" class="hk-tooltip-btn" aria-expanded="false" aria-controls="${panelId}" aria-label="${HKUI.escapeHtml(label)} 안내">${HKUI.icon("circle-help", 14, "currentColor")}</button></span>
+            <div id="${panelId}" class="hk-tooltip-panel" role="tooltip" hidden>${tooltipHtml}</div>`;
+        }
+        function dateLabel(iso) {
+          if (!iso) return "-";
+          const [y, m, d] = iso.split("-").map(Number);
+          return y === new Date().getFullYear() ? `${m}월 ${d}일` : `${y}.${m}.${d}`;
+        }
+        const total = profile.totalUses || 0;
+        const applyTotal = profile.applyTotal != null ? profile.applyTotal : profile.totalUses;
+        const nextTier = HKUI.USAGE_BADGES.find(([n]) => total < n);
+        const tierNote = [HKUI.tierBenefitsText(total), nextTier ? `${nextTier[1]}까지 ${nextTier[0] - total}회` : ""].filter(Boolean).join(" · ");
+        const tile = (iconName, valueHtml, label, tooltipHtml) => `<div class="hk-sum__tile"${tooltipHtml ? " data-tooltip-root" : ""}>
+            <div class="hk-sum__tile-value">${HKUI.icon(iconName, 16, "var(--color-signal-blue)")}<span>${valueHtml}</span></div>
+            ${tooltipHtml ? tipLabel(label, tooltipHtml) : `<span class="hk-sum__label">${label}</span>`}
+          </div>`;
+        const row = (label, tooltipHtml, valueHtml, noteText) => `<div class="hk-sum__row" data-tooltip-root>
+            ${tipLabel(label, tooltipHtml)}
+            <div class="hk-sum__value">${valueHtml}${noteText ? `<small>${HKUI.escapeHtml(noteText)}</small>` : ""}</div>
+          </div>`;
+        document.getElementById("usage-card").innerHTML = `
+          <div class="hk-sum__head">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="hk-fun-stat__icon" style="margin:0;background:var(--color-signal-blue-soft)">${HKUI.icon("clipboard-list", 19, "var(--color-signal-blue)")}</div>
+              <b style="font-size:17px;color:var(--color-midnight-navy);white-space:nowrap">내 이용 현황</b>
+            </div>
+            ${hasUsageHistory ? `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" id="usage-history-btn">이용 내역 보기</button>` : ""}
           </div>
-          ${hasUsageHistory ? `<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" id="usage-history-btn" style="flex-shrink:0;margin-left:auto">이용 내역 보기</button>` : ""}
-        </div>`;
+          <div class="hk-sum__tiles">
+            ${tile("hand-heart", `${total}<small>회</small>`, "누적 이용", HKUI.USAGE_TOTAL_TOOLTIP_HTML)}
+            ${tile("file-check", `${applyTotal ?? 0}<small>건</small>`, "누적 신청", HKUI.APPLY_TOTAL_TOOLTIP_HTML)}
+            ${tile("calendar-check", dateLabel(profile.lastUsedDate), "마지막 이용일")}
+          </div>
+          <div class="hk-sum__rows">
+            ${row("내 등급", HKUI.tierGuideHtml(total), HKUI.usageBadgeChip(total), tierNote)}
+            ${row("우선권", HKUI.PRIORITY_TOOLTIP_HTML, HKUI.badge(profile.lastUsedDate ? "이용 이력 있음" : "이력 없음 · 최우선", "info"))}
+          </div>
+          <div class="hk-sum__foot">${HKUI.icon("log-in", 14, "currentColor")} 최근 로그인 ${profile.lastLoginAt ? HKUI.formatDateTimeKst(profile.lastLoginAt) : "-"}</div>`;
         HKUI.bindTooltips(document.getElementById("usage-card"));
         HKUI.refreshIcons();
         const historyBtn = document.getElementById("usage-history-btn");
         if (historyBtn) historyBtn.onclick = () => openUsageHistoryModal(1);
+        HKFun.renderMyRecord(document.getElementById("my-record"), profile).then(() => {
+          // 기록 카드가 있을 때만 PC에서 요약과 2단으로 놓는다.
+          if (!document.getElementById("my-record").hidden) document.getElementById("mypage-top").classList.add("is-split");
+        });
       },
     });
   </script>

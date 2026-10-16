@@ -633,8 +633,8 @@ window.HKUI = (function () {
   function subNav(active) {
     const R = window.HKRoutes || { mypage: "/mypage", profile: "/profile" };
     const items = [
-      ["res", "예약 내역", R.mypage],
       ["profile", "계정", R.profile],
+      ["res", "예약 내역", R.mypage],
     ];
     return `<div style="display:flex;gap:4px;border-bottom:1px solid var(--border-default);margin-bottom:28px">${items
       .map(
