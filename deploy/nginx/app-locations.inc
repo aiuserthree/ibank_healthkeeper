@@ -59,6 +59,10 @@ location = /관리자/재신청메일.html { return 301 /admin/reapply-mail; }
 location = /관리자/휴가관리.html { return 301 /admin/vacation; }
 location = /관리자/운영설정.html { return 301 /admin/settings; }
 
+# /admin 으로 들어오면 대시보드로 (로그인 안 되어 있으면 대시보드가 로그인 화면으로 보냄)
+location = /admin { return 302 /admin/dashboard; }
+location = /admin/ { return 302 /admin/dashboard; }
+
 # admin .html 확장자 없이 접근
 location = /admin/login.html { return 301 /admin/login; }
 location = /admin/dashboard.html { return 301 /admin/dashboard; }
