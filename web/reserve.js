@@ -5,6 +5,7 @@
   let systemState = "BEFORE_OPEN";
   let systemInfo = null;
   let selected = null;
+  let memberProfile = null;
   function groupSlots(slots) {
     const byDate = {};
     for (const s of slots) {
@@ -71,6 +72,19 @@
     const dow = DAY_NAMES[last.getDay()];
     const others = (calendar.couponAvailable || 0) - 1;
     return `<div style="margin-top:10px;padding:10px 12px;border-radius:8px;background:#f6f1ff;font-size:13.5px;color:var(--color-midnight-navy)">${HKUI.icon("calendar-clock", 15, "var(--color-ultraviolet)", "vertical-align:-3px;margin-right:4px")}이번에 쓰는 쿠폰은 <b>${last.getMonth() + 1}/${last.getDate()}(${dow})까지</b> 쓸 수 있어요.${others > 0 ? " 기한이 가장 빠른 쿠폰부터 써요." : ""}</div>`;
+  }
+
+  // 쿠폰끼리 겹치면 마지막 이용일로 순서가 정해지므로 본인 날짜를 함께 보여준다 (우선권과 같은 값)
+  function couponLastUsedNote() {
+    const iso = memberProfile?.lastUsedDate;
+    const box = (html) => `<div style="margin-top:8px;padding:10px 12px;border-radius:8px;background:var(--color-mist);font-size:13.5px;color:var(--color-midnight-navy)">${HKUI.icon("history", 15, "var(--color-slate-blue)", "vertical-align:-3px;margin-right:4px")}${html}</div>`;
+    if (!iso) return box("아직 이용 기록이 없어요 · 쿠폰끼리 겹쳐도 <b>가장 먼저</b> 확정돼요.");
+    const d = new Date(iso + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Math.round((today - d) / 86400000);
+    const when = days > 0 ? `${days}일 전` : days === 0 ? "오늘" : "이용 예정";
+    return box(`내 마지막 이용일: <b>${d.getMonth() + 1}/${d.getDate()}(${DAY_NAMES[d.getDay()]})</b> · ${when}`);
   }
 
   function canUseCoupon(s) {
@@ -269,7 +283,7 @@
         const latestCalendar = HKApi.calendar().catch(() => null);
         useCoupon = await HKUI.confirmDialog(
           "무적 쿠폰을 사용할까요?",
-          `${calendar.couponAvailable > 1 ? `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을` : "보유한 무적 쿠폰 <b>1장</b>을"} 사용하면 이 시간대는 <b>일반 신청보다 먼저</b> 확정돼요. 쿠폰을 쓴 사람끼리 겹치면 <b>마지막 이용일이 오래된 분</b>이 확정되고, 지면 쿠폰은 돌아와요.${couponExpiryNote()}<br><span style="font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</span>`,
+          `${calendar.couponAvailable > 1 ? `보유한 무적 쿠폰 <b>${calendar.couponAvailable}장</b> 중 1장을` : "보유한 무적 쿠폰 <b>1장</b>을"} 사용하면 이 시간대는 <b>일반 신청보다 먼저</b> 확정돼요. 쿠폰을 쓴 사람끼리 겹치면 <b>마지막 이용일이 오래된 분</b>이 확정되고, 지면 쿠폰은 돌아와요.${couponExpiryNote()}${couponLastUsedNote()}<div style="margin-top:10px;font-size:13px;color:var(--text-muted)">쿠폰으로 확정된 예약은 양도·교환할 수 없어요.</div>`,
           { confirmLabel: "쿠폰 사용", cancelLabel: "사용 안 함" }
         );
         // 이 시간대에 이미 쿠폰으로 신청한 사람이 있으면 한 번 더 확인 (최신 신청 현황 기준)
@@ -333,7 +347,8 @@
   }
 
   window.HKReservePage = {
-    async init() {
+    async init(profile) {
+      memberProfile = profile || null;
       const bannerEl = document.getElementById("state-banner");
       const gridEl = document.getElementById("calendar-grid");
       const summaryEl = document.getElementById("summary");
