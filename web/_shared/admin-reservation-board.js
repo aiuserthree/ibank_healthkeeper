@@ -56,7 +56,9 @@ window.HKReservationBoard = (function () {
       };
     }
 
-    function typeBadge(type) {
+    function typeBadge(a) {
+      const type = a.type;
+      if (a.used_coupon) return `<span class="hk-badge" style="color:var(--color-ultraviolet);background:#efe8ff">무적 쿠폰</span>`;
       if (type === "REAPPLY") return HKUI.badge("재신청", "info");
       if (type === "TRANSFER") return HKUI.badge("양도", "info");
       if (type === "ADMIN_ASSIGN") return HKUI.badge("관리자 지정", "warning");
@@ -167,10 +169,10 @@ window.HKReservationBoard = (function () {
       const dept = a.department || a.dept || "";
       return `<div style="display:grid;grid-template-columns:${GRID};gap:12px;min-width:660px;padding:12px 8px;align-items:center;border-bottom:1px solid var(--color-mist)">
         <div style="font-size:13px;font-weight:700;color:${isTop ? "var(--color-signal-blue)" : "var(--text-muted)"}">${rank + 1}</div>
-        <div style="display:flex;align-items:center;gap:10px;min-width:0">${HKUI.avatar(a.member_name, "sm", a.avatarUrl || "")}<div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}${HKUI.couponApplicantTag(a)}${pos ? ` <span style="font-size:12px;font-weight:600;color:var(--color-slate-blue)">${HKUI.escapeHtml(pos)}</span>` : ""}</div><div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(dept ? `${dept} · ${a.member_email || ""}` : a.member_email || "")}</div></div></div>
+        <div style="display:flex;align-items:center;gap:10px;min-width:0">${HKUI.avatar(a.member_name, "sm", a.avatarUrl || "")}<div style="min-width:0"><div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}${pos ? ` <span style="font-size:12px;font-weight:600;color:var(--color-slate-blue)">${HKUI.escapeHtml(pos)}</span>` : ""}</div><div style="font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${HKUI.escapeHtml(dept ? `${dept} · ${a.member_email || ""}` : a.member_email || "")}</div></div></div>
         <div style="font-size:14px;color:var(--text-secondary);font-variant-numeric:tabular-nums">${a.applied_at ? HKUI.formatTimeKst(a.applied_at) : "-"}</div>
         <div style="font-size:13px;color:${noHist ? "var(--color-warning)" : "var(--text-secondary)"};font-weight:${noHist ? 700 : 400}">${noHist ? "이력 없음" : a.last_used_date ? HKUI.formatDate(a.last_used_date) : "-"}</div>
-        <div>${typeBadge(a.type)}</div>
+        <div>${typeBadge(a)}</div>
         <div>${a.priority_rank === 1 || isTop ? HKUI.badge("O", "info") : HKUI.badge("X", "neutral")}</div>
         <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">${HKUI.statusBadge(a.status)}${adminCancelConfirmedBtn(a, slot)}</div>
       </div>`;

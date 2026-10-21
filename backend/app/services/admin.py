@@ -444,6 +444,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
                 "last_used_date": member.last_used_date.isoformat() if member.last_used_date else None,
                 "no_history": member.last_used_date is None,
                 "type": reservation.type.value,
+                "used_coupon": reservation.coupon_id is not None,
                 "status": reservation.status.value,
                 "applied_at": format_kst_iso(reservation.applied_at),
                 "priority_rank": rank_info.get("priority_rank"),
