@@ -56,9 +56,21 @@
         const dates = Object.keys(byDate).sort();
         const firstMonth = monthKey(dates[0]);
         const lastMonth = monthKey(dates[dates.length - 1]);
-        // 평균 이용 간격 — 첫 이용부터 마지막 이용까지
-        const spanDays = Math.round((new Date(dates[dates.length - 1]) - new Date(dates[0])) / 86400000);
-        const avgGap = dates.length > 1 ? Math.round(spanDays / (dates.length - 1)) : null;
+        // 주로 받은 요일·시간 — 두 번 이상 나온 것만, 같으면 최근 것
+        const topOf = (keyOf) => {
+          const tally = {};
+          items.forEach((r) => {
+            const k = keyOf(r);
+            const t = (tally[k] ||= { count: 0, last: "" });
+            t.count += 1;
+            if (r.usageDate > t.last) t.last = r.usageDate;
+          });
+          const [key, t] = Object.entries(tally).sort((a, b) => b[1].count - a[1].count || b[1].last.localeCompare(a[1].last))[0];
+          return t.count >= 2 ? key : null;
+        };
+        const usualDay = topOf((r) => DOW[new Date(r.usageDate + "T12:00:00").getDay()]);
+        const usualTime = topOf((r) => r.startTime);
+        const usual = [usualDay && `${usualDay}요일`, usualTime].filter(Boolean).join(" · ");
         const monthCount = {};
         items.forEach((r) => { const k = monthKey(r.usageDate); monthCount[k] = (monthCount[k] || 0) + 1; });
         const usedMonths = Object.keys(monthCount).sort();
@@ -115,7 +127,7 @@
               <div class="hk-ucal__summary">
                 <span>이 달 <b>${monthItems.length}회</b></span>
                 <span>전체 <b>${items.length}회</b></span>
-                ${avgGap ? `<span>평균 <b>${avgGap}일</b>마다</span>` : ""}
+                ${usual ? `<span>주로 <b>${HKUI.escapeHtml(usual)}</b></span>` : ""}
               </div>
             </div>`;
           bodyEl.querySelectorAll("[data-nav]").forEach((b) => {
