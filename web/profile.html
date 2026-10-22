@@ -17,7 +17,6 @@
 <body>
   <div id="app"></div>
   <script>
-    const USAGE_HISTORY_PAGE_SIZE = 10;
 
     function fetchUsageHistory(page, pageSize) {
       if (typeof HKApi.myUsageHistory === "function") return HKApi.myUsageHistory(page, pageSize);
@@ -25,47 +24,107 @@
       return HKApi.get(`/me/usage-history?page=${page}&pageSize=${pageSize}`);
     }
 
-    function openUsageHistoryModal(initialPage = 1) {
-      HKUI.layerModal("과거 이용 내역", async (bodyEl, footerEl) => {
-        let page = initialPage;
-        let meta = { page: initialPage, pageSize: USAGE_HISTORY_PAGE_SIZE, total: 0, totalPages: 0 };
+    // 이용 내역은 전부 받아 달력으로 보여준다 (API는 한 번에 50건까지)
+    async function fetchAllUsageHistory() {
+      const items = [];
+      for (let page = 1; page <= 20; page++) {
+        const data = await fetchUsageHistory(page, 50);
+        items.push(...(data.items || []));
+        if (page >= (data.totalPages || 0)) break;
+      }
+      return items;
+    }
 
-        async function load(pageNum) {
-          page = pageNum;
-          bodyEl.innerHTML = `<div style="text-align:center;padding:32px"><span class="hk-spin"></span></div>`;
-          footerEl.innerHTML = "";
-          try {
-            const data = await fetchUsageHistory(pageNum, USAGE_HISTORY_PAGE_SIZE);
-            meta = {
-              page: data.page || pageNum,
-              pageSize: data.pageSize || USAGE_HISTORY_PAGE_SIZE,
-              total: data.total ?? 0,
-              totalPages: data.totalPages ?? 0,
-            };
-            const items = data.items || [];
-            if (!meta.total) {
-              bodyEl.innerHTML = `<div class="hk-empty" style="padding:24px 8px;text-align:center;color:var(--text-secondary)">이용 내역이 없습니다.</div>`;
-              return;
-            }
-            if (!items.length) {
-              if (meta.totalPages > 0 && pageNum > meta.totalPages) {
-                return load(meta.totalPages);
-              }
-              bodyEl.innerHTML = `<div class="hk-empty" style="padding:24px 8px;text-align:center;color:var(--text-secondary)">표시할 내역이 없습니다.</div>`;
-              return;
-            }
-            bodyEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:10px">${items.map((r) => HKUI.legacyUsageCard(r)).join("")}</div>`;
-            footerEl.innerHTML = HKUI.paginationBar(meta);
-            HKUI.bindPagination(footerEl, meta, load);
-            bodyEl.scrollTop = 0;
-            HKUI.refreshIcons();
-          } catch (e) {
-            bodyEl.innerHTML = `<div class="hk-empty" style="padding:24px 8px;text-align:center">${HKUI.escapeHtml(e.message)}</div>`;
-          }
+    function openUsageHistoryModal() {
+      HKUI.layerModal("과거 이용 내역", async (bodyEl) => {
+        bodyEl.innerHTML = `<div style="text-align:center;padding:32px"><span class="hk-spin"></span></div>`;
+        let items;
+        try {
+          items = await fetchAllUsageHistory();
+        } catch (e) {
+          bodyEl.innerHTML = `<div class="hk-empty" style="padding:24px 8px;text-align:center">${HKUI.escapeHtml(e.message)}</div>`;
+          return;
         }
+        if (!items.length) {
+          bodyEl.innerHTML = `<div class="hk-empty" style="padding:24px 8px;text-align:center;color:var(--text-secondary)">이용 내역이 없습니다.</div>`;
+          return;
+        }
+        const DOW = ["일", "월", "화", "수", "목", "금", "토"];
+        const monthKey = (iso) => iso.slice(0, 7);
+        const byDate = {};
+        items.forEach((r) => (byDate[r.usageDate] ||= []).push(r));
+        const dates = Object.keys(byDate).sort();
+        const firstMonth = monthKey(dates[0]);
+        const lastMonth = monthKey(dates[dates.length - 1]);
+        // 평균 이용 간격 — 첫 이용부터 마지막 이용까지
+        const spanDays = Math.round((new Date(dates[dates.length - 1]) - new Date(dates[0])) / 86400000);
+        const avgGap = dates.length > 1 ? Math.round(spanDays / (dates.length - 1)) : null;
+        const monthCount = {};
+        items.forEach((r) => { const k = monthKey(r.usageDate); monthCount[k] = (monthCount[k] || 0) + 1; });
+        const usedMonths = Object.keys(monthCount).sort();
+        let ym = lastMonth;
+        let picked = null;
 
-        await load(initialPage);
-      }, { fixedHeight: true });
+        const shiftMonth = (key, n) => {
+          const [y, m] = key.split("-").map(Number);
+          const d = new Date(y, m - 1 + n, 1);
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        };
+
+        function render() {
+          const [y, m] = ym.split("-").map(Number);
+          const first = new Date(y, m - 1, 1);
+          const daysIn = new Date(y, m, 0).getDate();
+          const todayIso = new Date().toLocaleDateString("sv-SE");
+          const monthItems = items.filter((r) => monthKey(r.usageDate) === ym).sort((a, b) => (a.usageDate + a.startTime).localeCompare(b.usageDate + b.startTime));
+          if (!picked && monthItems.length) picked = monthItems[monthItems.length - 1].usageDate;
+          const pickedItems = picked ? byDate[picked] || [] : [];
+          const pd = picked ? new Date(picked + "T12:00:00") : null;
+          const cells = [];
+          for (let k = 0; k < first.getDay(); k++) cells.push(`<span class="hk-ucal__cell is-blank"></span>`);
+          for (let d = 1; d <= daysIn; d++) {
+            const iso = `${ym}-${String(d).padStart(2, "0")}`;
+            const used = byDate[iso];
+            const dow = (first.getDay() + d - 1) % 7;
+            const cls = ["hk-ucal__cell", used ? "is-used" : "", iso === todayIso ? "is-today" : "", iso === picked ? "is-picked" : "", dow === 0 ? "is-sun" : dow === 6 ? "is-sat" : ""].filter(Boolean).join(" ");
+            cells.push(used
+              ? `<button type="button" class="${cls}" data-date="${iso}" aria-label="${m}월 ${d}일 ${used[0].startTime} 이용"><span class="hk-ucal__num">${d}</span></button>`
+              : `<span class="${cls}"><span class="hk-ucal__num">${d}</span></span>`);
+          }
+          bodyEl.innerHTML = `
+            <div class="hk-ucal">
+              <div class="hk-ucal__head">
+                <button type="button" class="hk-ucal__nav" data-nav="-1" aria-label="이전 달" ${ym <= firstMonth ? "disabled" : ""}>${HKUI.icon("chevron-left", 18, "currentColor")}</button>
+                <b>${y}년 ${m}월</b>
+                <button type="button" class="hk-ucal__nav" data-nav="1" aria-label="다음 달" ${ym >= lastMonth ? "disabled" : ""}>${HKUI.icon("chevron-right", 18, "currentColor")}</button>
+              </div>
+              <div class="hk-ucal__grid">${DOW.map((w, k) => `<span class="hk-ucal__dow${k === 0 ? " is-sun" : k === 6 ? " is-sat" : ""}">${w}</span>`).join("")}${cells.join("")}</div>
+              <div class="hk-ucal__detail">${pickedItems.length
+              ? `${HKUI.icon("check-circle-2", 17, "var(--color-signal-blue)")}<span><b>${pd.getMonth() + 1}월 ${pd.getDate()}일(${DOW[pd.getDay()]})</b> ${pickedItems.map((r) => `${HKUI.escapeHtml(r.startTime)} – ${HKUI.escapeHtml(r.endTime || r.startTime)}`).join(", ")} 이용</span>`
+              : `${HKUI.icon("calendar-x", 17, "var(--text-muted)")}<span style="color:var(--text-secondary)">이 달에는 이용 기록이 없어요.</span>`}</div>
+              <div class="hk-ucal__months" aria-label="이용한 달로 이동">${usedMonths.map((k) => {
+                const [yy, mm] = k.split("-").map(Number);
+                return `<button type="button" class="hk-ucal__month${k === ym ? " is-active" : ""}" data-month="${k}">${yy !== y || usedMonths.some((o) => o.slice(0, 4) !== k.slice(0, 4)) ? `${String(yy).slice(2)}.` : ""}${mm}월 <small>${monthCount[k]}</small></button>`;
+              }).join("")}</div>
+              <div class="hk-ucal__summary">
+                <span>이 달 <b>${monthItems.length}회</b></span>
+                <span>전체 <b>${items.length}회</b></span>
+                ${avgGap ? `<span>평균 <b>${avgGap}일</b>마다</span>` : ""}
+              </div>
+            </div>`;
+          bodyEl.querySelectorAll("[data-nav]").forEach((b) => {
+            b.onclick = () => { ym = shiftMonth(ym, Number(b.dataset.nav)); picked = null; render(); };
+          });
+          bodyEl.querySelectorAll("[data-month]").forEach((b) => {
+            b.onclick = () => { ym = b.dataset.month; picked = null; render(); };
+          });
+          bodyEl.querySelectorAll("[data-date]").forEach((b) => {
+            b.onclick = () => { picked = b.dataset.date; render(); };
+          });
+          HKUI.refreshIcons();
+        }
+        render();
+      });
     }
 
     HKMember.mountPage({
@@ -149,7 +208,7 @@
         HKUI.bindTooltips(document.getElementById("usage-card"));
         HKUI.refreshIcons();
         const historyBtn = document.getElementById("usage-history-btn");
-        if (historyBtn) historyBtn.onclick = () => openUsageHistoryModal(1);
+        if (historyBtn) historyBtn.onclick = () => openUsageHistoryModal();
         HKFun.renderMyRecord(document.getElementById("my-record"), profile).then(() => {
           // 기록 카드가 있을 때만 PC에서 요약과 2단으로 놓는다.
           if (!document.getElementById("my-record").hidden) document.getElementById("mypage-top").classList.add("is-split");

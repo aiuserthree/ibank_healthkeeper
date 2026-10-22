@@ -808,27 +808,6 @@ window.HKUI = (function () {
       .join("")}</div>`;
   }
 
-  function legacyUsageCard(r) {
-    const d = new Date(r.usageDate + "T12:00:00");
-    const dow = DAY_NAMES[d.getDay()];
-    const month = d.getMonth() + 1;
-    const dayNum = d.getDate();
-    const end = r.endTime || r.startTime;
-    return `<div class="hk-card hk-card--pad" style="padding:11px 14px">
-      <div style="display:flex;align-items:center;gap:14px">
-        <div style="width:50px;min-width:50px;padding:7px 0;border-radius:10px;background:var(--color-fog);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;text-align:center">
-          <div style="font-size:10px;font-weight:600;color:var(--color-slate-blue);line-height:1">${month}월</div>
-          <div style="font-size:20px;font-weight:700;color:var(--color-midnight-navy);line-height:1.05;margin:4px 0 3px;font-variant-numeric:tabular-nums">${dayNum}</div>
-          <div style="font-size:10px;font-weight:600;color:var(--text-muted);line-height:1">${dow}</div>
-        </div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:16px;font-weight:700;color:var(--color-midnight-navy);line-height:1.3">${escapeHtml(r.startTime)} – ${escapeHtml(end)}</div>
-        </div>
-        ${badge("이용 완료", "soft")}
-      </div>
-    </div>`;
-  }
-
   function reservationCard(r, opts = {}) {
     const reapplyAvailable = !!(opts.reapplyAvailable ?? r.reapplyAvailable);
     const muted = r.status === "CANCELLED";
@@ -1236,7 +1215,6 @@ window.HKUI = (function () {
     dowToApi,
     WEEKDAY_OPTIONS,
     stepper,
-    legacyUsageCard,
     reservationCard,
     mailPreviewVars,
     applyMailPreviewVars,
