@@ -107,25 +107,6 @@
     return HKUI.alertBox("warning", `다른 신청자 ${s.requestCount}명`, "마감 시점에 <b>우선권(마지막 이용일)</b>에 따라 확정됩니다.");
   }
 
-  async function renderNoticeStrip() {
-    const el = document.getElementById("notice-strip");
-    if (!el) return;
-    try {
-      const notices = await HKApi.notices();
-      const top = (notices || []).find((n) => n.pinned) || (notices || [])[0];
-      if (!top) return;
-      el.innerHTML = `<a class="hk-notice-strip" href="${HKRoutes.notice}?id=${top.id}">
-        <span class="hk-badge hk-badge--soft" style="flex-shrink:0">공지</span>
-        <span class="hk-notice-strip__title">${HKUI.escapeHtml(top.title)}</span>
-        <span class="hk-notice-strip__more">자세히 보기 ${HKUI.icon("chevron-right", 15, "currentColor")}</span>
-      </a>`;
-      el.hidden = false;
-      HKUI.refreshIcons();
-    } catch (_) {
-      /* 공지는 부가 정보 — 실패해도 예약 화면은 그대로 */
-    }
-  }
-
   function reapplyHasSlots() {
     return calendar?.reapplyEmptySlots == null || calendar.reapplyEmptySlots > 0;
   }
@@ -366,7 +347,6 @@
         renderGrid();
         renderSummary();
         HKUI.refreshIcons();
-        renderNoticeStrip();
       } catch (e) {
         if (bannerEl) {
           bannerEl.style.display = "";

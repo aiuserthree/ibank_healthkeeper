@@ -126,6 +126,26 @@
       </div>`;
     }
 
+    // 메인 맨 위 — 가장 최근에 게시된 공지 한 줄
+    async function renderLatestNotice() {
+      const el = document.getElementById("home-notice");
+      if (!el) return;
+      try {
+        const notices = (await HKApi.notices()) || [];
+        const latest = notices.slice().sort((a, b) => String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")))[0];
+        if (!latest) return;
+        el.innerHTML = `<a class="hk-notice-strip" href="${HKRoutes.notice}?id=${latest.id}">
+          <span class="hk-badge hk-badge--soft" style="flex-shrink:0">공지</span>
+          <span class="hk-notice-strip__title">${HKUI.escapeHtml(latest.title)}</span>
+          <span class="hk-notice-strip__more">자세히 보기 ${HKUI.icon("chevron-right", 15, "currentColor")}</span>
+        </a>`;
+        el.hidden = false;
+        HKUI.refreshIcons();
+      } catch (_) {
+        /* 공지는 부가 정보 — 실패해도 메인은 그대로 */
+      }
+    }
+
     HKMember.mountPage({
       active: "home",
       auth: false,
@@ -163,6 +183,7 @@
               </div>
             </div>
           </section>
+          <div class="hk-home-notice" id="home-notice" hidden></div>
           <section style="border-top:1px solid var(--border-default);border-bottom:1px solid var(--border-default);background:var(--surface-card)">
             <div style="max-width:1200px;margin:0 auto;padding:28px 32px;display:flex;gap:64px;flex-wrap:wrap">
               ${[["주 20타임", "월~금 · 하루 4타임"], ["1명", "전담 안마사"], ["수요일 9시", "차주 예약 오픈"], ["30분", "타임당 서비스"]]
@@ -187,7 +208,10 @@
           </section>
         </main>`;
       },
-      afterMount: () => refreshHeroState(),
+      afterMount: () => {
+        refreshHeroState();
+        renderLatestNotice();
+      },
     });
   </script>
 </body>
