@@ -62,6 +62,7 @@
         const monthCount = {};
         items.forEach((r) => { const k = monthKey(r.usageDate); monthCount[k] = (monthCount[k] || 0) + 1; });
         const usedMonths = Object.keys(monthCount).sort();
+        const usedYears = [...new Set(usedMonths.map((k) => k.slice(0, 4)))];
         let ym = lastMonth;
         let picked = null;
 
@@ -73,6 +74,8 @@
 
         function render() {
           const [y, m] = ym.split("-").map(Number);
+          const prevUsedYear = [...usedYears].reverse().find((yy) => Number(yy) < y);
+          const nextUsedYear = usedYears.find((yy) => Number(yy) > y);
           const first = new Date(y, m - 1, 1);
           const daysIn = new Date(y, m, 0).getDate();
           const todayIso = new Date().toLocaleDateString("sv-SE");
@@ -102,10 +105,14 @@
               <div class="hk-ucal__detail">${pickedItems.length
               ? `${HKUI.icon("check-circle-2", 17, "var(--color-signal-blue)")}<span><b>${pd.getMonth() + 1}월 ${pd.getDate()}일(${DOW[pd.getDay()]})</b> ${pickedItems.map((r) => `${HKUI.escapeHtml(r.startTime)} – ${HKUI.escapeHtml(r.endTime || r.startTime)}`).join(", ")} 이용</span>`
               : `${HKUI.icon("calendar-x", 17, "var(--text-muted)")}<span style="color:var(--text-secondary)">이 달에는 이용 기록이 없어요.</span>`}</div>
-              <div class="hk-ucal__months" aria-label="이용한 달로 이동">${usedMonths.map((k) => {
-                const [yy, mm] = k.split("-").map(Number);
-                return `<button type="button" class="hk-ucal__month${k === ym ? " is-active" : ""}" data-month="${k}">${yy !== y || usedMonths.some((o) => o.slice(0, 4) !== k.slice(0, 4)) ? `${String(yy).slice(2)}.` : ""}${mm}월 <small>${monthCount[k]}</small></button>`;
-              }).join("")}</div>
+              <div class="hk-ucal__months" aria-label="이용한 달로 이동">
+                ${usedYears.length > 1 ? `<span class="hk-ucal__year">
+                  <button type="button" class="hk-ucal__ynav" data-year="-1" aria-label="이전 해" ${prevUsedYear ? "" : "disabled"}>${HKUI.icon("chevron-left", 14, "currentColor")}</button>
+                  <b>${y}</b>
+                  <button type="button" class="hk-ucal__ynav" data-year="1" aria-label="다음 해" ${nextUsedYear ? "" : "disabled"}>${HKUI.icon("chevron-right", 14, "currentColor")}</button>
+                </span>` : ""}
+                ${usedMonths.filter((k) => k.startsWith(`${y}-`)).map((k) => `<button type="button" class="hk-ucal__month${k === ym ? " is-active" : ""}" data-month="${k}">${Number(k.slice(5))}월 <small>${monthCount[k]}</small></button>`).join("")}
+              </div>
               <div class="hk-ucal__summary">
                 <span>이 달 <b>${monthItems.length}회</b></span>
                 <span>전체 <b>${items.length}회</b></span>
@@ -114,6 +121,16 @@
             </div>`;
           bodyEl.querySelectorAll("[data-nav]").forEach((b) => {
             b.onclick = () => { ym = shiftMonth(ym, Number(b.dataset.nav)); picked = null; render(); };
+          });
+          bodyEl.querySelectorAll("[data-year]").forEach((b) => {
+            b.onclick = () => {
+              const target = Number(b.dataset.year) > 0 ? nextUsedYear : prevUsedYear;
+              if (!target) return;
+              // 그 해에 이용한 마지막 달로 이동
+              ym = usedMonths.filter((k) => k.startsWith(`${target}-`)).pop();
+              picked = null;
+              render();
+            };
           });
           bodyEl.querySelectorAll("[data-month]").forEach((b) => {
             b.onclick = () => { ym = b.dataset.month; picked = null; render(); };
