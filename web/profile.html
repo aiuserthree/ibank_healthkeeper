@@ -56,7 +56,7 @@
         const dates = Object.keys(byDate).sort();
         const firstMonth = monthKey(dates[0]);
         const lastMonth = monthKey(dates[dates.length - 1]);
-        // 주로 받은 요일·시간 — 두 번 이상 나온 것만, 같으면 최근 것
+        // 주로 받은 요일 — 두 번 이상 나온 것만, 같으면 최근 것
         const topOf = (keyOf) => {
           const tally = {};
           items.forEach((r) => {
@@ -65,12 +65,11 @@
             t.count += 1;
             if (r.usageDate > t.last) t.last = r.usageDate;
           });
-          const [key, t] = Object.entries(tally).sort((a, b) => b[1].count - a[1].count || b[1].last.localeCompare(a[1].last))[0];
-          return t.count >= 2 ? key : null;
+          const top = Object.entries(tally).sort((a, b) => b[1].count - a[1].count || b[1].last.localeCompare(a[1].last))[0];
+          return top && top[1].count >= 2 ? top[0] : null;
         };
         const usualDay = topOf((r) => DOW[new Date(r.usageDate + "T12:00:00").getDay()]);
-        const usualTime = topOf((r) => r.startTime);
-        const usual = [usualDay && `${usualDay}요일`, usualTime].filter(Boolean).join(" · ");
+        const usual = usualDay ? `${usualDay}요일` : "";
         const monthCount = {};
         items.forEach((r) => { const k = monthKey(r.usageDate); monthCount[k] = (monthCount[k] || 0) + 1; });
         const usedMonths = Object.keys(monthCount).sort();
