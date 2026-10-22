@@ -283,6 +283,73 @@ async def recent_pinned_notice(db: AsyncSession, send_date: date) -> Notice | No
     return result.scalar_one_or_none()
 
 
+def reapply_page_url() -> str:
+    return f"{get_settings().app_base_url.rstrip('/')}/reapply"
+
+
+def render_reapply_notice_body(
+    *,
+    name: str,
+    open_at: datetime,
+    close_at: datetime,
+    empty_slot_labels: list[str],
+) -> str:
+    """목 08:55 — 빈 슬롯이 있는 주의 탈락자에게 재신청 오픈 직전 안내."""
+    import html
+
+    open_kst = to_kst(open_at)
+    close_kst = to_kst(close_at)
+    url = reapply_page_url()
+    slots = ", ".join(html.escape(label) for label in empty_slot_labels)
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 재신청 안내</p>"
+        f"<p>{html.escape(name)}님, 오늘 {open_kst.strftime('%H:%M')}부터 {close_kst.strftime('%H:%M')}까지 "
+        f"빈 슬롯에 <strong>선착순</strong>으로 재신청할 수 있어요.</p>"
+        f"<p>빈 슬롯: {slots}</p>"
+        f'<p><a href="{url}">{url}</a></p>'
+    )
+
+
+def reapply_notice_dedupe_key(cycle_id: int, member_id: int) -> str:
+    return f"teams-reapply-notice:{cycle_id}:{member_id}"
+
+
+async def enqueue_reapply_notice(db: AsyncSession, cycle: ReservationCycle) -> tuple[int, int]:
+    """빈 슬롯이 있으면 재신청 대상 탈락자(Teams 로그인 회원)에게 1:1 안내. Returns (enqueued, skipped)."""
+    from app.services.admin import _reapply_drop_member_ids, _slot_chip_label
+    from app.services.reservation import get_empty_slots
+
+    empty = await get_empty_slots(db, cycle.id)
+    if not empty:
+        return 0, 0
+    labels = [_slot_chip_label(s.slot_date, s.start_time) for s in empty]
+    enqueued = skipped = 0
+    for member_id in sorted(await _reapply_drop_member_ids(db, cycle.id)):
+        member = await db.get(Member, member_id)
+        if not member or not member.entra_oid or member.status == MemberStatus.WITHDRAWN:
+            continue
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.REAPPLY_NOTICE,
+            to_member_id=member.id,
+            to_entra_oid=member.entra_oid,
+            body=render_reapply_notice_body(
+                name=member.name,
+                open_at=cycle.reapply_open_at,
+                close_at=cycle.reapply_close_at,
+                empty_slot_labels=labels,
+            ),
+            dedupe_key=reapply_notice_dedupe_key(cycle.id, member.id),
+        )
+        if msg:
+            enqueued += 1
+        else:
+            skipped += 1
+    if enqueued:
+        await db.commit()
+    return enqueued, skipped
+
+
 def notice_page_url(notice_id: int) -> str:
     return f"{get_settings().app_base_url.rstrip('/')}/notice?id={notice_id}"
 

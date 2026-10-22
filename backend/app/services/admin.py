@@ -88,24 +88,27 @@ def _slot_label(slot: Slot) -> str:
     return f"{slot.slot_date.month}/{slot.slot_date.day}({_weekday_ko(slot.slot_date)}) {slot.start_time.strftime('%H:%M')}"
 
 
-def _reapply_deadline_label(close_at) -> str:
-    close_kst = to_kst(close_at)
-    now = now_kst()
-    delta = (close_kst.date() - now.date()).days
-    dow = _weekday_ko(close_kst.date())
+def _relative_day_time_label(at) -> str:
+    """오늘(목) 17:00 · 내일(목) 09:00 · 10/30(목) 09:00"""
+    at_kst = to_kst(at)
+    delta = (at_kst.date() - now_kst().date()).days
+    dow = _weekday_ko(at_kst.date())
     if delta == 0:
         prefix = "오늘"
     elif delta == 1:
         prefix = "내일"
     else:
-        prefix = f"{close_kst.month}/{close_kst.day}"
-    return f"{prefix}({dow}) {close_kst.strftime('%H:%M')}"
+        prefix = f"{at_kst.month}/{at_kst.day}"
+    return f"{prefix}({dow}) {at_kst.strftime('%H:%M')}"
+
+
+def _reapply_deadline_label(close_at) -> str:
+    return _relative_day_time_label(close_at)
 
 
 def _reapply_open_label(open_at) -> str:
-    open_kst = to_kst(open_at)
-    dow = _weekday_ko(open_kst.date())
-    return f"{dow}요일 {open_kst.strftime('%H:%M')}"
+    # 탈락 메일은 수 17:00 마감 직후에 나가므로 "내일(목) 09:00"으로 보인다.
+    return _relative_day_time_label(open_at)
 
 
 def _mail_send_status(status: MailStatus) -> str:

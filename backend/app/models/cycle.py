@@ -4,7 +4,7 @@ from typing import Optional
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Boolean, Date, DateTime, Index, func
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, Index, false, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base
@@ -29,6 +29,8 @@ class ReservationCycle(Base):
         default=CycleState.BEFORE_OPEN, nullable=False
     )
     batch_close_done: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # 마감 후 재신청할 빈 슬롯이 없으면 목요일 재신청을 열지 않는다
+    reapply_skipped: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false(), nullable=False)
     opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     reapply_closed_at: Mapped[Optional[datetime]] = mapped_column(

@@ -67,7 +67,7 @@ PLAIN_BODY_DEFAULTS: dict[MailType, str] = {
     MailType.DROP_REAPPLY_NOTICE: (
         "안녕하세요, {이름}님.\n"
         "신청하신 시간대는 우선권(마지막 이용일)에 따라 다른 분께 확정되어 탈락 처리되었습니다. "
-        "아래 비어있는 슬롯에 선착순으로 재신청하실 수 있어요."
+        "아래 비어있는 슬롯에 {재신청시작}부터 선착순으로 재신청하실 수 있어요."
     ),
 }
 
@@ -505,7 +505,7 @@ PREVIEW_CONTEXT: dict[MailType, dict] = {
             'background:#ffffff; border:1px solid #d4e0ed; border-radius:999px; '
             'font-size:13px; color:#0b3558;">금 6/26 · 15:30</span>'
         ),
-        "reapplyOpenAt": "목요일 09:00",
+        "reapplyOpenAt": "내일(목) 09:00",
         "reapplyDeadline": "내일(목요일) 17:00",
         "couponLineHtml": "탈락 3/5 · <b>무적 쿠폰</b>까지 2회 남았어요.",
     },

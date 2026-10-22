@@ -88,6 +88,12 @@ def _schedule_jobs() -> None:
         replace_existing=True,
     )
     scheduler.add_job(
+        _async_job("teams_reapply_notice", sched.job_teams_reapply_notice),
+        CronTrigger(day_of_week="thu", hour=8, minute=55),
+        id="j11_teams_reapply_notice",
+        replace_existing=True,
+    )
+    scheduler.add_job(
         _async_job("teams_open_notice", sched.job_teams_open_notice),
         CronTrigger(day_of_week="wed", hour=8, minute=55),
         id="j7_teams_open_notice",

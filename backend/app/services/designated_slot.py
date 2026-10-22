@@ -3,7 +3,7 @@
 회원 화면에는 노출하지 않고, 신청은 누구나 받되 확정은 관리자가
 Teams SSO 로그인 회원 중에서 지정한 인원만 처리한다.
 미신청·탈락자도 지정 가능하며, 지정 시 같은 슬롯의 다른 신청자는 탈락 처리한다.
-재신청 기간에는 회원 재신청이 불가하며, 목 09:00에 미지정 신청은 자동 탈락된다.
+재신청 기간에는 회원 재신청이 불가하며, 수 17:00 마감 때 미지정 신청은 자동 탈락된다.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ async def drop_undesignated_confirm_slot_requests(
     """미지정 월요일 15:30 신청(REQUESTED)을 탈락 처리.
 
     관리자가 이미 지정·확정한 슬롯은 건너뛴다.
-    목 09:00 재신청 오픈 전 호출해 탈락 안내 메일 대상에 포함시킨다.
+    수 17:00 마감 직후(탈락 안내 메일 발송 전) 호출해 메일 대상에 포함시킨다.
     """
     slots = await db.execute(select(Slot).where(Slot.cycle_id == cycle_id))
     now = now_kst()

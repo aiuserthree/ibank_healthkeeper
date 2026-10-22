@@ -303,7 +303,7 @@ async def coupon_summary(db: AsyncSession, member: Member, *, total_uses: int | 
 
 
 async def drop_mail_coupon_line(db: AsyncSession, member_id: int, *, can_reapply: bool) -> str:
-    """탈락 메일 한 줄 — 이번 주 탈락까지 반영한 진행도 (목 09:00 발송 기준)."""
+    """탈락 메일 한 줄 — 이번 주 탈락까지 반영한 진행도 (수 17:00 마감 직후 발송 기준)."""
     projected = len(await _drop_weeks(db, member_id, finalized_only=False))
     progress = projected % DROP_WEEKS_PER_COUPON
     if progress == 0:

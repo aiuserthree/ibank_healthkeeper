@@ -86,7 +86,8 @@ def compute_cycle_state(cycle: ReservationCycle, now: datetime | None = None) ->
     if now < to_kst(cycle.reapply_open_at):
         return CycleState.CLOSED
     if now < to_kst(cycle.reapply_close_at):
-        return CycleState.REAPPLY
+        # 빈 슬롯이 없어 재신청을 열지 않는 주는 그대로 마감
+        return CycleState.CLOSED if cycle.reapply_skipped else CycleState.REAPPLY
     return CycleState.CLOSED
 
 

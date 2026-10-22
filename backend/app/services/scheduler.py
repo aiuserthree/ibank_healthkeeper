@@ -42,6 +42,7 @@ from app.services.teams import (
     resolve_scheduled_open_notice_cycle,
 )
 from app.services.priority import needs_manual, rank_applicants
+from app.services.reservation import get_empty_slots
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +125,13 @@ async def job_close_batch(db: AsyncSession) -> None:
 
     await db.commit()
 
+    # 탈락 안내 메일도 마감 직후 함께 보낸다 (월요일 15:30 신청자 탈락 처리 포함).
+    # 빈 슬롯이 있는 주는 "내일(목) 09:00부터 재신청" 안내가 들어간다.
+    await send_reapply_notice(db, cycle.id)
+    # 재신청할 빈 슬롯이 없으면 목요일 재신청을 열지 않는다
+    cycle.reapply_skipped = not await get_empty_slots(db, cycle.id)
+    await db.commit()
+
     for mail_id in drain_pending_mails():
         await process_one_mail(db, mail_id)
 
@@ -132,10 +140,7 @@ async def job_close_batch(db: AsyncSession) -> None:
 
 
 async def job_reapply_open(db: AsyncSession) -> None:
-    """목 09:00 — 재신청 기간 오픈 + 탈락자 안내 메일 자동 발송.
-
-    send_reapply_notice 가 월요일 15:30 미지정 REQUESTED 를 먼저 탈락 처리한다.
-    """
+    """목 09:00 — 빈 슬롯이 있을 때만 재신청 기간 오픈. 탈락 안내 메일은 수 17:00 마감 때 이미 나갔다."""
     from app.services.cycle import get_active_cycle
 
     cycle = await get_active_cycle(db)
@@ -144,16 +149,13 @@ async def job_reapply_open(db: AsyncSession) -> None:
     if now_kst() < to_kst(cycle.reapply_open_at):
         return
 
-    if cycle.state != CycleState.REAPPLY:
+    # 빈 슬롯이 있을 때만 재신청을 연다 (마감 때 판단을 오픈 시점에 한 번 더 확인)
+    cycle.reapply_skipped = not await get_empty_slots(db, cycle.id)
+    if cycle.reapply_skipped:
+        cycle.state = CycleState.CLOSED
+    elif cycle.state != CycleState.REAPPLY:
         cycle.state = CycleState.REAPPLY
-        await db.flush()
-
-    await send_reapply_notice(db, cycle.id)
-    # 월요일 15:30 미지정 탈락까지 반영된 뒤 쿠폰 지급 (빈 슬롯이 없는 주)
-    await sync_all_member_coupons(db)
-
-    for mail_id in drain_pending_mails():
-        await process_one_mail(db, mail_id)
+    await db.commit()
 
 
 async def job_reapply_close(db: AsyncSession) -> None:
@@ -188,6 +190,26 @@ async def job_teams_reminder(db: AsyncSession) -> None:
     """확정 예약 시작 N분 전 Teams 1:1 채팅 알림."""
     await enqueue_due_reminders(db)
     await process_pending_teams_messages(db)
+
+
+async def job_teams_reapply_notice(db: AsyncSession) -> None:
+    """목 08:55 — 빈 슬롯이 있는 주만, 재신청 대상 탈락자에게 Teams 1:1 안내."""
+    from app.config import get_settings
+    from app.services.cycle import get_active_cycle
+    from app.services.teams import enqueue_reapply_notice
+
+    if not get_settings().teams_open_notice_ready():
+        return
+    cycle = await get_active_cycle(db)
+    if not cycle or not cycle.batch_close_done or now_kst() >= to_kst(cycle.reapply_close_at):
+        return
+    enqueued, skipped = await enqueue_reapply_notice(db, cycle)
+    if enqueued or skipped:
+        logger.info("Teams reapply notice cycle=%s enqueued=%s skipped=%s", cycle.id, enqueued, skipped)
+    for _ in range(100):
+        sent = await process_pending_teams_messages(db, limit=50)
+        if sent == 0:
+            break
 
 
 async def job_teams_open_notice(db: AsyncSession) -> None:
