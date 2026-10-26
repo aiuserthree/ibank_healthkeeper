@@ -29,10 +29,25 @@ function extensionlessHtmlRoutes() {
   };
 }
 
+/** nginx 의 /go/stairs (별까지 계단 배너) 리다이렉트와 동일 */
+function goRedirects() {
+  return {
+    name: "go-redirects",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if ((req.url || "").split("?")[0] !== "/go/stairs") return next();
+        res.statusCode = 302;
+        res.setHeader("Location", "https://stairs-to-the-star-zeta.vercel.app/");
+        res.end();
+      });
+    },
+  };
+}
+
 /** @type {import('vite').UserConfig} */
 export default defineConfig({
   root: webRoot,
-  plugins: [extensionlessHtmlRoutes()],
+  plugins: [extensionlessHtmlRoutes(), goRedirects()],
   server: {
     port: 5173,
     strictPort: true,
