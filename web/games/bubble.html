@@ -268,6 +268,15 @@
         };
       }
 
+      // 효과음 — 같은 소리가 gap초 안에 또 나지 않게 (무대마다 S.t 가 0 으로 돌아가므로 실제 시간 기준)
+      const sfxAt = {};
+      function sfxGap(name, gap, arg) {
+        const now = performance.now();
+        if (sfxAt[name] != null && now - sfxAt[name] < gap * 1000) return;
+        sfxAt[name] = now;
+        ctx.sfx(name, arg);
+      }
+
       function newGame() {
         S = {
           score: 0, lives: 3, stage: 0, t: 0,
@@ -388,7 +397,7 @@
 
         if (S.phase === "intro") {
           S.phaseT -= dt;
-          if (S.phaseT <= 0) S.phase = "play";
+          if (S.phaseT <= 0) { S.phase = "play"; ctx.sfx("go"); }
           return;
         }
         if (S.phase === "over") {
@@ -421,6 +430,7 @@
           S.clearT = 3.2;
           S.mold = null;
           S.banner = { text: "청소 완료!", sub: `클리어 보너스 +${bonus.toLocaleString("ko-KR")}`, t: 2.6 };
+          ctx.sfx("line");
           addScore(bonus);
         }
       }
@@ -446,6 +456,7 @@
         if (p.coyote > 0) p.coyote -= dt;
         if (p.jumpBuf > 0 && (p.ground || p.coyote > 0)) {
           p.vy = -JUMP; p.ground = false; p.coyote = 0; p.jumpBuf = 0;
+          ctx.sfx("jump");
         }
         if (!keys.jump && p.vy < -170) p.vy = -170; // 짧게 누르면 낮게
         p.vy = Math.min(MAXFALL, p.vy + GRAV * dt);
@@ -464,6 +475,7 @@
               b.squish = 0.25; b.vy = 40;
               bounced = true;
               if (b.germ) popBubble(b, 0);
+              else sfxGap("tap", 0.12);
               break;
             }
           }
@@ -503,6 +515,7 @@
           if (Math.abs(it.x - p.x) < 12 && Math.abs((it.y - 6) - (p.y - PH / 2)) < 14) {
             it.got = true;
             const k = ITEMS[it.kind];
+            sfxGap("coin", 0.06);
             addScore(k.pts, it.x, it.y - 14, "#fde68a");
             burst(it.x, it.y - 6, "#fde68a", 8, 70);
           }
@@ -515,6 +528,7 @@
         const live = S.bubbles.filter((b) => !b.germ && b.popT == null);
         if (live.length >= 12) { live[0].popT = 0; live[0].quiet = true; }
         const x = p.x + p.face * 10;
+        ctx.sfx("shoot");
         S.bubbles.push({ x: Math.max(minX + BR, Math.min(maxX - BR, x)), y: p.y - PH / 2 - 1, vx: p.face * 240, vy: 0, r: BR, phase: "shoot", age: 0, life: 7.5, germ: null, trapT: 0, squish: 0, wob: Math.random() * 6, popT: null, chain: 0 });
       }
 
@@ -539,11 +553,13 @@
           const base = GERMS[b.germ.type].pts;
           addScore(base * mult, b.x, b.y - 8, S.combo > 1 ? "#f0abfc" : "#fff");
           if (S.combo > 1) S.texts.push({ x: b.x, y: b.y - 22, text: `${S.combo}연쇄!`, t: 0, color: "#67e8f9", big: true });
+          ctx.sfx("combo", Math.min(10, S.combo));
           const kind = Math.min(3, S.combo - 1 + (Math.random() < 0.15 ? 1 : 0));
           S.items.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 80, vy: -160, kind, t: 0, life: 8, ground: false });
           S.shakeT = 0.12;
         } else {
           S.score += 10; hud();
+          if (!b.quiet) sfxGap("tap", 0.07);
         }
         if (b.quiet) return;
         for (const o of S.bubbles) {
@@ -577,6 +593,7 @@
                   b.phase = "float";
                   b.vy = -20;
                   gm.dead = true;
+                  ctx.sfx("pop");
                   burst(b.x, b.y, "#cffafe", 6, 60);
                   break;
                 }
@@ -598,6 +615,7 @@
               gm.vy = -120;
               S.germs.push(gm);
               burst(b.x, b.y, "#fca5a5", 10, 90);
+              sfxGap("invalid", 0.2);
               b.popT = 99; b.escaped = true;
             }
           } else if (b.age > b.life) {
@@ -689,11 +707,13 @@
         if (!S.hurried && S.t > D.hurry) {
           S.hurried = true;
           S.banner = { text: "청소 시간이에요!", sub: "서두르지 않으면 곰팡이 구름이 와요", t: 2.4, warn: true };
+          ctx.sfx("countdown");
           S.germs.forEach((gm) => (gm.angry = true));
         }
         if (S.hurried && !S.mold && S.t > D.hurry + 8) {
           S.mold = { x: S.p.x < W / 2 ? W - 30 : 30, y: 20, sp: 26, anim: 0 };
           S.banner = { text: "곰팡이 구름 등장!", sub: "방울로도 못 가둬요 · 피하세요", t: 2, warn: true };
+          ctx.sfx("whoosh");
         }
         if (S.mold) {
           const m = S.mold, p = S.p;
@@ -727,10 +747,19 @@
       function hurt() {
         const p = S.p;
         S.lives--;
+        ctx.sfx("hurt");
         hud();
+        S.combo = 0;
+        if (S.lives > 0) {
+          // 목숨이 남아 있으면 튕기거나 떨어지지 않고 그 자리에서 깜빡이기만 (잠깐 무적)
+          p.inv = 2.2;
+          S.shakeT = 0.3;
+          burst(p.x, p.y - PH / 2, "#a5f3fc", 14, 120);
+          if (S.mold) { S.mold.x = p.x < W / 2 ? W - 30 : 30; S.mold.y = 20; S.mold.sp = 26; }
+          return;
+        }
         p.dead = 1.1;
         p.vy = -260;
-        S.combo = 0;
         S.shakeT = 0.3;
         burst(p.x, p.y - PH / 2, "#a5f3fc", 14, 120);
         if (S.mold) { S.mold.x = p.x < W / 2 ? W - 30 : 30; S.mold.y = 20; S.mold.sp = 26; }
@@ -1135,6 +1164,7 @@
         if (state === "over") return;
         state = "over";
         draw();
+        ctx.sfx("lose");
         const score = Math.min(10000000, Math.floor(S.score));
         showOverlay(`<div class="gm-card"><h2>게임 끝</h2><p>무대 ${S.stage}까지 청소했어요</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
         ctx.submit(score);

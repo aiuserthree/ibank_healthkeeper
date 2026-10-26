@@ -105,6 +105,7 @@
       let state = "ready"; // ready | play | paused | over
       let rows, genY, prevBlocked, lastWasRest;
       let player, camY, lineY, elapsed, coffees, maxRow, slowT, queued, deathT, deathKind, floats;
+      let warnT = 0; // 지각선 경고 tick 간격
 
       const CAR_COLORS = ["#ef6461", "#3d8bfd", "#f6b93b", "#8e7cf0", "#ff8fab", "#2ec4b6", "#f1f5f9", "#64748b"];
 
@@ -173,7 +174,11 @@
         if (r.type === "cross") {
           r.phaseT -= dt;
           if (r.phase === "red" && r.phaseT <= 0) { r.phase = "yellow"; r.phaseT = 0.6; }
-          else if (r.phase === "yellow" && r.phaseT <= 0 && r.vehicles.length === 0) { r.phase = "green"; r.phaseT = r.greenLen; }
+          else if (r.phase === "yellow" && r.phaseT <= 0 && r.vehicles.length === 0) {
+            r.phase = "green"; r.phaseT = r.greenLen;
+            // 바로 앞(지금 줄~두 칸 앞) 횡단보도 신호가 초록으로 바뀌면 알림
+            if (state === "play" && player && r.y >= player.r && r.y <= player.r + 2) ctx.sfx("select");
+          }
           else if (r.phase === "green" && r.phaseT <= 0) { r.phase = "red"; r.phaseT = rand(2.6, 3.6); r.timer = 0.15; }
           canSpawn = r.phase === "red";
         }
@@ -280,7 +285,7 @@
         player = { c: 4, r: 0, fc: 4, fr: 0, t: 1, face: "up", vc: 4, vr: 0 };
         camY = -2.6;
         lineY = -3.2;
-        elapsed = 0; coffees = 0; maxRow = 0; slowT = 0; queued = null; deathT = 0; deathKind = ""; floats = [];
+        elapsed = 0; coffees = 0; maxRow = 0; slowT = 0; queued = null; deathT = 0; deathKind = ""; floats = []; warnT = 0;
         getRow(30);
         updateHud();
       }
@@ -317,13 +322,19 @@
         if (row && row.blocked[c]) return;
         player.fc = player.c; player.fr = player.r;
         player.c = c; player.r = r; player.t = 0;
-        if (r > maxRow) maxRow = r;
+        let snd = "tap";
+        if (r > maxRow) {
+          if (Math.floor(r / 25) > Math.floor(maxRow / 25)) snd = "line"; // 25칸마다
+          maxRow = r;
+        }
         if (row && row.coffee === c) {
           row.coffee = -1;
           coffees++;
           slowT = 4;
           floats.push({ c, r, t: 0, text: "+5 커피!" });
+          snd = "coin";
         }
+        ctx.sfx(snd);
         updateHud();
       }
 
@@ -412,6 +423,7 @@
         hideOver();
         state = "play";
         last = performance.now();
+        ctx.sfx("go");
       }
 
       function pause() {
@@ -431,6 +443,7 @@
         state = "over";
         deathKind = kind;
         deathT = 0;
+        ctx.sfx(kind === "late" ? "lose" : "hurt");
         const final = score();
         setTimeout(() => {
           showOver(`<div class="gm-cx-card">
@@ -480,6 +493,12 @@
 
         // 지각선
         if (slowT > 0) slowT = Math.max(0, slowT - dt);
+        // 지각선 여유가 2칸 이하(빨간 경고)면 똑딱 — 가까울수록 빠르게
+        const gapNow = Math.floor(player.r + 0.45 - lineY);
+        if (slowT <= 0 && gapNow <= 2) {
+          warnT -= dt;
+          if (warnT <= 0) { ctx.sfx("tick"); warnT = gapNow <= 1 ? 0.4 : 0.7; }
+        } else warnT = 0;
         const base = Math.min(1.6, 0.45 + elapsed * 0.0085);
         lineY += base * (slowT > 0 ? 0.3 : 1) * dt;
         if (lineY < player.r - 5) lineY = player.r - 5;

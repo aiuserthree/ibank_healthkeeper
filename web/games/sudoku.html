@@ -181,6 +181,8 @@
         let sel = -1, memo = false, mistakes = 0;
         let state = "ready"; // ready · play · pause · done
         let elapsedMs = 0, runFrom = 0, tickId = 0;
+        // 효과음 — 푸는 동안만 (시작 전·일시정지 중에는 조용히)
+        const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
 
         stage.innerHTML = `<div class="gm-sd" tabindex="0">
           <div class="gm-sd__bar">
@@ -276,6 +278,7 @@
           showCover("none");
           sel = vals.findIndex((v) => !v);
           tickId = setInterval(drawTime, 250);
+          sfx("go");
           render();
           root.focus({ preventScroll: true });
         }
@@ -356,6 +359,7 @@
           if (memo) {
             if (vals[sel]) return;
             notes[sel] ^= 1 << n;
+            sfx("tick");
             render();
             return;
           }
@@ -370,6 +374,7 @@
             drawTime();
             render();
             floatText(sel, `+${PENALTY}초`);
+            sfx("fail");
             return;
           }
           bad[sel] = false;
@@ -380,11 +385,17 @@
           el.classList.remove("is-pop");
           void el.offsetWidth;
           el.classList.add("is-pop");
+          // 이 칸으로 가로줄·세로줄·3×3 칸 중 하나가 다 맞게 채워지면 coin, 아니면 tap
+          const sr = Math.floor(sel / 9), sc = sel % 9, sb = SD.BOX(sel);
+          const full = (f) => vals.every((v, i) => !f(i) || v === solution[i]);
+          if (full((i) => Math.floor(i / 9) === sr) || full((i) => i % 9 === sc) || full((i) => SD.BOX(i) === sb)) sfx("coin");
+          else sfx("tap");
           if (vals.every((v, i) => v === solution[i])) finish();
         }
 
         function erase() {
           if (state !== "play" || sel < 0 || given[sel]) return;
+          if (vals[sel] || notes[sel]) sfx("tick");
           vals[sel] = 0;
           bad[sel] = false;
           notes[sel] = 0;
@@ -417,6 +428,7 @@
         boardEl.addEventListener("pointerdown", (e) => {
           const el = e.target.closest("[data-i]");
           if (!el || state !== "play") return;
+          if (sel !== +el.dataset.i) sfx("select");
           sel = +el.dataset.i;
           render();
           root.focus({ preventScroll: true });
@@ -428,6 +440,7 @@
         root.querySelector("[data-erase]").onclick = erase;
         memoBtn.onclick = () => {
           memo = !memo;
+          sfx("swap");
           syncMemo();
         };
         root.querySelector("[data-pause]").onclick = () => (state === "play" ? pause() : state === "pause" ? resume() : null);
@@ -447,7 +460,7 @@
           else if (k === "ArrowLeft") { e.preventDefault(); move(0, -1); }
           else if (k === "ArrowRight") { e.preventDefault(); move(0, 1); }
           else if (k === "Backspace" || k === "Delete" || k === "0") { e.preventDefault(); erase(); }
-          else if (k === "m" || k === "M" || k === "ㅡ" || k === " ") { e.preventDefault(); memo = !memo; syncMemo(); }
+          else if (k === "m" || k === "M" || k === "ㅡ" || k === " ") { e.preventDefault(); memo = !memo; sfx("swap"); syncMemo(); }
           else if (k === "Escape" || k === "p" || k === "P") { e.preventDefault(); pause(); }
         }
         document.addEventListener("keydown", onKey);

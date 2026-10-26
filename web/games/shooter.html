@@ -25,14 +25,16 @@
     .gm-life { width: 8px; height: 18px; border-radius: 4px; background: linear-gradient(#fb923c 50%, #fff7ed 50%); box-shadow: 0 0 0 1px rgba(255,255,255,.35); }
     .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #150a2b; }
     .gm-canvas { display: block; touch-action: none; cursor: crosshair; }
-    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(16, 7, 34, .62); backdrop-filter: blur(2px); }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(16, 7, 34, .62); backdrop-filter: blur(2px); overflow-y: auto; }
     .gm-overlay[hidden] { display: none; }
-    .gm-card { width: 100%; max-width: 300px; padding: 22px 20px 20px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+    .gm-card { width: 100%; max-width: 320px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 18px 16px 16px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
     .gm-card h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.02em; }
     .gm-card p { word-break: keep-all; margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary, #475569); }
     .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #2b1055; }
-    .gm-items { display: grid; gap: 6px; margin: 4px 0 12px; text-align: left; }
-    .gm-items div { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-secondary, #475569); }
+    .gm-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin: 4px 0 8px; }
+    .gm-items div { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 3px; border-radius: 99px; background: #f1f5f9; font-size: 12px; font-weight: 600; color: #334155; white-space: nowrap; }
+    .gm-items div.is-new { background: #fee2e2; color: #991b1b; }
+    .gm-items-note { margin: 0 0 10px; font-size: 11.5px; color: #64748b; word-break: keep-all; }
     .gm-dot { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; }
     .gm-keys { font-size: 12px; color: var(--text-muted, #64748b); margin: 0 0 14px; line-height: 1.6; }
     .gm-keys kbd { display: inline-block; min-width: 20px; padding: 1px 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #f8fafc; font: 600 11px/1.5 inherit; }
@@ -107,10 +109,64 @@
       }
       makeStars();
 
+      // 효과음 — 같은 소리가 gap초 안에 또 나지 않게
+      function sfxGap(name, gap, arg) {
+        const k = "_sfx_" + name;
+        if (S && S[k] != null && S.t - S[k] < gap) return;
+        if (S) S[k] = S.t;
+        ctx.sfx(name, arg);
+      }
+
+      // 아이템 — [종류, 나오는 비율]
+      // 무기 아이템이 대부분(약 80%), 보조 아이템은 드물게
+      const ITEM_TABLE = [["vitc", 12], ["laser", 10], ["rapid", 10], ["homing", 10], ["orbit", 9], ["wing", 9], ["chili", 9], ["ripple", 9], ["zap", 9], ["bomb", 5], ["mask", 5], ["x2", 4], ["slow", 3], ["water", 2]];
+      const ITEM_TOTAL = ITEM_TABLE.reduce((a, [, w]) => a + w, 0);
+      // 동그라미 아이템 그림 — [바탕, 글자색, 글자]
+      const ITEM_LOOK = { rapid: ["#7c4a1e", "#fff", "커"], laser: ["#facc15", "#713f12", "레"], homing: ["#ef4444", "#fff", "생"], orbit: ["#f5f5f4", "#57534e", "마"], chili: ["#dc2626", "#fff", "고"], ripple: ["#c084fc", "#fff", "양"], zap: ["#3b82f6", "#fff", "블"], slow: ["#f59e0b", "#fff", "꿀"], wing: ["#22c55e", "#fff", "균"], x2: ["#a855f7", "#fff", "D"], bomb: ["#0ea5e9", "#fff", "소"] };
+      // 시간제 효과 — [상태 키, 이름, 막대 색, 최대 초]
+      const TIMED = [["triple", "확산탄", "#fb923c", 12], ["rapid", "연사", "#b45309", 12], ["laser", "관통 레이저", "#facc15", 12], ["homing", "유도탄", "#ef4444", 12], ["orbit", "마늘 방패", "#d6d3d1", 12], ["chili", "고추 화염", "#dc2626", 12], ["ripple", "파동탄", "#c084fc", 12], ["zap", "번개", "#3b82f6", 12], ["wing", "도우미", "#22c55e", 14], ["slow", "느리게", "#f59e0b", 6], ["x2", "점수 2배", "#a855f7", 8]];
+      // 무기 — 같은 걸 또 먹으면 시간이 늘고 한 단계 세진다 (최대 3단계)
+      const WEAPONS = { triple: 8, rapid: 7, laser: 6, homing: 8, orbit: 8, chili: 7, ripple: 8, zap: 8, wing: 10 };
+      const WEAPON_NAME = { triple: "확산탄", rapid: "연사", laser: "관통 레이저", homing: "유도탄", orbit: "마늘 방패", chili: "고추 화염", ripple: "양파 파동탄", zap: "블루베리 번개", wing: "도우미" };
+      // 고추 화염이 닿는 거리 (단계마다 길어짐)
+      const flameLen = () => 90 + lvOf("chili") * 30;
+      function lvOf(k) { return S[k] > 0 ? S.lv[k] || 1 : 0; }
+      // 마늘 방패 — 내 기체 둘레를 도는 알 (단계마다 2·3·4개)
+      function orbs() {
+        const n = lvOf("orbit") + 1;
+        if (n < 2) return [];
+        return Array.from({ length: n }, (_, i) => { const a = S.t * 3.2 + (i / n) * Math.PI * 2; return { x: S.px + Math.cos(a) * 44, y: PY + Math.sin(a) * 30 }; });
+      }
+      const WING_X = 34;
+      // 도우미 자리 — 늘 양옆 둘, 2단계면 가운데 하나, 3단계면 바깥 둘 더
+      function wingSpots() { return lvOf("wing") >= 3 ? [-WING_X, WING_X, -WING_X * 1.8, WING_X * 1.8] : lvOf("wing") >= 2 ? [-WING_X, WING_X, 0] : [-WING_X, WING_X]; }
+      function drawGarlic(x, y) {
+        g.save(); g.translate(x, y);
+        g.fillStyle = "rgba(245,245,244,.25)"; g.beginPath(); g.arc(0, 0, 12, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#fafaf9"; g.beginPath(); g.ellipse(0, 1, 8, 7, 0, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = "#d6d3d1"; g.lineWidth = 1; g.beginPath(); g.moveTo(-3, -5); g.quadraticCurveTo(-4, 1, -2, 7); g.moveTo(3, -5); g.quadraticCurveTo(4, 1, 2, 7); g.stroke();
+        g.fillStyle = "#a8a29e"; g.beginPath(); g.moveTo(-2, -6); g.lineTo(0, -11); g.lineTo(2, -6); g.fill();
+        g.restore();
+      }
+
+      // 유산균 도우미 — 작은 초록 캡슐
+      function drawHelper(x, y, t) {
+        g.save();
+        g.translate(x, y + Math.sin(t * 6 + x) * 2);
+        g.fillStyle = "rgba(34,197,94,.25)";
+        g.beginPath(); g.arc(0, 0, 12, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#22c55e";
+        roundRect(-5, -10, 10, 20, 5); g.fill();
+        g.fillStyle = "#bbf7d0";
+        roundRect(-5, -10, 10, 9, 5); g.fill();
+        g.restore();
+      }
+
       function newGame() {
         S = {
           score: 0, lives: 3, wave: 0, t: 0,
           px: W / 2, fireCd: 0.3, triple: 0, shield: false, invul: 0,
+          rapid: 0, laser: 0, homing: 0, orbit: 0, chili: 0, ripple: 0, zap: 0, waves: [], waveCd: 0, zapCd: 0, bolts: [], slow: 0, wing: 0, x2: 0, flashT: 0, lv: {}, homingCd: 0, missiles: [],
           bullets: [], ebullets: [], enemies: [], items: [], parts: [], texts: [],
           boss: null, form: null, diveCd: 3, shotCd: 1.5,
           banner: null, clearT: 0, dead: false, overT: 0,
@@ -147,6 +203,7 @@
           S.boss = { x: W / 2, y: -70, r: 44, hp, maxHp: hp, t: 0, spreadCd: 2.2, aimCd: 1.4, minionCd: 4, flash: 0, n };
           S.form = null;
           S.banner = { text: "큰 세균 등장!", sub: "체력 바를 다 깎아 주세요", t: 2 };
+          ctx.sfx("whoosh");
         } else {
           const dx = 36, dy = 30;
           const width = (P.cols - 1) * dx;
@@ -167,6 +224,7 @@
             }
           }
           S.banner = { text: `웨이브 ${S.wave}`, sub: S.wave === 1 ? "세균 편대가 몰려와요" : "더 빠르고 촘촘해져요", t: 1.6 };
+          ctx.sfx("go");
         }
         hud();
       }
@@ -211,19 +269,93 @@
         S.px = Math.max(22, Math.min(W - 22, S.px));
         if (S.invul > 0) S.invul -= dt;
         if (S.triple > 0) S.triple -= dt;
+        for (const k of ["rapid", "laser", "homing", "orbit", "chili", "ripple", "zap", "slow", "wing", "x2"]) if (S[k] > 0) S[k] -= dt;
+        if (S.flashT > 0) S.flashT -= dt;
 
         // 자동 연사
         S.fireCd -= dt;
         if (S.fireCd <= 0 && !S.clearT) {
-          S.fireCd = 0.21;
-          S.bullets.push({ x: S.px, y: PY - 20, vx: 0, vy: -540 });
-          if (S.triple > 0) {
-            S.bullets.push({ x: S.px - 6, y: PY - 16, vx: -130, vy: -520 });
-            S.bullets.push({ x: S.px + 6, y: PY - 16, vx: 130, vy: -520 });
+          S.fireCd = [0.21, 0.13, 0.1, 0.075][lvOf("rapid")];
+          // 자동 연사 — 세 발에 한 번만 소리
+          S.shotN = (S.shotN || 0) + 1;
+          if (S.shotN % 3 === 1) ctx.sfx("shoot");
+          const pierce = S.laser > 0;
+          S.bullets.push({ x: S.px, y: PY - 20, vx: 0, vy: -540, pierce });
+          // 확산탄: 1단계 3갈래, 2단계 5갈래, 3단계 7갈래
+          const spread = lvOf("triple");
+          for (let i = 1; i <= spread; i++) {
+            const vx = 120 * i;
+            S.bullets.push({ x: S.px - 6, y: PY - 16, vx: -vx, vy: -520, pierce });
+            S.bullets.push({ x: S.px + 6, y: PY - 16, vx, vy: -520, pierce });
           }
+          // 관통 레이저 2단계부터 양옆 한 줄씩 더
+          if (lvOf("laser") >= 2) for (const d of [-9, 9]) S.bullets.push({ x: S.px + d, y: PY - 18, vx: 0, vy: -560, pierce: true });
+          // 유산균 도우미 — 양옆에서 같이 쏜다
+          if (S.wing > 0) for (const d of wingSpots()) S.bullets.push({ x: S.px + d, y: PY - 8, vx: 0, vy: -520, pierce });
         }
         for (const b of S.bullets) { b.x += b.vx * dt; b.y += b.vy * dt; }
         S.bullets = S.bullets.filter((b) => b.y > -20 && b.x > -10 && b.x < W + 10 && !b.hit);
+        // 생강 유도탄 — 가장 가까운 세균을 쫓아간다 (단계만큼 한 번에 여러 발)
+        if (S.homing > 0 && !S.clearT) {
+          S.homingCd -= dt;
+          if (S.homingCd <= 0) {
+            S.homingCd = 0.55;
+            const n = lvOf("homing");
+            for (let i = 0; i < n; i++) {
+              const side = i % 2 ? 1 : -1;
+              S.missiles.push({ x: S.px + side * 10, y: PY - 6, vx: side * 140, vy: -200, t: 0 });
+            }
+          }
+        }
+        for (const m of S.missiles) {
+          m.t += dt;
+          let tgt = null, best = 1e9;
+          const pool = S.boss && S.boss.y > 40 ? [S.boss] : S.enemies;
+          for (const e of pool) { if (e.dead || (e.mode === "enter" && e.delay > 0)) continue; const d = (e.x - m.x) ** 2 + (e.y - m.y) ** 2; if (d < best) { best = d; tgt = e; } }
+          if (tgt) {
+            const a = Math.atan2(tgt.y - m.y, tgt.x - m.x);
+            m.vx += (Math.cos(a) * 420 - m.vx) * Math.min(1, dt * 5);
+            m.vy += (Math.sin(a) * 420 - m.vy) * Math.min(1, dt * 5);
+          } else m.vy -= 600 * dt;
+          m.x += m.vx * dt; m.y += m.vy * dt;
+        }
+        S.missiles = S.missiles.filter((m) => m.y > -30 && m.y < H + 30 && m.x > -30 && m.x < W + 30 && m.t < 3 && !m.hit);
+        // 양파 파동탄 — 넓게 퍼지며 올라가는 물결, 세균을 뚫고 지나간다
+        if (S.ripple > 0 && !S.clearT) {
+          S.waveCd -= dt;
+          if (S.waveCd <= 0) { S.waveCd = [0, 0.75, 0.55, 0.4][lvOf("ripple")]; S.waves.push({ x: S.px, y: PY - 20, w: 30, hits: new Set() }); }
+        }
+        for (const wv of S.waves) { wv.y -= 330 * dt; wv.w = Math.min(150, wv.w + 160 * dt); }
+        S.waves = S.waves.filter((wv) => wv.y > -20);
+        // 블루베리 번개 — 가까운 세균부터 줄줄이 튀는 번개 (단계마다 더 많이)
+        for (const bo of S.bolts) bo.t -= dt;
+        S.bolts = S.bolts.filter((bo) => bo.t > 0);
+        if (S.zap > 0 && !S.clearT) {
+          S.zapCd -= dt;
+          if (S.zapCd <= 0) {
+            S.zapCd = 0.7;
+            let from = { x: S.px, y: PY - 20 };
+            const done = new Set();
+            const pts = [from];
+            for (let i = 0; i < 2 + lvOf("zap"); i++) {
+              let tgt = null, best = 260 * 260;
+              for (const e of S.enemies) {
+                if (e.dead || done.has(e) || (e.mode === "enter" && e.delay > 0)) continue;
+                const d = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
+                if (d < best) { best = d; tgt = e; }
+              }
+              if (!tgt) break;
+              done.add(tgt); pts.push({ x: tgt.x, y: tgt.y });
+              tgt.hp--; tgt.flash = 0.1;
+              if (tgt.hp <= 0) killEnemy(tgt);
+              from = tgt;
+            }
+            if (pts.length > 1) { S.bolts.push({ pts, t: 0.14 }); sfxGap("laser", 0.5); }
+            S.enemies = S.enemies.filter((e) => !e.dead);
+          }
+        }
+        // 꿀 — 여기서부터(적·적 탄·보스·아이템) 시간이 느리게 흐른다. 내 기체와 내 탄은 그대로
+        if (S.slow > 0) dt *= 0.45;
 
         // 편대
         if (S.form) S.form.t += dt;
@@ -339,18 +471,83 @@
         for (const it of S.items) { it.y += 95 * dt; it.t += dt; }
         S.items = S.items.filter((it) => it.y < H + 20 && !it.got);
 
+        // 충돌: 유도탄 → 적 (한 발에 2 피해)
+        for (const m of S.missiles) {
+          if (B && B.y > 40 && Math.hypot(m.x - B.x, m.y - B.y) < B.r) {
+            m.hit = true; B.hp -= 2; B.flash = 0.06;
+            if (B.hp <= 0) killBoss(); else sfxGap("hit", 0.4);
+            continue;
+          }
+          for (const e of S.enemies) {
+            if (e.dead || (e.mode === "enter" && e.delay > 0)) continue;
+            if (Math.abs(m.x - e.x) < e.r + 4 && Math.abs(m.y - e.y) < e.r + 4) {
+              m.hit = true; e.hp -= 2; e.flash = 0.08;
+              burst(m.x, m.y, "#fca5a5", 5, 90);
+              if (e.hp <= 0) killEnemy(e); else sfxGap("hit", 0.12);
+              break;
+            }
+          }
+        }
+        // 충돌: 고추 화염 — 앞쪽 부채꼴 안의 세균을 0.15초마다 태운다
+        if (S.chili > 0) {
+          const len = flameLen();
+          for (const e of S.enemies) {
+            if (e.dead || (e.mode === "enter" && e.delay > 0) || (e.fireCd || 0) > S.t) continue;
+            const dy = PY - 20 - e.y, dx = e.x - S.px;
+            if (dy > 0 && dy < len && Math.abs(dx) < 14 + dy * 0.45) {
+              e.fireCd = S.t + 0.15; e.hp--; e.flash = 0.08;
+              if (e.hp <= 0) killEnemy(e);
+            }
+          }
+          if (B && B.y > 40 && PY - 20 - B.y < len + B.r && Math.abs(B.x - S.px) < B.r + 30 && (B.fireCd || 0) <= S.t) {
+            B.fireCd = S.t + 0.2; B.hp--; B.flash = 0.05; if (B.hp <= 0) killBoss();
+          }
+        }
+        // 충돌: 파동탄 → 세균 (같은 물결은 한 세균에 한 번)
+        for (const wv of S.waves) {
+          for (const e of S.enemies) {
+            if (e.dead || wv.hits.has(e) || (e.mode === "enter" && e.delay > 0)) continue;
+            if (Math.abs(e.y - wv.y) < e.r + 8 && Math.abs(e.x - wv.x) < wv.w / 2 + e.r) {
+              wv.hits.add(e); e.hp--; e.flash = 0.08;
+              if (e.hp <= 0) killEnemy(e); else sfxGap("hit", 0.12);
+            }
+          }
+          if (B && B.y > 40 && !wv.hits.has(B) && Math.abs(B.y - wv.y) < B.r && Math.abs(B.x - wv.x) < wv.w / 2 + B.r) {
+            wv.hits.add(B); B.hp -= 2; B.flash = 0.06; if (B.hp <= 0) killBoss();
+          }
+        }
+        S.enemies = S.enemies.filter((e) => !e.dead);
+        // 충돌: 마늘 방패 → 적 탄은 지우고, 닿은 세균은 0.3초마다 1 피해
+        for (const o of orbs()) {
+          for (const b of S.ebullets) if (Math.hypot(b.x - o.x, b.y - o.y) < 12 + b.r) { b.hit = true; burst(o.x, o.y, "#f5f5f4", 3, 60); }
+          for (const e of S.enemies) {
+            if (e.dead || (e.mode === "enter" && e.delay > 0) || (e.orbCd || 0) > S.t) continue;
+            if (Math.hypot(e.x - o.x, e.y - o.y) < e.r + 12) {
+              e.orbCd = S.t + 0.3; e.hp--; e.flash = 0.08;
+              if (e.hp <= 0) killEnemy(e); else sfxGap("hit", 0.12);
+            }
+          }
+        }
+        S.enemies = S.enemies.filter((e) => !e.dead);
         // 충돌: 내 탄 → 적
         for (const b of S.bullets) {
           if (B && B.y > 40 && Math.hypot(b.x - B.x, b.y - B.y) < B.r) {
             b.hit = true; B.hp--; B.flash = 0.06;
             if (B.hp <= 0) killBoss();
+            else sfxGap("hit", 0.4);
             continue;
           }
           for (const e of S.enemies) {
             if (e.mode === "enter" && e.delay > 0) continue;
             if (Math.abs(b.x - e.x) < e.r + 3 && Math.abs(b.y - e.y) < e.r + 6) {
-              b.hit = true; e.hp--; e.flash = 0.08;
+              // 레몬 관통탄은 사라지지 않고 지나가며, 같은 세균은 한 번만 맞힌다
+              if (b.pierce) {
+                if (b.hits && b.hits.has(e)) continue;
+                (b.hits = b.hits || new Set()).add(e);
+              } else b.hit = true;
+              e.hp--; e.flash = 0.08;
               if (e.hp <= 0) killEnemy(e);
+              else sfxGap("hit", 0.12);
               break;
             }
           }
@@ -382,9 +579,12 @@
           if (!S.clearT) {
             const bonus = 300 + S.wave * 200;
             S.score += bonus;
+            // 웨이브를 깨면 무기 아이템 하나를 선물로
+            dropItem(W / 2, 140, ["vitc", "laser", "rapid", "homing", "orbit", "chili", "ripple", "zap", "wing"][Math.floor(Math.random() * 9)]);
             S.banner = { text: `웨이브 ${S.wave} 클리어!`, sub: `보너스 +${bonus.toLocaleString("ko-KR")}`, t: 1.7 };
             S.clearT = 1.8;
             S.ebullets = [];
+            ctx.sfx("line");
             hud();
           } else {
             S.clearT -= dt;
@@ -426,20 +626,27 @@
         const T = TYPES[e.type];
         let pts = T.pts;
         if (e.mode === "dive" && !crash) pts *= 2;
+        if (S.x2 > 0) pts *= 2;
         S.score += pts;
         burst(e.x, e.y, T.c2, 12);
         S.texts.push({ x: e.x, y: e.y, text: `+${pts}`, life: 0.7, color: e.mode === "dive" ? "#fde047" : "#fff" });
-        if (!crash && Math.random() < 0.09) dropItem(e.x, e.y);
+        if (!crash) ctx.sfx(e.mode === "dive" ? "coin" : "pop");
+        // 아이템: 22% 확률, 그리고 7마리 연속으로 안 나오면 반드시 하나
+        if (!crash) {
+          S.dry = (S.dry || 0) + 1;
+          if (Math.random() < 0.22 || S.dry >= 7) { dropItem(e.x, e.y); S.dry = 0; }
+        }
         hud();
       }
 
       function killBoss() {
         const B = S.boss;
-        const pts = 3000 * B.n;
+        const pts = 3000 * B.n * (S.x2 > 0 ? 2 : 1);
+        ctx.sfx("explode");
         S.score += pts;
         for (let i = 0; i < 4; i++) burst(B.x + (Math.random() - 0.5) * 60, B.y + (Math.random() - 0.5) * 50, i % 2 ? "#f472b6" : "#a3e635", 18, 220);
         S.texts.push({ x: B.x, y: B.y, text: `+${pts.toLocaleString("ko-KR")}`, life: 1.2, color: "#fde047" });
-        dropItem(B.x, B.y, Math.random() < 0.5 ? "water" : "vitc");
+        dropItem(B.x, B.y, ["water", "wing", "bomb"][Math.floor(Math.random() * 3)]);
         S.boss = null;
         S.enemies.forEach((e) => { e.dead = true; burst(e.x, e.y, TYPES[e.type].c2, 8); });
         S.enemies = [];
@@ -449,25 +656,56 @@
 
       function dropItem(x, y, kind) {
         if (!kind) {
-          const r = Math.random();
-          kind = r < 0.5 ? "vitc" : r < 0.85 ? "mask" : "water";
+          // 아이템 뽑기 — 숫자가 클수록 자주 나온다
+          let r = Math.random() * ITEM_TOTAL;
+          kind = ITEM_TABLE.find(([, w]) => (r -= w) < 0)[0];
         }
         S.items.push({ x, y, kind, t: 0 });
       }
 
       function takeItem(it) {
         let label = "";
-        if (it.kind === "vitc") { S.triple = 8; label = "비타민C · 3갈래 탄!"; }
+        const wk = { vitc: "triple", rapid: "rapid", laser: "laser", homing: "homing", orbit: "orbit", chili: "chili", ripple: "ripple", zap: "zap", wing: "wing" }[it.kind];
+        if (wk) {
+          // 무기: 켜져 있을 때 또 먹으면 한 단계 위 + 시간 연장
+          S.lv[wk] = S[wk] > 0 ? Math.min(3, (S.lv[wk] || 1) + 1) : 1;
+          S[wk] = Math.min(12, Math.max(S[wk], 0) + WEAPONS[wk]);
+          label = `${WEAPON_NAME[wk]} ${S.lv[wk]}단계!`;
+        }
         else if (it.kind === "mask") { S.shield = true; label = "마스크 · 보호막!"; }
+        else if (it.kind === "slow") { S.slow = 6; label = "꿀 · 세균이 느려져요"; }
+        else if (it.kind === "x2") { S.x2 = 8; label = "비타민D · 점수 2배!"; }
+        else if (it.kind === "bomb") { label = "손소독제 · 싹 소독!"; sanitize(); }
         else { S.lives = Math.min(6, S.lives + 1); label = "물방울 · 목숨 +1"; }
         S.score += 100;
+        ctx.sfx("powerup");
         S.texts.push({ x: Math.max(70, Math.min(W - 70, S.px)), y: PY - 36, text: label, life: 1.2, color: "#fde68a", big: true });
         hud();
+      }
+
+      // 손소독제 — 화면의 작은 세균을 모두 없애고, 큰 세균은 체력 20%를 깎는다
+      function sanitize() {
+        S.flashT = 0.35;
+        ctx.sfx("explode");
+        for (const e of S.enemies) {
+          if (e.mode === "enter" && e.delay > 0) continue;
+          e.hp = 0;
+          killEnemy(e, true);
+        }
+        S.enemies = S.enemies.filter((e) => !e.dead);
+        S.ebullets = [];
+        const B = S.boss;
+        if (B && B.y > 40) {
+          B.hp -= Math.ceil(B.maxHp * 0.2);
+          B.flash = 0.2;
+          if (B.hp <= 0) killBoss();
+        }
       }
 
       function hitPlayer() {
         if (S.shield) {
           S.shield = false; S.invul = 1.0;
+          ctx.sfx("hit");
           burst(S.px, PY, "#67e8f9", 16, 180);
           S.texts.push({ x: S.px, y: PY - 30, text: "보호막이 막았어요", life: 1, color: "#a5f3fc" });
           return;
@@ -476,12 +714,19 @@
         burst(S.px, PY, "#fb923c", 24, 220);
         burst(S.px, PY, "#fff7ed", 12, 160);
         S.ebullets = [];
-        S.triple = 0;
+        // 맞으면 무기는 한 단계씩 내려간다 (모두 잃지는 않게)
+        for (const k of Object.keys(WEAPONS)) {
+          if (!(S[k] > 0)) continue;
+          if ((S.lv[k] || 1) > 1) S.lv[k]--; else S[k] = 0;
+        }
+        S.missiles = []; S.waves = [];
         hud();
         if (S.lives <= 0) {
           S.dead = true; S.overT = 1.3;
+          ctx.sfx("explode");
           return;
         }
+        ctx.sfx("hurt");
         S.invul = 2.2;
       }
 
@@ -521,12 +766,50 @@
         // 내 탄
         g.lineCap = "round";
         for (const b of S.bullets) {
-          g.strokeStyle = "rgba(253, 186, 116, .35)";
-          g.lineWidth = 6;
+          g.strokeStyle = b.pierce ? "rgba(250, 204, 21, .45)" : "rgba(253, 186, 116, .35)";
+          g.lineWidth = b.pierce ? 9 : 6;
           g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(b.x - b.vx * 0.02, b.y + 12); g.stroke();
-          g.strokeStyle = "#fff4d6";
-          g.lineWidth = 2.4;
+          g.strokeStyle = b.pierce ? "#fef9c3" : "#fff4d6";
+          g.lineWidth = b.pierce ? 3.4 : 2.4;
           g.beginPath(); g.moveTo(b.x, b.y); g.lineTo(b.x - b.vx * 0.02, b.y + 11); g.stroke();
+        }
+        // 고추 화염
+        if (S.chili > 0 && !S.dead) {
+          const len = flameLen(), y0 = PY - 22;
+          const fg = g.createLinearGradient(0, y0, 0, y0 - len);
+          fg.addColorStop(0, "rgba(254, 240, 138, .85)"); fg.addColorStop(0.45, "rgba(249, 115, 22, .55)"); fg.addColorStop(1, "rgba(220, 38, 38, 0)");
+          g.fillStyle = fg;
+          const fl = Math.sin(S.t * 40) * 4;
+          g.beginPath(); g.moveTo(S.px - 6, y0); g.lineTo(S.px - 14 - len * 0.45 + fl, y0 - len); g.lineTo(S.px + 14 + len * 0.45 - fl, y0 - len); g.lineTo(S.px + 6, y0); g.closePath(); g.fill();
+        }
+        // 양파 파동탄
+        for (const wv of S.waves) {
+          g.strokeStyle = "rgba(216, 180, 254, .9)"; g.lineWidth = 4; g.lineCap = "round";
+          g.beginPath(); g.ellipse(wv.x, wv.y + 10, wv.w / 2, 12, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+          g.strokeStyle = "rgba(192, 132, 252, .35)"; g.lineWidth = 9;
+          g.beginPath(); g.ellipse(wv.x, wv.y + 10, wv.w / 2, 12, 0, Math.PI * 1.1, Math.PI * 1.9); g.stroke();
+        }
+        // 블루베리 번개
+        for (const bo of S.bolts) {
+          g.globalAlpha = Math.min(1, bo.t / 0.08);
+          for (const [w, c] of [[6, "rgba(96, 165, 250, .45)"], [2, "#e0f2fe"]]) {
+            g.strokeStyle = c; g.lineWidth = w; g.beginPath();
+            bo.pts.forEach((p0, i) => {
+              if (!i) return g.moveTo(p0.x, p0.y);
+              const q = bo.pts[i - 1];
+              for (let k = 1; k <= 4; k++) { const u = k / 4; g.lineTo(q.x + (p0.x - q.x) * u + (k < 4 ? (Math.random() - 0.5) * 14 : 0), q.y + (p0.y - q.y) * u + (k < 4 ? (Math.random() - 0.5) * 14 : 0)); }
+            });
+            g.stroke();
+          }
+          g.globalAlpha = 1;
+        }
+        // 유도탄
+        for (const m of S.missiles) {
+          g.save(); g.translate(m.x, m.y); g.rotate(Math.atan2(m.vy, m.vx));
+          g.fillStyle = "rgba(248, 113, 113, .35)"; g.beginPath(); g.ellipse(-8, 0, 9, 4, 0, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#ef4444"; roundRect(-6, -3, 12, 6, 3); g.fill();
+          g.fillStyle = "#fde68a"; g.beginPath(); g.arc(5, 0, 2.2, 0, Math.PI * 2); g.fill();
+          g.restore();
         }
         // 적 탄
         for (const b of S.ebullets) {
@@ -537,7 +820,11 @@
         }
         if (!S.dead) {
           const blink = S.invul > 0 && Math.floor(S.invul * 12) % 2 === 0;
-          if (!blink) drawPlayer(S.px, PY, S.shield, S.t);
+          if (!blink) {
+            if (S.wing > 0) for (const d of wingSpots()) drawHelper(S.px + d, PY + 6 + (Math.abs(d) > WING_X ? 12 : 0), S.t);
+            for (const o of orbs()) drawGarlic(o.x, o.y);
+            drawPlayer(S.px, PY, S.shield, S.t);
+          }
         }
         for (const p of S.parts) {
           g.globalAlpha = Math.max(0, Math.min(1, p.life / 0.4));
@@ -556,17 +843,23 @@
         g.globalAlpha = 1;
 
         // 3갈래 탄 남은 시간
-        if (S.triple > 0) {
-          const w = 70 * (S.triple / 8);
+        // 켜져 있는 아이템 효과와 남은 시간
+        let barY = H - 18;
+        for (const [k, name, color, full] of TIMED) {
+          if (!(S[k] > 0)) continue;
           g.fillStyle = "rgba(255,255,255,.15)";
-          roundRect(12, H - 18, 70, 6, 3); g.fill();
-          g.fillStyle = "#fb923c";
-          roundRect(12, H - 18, w, 6, 3); g.fill();
+          roundRect(12, barY, 70, 6, 3); g.fill();
+          g.fillStyle = color;
+          roundRect(12, barY, 70 * Math.min(1, S[k] / full), 6, 3); g.fill();
           g.font = "700 10px Pretendard, system-ui, sans-serif";
           g.textAlign = "left";
-          g.fillStyle = "#fed7aa";
-          g.fillText("3갈래", 88, H - 15);
+          g.fillStyle = "#fff";
+          g.fillText(WEAPONS[k] && S.lv[k] > 1 ? `${name} ${S.lv[k]}단계` : name, 88, barY + 3);
+          barY -= 14;
         }
+        // 꿀(느리게) 중에는 화면이 살짝 노랗게, 손소독제는 하얗게 번쩍
+        if (S.slow > 0) { g.fillStyle = "rgba(250, 204, 21, .07)"; g.fillRect(0, 0, W, H); }
+        if (S.flashT > 0) { g.fillStyle = `rgba(255,255,255,${S.flashT * 1.6})`; g.fillRect(0, 0, W, H); }
         if (S.shield) {
           g.font = "700 10px Pretendard, system-ui, sans-serif";
           g.textAlign = "right";
@@ -747,6 +1040,16 @@
           roundRect(-10, -7, 20, 14, 5); g.fill();
           g.strokeStyle = "#93c5fd"; g.lineWidth = 1;
           g.beginPath(); g.moveTo(-7, -2); g.lineTo(7, -2); g.moveTo(-7, 2); g.lineTo(7, 2); g.stroke();
+        } else if (ITEM_LOOK[it.kind]) {
+          const [bg, fg, ch] = ITEM_LOOK[it.kind];
+          g.fillStyle = bg;
+          g.beginPath(); g.arc(0, 0, 11, 0, Math.PI * 2); g.fill();
+          g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 1.5;
+          g.beginPath(); g.arc(0, 0, 11, 0, Math.PI * 2); g.stroke();
+          g.fillStyle = fg;
+          g.font = "900 11px Pretendard, system-ui, sans-serif";
+          g.textAlign = "center"; g.textBaseline = "middle";
+          g.fillText(ch, 0, 1);
         } else {
           const dg = g.createLinearGradient(0, -12, 0, 11);
           dg.addColorStop(0, "#7dd3fc"); dg.addColorStop(1, "#2563eb");
@@ -791,12 +1094,20 @@
         draw();
         showOverlay(`<div class="gm-card">
           <h2>세균 격파</h2>
-          <p>비타민 캡슐로 세균 편대를 물리쳐요.<br>돌진하는 세균은 <b>2배 점수</b>, 5웨이브마다 큰 세균이 나와요.</p>
+          <p>비타민 캡슐로 세균 편대를 물리쳐요.<br>돌진하는 세균은 <b>2배 점수</b> · 5웨이브마다 큰 세균!</p>
           <div class="gm-items">
-            <div><span class="gm-dot" style="background:#f97316">C</span>비타민C — 8초간 3갈래 탄</div>
-            <div><span class="gm-dot" style="background:#e2e8f0;color:#2563eb">M</span>마스크 — 한 번 막아 주는 보호막</div>
-            <div><span class="gm-dot" style="background:#2563eb">+</span>물방울 — 목숨 +1 (드물어요)</div>
+            <div><span class="gm-dot" style="background:#f97316">C</span>확산탄</div>
+            <div><span class="gm-dot" style="background:#facc15;color:#713f12">레</span>관통 레이저</div>
+            <div><span class="gm-dot" style="background:#7c4a1e">커</span>빠른 연사</div>
+            <div><span class="gm-dot" style="background:#22c55e">균</span>양옆 도우미</div>
+            <div class="is-new"><span class="gm-dot" style="background:#ef4444">생</span>유도탄</div>
+            <div class="is-new"><span class="gm-dot" style="background:#a8a29e">마</span>마늘 방패</div>
+            <div class="is-new"><span class="gm-dot" style="background:#dc2626">고</span>고추 화염</div>
+            <div class="is-new"><span class="gm-dot" style="background:#c084fc">양</span>파동탄</div>
+            <div class="is-new"><span class="gm-dot" style="background:#3b82f6">블</span>연쇄 번개</div>
+            <div><span class="gm-dot" style="background:#0ea5e9">소</span>화면 소독</div>
           </div>
+          <p class="gm-items-note">같은 무기를 또 먹으면 <b>최대 3단계</b> · 빨간 칩은 새 무기 · 가끔 마스크·물방울·비타민D·꿀</p>
           <div class="gm-keys">PC <kbd>←</kbd> <kbd>→</kbd> 또는 <kbd>A</kbd> <kbd>D</kbd> · 자동 연사<br>모바일 화면을 좌우로 끌면 따라와요</div>
           <button type="button" class="gm-go" data-act="start">시작</button>
         </div>`);
@@ -827,6 +1138,7 @@
       function finish() {
         state = "over";
         draw();
+        ctx.sfx("lose");
         const score = S.score;
         showOverlay(`<div class="gm-card"><h2>게임 오버</h2><p>웨이브 ${S.wave}까지 버텼어요</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
         ctx.submit(score);

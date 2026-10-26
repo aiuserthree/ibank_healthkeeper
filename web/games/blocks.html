@@ -69,7 +69,7 @@
         const COLS = 10, ROWS = 18;
         const CLEAR_MS = 220, LOCK_MS = 450, BENTO_FX_MS = 750, OVER_MS = 900;
         const LINE_PTS = [0, 100, 300, 500, 800];
-        // 우리만의 조각 세트: 3칸 2종 + 4칸 5종 + 5칸 십자 1종 (+ 10줄마다 도시락)
+        // 우리만의 조각 세트: 3칸 2종 + 4칸 5종 (+ 10줄마다 도시락)
         const DEFS = {
           i3: { size: 3, cells: [[0, 1], [1, 1], [2, 1]], color: "#45c3ff" },
           v3: { size: 2, cells: [[0, 0], [1, 0], [1, 1]], color: "#7aa8ff" },
@@ -78,10 +78,9 @@
           l4: { size: 3, cells: [[0, 1], [1, 1], [2, 1], [2, 0]], color: "#0ea5e9" },
           s4: { size: 3, cells: [[1, 0], [2, 0], [0, 1], [1, 1]], color: "#14b8a6" },
           o4: { size: 2, cells: [[0, 0], [1, 0], [0, 1], [1, 1]], color: "#93c5fd" },
-          x5: { size: 3, cells: [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]], color: "#a78bfa" },
           bento: { size: 2, cells: [[0, 0], [1, 0], [0, 1], [1, 1]], color: "#ff9f43" },
         };
-        const BAG = ["i3", "v3", "i4", "t4", "l4", "s4", "o4", "x5"];
+        const BAG = ["i3", "v3", "i4", "t4", "l4", "s4", "o4"];
 
         stage.innerHTML = `<div class="gm-wrap">
           <div class="gm-hud">
@@ -128,6 +127,9 @@
         let cell = 24, dpr = 1, sideW = 110;
         let grid, cur, queue, bag, score, lines, level, state, dropAcc, lockAcc, lockMoves;
         let clearing, bentoFx, nextBentoAt, overT, submitted, lastT = 0;
+        // 효과음 — 판을 하는 동안만 (시작 전·일시정지 중에는 조용히). 옮기기 소리는 몰리지 않게 간격을 둔다
+        const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
+        let lastMoveSfx = 0;
 
         // ---------- 크기 ----------
         function layout() {
@@ -201,14 +203,18 @@
         }
         function move(dx) {
           if (!canAct()) return;
-          if (!collide(cur.cells, cur.x + dx, cur.y)) { cur.x += dx; touched(); }
+          if (!collide(cur.cells, cur.x + dx, cur.y)) {
+            cur.x += dx; touched();
+            const now = performance.now();
+            if (now - lastMoveSfx >= 90) { lastMoveSfx = now; sfx("tick"); }
+          }
         }
         function rotate() {
-          if (!canAct() || cur.key === "o4" || cur.key === "bento" || cur.key === "x5") return;
+          if (!canAct() || cur.key === "o4" || cur.key === "bento") return;
           const n = cur.size;
           const rc = cur.cells.map(([x, y]) => [n - 1 - y, x]);
           for (const [kx, ky] of [[0, 0], [-1, 0], [1, 0], [0, -1], [-2, 0], [2, 0], [0, 1]]) {
-            if (!collide(rc, cur.x + kx, cur.y + ky)) { cur.cells = rc; cur.x += kx; cur.y += ky; touched(); return; }
+            if (!collide(rc, cur.x + kx, cur.y + ky)) { cur.cells = rc; cur.x += kx; cur.y += ky; touched(); sfx("swap"); return; }
           }
         }
         function softDrop() {
@@ -222,11 +228,11 @@
           const y = dropY();
           score += 2 * (y - cur.y);
           cur.y = y;
-          lock();
+          lock(true);
         }
         function canAct() { return state === "play" && cur && !clearing; }
 
-        function lock() {
+        function lock(hard) {
           const p = cur; cur = null;
           if (p.key === "bento") { bentoLand(p); return; }
           let top = false;
@@ -237,12 +243,14 @@
           }
           updateHud();
           if (top) { gameOver(); return; }
+          // 줄이 지워질 때는 checkLines 가 line 을 낸다 — 착지 소리는 줄이 안 찰 때만
+          if (!grid.some((row) => row.every(Boolean))) sfx(hard ? "drop" : "land");
           checkLines();
         }
         function checkLines() {
           const rows = [];
           for (let r = 0; r < ROWS; r++) if (grid[r].every(Boolean)) rows.push(r);
-          if (rows.length) clearing = { rows, t: 0 };
+          if (rows.length) { clearing = { rows, t: 0 }; sfx("line"); }
           else spawn();
         }
         function finishClear() {
@@ -255,7 +263,7 @@
           pop(n === 1 ? `+${base * level}` : `${n}줄! +${(base * level).toLocaleString("ko-KR")}`);
           lines += n;
           const nl = 1 + Math.floor(lines / 10);
-          if (nl > level) { level = nl; pop(`레벨 업! Lv.${level}`, "lv"); }
+          if (nl > level) { level = nl; pop(`레벨 업! Lv.${level}`, "lv"); sfx("powerup"); }
           let bentos = 0;
           while (lines >= nextBentoAt) { bentos++; nextBentoAt += 10; }
           spawn();
@@ -275,11 +283,13 @@
             for (let r = 0; r < ROWS; r++) grid[r][c] = r < 3 ? null : col[r - 3];
           }
           bentoFx = { cols, t: 0 };
+          sfx("explode");
           pop("도시락 냠! 아래 3줄 비움", "bento");
           updateHud();
           checkLines();
         }
         function gameOver() {
+          if (state === "play") ctx.sfx("lose");
           state = "over"; cur = null; overT = 0;
           pauseBtn.disabled = true;
         }
@@ -448,8 +458,8 @@
             <p>떨어지는 조각으로 가로줄을 꽉 채우면 사라져요.<br>10줄마다 빨라지고, <b style="color:#ffcf8a">도시락 블록</b>이 한 번 나와요.</p>
             <div class="gm-keys">
               <b>← →</b><span>옮기기</span>
-              <b>↑ / X</b><span>돌리기</span>
-              <b>↓</b><span>빠르게</span>
+              <b>↑ ↓ / X</b><span>돌리기</span>
+              <b>S</b><span>빠르게</span>
               <b>스페이스</b><span>바로 내리기</span>
             </div>
             <p style="font-size:12px">휴대폰은 좌우 밀기 · 톡 돌리기 · 아래로 휙 내리기</p>
@@ -461,6 +471,7 @@
           hideOverlay();
           state = "play";
           pauseBtn.disabled = false;
+          sfx("go");
           spawn();
           lastT = performance.now();
           const r = boardEl.getBoundingClientRect();
@@ -519,12 +530,12 @@
           if (state !== "play") return;
           const map = {
             ArrowLeft: () => move(-1), ArrowRight: () => move(1), ArrowUp: rotate, x: rotate, X: rotate, "ㅌ": rotate,
-            ArrowDown: softDrop, " ": hardDrop, Spacebar: hardDrop, p: pause, P: pause, Escape: pause,
+            ArrowDown: rotate, s: softDrop, S: softDrop, "ㄴ": softDrop, " ": hardDrop, Spacebar: hardDrop, p: pause, P: pause, Escape: pause,
           };
           const fn = map[k];
           if (!fn) return;
           e.preventDefault();
-          if ((k === " " || k === "ArrowUp" || k === "x" || k === "X") && e.repeat) return;
+          if ((k === " " || k === "ArrowUp" || k === "ArrowDown" || k === "x" || k === "X") && e.repeat) return;
           fn();
         });
 

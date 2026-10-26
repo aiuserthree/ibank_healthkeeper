@@ -227,6 +227,7 @@
         let tries = 0, revealed = 0, remainMs = 0, lastTs = 0, raf = 0, timer = 0;
         let phase = "intro"; // intro | play | feedback | paused | done
         let lastSubmitAt = 0;
+        let lastSec = 0; // 마지막 5초 똑딱용
 
         const correctPoints = () => results.reduce((s, r) => s + (r.ok ? 100 + r.sec * 3 : 0), 0);
         const totalScore = () => Math.max(0, correctPoints() - hintsTotal * HINT_COST);
@@ -279,6 +280,7 @@
           idx = 0;
           results = [];
           hintsTotal = 0;
+          ctx.sfx("go");
           showQuestion();
         }
 
@@ -289,6 +291,7 @@
           tries = 0;
           revealed = 0;
           remainMs = LIMIT * 1000;
+          lastSec = LIMIT;
           phase = "play";
           const dots = qs.map((_, i) => {
             const r = results[i];
@@ -358,6 +361,7 @@
           if (phase !== "play" || revealed >= maxHints()) return;
           revealed++;
           hintsTotal++;
+          ctx.sfx("tick");
           renderTiles();
           updateHintBtn();
           stage.querySelector("[data-score]").textContent = `${totalScore()}점`;
@@ -379,6 +383,7 @@
           const input = stage.querySelector("[data-input]");
           const guess = norm(input.value);
           if (!guess) {
+            ctx.sfx("invalid");
             setMsg("정답을 입력해 주세요", true);
             return;
           }
@@ -391,6 +396,7 @@
             finishQuestion(false, "wrong");
             return;
           }
+          ctx.sfx("invalid");
           input.value = "";
           input.classList.remove("is-shake");
           void input.offsetWidth;
@@ -410,6 +416,12 @@
             bar.classList.toggle("is-low", remainMs < 8000);
             stage.querySelector("[data-sec]").textContent = Math.ceil(remainMs / 1000);
           }
+          // 마지막 5초는 초가 바뀔 때마다 똑딱
+          const secNow = Math.ceil(remainMs / 1000);
+          if (secNow !== lastSec) {
+            lastSec = secNow;
+            if (secNow >= 1 && secNow <= 5) ctx.sfx("tick");
+          }
           if (remainMs <= 0) {
             finishQuestion(false, "time");
             return;
@@ -424,6 +436,7 @@
           const [word, , , tip] = qs[idx];
           const sec = ok ? Math.floor(remainMs / 1000) : 0;
           results[idx] = { ok, sec, why };
+          ctx.sfx(ok ? "success" : why === "skip" ? "whoosh" : "fail");
           const card = stage.querySelector(".gm-cs");
           const title = ok ? "정답이에요!" : why === "time" ? "시간이 다 됐어요" : why === "skip" ? "넘겼어요" : "아쉬워요";
           const fb = document.createElement("div");

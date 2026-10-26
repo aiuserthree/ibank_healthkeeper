@@ -10,10 +10,156 @@
  *     begin()     → Promise<boolean> — 오늘의 도전 게임은 [시작] 때 반드시 호출. 오늘 첫 시작이면 true(순위 반영),
  *                   이미 시작했던 날이면 false(연습) — 문제를 본 뒤 새로고침해 다시 하는 것을 막는다
  *     submit(score) → Promise — 점수 저장 + 결과 창 + 순위표 새로고침
- *     onRestart(fn) — 결과 창 '다시 하기'를 눌렀을 때
+ *     onRestart(fn) — 판이 끝난 뒤 스페이스를 누르면 부른다 (처음 상태로 되돌리는 함수)
  *     formatScore(n)
+ *     sfx(name, arg) — 효과음 (HKSound 이름 목록 참고). 소리 켜고 끄기는 공통 버튼이 맡는다
  *   }
  */
+/**
+ * 점심 라운지 효과음 — 소리 파일 없이 Web Audio 로 바로 만든다.
+ * HKPlay.sfx(name, arg) 로 부르고, 켜고 끄기는 게임 머리의 🔊 버튼(모든 게임 공통, 기억됨).
+ * 기본은 켜짐. 브라우저 정책상 첫 클릭·키 입력 뒤부터 소리가 난다.
+ *
+ * 이름: tap select pop coin jump land hit hurt explode shoot laser powerup drop line
+ *       combo(단계 1~) success fail win lose countdown go tick whoosh swap invalid
+ */
+window.HKSound = (function () {
+  const KEY = "hk-play-muted";
+  let ac = null;
+  let master = null;
+  let muted = (() => {
+    try {
+      return localStorage.getItem(KEY) === "1";
+    } catch (_) {
+      return false;
+    }
+  })();
+  const listeners = [];
+  const lastAt = {};
+
+  function ensure() {
+    if (!ac) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      ac = new AC();
+      master = ac.createGain();
+      master.gain.value = 0.32;
+      master.connect(ac.destination);
+    }
+    if (ac.state === "suspended") ac.resume().catch(() => {});
+    return ac;
+  }
+  // 첫 입력에서 오디오 잠금 해제
+  ["pointerdown", "keydown", "touchstart"].forEach((t) =>
+    window.addEventListener(t, () => !muted && ensure(), { passive: true, capture: true })
+  );
+
+  // 기본 음 — 주파수 f 에서 f2 로 미끄러지며 t초
+  function tone({ type = "square", f = 440, f2 = null, t = 0.1, v = 0.25, delay = 0, attack = 0.004 }) {
+    const now = ac.currentTime + delay;
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f, now);
+    if (f2) o.frequency.exponentialRampToValueAtTime(Math.max(20, f2), now + t);
+    g.gain.setValueAtTime(0.0001, now);
+    g.gain.exponentialRampToValueAtTime(v, now + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + t);
+    o.connect(g).connect(master);
+    o.start(now);
+    o.stop(now + t + 0.02);
+  }
+  let noiseBuf = null;
+  function noise({ t = 0.2, v = 0.3, f = 1200, f2 = null, q = 0.8, delay = 0, type = "bandpass" }) {
+    if (!noiseBuf) {
+      noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const now = ac.currentTime + delay;
+    const src = ac.createBufferSource();
+    src.buffer = noiseBuf;
+    const flt = ac.createBiquadFilter();
+    flt.type = type;
+    flt.frequency.setValueAtTime(f, now);
+    if (f2) flt.frequency.exponentialRampToValueAtTime(f2, now + t);
+    flt.Q.value = q;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(v, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + t);
+    src.connect(flt).connect(g).connect(master);
+    src.start(now);
+    src.stop(now + t + 0.02);
+  }
+  const notes = (list, type = "square", step = 0.07, v = 0.22, len = 0.09) =>
+    list.forEach((f, i) => tone({ type, f, t: len, v, delay: i * step }));
+
+  const SFX = {
+    tap: () => tone({ type: "triangle", f: 700, f2: 520, t: 0.05, v: 0.22 }),
+    select: () => tone({ type: "triangle", f: 880, t: 0.06, v: 0.2 }),
+    swap: () => tone({ type: "triangle", f: 420, f2: 640, t: 0.08, v: 0.18 }),
+    invalid: () => notes([260, 200], "square", 0.06, 0.14, 0.07),
+    pop: () => { tone({ type: "sine", f: 520, f2: 1100, t: 0.08, v: 0.3 }); noise({ t: 0.05, v: 0.12, f: 3000 }); },
+    coin: () => notes([988, 1319], "square", 0.06, 0.16, 0.1),
+    jump: () => tone({ type: "square", f: 300, f2: 760, t: 0.14, v: 0.16 }),
+    land: () => noise({ t: 0.06, v: 0.2, f: 400, type: "lowpass" }),
+    hit: () => { tone({ type: "square", f: 220, f2: 110, t: 0.08, v: 0.2 }); noise({ t: 0.06, v: 0.15, f: 1800 }); },
+    hurt: () => { tone({ type: "sawtooth", f: 330, f2: 90, t: 0.3, v: 0.22 }); noise({ t: 0.18, v: 0.15, f: 900 }); },
+    explode: () => { noise({ t: 0.45, v: 0.45, f: 1400, f2: 120, type: "lowpass", q: 0.5 }); tone({ type: "sine", f: 140, f2: 40, t: 0.35, v: 0.35 }); },
+    shoot: () => tone({ type: "square", f: 1200, f2: 380, t: 0.07, v: 0.09 }),
+    laser: () => tone({ type: "sawtooth", f: 1600, f2: 300, t: 0.16, v: 0.12 }),
+    powerup: () => notes([523, 659, 784, 1047], "square", 0.055, 0.16, 0.08),
+    drop: () => { tone({ type: "triangle", f: 180, f2: 90, t: 0.09, v: 0.25 }); noise({ t: 0.05, v: 0.12, f: 600, type: "lowpass" }); },
+    line: () => { notes([660, 880, 1175], "square", 0.05, 0.16, 0.1); noise({ t: 0.25, v: 0.12, f: 5000, f2: 1500, type: "highpass" }); },
+    combo: (n = 1) => {
+      const scale = [523, 587, 659, 784, 880, 1047, 1175, 1319, 1568, 1760];
+      const f = scale[Math.min(scale.length - 1, Math.max(0, n - 1))];
+      tone({ type: "square", f, t: 0.09, v: 0.17 });
+      tone({ type: "square", f: f * 1.5, t: 0.09, v: 0.1, delay: 0.05 });
+    },
+    success: () => notes([784, 1047], "triangle", 0.08, 0.24, 0.12),
+    fail: () => notes([311, 233], "square", 0.11, 0.16, 0.14),
+    win: () => notes([523, 659, 784, 1047, 784, 1047], "square", 0.09, 0.16, 0.12),
+    lose: () => notes([392, 330, 262, 196], "triangle", 0.13, 0.22, 0.18),
+    countdown: () => tone({ type: "square", f: 660, t: 0.12, v: 0.16 }),
+    go: () => tone({ type: "square", f: 1320, t: 0.28, v: 0.18 }),
+    tick: () => tone({ type: "square", f: 1800, t: 0.025, v: 0.08 }),
+    whoosh: () => noise({ t: 0.25, v: 0.2, f: 400, f2: 2600, q: 1.5 }),
+  };
+
+  function play(name, arg) {
+    if (muted || !SFX[name]) return;
+    // 같은 소리가 한꺼번에 몰리면 귀가 아프니 25ms 안의 중복은 건너뜀
+    const now = performance.now();
+    if (lastAt[name] && now - lastAt[name] < 25) return;
+    lastAt[name] = now;
+    if (!ensure() || ac.state !== "running") return;
+    try {
+      SFX[name](arg);
+    } catch (_) {
+      /* 소리는 부가 기능 — 실패해도 게임은 계속 */
+    }
+  }
+  function setMuted(m) {
+    muted = !!m;
+    try {
+      localStorage.setItem(KEY, muted ? "1" : "0");
+    } catch (_) {
+      /* 저장 못 해도 이번 화면에서는 적용 */
+    }
+    if (!muted) ensure();
+    listeners.forEach((fn) => fn(muted));
+  }
+  return {
+    play,
+    isMuted: () => muted,
+    setMuted,
+    toggle: () => setMuted(!muted),
+    onChange: (fn) => listeners.push(fn),
+    names: Object.keys(SFX),
+  };
+})();
+
 window.HKPlay = (function () {
   const PERIODS = [
     ["today", "오늘"],
@@ -31,16 +177,11 @@ window.HKPlay = (function () {
     pairs: ["#0f8b8d", "#57cc99"],
     shooter: ["#2b1055", "#d53369"],
     bricks: ["#c2410c", "#fb923c"],
-    kart: ["#dc2626", "#f97316"],
-    circus: ["#be123c", "#f59e0b"],
-    olympic: ["#0369a1", "#22c55e"],
-    jump: ["#0ea5e9", "#84cc16"],
     bubble: ["#06b6d4", "#a78bfa"],
-    commando: ["#3f6212", "#a3a635"],
     sudoku: ["#334155", "#64748b"],
     chosung: ["#e0508a", "#ff9a8b"],
-    ox: ["#f59e0b", "#fcd34d"],
     typing: ["#4f46e5", "#a78bfa"],
+    korean: ["#b45309", "#facc15"],
   };
 
   function todayKst() {
@@ -124,37 +265,36 @@ window.HKPlay = (function () {
       </aside>`;
   }
 
-  function resultModal(game, result, onRestart) {
+  // 판이 끝나면 화면 위쪽에 결과 띠 — 게임 자체의 끝 화면(다시 하기 버튼 포함)과 겹치지 않게
+  // 가운데 창 대신 띠로 보여 주고, 몇 초 뒤 저절로 사라진다
+  let resultTimer = null;
+  function resultBanner(game, result) {
+    HKSound.play(result.counted && result.newBest ? "win" : "success");
+    document.querySelector(".hk-play-result")?.remove();
+    clearTimeout(resultTimer);
     const title = !result.counted ? "연습 기록" : result.newBest ? "새 최고 기록!" : "기록을 남겼어요";
     const iconName = !result.counted ? "dumbbell" : result.newBest ? "party-popper" : "flag";
-    const lines = [];
-    if (result.todayRank) lines.push(`오늘 <b>${result.todayRank}위</b>`);
-    if (result.weekRank) lines.push(`이번 주 <b>${result.weekRank}위</b>`);
-    const overlay = document.createElement("div");
-    overlay.className = "hk-dialog__overlay";
-    overlay.innerHTML = `<div class="hk-dialog hk-play-result" role="dialog" aria-label="${title}">
-        <div class="hk-play-result__icon" style="${tintStyle(game.key)}">${HKUI.icon(iconName, 28, "#fff")}</div>
-        <div class="hk-play-result__title">${title}</div>
-        <div class="hk-play-result__score">${formatScore(game, result.score)}</div>
-        ${lines.length ? `<div class="hk-play-result__ranks">${lines.join(" · ")}</div>` : ""}
-        ${result.best != null ? `<div class="hk-play-result__best">내 최고 기록 ${formatScore(game, result.best)}</div>` : ""}
-        ${!result.counted ? `<p class="hk-play-result__note">오늘의 도전은 <b>첫 기록만</b> 순위에 들어가요. 내일 새 문제로 다시 도전해 보세요!</p>` : ""}
-        <div class="hk-play-result__actions">
-          <a class="hk-btn hk-btn--secondary" href="${HKRoutes.lounge}">라운지로</a>
-          <button type="button" class="hk-btn hk-btn--primary" data-restart>${HKUI.icon("rotate-ccw", 16, "#fff")} 다시 하기</button>
-        </div>
-      </div>`;
-    const close = () => overlay.remove();
-    overlay.querySelector("[data-restart]").onclick = () => {
-      close();
-      onRestart();
+    const ranks = [];
+    if (result.todayRank) ranks.push(`오늘 <b>${result.todayRank}위</b>`);
+    if (result.weekRank) ranks.push(`이번 주 <b>${result.weekRank}위</b>`);
+    const el = document.createElement("div");
+    el.className = `hk-play-result${result.newBest && result.counted ? " is-best" : ""}`;
+    el.setAttribute("role", "status");
+    el.innerHTML = `<span class="hk-play-result__icon" style="${tintStyle(game.key)}">${HKUI.icon(iconName, 20, "#fff")}</span>
+      <div class="hk-play-result__text">
+        <b>${title} · ${formatScore(game, result.score)}</b>
+        <span>${ranks.join(" · ") || (result.counted ? "순위를 불러오는 중이에요" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.best != null && !result.newBest ? ` · 내 최고 ${formatScore(game, result.best)}` : ""}</span>
+      </div>
+      <button type="button" class="hk-play-result__close" aria-label="닫기">${HKUI.icon("x", 16, "currentColor")}</button>`;
+    const close = () => {
+      el.classList.remove("is-in");
+      setTimeout(() => el.remove(), 250);
     };
-    overlay.addEventListener("click", (e) => {
-      if (e.target === overlay) close();
-    });
-    document.body.appendChild(overlay);
-    HKUI.refreshIcons(overlay);
-    overlay.querySelector("[data-restart]").focus();
+    el.querySelector(".hk-play-result__close").onclick = close;
+    (document.querySelector(".hk-pf") || document.body).appendChild(el);
+    HKUI.refreshIcons(el);
+    requestAnimationFrame(() => el.classList.add("is-in"));
+    resultTimer = setTimeout(close, 7000);
   }
 
   async function mountGame({ key, setup }) {
@@ -162,6 +302,48 @@ window.HKPlay = (function () {
     let period = "today";
     const restartFns = [];
     let dailyToken = null;
+    // 스페이스 하나로 시작·다시 시작 (모든 게임 공통)
+    //  - 판이 끝난 뒤: 다시 하기 (게임이 onRestart 로 등록한 함수)
+    //  - 시작 화면·일시정지·끝 화면에 버튼이 보이면: 그 버튼(시작/출발/계속하기/다시 하기 …)을 누른다
+    let canRestart = false;
+    const GO_TEXT = /시작|출발|출근하기|도전|계속하기|다시 하기|다시 달리기|준비/;
+    function visibleGoButton() {
+      const stageEl = document.getElementById("hk-play-stage");
+      if (!stageEl) return null;
+      return [...stageEl.querySelectorAll("button")].find((b) => {
+        if (b.disabled || !GO_TEXT.test(b.textContent || "")) return false;
+        const r = b.getBoundingClientRect();
+        return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
+      });
+    }
+    window.addEventListener(
+      "keydown",
+      (e) => {
+        if (e.repeat) return;
+        if (e.code !== "Space") {
+          canRestart = false; // 다른 키를 누르면(새 판을 이미 시작) 스페이스 재시작은 꺼진다
+          return;
+        }
+        const t = e.target;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+        if (canRestart) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          canRestart = false;
+          document.querySelector(".hk-play-result")?.remove();
+          restartFns.forEach((fn) => fn());
+          return;
+        }
+        const btn = visibleGoButton();
+        if (btn) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          btn.click();
+        }
+      },
+      true
+    );
+    window.addEventListener("pointerdown", () => (canRestart = false), true);
 
     async function loadBoard() {
       const body = document.getElementById("hk-play-board-body");
@@ -177,26 +359,49 @@ window.HKPlay = (function () {
       }
     }
 
-    await HKMember.mountPage({
-      active: "lounge",
-      auth: true,
-      mainStyle: "max-width:1200px;margin:0 auto;padding:24px 32px 72px",
-      render: () => `<a class="hk-play-back" href="${HKRoutes.lounge}">${HKUI.icon("chevron-left", 16, "currentColor")} 점심 라운지</a>
-        <div class="hk-play-head" id="hk-play-head"></div>
-        <div class="hk-play-layout">
-          <div class="hk-play-stage-wrap"><div class="hk-play-stage" id="hk-play-stage"></div></div>
+    // 전체 화면 — 사이트 머리·꼬리 없이 위에 얇은 막대, 가운데 게임, 넓은 화면은 오른쪽 순위표
+    await HKUI.loadLucide();
+    const profile = await HKMember.requireAuth(window.location.pathname);
+    if (!profile) return;
+    document.body.classList.add("hk-pf-body");
+    document.getElementById("app").innerHTML = `<div class="hk-pf">
+        <header class="hk-pf__bar" id="hk-play-head"></header>
+        <div class="hk-pf__body">
+          <main class="hk-pf__main" id="hk-pf-main"><div class="hk-play-stage" id="hk-play-stage"></div></main>
           ${boardHtml()}
-        </div>`,
-      afterMount: async (profile) => {
+        </div>
+        <div class="hk-pf__scrim" id="hk-pf-scrim" hidden></div>
+      </div>`;
+    {
         // 순위표는 기다리지 않는다 — 게임 목록(오늘 참여 여부)만 받고 바로 게임을 띄운다
         loadBoard();
         const list = await HKApi.playGames().catch(() => []);
         const meta = list.find((g) => g.key === key) || game || { key, title: key, unit: "" };
         game = { ...meta, ...(game || {}) };
         const dailyDone = !!(meta.dailyOnce && meta.playedToday);
-        document.getElementById("hk-play-head").innerHTML = `<span class="hk-play-head__icon" style="${tintStyle(key)}">${HKUI.icon(meta.icon || "gamepad-2", 24, "#fff")}</span>
-          <div><h1>${HKUI.escapeHtml(meta.title)}</h1><p>${HKUI.escapeHtml(meta.desc || "")}</p></div>
-          ${meta.dailyOnce ? `<span class="hk-badge ${dailyDone ? "hk-badge--neutral" : "hk-badge--warning"}" style="margin-left:auto">${dailyDone ? "오늘 도전 완료 · 연습 모드" : "오늘의 도전 · 첫 기록만 순위 반영"}</span>` : ""}`;
+        document.getElementById("hk-play-head").innerHTML = `<a class="hk-pf__back" href="${HKRoutes.lounge}" aria-label="점심 라운지로">${HKUI.icon("chevron-left", 20, "currentColor")}<span>라운지</span></a>
+          <span class="hk-pf__icon" style="${tintStyle(key)}">${HKUI.icon(meta.icon || "gamepad-2", 18, "#fff")}</span>
+          <div class="hk-pf__title"><b>${HKUI.escapeHtml(meta.title)}</b><small>${HKUI.escapeHtml(meta.desc || "")}</small></div>
+          <div class="hk-pf__tools">
+            ${meta.dailyOnce ? `<span class="hk-badge ${dailyDone ? "hk-badge--neutral" : "hk-badge--warning"} hk-pf__daily">${dailyDone ? "오늘 도전 완료 · 연습" : "오늘의 도전"}</span>` : ""}
+            <button type="button" class="hk-play-sound" id="hk-play-sound"></button>
+            <button type="button" class="hk-play-sound hk-pf__rank-btn" id="hk-pf-rank">${HKUI.icon("trophy", 18, "currentColor")}<span>순위</span></button>
+          </div>`;
+        const soundBtn = document.getElementById("hk-play-sound");
+        const paintSound = () => {
+          const m = HKSound.isMuted();
+          soundBtn.innerHTML = `${HKUI.icon(m ? "volume-x" : "volume-2", 18, "currentColor")}<span>${m ? "소리 꺼짐" : "소리 켜짐"}</span>`;
+          soundBtn.setAttribute("aria-pressed", m ? "false" : "true");
+          soundBtn.classList.toggle("is-off", m);
+          HKUI.refreshIcons(soundBtn);
+        };
+        paintSound();
+        HKSound.onChange(paintSound);
+        soundBtn.onclick = () => {
+          HKSound.toggle();
+          HKSound.play("select");
+          soundBtn.blur();
+        };
         document.title = `${meta.title} — 점심 라운지`;
         document.querySelectorAll(".hk-play-tab").forEach((b) => {
           b.onclick = () => {
@@ -216,6 +421,7 @@ window.HKPlay = (function () {
           dailyDone,
           rng: (salt = "") => seededRng(`${key}:${today}:${salt}`),
           formatScore: (n) => formatScore(game, n).replace(/<[^>]+>/g, ""),
+          sfx: (name, arg) => HKSound.play(name, arg),
           onRestart: (fn) => restartFns.push(fn),
           begin: async () => {
             if (!game.dailyOnce) return true;
@@ -243,15 +449,63 @@ window.HKPlay = (function () {
               result = { counted: false, score: value, best: null };
             }
             if (result.counted && game.dailyOnce) ctx.dailyDone = true;
-            resultModal(game, result, () => restartFns.forEach((fn) => fn()));
+            resultBanner(game, result);
+            canRestart = true;
             loadBoard();
             return result;
           },
         };
-        setup(document.getElementById("hk-play-stage"), ctx);
-      },
-    });
+        const stage = document.getElementById("hk-play-stage");
+        setup(stage, ctx);
+        fitStage(stage);
+        bindDrawer();
+    }
   }
 
-  return { mountGame, tintStyle, formatScore, seededRng, todayKst, TINTS };
+  // 순위 버튼(좁은 화면) — 오른쪽에서 밀려 나오는 순위표
+  function bindDrawer() {
+    const board = document.querySelector(".hk-pf .hk-play-board");
+    const scrim = document.getElementById("hk-pf-scrim");
+    const open = (on) => {
+      board.classList.toggle("is-open", on);
+      scrim.hidden = !on;
+    };
+    document.getElementById("hk-pf-rank").onclick = () => open(!board.classList.contains("is-open"));
+    scrim.onclick = () => open(false);
+    window.addEventListener("keydown", (e) => e.key === "Escape" && board.classList.contains("is-open") && open(false));
+  }
+
+  // 게임 영역을 화면에 꽉 차게 — 게임마다 세로·가로 비율이 달라서, 지금 비율을 재고
+  // 화면 높이·폭 안에 들어가는 가장 큰 폭으로 맞춘다 (게임들은 폭에 맞춰 다시 그린다)
+  function fitStage(stage) {
+    const main = document.getElementById("hk-pf-main");
+    const MAX_W = 760;
+    let selfResize = false;
+    function fit() {
+      const W = main.clientWidth - 24;
+      const H = main.clientHeight - 24;
+      const w = stage.getBoundingClientRect().width;
+      const h = stage.scrollHeight;
+      if (!w || !h || W <= 0 || H <= 0) return;
+      const target = Math.round(Math.max(Math.min(300, W), Math.min(W, (H * w) / h, MAX_W)));
+      if (Math.abs(target - w) < 6) return;
+      stage.style.width = `${target}px`;
+      selfResize = true;
+      window.dispatchEvent(new Event("resize"));
+      selfResize = false;
+    }
+    stage.style.width = `${Math.min(main.clientWidth - 24, 560)}px`;
+    let timer = null;
+    const later = () => {
+      clearTimeout(timer);
+      timer = setTimeout(fit, 60);
+    };
+    window.addEventListener("resize", () => !selfResize && later());
+    // 시작 화면 → 플레이처럼 내용이 바뀌면 다시 맞춘다 (맞추는 동안 생기는 변화는 무시하고 몇 번만)
+    let passes = 0;
+    new ResizeObserver(() => passes++ < 40 && later()).observe(stage);
+    [80, 300, 800].forEach((ms) => setTimeout(fit, ms));
+  }
+
+  return { mountGame, tintStyle, formatScore, seededRng, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
 })();

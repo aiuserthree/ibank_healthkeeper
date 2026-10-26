@@ -168,6 +168,14 @@
       const keys = { left: false, right: false };
       const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+      // 효과음 — 같은 소리가 gap초 안에 또 나지 않게
+      function sfxGap(name, gap, arg) {
+        const k = "_sfx_" + name;
+        if (S && S[k] != null && S.t - S[k] < gap) return;
+        if (S) S[k] = S.t;
+        ctx.sfx(name, arg);
+      }
+
       function newGame() {
         S = {
           score: 0, lives: 3, stageNo: 0, t: 0,
@@ -185,10 +193,12 @@
         const bricks = [];
         const words = def.food ? FOOD_WORDS : WORDS;
         const hards = def.food ? HARD_FOOD : HARD_WORDS;
+        // 단단한(금 가는) 벽돌은 앞줄에 두지 않는다 — 같은 칸 아래에 일반 벽돌이 있을 때만 단단하게
+        const below = (r, c) => def.map.slice(r + 1).some((row) => row[c] && row[c] !== ".");
         def.map.forEach((row, r) => {
           [...row].forEach((ch, c) => {
             if (ch === ".") return;
-            const hard = ch === "h";
+            const hard = ch === "h" && below(r, c);
             bricks.push({
               x: side + c * (bw + gap), y: TOP + r * (bh + gap), w: bw, h: bh,
               hp: hard ? 2 : 1, hard,
@@ -203,7 +213,7 @@
 
       function stageSpeed() {
         const loop = Math.floor((S.stageNo - 1) / STAGES.length);
-        return Math.min(540, 280 * (1 + 0.07 * (S.stageNo - 1) + 0.12 * loop));
+        return Math.min(720, 410 * (1 + 0.07 * (S.stageNo - 1) + 0.12 * loop));
       }
 
       function nextStage() {
@@ -218,6 +228,7 @@
         resetBall();
         const loop = Math.floor((S.stageNo - 1) / STAGES.length);
         S.banner = { text: `${S.stageNo}단계 · ${def.name}`, sub: loop ? `한 바퀴 더! 공이 더 빨라져요` : "스페이스 · 클릭 · 탭으로 발사", t: 2.2 };
+        ctx.sfx("go");
         hud();
       }
 
@@ -241,6 +252,7 @@
           b.stuck = false;
           any = true;
         }
+        if (any) ctx.sfx("jump");
         if (any && S.banner && S.banner.t > 0.4) S.banner.t = 0.4;
       }
 
@@ -331,6 +343,7 @@
           b.y = PADDLE_Y - BALL_R;
           normalize(b);
           S.paddleFlash = 0.12;
+          sfxGap("tap", 0.06);
           return;
         }
         // 벽돌
@@ -377,6 +390,7 @@
         if (k.hp <= 0) breakBrick(k);
         else {
           S.score += Math.round(10 * mult());
+          sfxGap("hit", 0.05);
           burst(k.x + k.w / 2, k.y + k.h / 2, "#cbd5e1", 5, 70);
           hud();
         }
@@ -387,6 +401,7 @@
         k.dead = true;
         const pts = Math.round((k.hard ? 150 : 50) * mult());
         S.score += pts;
+        sfxGap("pop", 0.05);
         burst(k.x + k.w / 2, k.y + k.h / 2, k.hard ? "#94a3b8" : k.color, 10, 120);
         S.texts.push({ x: k.x + k.w / 2, y: k.y + k.h / 2, text: `+${pts}`, life: 0.6, color: k.hard ? "#fde68a" : "#fff" });
         const falling = S.items.length;
@@ -418,12 +433,14 @@
           }
         }
         S.score += 50;
+        ctx.sfx("powerup");
         S.texts.push({ x: Math.max(50, Math.min(W - 50, S.px)), y: PADDLE_Y - 22, text: I.label + "!", life: 1, color: "#fed7aa", big: true });
         hud();
       }
 
       function loseLife() {
         S.lives--;
+        ctx.sfx("hurt");
         burst(S.px, PADDLE_Y, "#fb923c", 16, 160);
         S.items = [];
         S.wide = S.slow = S.pierce = 0;
@@ -444,6 +461,7 @@
         S.score += bonus;
         S.banner = { text: `${S.stageNo}단계 클리어!`, sub: `남은 목숨 ${S.lives} × ${300 * S.stageNo} = +${bonus.toLocaleString("ko-KR")}`, t: 1.9 };
         S.clearT = 2;
+        ctx.sfx("line");
         S.balls.forEach((b) => (b.vx = b.vy = 0));
         S.items = [];
         hud();
@@ -717,6 +735,7 @@
       function finish() {
         state = "over";
         draw();
+        ctx.sfx("lose");
         const score = S.score;
         showOverlay(`<div class="gm-card"><h2>게임 오버</h2><p>${S.stageNo}단계 · ${S.def.name}까지 왔어요</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
         ctx.submit(score);

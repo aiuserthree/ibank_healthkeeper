@@ -19,20 +19,19 @@
   <script>
     const CATEGORIES = [
       ["ALL", "전체"],
-      ["CLASSIC", "추억의 게임"],
-      ["HEALTH", "건강 퀴즈"],
+      ["MINI", "미니 게임"],
+      ["QUIZ", "퀴즈"],
       ["STUDY", "어학"],
     ];
 
     function lunchChip() {
-      const kst = new Date(Date.now() + 9 * 3600 * 1000);
-      const day = kst.getUTCDay();
-      const min = kst.getUTCHours() * 60 + kst.getUTCMinutes();
-      const live = day >= 1 && day <= 5 && min >= 11 * 60 + 30 && min < 13 * 60;
-      return live
+      return HKLunch.isLunchTime()
         ? `<span class="hk-lounge-lunch is-live">지금 점심시간 · 13:00까지</span>`
         : `<span class="hk-lounge-lunch">${HKUI.icon("clock", 13, "currentColor")} 점심시간 11:30 ~ 13:00</span>`;
     }
+
+    // 썸네일에서 보여 줄 부분 (기본은 가운데 조금 위)
+    const THUMB_POS = { stairs: "center 8%", blocks: "center 85%", typing: "center 35%", ox: "center 30%" };
 
     function cardHtml(g) {
       const top = g.todayTop
@@ -40,9 +39,10 @@
         : `<span class="hk-lounge-card__top">${HKUI.icon("crown", 14, "var(--text-muted)")}<span>오늘 1위가 비어 있어요</span></span>`;
       return `<a class="hk-lounge-card" href="/games/${g.key}" data-cat="${g.category}">
           <div class="hk-lounge-card__art" style="${HKPlay.tintStyle(g.key)}">
+            <img src="/assets/lounge/${g.key}.jpg" alt="" loading="lazy" style="object-position:${THUMB_POS[g.key] || "center 40%"}" onerror="this.remove()">
             ${g.dailyOnce ? `<span class="hk-lounge-card__flag">${HKUI.icon("calendar-check", 12, "currentColor")} 오늘의 도전</span>` : ""}
             ${g.dailyOnce && g.playedToday ? `<span class="hk-lounge-card__done">참여 완료</span>` : ""}
-            ${HKUI.icon(g.icon, 46, "#fff")}
+            <span class="hk-lounge-card__badge" style="${HKPlay.tintStyle(g.key)}">${HKUI.icon(g.icon, 18, "#fff")}</span>
           </div>
           <div>
             <div class="hk-lounge-card__body"><b>${HKUI.escapeHtml(g.title)}</b><p>${HKUI.escapeHtml(g.desc)}</p></div>

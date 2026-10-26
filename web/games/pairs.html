@@ -115,7 +115,11 @@
           if (!svgCache[name]) {
             const tmp = document.createElement("div");
             tmp.innerHTML = HKUI.icon(name, 24, "currentColor");
+            // 아이콘 스크립트는 문서 안에 붙어 있는 요소만 바꿔 주므로 잠깐 숨겨서 붙였다 뗀다
+            tmp.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;visibility:hidden";
+            document.body.appendChild(tmp);
             HKUI.refreshIcons(tmp);
+            tmp.remove();
             // 아이콘 스크립트가 아직 없으면 캐시하지 않고 다음에 다시 만든다
             if (!tmp.querySelector("svg")) return tmp.innerHTML;
             svgCache[name] = tmp.innerHTML;
@@ -163,6 +167,9 @@
         let score = 0, level = 1, hintsLeft = HINTS, combo = 0, lastMatch = 0, pairsMade = 0;
         let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, rafId = 0;
         let sel = null, cur = null, hintPair = null, busy = false;
+        // 효과음 — 판을 하는 동안만 (시작 전·일시정지 중에는 조용히)
+        const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
+        let lastSec = 0;
 
         const kindsFor = (lv) => Math.min(8 + (lv - 1) * 2, KINDS.length);
         const pickOrientation = () => (stage.clientWidth < 480 ? [6, 8] : [8, 6]);
@@ -360,10 +367,13 @@
           if (state !== "play" || busy || at(rc[0], rc[1]) < 0) return;
           if (!sel) {
             sel = rc;
+            sfx("select");
           } else if (sel[0] === rc[0] && sel[1] === rc[1]) {
             sel = null;
+            sfx("tap");
           } else if (at(sel[0], sel[1]) !== at(rc[0], rc[1])) {
             sel = rc; // 다른 그림이면 새로 고른 것으로
+            sfx("select");
           } else {
             const path = findPath(sel, rc);
             if (path) match(sel, rc, path);
@@ -371,6 +381,7 @@
               shake(sel);
               shake(rc);
               sel = rc;
+              sfx("invalid");
             }
           }
           drawMarks();
@@ -403,14 +414,17 @@
           drawMarks();
 
           if (remaining() === 0) {
+            sfx("line"); // 판 완료
             boardClear();
             return;
           }
+          if (mult > 1) sfx("combo", mult);
+          else sfx("pop");
           if (!anyMove()) {
             busy = true;
             setTimeout(() => {
               busy = false;
-              if (state === "play") reshuffle();
+              if (state === "play") { reshuffle(); sfx("whoosh"); }
             }, 450);
           }
         }
@@ -438,6 +452,7 @@
           hintsLeft--;
           score = Math.max(0, score - HINT_COST);
           hintPair = pair;
+          sfx("tick");
           floatAt(boardEl.clientWidth / 2, 10, `힌트 −${HINT_COST}`, true);
           drawHud();
           drawMarks();
@@ -455,6 +470,8 @@
             combo = 0;
             comboLabel.innerHTML = "&nbsp;";
           }
+          const sec = Math.ceil(timeLeftMs / 1000);
+          if (sec !== lastSec) { lastSec = sec; if (sec >= 1 && sec <= 5) sfx("countdown"); }
           if (timeLeftMs <= 0) {
             timeLeftMs = 0;
             drawHud();
@@ -478,6 +495,8 @@
 
         function start() {
           state = "play";
+          lastSec = Math.ceil(timeLeftMs / 1000);
+          sfx("go");
           showCover("none");
           lastTick = performance.now();
           drawHud();

@@ -21,10 +21,10 @@ from app.services.fun_stats import DEPARTMENT_RANKING_EXCLUDED
 class Game:
     key: str
     title: str
-    category: str  # HEALTH · STUDY · CLASSIC
+    category: str  # MINI(미니 게임) · QUIZ(퀴즈) · STUDY(어학)
     desc: str
     icon: str
-    unit: str  # 점수 뒤에 붙는 말 — "time" 은 초 → 분:초, "centi" 는 1/100초 → 분:초.백분초
+    unit: str  # 점수 뒤에 붙는 말 — "time" 은 초 → 분:초, "centi" 는 1/100초 → 분:초.백분초(지금은 쓰는 게임 없음)
     max_score: int
     lower_better: bool = False
     # 하루 한 번만 순위에 반영 (모두 같은 문제를 받는 '오늘의 도전')
@@ -34,22 +34,16 @@ class Game:
 GAMES: dict[str, Game] = {
     g.key: g
     for g in (
-        Game("stairs", "별까지 계단", "CLASSIC", "고양이와 함께 끝없는 계단을 올라 별까지", "sparkles", "층", 100000),
-        Game("match3", "비타민 3매치", "CLASSIC", "같은 과일 셋을 맞춰 터뜨리는 60초 퍼즐", "cherry", "점", 10_000_000),
-        Game("crossing", "출근길 대작전", "CLASSIC", "차와 자전거를 피해 회사까지 한 칸씩", "footprints", "칸", 100000),
-        Game("blocks", "점심 블록", "CLASSIC", "떨어지는 블록으로 줄을 채워 지우기", "blocks", "점", 10_000_000),
-        Game("pairs", "아이콘 짝 잇기", "CLASSIC", "같은 그림 두 개를 두 번 이하로 꺾어 잇기", "link", "점", 1_000_000),
-        Game("bricks", "벽돌 깨기", "CLASSIC", "공을 튕겨 벽돌을 모두 부수기", "brick-wall", "점", 10_000_000),
-        Game("shooter", "세균 격파", "CLASSIC", "몰려오는 세균 편대를 비타민 레이저로", "rocket", "점", 10_000_000),
-        Game("kart", "사내 카트 레이스", "CLASSIC", "드리프트로 코너를 돌아 3바퀴 기록 단축", "car-front", "centi", 60000, lower_better=True),
-        Game("circus", "점심 서커스", "CLASSIC", "버튼 하나로 불꽃 고리와 장애물 뛰어넘기", "tent", "m", 100000),
-        Game("olympic", "사무실 올림픽", "CLASSIC", "연타 달리기 · 멀리뛰기 · 의자 굴리기 3종목", "medal", "점", 100000),
-        Game("jump", "출근 점프", "CLASSIC", "달리고 뛰어올라 장애물을 넘어 회사까지", "flag-triangle-right", "점", 10_000_000),
-        Game("bubble", "비눗방울 대작전", "CLASSIC", "비눗방울에 세균을 가두고 톡 터뜨리기", "droplets", "점", 10_000_000),
-        Game("commando", "점심 특공대", "CLASSIC", "달리며 쏘아 세균 기지를 돌파하기", "crosshair", "점", 10_000_000),
-        Game("sudoku", "오늘의 스도쿠", "CLASSIC", "모두 같은 문제 · 빨리 푼 순서대로", "grid-3x3", "time", 24 * 3600, lower_better=True, daily_once=True),
-        Game("chosung", "건강 초성 퀴즈", "HEALTH", "ㄱㅂㅁ → 거북목 · 오늘의 5문제", "spell-check", "점", 100000, daily_once=True),
-        Game("ox", "OX 서바이벌", "HEALTH", "틀리면 탈락 · 오늘 끝까지 살아남기", "circle-check", "점", 100000, daily_once=True),
+        Game("stairs", "별까지 계단", "MINI", "고양이와 함께 끝없는 계단을 올라 별까지", "sparkles", "층", 100000),
+        Game("match3", "비타민 3매치", "MINI", "같은 과일 셋을 맞춰 터뜨리는 60초 퍼즐", "cherry", "점", 10_000_000),
+        Game("crossing", "출근길 대작전", "MINI", "차와 자전거를 피해 회사까지 한 칸씩", "footprints", "칸", 100000),
+        Game("blocks", "점심 블록", "MINI", "떨어지는 블록으로 줄을 채워 지우기", "blocks", "점", 10_000_000),
+        Game("pairs", "아이콘 짝 잇기", "MINI", "같은 그림 두 개를 두 번 이하로 꺾어 잇기", "link", "점", 1_000_000),
+        Game("bricks", "벽돌 깨기", "MINI", "공을 튕겨 벽돌을 모두 부수기", "brick-wall", "점", 10_000_000),
+        Game("shooter", "세균 격파", "MINI", "몰려오는 세균 편대를 비타민 레이저로", "rocket", "점", 10_000_000),
+        Game("bubble", "비눗방울 대작전", "MINI", "비눗방울에 세균을 가두고 톡 터뜨리기", "droplets", "점", 10_000_000),
+        Game("sudoku", "오늘의 스도쿠", "MINI", "모두 같은 문제 · 빨리 푼 순서대로", "grid-3x3", "time", 24 * 3600, lower_better=True, daily_once=True),
+        Game("chosung", "건강 초성 퀴즈", "QUIZ", "ㄱㅂㅁ → 거북목 · 오늘의 5문제", "spell-check", "점", 100000, daily_once=True),
         Game("typing", "영어 타자 레이스", "STUDY", "떨어지는 뜻을 보고 영어 단어 치기", "keyboard", "점", 1_000_000),
     )
 }

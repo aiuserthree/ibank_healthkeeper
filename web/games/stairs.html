@@ -537,11 +537,13 @@
   function saveBest(v){
     try{ localStorage.setItem('gyedan-best', String(v)); }catch(e){}
   }
+  // 소리 설정은 라운지 다른 게임들과 같은 값(hk-play-muted)을 쓴다. iframe 안에 들어가면 바깥 틀 버튼을 따른다
+  var inLounge = window.parent !== window;
   function loadMuted(){
-    try{ return localStorage.getItem('gyedan-mute') === '1'; }catch(e){ return false; }
+    try{ return localStorage.getItem('hk-play-muted') === '1'; }catch(e){ return false; }
   }
   function saveMuted(m){
-    try{ localStorage.setItem('gyedan-mute', m ? '1' : '0'); }catch(e){}
+    try{ localStorage.setItem('hk-play-muted', m ? '1' : '0'); }catch(e){}
   }
 
   // ---------- audio ----------
@@ -552,6 +554,15 @@
     elMute.setAttribute('aria-pressed', muted ? 'true' : 'false');
   }
   updateMuteBtn();
+  if(inLounge){
+    elMute.hidden = true;
+    window.addEventListener('message', function(e){
+      if(e.origin !== location.origin || !e.data || e.data.type !== 'hk-mute') return;
+      muted = !!e.data.muted;
+      if(master) master.gain.value = muted ? 0 : 0.5;
+      updateMuteBtn();
+    });
+  }
 
   function audio(){
     if(!AC){
@@ -1579,6 +1590,8 @@
   var TABS = [[$('tabAll'), $('tabWeek')], [$('tabAll2'), $('tabWeek2')]];
 
   var me = null;
+  // 점심 라운지 공통 틀(/games/stairs) 안에 iframe 으로 들어가 있으면 점수 저장·결과 창은 바깥 틀이 맡는다
+  var embedded = window.parent !== window;
   var players = [];
   var refreshSeq = 0;
   var lastRefreshAt = 0;
@@ -1617,7 +1630,7 @@
 
   // 왼쪽 위 칩 — 내 사진·이름, 누르면 점심 라운지로
   function renderChip(){
-    if(!me){ elChip.classList.remove('show'); return; }
+    if(!me || embedded){ elChip.classList.remove('show'); return; }
     elChip.innerHTML = '';
     var back = document.createElement('span');
     back.className = 'back';
@@ -1906,6 +1919,11 @@
   window.addEventListener('gyedan:gameover', function(e){
     var score = e.detail && e.detail.score;
     if(!me || !score || score < 1){ refresh(); return; }
+    if(embedded){
+      window.parent.postMessage({ type: 'hk-game-over', score: score }, location.origin);
+      setTimeout(refresh, 1500);
+      return;
+    }
     api('/play/stairs/score', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

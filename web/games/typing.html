@@ -578,14 +578,20 @@ friendly|친절한|kind
         return v;
       }
 
+      let lastLen = 0, lastTickAt = 0;
       function onInput() {
         if (state !== "play") { input.value = ""; return; }
         const v = refreshTarget();
+        const grew = v.length > lastLen;
+        lastLen = v.length;
         if (!v) return;
         // 정확히 맞으면 자동으로 터뜨림
         let hit = null;
         for (const c of cards) if (!c.dead && c.entry.answers.includes(v) && (!hit || c.y > hit.y)) hit = c;
-        if (hit) pop(hit);
+        if (hit) return pop(hit);
+        // 카드와 맞아 들어가는 글자일 때만 아주 작게 똑 — 빠르게 칠 땐 120ms 간격으로 솎음
+        const now = performance.now();
+        if (grew && target && now - lastTickAt > 120) { lastTickAt = now; ctx.sfx("tick"); }
       }
       input.addEventListener("input", onInput);
 
@@ -600,10 +606,12 @@ friendly|친절한|kind
         for (const c of cards) if (!c.dead && c.entry.answers.includes(v) && (!hit || c.y > hit.y)) hit = c;
         if (hit) return pop(hit);
         // 틀린 입력 — 콤보가 끊겨요
+        ctx.sfx("invalid");
         combo = 0;
         renderHud();
         input.classList.remove("is-shake"); void input.offsetWidth; input.classList.add("is-shake");
         input.value = "";
+        lastLen = 0;
         refreshTarget();
       });
 
@@ -639,6 +647,8 @@ friendly|친절한|kind
         c.el.style.transform = `translate(${c.x}px, ${y}px) scale(1.25)`;
         setTimeout(() => c.el.remove(), 260);
         floatText(c.x + c.w / 2, y, `+${gain}${mult > 1 ? ` ×${mult}` : ""}`, c.gold);
+        // 금빛 카드는 powerup, 연속 2개째부터 combo(n), 첫 개는 pop
+        ctx.sfx(c.gold ? "powerup" : combo >= 2 ? "combo" : "pop", Math.min(10, combo));
         if (c.gold) {
           freezeT = 3;
           field.classList.add("is-frozen");
@@ -649,6 +659,7 @@ friendly|친절한|kind
         const chip = $("#gm-ty-combo");
         chip.classList.add("is-bump"); setTimeout(() => chip.classList.remove("is-bump"), 150);
         input.value = "";
+        lastLen = 0;
         target = null;
         refreshTarget();
         renderHud();
@@ -663,6 +674,7 @@ friendly|친절한|kind
         // 정답을 보여 주고 사라짐
         c.el.querySelectorAll(".gm-ty-slots i").forEach((s, i) => { s.textContent = c.entry.word[i]; s.classList.add("is-on"); });
         c.el.classList.add("is-miss");
+        ctx.sfx(hearts <= 0 ? "lose" : "hurt");
         setTimeout(() => c.el.remove(), 900);
         field.classList.remove("is-hurt"); void field.offsetWidth; field.classList.add("is-hurt");
         renderHud();
@@ -674,7 +686,7 @@ friendly|친절한|kind
       function update(dt) {
         elapsed += dt;
         const lv = levelOf(elapsed);
-        if (lv !== level) { level = lv; banner(`단계 ${level} · 조금 더 빨라져요`); renderHud(); }
+        if (lv !== level) { level = lv; banner(`단계 ${level} · 조금 더 빨라져요`); renderHud(); ctx.sfx("line"); }
         if (freezeT > 0) {
           freezeT -= dt;
           $("#gm-ty-freeze").hidden = false;
@@ -727,6 +739,8 @@ friendly|친절한|kind
         hideOver();
         state = "play";
         last = performance.now();
+        lastLen = 0;
+        ctx.sfx("go");
         input.focus({ preventScroll: true });
         setTimeout(layout, 300);
         fieldW = field.clientWidth;
