@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>건강 초성 퀴즈 — 게임 라운지</title>
+  <title>건강 초성 퀴즈 — 아케이드</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -209,15 +209,19 @@
         const toCho = (word) => Array.from(word).map((c) => (c === " " ? " " : choOf(c))).join("");
 
         // 오늘의 5문제 — 같은 날이면 모든 직원이 같은 문제 (ctx.rng)
+        // 오늘 문제 — 섞어 둔 낱말 줄에서 날마다 다음 5개를 낸다 (한 바퀴 약 17일 동안 같은 낱말이 다시 나오지 않음)
         function todaysQuestions() {
-          const r = ctx.rng("bank");
+          const [y, m, d] = ctx.today.split("-").map(Number);
+          const day = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(2026, 0, 1)) / 86400000);
+          const r = HKPlay.seededRng("chosung-bank");
           const ids = BANK.map((_, i) => i);
           for (let i = ids.length - 1; i > 0; i--) {
             const j = Math.floor(r() * (i + 1));
             [ids[i], ids[j]] = [ids[j], ids[i]];
           }
           // 짧은 낱말부터 → 뒤로 갈수록 어려워지게
-          return ids.slice(0, COUNT).map((i) => BANK[i]).sort((a, b) => norm(a[0]).length - norm(b[0]).length);
+          const n = ids.length, from = (((day * COUNT) % n) + n) % n;
+          return Array.from({ length: COUNT }, (_, j) => BANK[ids[(from + j) % n]]).sort((a, b) => norm(a[0]).length - norm(b[0]).length);
         }
 
         let qs = [], idx = 0, results = [], hintsTotal = 0;

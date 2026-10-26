@@ -262,7 +262,7 @@ window.HKPlay = (function () {
 
   function boardHtml() {
     return `<aside class="hk-card hk-play-board">
-        <div class="hk-play-board__head">${HKUI.icon("trophy", 18, "var(--color-warning)")}<b>사내 순위</b><span class="hk-play-board__count" id="hk-play-count"></span></div>
+        <div class="hk-play-board__head">${HKUI.icon("trophy", 18, "var(--color-warning)")}<b>사내 순위</b><span class="hk-play-board__count" id="hk-play-count"></span><button type="button" class="hk-play-board__close" aria-label="순위 닫기">${HKUI.icon("x", 18, "currentColor")}</button></div>
         <div class="hk-play-tabs" role="tablist">${PERIODS.map(([k, l], i) => `<button type="button" role="tab" class="hk-play-tab${i === 0 ? " is-active" : ""}" data-period="${k}">${l}</button>`).join("")}</div>
         <div id="hk-play-board-body"><div style="text-align:center;padding:28px"><span class="hk-spin"></span></div></div>
       </aside>`;
@@ -312,7 +312,14 @@ window.HKPlay = (function () {
     const pauseFns = [];
     const GO_TEXT = /시작|출발|출근하기|도전|계속하기|이어서|다시 하기|다시 달리기|준비/;
     const RESUME_TEXT = /계속하기|이어서/;
-    function visibleButton(re) {
+    // 순위표는 판이 끝났을 때만 오른쪽에서 열린다 — 새 판을 시작하면 닫는다
+    let runNo = 0; // 새 판마다 1씩 — 순위를 받아 오는 사이에 새 판이 시작됐으면 열지 않는다
+    function setPlaying(on) {
+      if (!on) return;
+      runNo++;
+      openBoard(false);
+    }
+        function visibleButton(re) {
       const stageEl = document.getElementById("hk-play-stage");
       if (!stageEl) return null;
       return [...stageEl.querySelectorAll("button")].find((b) => {
@@ -347,6 +354,7 @@ window.HKPlay = (function () {
           e.stopImmediatePropagation();
           canRestart = false;
           document.querySelector(".hk-play-result")?.remove();
+          setPlaying(true);
           restartFns.forEach((fn) => fn());
           return;
         }
@@ -383,7 +391,7 @@ window.HKPlay = (function () {
     document.getElementById("app").innerHTML = `<div class="hk-pf">
         <header class="hk-pf__bar" id="hk-play-head"></header>
         <div class="hk-pf__body">
-          <main class="hk-pf__main" id="hk-pf-main"><div class="hk-play-stage" id="hk-play-stage"></div></main>
+          <main class="hk-pf__main" id="hk-pf-main"><div class="hk-play-frame"><div class="hk-play-stage" id="hk-play-stage"></div></div></main>
           ${boardHtml()}
         </div>
         <div class="hk-pf__scrim" id="hk-pf-scrim" hidden></div>
@@ -395,7 +403,7 @@ window.HKPlay = (function () {
         const meta = list.find((g) => g.key === key) || game || { key, title: key, unit: "" };
         game = { ...meta, ...(game || {}) };
         const dailyDone = !!(meta.dailyOnce && meta.playedToday);
-        document.getElementById("hk-play-head").innerHTML = `<a class="hk-pf__back" href="${HKRoutes.lounge}" aria-label="게임 라운지로">${HKUI.icon("chevron-left", 20, "currentColor")}<span>게임 라운지</span></a>
+        document.getElementById("hk-play-head").innerHTML = `<a class="hk-pf__back" href="${HKRoutes.lounge}" aria-label="아케이드로">${HKUI.icon("chevron-left", 20, "currentColor")}<span>아케이드</span></a>
           <span class="hk-pf__icon" style="${tintStyle(key)}">${HKUI.icon(meta.icon || "gamepad-2", 18, "#fff")}</span>
           <div class="hk-pf__title"><b>${HKUI.escapeHtml(meta.title)}</b><small>${HKUI.escapeHtml(meta.desc || "")}</small></div>
           <div class="hk-pf__tools">
@@ -418,7 +426,7 @@ window.HKPlay = (function () {
           HKSound.play("select");
           soundBtn.blur();
         };
-        document.title = `${meta.title} — 게임 라운지`;
+        document.title = `${meta.title} — 아케이드`;
         document.querySelectorAll(".hk-play-tab").forEach((b) => {
           b.onclick = () => {
             period = b.dataset.period;
@@ -440,6 +448,8 @@ window.HKPlay = (function () {
           sfx: (name, arg) => HKSound.play(name, arg),
           onRestart: (fn) => restartFns.push(fn),
           onPause: (fn) => pauseFns.push(fn),
+          // 버튼 없이 시작하는 게임(예: iframe 안의 게임)이 새 판 시작을 알릴 때
+          started: () => setPlaying(true),
           begin: async () => {
             if (!game.dailyOnce) return true;
             try {
@@ -456,6 +466,7 @@ window.HKPlay = (function () {
             }
           },
           submit: async (score) => {
+            setPlaying(false);
             const value = Math.max(0, Math.round(score));
             let result;
             try {
@@ -468,7 +479,10 @@ window.HKPlay = (function () {
             if (result.counted && game.dailyOnce) ctx.dailyDone = true;
             resultBanner(game, result);
             canRestart = true;
-            loadBoard();
+            const run = runNo;
+            await loadBoard();
+            // 넓은 화면은 끝나자마자 순위표를 연다 (휴대폰은 '순위' 버튼으로)
+            if (run === runNo && window.matchMedia("(min-width: 900px)").matches) openBoard(true);
             return result;
           },
         };
@@ -486,6 +500,16 @@ window.HKPlay = (function () {
           }, 60000);
           return;
         }
+        // 시작·다시 하기·이어 하기 버튼을 누르면 게임 중으로 본다 (스페이스로 누르는 것도 여기로 온다)
+        stage.addEventListener(
+          "click",
+          (e) => {
+            const b = e.target.closest && e.target.closest("button");
+            const label = b ? (b.textContent || "").replace(/\s+/g, " ").trim() : "";
+            if (b && label.length <= 12 && GO_TEXT.test(label)) setPlaying(true);
+          },
+          true
+        );
         setup(stage, ctx);
         fitStage(stage);
         bindDrawer();
@@ -499,54 +523,58 @@ window.HKPlay = (function () {
         <h2>지금은 업무 시간이에요</h2>
         <p>게임은 <b>점심시간(11:30~13:00)</b>과 <b>퇴근 후(18:00~)</b>, <b>출근 전(~09:00)</b>, 주말·공휴일에 할 수 있어요.</p>
         ${opensAt ? `<p class="hk-play-closed__next">${HKUI.icon("clock", 16, "currentColor")} 오늘 <b>${opensAt}</b>에 다시 열려요</p>` : ""}
-        <a class="hk-btn hk-btn--secondary" href="${HKRoutes.lounge}">게임 라운지로</a>
+        <a class="hk-btn hk-btn--secondary" href="${HKRoutes.lounge}">아케이드로</a>
       </div>`;
   }
 
   // 순위 버튼(좁은 화면) — 오른쪽에서 밀려 나오는 순위표
-  function bindDrawer() {
+  // 순위표 서랍 — 넓은 화면은 게임을 가리지 않게 어둡게 덮지 않고, 휴대폰은 뒤를 어둡게
+  function openBoard(on) {
     const board = document.querySelector(".hk-pf .hk-play-board");
     const scrim = document.getElementById("hk-pf-scrim");
-    const open = (on) => {
-      board.classList.toggle("is-open", on);
-      scrim.hidden = !on;
-    };
-    document.getElementById("hk-pf-rank").onclick = () => open(!board.classList.contains("is-open"));
-    scrim.onclick = () => open(false);
-    window.addEventListener("keydown", (e) => e.key === "Escape" && board.classList.contains("is-open") && open(false));
+    if (!board) return;
+    board.classList.toggle("is-open", on);
+    if (scrim) scrim.hidden = !on || window.matchMedia("(min-width: 900px)").matches;
+  }
+  function bindDrawer() {
+    const board = document.querySelector(".hk-pf .hk-play-board");
+    document.getElementById("hk-pf-rank").onclick = () => openBoard(!board.classList.contains("is-open"));
+    document.getElementById("hk-pf-scrim").onclick = () => openBoard(false);
+    board.querySelector(".hk-play-board__close").onclick = () => openBoard(false);
+    window.addEventListener("keydown", (e) => e.key === "Escape" && board.classList.contains("is-open") && openBoard(false));
   }
 
-  // 게임 영역을 화면에 꽉 차게 — 게임마다 세로·가로 비율이 달라서, 지금 비율을 재고
-  // 화면 높이·폭 안에 들어가는 가장 큰 폭으로 맞춘다 (게임들은 폭에 맞춰 다시 그린다)
+  // 게임 판이 쓸 수 있는 높이 — 가운데 영역 높이에서 판 밖(점수 줄·안내 줄 등) 높이를 뺀다
+  function roomFor(stage, el) {
+    const cs = getComputedStyle(stage);
+    const avail = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    const root = stage.firstElementChild;
+    const chrome = el && root ? Math.max(0, root.getBoundingClientRect().height - el.getBoundingClientRect().height) : 0;
+    return Math.floor(avail - chrome);
+  }
+
+  // 모든 게임을 같은 크기의 창 안에 — 창 높이는 화면 가운데 영역 높이, 폭은 높이 × FRAME_RATIO
+  // (출근길 대작전·비타민 3매치 비율). 화면이 좁으면 화면 폭에 맞춘다. 게임들은 창 크기에 맞춰 다시 그린다
+  const FRAME_RATIO = 0.88;
   function fitStage(stage) {
     const main = document.getElementById("hk-pf-main");
-    const MAX_W = 760;
-    let selfResize = false;
+    const frame = stage.parentElement;
     function fit() {
-      const W = main.clientWidth - 24;
-      const H = main.clientHeight - 24;
-      const w = stage.getBoundingClientRect().width;
-      const h = stage.scrollHeight;
-      if (!w || !h || W <= 0 || H <= 0) return;
-      const target = Math.round(Math.max(Math.min(300, W), Math.min(W, (H * w) / h, MAX_W)));
-      if (Math.abs(target - w) < 6) return;
-      stage.style.width = `${target}px`;
-      selfResize = true;
+      const pad = parseFloat(getComputedStyle(main).paddingTop) * 2;
+      const H = Math.max(360, main.clientHeight - pad);
+      const W = Math.max(280, Math.min(main.clientWidth - pad, Math.round(H * FRAME_RATIO)));
+      if (frame.style.width === `${W}px` && frame.style.height === `${H}px`) return;
+      frame.style.width = `${W}px`;
+      frame.style.height = `${H}px`;
       window.dispatchEvent(new Event("resize"));
-      selfResize = false;
     }
-    stage.style.width = `${Math.min(main.clientWidth - 24, 560)}px`;
+    fit();
     let timer = null;
-    const later = () => {
+    window.addEventListener("resize", () => {
       clearTimeout(timer);
       timer = setTimeout(fit, 60);
-    };
-    window.addEventListener("resize", () => !selfResize && later());
-    // 시작 화면 → 플레이처럼 내용이 바뀌면 다시 맞춘다 (맞추는 동안 생기는 변화는 무시하고 몇 번만)
-    let passes = 0;
-    new ResizeObserver(() => passes++ < 40 && later()).observe(stage);
-    [80, 300, 800].forEach((ms) => setTimeout(fit, ms));
+    });
   }
 
-  return { closedHtml, mountGame, tintStyle, formatScore, seededRng, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
+  return { closedHtml, mountGame, roomFor, tintStyle, formatScore, seededRng, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
 })();

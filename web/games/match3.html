@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>비타민 3매치 — 게임 라운지</title>
+  <title>비타민 3매치 — 아케이드</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -305,6 +305,7 @@
         stage.querySelectorAll("[data-v]").forEach((el) => (V[el.dataset.v] = el));
 
         let S = 50, NR = 8, NC = 8;
+        const BASE_DIM = Math.max(...MAPS.map((mp) => Math.max(mp.m.length, mp.m[0].length)));
         let mask = [], stoneHp = [], stoneEl = [], board = [], cellsEl = null;
         let stageNo = 1, C = cfg(1), mapIdx = 0, mapOrder = [];
         let score = 0, stageScore = 0, timeLeft = C.timeMs, gauge = 0, feverLeft = 0, doubleLeft = 0, spawnLeft = 0, seenItems = new Set();
@@ -321,13 +322,17 @@
         const N4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
         // ---------- 크기 (stage 폭에 맞춰 — 공통 틀이 화면 높이에 맞게 stage 폭을 정한다) ----------
-        function layout() {
+        function layout(again = true) {
           const W = stage.clientWidth || 340;
-          const dim = Math.max(NR, NC);
+          // 비타민 크기는 단계와 상관없이 가장 큰 맵(9×9) 기준 — 작은 맵은 같은 크기 판 자리 가운데에 놓는다
+          const dim = BASE_DIM;
           const inner = Math.min(W - 14, 660);
-          S = Math.floor(inner / dim);
+          // 폭과 창 높이 둘 다에 들어가게 (판 위 점수·목표 줄 높이는 빼고)
+          const room = HKPlay.roomFor(stage, boardWrap) - 12;
+          S = Math.max(24, Math.floor(Math.min(inner / dim, room / dim)));
           boardEl.style.width = S * NC + "px";
           boardEl.style.height = S * NR + "px";
+          boardWrap.style.padding = `${6 + ((dim - NR) * S) / 2}px ${6 + ((dim - NC) * S) / 2}px`;
           wrapEl.style.maxWidth = Math.max(S * dim + 14, 300) + "px";
           if (cellsEl) cellsEl.querySelectorAll(".gm-cell").forEach((el) => {
             const r = +el.dataset.r, c = +el.dataset.c;
@@ -339,6 +344,8 @@
             const st = stoneEl[r] && stoneEl[r][c];
             if (st) posStone(st, r, c);
           }
+          // 처음엔 판 높이를 몰라 남은 높이를 작게 재므로 한 번 더 맞춘다
+          if (again) layout(false);
         }
 
         // ---------- 타일 ----------

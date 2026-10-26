@@ -768,15 +768,22 @@ body {
 .hk-pf__tools { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .hk-pf__body { flex: 1; min-height: 0; display: flex; }
 .hk-pf__main { flex: 1; min-width: 0; overflow: auto; display: flex; justify-content: center; align-items: flex-start; padding: 12px; box-sizing: border-box; }
-.hk-pf .hk-play-stage { max-width: none; margin: auto 0; }
-.hk-pf .hk-play-board { position: static; width: 320px; flex-shrink: 0; margin: 12px 12px 12px 0; overflow-y: auto; border-radius: 16px; box-sizing: border-box; }
+/* 모든 게임이 같은 크기의 창 — 창 크기는 공통 틀(fitStage)이 정하고, 게임은 창 안쪽(stage)에 맞춰 그린다.
+   내용은 창 가운데, 넘치면 창 안에서 스크롤 */
+.hk-play-frame { box-sizing: border-box; margin: auto; display: flex; padding: 14px; border-radius: 20px; background: var(--surface-card, #fff); border: 1px solid var(--border-default); box-shadow: 0 8px 28px rgba(15, 23, 42, .08); }
+.hk-pf .hk-play-frame > .hk-play-stage { flex: 1; min-width: 0; min-height: 0; max-width: none; margin: 0; display: flex; flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+.hk-pf .hk-play-stage > * { flex-shrink: 0; margin-top: auto; margin-bottom: auto; }
+.hk-pf .hk-play-stage > .gm-st { flex: 1; }
+/* 순위표 — 평소엔 접혀 있다가 판이 끝나면(또는 '순위' 버튼) 오른쪽에서 열린다. 게임은 화면 폭을 다 쓴다 */
+.hk-pf .hk-play-board { position: fixed; z-index: 41; top: 68px; right: 12px; bottom: 12px; margin: 0; width: min(340px, 88vw); overflow-y: auto; border-radius: 16px; box-sizing: border-box; transform: translateX(calc(100% + 24px)); transition: transform .22s ease; box-shadow: -8px 0 24px rgba(15, 23, 42, .14); }
+.hk-pf .hk-play-board.is-open { transform: none; }
 .hk-pf .hk-play-board__list { max-height: none; }
-.hk-pf__rank-btn { display: none; }
+.hk-play-board__close { margin-left: 6px; width: 30px; height: 30px; border: 0; border-radius: 8px; background: transparent; color: var(--text-muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.hk-play-board__close:hover { background: var(--color-mist); color: var(--color-midnight-navy); }
+.hk-pf__rank-btn { display: inline-flex; }
 .hk-pf__scrim { position: fixed; inset: 0; z-index: 40; background: rgba(15, 23, 42, .35); }
-@media (max-width: 1099px) {
-  .hk-pf__rank-btn { display: inline-flex; }
-  .hk-pf .hk-play-board { position: fixed; z-index: 41; top: 0; right: 0; bottom: 0; margin: 0; width: min(340px, 88vw); border-radius: 16px 0 0 16px; transform: translateX(105%); transition: transform .22s ease; box-shadow: -8px 0 24px rgba(15, 23, 42, .18); }
-  .hk-pf .hk-play-board.is-open { transform: none; }
+@media (max-width: 640px) {
+  .hk-pf .hk-play-board { top: 0; right: 0; bottom: 0; border-radius: 16px 0 0 16px; }
 }
 @media (max-width: 640px) {
   .hk-pf__bar { height: 50px; gap: 6px; padding: 0 8px; }
@@ -785,6 +792,7 @@ body {
   .hk-pf__tools .hk-play-sound span { display: none; }
   .hk-pf__tools .hk-play-sound { padding: 7px 9px; }
   .hk-pf__main { padding: 8px; }
+  .hk-play-frame { padding: 6px; border-radius: 16px; }
 }
 
 /* 판이 끝났을 때 위쪽 결과 띠 */

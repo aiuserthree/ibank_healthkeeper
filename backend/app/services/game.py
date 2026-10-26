@@ -36,13 +36,13 @@ class Game:
 GAMES: dict[str, Game] = {
     g.key: g
     for g in (
-        Game("stairs", "별까지 계단", "MINI", "좌우 계단을 골라 별까지 · 동료 기록 깃발 넘기", "sparkles", "층", 100000),
-        Game("match3", "비타민 3매치", "MINI", "3개·네모로 맞춰 펑! · 단계마다 새 맵과 목표", "cherry", "점", 10_000_000),
-        Game("crossing", "출근길 대작전", "MINI", "차·자전거·지각선을 피해 회사까지 한 칸씩", "footprints", "칸", 100000),
         Game("blocks", "점심 블록", "MINI", "줄을 채워 지우기 · 10줄마다 도시락 블록", "blocks", "점", 10_000_000),
+        Game("shooter", "세균 격파", "MINI", "9가지 무기로 세균 편대 격파 · 같은 무기 3단계", "rocket", "점", 10_000_000),
+        Game("match3", "비타민 3매치", "MINI", "3개·네모로 맞춰 펑! · 단계마다 새 맵과 목표", "cherry", "점", 10_000_000),
+        Game("stairs", "별까지 계단", "MINI", "좌우 계단을 골라 별까지 · 동료 기록 깃발 넘기", "sparkles", "층", 100000),
+        Game("crossing", "출근길 대작전", "MINI", "차·자전거·지각선을 피해 회사까지 한 칸씩", "footprints", "칸", 100000),
         Game("pairs", "아이콘 짝 잇기", "MINI", "같은 그림을 두 번 이하로 꺾어 잇기 · 콤보", "link", "점", 1_000_000),
         Game("bricks", "벽돌 깨기", "MINI", "공을 튕겨 야근·회의 벽돌 부수기", "brick-wall", "점", 10_000_000),
-        Game("shooter", "세균 격파", "MINI", "9가지 무기로 세균 편대 격파 · 같은 무기 3단계", "rocket", "점", 10_000_000),
         Game("bubble", "비눗방울 대작전", "MINI", "비눗방울에 세균을 가두고 톡 터뜨리기", "droplets", "점", 10_000_000),
         Game("sudoku", "오늘의 스도쿠", "MINI", "모두 같은 문제 · 빨리 푼 순서대로", "grid-3x3", "time", 24 * 3600, lower_better=True, daily_once=True),
         Game("chosung", "건강 초성 퀴즈", "QUIZ", "ㄱㅂㅁ → 거북목 · 오늘의 건강 낱말 5문제", "spell-check", "점", 100000, daily_once=True),
