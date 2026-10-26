@@ -42,6 +42,7 @@
     .gm-ty-slots { display: flex; justify-content: center; gap: 2px; margin-top: 5px; font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #a5a8c8; letter-spacing: 0; }
     .gm-ty-slots i { font-style: normal; display: inline-block; width: 9px; border-bottom: 2px solid #d4d6ea; padding-bottom: 2px; height: 14px; }
     .gm-ty-slots i.is-on { color: #4f46e5; border-color: #4f46e5; }
+    .gm-ty-slots i.is-hint { color: #f97316; border-color: #fdba74; }
     .gm-ty-card.is-target { box-shadow: 0 6px 18px rgba(79,70,229,.28), inset 0 0 0 2.5px #4f46e5; z-index: 3; }
     .gm-ty-card.is-danger:not(.is-target) { box-shadow: 0 2px 8px rgba(244,63,94,.2), inset 0 0 0 2px #fda4af; }
     .gm-ty-card--gold { background: linear-gradient(135deg, #fde68a, #fbbf24); color: #78350f; box-shadow: 0 4px 14px rgba(245,158,11,.4), inset 0 0 0 1.5px #f59e0b; }
@@ -516,7 +517,7 @@ friendly|친절한|kind
         if (gold) lastGoldAt = elapsed;
         const el = document.createElement("div");
         el.className = "gm-ty-card" + (gold ? " gm-ty-card--gold" : "");
-        el.innerHTML = `${gold ? `<span class="gm-ty-star">${STAR}</span>` : ""}<b></b><span class="gm-ty-slots">${"<i></i>".repeat(entry.word.length)}</span>`;
+        el.innerHTML = `${gold ? `<span class="gm-ty-star">${STAR}</span>` : ""}<b></b><span class="gm-ty-slots"><i class="is-hint">${entry.word[0]}</i>${"<i></i>".repeat(entry.word.length - 1)}</span>`;
         el.querySelector("b").textContent = entry.meaning;
         field.insertBefore(el, over);
         const w = el.offsetWidth, h = el.offsetHeight;
@@ -553,8 +554,10 @@ friendly|친절한|kind
         const showWord = ans && ans.length === c.entry.word.length ? ans : c.entry.word;
         slots.forEach((s, i) => {
           const on = !!typed && i < typed.length && ans === showWord;
-          s.textContent = on ? showWord[i] : "";
+          // 첫 글자는 늘 힌트로 보여 준다
+          s.textContent = on ? showWord[i] : i === 0 ? c.entry.word[0] : "";
           s.classList.toggle("is-on", on);
+          s.classList.toggle("is-hint", !on && i === 0);
         });
       }
 
