@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아이콘 짝 잇기 — 점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-pr { --gm-a: #0f8b8d; --gm-b: #57cc99; --gm-ink: #0b3b3c; position: relative; user-select: none; -webkit-user-select: none; touch-action: manipulation; outline: none; }
+    .gm-pr__bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: nowrap; }
+    .gm-pr__chip { display: inline-flex; align-items: center; gap: 5px; padding: 7px 11px; border-radius: 12px; background: #e9f6f2; color: var(--gm-ink); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-pr__chip b { font-size: 16px; }
+    .gm-pr__gap { flex: 1; }
+    .gm-pr__hintbtn { border: 0; display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 12px; background: var(--gm-a); color: #fff; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .gm-pr__hintbtn:disabled { background: #cbd5e1; cursor: default; }
+    .gm-pr__hintbtn small { font-weight: 600; opacity: .8; font-size: 12px; }
+    .gm-pr__time { position: relative; height: 10px; border-radius: 999px; background: #e2e8f0; overflow: hidden; margin-bottom: 4px; }
+    .gm-pr__time i { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--gm-a), var(--gm-b)); transition: width .2s linear; }
+    .gm-pr__time.is-low i { background: linear-gradient(90deg, #dc2626, #fb923c); }
+    .gm-pr__meta { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-muted); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+    .gm-pr__meta b { color: var(--gm-ink); }
+    .gm-pr__wrap { position: relative; padding: 10px; border-radius: 16px; background: linear-gradient(160deg, #effaf6, #e3f3f4); border: 1px solid #cfe9e4; }
+    .gm-pr__board { position: relative; width: 100%; }
+    .gm-pr__tile { position: absolute; padding: 2.5px; border: 0; background: transparent; cursor: pointer; transition: transform .12s, opacity .25s; -webkit-tap-highlight-color: transparent; }
+    .gm-pr__face { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 22%; background: var(--bg); color: var(--fg); box-shadow: inset 0 -3px 0 rgba(0,0,0,.08), 0 1px 2px rgba(15,23,42,.10); transition: box-shadow .1s, transform .1s; }
+    .gm-pr__face svg { width: 62% !important; height: 62% !important; stroke-width: 2; }
+    .gm-pr__tile:hover .gm-pr__face { transform: translateY(-1px); }
+    .gm-pr__tile.is-sel .gm-pr__face { box-shadow: 0 0 0 3px #fff, 0 0 0 5.5px var(--gm-a); transform: scale(1.06); }
+    .gm-pr__tile.is-cur .gm-pr__face { outline: 2.5px dashed var(--gm-a); outline-offset: 1px; }
+    .gm-pr__tile.is-hint .gm-pr__face { animation: gm-pr-hint .6s ease-in-out infinite alternate; }
+    @keyframes gm-pr-hint { from { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #facc15; } to { box-shadow: 0 0 0 3px #fff, 0 0 0 8px rgba(250,204,21,.55); transform: scale(1.08); } }
+    .gm-pr__tile.is-gone { opacity: 0; transform: scale(.4); pointer-events: none; }
+    .gm-pr__tile.is-shake { animation: gm-pr-shake .3s; }
+    @keyframes gm-pr-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    .gm-pr__svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 2; }
+    .gm-pr__svg polyline { fill: none; stroke: #f59e0b; stroke-width: 5px; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 2px rgba(0,0,0,.25)); animation: gm-pr-line .38s ease-out forwards; }
+    @keyframes gm-pr-line { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+    .gm-pr__combo { position: absolute; z-index: 4; pointer-events: none; transform: translate(-50%, -50%); padding: 5px 12px; border-radius: 999px; background: linear-gradient(135deg, #f59e0b, #ef4444); color: #fff; font-weight: 800; font-size: 15px; white-space: nowrap; animation: gm-pr-pop .9s ease-out forwards; box-shadow: 0 4px 10px rgba(239,68,68,.3); }
+    .gm-pr__combo.is-plain { background: var(--gm-a); box-shadow: none; font-size: 13px; }
+    @keyframes gm-pr-pop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.7); } 20% { opacity: 1; transform: translate(-50%, -60%) scale(1.08); } 100% { opacity: 0; transform: translate(-50%, -150%) scale(1); } }
+    .gm-pr__combometer { height: 4px; border-radius: 999px; background: transparent; margin-top: 8px; overflow: hidden; }
+    .gm-pr__combometer i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f59e0b, #ef4444); border-radius: 999px; }
+    .gm-pr__cover { position: absolute; inset: 0; z-index: 5; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 20px; text-align: center; color: #fff; background: linear-gradient(135deg, #0f8b8d, #57cc99); }
+    .gm-pr__cover[hidden] { display: none; }
+    .gm-pr__cover h2 { margin: 0; color: #fff; font-size: 24px; }
+    .gm-pr__cover p { margin: 0; font-size: 14px; line-height: 1.6; color: rgba(255,255,255,.92); }
+    .gm-pr__cover .gm-pr__keys { font-size: 12.5px; color: rgba(255,255,255,.78); }
+    .gm-pr__cover .gm-pr__big { font-size: 34px; font-weight: 800; }
+    .gm-pr__demo { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+    .gm-pr__demo span { width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,.95); display: flex; align-items: center; justify-content: center; }
+    .gm-pr__demo em { width: 34px; height: 3px; border-radius: 3px; background: #fde68a; }
+    .gm-pr__go { border: 0; padding: 12px 34px; border-radius: 14px; background: #fff; color: var(--gm-a); font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .gm-pr__go:hover { background: #f0fdf9; }
+    .gm-pr__help { margin: 10px 0 0; font-size: 12.5px; color: var(--text-muted); text-align: center; }
+    @media (max-width: 640px) {
+      .gm-pr__wrap { padding: 8px; }
+      .gm-pr__chip { padding: 6px 9px; font-size: 13px; }
+      .gm-pr__hintbtn { padding: 6px 10px; font-size: 13px; }
+      .gm-pr__help { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "pairs",
+      setup(stage, ctx) {
+        // 건강·음식·운동 아이콘 (lucide 0.460) — [이름, 바탕색, 그림색]
+        const KINDS = [
+          ["apple", "#ffe1e1", "#dc2626"],
+          ["carrot", "#ffe6cf", "#ea580c"],
+          ["dumbbell", "#e2e8f0", "#334155"],
+          ["heart-pulse", "#ffe0ec", "#db2777"],
+          ["bike", "#dbf1ff", "#0284c7"],
+          ["coffee", "#efe2d6", "#7c4a1e"],
+          ["banana", "#fff4bf", "#b48a00"],
+          ["salad", "#ddf7e3", "#15803d"],
+          ["grape", "#efe3ff", "#7c3aed"],
+          ["glass-water", "#d8f7fb", "#0891b2"],
+          ["moon", "#e2e4ff", "#4338ca"],
+          ["footprints", "#f3ead8", "#92670f"],
+          ["pill", "#fde4f6", "#c026d3"],
+          ["fish", "#dcecff", "#1d4ed8"],
+          ["sprout", "#ecf7d4", "#4d7c0f"],
+          ["sun", "#fff0c9", "#d97706"],
+          ["egg", "#fbf3e4", "#a16207"],
+          ["stethoscope", "#d7f3ee", "#0f766e"],
+          ["soup", "#ffe5d6", "#c2410c"],
+          ["bed", "#e5e7ff", "#5b5bd6"],
+          ["cherry", "#ffe0e6", "#be123c"],
+          ["volleyball", "#fff1d6", "#c2410c"],
+          ["brain", "#fbe3ff", "#a21caf"],
+          ["citrus", "#f0fbd0", "#65a30d"],
+          ["milk", "#eef2f6", "#475569"],
+          ["timer", "#d9f4ef", "#0f8b8d"],
+        ];
+        const TIME_LIMIT = 120;
+        const CLEAR_TIME = 15; // 판을 비우면 더해 주는 시간
+        const COMBO_WINDOW = 3000;
+        const HINTS = 3;
+        const HINT_COST = 300;
+        const MAX_SCORE = 1_000_000;
+
+        // 아이콘 SVG 를 한 번만 만들어 두고 재사용
+        const svgCache = {};
+        function svgOf(name) {
+          if (!svgCache[name]) {
+            const tmp = document.createElement("div");
+            tmp.innerHTML = HKUI.icon(name, 24, "currentColor");
+            HKUI.refreshIcons(tmp);
+            // 아이콘 스크립트가 아직 없으면 캐시하지 않고 다음에 다시 만든다
+            if (!tmp.querySelector("svg")) return tmp.innerHTML;
+            svgCache[name] = tmp.innerHTML;
+          }
+          return svgCache[name];
+        }
+
+        stage.innerHTML = `<div class="gm-pr" tabindex="0">
+          <div class="gm-pr__bar">
+            <span class="gm-pr__chip">${HKUI.icon("star", 15, "currentColor")}<b data-score>0</b></span>
+            <span class="gm-pr__chip">${HKUI.icon("layers", 15, "currentColor")}<span data-level>1판</span></span>
+            <span class="gm-pr__gap"></span>
+            <button type="button" class="gm-pr__hintbtn" data-hint>${HKUI.icon("lightbulb", 15, "currentColor")} 힌트 <small data-hints>3</small></button>
+          </div>
+          <div class="gm-pr__time" data-timebar><i></i></div>
+          <div class="gm-pr__meta"><span>남은 시간 <b data-time>2:00</b></span><span data-combo-label>&nbsp;</span></div>
+          <div class="gm-pr__wrap">
+            <div class="gm-pr__board" data-board>
+              <svg class="gm-pr__svg" data-svg preserveAspectRatio="none"></svg>
+            </div>
+            <div class="gm-pr__cover" data-cover></div>
+          </div>
+          <div class="gm-pr__combometer"><i data-meter></i></div>
+          <p class="gm-pr__help">클릭으로 고르기 · 방향키 이동 + 스페이스로 고르기 · H 힌트</p>
+        </div>`;
+        const root = stage.querySelector(".gm-pr");
+        const boardEl = root.querySelector("[data-board]");
+        const svgEl = root.querySelector("[data-svg]");
+        const cover = root.querySelector("[data-cover]");
+        const scoreEl = root.querySelector("[data-score]");
+        const levelEl = root.querySelector("[data-level]");
+        const hintBtn = root.querySelector("[data-hint]");
+        const hintsEl = root.querySelector("[data-hints]");
+        const timeEl = root.querySelector("[data-time]");
+        const timeBar = root.querySelector("[data-timebar]");
+        const comboLabel = root.querySelector("[data-combo-label]");
+        const meter = root.querySelector("[data-meter]");
+        HKUI.refreshIcons(root);
+
+        // ── 상태 ─────────────────────────────────────────
+        let W = 8, H = 6; // 좁은 화면에서는 세로로 세워 6×8
+        let grid = []; // (H+2)×(W+2), 바깥 테두리 한 줄은 늘 빈 칸(-1)
+        let tileEls = {}; // "r,c" → 버튼
+        let state = "ready"; // ready · play · pause · over
+        let score = 0, level = 1, hintsLeft = HINTS, combo = 0, lastMatch = 0, pairsMade = 0;
+        let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, rafId = 0;
+        let sel = null, cur = null, hintPair = null, busy = false;
+
+        const kindsFor = (lv) => Math.min(8 + (lv - 1) * 2, KINDS.length);
+        const pickOrientation = () => (stage.clientWidth < 480 ? [6, 8] : [8, 6]);
+
+        function shuffle(a) {
+          for (let i = a.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [a[i], a[j]] = [a[j], a[i]];
+          }
+          return a;
+        }
+        const at = (r, c) => (r < 0 || c < 0 || r > H + 1 || c > W + 1 ? -2 : grid[r][c]);
+        const empty = (r, c) => at(r, c) === -1;
+
+        // ── 경로 찾기: 꺾임 2번 이하 ───────────────────────────
+        function lineClear(a, b) {
+          if (a[0] === b[0]) {
+            const [lo, hi] = a[1] < b[1] ? [a[1], b[1]] : [b[1], a[1]];
+            for (let c = lo + 1; c < hi; c++) if (!empty(a[0], c)) return false;
+            return true;
+          }
+          if (a[1] === b[1]) {
+            const [lo, hi] = a[0] < b[0] ? [a[0], b[0]] : [b[0], a[0]];
+            for (let r = lo + 1; r < hi; r++) if (!empty(r, a[1])) return false;
+            return true;
+          }
+          return false;
+        }
+        const dist = (pts) => pts.reduce((s, p, i) => (i ? s + Math.abs(p[0] - pts[i - 1][0]) + Math.abs(p[1] - pts[i - 1][1]) : 0), 0);
+        function oneTurn(a, b) {
+          // a 는 빈 칸이거나 시작 타일, b 는 목적 타일
+          for (const k of [[a[0], b[1]], [b[0], a[1]]]) {
+            if (empty(k[0], k[1]) && lineClear(a, k) && lineClear(k, b)) return [a, k, b];
+          }
+          return null;
+        }
+        function findPath(a, b) {
+          if ((a[0] === b[0] || a[1] === b[1]) && lineClear(a, b)) return [a, b];
+          let best = oneTurn(a, b);
+          if (best) return best;
+          for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+            let r = a[0] + dr, c = a[1] + dc;
+            while (empty(r, c)) {
+              const rest = oneTurn([r, c], b);
+              if (rest) {
+                const pts = [a, ...rest];
+                if (!best || dist(pts) < dist(best)) best = pts;
+              }
+              r += dr;
+              c += dc;
+            }
+          }
+          return best;
+        }
+        function tilesByKind() {
+          const m = {};
+          for (let r = 1; r <= H; r++) for (let c = 1; c <= W; c++) if (grid[r][c] >= 0) (m[grid[r][c]] ||= []).push([r, c]);
+          return m;
+        }
+        function anyMove() {
+          for (const list of Object.values(tilesByKind())) {
+            for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) if (findPath(list[i], list[j])) return [list[i], list[j]];
+          }
+          return null;
+        }
+        const remaining = () => {
+          let n = 0;
+          for (let r = 1; r <= H; r++) for (let c = 1; c <= W; c++) if (grid[r][c] >= 0) n++;
+          return n;
+        };
+
+        // ── 판 만들기 · 섞기 ──────────────────────────────────
+        function newBoard() {
+          [W, H] = pickOrientation();
+          const kinds = shuffle([...KINDS.keys()]).slice(0, kindsFor(level));
+          // 첫 판은 바탕색이 서로 확 다른 기본 8종
+          if (level === 1) kinds.splice(0, kinds.length, 0, 1, 2, 3, 4, 5, 6, 7);
+          const pool = [];
+          for (let i = 0; i < (W * H) / 2; i++) pool.push(kinds[i % kinds.length], kinds[i % kinds.length]);
+          for (let t = 0; t < 200; t++) {
+            shuffle(pool);
+            grid = Array.from({ length: H + 2 }, (_, r) => Array.from({ length: W + 2 }, (_, c) => (r && c && r <= H && c <= W ? pool[(r - 1) * W + (c - 1)] : -1)));
+            if (anyMove()) break;
+          }
+          sel = null;
+          hintPair = null;
+          cur = null;
+          buildTiles();
+        }
+        function reshuffle() {
+          const cellsList = [];
+          for (let r = 1; r <= H; r++) for (let c = 1; c <= W; c++) if (grid[r][c] >= 0) cellsList.push([r, c]);
+          const kinds = cellsList.map(([r, c]) => grid[r][c]);
+          for (let t = 0; t < 300; t++) {
+            shuffle(kinds);
+            cellsList.forEach(([r, c], i) => (grid[r][c] = kinds[i]));
+            if (anyMove()) break;
+          }
+          sel = null;
+          hintPair = null;
+          buildTiles();
+          floatAt(boardEl.clientWidth / 2, boardEl.clientHeight / 2, "더 이을 짝이 없어 섞었어요", true);
+        }
+        // 좁은 화면 ↔ 넓은 화면을 오가면 판을 돌려 세움
+        function maybeRotate() {
+          if (state === "ready" || !grid.length) return;
+          const [nw, nh] = pickOrientation();
+          if (nw === W) return;
+          const g = Array.from({ length: nw + 2 }, () => []);
+          for (let r = 0; r < H + 2; r++) for (let c = 0; c < W + 2; c++) g[c][r] = grid[r][c];
+          grid = g;
+          [W, H] = [nw, nh];
+          sel = null;
+          hintPair = null;
+          cur = null;
+          buildTiles();
+        }
+
+        // ── 그리기 ───────────────────────────────────────────
+        function place(el, r, c) {
+          el.style.left = `${((c - 0.5) / (W + 1)) * 100}%`;
+          el.style.top = `${((r - 0.5) / (H + 1)) * 100}%`;
+          el.style.width = `${(1 / (W + 1)) * 100}%`;
+          el.style.height = `${(1 / (H + 1)) * 100}%`;
+        }
+        function buildTiles() {
+          boardEl.querySelectorAll(".gm-pr__tile").forEach((t) => t.remove());
+          boardEl.style.aspectRatio = `${W + 1} / ${H + 1}`;
+          svgEl.setAttribute("viewBox", `0 0 ${W + 1} ${H + 1}`);
+          tileEls = {};
+          const frag = document.createDocumentFragment();
+          for (let r = 1; r <= H; r++) {
+            for (let c = 1; c <= W; c++) {
+              const k = grid[r][c];
+              if (k < 0) continue;
+              const [name, bg, fg] = KINDS[k];
+              const b = document.createElement("button");
+              b.type = "button";
+              b.className = "gm-pr__tile";
+              b.dataset.rc = `${r},${c}`;
+              b.tabIndex = -1;
+              b.setAttribute("aria-label", name);
+              b.innerHTML = `<span class="gm-pr__face" style="--bg:${bg};--fg:${fg}">${svgOf(name)}</span>`;
+              place(b, r, c);
+              tileEls[`${r},${c}`] = b;
+              frag.appendChild(b);
+            }
+          }
+          boardEl.appendChild(frag);
+          drawMarks();
+        }
+        function drawMarks() {
+          for (const [key, el] of Object.entries(tileEls)) {
+            el.classList.toggle("is-sel", !!sel && key === `${sel[0]},${sel[1]}`);
+            el.classList.toggle("is-cur", !!cur && key === `${cur[0]},${cur[1]}`);
+            el.classList.toggle("is-hint", !!hintPair && hintPair.some((p) => key === `${p[0]},${p[1]}`));
+          }
+        }
+        function drawHud() {
+          scoreEl.textContent = score.toLocaleString("ko-KR");
+          levelEl.textContent = `${level}판`;
+          hintsEl.textContent = hintsLeft;
+          hintBtn.disabled = hintsLeft <= 0 || state !== "play";
+          const sec = Math.ceil(timeLeftMs / 1000);
+          timeEl.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+          timeBar.firstElementChild.style.width = `${Math.min(100, (timeLeftMs / (TIME_LIMIT * 1000)) * 100)}%`;
+          timeBar.classList.toggle("is-low", sec <= 15);
+        }
+        function floatAt(x, y, text, plain) {
+          const f = document.createElement("div");
+          f.className = `gm-pr__combo${plain ? " is-plain" : ""}`;
+          f.textContent = text;
+          f.style.left = `${x + 10}px`;
+          f.style.top = `${y + 10}px`;
+          root.querySelector(".gm-pr__wrap").appendChild(f);
+          setTimeout(() => f.remove(), 900);
+        }
+        function drawPath(pts) {
+          const line = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+          line.setAttribute("points", pts.map(([r, c]) => `${c},${r}`).join(" "));
+          line.setAttribute("vector-effect", "non-scaling-stroke");
+          svgEl.appendChild(line);
+          setTimeout(() => line.remove(), 400);
+        }
+        function shake(rc) {
+          const el = tileEls[`${rc[0]},${rc[1]}`];
+          if (!el) return;
+          el.classList.remove("is-shake");
+          void el.offsetWidth;
+          el.classList.add("is-shake");
+        }
+
+        // ── 진행 ─────────────────────────────────────────────
+        function tap(rc) {
+          if (state !== "play" || busy || at(rc[0], rc[1]) < 0) return;
+          if (!sel) {
+            sel = rc;
+          } else if (sel[0] === rc[0] && sel[1] === rc[1]) {
+            sel = null;
+          } else if (at(sel[0], sel[1]) !== at(rc[0], rc[1])) {
+            sel = rc; // 다른 그림이면 새로 고른 것으로
+          } else {
+            const path = findPath(sel, rc);
+            if (path) match(sel, rc, path);
+            else {
+              shake(sel);
+              shake(rc);
+              sel = rc;
+            }
+          }
+          drawMarks();
+        }
+
+        function match(a, b, path) {
+          const now = performance.now();
+          combo = lastMatch && now - lastMatch <= COMBO_WINDOW ? combo + 1 : 1;
+          lastMatch = now;
+          const mult = Math.min(combo, 10);
+          score = Math.min(MAX_SCORE, score + 100 * mult);
+          pairsMade++;
+          grid[a[0]][a[1]] = -1;
+          grid[b[0]][b[1]] = -1;
+          drawPath(path);
+          const ea = tileEls[`${a[0]},${a[1]}`], eb = tileEls[`${b[0]},${b[1]}`];
+          ea.classList.add("is-gone");
+          eb.classList.add("is-gone");
+          delete tileEls[`${a[0]},${a[1]}`];
+          delete tileEls[`${b[0]},${b[1]}`];
+          setTimeout(() => { ea.remove(); eb.remove(); }, 300);
+          sel = null;
+          if (hintPair) hintPair = null;
+          // 점수 띄우기 (두 타일 가운데)
+          const bw = boardEl.clientWidth / (W + 1), bh = boardEl.clientHeight / (H + 1);
+          const x = ((a[1] + b[1]) / 2) * bw, y = ((a[0] + b[0]) / 2) * bh;
+          floatAt(x, y, mult > 1 ? `콤보 ×${mult} +${100 * mult}` : "+100", mult === 1);
+          comboLabel.innerHTML = mult > 1 ? `<b style="color:#ef4444">콤보 ×${mult}</b>` : "&nbsp;";
+          drawHud();
+          drawMarks();
+
+          if (remaining() === 0) {
+            boardClear();
+            return;
+          }
+          if (!anyMove()) {
+            busy = true;
+            setTimeout(() => {
+              busy = false;
+              if (state === "play") reshuffle();
+            }, 450);
+          }
+        }
+
+        function boardClear() {
+          const sec = Math.ceil(timeLeftMs / 1000);
+          const bonus = 1000 * level + sec * 20;
+          score = Math.min(MAX_SCORE, score + bonus);
+          busy = true;
+          floatAt(boardEl.clientWidth / 2, boardEl.clientHeight / 2 - 30, `판 완료! +${bonus.toLocaleString("ko-KR")}`, false);
+          setTimeout(() => floatAt(boardEl.clientWidth / 2, boardEl.clientHeight / 2 + 10, `+${CLEAR_TIME}초`, true), 250);
+          timeLeftMs += CLEAR_TIME * 1000;
+          level++;
+          drawHud();
+          setTimeout(() => {
+            busy = false;
+            if (state === "play" || state === "pause") newBoard();
+          }, 700);
+        }
+
+        function useHint() {
+          if (state !== "play" || hintsLeft <= 0 || busy) return;
+          const pair = anyMove();
+          if (!pair) return;
+          hintsLeft--;
+          score = Math.max(0, score - HINT_COST);
+          hintPair = pair;
+          floatAt(boardEl.clientWidth / 2, 10, `힌트 −${HINT_COST}`, true);
+          drawHud();
+          drawMarks();
+        }
+
+        function loop() {
+          if (state !== "play") return;
+          const t = performance.now();
+          const dt = Math.max(0, Math.min(250, t - lastTick));
+          lastTick = t;
+          timeLeftMs -= dt;
+          const since = performance.now() - lastMatch;
+          meter.style.width = lastMatch && since < COMBO_WINDOW ? `${(1 - since / COMBO_WINDOW) * 100}%` : "0";
+          if (lastMatch && since > COMBO_WINDOW && combo) {
+            combo = 0;
+            comboLabel.innerHTML = "&nbsp;";
+          }
+          if (timeLeftMs <= 0) {
+            timeLeftMs = 0;
+            drawHud();
+            gameOver();
+            return;
+          }
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+        }
+
+        function gameOver() {
+          state = "over";
+          sel = null;
+          hintPair = null;
+          drawMarks();
+          drawHud();
+          meter.style.width = "0";
+          showCover("over");
+          setTimeout(() => ctx.submit(Math.min(MAX_SCORE, Math.max(0, Math.round(score)))), 900);
+        }
+
+        function start() {
+          state = "play";
+          showCover("none");
+          lastTick = performance.now();
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "pause";
+          cancelAnimationFrame(rafId);
+          showCover("pause");
+        }
+        function resume() {
+          if (state !== "pause") return;
+          state = "play";
+          showCover("none");
+          lastTick = performance.now();
+          // 일시정지 동안은 콤보 시간도 멈춤
+          if (lastMatch) lastMatch = performance.now() - Math.min(COMBO_WINDOW, pausedSince - lastMatch);
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        let pausedSince = 0;
+
+        function showCover(kind) {
+          if (kind === "none") {
+            cover.hidden = true;
+            return;
+          }
+          cover.hidden = false;
+          if (kind === "ready") {
+            cover.innerHTML = `<div class="gm-pr__demo"><span style="color:#dc2626">${svgOf("apple")}</span><em></em><span style="color:#dc2626">${svgOf("apple")}</span></div>
+              <h2>아이콘 짝 잇기</h2>
+              <p>같은 그림 두 장을 차례로 누르세요.<br>빈 칸을 지나 <b>두 번 이하로 꺾어</b> 이어지면 사라져요.</p>
+              <p class="gm-pr__keys">제한 ${TIME_LIMIT}초 · 3초 안에 연달아 이으면 콤보 · 판을 비우면 +${CLEAR_TIME}초</p>
+              <button type="button" class="gm-pr__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
+          } else if (kind === "pause") {
+            pausedSince = performance.now();
+            cover.innerHTML = `<h2>잠깐 쉬는 중</h2><p>시간이 멈춰 있어요.</p>
+              <button type="button" class="gm-pr__go" data-go>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
+          } else if (kind === "over") {
+            cover.innerHTML = `<h2>시간 끝!</h2><div class="gm-pr__big">${score.toLocaleString("ko-KR")}점</div><p>${level}판까지 · ${pairsMade}쌍 이었어요</p>`;
+          }
+          HKUI.refreshIcons(cover);
+          const go = cover.querySelector("[data-go]");
+          if (go) go.onclick = () => (state === "ready" ? start() : resume());
+        }
+
+        function reset() {
+          cancelAnimationFrame(rafId);
+          state = "ready";
+          score = 0;
+          level = 1;
+          hintsLeft = HINTS;
+          combo = 0;
+          lastMatch = 0;
+          pairsMade = 0;
+          busy = false;
+          timeLeftMs = TIME_LIMIT * 1000;
+          meter.style.width = "0";
+          comboLabel.innerHTML = "&nbsp;";
+          newBoard();
+          drawHud();
+          showCover("ready");
+        }
+
+        // ── 입력 ─────────────────────────────────────────────
+        boardEl.addEventListener("click", (e) => {
+          const t = e.target.closest(".gm-pr__tile");
+          if (!t) return;
+          const [r, c] = t.dataset.rc.split(",").map(Number);
+          cur = null;
+          tap([r, c]);
+        });
+        hintBtn.onclick = useHint;
+
+        function moveCur(dr, dc) {
+          if (!cur) cur = sel ? [...sel] : [1, 1];
+          else {
+            cur = [Math.min(H, Math.max(1, cur[0] + dr)), Math.min(W, Math.max(1, cur[1] + dc))];
+          }
+          drawMarks();
+        }
+        document.addEventListener("keydown", (e) => {
+          if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          const k = e.key;
+          if (state === "ready") {
+            if (k === "Enter" && document.activeElement === root) { e.preventDefault(); start(); }
+            return;
+          }
+          if (state === "pause") {
+            if (k === "Enter" || k === " ") { e.preventDefault(); resume(); }
+            return;
+          }
+          if (state !== "play") return;
+          if (k === "ArrowUp") { e.preventDefault(); moveCur(-1, 0); }
+          else if (k === "ArrowDown") { e.preventDefault(); moveCur(1, 0); }
+          else if (k === "ArrowLeft") { e.preventDefault(); moveCur(0, -1); }
+          else if (k === "ArrowRight") { e.preventDefault(); moveCur(0, 1); }
+          else if (k === " " || k === "Enter") { e.preventDefault(); if (cur) tap([...cur]); }
+          else if (k === "h" || k === "H" || k === "ㅗ") { e.preventDefault(); useHint(); }
+          else if (k === "Escape" || k === "p" || k === "P") { e.preventDefault(); pause(); }
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+        let rt = 0;
+        window.addEventListener("resize", () => {
+          clearTimeout(rt);
+          rt = setTimeout(() => (state === "ready" ? newBoard() : maybeRotate()), 150);
+        });
+
+        ctx.onRestart(reset);
+        reset();
+      },
+    });
+  </script>
+</body>
+</html>

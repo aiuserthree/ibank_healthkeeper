@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>사무실 올림픽 — 점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-ol { display: flex; flex-direction: column; gap: 10px; user-select: none; -webkit-user-select: none; }
+    .gm-ol-hud { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .gm-ol-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: #fff; border: 1px solid #e3e8ef; font-size: 14px; color: #0b3558; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .gm-ol-chip b { font-size: 16px; }
+    .gm-ol-chip--total { margin-left: auto; background: linear-gradient(135deg, #0369a1, #22c55e); color: #fff; border-color: transparent; }
+    .gm-ol-steps { display: inline-flex; gap: 4px; }
+    .gm-ol-steps i { width: 8px; height: 8px; border-radius: 50%; background: #dbe3ea; }
+    .gm-ol-steps i.is-done { background: #22c55e; }
+    .gm-ol-steps i.is-now { background: #0369a1; }
+    .gm-ol-board { position: relative; border-radius: 16px; overflow: hidden; background: #e6eef5; box-shadow: 0 1px 3px rgba(15,23,42,.08); touch-action: none; }
+    .gm-ol-board canvas { display: block; width: 100%; touch-action: none; }
+    .gm-ol-over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(3, 55, 90, .38); overflow-y: auto; }
+    .gm-ol-over[hidden] { display: none; }
+    .gm-ol-card { width: 100%; max-width: 360px; margin: auto; background: #fff; border-radius: 16px; padding: 20px 20px; text-align: center; box-shadow: 0 12px 32px rgba(15,23,42,.18); }
+    .gm-ol-card h2 { margin: 6px 0 6px; font-size: 21px; color: #0b3558; }
+    .gm-ol-card p { margin: 0 0 6px; font-size: 14px; line-height: 1.55; color: #475569; }
+    .gm-ol-card .hk-btn { width: 100%; margin-top: 12px; }
+    .gm-ol-badge { display: inline-flex; width: 50px; height: 50px; border-radius: 14px; align-items: center; justify-content: center; background: linear-gradient(135deg, #0369a1, #22c55e); }
+    .gm-ol-tag { display: inline-block; padding: 3px 10px; border-radius: 999px; background: #e0f2fe; color: #0369a1; font-size: 12.5px; font-weight: 700; }
+    .gm-ol-keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; margin: 10px 0 0; padding: 11px 12px; border-radius: 12px; background: #f1f6fa; text-align: left; font-size: 13px; color: #334155; }
+    .gm-ol-keys dt { font-weight: 700; color: #0b3558; }
+    .gm-ol-keys dd { margin: 0; }
+    @media (hover: none) { .gm-ol-keys .gm-ol-pc { display: none; } }
+    .gm-ol-evrow { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 8px 0 0; }
+    .gm-ol-evrow span { display: inline-flex; align-items: center; gap: 4px; padding: 5px 10px; border-radius: 999px; background: #f1f6fa; font-size: 12.5px; font-weight: 700; color: #0b3558; }
+    .gm-ol-list { list-style: none; margin: 10px 0 0; padding: 0; text-align: left; }
+    .gm-ol-list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; font-size: 14px; color: #334155; }
+    .gm-ol-list li:nth-child(odd) { background: #f4f8fb; }
+    .gm-ol-list li span { flex: 1; }
+    .gm-ol-list li em { font-style: normal; color: #64748b; font-size: 13px; }
+    .gm-ol-list li b { min-width: 64px; text-align: right; color: #0b3558; font-variant-numeric: tabular-nums; }
+    .gm-ol-big { font-size: 40px; font-weight: 800; letter-spacing: -1px; margin: 2px 0; color: #0b3558; font-variant-numeric: tabular-nums; }
+    .gm-ol-big small { font-size: 18px; margin-left: 2px; }
+    .gm-ol-pts { font-size: 15px; font-weight: 700; color: #16a34a; }
+    .gm-ol-medal { width: 74px; height: 74px; margin: 2px auto 6px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 800; color: #fff; box-shadow: inset 0 -5px 0 rgba(0,0,0,.12), 0 6px 16px rgba(15,23,42,.18); border: 4px solid rgba(255,255,255,.7); }
+    .gm-ol-medal.is-gold { background: radial-gradient(circle at 35% 30%, #fde68a, #d4a106 70%); }
+    .gm-ol-medal.is-silver { background: radial-gradient(circle at 35% 30%, #f1f5f9, #94a3b8 70%); }
+    .gm-ol-medal.is-bronze { background: radial-gradient(circle at 35% 30%, #fed7aa, #b8743d 70%); }
+    .gm-ol-medal.is-none { background: radial-gradient(circle at 35% 30%, #bae6fd, #0369a1 75%); font-size: 15px; }
+    .gm-ol-pad { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .gm-ol-pad[data-mode="run"] { grid-template-columns: 1fr 1fr; }
+    .gm-ol-pad[data-mode="run"] [data-b="act"] { display: none; }
+    .gm-ol-pad[data-mode="chair"] { grid-template-columns: 1fr; }
+    .gm-ol-pad[data-mode="chair"] [data-b="L"], .gm-ol-pad[data-mode="chair"] [data-b="R"] { display: none; }
+    .gm-ol-btn { height: 64px; border: 1px solid #d6e2ec; background: #fff; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #0b3558; font-size: 13px; font-weight: 700; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    .gm-ol-btn.is-down { background: #e0f2fe; border-color: #0369a1; }
+    .gm-ol-btn.is-next { box-shadow: 0 0 0 3px rgba(34,197,94,.45); }
+    .gm-ol-btn--act { background: linear-gradient(135deg, #0369a1, #22c55e); border-color: transparent; color: #fff; }
+    .gm-ol-btn--act.is-down { background: #075985; }
+    @media (min-width: 900px) and (hover: hover) { .gm-ol-pad { display: none; } }
+    @media (max-width: 480px) {
+      .gm-ol-over { padding: 8px; }
+      .gm-ol-card { padding: 14px 14px; }
+      .gm-ol-card h2 { font-size: 18px; margin: 4px 0; }
+      .gm-ol-card p { font-size: 13px; line-height: 1.5; }
+      .gm-ol-badge { width: 40px; height: 40px; border-radius: 12px; }
+      .gm-ol-keys { font-size: 12px; padding: 9px 10px; margin-top: 6px; }
+      .gm-ol-card .hk-btn { margin-top: 10px; }
+      .gm-ol-chip { padding: 6px 10px; font-size: 13px; }
+      .gm-ol-chip b { font-size: 14px; }
+      .gm-ol-big { font-size: 32px; }
+      .gm-ol-list li { padding: 6px 8px; font-size: 13px; }
+      .gm-ol-medal { width: 60px; height: 60px; font-size: 22px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  HKPlay.mountGame({
+    key: "olympic",
+    setup(stage, ctx) {
+      stage.innerHTML = `<div class="gm-ol">
+        <div class="gm-ol-hud">
+          <span class="gm-ol-chip"><span class="gm-ol-steps" id="gm-ol-steps"><i></i><i></i><i></i></span> <span id="gm-ol-evname">사무실 올림픽</span></span>
+          <span class="gm-ol-chip gm-ol-chip--total">${HKUI.icon("medal", 16, "#fff")} 합계 <b id="gm-ol-total">0</b>점</span>
+        </div>
+        <div class="gm-ol-board" id="gm-ol-board">
+          <canvas id="gm-ol-canvas"></canvas>
+          <div class="gm-ol-over" id="gm-ol-over"></div>
+        </div>
+        <div class="gm-ol-pad" id="gm-ol-pad" data-mode="run">
+          <button type="button" class="gm-ol-btn" data-b="L" aria-label="왼발">${HKUI.icon("footprints", 22, "currentColor")}왼발</button>
+          <button type="button" class="gm-ol-btn gm-ol-btn--act" data-b="act" aria-label="점프">${HKUI.icon("arrow-up-right", 22, "currentColor")}<span id="gm-ol-actlabel">점프</span></button>
+          <button type="button" class="gm-ol-btn" data-b="R" aria-label="오른발">${HKUI.icon("footprints", 22, "currentColor")}오른발</button>
+        </div>
+      </div>`;
+      HKUI.refreshIcons(stage);
+
+      const $ = (s) => stage.querySelector(s);
+      const canvas = $("#gm-ol-canvas");
+      const g = canvas.getContext("2d");
+      const board = $("#gm-ol-board");
+      const over = $("#gm-ol-over");
+      const pad = $("#gm-ol-pad");
+      const FONT = getComputedStyle(document.body).fontFamily || "sans-serif";
+
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const font = (size, w = 700) => (g.font = `${w} ${size}px ${FONT}`);
+      function rr(x, y, w, h, r) {
+        r = Math.min(r, w / 2, h / 2);
+        g.beginPath();
+        g.moveTo(x + r, y);
+        g.arcTo(x + w, y, x + w, y + h, r);
+        g.arcTo(x + w, y + h, x, y + h, r);
+        g.arcTo(x, y + h, x, y, r);
+        g.arcTo(x, y, x + w, y, r);
+        g.closePath();
+      }
+
+      // ───────────────────────── 상수
+      const VH = 320;            // 가상 높이 (가로는 화면 비율대로)
+      const PPM = 34;            // 1m = 34px
+      const VMAX = 12.2;         // 최고 속도(m/s) — 연타 상한과 함께 터무니없는 기록 방지
+      const TAP_GAIN = 0.92;     // 번갈아 한 번 누를 때 붙는 속도
+      const DRAG = 0.74;         // 속도 감쇠
+      const MIN_TAP_GAP = 0.065; // 이보다 빠른 연타는 무시 (초당 약 15회 상한)
+      const BOARD = 30;          // 멀리뛰기 발판 위치(m)
+      const GRAV = 14;           // 멀리뛰기 중력
+      const EVENTS = [
+        { key: "run", name: "복도 100m", icon: "footprints" },
+        { key: "jump", name: "보고서 멀리뛰기", icon: "file-text" },
+        { key: "chair", name: "의자 굴리기", icon: "armchair" },
+      ];
+      const CHAIR_RINGS = [[14, 15], [30, 12], [46, 9], [62, 6], [78, 3]];
+      const BANNERS = ["우리 팀 파이팅!", "야근 없는 그날까지", "점심 먹고 한 판", "부장님 보고 계셔요", "오늘도 무사 퇴근", "회의는 짧게"];
+      const CROWD = ["#f97316", "#0ea5e9", "#22c55e", "#a855f7", "#ef4444", "#eab308", "#14b8a6", "#64748b", "#ec4899"];
+
+      let W = 360, H = 250, S = 1, VW = 460, dpr = 1;
+
+      // ───────────────────────── 상태
+      let state = "ready"; // ready | intro | play | result | final | paused
+      let evIdx = 0, scores = [0, 0, 0], records = [null, null, null];
+      let R = null; // 현재 종목 데이터
+      let clock = 0; // 화면 장식용
+      let lastSide = null, lastTapAt = -1, wrongFlash = 0;
+      let pausedFrom = null;
+
+      // ───────────────────────── 점수표
+      const score100 = (t) => Math.max(0, Math.round((20 - t) * 300));
+      const scoreJump = (m) => Math.max(0, Math.round(m * 400));
+      const scoreChair = (pts) => pts * 100;
+      function medalOf(total) {
+        if (total >= 8000) return ["gold", "금"];
+        if (total >= 6200) return ["silver", "은"];
+        if (total >= 4200) return ["bronze", "동"];
+        return ["none", "완주"];
+      }
+
+      // ───────────────────────── 크기
+      function resize() {
+        const w = Math.round(board.clientWidth || stage.clientWidth || 360);
+        const h = Math.round(clamp(w * 0.68, 270, 380));
+        dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        W = w; H = h; S = h / VH; VW = w / S;
+        canvas.width = Math.round(w * dpr);
+        canvas.height = Math.round(h * dpr);
+        canvas.style.height = h + "px";
+        if (typeof fitOver === "function" && !over.hidden) fitOver();
+        draw();
+      }
+
+      // ───────────────────────── 종목 준비
+      function makeRun() {
+        const t1 = rand(10.4, 11.4), t2 = rand(12.4, 14.2);
+        return {
+          kind: "run", x: 0, v: 0, t: 0, cd: 2.6, done: false, after: 0, finishT: 0, ph: 0,
+          rivals: [
+            { x: 0, vmax: 100 / (t1 - 0.9), ph: 1, suit: "#475569", tie: "#22c55e", hair: "#3f2a1d", name: "총무팀" },
+            { x: 0, vmax: 100 / (t2 - 0.9), ph: 2, suit: "#7c4a2d", tie: "#0ea5e9", hair: "#111827", name: "인사팀" },
+          ],
+        };
+      }
+      function makeJump(attempt, best) {
+        return { kind: "jump", attempt, best: best || [], x: 0, v: 0, y: 0, vx: 0, vy: 0, ph: 0, phase: "run", angle: 0, holding: false, land: null, msg: "", msgT: 0, takeoff: 0, papers: [] };
+      }
+      function makeChair(attempt, got) {
+        const sp = attempt === 1 ? 1 : 1.35;
+        const prev = R && R.kind === "chair" && R.phase === "stop" ? { x: R.cx, y: R.cy, rot: R.spin } : null;
+        return { kind: "chair", attempt, got: got || [], phase: "power", t: 0, p: 0, d: 1, sp, cx: 0, cy: 0, vx: 0, vy: 0, spin: 0, pts: 0, msgT: 0, trail: [], prev };
+      }
+
+      function chairLayout() {
+        const sx = 52, ty = 186;
+        const tx = Math.max(sx + 240, VW - 108);
+        return { sx, sy: ty, tx, ty, L: tx - sx };
+      }
+
+      // ───────────────────────── 입력
+      function tap(side) {
+        if (state !== "play" || !R) return;
+        const can = (R.kind === "run" && R.cd <= 0 && !R.done) || (R.kind === "jump" && R.phase === "run" && !R.holding);
+        if (!can) return;
+        if (side === lastSide) { wrongFlash = 0.5; return; } // 같은 키 반복은 무시
+        const now = performance.now() / 1000;
+        if (now - lastTapAt < MIN_TAP_GAP) return;
+        lastSide = side; lastTapAt = now;
+        R.v = Math.min(VMAX, R.v + TAP_GAIN);
+        updatePadHint();
+      }
+      function actDown() {
+        if (state !== "play" || !R) return;
+        if (R.kind === "jump" && R.phase === "run" && R.x > 0.3 && !R.holding) { R.holding = true; R.angle = 4; }
+        else if (R.kind === "chair") chairTap();
+      }
+      function actUp() {
+        if (state !== "play" || !R) return;
+        if (R.kind === "jump" && R.holding) takeoff();
+      }
+
+      const KEY_L = { ArrowLeft: 1, KeyZ: 1 }, KEY_R = { ArrowRight: 1, KeyX: 1 }, KEY_ACT = { Space: 1, ArrowUp: 1 };
+      function isTyping(t) { return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable); }
+      let overlayAction = null;
+      window.addEventListener("keydown", (e) => {
+        if (isTyping(e.target)) return;
+        if (document.querySelector(".hk-dialog__overlay")) return;
+        const c = e.code;
+        const mine = KEY_L[c] || KEY_R[c] || KEY_ACT[c] || c === "ArrowDown" || c === "Enter";
+        if (!mine) return;
+        e.preventDefault();
+        if (!over.hidden) {
+          if ((c === "Enter" || c === "Space") && !e.repeat && overlayAction) overlayAction();
+          return;
+        }
+        if (e.repeat) return;
+        if (KEY_L[c]) tap("L");
+        else if (KEY_R[c]) tap("R");
+        else if (KEY_ACT[c]) actDown();
+        else if (c === "Enter" && R && R.kind === "chair") actDown();
+      });
+      window.addEventListener("keyup", (e) => {
+        if (isTyping(e.target)) return;
+        if (KEY_ACT[e.code]) { if (!over.hidden) return; e.preventDefault(); actUp(); }
+      });
+      window.addEventListener("blur", () => actUp());
+
+      // 화면 버튼 (멀티터치)
+      pad.querySelectorAll(".gm-ol-btn").forEach((b) => {
+        const kind = b.dataset.b;
+        b.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          try { b.setPointerCapture(e.pointerId); } catch (_) {}
+          b.classList.add("is-down");
+          if (!over.hidden) return;
+          if (kind === "act") actDown(); else tap(kind);
+        });
+        const up = (e) => {
+          if (!b.classList.contains("is-down")) return;
+          b.classList.remove("is-down");
+          if (kind === "act") actUp();
+        };
+        b.addEventListener("pointerup", up);
+        b.addEventListener("pointercancel", up);
+        b.addEventListener("contextmenu", (e) => e.preventDefault());
+        b.addEventListener("click", (e) => e.preventDefault());
+      });
+      canvas.addEventListener("pointerdown", (e) => {
+        if (state === "play" && R && R.kind === "chair") { e.preventDefault(); chairTap(); }
+      });
+      board.addEventListener("touchmove", (e) => { if (state === "play") e.preventDefault(); }, { passive: false });
+
+      function setPad(mode) {
+        pad.dataset.mode = mode;
+        $("#gm-ol-actlabel").textContent = mode === "chair" ? "멈추기" : "점프 (꾹)";
+        updatePadHint();
+      }
+      function updatePadHint() {
+        pad.querySelectorAll("[data-b=L],[data-b=R]").forEach((b) => b.classList.toggle("is-next", lastSide !== null && b.dataset.b !== lastSide));
+      }
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && state === "play") pause();
+      });
+
+      // ───────────────────────── 겹침 화면
+      function showOver(html, action) {
+        over.innerHTML = html;
+        over.hidden = false;
+        overlayAction = action || null;
+        HKUI.refreshIcons(over);
+        const btn = over.querySelector("[data-go]");
+        if (btn && action) btn.onclick = action;
+        fitOver();
+      }
+      // 카드가 캔버스보다 길면(좁은 화면) 판을 카드 높이만큼 늘려요
+      function fitOver() {
+        board.style.minHeight = "";
+        if (over.hidden || !over.firstElementChild) return;
+        const need = over.firstElementChild.offsetHeight + (W < 480 ? 16 : 28);
+        if (need > H) board.style.minHeight = need + "px";
+      }
+      function hideOver() { over.hidden = true; over.innerHTML = ""; overlayAction = null; board.style.minHeight = ""; }
+
+      function updateHud() {
+        const steps = stage.querySelectorAll("#gm-ol-steps i");
+        steps.forEach((s, i) => {
+          s.className = state === "final" || i < evIdx ? "is-done" : i === evIdx && state !== "ready" ? "is-now" : "";
+        });
+        $("#gm-ol-evname").textContent = state === "ready" ? "사무실 올림픽" : state === "final" ? "전 종목 완료" : `${evIdx + 1}/3 · ${EVENTS[evIdx].name}`;
+        $("#gm-ol-total").textContent = (scores[0] + scores[1] + scores[2]).toLocaleString("ko-KR");
+      }
+
+      function showReady() {
+        state = "ready";
+        evIdx = 0; scores = [0, 0, 0]; records = [null, null, null]; R = null;
+        lastSide = null;
+        updateHud();
+        showOver(`<div class="gm-ol-card">
+          <span class="gm-ol-badge">${HKUI.icon("medal", 24, "#fff")}</span>
+          <h2>사무실 올림픽</h2>
+          <p>정장 차림 그대로 <b>3종목</b>에 도전해요. 합계 점수로 금·은·동이 정해져요.</p>
+          <div class="gm-ol-evrow">${EVENTS.map((ev, i) => `<span>${HKUI.icon(ev.icon, 14, "#0369a1")}${ev.name}</span>`).join("")}</div>
+          <dl class="gm-ol-keys">
+            <dt class="gm-ol-pc">PC</dt><dd class="gm-ol-pc">← → 또는 Z·X 번갈아 · 스페이스</dd>
+            <dt>모바일</dt><dd>아래 왼발·오른발 버튼 번갈아</dd>
+          </dl>
+          <button type="button" class="hk-btn hk-btn--primary" data-go>${HKUI.icon("play", 16, "#fff")} 시작</button>
+        </div>`, () => showIntro(0));
+        draw();
+      }
+
+      const INTRO = [
+        { text: "복도 끝 결승선까지 달려요. <b>왼발·오른발을 번갈아</b> 누를수록 빨라져요. 같은 키만 누르면 안 나가요!", rec: "기록이 빠를수록 점수가 높아요 · (20초 − 기록) × 300" },
+        { text: "연타로 도움닫기를 하다가 <b>발판 앞에서 점프 키를 꾹</b> 눌러요. 누르는 동안 각도가 올라가고, <b>놓으면 점프</b>! 45° 근처가 가장 멀리 가요.", rec: "발판을 넘으면 파울 · 2번 중 좋은 기록 · 1m당 400점" },
+        { text: "바늘이 오가는 게이지를 두 번 멈춰요. <b>처음은 힘, 다음은 방향</b>. 바퀴 의자를 바닥 과녁 가운데에 세워 보세요.", rec: "과녁 3~15점 × 100 · 2번 시도 합계" },
+      ];
+      function showIntro(i) {
+        evIdx = i;
+        state = "intro";
+        R = i === 0 ? makeRun() : i === 1 ? makeJump(1) : makeChair(1);
+        setPad(EVENTS[i].key);
+        updateHud();
+        const ev = EVENTS[i];
+        showOver(`<div class="gm-ol-card">
+          <span class="gm-ol-tag">${i + 1}종목</span>
+          <h2>${ev.name}</h2>
+          <p>${INTRO[i].text}</p>
+          <p style="font-size:12.5px;color:#64748b">${INTRO[i].rec}</p>
+          <button type="button" class="hk-btn hk-btn--primary" data-go>${HKUI.icon("play", 16, "#fff")} 준비됐어요</button>
+        </div>`, beginEvent);
+        draw();
+      }
+      function beginEvent() {
+        hideOver();
+        lastSide = null; lastTapAt = -1;
+        updatePadHint();
+        state = "play";
+        updateHud();
+      }
+
+      function pause() {
+        actUp();
+        pausedFrom = state;
+        state = "paused";
+        showOver(`<div class="gm-ol-card"><span class="gm-ol-badge">${HKUI.icon("pause", 24, "#fff")}</span><h2>잠시 멈췄어요</h2><p>준비되면 이어서 해요.</p>
+          <button type="button" class="hk-btn hk-btn--primary" data-go>${HKUI.icon("play", 16, "#fff")} 계속하기</button></div>`, resume);
+      }
+      function resume() {
+        hideOver();
+        state = "play";
+        lastTapAt = -1;
+      }
+
+      function finishEvent(record, recText, pts, extra) {
+        scores[evIdx] = pts;
+        records[evIdx] = recText;
+        state = "result";
+        updateHud();
+        const last = evIdx === 2;
+        setTimeout(() => {
+          if (state !== "result") return;
+          showOver(`<div class="gm-ol-card">
+            <span class="gm-ol-tag">${evIdx + 1}종목 결과</span>
+            <h2>${EVENTS[evIdx].name}</h2>
+            <div class="gm-ol-big">${record}</div>
+            ${extra ? `<p>${extra}</p>` : ""}
+            <div class="gm-ol-pts">+${pts.toLocaleString("ko-KR")}점</div>
+            <button type="button" class="hk-btn hk-btn--primary" data-go>${last ? `${HKUI.icon("medal", 16, "#fff")} 최종 결과 보기` : `${HKUI.icon("chevron-right", 16, "#fff")} 다음 종목`}</button>
+          </div>`, () => (last ? showFinal() : showIntro(evIdx + 1)));
+        }, 900);
+      }
+
+      function showFinal() {
+        state = "final";
+        updateHud();
+        const total = scores[0] + scores[1] + scores[2];
+        const [cls, label] = medalOf(total);
+        const msg = cls === "gold" ? "사무실 최강자예요!" : cls === "silver" ? "아깝게 은메달이에요!" : cls === "bronze" ? "시상대에 올랐어요!" : "끝까지 완주했어요. 다음엔 메달!";
+        showOver(`<div class="gm-ol-card">
+          <div class="gm-ol-medal is-${cls}">${label}</div>
+          <h2>${msg}</h2>
+          <ul class="gm-ol-list">
+            ${EVENTS.map((ev, i) => `<li>${HKUI.icon(ev.icon, 16, "#0369a1")}<span>${ev.name}</span><em>${records[i] || "-"}</em><b>${scores[i].toLocaleString("ko-KR")}</b></li>`).join("")}
+          </ul>
+          <div class="gm-ol-big" style="margin-top:8px">${total.toLocaleString("ko-KR")}<small>점</small></div>
+          <p style="font-size:12.5px;color:#64748b">금 8,000 · 은 6,200 · 동 4,200점 이상</p>
+          <button type="button" class="hk-btn hk-btn--secondary" data-go>${HKUI.icon("rotate-ccw", 16, "currentColor")} 처음부터 다시</button>
+        </div>`, showReady);
+        ctx.submit(total);
+      }
+
+      ctx.onRestart(() => {
+        hideOver();
+        showReady();
+      });
+
+      // ───────────────────────── 종목 진행
+      function stepRunner(o, dt) {
+        o.v = Math.max(0, o.v - o.v * DRAG * dt - (o.v > 0 ? 0.15 * dt : 0));
+        o.x += o.v * dt;
+        o.ph += o.v * dt * 1.25;
+      }
+
+      function updateRun(dt) {
+        if (R.cd > 0) { R.cd -= dt; return; }
+        if (!R.done) R.t += dt;
+        const prevX = R.x;
+        stepRunner(R, dt);
+        if (R.done) R.v = Math.max(0, R.v - 9 * dt);
+        R.rivals.forEach((rv) => {
+          const since = R.t + (R.done ? R.after : 0);
+          const v = rv.x >= 100 ? Math.max(0, rv.vmax * (1 - (rv.x - 100) / 8)) : rv.vmax * Math.min(1, since / 1.8);
+          rv.x += v * dt; rv.ph += v * dt * 1.25; rv.v = v;
+        });
+        if (!R.done && R.x >= 100) {
+          const frac = R.v > 0 ? (R.x - 100) / (R.x - prevX || 1) : 0;
+          R.finishT = Math.max(0, R.t - frac * dt);
+          R.done = true;
+          const t = Math.round(R.finishT * 100) / 100;
+          const place = 1 + R.rivals.filter((rv) => rv.x >= 100).length;
+          finishEvent(`${t.toFixed(2)}<small>초</small>`, `${t.toFixed(2)}초`, score100(t), `${place}위로 들어왔어요`);
+        } else if (!R.done && R.t >= 30) {
+          R.done = true; R.finishT = 30;
+          finishEvent(`30.00<small>초</small>`, "30초 초과", 0, "시간이 다 됐어요. 번갈아 눌러야 빨라져요!");
+        }
+        if (R.done) R.after += dt;
+      }
+
+      function takeoff() {
+        R.holding = false;
+        if (R.x > BOARD) return jumpFoul("발판을 넘었어요");
+        const a = (R.angle * Math.PI) / 180;
+        R.vx = R.v * Math.cos(a); R.vy = R.v * Math.sin(a);
+        R.takeoff = R.x;
+        R.phase = "air";
+        for (let i = 0; i < 6; i++) R.papers.push({ x: R.x, y: 1.4, vx: R.vx * rand(0.3, 0.9), vy: rand(1, 4), r: rand(0, 6), vr: rand(-6, 6), life: 2.2 });
+      }
+      function jumpFoul(msg) {
+        R.phase = "foul";
+        R.holding = false;
+        R.msg = `파울 · ${msg}`;
+        R.msgT = 0;
+        R.best.push(null);
+      }
+      function updateJump(dt) {
+        R.papers.forEach((p) => { p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= 6 * dt; p.vx *= 1 - 0.8 * dt; p.r += p.vr * dt; p.life -= dt; if (p.y < 0) { p.y = 0; p.vx = 0; p.vy = 0; p.vr = 0; } });
+        if (R.phase === "run") {
+          if (R.holding) {
+            R.angle = Math.min(80, R.angle + 72 * dt);
+            R.v = Math.max(0, R.v - R.v * 0.22 * dt);
+            R.x += R.v * dt; R.ph += R.v * dt * 0.6;
+            if (R.x > BOARD) jumpFoul("점프 키를 너무 늦게 놓았어요");
+          } else {
+            stepRunner(R, dt);
+            if (R.x > BOARD) jumpFoul("발판 전에 점프하지 않았어요");
+          }
+          return;
+        }
+        if (R.phase === "air") {
+          R.x += R.vx * dt; R.y += R.vy * dt; R.vy -= GRAV * dt; R.ph += dt * 4;
+          if (R.y <= 0 && R.vy < 0) {
+            R.y = 0;
+            const dist = Math.max(0, Math.floor((R.x - BOARD) * 100) / 100);
+            R.land = R.x;
+            R.phase = "land";
+            R.msg = `${dist.toFixed(2)}m`;
+            R.msgT = 0;
+            R.best.push(dist);
+          }
+          return;
+        }
+        if (R.phase === "done") return;
+        // land / foul → 다음 시기
+        if (R.phase === "land") { R.x += Math.max(0, R.vx * 0.25 * (1 - R.msgT * 3)) * dt; }
+        R.msgT += dt;
+        if (R.msgT > 1.9) {
+          if (R.attempt < 2) {
+            R = makeJump(2, R.best);
+            lastSide = null; updatePadHint();
+          } else {
+            const vals = R.best.filter((b) => b != null);
+            const best = vals.length ? Math.max(...vals) : 0;
+            const hist = R.best.map((b, i) => `${i + 1}차 ${b == null ? "파울" : b.toFixed(2) + "m"}`).join(" · ");
+            finishEvent(`${best.toFixed(2)}<small>m</small>`, `${best.toFixed(2)}m`, scoreJump(best), hist);
+            R.phase = "done";
+          }
+        }
+      }
+
+      function chairTap() {
+        if (R.phase === "power") { R.phase = "dir"; R.t = 0; }
+        else if (R.phase === "dir") {
+          const L = chairLayout();
+          const D = R.p * L.L * 1.35;
+          const ang = R.d * (10 * Math.PI) / 180;
+          const DEC = 250;
+          const v0 = Math.sqrt(2 * DEC * D);
+          R.vx = v0 * Math.cos(ang); R.vy = -v0 * Math.sin(ang);
+          R.cx = L.sx; R.cy = L.sy; R.dec = DEC;
+          R.phase = "roll";
+        }
+      }
+      function triangle(t) { const f = t % 2; return f < 1 ? f : 2 - f; }
+      function updateChair(dt) {
+        const L = chairLayout();
+        if (R.phase === "power") { R.t += dt; R.p = triangle(R.t * 1.25 * R.sp); return; }
+        if (R.phase === "dir") { R.t += dt; R.d = Math.cos(R.t * 2.6 * R.sp); return; }
+        if (R.phase === "roll") {
+          const sp = Math.hypot(R.vx, R.vy);
+          const nsp = Math.max(0, sp - R.dec * dt);
+          if (sp > 0) { R.vx *= nsp / sp; R.vy *= nsp / sp; }
+          R.cx += R.vx * dt; R.cy += R.vy * dt;
+          R.spin += nsp * dt * 0.03;
+          if (R.cy < 112) { R.cy = 112; R.vy = Math.abs(R.vy) * 0.5; }
+          if (R.cy > VH - 22) { R.cy = VH - 22; R.vy = -Math.abs(R.vy) * 0.5; }
+          if (R.cx > VW - 22) { R.cx = VW - 22; R.vx = -Math.abs(R.vx) * 0.4; }
+          if (Math.random() < 0.5) R.trail.push({ x: R.cx, y: R.cy, life: 0.8 });
+          if (nsp <= 0) {
+            const dist = Math.hypot(R.cx - L.tx, R.cy - L.ty);
+            const ring = CHAIR_RINGS.find(([r]) => dist <= r);
+            R.pts = ring ? ring[1] : 0;
+            R.phase = "stop"; R.msgT = 0;
+            R.got.push(R.pts);
+          }
+        }
+        R.trail.forEach((t) => (t.life -= dt));
+        R.trail = R.trail.filter((t) => t.life > 0);
+        if (R.phase === "stop") {
+          R.msgT += dt;
+          if (R.msgT > 1.8) {
+            if (R.attempt < 2) R = makeChair(2, R.got);
+            else {
+              const sum = R.got.reduce((a, b) => a + b, 0);
+              finishEvent(`${sum}<small>점</small>`, `${R.got.join(" + ")}점`, scoreChair(sum), `1차 ${R.got[0]}점 · 2차 ${R.got[1]}점`);
+              R.phase = "done";
+            }
+          }
+        }
+      }
+
+      function update(dt) {
+        if (wrongFlash > 0) wrongFlash -= dt;
+        if (!R) return;
+        if (R.kind === "run") updateRun(dt);
+        else if (R.kind === "jump") updateJump(dt);
+        else updateChair(dt);
+      }
+
+      // ───────────────────────── 그리기: 사람
+      const SKIN = "#f6c9a0";
+      function limb(x1, y1, x2, y2, w, c) {
+        g.strokeStyle = c; g.lineWidth = w; g.lineCap = "round";
+        g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke();
+      }
+      function drawPerson(x, y, sc, o) {
+        // o: { ph, pose: stand|run|air|sit|lean, suit, tie, hair }
+        g.save();
+        g.translate(x, y);
+        g.scale(sc, sc);
+        const pose = o.pose || "stand";
+        const ph = o.ph || 0;
+        const lean = pose === "run" ? 5 : pose === "lean" ? 7 : pose === "air" ? 3 : 0;
+        const hip = { x: 0, y: -26 }, sh = { x: lean, y: -46 };
+        if (pose === "sit") { hip.y = -10; sh.x = -3; sh.y = -30; }
+        // 그림자
+        g.fillStyle = "rgba(15,23,42,.14)";
+        g.beginPath(); g.ellipse(0, 1, 13, 3, 0, 0, Math.PI * 2); g.fill();
+        if (pose === "air" && o.lift) { g.translate(0, -o.lift); }
+        const pants = "#1f2937";
+        function leg(p, back) {
+          let a, bend;
+          if (pose === "run" || pose === "lean") { a = Math.sin(p) * 0.85; bend = 0.15 + 1.05 * Math.max(0, -Math.cos(p)); }
+          else if (pose === "air") { a = back ? 0.5 : 1.1; bend = back ? 1.3 : 0.6; }
+          else if (pose === "sit") { a = 1.45; bend = back ? 0.2 : 0; }
+          else { a = back ? -0.06 : 0.06; bend = 0; }
+          const kx = hip.x + Math.sin(a) * 13, ky = hip.y + Math.cos(a) * 13;
+          const sa = a - bend;
+          const fx = kx + Math.sin(sa) * 13, fy = ky + Math.cos(sa) * 13;
+          const c = back ? "#111827" : pants;
+          limb(hip.x, hip.y, kx, ky, 6.5, c);
+          limb(kx, ky, fx, fy, 6, c);
+          limb(fx - 1, fy + 1, fx + 5, fy + 1, 4, "#0b0f19");
+        }
+        function arm(p, back) {
+          let a, b;
+          if (pose === "run" || pose === "lean") { a = -Math.sin(p) * 0.95; b = 1.2; }
+          else if (pose === "air") { a = back ? -2.2 : -2.6; b = 0.3; }
+          else if (pose === "sit") { a = 0.5; b = 1.0; }
+          else { a = back ? -0.15 : 0.12; b = 0.2; }
+          const ex = sh.x + Math.sin(a) * 11, ey = sh.y + 2 + Math.cos(a) * 11;
+          const ba = a + b;
+          const hx = ex + Math.sin(ba) * 10, hy = ey + Math.cos(ba) * 10;
+          const c = back ? shade(o.suit) : o.suit;
+          limb(sh.x, sh.y + 2, ex, ey, 5.5, c);
+          limb(ex, ey, hx, hy, 5, c);
+          g.fillStyle = SKIN; g.beginPath(); g.arc(hx, hy, 2.6, 0, Math.PI * 2); g.fill();
+        }
+        leg(ph + Math.PI, true);
+        arm(ph, true);
+        // 몸통(정장)
+        limb(sh.x, sh.y + 3, hip.x, hip.y, 14, o.suit);
+        // 셔츠·넥타이
+        const mx = (sh.x + hip.x) / 2;
+        g.fillStyle = "#fff";
+        g.beginPath(); g.moveTo(sh.x + 1, sh.y + 1); g.lineTo(sh.x + 6, sh.y + 2); g.lineTo(mx + 4, (sh.y + hip.y) / 2 - 2); g.closePath(); g.fill();
+        limb(sh.x + 3, sh.y + 3, mx + 3.5, (sh.y + hip.y) / 2 + 2, 2.6, o.tie);
+        leg(ph, false);
+        // 머리
+        const hx = sh.x + 3, hy = sh.y - 10;
+        g.fillStyle = SKIN; g.beginPath(); g.arc(hx, hy, 8.5, 0, Math.PI * 2); g.fill();
+        g.fillStyle = o.hair || "#2b1d14";
+        g.beginPath(); g.arc(hx - 1, hy - 1.5, 8.6, Math.PI * 0.95, Math.PI * 2.08); g.closePath(); g.fill();
+        g.fillStyle = "#1f2937"; g.beginPath(); g.arc(hx + 4.5, hy + 0.5, 1.2, 0, Math.PI * 2); g.fill();
+        if (o.glasses) { g.strokeStyle = "#1f2937"; g.lineWidth = 1; g.strokeRect(hx + 2.2, hy - 1.6, 4.5, 3.4); }
+        arm(ph, false);
+        g.restore();
+      }
+      function shade(hex) {
+        const n = parseInt(hex.slice(1), 16);
+        const f = (v) => Math.max(0, Math.round(v * 0.72));
+        return `rgb(${f(n >> 16)},${f((n >> 8) & 255)},${f(n & 255)})`;
+      }
+      const PLAYER = { suit: "#1e3a8a", tie: "#ef4444", hair: "#2b1d14", glasses: true };
+
+      // ───────────────────────── 그리기: 배경
+      function drawStands(camX, cheer) {
+        const top = 96;
+        const grd = g.createLinearGradient(0, 0, 0, top);
+        grd.addColorStop(0, "#0369a1"); grd.addColorStop(1, "#0b7fb8");
+        g.fillStyle = grd; g.fillRect(0, 0, VW, top);
+        // 관중 두 줄 (시차)
+        for (let row = 0; row < 2; row++) {
+          const par = row === 0 ? 0.35 : 0.5;
+          const gap = 26;
+          const baseY = row === 0 ? 46 : 74;
+          const off = camX * par;
+          const i0 = Math.floor(off / gap) - 1, i1 = i0 + Math.ceil(VW / gap) + 2;
+          for (let i = i0; i <= i1; i++) {
+            const x = i * gap - off + (row ? 13 : 0);
+            const col = CROWD[((i * 7 + row * 3) % CROWD.length + CROWD.length) % CROWD.length];
+            const bob = cheer > 0.05 ? Math.abs(Math.sin(clock * 9 + i * 1.7)) * 4 * cheer : 0;
+            const yy = baseY - bob;
+            g.fillStyle = col; rr(x - 9, yy - 6, 18, 18, 7); g.fill();
+            g.fillStyle = row ? "#f2c39a" : "#e8b98f"; g.beginPath(); g.arc(x, yy - 12, 6.5, 0, Math.PI * 2); g.fill();
+            if (cheer > 0.5 && (i + row) % 3 === 0) { limb(x + 7, yy - 4, x + 10, yy - 18 - bob, 3, col); }
+          }
+        }
+        // 난간과 응원 현수막
+        g.fillStyle = "#e2e8f0"; g.fillRect(0, top - 14, VW, 14);
+        g.fillStyle = "#94a3b8"; g.fillRect(0, top - 14, VW, 2);
+        const bw = 150, bgap = 260, off = camX * 0.6;
+        const j0 = Math.floor(off / bgap) - 1, j1 = j0 + Math.ceil(VW / bgap) + 2;
+        font(10.5);
+        g.textAlign = "center"; g.textBaseline = "middle";
+        for (let j = j0; j <= j1; j++) {
+          const x = j * bgap - off + 40;
+          g.fillStyle = j % 2 ? "#22c55e" : "#fff";
+          rr(x, top - 13, bw, 12, 3); g.fill();
+          g.fillStyle = j % 2 ? "#fff" : "#0369a1";
+          g.fillText(BANNERS[((j % BANNERS.length) + BANNERS.length) % BANNERS.length], x + bw / 2, top - 6.5);
+        }
+      }
+      function drawFloor(camX, top) {
+        g.fillStyle = "#cfd8e3"; g.fillRect(0, top, VW, VH - top);
+        // 카펫 타일 무늬
+        g.fillStyle = "rgba(255,255,255,.18)";
+        const tw = 40, off = camX % (tw * 2);
+        for (let x = -off - tw * 2; x < VW + tw; x += tw * 2) g.fillRect(x, top, tw, VH - top);
+      }
+
+      // ───────────────────────── 그리기: 종목별
+      let idleRun = null;
+      function drawRun(r) {
+        const lead = Math.max(r.x, 0);
+        const camX = lead * PPM - VW * 0.32;
+        drawStands(camX, clamp(r.v / 9, 0, 1));
+        drawFloor(camX, 96);
+        const lanes = [168, 232, 300];
+        // 레인 선
+        g.fillStyle = "#fff";
+        [124, 196, 264].forEach((y) => g.fillRect(0, y, VW, 2.5));
+        // 거리 표시
+        font(11);
+        g.textAlign = "center"; g.textBaseline = "alphabetic";
+        for (let m = 0; m <= 110; m += 10) {
+          const x = m * PPM - camX;
+          if (x < -40 || x > VW + 40) continue;
+          if (m === 0) { g.fillStyle = "#fff"; g.fillRect(x - 2, 112, 4, VH - 112); continue; }
+          if (m === 100) {
+            for (let k = 0; k < 26; k++) { g.fillStyle = k % 2 ? "#0f172a" : "#fff"; g.fillRect(x - 5, 112 + k * 8, 5, 8); g.fillStyle = k % 2 ? "#fff" : "#0f172a"; g.fillRect(x, 112 + k * 8, 5, 8); }
+            // 결승 아치 (사무실 출입 게이트)
+            g.fillStyle = "#22c55e"; rr(x - 8, 100, 16, 14, 4); g.fill();
+            g.fillStyle = "#0b3558"; font(12, 800); g.fillText("FINISH", x, 128);
+            continue;
+          }
+          if (m > 100) continue;
+          g.fillStyle = "rgba(255,255,255,.55)"; g.fillRect(x - 1, 112, 2, VH - 112);
+          g.fillStyle = "#475569"; font(11); g.fillText(`${m}m`, x, VH - 4);
+        }
+        // 복도 소품 (정수기·화분)
+        for (let k = 0; k < 6; k++) {
+          const x = (15 + k * 18) * PPM - camX;
+          if (x < -30 || x > VW + 30) continue;
+          if (k % 2) { g.fillStyle = "#e0f2fe"; rr(x - 6, 100, 12, 22, 3); g.fill(); g.fillStyle = "#38bdf8"; rr(x - 5, 100, 10, 8, 3); g.fill(); }
+          else { g.fillStyle = "#a16207"; rr(x - 6, 110, 12, 12, 3); g.fill(); g.fillStyle = "#16a34a"; g.beginPath(); g.arc(x, 106, 8, 0, Math.PI * 2); g.fill(); }
+        }
+        // 선수들 (뒤 레인부터)
+        const rivPose = (rv) => (r.cd > 0 ? "stand" : rv.v > 0.5 ? "run" : "stand");
+        r.rivals.forEach((rv, i) => {
+          drawPerson(rv.x * PPM - camX, lanes[i], 1.15, { ph: rv.ph, pose: rivPose(rv), suit: rv.suit, tie: rv.tie, hair: rv.hair });
+          font(10.5, 700); g.fillStyle = "rgba(15,23,42,.55)"; g.textAlign = "center";
+          g.fillText(rv.name, rv.x * PPM - camX, lanes[i] - 78);
+        });
+        drawPerson(r.x * PPM - camX, lanes[2], 1.25, { ...PLAYER, ph: r.ph, pose: r.cd > 0 ? (r.cd < 1.4 ? "lean" : "stand") : r.v > 0.4 ? "run" : "stand" });
+        g.fillStyle = "#0369a1"; font(11, 800); g.textAlign = "center";
+        g.fillText("나", r.x * PPM - camX, lanes[2] - 84);
+        // 시계·속도
+        drawTopPanel(`${(r.done ? r.finishT : r.t).toFixed(2)}초`, r.v);
+        if (state === "play" && r.cd > 0) {
+          const msg = r.cd > 1.4 ? "제자리에…" : r.cd > 0.5 ? "준비…" : "";
+          if (msg) bigText(msg, "#0b3558");
+        } else if (state === "play" && r.t < 0.7 && !r.done) bigText("출발!", "#16a34a");
+        if (state === "play" && wrongFlash > 0 && !r.done) hint("번갈아 눌러야 빨라져요!");
+      }
+      function drawTopPanel(timeText, v) {
+        const w = 150;
+        g.fillStyle = "rgba(255,255,255,.94)"; rr(10, 8, w, 30, 10); g.fill();
+        font(16, 800); g.fillStyle = "#0b3558"; g.textAlign = "left"; g.textBaseline = "middle";
+        g.fillText(timeText, 20, 24);
+        // 속도 막대
+        if (v != null) {
+          const bx = VW - 118, bw = 104;
+          g.fillStyle = "rgba(255,255,255,.94)"; rr(bx - 6, 8, bw + 12, 30, 10); g.fill();
+          g.fillStyle = "#e2e8f0"; rr(bx, 20, bw, 8, 4); g.fill();
+          const f = clamp(v / VMAX, 0, 1);
+          const grd = g.createLinearGradient(bx, 0, bx + bw, 0);
+          grd.addColorStop(0, "#22c55e"); grd.addColorStop(1, "#0369a1");
+          g.fillStyle = grd; rr(bx, 20, Math.max(8, bw * f), 8, 4); g.fill();
+          font(9.5, 700); g.fillStyle = "#64748b"; g.fillText("속도", bx, 14);
+          g.textAlign = "right"; g.fillText(`${(v * 3.6).toFixed(0)}km/h`, bx + bw, 14);
+        }
+      }
+      function bigText(text, color, y = 160, size = 34) {
+        font(size, 800); g.textAlign = "center"; g.textBaseline = "middle";
+        g.lineWidth = 6; g.strokeStyle = "rgba(255,255,255,.95)"; g.lineJoin = "round";
+        g.strokeText(text, VW / 2, y);
+        g.fillStyle = color; g.fillText(text, VW / 2, y);
+      }
+      function hint(text) {
+        font(13, 700); g.textAlign = "center"; g.textBaseline = "middle";
+        const w = g.measureText(text).width + 24;
+        g.fillStyle = "rgba(220,38,38,.92)"; rr(VW / 2 - w / 2, 46, w, 26, 13); g.fill();
+        g.fillStyle = "#fff"; g.fillText(text, VW / 2, 59);
+      }
+
+      function drawJump(r) {
+        const camX = Math.max(-30, r.x * PPM - VW * 0.32);
+        drawStands(camX, r.phase === "air" ? 1 : clamp(r.v / 10, 0, 1));
+        drawFloor(camX, 96);
+        const base = 262;
+        // 도움닫기 길
+        g.fillStyle = "#94a3b8"; g.fillRect(-camX - 40, base - 8, (BOARD + 0.2) * PPM + 40, 16);
+        g.fillStyle = "#fff";
+        for (let m = 0; m < BOARD; m += 5) { const x = m * PPM - camX; g.fillRect(x, base - 8, 2, 16); }
+        // 파쇄지 모래판
+        const px0 = (BOARD + 0.3) * PPM - camX, px1 = (BOARD + 12) * PPM - camX;
+        g.fillStyle = "#fff4d6"; rr(px0, base - 16, px1 - px0, 40, 10); g.fill();
+        g.strokeStyle = "#f2d999"; g.lineWidth = 1.5;
+        for (let k = 0; k < 60; k++) {
+          const sx = px0 + 6 + ((k * 53) % Math.max(1, (px1 - px0 - 12)));
+          const sy = base - 10 + ((k * 29) % 28);
+          g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx + 6, sy + ((k % 3) - 1) * 2); g.stroke();
+        }
+        font(10.5, 700); g.fillStyle = "#a16207"; g.textAlign = "center"; g.textBaseline = "alphabetic";
+        for (let m = 3; m <= 11; m++) {
+          const x = (BOARD + m) * PPM - camX;
+          g.fillStyle = "rgba(161,98,7,.35)"; g.fillRect(x - 0.5, base - 16, 1, 6);
+          g.fillStyle = "#a16207"; g.fillText(`${m}m`, x, base + 36);
+        }
+        // 발판
+        const bx = BOARD * PPM - camX;
+        g.fillStyle = "#fff"; g.fillRect(bx - 16, base - 8, 16, 16);
+        g.fillStyle = "#ef4444"; g.fillRect(bx, base - 9, 3, 18);
+        font(10, 800); g.fillStyle = "#ef4444"; g.fillText("발판", bx - 4, base + 22);
+        // 이전 기록 표시
+        r.best.forEach((b, i) => {
+          if (b == null) return;
+          const x = (BOARD + b) * PPM - camX;
+          g.fillStyle = "#f97316"; g.beginPath(); g.moveTo(x, base - 24); g.lineTo(x - 5, base - 12); g.lineTo(x + 5, base - 12); g.closePath(); g.fill();
+          g.fillStyle = "#9a3412"; font(9.5, 700); g.fillText(`${i + 1}차`, x, base - 27);
+        });
+        // 날리는 보고서 종이
+        r.papers.forEach((p) => {
+          if (p.life <= 0) return;
+          g.save(); g.translate(p.x * PPM - camX, base - p.y * PPM); g.rotate(p.r);
+          g.fillStyle = "#fff"; g.fillRect(-5, -6, 10, 12); g.fillStyle = "#93c5fd"; g.fillRect(-3, -3, 6, 1.2); g.fillRect(-3, 0, 6, 1.2);
+          g.restore();
+        });
+        // 선수
+        const px = r.x * PPM - camX;
+        let pose = "stand";
+        if (r.phase === "run") pose = r.v > 0.4 ? "run" : "stand";
+        else if (r.phase === "air") pose = "air";
+        else if (r.phase === "land") pose = "sit";
+        else if (r.phase === "foul") pose = "stand";
+        drawPerson(px, base - r.y * PPM, 1.25, { ...PLAYER, ph: r.ph, pose });
+        // 각도 게이지
+        if (r.holding || (r.phase === "air" && r.y > 0.2)) {
+          const ax = px + 18, ay = base - 30;
+          g.strokeStyle = "rgba(255,255,255,.9)"; g.lineWidth = 10;
+          g.beginPath(); g.arc(ax, ay, 40, -Math.PI / 2 + 0.1, 0); g.stroke();
+          g.strokeStyle = "rgba(34,197,94,.85)";
+          g.beginPath(); g.arc(ax, ay, 40, -(50 * Math.PI) / 180, -(40 * Math.PI) / 180); g.stroke();
+          const a = -(r.angle * Math.PI) / 180;
+          limb(ax, ay, ax + Math.cos(a) * 46, ay + Math.sin(a) * 46, 3, "#0b3558");
+          font(12, 800); g.fillStyle = "#0b3558"; g.textAlign = "left"; g.textBaseline = "middle";
+          g.fillText(`${Math.round(r.angle)}°`, ax + 50, ay - 18);
+        }
+        drawTopPanel(`${r.attempt}차 시기`, r.phase === "run" ? r.v : null);
+        if (state === "play") {
+          if (r.phase === "run" && r.x < 0.3 && r.v < 0.3) hint("번갈아 연타로 출발해요");
+          else if (r.phase === "run" && wrongFlash > 0) hint("번갈아 눌러야 빨라져요!");
+          else if (r.phase === "run" && !r.holding && r.x > BOARD - 9) hint("지금! 점프 키를 꾹");
+          if (r.phase === "land") bigText(r.msg, "#0369a1", 150, 38);
+          if (r.phase === "foul") bigText(r.msg, "#dc2626", 150, 24);
+        }
+      }
+
+      function drawChairShape(x, y, rot, sc = 1) {
+        g.save(); g.translate(x, y); g.rotate(rot); g.scale(sc, sc);
+        g.strokeStyle = "#334155"; g.lineWidth = 4; g.lineCap = "round";
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * Math.PI * 2;
+          g.beginPath(); g.moveTo(0, 0); g.lineTo(Math.cos(a) * 17, Math.sin(a) * 17); g.stroke();
+          g.fillStyle = "#0f172a"; g.beginPath(); g.arc(Math.cos(a) * 17, Math.sin(a) * 17, 3.4, 0, Math.PI * 2); g.fill();
+        }
+        g.fillStyle = "#0369a1"; g.beginPath(); g.arc(0, 0, 12, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "rgba(255,255,255,.25)"; g.beginPath(); g.arc(-3, -3, 6, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = "#0b3558"; g.lineWidth = 6;
+        g.beginPath(); g.arc(0, 0, 13, Math.PI * 0.7, Math.PI * 1.3); g.stroke();
+        g.restore();
+      }
+      function drawChair(r) {
+        const L = chairLayout();
+        // 사무실 바닥 (위에서 본 모습)
+        g.fillStyle = "#0369a1"; g.fillRect(0, 0, VW, 92);
+        // 위쪽 책상 줄
+        for (let x = 10; x < VW; x += 96) {
+          g.fillStyle = "#e2e8f0"; rr(x, 30, 84, 48, 8); g.fill();
+          g.fillStyle = "#1e293b"; rr(x + 26, 38, 32, 18, 3); g.fill();
+          g.fillStyle = "#38bdf8"; rr(x + 28, 40, 28, 13, 2); g.fill();
+          g.fillStyle = "#fde68a"; g.fillRect(x + 64, 60, 10, 10);
+        }
+        g.fillStyle = "#dbe5ee"; g.fillRect(0, 92, VW, VH - 92);
+        g.strokeStyle = "rgba(148,163,184,.35)"; g.lineWidth = 1;
+        for (let x = 0; x < VW; x += 32) { g.beginPath(); g.moveTo(x, 92); g.lineTo(x, VH); g.stroke(); }
+        for (let y = 92; y < VH; y += 32) { g.beginPath(); g.moveTo(0, y); g.lineTo(VW, y); g.stroke(); }
+        // 관중(동료들) — 위쪽 책상 뒤에서 응원
+        for (let x = 30, i = 0; x < VW; x += 48, i++) {
+          const bob = r.phase === "roll" ? Math.abs(Math.sin(clock * 8 + i)) * 3 : 0;
+          g.fillStyle = CROWD[i % CROWD.length]; g.beginPath(); g.arc(x, 14 - bob, 9, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#2b1d14"; g.beginPath(); g.arc(x, 14 - bob, 5.5, 0, Math.PI * 2); g.fill();
+        }
+        // 과녁 (바닥 테이프)
+        const ringCols = ["#22c55e", "#ffffff", "#0ea5e9", "#ffffff", "#0369a1"];
+        for (let k = CHAIR_RINGS.length - 1; k >= 0; k--) {
+          g.fillStyle = ringCols[k]; g.beginPath(); g.arc(L.tx, L.ty, CHAIR_RINGS[k][0], 0, Math.PI * 2); g.fill();
+        }
+        g.fillStyle = "#facc15"; g.beginPath(); g.arc(L.tx, L.ty, 5, 0, Math.PI * 2); g.fill();
+        font(9.5, 800); g.textAlign = "center"; g.textBaseline = "middle";
+        CHAIR_RINGS.forEach(([rad, pts], k) => {
+          if (k === 0) return;
+          const inner = CHAIR_RINGS[k - 1][0];
+          g.fillStyle = k % 2 ? "#0369a1" : "#fff";
+          g.fillText(String(pts), L.tx, L.ty - (rad + inner) / 2);
+        });
+        g.fillStyle = "#fff"; g.fillText("15", L.tx, L.ty + 9);
+        // 출발선
+        g.fillStyle = "#f97316"; g.fillRect(L.sx + 22, 104, 3, VH - 172);
+        if (r.prev) drawChairShape(r.prev.x, r.prev.y, r.prev.rot, 0.9);
+        // 조준선
+        if (r.phase === "dir" || r.phase === "power") {
+          const ang = r.phase === "dir" ? r.d * (10 * Math.PI) / 180 : 0;
+          const len = r.phase === "dir" ? r.p * L.L * 1.35 : L.L;
+          g.save(); g.setLineDash([6, 6]); g.strokeStyle = r.phase === "dir" ? "#0b3558" : "rgba(11,53,88,.25)"; g.lineWidth = 2;
+          g.beginPath(); g.moveTo(L.sx, L.sy); g.lineTo(L.sx + Math.cos(ang) * len, L.sy - Math.sin(ang) * len); g.stroke(); g.restore();
+        }
+        r.trail.forEach((t) => { g.fillStyle = `rgba(51,65,85,${t.life * 0.18})`; g.beginPath(); g.arc(t.x, t.y, 2, 0, Math.PI * 2); g.fill(); });
+        const cx = r.phase === "roll" || r.phase === "stop" || r.phase === "done" ? r.cx : L.sx;
+        const cy = r.phase === "roll" || r.phase === "stop" || r.phase === "done" ? r.cy : L.sy;
+        drawChairShape(cx, cy, r.spin);
+        // 게이지
+        const gx = 16, gw = Math.min(220, VW * 0.42), gy = VH - 34;
+        g.fillStyle = "rgba(255,255,255,.95)"; rr(gx - 8, gy - 22, gw + 16, 44, 10); g.fill();
+        font(10.5, 800); g.textAlign = "left"; g.textBaseline = "middle"; g.fillStyle = "#0b3558";
+        const powerOn = r.phase === "power";
+        g.fillText(powerOn ? "① 힘" : r.phase === "dir" ? "② 방향" : `${r.attempt}차 시도`, gx, gy - 12);
+        if (powerOn || r.phase !== "dir") {
+          const grd = g.createLinearGradient(gx, 0, gx + gw, 0);
+          grd.addColorStop(0, "#bae6fd"); grd.addColorStop(0.74, "#22c55e"); grd.addColorStop(1, "#ef4444");
+          g.fillStyle = grd; rr(gx, gy, gw, 10, 5); g.fill();
+          const nx = gx + gw * r.p;
+          limb(nx, gy - 4, nx, gy + 14, 3, "#0b3558");
+        } else {
+          g.fillStyle = "#e2e8f0"; rr(gx, gy, gw, 10, 5); g.fill();
+          g.fillStyle = "#22c55e"; rr(gx + gw / 2 - 10, gy, 20, 10, 5); g.fill();
+          const nx = gx + gw / 2 - (gw / 2) * r.d;
+          limb(nx, gy - 4, nx, gy + 14, 3, "#0b3558");
+          font(9, 700); g.fillStyle = "#64748b"; g.fillText("위", gx, gy + 20); g.textAlign = "right"; g.fillText("아래", gx + gw, gy + 20);
+        }
+        drawScoreChips(r);
+        if (state === "play") {
+          if (r.phase === "power") hint("힘 게이지를 멈춰요 (스페이스·탭)");
+          else if (r.phase === "dir") hint("이제 방향을 멈춰요");
+          if (r.phase === "stop") bigText(r.pts ? `${r.pts}점!` : "과녁 밖이에요", r.pts ? "#0369a1" : "#dc2626", 150, 34);
+        }
+      }
+      function drawScoreChips(r) {
+        const x = VW - 12;
+        font(12, 800); g.textAlign = "right"; g.textBaseline = "middle";
+        const txt = `1차 ${r.got[0] != null ? r.got[0] + "점" : "-"}  ·  2차 ${r.got[1] != null ? r.got[1] + "점" : "-"}`;
+        const w = g.measureText(txt).width + 20;
+        g.fillStyle = "rgba(255,255,255,.95)"; rr(x - w, VH - 40, w, 28, 10); g.fill();
+        g.fillStyle = "#0b3558"; g.fillText(txt, x - 10, VH - 26);
+      }
+
+      function draw() {
+        g.setTransform(dpr * S, 0, 0, dpr * S, 0, 0);
+        g.clearRect(0, 0, VW, VH);
+        if (!R) { if (!idleRun) idleRun = makeRun(); drawRun(idleRun); return; }
+        if (R.kind === "run") drawRun(R);
+        else if (R.kind === "jump") drawJump(R);
+        else drawChair(R);
+      }
+
+      // ───────────────────────── 루프
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        clock += dt;
+        if (state === "play" || state === "result") update(dt);
+        draw();
+        requestAnimationFrame(frame);
+      }
+
+      window.addEventListener("resize", resize);
+      resize();
+      showReady();
+      requestAnimationFrame(frame);
+      window.__gmOlympic = { get state() { return state; }, get R() { return R; }, scores: () => scores };
+    },
+  });
+  </script>
+</body>
+</html>

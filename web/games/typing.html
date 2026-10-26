@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, interactive-widget=resizes-content">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>영어 타자 레이스 — 점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-ty { display: flex; flex-direction: column; gap: 10px; scroll-margin-top: 8px; }
+    .gm-ty-hud { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .gm-ty-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: #fff; border: 1px solid #e3e6f3; font-size: 14px; font-weight: 600; color: #0b3558; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-ty-chip b { font-size: 17px; }
+    .gm-ty-chip--score { background: linear-gradient(135deg, #4f46e5, #a78bfa); color: #fff; border-color: transparent; }
+    .gm-ty-chip--combo { transition: transform .15s; }
+    .gm-ty-chip--combo.is-hot { background: #fff7ed; border-color: #fdba74; color: #c2410c; }
+    .gm-ty-chip--combo.is-bump { transform: scale(1.12); }
+    .gm-ty-mult { margin-left: 2px; padding: 1px 6px; border-radius: 999px; background: rgba(79,70,229,.1); color: #4f46e5; font-size: 13px; }
+    .gm-ty-chip--combo.is-hot .gm-ty-mult { background: #f97316; color: #fff; }
+    .gm-ty-hearts { margin-left: auto; display: inline-flex; gap: 3px; }
+    .gm-ty-hearts svg { width: 20px; height: 20px; transition: transform .2s, opacity .2s; }
+    .gm-ty-hearts svg.is-empty { opacity: .25; transform: scale(.85); }
+
+    .gm-ty-field { position: relative; height: 440px; border-radius: 16px; overflow: hidden; touch-action: manipulation;
+      background: linear-gradient(180deg, #eef0ff 0%, #f7f5ff 70%, #fdf2f8 100%); box-shadow: inset 0 0 0 1px #e3e6f3; }
+    .gm-ty-field::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+      background-image: linear-gradient(rgba(79,70,229,.06) 1px, transparent 1px); background-size: 100% 44px; }
+    .gm-ty-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 6px; background: repeating-linear-gradient(90deg, #f43f5e 0 14px, #fecdd3 14px 24px); opacity: .7; }
+    .gm-ty-field.is-hurt { animation: gm-ty-hurt .35s; }
+    @keyframes gm-ty-hurt { 0% { box-shadow: inset 0 0 0 3px #f43f5e; } 100% { box-shadow: inset 0 0 0 1px #e3e6f3; } }
+    .gm-ty-field.is-frozen { background: linear-gradient(180deg, #fff8e1 0%, #fffbeb 70%, #fef3c7 100%); }
+
+    .gm-ty-card { position: absolute; left: 0; top: 0; min-width: 84px; max-width: 46%; padding: 8px 12px 7px; border-radius: 12px; background: #fff; color: #1e1b4b;
+      box-shadow: 0 2px 8px rgba(30,27,75,.12), inset 0 0 0 1.5px #e0e3f5; text-align: center; will-change: transform; cursor: text; }
+    .gm-ty-card b { display: block; font-size: 16px; line-height: 1.3; font-weight: 700; word-break: keep-all; }
+    .gm-ty-slots { display: flex; justify-content: center; gap: 2px; margin-top: 5px; font: 700 12px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #a5a8c8; letter-spacing: 0; }
+    .gm-ty-slots i { font-style: normal; display: inline-block; width: 9px; border-bottom: 2px solid #d4d6ea; padding-bottom: 2px; height: 14px; }
+    .gm-ty-slots i.is-on { color: #4f46e5; border-color: #4f46e5; }
+    .gm-ty-card.is-target { box-shadow: 0 6px 18px rgba(79,70,229,.28), inset 0 0 0 2.5px #4f46e5; z-index: 3; }
+    .gm-ty-card.is-danger:not(.is-target) { box-shadow: 0 2px 8px rgba(244,63,94,.2), inset 0 0 0 2px #fda4af; }
+    .gm-ty-card--gold { background: linear-gradient(135deg, #fde68a, #fbbf24); color: #78350f; box-shadow: 0 4px 14px rgba(245,158,11,.4), inset 0 0 0 1.5px #f59e0b; }
+    .gm-ty-card--gold .gm-ty-slots { color: #92400e; }
+    .gm-ty-card--gold .gm-ty-slots i { border-color: #d97706; }
+    .gm-ty-card--gold .gm-ty-star { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+    .gm-ty-card.is-pop { transition: transform .25s ease-out, opacity .25s; opacity: 0; }
+    .gm-ty-card.is-miss { transition: opacity .4s .45s; opacity: 0; background: #ffe4e6; }
+    .gm-ty-field.is-frozen .gm-ty-card:not(.gm-ty-card--gold) { box-shadow: 0 2px 8px rgba(245,158,11,.18), inset 0 0 0 2px #fcd34d; }
+    .gm-ty-float { position: absolute; font-weight: 800; font-size: 18px; color: #4f46e5; pointer-events: none; animation: gm-ty-float .8s ease-out forwards; text-shadow: 0 1px 0 #fff; white-space: nowrap; z-index: 5; }
+    .gm-ty-float.is-gold { color: #b45309; }
+    @keyframes gm-ty-float { from { opacity: 1; transform: translate(-50%, 0); } to { opacity: 0; transform: translate(-50%, -40px); } }
+    .gm-ty-banner { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); padding: 6px 14px; border-radius: 999px; background: #1e1b4b; color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; z-index: 6; animation: gm-ty-banner 1.6s ease forwards; pointer-events: none; }
+    .gm-ty-banner.is-gold { background: #b45309; }
+    @keyframes gm-ty-banner { 0% { opacity: 0; transform: translate(-50%, -8px); } 12%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
+    .gm-ty-freeze { position: absolute; right: 10px; bottom: 14px; display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: #f59e0b; color: #fff; font-size: 13px; font-weight: 700; z-index: 6; }
+    .gm-ty-freeze[hidden] { display: none; }
+
+    .gm-ty-over { position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(30, 27, 75, .32); }
+    .gm-ty-over[hidden] { display: none; }
+    .gm-ty-pop { width: 100%; max-width: 360px; background: #fff; border-radius: 16px; padding: 20px 18px; text-align: center; box-shadow: 0 12px 32px rgba(15,23,42,.18); }
+    .gm-ty-pop h2 { margin: 6px 0; font-size: 21px; color: #1e1b4b; }
+    .gm-ty-pop p { margin: 0 0 6px; font-size: 14px; line-height: 1.55; color: #475569; }
+    .gm-ty-pop .hk-btn { width: 100%; margin-top: 12px; }
+    .gm-ty-badge { display: inline-flex; width: 50px; height: 50px; border-radius: 14px; align-items: center; justify-content: center; background: linear-gradient(135deg, #4f46e5, #a78bfa); }
+    .gm-ty-demo { display: flex; justify-content: center; gap: 8px; margin: 10px 0 4px; flex-wrap: wrap; }
+    .gm-ty-demo span { padding: 6px 10px; border-radius: 10px; background: #f1f0ff; font-size: 13px; color: #312e81; }
+    .gm-ty-demo span.is-gold { background: #fef3c7; color: #92400e; }
+    .gm-ty-stat { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 2px; }
+    .gm-ty-stat div { background: #f5f5ff; border-radius: 10px; padding: 8px 4px; font-size: 12px; color: #64748b; }
+    .gm-ty-stat b { display: block; font-size: 18px; color: #1e1b4b; }
+
+    .gm-ty-inputrow { display: flex; gap: 8px; align-items: stretch; }
+    .gm-ty-input { flex: 1; min-width: 0; height: 52px; padding: 0 16px; border-radius: 14px; border: 2px solid #c7c9f0; background: #fff; font: 600 20px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: #1e1b4b; outline: none; letter-spacing: .5px; }
+    .gm-ty-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+    .gm-ty-input.is-match { border-color: #4f46e5; }
+    .gm-ty-input.is-wrong { border-color: #f43f5e; color: #be123c; box-shadow: 0 0 0 3px rgba(244,63,94,.12); }
+    .gm-ty-input.is-shake { animation: gm-ty-shake .3s; }
+    @keyframes gm-ty-shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+    .gm-ty-input::placeholder { color: #a5a8c8; font-family: inherit; font-weight: 500; font-size: 15px; letter-spacing: 0; }
+    .gm-ty-go { height: 52px; padding: 0 18px; border: 0; border-radius: 14px; background: linear-gradient(135deg, #4f46e5, #7c6cf0); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+    .gm-ty-hint { min-height: 18px; font-size: 12.5px; color: #64748b; text-align: center; }
+    .gm-ty-hint.is-warn { color: #be123c; font-weight: 600; }
+
+    @media (max-width: 480px) {
+      .gm-ty-hud { flex-wrap: nowrap; gap: 5px; }
+      .gm-ty-chip { padding: 5px 8px; font-size: 12.5px; gap: 3px; }
+      .gm-ty-chip b { font-size: 15px; }
+      .gm-ty-ico { display: none; }
+      .gm-ty-mult { font-size: 12px; padding: 1px 5px; }
+      .gm-ty-hearts { gap: 1px; }
+      .gm-ty-hearts svg { width: 15px; height: 15px; }
+      .gm-ty-card { min-width: 72px; padding: 7px 9px 6px; max-width: 52%; }
+      .gm-ty-card b { font-size: 14.5px; }
+      .gm-ty-slots i { width: 7px; }
+      .gm-ty-pop { padding: 16px 14px; }
+      .gm-ty-pop h2 { font-size: 19px; }
+      .gm-ty-pop p { font-size: 13px; }
+      .gm-ty-input { font-size: 18px; height: 48px; }
+      .gm-ty-go { height: 48px; padding: 0 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  // 단어장 — 영어|뜻|다른 정답(쉼표). 화면에는 뜻이 나오고 영어로 친다.
+  const GM_TY_WORDS = `
+desk|책상
+chair|의자
+lunch|점심 식사
+plan|계획
+goal|목표|target,aim
+call|전화하다
+break|쉬는 시간
+rest|쉬다
+sleep|잠자다
+water|물
+walk|걷다
+run|달리다
+eye|눈 (신체)
+neck|목 (신체)
+back|등 (신체)
+hand|손
+head|머리 (신체)
+knee|무릎
+waist|허리
+wrist|손목
+tired|피곤한
+happy|행복한
+busy|바쁜
+late|늦은
+early|이른, 일찍
+fast|빠른|quick
+slow|느린
+open|열다
+close|닫다|shut
+send|보내다
+read|읽다
+write|(글을) 쓰다
+ask|묻다
+help|돕다
+start|시작하다|begin
+check|확인하다
+sign|서명하다
+price|가격
+cost|비용|expense
+money|돈
+bank|은행
+print|인쇄하다
+copy|복사하다
+paper|종이
+clock|시계|watch
+noon|정오
+week|일주일
+month|달 (한 달)
+year|해 (일 년)
+today|오늘
+hour|한 시간
+floor|층
+door|문
+room|방
+boss|상사
+staff|직원들|employees
+guest|손님|visitor
+order|주문하다
+rice|밥, 쌀
+soup|국
+bread|빵
+fruit|과일
+tea|(마시는) 차
+milk|우유
+sugar|설탕
+salt|소금
+meal|식사
+diet|식단
+sweat|땀
+pain|통증
+heart|심장
+blood|피, 혈액
+bone|뼈
+skin|피부
+smile|미소
+laugh|소리 내어 웃다
+relax|긴장을 풀다
+calm|차분한
+vote|투표하다
+rule|규칙
+event|행사
+topic|주제
+issue|쟁점
+data|자료
+chart|도표
+sales|매출|revenue
+loss|손실
+shift|교대 근무
+delay|지연
+snack|간식
+nurse|간호사
+fever|열 (몸의)
+cough|기침
+sorry|미안한
+daily|매일의
+team|팀, 조
+idea|생각, 착안|thought
+coffee|커피
+health|건강
+report|보고서
+meeting|회의
+office|사무실
+stretch|스트레칭하다
+posture|자세
+weekend|주말
+holiday|공휴일
+receipt|영수증
+invoice|청구서
+budget|예산
+profit|이익, 수익
+client|의뢰인
+manager|관리자
+urgent|긴급한
+review|검토하다
+approve|승인하다
+reject|거절하다|refuse,decline
+request|요청하다
+answer|대답하다|reply,respond
+explain|설명하다
+discuss|논의하다
+prepare|준비하다
+attend|참석하다
+cancel|취소하다
+arrive|도착하다
+return|돌아오다
+travel|여행하다
+airport|공항
+station|역 (기차역)
+subway|지하철
+traffic|교통
+weather|날씨
+dinner|저녁 식사
+noodle|국수|noodles
+muscle|근육
+finger|손가락
+stomach|위, 배|belly
+doctor|의사
+massage|안마
+breathe|숨 쉬다
+stress|스트레스
+balance|균형
+comfort|편안함
+healthy|건강한
+careful|조심스러운
+honest|정직한
+polite|예의 바른
+patient|환자
+success|성공
+failure|실패
+mistake|실수|error
+problem|문제|trouble
+result|결과
+reason|이유
+example|예시
+number|숫자, 번호
+letter|편지
+address|주소
+phone|전화기|telephone
+account|계정, 계좌
+window|창문
+stairs|계단|staircase
+parking|주차
+salary|월급|wage,pay
+resign|사직하다|quit
+retire|은퇴하다
+hire|고용하다|employ
+welcome|환영하다
+thank|감사하다|thanks
+promise|약속하다
+morning|아침
+evening|저녁 (때)
+minute|분 (시간 단위)
+second|초 (시간 단위)
+quarter|분기
+annual|연간의|yearly
+monthly|매월의
+weekly|매주의
+commute|통근하다
+sleepy|졸린
+hundred|백 (100)
+million|백만
+deadline|마감 기한
+schedule|일정
+colleague|동료|coworker
+presentation|발표
+conference|학술 대회
+department|부서
+employee|사원
+customer|고객
+document|문서
+business|사업
+strategy|전략
+decision|결정
+agreement|합의
+negotiate|협상하다
+important|중요한
+necessary|필요한
+possible|가능한
+available|이용 가능한
+difficult|어려운|hard
+excellent|훌륭한
+comfortable|편안한
+vacation|휴가|leave
+overtime|초과 근무
+vegetable|채소|vegetables
+breakfast|아침 식사
+delicious|맛있는|tasty
+restaurant|식당
+cafeteria|구내식당
+hospital|병원
+shoulder|어깨
+headache|두통
+exercise|운동|workout
+medicine|약|drug,pill
+password|비밀번호
+elevator|승강기|lift
+contract|계약서
+calendar|달력
+tomorrow|내일
+umbrella|우산
+promotion|승진
+interview|면접
+yesterday|어제
+solution|해결책
+reservation|예약|booking,appointment
+announcement|공지
+attendance|출석
+signature|서명
+condition|몸 상태
+backache|요통
+eyesight|시력|vision
+nutrition|영양
+workplace|직장
+teamwork|협동
+knowledge|지식
+experience|경험
+education|교육
+training|연수, 훈련
+question|질문
+complaint|불만, 항의
+apologize|사과하다|apologise
+introduce|소개하다
+celebrate|축하하다|congratulate
+birthday|생일
+thousand|천 (1,000)
+direction|방향
+building|건물
+entrance|입구
+security|보안
+friendly|친절한|kind
+`
+    .trim()
+    .split("\n")
+    .map((line) => {
+      const [w, m, alt = ""] = line.split("|");
+      const answers = [w, ...alt.split(",").map((s) => s.trim()).filter(Boolean)].map((s) => s.toLowerCase());
+      const len = w.length;
+      return { word: w, meaning: m, answers, tier: len <= 5 ? 0 : len <= 7 ? 1 : 2 };
+    });
+
+  HKPlay.mountGame({
+    key: "typing",
+    setup(stage, ctx) {
+      const HEART = (empty) => `<svg viewBox="0 0 24 24" class="${empty ? "is-empty" : ""}" aria-hidden="true"><path fill="#f43f5e" d="M12 21s-7.5-4.6-9.6-9.3C.9 8.4 2.8 4.5 6.6 4.5c2.2 0 3.6 1.2 5.4 3 1.8-1.8 3.2-3 5.4-3 3.8 0 5.7 3.9 4.2 7.2C19.5 16.4 12 21 12 21z"/></svg>`;
+      const STAR = `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="#f59e0b" d="M12 2.5l2.9 6 6.6.8-4.9 4.6 1.3 6.6L12 17.3 6.1 20.5l1.3-6.6L2.5 9.3l6.6-.8z"/></svg>`;
+
+      stage.innerHTML = `<div class="gm-ty" id="gm-ty">
+        <div class="gm-ty-hud">
+          <span class="gm-ty-chip gm-ty-chip--score"><span class="gm-ty-ico">${HKUI.icon("keyboard", 16, "#fff")}</span> <b id="gm-ty-score">0</b>점</span>
+          <span class="gm-ty-chip gm-ty-chip--combo" id="gm-ty-combo">콤보 <b id="gm-ty-combo-n">0</b><span class="gm-ty-mult">×<span id="gm-ty-mult">1</span></span></span>
+          <span class="gm-ty-chip" id="gm-ty-level">단계 <b id="gm-ty-level-n">1</b></span>
+          <span class="gm-ty-hearts" id="gm-ty-hearts" aria-label="남은 하트"></span>
+        </div>
+        <div class="gm-ty-field" id="gm-ty-field">
+          <div class="gm-ty-floor"></div>
+          <div class="gm-ty-freeze" id="gm-ty-freeze" hidden>${HKUI.icon("snowflake", 14, "#fff")} 모두 정지 <b id="gm-ty-freeze-n">3</b></div>
+          <div class="gm-ty-over" id="gm-ty-over"></div>
+        </div>
+        <form class="gm-ty-inputrow" id="gm-ty-form" autocomplete="off">
+          <input class="gm-ty-input" id="gm-ty-input" type="text" lang="en" inputmode="text" enterkeyhint="go"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="영어 단어를 입력해요" aria-label="영어 단어 입력">
+          <button type="submit" class="gm-ty-go">${HKUI.icon("corner-down-left", 16, "#fff")} 입력</button>
+        </form>
+        <div class="gm-ty-hint" id="gm-ty-hint">카드를 누르면 입력창으로 돌아와요 · 대소문자는 상관없어요</div>
+      </div>`;
+      HKUI.refreshIcons(stage);
+
+      const $ = (s) => stage.querySelector(s);
+      const wrap = $("#gm-ty");
+      const field = $("#gm-ty-field");
+      const over = $("#gm-ty-over");
+      const input = $("#gm-ty-input");
+      const hint = $("#gm-ty-hint");
+      const HINT_DEFAULT = hint.textContent;
+
+      const MAX_HEARTS = 5;
+      let state = "ready"; // ready | play | paused | over
+      let cards, score, combo, bestCombo, hearts, elapsed, spawnT, freezeT, level, popped, recent, lastGoldAt, uid;
+      let fieldH = 440, fieldW = 520;
+
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+      // ── 크기: 가상 키보드가 올라오면 판 높이를 줄여 입력창이 보이게
+      const isTouch = matchMedia("(pointer: coarse)").matches;
+      let baseVH = 0; // 키보드가 없을 때의 화면 높이
+      function layout() {
+        const vv = window.visualViewport;
+        const vh = vv ? vv.height : window.innerHeight;
+        if (document.activeElement !== input || vh > baseVH) baseVH = Math.max(vh, document.activeElement !== input ? 0 : baseVH);
+        const hudH = $(".gm-ty-hud").offsetHeight;
+        const inH = $("#gm-ty-form").offsetHeight + $("#gm-ty-hint").offsetHeight;
+        const keyboardOpen = isTouch && document.activeElement === input && vh < baseVH * 0.82;
+        let h;
+        if (keyboardOpen) h = clamp(vh - hudH - inH - 36, 170, 440);
+        else h = clamp(vh - hudH - inH - (isTouch ? 160 : 260), 300, 440);
+        if (Math.abs(h - fieldH) > 2) {
+          fieldH = Math.round(h);
+          field.style.height = fieldH + "px";
+        }
+        fieldW = field.clientWidth;
+        if (keyboardOpen && state === "play") pinToTop();
+      }
+      function headerOffset() {
+        const hd = document.querySelector("header");
+        if (!hd) return 0;
+        const pos = getComputedStyle(hd).position;
+        return pos === "sticky" || pos === "fixed" ? hd.offsetHeight : 0;
+      }
+      function pinToTop() {
+        const top = wrap.getBoundingClientRect().top + window.scrollY - headerOffset() - 6;
+        const vv = window.visualViewport;
+        const cur = window.scrollY + (vv ? vv.offsetTop : 0);
+        if (Math.abs(cur - top) > 4) window.scrollTo({ top, behavior: "auto" });
+      }
+      if (window.visualViewport) {
+        visualViewport.addEventListener("resize", layout);
+      }
+      window.addEventListener("resize", layout);
+      input.addEventListener("focus", () => setTimeout(layout, 250));
+      input.addEventListener("blur", () => setTimeout(layout, 250));
+
+      // ── 판 정보
+      function multOf(c) { return Math.min(3, 1 + 0.5 * Math.floor(c / 3)); }
+
+      function renderHud() {
+        $("#gm-ty-score").textContent = score.toLocaleString("ko-KR");
+        $("#gm-ty-combo-n").textContent = combo;
+        $("#gm-ty-mult").textContent = multOf(combo).toString();
+        $("#gm-ty-combo").classList.toggle("is-hot", combo >= 3);
+        $("#gm-ty-level-n").textContent = level;
+        $("#gm-ty-hearts").innerHTML = Array.from({ length: MAX_HEARTS }, (_, i) => HEART(i >= hearts)).join("");
+      }
+
+      function reset() {
+        cards?.forEach((c) => c.el.remove());
+        field.querySelectorAll(".gm-ty-float, .gm-ty-banner").forEach((n) => n.remove());
+        cards = []; score = 0; combo = 0; bestCombo = 0; hearts = MAX_HEARTS; elapsed = 0; spawnT = 0.6; freezeT = 0; level = 1; popped = 0;
+        recent = []; lastGoldAt = 0; uid = 0;
+        field.classList.remove("is-frozen");
+        $("#gm-ty-freeze").hidden = true;
+        input.value = "";
+        input.classList.remove("is-wrong", "is-match");
+        renderHud();
+      }
+
+      // ── 단계(시간)에 따른 난이도
+      function levelOf(t) { return Math.min(9, 1 + Math.floor(t / 18)); }
+      function tierWeights(lv) {
+        return [[1, 0, 0], [0.8, 0.2, 0], [0.6, 0.35, 0.05], [0.45, 0.4, 0.15], [0.35, 0.4, 0.25], [0.28, 0.4, 0.32], [0.22, 0.4, 0.38], [0.18, 0.4, 0.42], [0.15, 0.4, 0.45]][lv - 1];
+      }
+      function fallTime(lv) { return Math.max(5.2, 11.5 - (lv - 1) * 0.8); }
+      function spawnGap(lv) { return Math.max(0.95, 2.7 - (lv - 1) * 0.22); }
+      function maxCards(lv) { return Math.min(8, 3 + Math.floor(lv / 2)); }
+
+      function conflicts(entry) {
+        // 화면 위 카드와 뜻이 같거나, 한쪽 정답이 다른 쪽 정답의 앞부분이면 자동 정답이 꼬이니 피한다
+        for (const c of cards) {
+          if (c.dead) continue;
+          if (c.entry === entry || c.entry.meaning === entry.meaning) return true;
+          for (const a of c.entry.answers) for (const b of entry.answers) if (a.startsWith(b) || b.startsWith(a)) return true;
+        }
+        return recent.includes(entry.word);
+      }
+
+      function pickEntry() {
+        const w = tierWeights(level);
+        let r = Math.random(), tier = 0;
+        if (r < w[0]) tier = 0; else if (r < w[0] + w[1]) tier = 1; else tier = 2;
+        const pool = GM_TY_WORDS.filter((e) => e.tier === tier);
+        for (let i = 0; i < 30; i++) {
+          const e = pool[Math.floor(Math.random() * pool.length)];
+          if (!conflicts(e)) return e;
+        }
+        return null;
+      }
+
+      function spawn() {
+        const entry = pickEntry();
+        if (!entry) return;
+        recent.push(entry.word);
+        if (recent.length > 40) recent.shift();
+        const gold = elapsed > 12 && elapsed - lastGoldAt > 16 && !cards.some((c) => c.gold && !c.dead) && Math.random() < 0.12;
+        if (gold) lastGoldAt = elapsed;
+        const el = document.createElement("div");
+        el.className = "gm-ty-card" + (gold ? " gm-ty-card--gold" : "");
+        el.innerHTML = `${gold ? `<span class="gm-ty-star">${STAR}</span>` : ""}<b></b><span class="gm-ty-slots">${"<i></i>".repeat(entry.word.length)}</span>`;
+        el.querySelector("b").textContent = entry.meaning;
+        field.insertBefore(el, over);
+        const w = el.offsetWidth, h = el.offsetHeight;
+        // 다른 카드와 가로로 덜 겹치는 자리
+        let x = 0, bestScore = -1;
+        for (let i = 0; i < 8; i++) {
+          const cx = rand(6, Math.max(6, fieldW - w - 6));
+          let minGap = 1e9;
+          for (const c of cards) {
+            if (c.dead || c.y > 0.45) continue;
+            const gap = Math.max(c.x - (cx + w), cx - (c.x + c.w));
+            minGap = Math.min(minGap, gap + c.y * 200);
+          }
+          if (minGap > bestScore) { bestScore = minGap; x = cx; }
+        }
+        const lenBonus = 1 + Math.max(0, entry.word.length - 5) * 0.05;
+        cards.push({ id: ++uid, el, entry, gold, x, y: 0, w, h, speed: 1 / (fallTime(level) * lenBonus * rand(0.92, 1.1)), dead: false });
+        place(cards[cards.length - 1]);
+      }
+
+      function place(c) {
+        const y = c.y * (fieldH - c.h - 6);
+        c.el.style.transform = `translate(${c.x}px, ${y}px)`;
+        c.el.classList.toggle("is-danger", c.y > 0.72);
+      }
+
+      // ── 입력 처리
+      let target = null;
+      function norm(v) { return v.toLowerCase().replace(/\s+/g, ""); }
+
+      function setSlots(c, typed) {
+        const slots = c.el.querySelectorAll(".gm-ty-slots i");
+        const ans = typed ? c.entry.answers.find((a) => a.startsWith(typed)) : null;
+        const showWord = ans && ans.length === c.entry.word.length ? ans : c.entry.word;
+        slots.forEach((s, i) => {
+          const on = !!typed && i < typed.length && ans === showWord;
+          s.textContent = on ? showWord[i] : "";
+          s.classList.toggle("is-on", on);
+        });
+      }
+
+      function refreshTarget() {
+        const v = norm(input.value);
+        const hangul = /[ㄱ-ㅎㅏ-ㅣ가-힣]/.test(input.value);
+        let best = null;
+        if (v) {
+          for (const c of cards) {
+            if (c.dead) continue;
+            if (c.entry.answers.some((a) => a.startsWith(v)) && (!best || c.y > best.y)) best = c;
+          }
+        }
+        if (target && target !== best && !target.dead) { target.el.classList.remove("is-target"); setSlots(target, ""); }
+        target = best;
+        if (target) { target.el.classList.add("is-target"); setSlots(target, v); }
+        input.classList.toggle("is-match", !!target);
+        input.classList.toggle("is-wrong", !!v && !target);
+        if (hangul) { hint.textContent = "한/영 키를 눌러 영문으로 바꿔 주세요"; hint.classList.add("is-warn"); }
+        else { hint.textContent = HINT_DEFAULT; hint.classList.remove("is-warn"); }
+        return v;
+      }
+
+      function onInput() {
+        if (state !== "play") { input.value = ""; return; }
+        const v = refreshTarget();
+        if (!v) return;
+        // 정확히 맞으면 자동으로 터뜨림
+        let hit = null;
+        for (const c of cards) if (!c.dead && c.entry.answers.includes(v) && (!hit || c.y > hit.y)) hit = c;
+        if (hit) pop(hit);
+      }
+      input.addEventListener("input", onInput);
+
+      $("#gm-ty-form").addEventListener("submit", (e) => {
+        e.preventDefault();
+        if (state === "ready") return start();
+        if (state === "paused") return resume();
+        if (state !== "play") return;
+        const v = norm(input.value);
+        if (!v) return;
+        let hit = null;
+        for (const c of cards) if (!c.dead && c.entry.answers.includes(v) && (!hit || c.y > hit.y)) hit = c;
+        if (hit) return pop(hit);
+        // 틀린 입력 — 콤보가 끊겨요
+        combo = 0;
+        renderHud();
+        input.classList.remove("is-shake"); void input.offsetWidth; input.classList.add("is-shake");
+        input.value = "";
+        refreshTarget();
+      });
+
+      function floatText(x, y, text, gold) {
+        const f = document.createElement("div");
+        f.className = "gm-ty-float" + (gold ? " is-gold" : "");
+        f.style.left = x + "px"; f.style.top = y + "px";
+        f.textContent = text;
+        field.appendChild(f);
+        setTimeout(() => f.remove(), 850);
+      }
+      function banner(text, gold) {
+        field.querySelectorAll(".gm-ty-banner").forEach((n) => n.remove());
+        const b = document.createElement("div");
+        b.className = "gm-ty-banner" + (gold ? " is-gold" : "");
+        b.textContent = text;
+        field.appendChild(b);
+        setTimeout(() => b.remove(), 1650);
+      }
+
+      function pop(c) {
+        c.dead = true;
+        combo++;
+        bestCombo = Math.max(bestCombo, combo);
+        popped++;
+        const mult = multOf(combo);
+        const gain = Math.round(c.entry.word.length * 10 * mult);
+        score = Math.min(1_000_000, score + gain);
+        const y = c.y * (fieldH - c.h - 6);
+        setSlots(c, c.entry.word);
+        c.el.classList.remove("is-target", "is-danger");
+        c.el.classList.add("is-pop");
+        c.el.style.transform = `translate(${c.x}px, ${y}px) scale(1.25)`;
+        setTimeout(() => c.el.remove(), 260);
+        floatText(c.x + c.w / 2, y, `+${gain}${mult > 1 ? ` ×${mult}` : ""}`, c.gold);
+        if (c.gold) {
+          freezeT = 3;
+          field.classList.add("is-frozen");
+          banner("금빛 카드! 모든 카드가 3초 멈춰요", true);
+        } else if (combo > 0 && combo % 3 === 0 && combo <= 18) {
+          banner(`${combo}연속! 이제 ×${mult}`);
+        }
+        const chip = $("#gm-ty-combo");
+        chip.classList.add("is-bump"); setTimeout(() => chip.classList.remove("is-bump"), 150);
+        input.value = "";
+        target = null;
+        refreshTarget();
+        renderHud();
+      }
+
+      function miss(c) {
+        c.dead = true;
+        hearts--;
+        combo = 0;
+        if (target === c) target = null;
+        c.el.classList.remove("is-target");
+        // 정답을 보여 주고 사라짐
+        c.el.querySelectorAll(".gm-ty-slots i").forEach((s, i) => { s.textContent = c.entry.word[i]; s.classList.add("is-on"); });
+        c.el.classList.add("is-miss");
+        setTimeout(() => c.el.remove(), 900);
+        field.classList.remove("is-hurt"); void field.offsetWidth; field.classList.add("is-hurt");
+        renderHud();
+        if (hearts <= 0) gameOver();
+        else refreshTarget();
+      }
+
+      // ── 진행
+      function update(dt) {
+        elapsed += dt;
+        const lv = levelOf(elapsed);
+        if (lv !== level) { level = lv; banner(`단계 ${level} · 조금 더 빨라져요`); renderHud(); }
+        if (freezeT > 0) {
+          freezeT -= dt;
+          $("#gm-ty-freeze").hidden = false;
+          $("#gm-ty-freeze-n").textContent = Math.max(1, Math.ceil(freezeT));
+          if (freezeT <= 0) { freezeT = 0; field.classList.remove("is-frozen"); $("#gm-ty-freeze").hidden = true; }
+          return;
+        }
+        spawnT -= dt;
+        const alive = cards.filter((c) => !c.dead);
+        if (spawnT <= 0) {
+          if (alive.length < maxCards(level)) spawn();
+          spawnT = spawnGap(level) * rand(0.8, 1.2);
+          if (!alive.length) spawnT *= 0.5;
+        }
+        for (const c of alive) {
+          c.y += c.speed * dt;
+          if (c.y >= 1) { c.y = 1; place(c); miss(c); if (state !== "play") return; }
+          else place(c);
+        }
+        cards = cards.filter((c) => !c.dead || c.el.isConnected);
+      }
+
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        if (state === "play") update(dt);
+        requestAnimationFrame(frame);
+      }
+
+      // ── 화면 전환
+      function showOver(html) { over.innerHTML = html; over.hidden = false; HKUI.refreshIcons(over); }
+      function hideOver() { over.hidden = true; over.innerHTML = ""; }
+
+      function showReady() {
+        state = "ready";
+        showOver(`<div class="gm-ty-pop">
+          <span class="gm-ty-badge">${HKUI.icon("keyboard", 24, "#fff")}</span>
+          <h2>영어 타자 레이스</h2>
+          <p>위에서 <b>한국어 뜻</b> 카드가 떨어져요. 그 뜻의 <b>영어 단어</b>를 쳐서 바닥에 닿기 전에 터뜨려요.</p>
+          <div class="gm-ty-demo"><span>회의 → meeting</span><span>마감 기한 → deadline</span><span class="is-gold">금빛 카드 = 3초 정지</span></div>
+          <p style="font-size:13px">연속으로 맞히면 콤보 배수가 올라가요(3개마다 ×0.5). 하트 ${MAX_HEARTS}개를 다 잃으면 끝!</p>
+          <button type="button" class="hk-btn hk-btn--primary" id="gm-ty-start">${HKUI.icon("play", 16, "#fff")} 시작</button>
+        </div>`);
+        over.querySelector("#gm-ty-start").onclick = start;
+      }
+
+      function start() {
+        reset();
+        hideOver();
+        state = "play";
+        last = performance.now();
+        input.focus({ preventScroll: true });
+        setTimeout(layout, 300);
+        fieldW = field.clientWidth;
+      }
+
+      function pause() {
+        state = "paused";
+        showOver(`<div class="gm-ty-pop"><span class="gm-ty-badge">${HKUI.icon("pause", 24, "#fff")}</span><h2>잠시 멈췄어요</h2><p>카드도 그대로 멈춰 있어요.</p>
+          <button type="button" class="hk-btn hk-btn--primary" id="gm-ty-resume">${HKUI.icon("play", 16, "#fff")} 계속하기</button></div>`);
+        over.querySelector("#gm-ty-resume").onclick = resume;
+      }
+      function resume() {
+        hideOver();
+        state = "play";
+        last = performance.now();
+        input.focus({ preventScroll: true });
+      }
+
+      function gameOver() {
+        state = "over";
+        input.blur();
+        if (target) target.el.classList.remove("is-target");
+        const final = score;
+        showOver(`<div class="gm-ty-pop">
+          <span class="gm-ty-badge">${HKUI.icon("heart-crack", 24, "#fff")}</span>
+          <h2>하트를 모두 잃었어요</h2>
+          <div class="gm-ty-stat"><div><b>${final.toLocaleString("ko-KR")}</b>점수</div><div><b>${popped}</b>맞힌 단어</div><div><b>${bestCombo}</b>최고 콤보</div></div>
+          <button type="button" class="hk-btn hk-btn--primary" id="gm-ty-again">${HKUI.icon("rotate-ccw", 16, "#fff")} 다시 하기</button>
+        </div>`);
+        over.querySelector("#gm-ty-again").onclick = start;
+        setTimeout(() => ctx.submit(final), 700);
+      }
+
+      ctx.onRestart(() => start());
+
+      // 판이나 카드를 누르면 입력창으로
+      field.addEventListener("pointerdown", (e) => {
+        if (state !== "play" || e.target.closest(".gm-ty-over")) return;
+        e.preventDefault();
+        input.focus({ preventScroll: true });
+      });
+
+      // PC: 입력창 밖에서 글자를 치면 입력창으로
+      window.addEventListener("keydown", (e) => {
+        if (document.querySelector(".hk-dialog__overlay")) return;
+        const t = e.target;
+        const inField = t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+        if (inField) return;
+        if (state === "ready" && e.key === "Enter") { e.preventDefault(); return start(); }
+        if (state === "paused" && (e.key === "Enter" || e.code === "Space")) { e.preventDefault(); return resume(); }
+        if (state !== "play") return;
+        if (e.code === "Space" || e.key.startsWith("Arrow")) e.preventDefault();
+        if (/^[a-zA-Z]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) input.focus({ preventScroll: true });
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && state === "play") pause();
+      });
+
+      reset();
+      layout();
+      showReady();
+      requestAnimationFrame(frame);
+    },
+  });
+  </script>
+</body>
+</html>

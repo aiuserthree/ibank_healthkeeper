@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 비눗방울 대작전 전용 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    .gm-hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #06b6d4, #a78bfa); color: #fff; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .gm-hud__item small { font-size: 11px; opacity: .85; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-hud__mid { align-items: center; }
+    .gm-hud__right { align-items: flex-end; }
+    .gm-lives { display: flex; gap: 4px; height: 22px; align-items: center; }
+    .gm-life { width: 15px; height: 15px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff 0 18%, rgba(255,255,255,.35) 30%, rgba(255,255,255,.15) 70%); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.9); }
+    .gm-life.is-off { opacity: .25; }
+    .gm-screen { position: relative; overflow: hidden; background: #0c2233; }
+    .gm-screen.is-last { border-radius: 0 0 16px 16px; }
+    .gm-canvas { display: block; touch-action: none; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 24, 38, .55); backdrop-filter: blur(2px); }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 310px; padding: 20px 18px 18px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+    .gm-card h2 { margin: 0 0 6px; font-size: 21px; letter-spacing: -0.02em; }
+    .gm-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.55; color: var(--text-secondary, #475569); }
+    .gm-card .gm-big { font-size: 32px; font-weight: 800; margin: 2px 0 8px; color: #0e7490; }
+    .gm-rules { display: grid; gap: 6px; margin: 4px 0 12px; text-align: left; }
+    .gm-rules div { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary, #475569); }
+    .gm-num { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #06b6d4, #a78bfa); margin-top: 1px; }
+    .gm-keys { font-size: 12px; color: var(--text-muted, #64748b); margin: 0 0 14px; line-height: 1.7; }
+    .gm-keys kbd { display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #f8fafc; font: 600 11px/1.6 inherit; }
+    .gm-go { width: 100%; border: 0; padding: 12px; border-radius: 12px; font-size: 15.5px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(135deg, #0891b2, #8b5cf6); }
+    .gm-go:focus-visible { outline: 3px solid #a5f3fc; outline-offset: 2px; }
+    .gm-pad { display: none; grid-template-columns: 1fr 1fr .35fr 1.15fr 1.15fr; gap: 8px; padding: 10px; border-radius: 0 0 16px 16px; background: #102a3c; touch-action: none; }
+    .gm-pad.is-on { display: grid; }
+    .gm-pad button { height: 58px; border: 0; border-radius: 14px; background: rgba(255,255,255,.1); color: #e0f7fa; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    .gm-pad button.is-down { background: rgba(103,232,249,.35); }
+    .gm-pad button[data-k="jump"] { background: rgba(167,139,250,.28); }
+    .gm-pad button[data-k="shoot"] { background: rgba(34,211,238,.28); }
+    .gm-pad button[data-k="jump"].is-down { background: rgba(167,139,250,.55); }
+    .gm-pad button[data-k="shoot"].is-down { background: rgba(34,211,238,.55); }
+    .gm-note { margin-top: 10px; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  HKPlay.mountGame({
+    key: "bubble",
+    setup(stage, ctx) {
+      const T = 20, COLS = 16, ROWS = 15;
+      const W = COLS * T, H = ROWS * T;
+      stage.innerHTML = `
+        <div class="gm-shell">
+          <div class="gm-hud">
+            <div class="gm-hud__item"><small>점수</small><b data-score>0</b></div>
+            <div class="gm-hud__item gm-hud__mid"><small>무대</small><b data-stage>1</b></div>
+            <div class="gm-hud__item gm-hud__right"><small>목숨</small><span class="gm-lives" data-lives></span></div>
+          </div>
+          <div class="gm-screen">
+            <canvas class="gm-canvas" aria-label="비눗방울 대작전 게임 화면"></canvas>
+            <div class="gm-overlay" data-overlay></div>
+          </div>
+          <div class="gm-pad" data-pad>
+            <button type="button" data-k="left" aria-label="왼쪽">${HKUI.icon("chevron-left", 26, "currentColor")}</button>
+            <button type="button" data-k="right" aria-label="오른쪽">${HKUI.icon("chevron-right", 26, "currentColor")}</button>
+            <span></span>
+            <button type="button" data-k="jump">점프</button>
+            <button type="button" data-k="shoot">쏘기</button>
+          </div>
+          <div class="gm-note">← → 이동 · ↑ 또는 스페이스 점프 · X(Z) 비눗방울 · P 일시정지</div>
+        </div>`;
+      HKUI.refreshIcons(stage);
+      const shell = stage.querySelector(".gm-shell");
+      const screen = stage.querySelector(".gm-screen");
+      const canvas = stage.querySelector("canvas");
+      const g = canvas.getContext("2d");
+      const overlay = stage.querySelector("[data-overlay]");
+      const pad = stage.querySelector("[data-pad]");
+      const elScore = stage.querySelector("[data-score]");
+      const elStage = stage.querySelector("[data-stage]");
+      const elLives = stage.querySelector("[data-lives]");
+
+      // ---------- 무대 설계 (16×15, # 벽/바닥 · = 발판 · a/b/c 세균 · P 시작) ----------
+      const STAGES = [
+        { name: "첫 출근", rows: [
+          "#..............#",
+          "#..............#",
+          "#..............#",
+          "#..............#",
+          "#....a....a....#",
+          "#...========...#",
+          "#..............#",
+          "#..a.......a...#",
+          "#=====....=====#",
+          "#..............#",
+          "#..............#",
+          "#...===..===...#",
+          "#..............#",
+          "#..P...........#",
+          "######....######"] },
+        { name: "긴 복도", rows: [
+          "#..............#",
+          "#..............#",
+          "#..............#",
+          "#..............#",
+          "#.a..........a.#",
+          "#====......====#",
+          "#..............#",
+          "#......b.......#",
+          "#....======....#",
+          "#..............#",
+          "#.a..........a.#",
+          "#====......====#",
+          "#..............#",
+          "#.P............#",
+          "####........####"] },
+        { name: "계단참", rows: [
+          "#..............#",
+          "#..........a...#",
+          "#.........=====#",
+          "#..............#",
+          "#......a.......#",
+          "#.....=====....#",
+          "#..............#",
+          "#..b........a..#",
+          "#.=====...=====#",
+          "#..............#",
+          "#.........b....#",
+          "#.....========.#",
+          "#..............#",
+          "#..P...........#",
+          "#####......#####"] },
+        { name: "엘리베이터 홀", rows: [
+          "#..............#",
+          "#..............#",
+          "#..............#",
+          "#......c.......#",
+          "#..a........a..#",
+          "#.===......===.#",
+          "#..............#",
+          "#......a.......#",
+          "#....======....#",
+          "#..............#",
+          "#..b........b..#",
+          "#.===......===.#",
+          "#..............#",
+          "#..P...........#",
+          "######....######"] },
+        { name: "탕비실", rows: [
+          "#..............#",
+          "#.a..........a.#",
+          "#====......====#",
+          "#..............#",
+          "#.....b..b.....#",
+          "#....======....#",
+          "#..............#",
+          "#.a..........a.#",
+          "#===...==...===#",
+          "#..............#",
+          "#......c.......#",
+          "#...========...#",
+          "#..............#",
+          "#.P............#",
+          "#####......#####"] },
+        { name: "회의실", rows: [
+          "#..............#",
+          "#......bb......#",
+          "#.....====.....#",
+          "#..............#",
+          "#..a........a..#",
+          "#.====....====.#",
+          "#..............#",
+          "#......c.......#",
+          "#..==========..#",
+          "#..............#",
+          "#.b..........b.#",
+          "#===........===#",
+          "#..............#",
+          "#..P...........#",
+          "######....######"] },
+        { name: "휴게실", rows: [
+          "#..............#",
+          "#..a........a..#",
+          "#.===......===.#",
+          "#..............#",
+          "#......bb......#",
+          "#.....====.....#",
+          "#..............#",
+          "#.a..b....b..a.#",
+          "#.====.==.====.#",
+          "#..............#",
+          "#......c.......#",
+          "#..===....===..#",
+          "#..............#",
+          "#.P............#",
+          "#####......#####"] },
+        { name: "대청소의 날", rows: [
+          "#..............#",
+          "#.b...bb....b..#",
+          "#===.====.====.#",
+          "#..............#",
+          "#...c......c...#",
+          "#.====....====.#",
+          "#..............#",
+          "#....a....a....#",
+          "#...========...#",
+          "#..............#",
+          "#.a..........a.#",
+          "#====......====#",
+          "#..............#",
+          "#..P...........#",
+          "######....######"] },
+      ];
+      // 무대마다 발판 색 (청록·보라 계열)
+      const PALETTES = [
+        ["#22d3ee", "#0e7490"], ["#a78bfa", "#6d28d9"], ["#2dd4bf", "#0f766e"], ["#818cf8", "#4338ca"],
+        ["#67e8f9", "#0891b2"], ["#c084fc", "#7e22ce"], ["#5eead4", "#0d9488"], ["#93c5fd", "#6d28d9"],
+      ];
+      const GERMS = {
+        a: { name: "꼬물이", speed: 34, jump: 0.35, c1: "#86efac", c2: "#16a34a", pts: 100 },
+        b: { name: "날쌘이", speed: 52, jump: 0.7, c1: "#f9a8d4", c2: "#db2777", pts: 150 },
+        c: { name: "둥실이", speed: 40, jump: 0, c1: "#fde68a", c2: "#ca8a04", pts: 200, fly: true },
+      };
+      const ITEMS = [
+        { name: "사과", pts: 200 },
+        { name: "귤", pts: 400 },
+        { name: "포도", pts: 700 },
+        { name: "비타민", pts: 1200 },
+      ];
+
+      // ---------- 물리 상수 ----------
+      const GRAV = 980, JUMP = 375, RUN = 92, MAXFALL = 400;
+      const PW = 14, PH = 17; // 요정 히트박스
+      const GW = 14, GH = 14; // 세균 히트박스
+      const BR = 10; // 방울 반지름
+      const STEP = 1 / 120;
+
+      // ---------- 상태 ----------
+      let state = "ready"; // ready | play | paused | over
+      let S = null;
+      let solid = [];
+      const keys = { left: false, right: false, jump: false, shoot: false };
+      let bokeh = [];
+      function makeBokeh() {
+        bokeh = [];
+        for (let i = 0; i < 16; i++) bokeh.push({ x: Math.random() * W, y: Math.random() * H, r: 6 + Math.random() * 18, sp: 4 + Math.random() * 8, ph: Math.random() * 6 });
+      }
+      makeBokeh();
+
+      function stageDef(n) { return STAGES[(n - 1) % STAGES.length]; }
+      function diff(n) {
+        const loop = Math.floor((n - 1) / STAGES.length);
+        return {
+          speed: Math.min(2.0, 1 + (n - 1) * 0.06 + loop * 0.12),
+          trap: Math.max(3.2, 7.5 - (n - 1) * 0.35),
+          hurry: Math.max(26, 46 - (n - 1) * 1.5),
+          loop,
+        };
+      }
+
+      function newGame() {
+        S = {
+          score: 0, lives: 3, stage: 0, t: 0,
+          p: null, germs: [], bubbles: [], items: [], parts: [], texts: [],
+          combo: 0, comboT: 0, banner: null, phase: "intro", phaseT: 0,
+          hurried: false, mold: null, clearT: 0, overT: 0, shakeT: 0,
+        };
+        nextStage();
+        hud();
+      }
+
+      function parse(def) {
+        solid = [];
+        const spawns = [];
+        let start = { x: W / 2, y: 13 * T + T };
+        def.rows.forEach((line, r) => {
+          solid[r] = [];
+          for (let c = 0; c < COLS; c++) {
+            const ch = line[c] || ".";
+            solid[r][c] = ch === "#" || ch === "=";
+            if (ch === "a" || ch === "b" || ch === "c") spawns.push({ type: ch, x: c * T + T / 2, y: (r + 1) * T });
+            if (ch === "P") start = { x: c * T + T / 2, y: (r + 1) * T };
+          }
+        });
+        return { spawns, start };
+      }
+
+      function nextStage() {
+        S.stage++;
+        const def = stageDef(S.stage);
+        const D = diff(S.stage);
+        const { spawns, start } = parse(def);
+        S.D = D;
+        S.start = start;
+        S.t = 0;
+        S.germs = spawns.map((s) => makeGerm(s.type, s.x, s.y, false));
+        S.bubbles = [];
+        S.items = [];
+        S.mold = null;
+        S.hurried = false;
+        S.phase = "intro";
+        S.phaseT = 1.5;
+        S.p = makePlayer();
+        S.banner = { text: `무대 ${S.stage}`, sub: def.name + (D.loop ? ` · ${D.loop + 1}바퀴째` : ""), t: 1.5 };
+        hud();
+      }
+
+      function makePlayer() {
+        return { x: S.start.x, y: S.start.y, vx: 0, vy: 0, face: 1, ground: true, coyote: 0, jumpBuf: 0, shootCd: 0, shootBuf: 0, inv: 1.2, walkT: 0, dead: 0 };
+      }
+      function makeGerm(type, x, y, angry) {
+        const k = GERMS[type];
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        return {
+          type, x, y, vx: 0, vy: 0, dir, ground: false, angry, jumpCd: 1 + Math.random() * 2, thinkT: Math.random() * 1.5,
+          fx: dir, fy: Math.random() < 0.5 ? -1 : 1, anim: Math.random() * 6, edgeDone: false, freeze: 0,
+          speed: k.speed,
+        };
+      }
+
+      // ---------- 지형 ----------
+      function isSolid(r, c) {
+        if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return false;
+        return solid[r][c];
+      }
+      // 아래로 내려오며 발판 윗면을 지나쳤는지 → 윗면 y
+      function landing(x, half, prev, next) {
+        if (next < prev) return null;
+        const r0 = Math.max(0, Math.floor((prev - 0.5) / T));
+        const r1 = Math.min(ROWS - 1, Math.floor(next / T));
+        for (let r = r0; r <= r1; r++) {
+          const top = r * T;
+          if (top < prev - 0.5 || top > next) continue;
+          const c0 = Math.floor((x - half + 2) / T), c1 = Math.floor((x + half - 2) / T);
+          for (let c = Math.max(1, c0); c <= Math.min(COLS - 2, c1); c++) if (isSolid(r, c)) return top;
+        }
+        return null;
+      }
+      function supportAhead(x, y) {
+        const r = Math.round(y / T);
+        const c = Math.floor(x / T);
+        return isSolid(r, c);
+      }
+      const minX = T, maxX = W - T;
+
+      // ---------- 점수·연출 ----------
+      function addScore(n, x, y, color) {
+        S.score += n;
+        if (x != null) S.texts.push({ x, y, text: "+" + n.toLocaleString("ko-KR"), t: 0, color: color || "#fff" });
+        hud();
+      }
+      function burst(x, y, color, n = 10, sp = 90) {
+        for (let i = 0; i < n; i++) {
+          const a = Math.random() * Math.PI * 2, v = sp * (0.4 + Math.random() * 0.8);
+          S.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: 0.45 + Math.random() * 0.3, color, r: 1.5 + Math.random() * 2 });
+        }
+      }
+      function hud() {
+        if (!S) return;
+        elScore.textContent = S.score.toLocaleString("ko-KR");
+        elStage.textContent = S.stage;
+        let h = "";
+        for (let i = 0; i < 3; i++) h += `<i class="gm-life${i < S.lives ? "" : " is-off"}"></i>`;
+        if (S.lives > 3) h += `<b style="font-size:13px">+${S.lives - 3}</b>`;
+        elLives.innerHTML = h;
+      }
+
+      // ---------- 갱신 ----------
+      function update(dt) {
+        S.t += dt;
+        // 연출 요소는 항상
+        for (const p of S.parts) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 160 * dt; }
+        S.parts = S.parts.filter((p) => p.t < p.life);
+        for (const t of S.texts) t.t += dt;
+        S.texts = S.texts.filter((t) => t.t < 1.1);
+        if (S.banner) { S.banner.t -= dt; if (S.banner.t <= 0) S.banner = null; }
+        if (S.shakeT > 0) S.shakeT -= dt;
+
+        if (S.phase === "intro") {
+          S.phaseT -= dt;
+          if (S.phaseT <= 0) S.phase = "play";
+          return;
+        }
+        if (S.phase === "over") {
+          S.overT -= dt;
+          if (S.overT <= 0) finish();
+          return;
+        }
+        if (S.phase === "clear") {
+          S.clearT -= dt;
+          updatePlayer(dt);
+          updateBubbles(dt);
+          updateItems(dt);
+          if (S.clearT <= 0) nextStage();
+          return;
+        }
+
+        if (S.comboT > 0) { S.comboT -= dt; if (S.comboT <= 0) S.combo = 0; }
+        updatePlayer(dt);
+        updateBubbles(dt);
+        updateGerms(dt);
+        updateItems(dt);
+        updateHurry(dt);
+
+        // 클리어 판정 — 살아 있는 세균도, 갇힌 세균도 없으면
+        if (S.phase === "play" && !S.germs.length && !S.bubbles.some((b) => b.germ)) {
+          const D = S.D;
+          const left = Math.max(0, Math.ceil(D.hurry - S.t));
+          const bonus = 1000 + S.stage * 300 + left * 20;
+          S.phase = "clear";
+          S.clearT = 3.2;
+          S.mold = null;
+          S.banner = { text: "청소 완료!", sub: `클리어 보너스 +${bonus.toLocaleString("ko-KR")}`, t: 2.6 };
+          addScore(bonus);
+        }
+      }
+
+      function updatePlayer(dt) {
+        const p = S.p;
+        if (p.dead > 0) {
+          p.dead -= dt;
+          p.vy += GRAV * 0.6 * dt; p.y += p.vy * dt;
+          if (p.dead <= 0) {
+            if (S.lives <= 0) { S.phase = "over"; S.overT = 1.0; S.banner = { text: "게임 끝", sub: "수고했어요!", t: 9 }; return; }
+            const keep = { inv: 2.2 };
+            S.p = Object.assign(makePlayer(), keep);
+          }
+          return;
+        }
+        if (p.inv > 0) p.inv -= dt;
+        const dir = (keys.left ? -1 : 0) + (keys.right ? 1 : 0);
+        const target = dir * RUN;
+        p.vx += (target - p.vx) * Math.min(1, dt * (p.ground ? 18 : 9));
+        if (dir) p.face = dir;
+        if (p.jumpBuf > 0) p.jumpBuf -= dt;
+        if (p.coyote > 0) p.coyote -= dt;
+        if (p.jumpBuf > 0 && (p.ground || p.coyote > 0)) {
+          p.vy = -JUMP; p.ground = false; p.coyote = 0; p.jumpBuf = 0;
+        }
+        if (!keys.jump && p.vy < -170) p.vy = -170; // 짧게 누르면 낮게
+        p.vy = Math.min(MAXFALL, p.vy + GRAV * dt);
+        p.x += p.vx * dt;
+        p.x = Math.max(minX + PW / 2, Math.min(maxX - PW / 2, p.x));
+        const prev = p.y;
+        p.y += p.vy * dt;
+        // 방울 밟기
+        let bounced = false;
+        if (p.vy > 0) {
+          for (const b of S.bubbles) {
+            if (b.phase !== "float" || b.popT != null) continue;
+            const top = b.y - b.r;
+            if (Math.abs(p.x - b.x) < b.r + 3 && prev <= top + 4 && p.y >= top - 1) {
+              p.y = top; p.vy = keys.jump ? -JUMP * 1.05 : -JUMP * 0.72; p.ground = false;
+              b.squish = 0.25; b.vy = 40;
+              bounced = true;
+              if (b.germ) popBubble(b, 0);
+              break;
+            }
+          }
+        }
+        const wasGround = p.ground;
+        p.ground = false;
+        if (!bounced) {
+          const land = landing(p.x, PW / 2, prev, p.y);
+          if (land != null) { p.y = land; p.vy = 0; p.ground = true; }
+        }
+        if (wasGround && !p.ground && p.vy >= 0) p.coyote = 0.08;
+        if (p.y > H + 6) p.y -= H + 26; // 아래로 떨어지면 위에서
+        if (p.y < -40) { p.y = -40; if (p.vy < 0) p.vy = 0; }
+        p.walkT += Math.abs(p.vx) * dt * 0.08;
+
+        // 쏘기
+        if (p.shootCd > 0) p.shootCd -= dt;
+        if (p.shootBuf > 0) p.shootBuf -= dt;
+        if ((keys.shoot || p.shootBuf > 0) && p.shootCd <= 0 && S.phase === "play") {
+          shoot();
+          p.shootCd = p.shootBuf > 0 ? 0.22 : 0.42;
+          p.shootBuf = 0;
+        }
+
+        // 떠 있는 방울을 몸으로 건드리면 톡
+        for (const b of S.bubbles) {
+          if (b.popT != null) continue;
+          if (b.phase === "shoot" && b.age < 0.2) continue;
+          if (circleRect(b.x, b.y, b.r - 1, p.x - PW / 2, p.y - PH, PW, PH)) {
+            // 위에서 내려오는 중이면 밟기로 처리됐을 것 → 옆·아래에서 닿으면 터짐
+            popBubble(b, 0);
+          }
+        }
+        // 아이템 줍기
+        for (const it of S.items) {
+          if (it.got) continue;
+          if (Math.abs(it.x - p.x) < 12 && Math.abs((it.y - 6) - (p.y - PH / 2)) < 14) {
+            it.got = true;
+            const k = ITEMS[it.kind];
+            addScore(k.pts, it.x, it.y - 14, "#fde68a");
+            burst(it.x, it.y - 6, "#fde68a", 8, 70);
+          }
+        }
+        S.items = S.items.filter((it) => !it.got && it.t < it.life);
+      }
+
+      function shoot() {
+        const p = S.p;
+        const live = S.bubbles.filter((b) => !b.germ && b.popT == null);
+        if (live.length >= 12) { live[0].popT = 0; live[0].quiet = true; }
+        const x = p.x + p.face * 10;
+        S.bubbles.push({ x: Math.max(minX + BR, Math.min(maxX - BR, x)), y: p.y - PH / 2 - 1, vx: p.face * 240, vy: 0, r: BR, phase: "shoot", age: 0, life: 7.5, germ: null, trapT: 0, squish: 0, wob: Math.random() * 6, popT: null, chain: 0 });
+      }
+
+      function circleRect(cx, cy, r, rx, ry, rw, rh) {
+        const nx = Math.max(rx, Math.min(cx, rx + rw)), ny = Math.max(ry, Math.min(cy, ry + rh));
+        return (cx - nx) ** 2 + (cy - ny) ** 2 < r * r;
+      }
+
+      function popBubble(b, chain) {
+        if (b.popT != null) return;
+        b.popT = 0;
+        b.chain = chain;
+      }
+
+      function resolvePop(b) {
+        // 실제로 터짐 — 이웃 방울도 연쇄
+        burst(b.x, b.y, b.germ ? "#a5f3fc" : "#e0f2fe", b.germ ? 12 : 6, b.germ ? 110 : 70);
+        if (b.germ) {
+          S.combo++;
+          S.comboT = 1.3;
+          const mult = Math.min(32, 2 ** (S.combo - 1));
+          const base = GERMS[b.germ.type].pts;
+          addScore(base * mult, b.x, b.y - 8, S.combo > 1 ? "#f0abfc" : "#fff");
+          if (S.combo > 1) S.texts.push({ x: b.x, y: b.y - 22, text: `${S.combo}연쇄!`, t: 0, color: "#67e8f9", big: true });
+          const kind = Math.min(3, S.combo - 1 + (Math.random() < 0.15 ? 1 : 0));
+          S.items.push({ x: b.x, y: b.y, vx: (Math.random() - 0.5) * 80, vy: -160, kind, t: 0, life: 8, ground: false });
+          S.shakeT = 0.12;
+        } else {
+          S.score += 10; hud();
+        }
+        if (b.quiet) return;
+        for (const o of S.bubbles) {
+          if (o === b || o.popT != null) continue;
+          const d = Math.hypot(o.x - b.x, o.y - b.y);
+          if (d < o.r + b.r + 7) { o.popT = -0.09; o.chain = b.chain + 1; } // 살짝 늦게 → 톡톡톡
+        }
+      }
+
+      function updateBubbles(dt) {
+        const topY = 13;
+        for (const b of S.bubbles) {
+          if (b.popT != null) { b.popT += dt; continue; }
+          b.age += dt;
+          b.wob += dt * 3;
+          if (b.squish > 0) b.squish -= dt;
+          if (b.phase === "shoot") {
+            b.x += b.vx * dt;
+            b.vx *= Math.pow(0.08, dt);
+            if (b.x < minX + b.r || b.x > maxX - b.r) { b.x = Math.max(minX + b.r, Math.min(maxX - b.r, b.x)); b.vx = 0; }
+            if (b.age > 0.36 || Math.abs(b.vx) < 30) { b.phase = "float"; b.vy = 0; }
+            // 날아가는 중에 세균에 닿으면 가둠
+            if (!b.germ) {
+              for (const gm of S.germs) {
+                if (gm.freeze > 0) continue;
+                const gy = gm.y - GH / 2;
+                if (Math.hypot(gm.x - b.x, gy - b.y) < b.r + 8) {
+                  b.germ = { type: gm.type, angry: false };
+                  b.r = BR + 2;
+                  b.trapT = 0;
+                  b.phase = "float";
+                  b.vy = -20;
+                  gm.dead = true;
+                  burst(b.x, b.y, "#cffafe", 6, 60);
+                  break;
+                }
+              }
+              S.germs = S.germs.filter((gm) => !gm.dead);
+            }
+          } else {
+            b.vy += (-30 - b.vy) * Math.min(1, dt * 2);
+            b.y += b.vy * dt;
+            if (b.y < topY + b.r) { b.y = topY + b.r; b.vy = 0; b.x += (W / 2 - b.x) * Math.min(1, dt * 0.35); }
+            b.x += Math.sin(b.wob) * 6 * dt;
+            b.x = Math.max(minX + b.r, Math.min(maxX - b.r, b.x));
+          }
+          if (b.germ) {
+            b.trapT += dt;
+            if (b.trapT > S.D.trap) {
+              // 화가 나서 탈출
+              const gm = makeGerm(b.germ.type, b.x, b.y + GH / 2, true);
+              gm.vy = -120;
+              S.germs.push(gm);
+              burst(b.x, b.y, "#fca5a5", 10, 90);
+              b.popT = 99; b.escaped = true;
+            }
+          } else if (b.age > b.life) {
+            b.popT = 0; b.quiet = true; // 저절로 꺼진 방울은 연쇄 없음
+          }
+        }
+        // 서로 밀어내며 모이기
+        const fl = S.bubbles.filter((b) => b.phase === "float" && b.popT == null);
+        for (let i = 0; i < fl.length; i++) {
+          for (let j = i + 1; j < fl.length; j++) {
+            const a = fl[i], c = fl[j];
+            const dx = c.x - a.x, dy = c.y - a.y;
+            const d = Math.hypot(dx, dy) || 0.01, m = a.r + c.r - 1;
+            if (d < m) {
+              const push = (m - d) / 2, ux = dx / d, uy = dy / d;
+              a.x -= ux * push; a.y -= uy * push; c.x += ux * push; c.y += uy * push;
+            }
+          }
+        }
+        // 터짐 처리 (연쇄 지연 포함)
+        for (const b of S.bubbles) {
+          if (b.popT != null && b.popT >= 0 && !b.done) {
+            b.done = true;
+            if (!b.escaped) resolvePop(b);
+          }
+        }
+        S.bubbles = S.bubbles.filter((b) => !b.done);
+      }
+
+      function updateGerms(dt) {
+        const p = S.p;
+        const D = S.D;
+        for (const gm of S.germs) {
+          gm.anim += dt * 8;
+          const k = GERMS[gm.type];
+          const sp = k.speed * D.speed * (gm.angry ? 1.65 : 1);
+          if (k.fly) {
+            gm.x += gm.fx * sp * dt;
+            gm.y += gm.fy * sp * 0.8 * dt;
+            if (gm.x < minX + GW / 2) { gm.x = minX + GW / 2; gm.fx = 1; }
+            if (gm.x > maxX - GW / 2) { gm.x = maxX - GW / 2; gm.fx = -1; }
+            if (gm.y < 24) { gm.y = 24; gm.fy = 1; }
+            if (gm.y > H - T) { gm.y = H - T; gm.fy = -1; }
+            gm.thinkT -= dt;
+            if (gm.thinkT <= 0) { gm.thinkT = 1.5 + Math.random() * 2; if (Math.random() < 0.5) gm.fx = p.x < gm.x ? -1 : 1; }
+          } else {
+            gm.thinkT -= dt;
+            gm.jumpCd -= dt;
+            if (gm.ground) {
+              if (gm.thinkT <= 0) {
+                gm.thinkT = 1.2 + Math.random() * 1.8;
+                if (Math.abs(p.y - gm.y) < 10 || gm.angry || Math.random() < 0.4) gm.dir = p.x < gm.x ? -1 : 1;
+              }
+              // 위에 사람이 있으면 점프로 쫓아감
+              if (gm.jumpCd <= 0 && p.y < gm.y - 24 && Math.abs(p.x - gm.x) < 90 && Math.random() < k.jump + (gm.angry ? 0.3 : 0)) {
+                gm.vy = -JUMP * 0.98; gm.ground = false; gm.jumpCd = 1.6 + Math.random() * 1.5;
+              } else if (gm.jumpCd <= 0) gm.jumpCd = 0.8 + Math.random();
+              // 발판 끝
+              const ahead = gm.x + gm.dir * (GW / 2 + 1);
+              if (!supportAhead(ahead, gm.y)) {
+                if (!gm.edgeDone) {
+                  gm.edgeDone = true;
+                  const goDown = p.y > gm.y + 10 ? 0.8 : 0.3;
+                  if (Math.random() > goDown) gm.dir *= -1;
+                }
+              } else gm.edgeDone = false;
+            }
+            gm.vx = gm.dir * sp;
+            gm.x += gm.vx * dt;
+            if (gm.x < minX + GW / 2) { gm.x = minX + GW / 2; gm.dir = 1; }
+            if (gm.x > maxX - GW / 2) { gm.x = maxX - GW / 2; gm.dir = -1; }
+            const prev = gm.y;
+            gm.vy = Math.min(MAXFALL * 0.85, gm.vy + GRAV * dt);
+            gm.y += gm.vy * dt;
+            gm.ground = false;
+            const land = landing(gm.x, GW / 2, prev, gm.y);
+            if (land != null) { gm.y = land; gm.vy = 0; gm.ground = true; }
+            if (gm.y > H + 6) gm.y -= H + 26;
+          }
+          // 닿으면 아야
+          if (p.dead <= 0 && p.inv <= 0 && S.phase === "play") {
+            if (Math.abs(gm.x - p.x) < (GW + PW) / 2 - 3 && Math.abs((gm.y - GH / 2) - (p.y - PH / 2)) < (GH + PH) / 2 - 4) hurt();
+          }
+        }
+      }
+
+      function updateHurry(dt) {
+        const D = S.D;
+        if (!S.hurried && S.t > D.hurry) {
+          S.hurried = true;
+          S.banner = { text: "청소 시간이에요!", sub: "서두르지 않으면 곰팡이 구름이 와요", t: 2.4, warn: true };
+          S.germs.forEach((gm) => (gm.angry = true));
+        }
+        if (S.hurried && !S.mold && S.t > D.hurry + 8) {
+          S.mold = { x: S.p.x < W / 2 ? W - 30 : 30, y: 20, sp: 26, anim: 0 };
+          S.banner = { text: "곰팡이 구름 등장!", sub: "방울로도 못 가둬요 · 피하세요", t: 2, warn: true };
+        }
+        if (S.mold) {
+          const m = S.mold, p = S.p;
+          m.anim += dt;
+          m.sp = Math.min(95, m.sp + dt * 3.5);
+          const tx = p.x, ty = p.y - PH / 2;
+          const dx = tx - m.x, dy = ty - m.y, d = Math.hypot(dx, dy) || 1;
+          m.x += (dx / d) * m.sp * dt;
+          m.y += (dy / d) * m.sp * dt;
+          if (p.dead <= 0 && p.inv <= 0 && d < 15) hurt();
+        }
+      }
+
+      function updateItems(dt) {
+        for (const it of S.items) {
+          it.t += dt;
+          if (it.ground) continue;
+          it.vy = Math.min(320, it.vy + GRAV * 0.8 * dt);
+          it.x += it.vx * dt;
+          it.x = Math.max(minX + 8, Math.min(maxX - 8, it.x));
+          const prev = it.y;
+          it.y += it.vy * dt;
+          if (it.vy > 0) {
+            const land = landing(it.x, 6, prev, it.y);
+            if (land != null) { it.y = land; it.vy = 0; it.vx = 0; it.ground = true; }
+          }
+          if (it.y > H + 6) it.y -= H + 26;
+        }
+      }
+
+      function hurt() {
+        const p = S.p;
+        S.lives--;
+        hud();
+        p.dead = 1.1;
+        p.vy = -260;
+        S.combo = 0;
+        S.shakeT = 0.3;
+        burst(p.x, p.y - PH / 2, "#a5f3fc", 14, 120);
+        if (S.mold) { S.mold.x = p.x < W / 2 ? W - 30 : 30; S.mold.y = 20; S.mold.sp = 26; }
+      }
+
+      // ---------- 그리기 ----------
+      let scale = 1;
+      function draw() {
+        g.setTransform(scale, 0, 0, scale, 0, 0);
+        // 배경
+        const bg = g.createLinearGradient(0, 0, 0, H);
+        bg.addColorStop(0, "#0b2a3d");
+        bg.addColorStop(1, "#231a4d");
+        g.fillStyle = bg;
+        g.fillRect(0, 0, W, H);
+        const now = performance.now() / 1000;
+        for (const b of bokeh) {
+          const y = ((b.y - now * b.sp) % (H + 40) + H + 40) % (H + 40) - 20;
+          g.beginPath();
+          g.arc(b.x + Math.sin(now * 0.6 + b.ph) * 6, y, b.r, 0, Math.PI * 2);
+          g.fillStyle = "rgba(167,243,252,0.045)";
+          g.fill();
+        }
+        if (S) {
+          g.save();
+          if (S.shakeT > 0) g.translate((Math.random() - 0.5) * 3, (Math.random() - 0.5) * 3);
+          drawLevel();
+          for (const it of S.items) drawItem(it);
+          for (const gm of S.germs) drawGerm(gm.x, gm.y - GH / 2, gm.type, gm.angry, gm.anim, gm.dir || gm.fx, 1);
+          drawPlayer(S.p);
+          for (const b of S.bubbles) drawBubble(b);
+          if (S.mold) drawMold(S.mold);
+          for (const p of S.parts) {
+            g.globalAlpha = 1 - p.t / p.life;
+            g.fillStyle = p.color;
+            g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill();
+          }
+          g.globalAlpha = 1;
+          for (const t of S.texts) {
+            g.globalAlpha = Math.max(0, 1 - t.t / 1.1);
+            g.font = `800 ${t.big ? 13 : 11}px system-ui, -apple-system, sans-serif`;
+            g.textAlign = "center";
+            g.lineWidth = 3;
+            g.strokeStyle = "rgba(8,20,35,.8)";
+            g.strokeText(t.text, t.x, t.y - t.t * 22);
+            g.fillStyle = t.color;
+            g.fillText(t.text, t.x, t.y - t.t * 22);
+          }
+          g.globalAlpha = 1;
+          g.restore();
+          // 청소 시간 남은 시간
+          if (S.phase === "play" && !S.hurried && S.D.hurry - S.t < 10) {
+            g.font = "700 11px system-ui, -apple-system, sans-serif";
+            g.textAlign = "right";
+            g.fillStyle = "rgba(253,224,71,.9)";
+            g.fillText(`청소 시간까지 ${Math.ceil(S.D.hurry - S.t)}초`, W - 24, 14);
+          }
+          if (S.banner) drawBanner(S.banner);
+        } else {
+          // 준비 화면 장식
+          drawPlayer({ x: W / 2 - 50, y: H - 70, face: 1, walkT: 0, inv: 0, dead: 0, vy: 0, ground: true });
+          drawBubble({ x: W / 2 + 20, y: H - 110, r: BR + 2, germ: { type: "a" }, trapT: 0, squish: 0, wob: now, popT: null, phase: "float" });
+          drawBubble({ x: W / 2 + 52, y: H - 140, r: BR, germ: null, squish: 0, wob: now + 1, popT: null, phase: "float" });
+        }
+      }
+
+      function drawLevel() {
+        const [c1, c2] = PALETTES[(S.stage - 1) % PALETTES.length];
+        // 옆 벽
+        for (const x of [0, W - T]) {
+          const wg = g.createLinearGradient(x, 0, x + T, 0);
+          wg.addColorStop(0, c2); wg.addColorStop(1, c1);
+          g.fillStyle = wg;
+          g.globalAlpha = 0.55;
+          g.fillRect(x, 0, T, H);
+          g.globalAlpha = 1;
+          g.fillStyle = "rgba(255,255,255,.12)";
+          for (let r = 0; r < ROWS; r++) { g.beginPath(); g.arc(x + T / 2, r * T + T / 2, 3.2, 0, Math.PI * 2); g.fill(); }
+        }
+        // 발판 (가로로 이어진 칸을 한 덩어리로)
+        for (let r = 0; r < ROWS; r++) {
+          let c = 1;
+          while (c < COLS - 1) {
+            if (!solid[r][c]) { c++; continue; }
+            let e = c;
+            while (e + 1 < COLS - 1 && solid[r][e + 1]) e++;
+            const x = c * T, y = r * T, w = (e - c + 1) * T, h = r === ROWS - 1 ? T : 12;
+            const pg = g.createLinearGradient(0, y, 0, y + h);
+            pg.addColorStop(0, c1); pg.addColorStop(1, c2);
+            g.fillStyle = pg;
+            roundRect(x + 1, y, w - 2, h, 6);
+            g.fill();
+            g.fillStyle = "rgba(255,255,255,.35)";
+            roundRect(x + 4, y + 2, w - 8, 3, 1.5);
+            g.fill();
+            c = e + 1;
+          }
+        }
+      }
+
+      function roundRect(x, y, w, h, r) {
+        g.beginPath();
+        g.moveTo(x + r, y);
+        g.arcTo(x + w, y, x + w, y + h, r);
+        g.arcTo(x + w, y + h, x, y + h, r);
+        g.arcTo(x, y + h, x, y, r);
+        g.arcTo(x, y, x + w, y, r);
+        g.closePath();
+      }
+
+      function drawPlayer(p) {
+        if (p.inv > 0 && p.dead <= 0 && Math.floor(p.inv * 12) % 2 === 0) return;
+        const cx = p.x, cy = p.y - 9;
+        const bob = p.ground && Math.abs(p.vx || 0) > 10 ? Math.abs(Math.sin(p.walkT * 2.2)) * 1.4 : 0;
+        g.save();
+        g.translate(cx, cy - bob);
+        if (p.dead > 0) g.rotate((1.1 - p.dead) * 8);
+        // 날개
+        g.fillStyle = "rgba(224,242,254,.55)";
+        g.beginPath(); g.ellipse(-p.face * 9, -3, 5, 7, -p.face * 0.6, 0, Math.PI * 2); g.fill();
+        // 몸
+        const bg2 = g.createRadialGradient(-3, -4, 1, 0, 0, 10);
+        bg2.addColorStop(0, "#ecfeff"); bg2.addColorStop(0.45, "#67e8f9"); bg2.addColorStop(1, "#0891b2");
+        g.fillStyle = bg2;
+        g.beginPath(); g.arc(0, 0, 9, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = "rgba(255,255,255,.75)"; g.lineWidth = 1;
+        g.stroke();
+        // 머리 위 거품 장식
+        const t = performance.now() / 300;
+        const tufts = [[-4, -11, 3.2], [1, -13.5, 3.8], [5.5, -10.5, 2.6]];
+        for (const [bx, by, br] of tufts) {
+          g.beginPath(); g.arc(bx, by + Math.sin(t + bx) * 0.6, br, 0, Math.PI * 2);
+          g.fillStyle = "rgba(237,233,254,.75)"; g.fill();
+          g.strokeStyle = "#c4b5fd"; g.lineWidth = 0.9; g.stroke();
+        }
+        // 얼굴
+        const ex = p.face * 2.2;
+        g.fillStyle = "#0f172a";
+        g.beginPath(); g.ellipse(ex - 2.8, -1, 1.3, 1.8, 0, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(ex + 2.8, -1, 1.3, 1.8, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#fff";
+        g.fillRect(ex - 3.2, -2.2, 0.9, 0.9); g.fillRect(ex + 2.4, -2.2, 0.9, 0.9);
+        g.fillStyle = "rgba(244,114,182,.55)";
+        g.beginPath(); g.arc(ex - 5, 2.5, 1.6, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(ex + 5, 2.5, 1.6, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = "#0f172a"; g.lineWidth = 1;
+        g.beginPath(); g.arc(ex, 2.2, 1.8, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
+        // 발
+        g.fillStyle = "#0e7490";
+        const step = p.ground ? Math.sin(p.walkT * 2.2) * 2 : 0;
+        g.beginPath(); g.ellipse(-3.5 + step, 8.6, 2.8, 1.6, 0, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.ellipse(3.5 - step, 8.6, 2.8, 1.6, 0, 0, Math.PI * 2); g.fill();
+        g.restore();
+      }
+
+      function drawGerm(x, y, type, angry, anim, dir, s) {
+        const k = GERMS[type];
+        g.save();
+        g.translate(x, y);
+        g.scale(s, s);
+        const sq = 1 + Math.sin(anim) * 0.06;
+        g.scale(1 / sq, sq);
+        const c1 = angry ? "#fecaca" : k.c1, c2 = angry ? "#dc2626" : k.c2;
+        // 섬모
+        g.strokeStyle = c2; g.lineWidth = 1.6; g.lineCap = "round";
+        const n = type === "b" ? 10 : 8;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + anim * 0.15;
+          const l = 9.5 + Math.sin(anim + i) * 0.8;
+          g.beginPath(); g.moveTo(Math.cos(a) * 6, Math.sin(a) * 6); g.lineTo(Math.cos(a) * l, Math.sin(a) * l); g.stroke();
+          g.fillStyle = c2; g.beginPath(); g.arc(Math.cos(a) * l, Math.sin(a) * l, 1.2, 0, Math.PI * 2); g.fill();
+        }
+        if (k.fly) {
+          g.fillStyle = "rgba(254,243,199,.6)";
+          const f = Math.sin(anim * 3) * 2;
+          g.beginPath(); g.ellipse(-7, -6 - f, 4, 2.5, -0.5, 0, Math.PI * 2); g.fill();
+          g.beginPath(); g.ellipse(7, -6 - f, 4, 2.5, 0.5, 0, Math.PI * 2); g.fill();
+        }
+        const bgr = g.createRadialGradient(-2, -3, 1, 0, 0, 8);
+        bgr.addColorStop(0, c1); bgr.addColorStop(1, c2);
+        g.fillStyle = bgr;
+        g.beginPath(); g.arc(0, 0, 7.5, 0, Math.PI * 2); g.fill();
+        // 점박이
+        g.fillStyle = "rgba(255,255,255,.25)";
+        g.beginPath(); g.arc(-3.5, 3, 1.4, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(3.8, 3.6, 1, 0, Math.PI * 2); g.fill();
+        // 눈
+        const ex = (dir || 1) * 1.5;
+        g.fillStyle = "#fff";
+        g.beginPath(); g.arc(ex - 2.6, -1.5, 2.2, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(ex + 2.6, -1.5, 2.2, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#111827";
+        g.beginPath(); g.arc(ex - 2.6 + (dir || 1) * 0.7, -1.2, 1.1, 0, Math.PI * 2); g.fill();
+        g.beginPath(); g.arc(ex + 2.6 + (dir || 1) * 0.7, -1.2, 1.1, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = "#111827"; g.lineWidth = 1.1;
+        g.beginPath();
+        g.moveTo(ex - 4.6, angry ? -5.4 : -4.6); g.lineTo(ex - 1, angry ? -3.4 : -4.4);
+        g.moveTo(ex + 4.6, angry ? -5.4 : -4.6); g.lineTo(ex + 1, angry ? -3.4 : -4.4);
+        g.stroke();
+        g.restore();
+      }
+
+      function drawBubble(b) {
+        if (b.done) return;
+        if (b.popT != null && b.popT >= 0) return;
+        let r = b.r;
+        let sx = 1, sy = 1;
+        if (b.squish > 0) { sx = 1 + b.squish * 0.8; sy = 1 - b.squish * 0.8; }
+        const wob = Math.sin(b.wob * 1.3) * 0.04;
+        g.save();
+        g.translate(b.x, b.y);
+        g.scale(sx + wob, sy - wob);
+        if (b.germ) {
+          const warn = b.trapT > S_trap() - 2.2;
+          const angry = b.trapT > S_trap() - 1.2;
+          const shake = warn ? Math.sin(b.trapT * 40) * 1 : 0;
+          drawGerm(shake, 0.5, b.germ.type, angry, b.trapT * 3, 1, 0.78);
+          g.strokeStyle = warn && Math.floor(b.trapT * 8) % 2 ? "rgba(248,113,113,.95)" : "rgba(165,243,252,.95)";
+        } else {
+          g.strokeStyle = "rgba(196,181,253,.9)";
+        }
+        const fill = g.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+        fill.addColorStop(0, "rgba(255,255,255,.28)");
+        fill.addColorStop(0.7, b.germ ? "rgba(34,211,238,.12)" : "rgba(167,139,250,.12)");
+        fill.addColorStop(1, b.germ ? "rgba(34,211,238,.35)" : "rgba(167,139,250,.35)");
+        g.fillStyle = fill;
+        g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+        g.lineWidth = 1.6;
+        g.stroke();
+        g.strokeStyle = "rgba(255,255,255,.85)"; g.lineWidth = 1.6;
+        g.beginPath(); g.arc(0, 0, r - 3, 1.15 * Math.PI, 1.45 * Math.PI); g.stroke();
+        g.restore();
+      }
+      function S_trap() { return S && S.D ? S.D.trap : 7; }
+
+      function drawItem(it) {
+        if (it.life - it.t < 2 && Math.floor(it.t * 10) % 2) return;
+        const x = it.x, y = it.y - 6;
+        g.save();
+        g.translate(x, y);
+        if (it.kind === 0) { // 사과
+          g.fillStyle = "#ef4444"; g.beginPath(); g.arc(-2, 0, 5, 0, Math.PI * 2); g.arc(2, 0, 5, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#fff"; g.globalAlpha = .5; g.beginPath(); g.arc(-3, -2, 1.4, 0, Math.PI * 2); g.fill(); g.globalAlpha = 1;
+          g.strokeStyle = "#78350f"; g.lineWidth = 1.2; g.beginPath(); g.moveTo(0, -4); g.lineTo(1, -8); g.stroke();
+          g.fillStyle = "#22c55e"; g.beginPath(); g.ellipse(3.5, -7, 3, 1.5, -0.4, 0, Math.PI * 2); g.fill();
+        } else if (it.kind === 1) { // 귤
+          g.fillStyle = "#fb923c"; g.beginPath(); g.arc(0, 0, 6, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "rgba(255,255,255,.35)"; g.beginPath(); g.arc(-2, -2, 1.5, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#16a34a"; g.beginPath(); g.ellipse(1, -6, 2.6, 1.3, 0.3, 0, Math.PI * 2); g.fill();
+        } else if (it.kind === 2) { // 포도
+          g.fillStyle = "#8b5cf6";
+          for (const [gx, gy] of [[-3, -3], [0, -3], [3, -3], [-1.5, 0], [1.5, 0], [0, 3]]) { g.beginPath(); g.arc(gx, gy, 2.4, 0, Math.PI * 2); g.fill(); }
+          g.fillStyle = "#22c55e"; g.beginPath(); g.ellipse(0, -6.5, 3, 1.3, 0, 0, Math.PI * 2); g.fill();
+        } else { // 비타민 캡슐
+          g.rotate(-0.6);
+          g.fillStyle = "#fff"; roundRect(-7, -3.2, 7, 6.4, 3.2); g.fill();
+          g.fillStyle = "#f59e0b"; roundRect(0, -3.2, 7, 6.4, 3.2); g.fill();
+          g.fillStyle = "#fde68a"; g.fillRect(0, -3.2, 1.5, 6.4);
+          g.strokeStyle = "rgba(15,23,42,.25)"; g.lineWidth = 0.8; roundRect(-7, -3.2, 14, 6.4, 3.2); g.stroke();
+        }
+        g.restore();
+      }
+
+      function drawMold(m) {
+        g.save();
+        g.translate(m.x, m.y);
+        const t = m.anim;
+        g.shadowColor = "rgba(190,242,100,.55)"; g.shadowBlur = 10;
+        g.fillStyle = "rgba(101,118,92,.95)";
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + t;
+          g.beginPath(); g.arc(Math.cos(a) * 6, Math.sin(a) * 4, 7 + Math.sin(t * 3 + i) * 1.2, 0, Math.PI * 2); g.fill();
+        }
+        g.shadowBlur = 0;
+        g.fillStyle = "#3f4a36";
+        g.beginPath(); g.arc(0, 0, 8, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#facc15";
+        g.beginPath(); g.arc(-3, -1, 1.8, 0, Math.PI * 2); g.arc(3, -1, 1.8, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = "#facc15"; g.lineWidth = 1;
+        g.beginPath(); g.moveTo(-3, 4); g.lineTo(-1, 3); g.lineTo(1, 4.5); g.lineTo(3, 3); g.stroke();
+        g.restore();
+      }
+
+      function drawBanner(b) {
+        const a = Math.min(1, b.t * 3);
+        g.save();
+        g.globalAlpha = a;
+        const y = H / 2 - 20;
+        g.fillStyle = b.warn ? "rgba(127,29,29,.82)" : "rgba(8,30,48,.78)";
+        roundRect(W / 2 - 120, y - 26, 240, b.sub ? 54 : 40, 14);
+        g.fill();
+        g.textAlign = "center";
+        g.fillStyle = b.warn ? "#fde68a" : "#fff";
+        g.font = "800 19px system-ui, -apple-system, sans-serif";
+        g.fillText(b.text, W / 2, y);
+        if (b.sub) {
+          g.font = "600 11.5px system-ui, -apple-system, sans-serif";
+          g.fillStyle = b.warn ? "#fecaca" : "#a5f3fc";
+          g.fillText(b.sub, W / 2, y + 18);
+        }
+        g.restore();
+      }
+
+      // ---------- 화면 크기 ----------
+      function fit() {
+        const sw = stage.clientWidth || W;
+        const padH = pad.classList.contains("is-on") ? 78 : 0;
+        const maxH = Math.max(300, window.innerHeight - 250 - padH);
+        const cw = Math.floor(Math.min(sw, (maxH * W) / H));
+        const ch = Math.round((cw * H) / W);
+        shell.style.width = cw + "px";
+        canvas.style.width = cw + "px";
+        canvas.style.height = ch + "px";
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        canvas.width = Math.round(cw * dpr);
+        canvas.height = Math.round(ch * dpr);
+        scale = canvas.width / W;
+        draw();
+      }
+      function usePad() {
+        const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+        const on = coarse || (stage.clientWidth || 999) < 480;
+        pad.classList.toggle("is-on", on);
+        screen.classList.toggle("is-last", !on);
+        stage.querySelector(".gm-note").hidden = on;
+      }
+
+      // ---------- 루프 ----------
+      let raf = 0, last = 0, acc = 0;
+      function frame(now) {
+        raf = 0;
+        if (state !== "play") return;
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        acc += dt;
+        while (acc >= STEP && state === "play") { update(STEP); acc -= STEP; }
+        draw();
+        if (state === "play") raf = requestAnimationFrame(frame);
+      }
+      function run() {
+        if (raf) cancelAnimationFrame(raf);
+        last = performance.now();
+        acc = 0;
+        raf = requestAnimationFrame(frame);
+      }
+      let idleRaf = 0;
+      function idle() {
+        idleRaf = 0;
+        if (state !== "ready") return;
+        draw();
+        idleRaf = requestAnimationFrame(idle);
+      }
+
+      // ---------- 화면 전환 ----------
+      function showOverlay(html) {
+        overlay.innerHTML = html;
+        overlay.hidden = false;
+        const btn = overlay.querySelector("button");
+        if (btn) btn.focus({ preventScroll: true });
+      }
+      function clearKeys() { keys.left = keys.right = keys.jump = keys.shoot = false; pad.querySelectorAll(".is-down").forEach((b) => b.classList.remove("is-down")); }
+      function showReady() {
+        state = "ready";
+        S = null;
+        elScore.textContent = "0"; elStage.textContent = "1";
+        elLives.innerHTML = '<i class="gm-life"></i><i class="gm-life"></i><i class="gm-life"></i>';
+        showOverlay(`<div class="gm-card">
+          <h2>비눗방울 대작전</h2>
+          <p>거품 요정이 되어 사무실 세균을 청소해요.</p>
+          <div class="gm-rules">
+            <div><span class="gm-num">1</span><span>비눗방울을 쏴서 세균을 <b>가두고</b>, 몸으로 톡 건드려 터뜨려요.</span></div>
+            <div><span class="gm-num">2</span><span>붙어 있는 방울은 <b>연쇄</b>로 터져요. 연쇄마다 점수 2배!</span></div>
+            <div><span class="gm-num">3</span><span>방울은 위에서 밟으면 통통 튀어 올라요. 오래 두면 세균이 화나서 나와요.</span></div>
+          </div>
+          <div class="gm-keys"><kbd>←</kbd> <kbd>→</kbd> 이동 · <kbd>↑</kbd>/<kbd>Space</kbd> 점프 · <kbd>X</kbd> 방울<br>모바일은 아래 버튼으로 조작해요</div>
+          <button type="button" class="gm-go" data-act="start">시작</button>
+        </div>`);
+        if (!idleRaf) idleRaf = requestAnimationFrame(idle);
+      }
+      function start() {
+        overlay.hidden = true;
+        overlay.innerHTML = "";
+        clearKeys();
+        makeBokeh();
+        newGame();
+        state = "play";
+        run();
+      }
+      function pause() {
+        if (state !== "play") return;
+        state = "paused";
+        clearKeys();
+        showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>현재 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점 · 무대 ${S.stage}</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+      }
+      function resume() {
+        if (state !== "paused") return;
+        overlay.hidden = true;
+        state = "play";
+        run();
+      }
+      function finish() {
+        if (state === "over") return;
+        state = "over";
+        draw();
+        const score = Math.min(10000000, Math.floor(S.score));
+        showOverlay(`<div class="gm-card"><h2>게임 끝</h2><p>무대 ${S.stage}까지 청소했어요</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+        ctx.submit(score);
+      }
+
+      overlay.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-act]");
+        if (!b) return;
+        if (b.dataset.act === "start") start();
+        else if (b.dataset.act === "resume") resume();
+      });
+
+      // ---------- 입력 ----------
+      function typing(e) {
+        const t = e.target;
+        return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      }
+      const dialogOpen = () => !!document.querySelector(".hk-dialog__overlay");
+      const GAME_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"];
+      function press(k) {
+        if (state !== "play") return;
+        if (k === "jump") { if (!keys.jump && S && S.p) S.p.jumpBuf = 0.13; keys.jump = true; }
+        else if (k === "shoot") { if (!keys.shoot && S && S.p) S.p.shootBuf = 0.2; keys.shoot = true; }
+        else keys[k] = true;
+      }
+      function release(k) { keys[k] = false; }
+      const KEYMAP = { ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "jump", KeyW: "jump", Space: "jump", KeyX: "shoot", KeyZ: "shoot", KeyJ: "shoot" };
+      window.addEventListener("keydown", (e) => {
+        if (typing(e) || dialogOpen()) return;
+        const c = e.code;
+        if (state === "play") {
+          if (GAME_KEYS.includes(c)) e.preventDefault();
+          if (KEYMAP[c] && !e.repeat) press(KEYMAP[c]);
+          if (c === "KeyP" || c === "Escape") pause();
+        } else if (state === "paused") {
+          if (GAME_KEYS.includes(c)) e.preventDefault();
+          if (c === "Space" || c === "Enter" || c === "KeyP") resume();
+        } else if (state === "ready") {
+          if (GAME_KEYS.includes(c)) e.preventDefault();
+          if (c === "Space" || c === "Enter") { e.preventDefault(); start(); }
+        }
+      });
+      window.addEventListener("keyup", (e) => { if (KEYMAP[e.code]) release(KEYMAP[e.code]); });
+      window.addEventListener("blur", clearKeys);
+
+      pad.querySelectorAll("button").forEach((btn) => {
+        const k = btn.dataset.k;
+        const down = (e) => { e.preventDefault(); btn.classList.add("is-down"); try { btn.setPointerCapture(e.pointerId); } catch (_) {} press(k); };
+        const up = (e) => { e.preventDefault(); btn.classList.remove("is-down"); release(k); };
+        btn.addEventListener("pointerdown", down);
+        btn.addEventListener("pointerup", up);
+        btn.addEventListener("pointercancel", up);
+        btn.addEventListener("lostpointercapture", up);
+        btn.addEventListener("contextmenu", (e) => e.preventDefault());
+      });
+
+      document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+      // ---------- 시작 ----------
+      ctx.onRestart(start);
+      const refit = () => { usePad(); fit(); };
+      if (window.ResizeObserver) new ResizeObserver(refit).observe(stage);
+      window.addEventListener("resize", refit);
+      usePad();
+      fit();
+      showReady();
+      // 테스트·디버그용 (전역 노출 최소화)
+      stage._gm = { get S() { return S; }, get state() { return state; } };
+    },
+  });
+  </script>
+</body>
+</html>

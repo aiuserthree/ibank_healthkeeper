@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
+  <title>헬스키퍼 — 점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const CATEGORIES = [
+      ["ALL", "전체"],
+      ["CLASSIC", "추억의 게임"],
+      ["HEALTH", "건강 퀴즈"],
+      ["STUDY", "어학"],
+    ];
+
+    function lunchChip() {
+      const kst = new Date(Date.now() + 9 * 3600 * 1000);
+      const day = kst.getUTCDay();
+      const min = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+      const live = day >= 1 && day <= 5 && min >= 11 * 60 + 30 && min < 13 * 60;
+      return live
+        ? `<span class="hk-lounge-lunch is-live">지금 점심시간 · 13:00까지</span>`
+        : `<span class="hk-lounge-lunch">${HKUI.icon("clock", 13, "currentColor")} 점심시간 11:30 ~ 13:00</span>`;
+    }
+
+    function cardHtml(g) {
+      const top = g.todayTop
+        ? `<span class="hk-lounge-card__top">${HKUI.icon("crown", 14, "#d49a00")}<span>오늘 1위 <b>${HKUI.escapeHtml(g.todayTop.name)}</b> ${HKPlay.formatScore(g, g.todayTop.score)}</span></span>`
+        : `<span class="hk-lounge-card__top">${HKUI.icon("crown", 14, "var(--text-muted)")}<span>오늘 1위가 비어 있어요</span></span>`;
+      return `<a class="hk-lounge-card" href="/games/${g.key}" data-cat="${g.category}">
+          <div class="hk-lounge-card__art" style="${HKPlay.tintStyle(g.key)}">
+            ${g.dailyOnce ? `<span class="hk-lounge-card__flag">${HKUI.icon("calendar-check", 12, "currentColor")} 오늘의 도전</span>` : ""}
+            ${g.dailyOnce && g.playedToday ? `<span class="hk-lounge-card__done">참여 완료</span>` : ""}
+            ${HKUI.icon(g.icon, 46, "#fff")}
+          </div>
+          <div>
+            <div class="hk-lounge-card__body"><b>${HKUI.escapeHtml(g.title)}</b><p>${HKUI.escapeHtml(g.desc)}</p></div>
+            <div class="hk-lounge-card__foot">${top}<span>${g.todayPlayers ? `${g.todayPlayers}명 참가` : ""}</span></div>
+          </div>
+        </a>`;
+    }
+
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      mainStyle: "max-width:1200px;margin:0 auto;padding:36px 32px 72px",
+      render: () => `<div class="hk-lounge-hero">
+          <div>
+            ${lunchChip()}
+            <h1>점심 라운지</h1>
+            <p>점심 먹고 남은 10분, 동료들과 한 판. 오늘 사내 1위는 누구일까요?</p>
+          </div>
+        </div>
+        <div class="hk-lounge-tabs">${CATEGORIES.map(([k, l], i) => `<button type="button" class="hk-lounge-tab${i === 0 ? " is-active" : ""}" data-cat="${k}">${l}</button>`).join("")}</div>
+        <div class="hk-lounge-grid" id="lounge-grid"><div style="grid-column:1/-1;text-align:center;padding:48px"><span class="hk-spin"></span></div></div>`,
+      afterMount: async () => {
+        const grid = document.getElementById("lounge-grid");
+        try {
+          const games = await HKApi.playGames();
+          grid.innerHTML = games.map(cardHtml).join("");
+        } catch (e) {
+          grid.innerHTML = `<div style="grid-column:1/-1">${HKUI.alertBox("danger", "불러오기 실패", HKUI.escapeHtml(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
+        }
+        document.querySelectorAll(".hk-lounge-tab").forEach((b) => {
+          b.onclick = () => {
+            document.querySelectorAll(".hk-lounge-tab").forEach((x) => x.classList.toggle("is-active", x === b));
+            grid.querySelectorAll(".hk-lounge-card").forEach((c) => (c.hidden = b.dataset.cat !== "ALL" && c.dataset.cat !== b.dataset.cat));
+          };
+        });
+        HKUI.refreshIcons();
+      },
+    });
+  </script>
+</body>
+</html>

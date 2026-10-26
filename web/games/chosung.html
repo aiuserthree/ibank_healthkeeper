@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>건강 초성 퀴즈 — 점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-cs { --gm-a: #e0508a; --gm-b: #ff9a8b; --gm-ink: #b8306a; --gm-soft: #fff1f5; --gm-line: #f6c9da;
+      position: relative; background: var(--surface-card, #fff); border: 1px solid var(--color-mist-border, #e3e8f0); border-radius: 16px; overflow: hidden; box-shadow: 0 6px 24px rgba(224, 80, 138, .10); }
+    .gm-cs__top { display: flex; align-items: center; gap: 10px; padding: 14px 18px; color: #fff; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); }
+    .gm-cs__top b { font-size: 15px; }
+    .gm-cs__dots { display: flex; gap: 6px; margin-left: 4px; }
+    .gm-cs__dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.35); }
+    .gm-cs__dot.is-now { background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.35); }
+    .gm-cs__dot.is-ok { background: #fff; }
+    .gm-cs__dot.is-ng { background: rgba(60, 10, 30, .35); }
+    .gm-cs__score { margin-left: auto; font-size: 14px; font-weight: 700; background: rgba(255,255,255,.22); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+    .gm-cs__timer { height: 8px; background: var(--gm-soft); }
+    .gm-cs__timer i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--gm-a), var(--gm-b)); border-radius: 0 6px 6px 0; transform-origin: left center; }
+    .gm-cs__timer.is-low i { background: #e5484d; }
+    .gm-cs__body { padding: 22px 20px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .gm-cs__meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+    .gm-cs__cat { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: var(--gm-soft); color: var(--gm-ink); font-weight: 700; font-size: 13px; }
+    .gm-cs__sec { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--color-midnight-navy); }
+    .gm-cs__tiles { display: flex; justify-content: center; gap: 6px; padding: 6px 0; }
+    .gm-cs__tile { flex: 0 1 58px; min-width: 0; aspect-ratio: 5 / 6; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: var(--gm-soft); border: 2px solid var(--gm-line); color: var(--gm-ink); font-weight: 800; font-size: clamp(18px, 6.2vw, 30px); line-height: 1; }
+    .gm-cs__tile.is-open { background: #fff; border-color: var(--gm-a); color: var(--color-midnight-navy); animation: gm-pop .28s ease-out; }
+    .gm-cs__gap { flex: 0 0 12px; }
+    .gm-cs__desc { margin: 0; text-align: center; font-size: 15.5px; line-height: 1.55; color: var(--color-midnight-navy); padding: 12px 14px; border-radius: 12px; background: var(--color-mist, #f3f6fa); word-break: keep-all; }
+    .gm-cs__form { display: flex; gap: 8px; }
+    .gm-cs__input { flex: 1; min-width: 0; height: 50px; border-radius: 12px; border: 2px solid var(--border-default, #d6dde8); padding: 0 14px; font-size: 18px; font-weight: 600; color: var(--color-midnight-navy); background: #fff; outline: none; }
+    .gm-cs__input:focus { border-color: var(--gm-a); box-shadow: 0 0 0 4px rgba(224, 80, 138, .14); }
+    .gm-cs__input.is-shake { animation: gm-shake .35s; border-color: #e5484d; }
+    .gm-cs__go { height: 50px; padding: 0 18px; border: 0; border-radius: 12px; font-size: 16px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--gm-a), #f0717f); cursor: pointer; flex-shrink: 0; }
+    .gm-cs__msg { min-height: 20px; margin: -6px 0 0; font-size: 13.5px; text-align: center; color: var(--text-secondary); }
+    .gm-cs__msg.is-bad { color: #d23b48; font-weight: 600; }
+    .gm-cs__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .gm-cs__btn { height: 44px; border-radius: 12px; border: 1px solid var(--border-default, #d6dde8); background: #fff; color: var(--color-midnight-navy); font-size: 14.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .gm-cs__btn:hover:not([disabled]) { background: var(--gm-soft); border-color: var(--gm-line); }
+    .gm-cs__btn[disabled] { opacity: .45; cursor: default; }
+    .gm-cs__btn small { color: var(--gm-ink); font-weight: 700; }
+
+    /* 결과 띠 (문제마다 1.5초) */
+    .gm-cs__fb { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; background: rgba(255,255,255,.96); animation: gm-fade .18s ease-out; }
+    .gm-cs__fb-badge { width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
+    .gm-cs__fb-badge.is-ok { background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); }
+    .gm-cs__fb-badge.is-ng { background: #94a3b8; }
+    .gm-cs__fb-title { font-size: 22px; font-weight: 800; color: var(--color-midnight-navy); }
+    .gm-cs__fb-word { font-size: 28px; font-weight: 800; color: var(--gm-ink); letter-spacing: .02em; }
+    .gm-cs__fb-tip { margin: 0; max-width: 400px; font-size: 15px; line-height: 1.55; color: var(--text-secondary); word-break: keep-all; }
+    .gm-cs__fb-pts { font-size: 14px; font-weight: 700; color: var(--gm-ink); }
+
+    /* 일시정지 */
+    .gm-cs__pause { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(255, 241, 245, .97); text-align: center; padding: 20px; }
+    .gm-cs__pause b { font-size: 20px; color: var(--color-midnight-navy); }
+
+    /* 시작 / 요약 화면 */
+    .gm-cs__intro { padding: 26px 22px 24px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+    .gm-cs__demo { display: flex; align-items: center; gap: 10px; }
+    .gm-cs__demo .gm-cs__tile { flex: 0 0 auto; width: 48px; font-size: 26px; }
+    .gm-cs__arrow { color: var(--gm-a); }
+    .gm-cs__date { font-size: 13px; font-weight: 700; color: var(--gm-ink); background: var(--gm-soft); padding: 5px 12px; border-radius: 999px; }
+    .gm-cs__h { margin: 0; font-size: 24px; color: var(--color-midnight-navy); }
+    .gm-cs__rules { margin: 0; padding: 14px 16px; list-style: none; width: 100%; max-width: 420px; text-align: left; border-radius: 12px; background: var(--color-mist, #f3f6fa); display: flex; flex-direction: column; gap: 7px; font-size: 14px; line-height: 1.5; color: var(--text-secondary); }
+    .gm-cs__rules li { display: flex; gap: 8px; }
+    .gm-cs__rules li > span:first-child { flex-shrink: 0; width: 18px; height: 18px; border-radius: 6px; margin-top: 2px; background: var(--gm-soft); color: var(--gm-ink); font-size: 11.5px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+    .gm-cs__rules b { color: var(--color-midnight-navy); }
+    .gm-cs__note { width: 100%; max-width: 420px; padding: 10px 14px; border-radius: 12px; background: #fff7e6; color: #9a6400; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .gm-cs__start { min-width: 200px; height: 52px; border: 0; border-radius: 14px; color: #fff; font-size: 17px; font-weight: 800; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); box-shadow: 0 6px 18px rgba(224, 80, 138, .3); cursor: pointer; }
+    .gm-cs__start:hover { filter: brightness(1.04); }
+    .gm-cs__sum-big { font-size: 40px; font-weight: 800; color: var(--color-midnight-navy); letter-spacing: -.02em; }
+    .gm-cs__sum-big small { font-size: 18px; color: var(--text-secondary); font-weight: 700; }
+    .gm-cs__calc { width: 100%; max-width: 420px; display: grid; grid-template-columns: 1fr auto; gap: 6px 0; font-size: 14px; color: var(--text-secondary); padding: 12px 16px; border-radius: 12px; background: var(--color-mist, #f3f6fa); text-align: left; }
+    .gm-cs__calc b { color: var(--color-midnight-navy); text-align: right; font-variant-numeric: tabular-nums; }
+    .gm-cs__calc .is-total { border-top: 1px solid var(--color-mist-border, #e3e8f0); padding-top: 6px; font-weight: 800; color: var(--color-midnight-navy); }
+    .gm-cs__list { width: 100%; max-width: 420px; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; text-align: left; }
+    .gm-cs__list li { display: flex; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--color-mist-border, #e3e8f0); }
+    .gm-cs__list li > i, .gm-cs__list li > svg { flex-shrink: 0; margin-top: 2px; }
+    .gm-cs__list b { font-size: 15px; color: var(--color-midnight-navy); }
+    .gm-cs__list small { display: block; font-size: 13px; line-height: 1.5; color: var(--text-secondary); margin-top: 2px; word-break: keep-all; }
+    .gm-cs__list .gm-cs__cho { font-size: 12px; color: var(--gm-ink); font-weight: 700; margin-left: 6px; }
+
+    @keyframes gm-pop { 0% { transform: scale(.8); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
+    @keyframes gm-shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-7px); } 40% { transform: translateX(7px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+    @keyframes gm-fade { from { opacity: 0; } to { opacity: 1; } }
+
+    @media (max-width: 480px) {
+      .gm-cs__body { padding: 18px 14px 16px; gap: 12px; }
+      .gm-cs__intro { padding: 22px 14px 20px; }
+      .gm-cs__tiles { gap: 4px; }
+      .gm-cs__gap { flex-basis: 8px; }
+      .gm-cs__go { padding: 0 14px; }
+      .gm-cs__h { font-size: 21px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // [낱말, 분류, 뜻(화면 단서), 해설(정답 뒤)]
+    // 의학적으로 널리 확립된 상식만. 뜻 문장에는 정답 낱말이 들어가지 않게.
+    const BANK = [
+      ["거북목", "자세", "고개가 어깨보다 앞으로 쭉 빠져 나온 자세예요.", "모니터를 눈높이에 맞추면 목 부담을 줄일 수 있어요."],
+      ["스트레칭", "운동", "근육을 천천히 늘여 굳은 몸을 풀어 주는 동작이에요.", "한 시간에 한 번쯤 자리에서 가볍게 몸을 풀어 주세요."],
+      ["손목터널증후군", "사무실 건강", "손목 안쪽 신경이 눌려 손가락이 저리고 아픈 증상이에요.", "손목을 꺾은 채 오래 타이핑하지 않도록 자세를 바꿔 주세요."],
+      ["단백질", "영양", "근육·피부·머리카락 등 몸을 이루는 주요 영양소예요.", "콩·두부·달걀·생선·살코기에 많이 들어 있어요."],
+      ["수분", "영양", "땀과 소변으로 빠져나가 꾸준히 채워 줘야 하는 몸속 물이에요.", "목마르기 전에 조금씩 자주 마시는 게 좋아요."],
+      ["혈액순환", "신체", "피가 온몸을 돌며 산소와 영양분을 나르는 흐름이에요.", "오래 앉아 있었다면 잠깐 일어나 걸어 주세요."],
+      ["수면", "생활 습관", "몸과 뇌가 쉬면서 회복하는 밤의 시간이에요.", "성인은 하루 7시간 이상 자는 것이 권장돼요."],
+      ["비타민", "영양", "적은 양으로 몸의 여러 기능을 조절하는 필수 영양소예요.", "여러 색의 채소와 과일을 골고루 먹으면 다양하게 챙길 수 있어요."],
+      ["근육", "신체", "줄어들고 늘어나며 몸을 움직이게 하는 조직이에요.", "나이가 들수록 근력운동으로 지켜 주는 게 중요해요."],
+      ["유산소 운동", "운동", "걷기·자전거·수영처럼 숨이 조금 찰 만큼 오래 하는 운동이에요.", "세계보건기구(WHO)는 성인에게 일주일에 150분 이상의 중강도 신체활동을 권장해요."],
+      ["자외선", "생활 습관", "햇빛 속에 있어 피부를 그을리게 하는, 눈에 보이지 않는 빛이에요.", "볕이 강한 날엔 자외선 차단제와 모자를 챙겨 주세요."],
+      ["안구건조증", "눈 건강", "눈물이 부족하거나 빨리 말라 눈이 뻑뻑한 증상이에요.", "화면을 볼 때 의식적으로 눈을 자주 깜빡여 주세요."],
+      ["식이섬유", "영양", "채소·통곡물에 많고 장 운동을 돕는 성분이에요.", "채소·과일·콩·통곡물로 챙길 수 있어요."],
+      ["탄수화물", "영양", "밥·빵·면에 많아 몸의 주된 에너지원이 되는 영양소예요.", "흰쌀보다 잡곡처럼 덜 정제된 것을 고르면 더 좋아요."],
+      ["칼슘", "영양", "뼈와 치아를 이루는 대표 무기질이에요.", "우유·멸치·두부 등에 많이 들어 있어요."],
+      ["철분", "영양", "피 속 헤모글로빈을 만드는 데 필요한 무기질이에요.", "부족하면 빈혈이 생길 수 있어요."],
+      ["나트륨", "영양", "소금의 주성분으로, 많이 먹으면 혈압을 높일 수 있어요.", "국물을 덜 먹기만 해도 섭취를 꽤 줄일 수 있어요."],
+      ["혈압", "신체", "심장이 피를 내보낼 때 혈관 벽에 가해지는 압력이에요.", "증상이 없어도 정기적으로 재 보는 게 좋아요."],
+      ["혈당", "신체", "피 속에 들어 있는 포도당의 양이에요.", "단 음료를 줄이면 급격히 오르는 것을 막는 데 도움이 돼요."],
+      ["콜레스테롤", "신체", "피 속 기름 성분의 하나로, 너무 많으면 혈관 건강을 해쳐요.", "건강검진 피검사로 수치를 확인할 수 있어요."],
+      ["면역력", "신체", "세균·바이러스 같은 병원체로부터 몸을 지키는 힘이에요.", "충분한 잠과 골고루 먹는 식사가 기본이에요."],
+      ["손 씻기", "생활 습관", "흐르는 물에 비누로 30초 이상! 가장 쉬운 감염병 예방법이에요.", "손가락 사이와 손톱 밑까지 꼼꼼히 문질러 주세요."],
+      ["기지개", "운동", "몸을 쭉 펴며 팔다리를 힘껏 뻗는 동작이에요.", "자리에서 일어나 한 번만 켜도 굳은 몸이 풀려요."],
+      ["허리 디스크", "질환", "척추뼈 사이의 연골이 밀려 나와 신경을 누르는 질환이에요.", "무거운 물건은 허리 대신 무릎을 굽혀 들어 올리세요."],
+      ["척추", "신체", "목부터 엉덩이까지 몸의 중심을 받치는 뼈 기둥이에요.", "바른 자세는 이 뼈 기둥의 자연스러운 곡선을 지켜 줘요."],
+      ["어깨 결림", "자세", "어깨 근육이 뭉쳐 뻐근하고 무거운 느낌이에요.", "어깨를 천천히 앞뒤로 돌리는 스트레칭이 도움이 돼요."],
+      ["수면 위생", "생활 습관", "잘 자기 위한 생활 습관과 잠자리 환경을 통틀어 이르는 말이에요.", "잠자리에서 휴대폰을 멀리 두는 것도 그중 하나예요."],
+      ["카페인", "영양", "커피·녹차에 들어 있어 잠을 깨우는 성분이에요.", "잠들기 몇 시간 전부터는 줄이는 게 숙면에 좋아요."],
+      ["숙면", "수면", "중간에 깨지 않고 깊이 푹 자는 잠이에요.", "매일 같은 시간에 자고 일어나면 도움이 돼요."],
+      ["생체 시계", "수면", "하루 약 24시간 주기로 잠과 깸의 리듬을 조절하는 몸속 장치예요.", "아침에 햇빛을 쬐면 리듬을 맞추는 데 도움이 돼요."],
+      ["멜라토닌", "수면", "어두워지면 분비되어 잠이 오게 하는 호르몬이에요.", "밤에 밝은 빛을 오래 보면 분비가 줄어들 수 있어요."],
+      ["낮잠", "수면", "오후에 잠깐 자는 짧은 잠이에요.", "20~30분 이내로 짧게 자야 밤잠에 덜 방해돼요."],
+      ["근력 운동", "운동", "아령이나 맨몸으로 근육에 힘을 주는 운동이에요.", "세계보건기구(WHO)는 일주일에 2일 이상 하도록 권장해요."],
+      ["걷기", "운동", "도구 없이 언제든 할 수 있는 가장 기본적인 유산소 운동이에요.", "점심 식사 뒤 잠깐만 걸어도 몸이 한결 가벼워져요."],
+      ["계단 오르기", "운동", "엘리베이터 대신 할 수 있는 생활 속 운동이에요.", "짧은 시간에도 심박수를 올려 주는 좋은 운동이에요."],
+      ["플랭크", "운동", "엎드려 팔꿈치와 발끝으로 몸을 일자로 버티는 운동이에요.", "허리가 처지지 않게 머리부터 발끝까지 일직선을 유지하세요."],
+      ["스쿼트", "운동", "의자에 앉듯 엉덩이를 내렸다 올리는 하체 운동이에요.", "무릎이 안쪽으로 모이지 않게 주의하세요."],
+      ["준비 운동", "운동", "본 운동 전에 몸을 데우고 관절을 풀어 주는 가벼운 운동이에요.", "운동 전에 챙기면 몸이 움직일 준비를 할 수 있어요."],
+      ["정리 운동", "운동", "운동을 마친 뒤 숨과 심박수를 천천히 가라앉히는 가벼운 운동이에요.", "갑자기 멈추기보다 천천히 걸으며 마무리해 주세요."],
+      ["심박수", "신체", "1분 동안 심장이 뛰는 횟수예요.", "운동 강도를 가늠하는 지표로 쓰여요."],
+      ["체지방", "신체", "몸무게 가운데 기름 조직이 차지하는 부분이에요.", "몸무게와 함께 체지방률도 살펴보면 좋아요."],
+      ["기초 대사량", "신체", "가만히 쉬고 있어도 생명 유지에 쓰이는 최소한의 에너지예요.", "근육량이 늘면 조금 높아져요."],
+      ["복식 호흡", "마음 건강", "배를 부풀렸다 집어넣으며 깊게 숨 쉬는 방법이에요.", "천천히 깊게 숨 쉬면 긴장을 푸는 데 도움이 돼요."],
+      ["스트레스", "마음 건강", "몸과 마음이 부담을 느낄 때 나타나는 반응이에요.", "가벼운 산책이나 대화가 푸는 데 도움이 돼요."],
+      ["번아웃", "마음 건강", "일에 지쳐 의욕과 에너지가 바닥난 상태예요.", "충분히 쉬고 주변에 도움을 청하는 것이 중요해요."],
+      ["명상", "마음 건강", "호흡에 집중하며 마음을 차분히 가라앉히는 활동이에요.", "하루 몇 분이라도 꾸준히 하면 좋아요."],
+      ["요추", "신체", "허리 부분을 이루는 척추뼈예요.", "의자 등받이에 허리를 붙여 앉으면 잘 받쳐 줄 수 있어요."],
+      ["경추", "신체", "목 부분을 이루는 척추뼈예요.", "고개를 오래 숙이면 부담이 커져요."],
+      ["인공눈물", "눈 건강", "건조한 눈에 넣어 촉촉하게 해 주는 점안액이에요.", "증상이 계속되면 안과 진료를 받아 보세요."],
+      ["시력", "눈 건강", "물체의 모양을 알아보는 눈의 능력이에요.", "정기적으로 검사해 변화를 확인해 주세요."],
+      ["깜빡임", "눈 건강", "화면에 집중하면 횟수가 줄어드는 눈꺼풀의 움직임이에요.", "횟수가 줄면 눈이 쉽게 건조해져요."],
+      ["양치질", "생활 습관", "칫솔로 이를 닦는 일이에요.", "하루 두 번 이상, 잇몸 경계까지 꼼꼼히 닦아 주세요."],
+      ["치실", "생활 습관", "칫솔이 닿기 어려운 이 사이를 닦아 내는 도구예요.", "이 사이 음식물과 치태를 없애는 데 좋아요."],
+      ["금연", "생활 습관", "담배를 끊는 것이에요.", "언제 끊어도 건강에 이득이 있어요."],
+      ["절주", "생활 습관", "술을 줄여 마시는 것이에요.", "술은 적게 마실수록 건강에 좋아요."],
+      ["건강 검진", "생활 습관", "증상이 없을 때도 정기적으로 몸 상태를 확인하는 일이에요.", "아픈 곳이 없어도 정해진 주기에 맞춰 받아 보세요."],
+      ["예방 접종", "생활 습관", "백신을 맞아 감염병을 미리 막는 일이에요.", "독감 백신은 해마다 맞는 것이 권장돼요."],
+      ["전해질", "영양", "땀으로 빠져나가는 나트륨·칼륨 같은 성분이에요.", "땀을 많이 흘렸다면 물과 함께 보충이 필요할 수 있어요."],
+      ["칼륨", "영양", "바나나·감자·시금치 등에 많은 무기질이에요.", "채소와 과일을 충분히 먹으면 자연스럽게 챙길 수 있어요."],
+      ["골다공증", "질환", "뼈의 밀도가 낮아져 쉽게 부러지는 상태예요.", "칼슘·비타민 D를 챙기고 꾸준히 운동하면 예방에 도움이 돼요."],
+      ["빈혈", "질환", "피 속 적혈구나 헤모글로빈이 부족한 상태예요.", "어지럼증이 잦다면 검사를 받아 보세요."],
+      ["고혈압", "질환", "혈관에 가해지는 압력이 정상보다 높은 상태가 계속되는 질환이에요.", "뚜렷한 증상이 없을 때가 많아 정기적으로 재 보는 게 중요해요."],
+      ["당뇨병", "질환", "혈당이 잘 조절되지 않아 높은 상태가 계속되는 질환이에요.", "규칙적인 운동과 식습관이 예방에 도움이 돼요."],
+      ["열사병", "응급", "더운 곳에서 체온 조절이 안 돼 몸이 크게 뜨거워지는 응급 상황이에요.", "무더위엔 물을 자주 마시고 그늘에서 쉬어 주세요."],
+      ["저체온증", "응급", "몸의 온도가 35도 아래로 떨어진 상태예요.", "추운 날엔 옷을 겹겹이 입어 몸을 따뜻하게 지켜 주세요."],
+      ["심폐소생술", "응급", "심장이 멈춘 사람에게 가슴 압박과 인공호흡을 하는 응급처치예요.", "가슴 압박은 1분에 100~120회 속도로 해요."],
+      ["자동심장충격기", "응급", "공공장소에 비치돼 있고 음성 안내를 따라 쓰는 AED의 우리말 이름이에요.", "음성 안내에 따라 일반인 누구나 사용할 수 있어요."],
+      ["하임리히법", "응급", "기도가 막혔을 때 배를 밀어 올려 이물질을 빼내는 응급처치예요.", "배꼽과 명치 사이에 주먹을 대고 위로 밀어 올려요."],
+      ["하지정맥류", "질환", "다리 혈관이 늘어나 피부 위로 울퉁불퉁 튀어나오는 질환이에요.", "오래 서 있거나 앉아 있을 땐 틈틈이 다리를 움직여 주세요."],
+      ["종아리", "신체", "무릎 아래, 다리 뒤쪽의 볼록한 근육 부위예요.", "발뒤꿈치를 들었다 내리는 운동이 다리 혈액순환을 도와요."],
+      ["햄스트링", "신체", "허벅지 뒤쪽에 있는 근육이에요.", "오래 앉아 있으면 뻣뻣해지기 쉬워 스트레칭이 필요해요."],
+      ["코어", "운동", "배·허리·엉덩이를 감싸 몸통을 받쳐 주는 근육 부위를 이르는 말이에요.", "플랭크 같은 운동으로 강화할 수 있어요."],
+      ["과식", "영양", "한 번에 필요 이상으로 많이 먹는 것이에요.", "천천히 꼭꼭 씹어 먹으면 줄이는 데 도움이 돼요."],
+      ["당류", "영양", "설탕·시럽처럼 단맛을 내는 성분이에요.", "세계보건기구(WHO)는 첨가 당류를 하루 열량의 10% 미만으로 줄이도록 권장해요."],
+      ["포화지방", "영양", "버터·기름진 고기에 많아, 너무 많이 먹으면 콜레스테롤을 높일 수 있는 기름 성분이에요.", "견과류·생선처럼 불포화지방이 많은 식품으로 바꿔 보세요."],
+      ["통곡물", "영양", "겨와 씨눈을 남긴 현미·귀리 같은 곡식이에요.", "식이섬유가 풍부해 포만감이 오래가요."],
+      ["등받이", "사무실 건강", "의자에서 등을 기대는 부분이에요.", "엉덩이를 의자 깊숙이 넣고 등을 기대 앉아요."],
+      ["환기", "사무실 건강", "창문을 열어 실내 공기를 바꿔 주는 일이에요.", "하루 몇 차례 창문을 열어 공기를 바꿔 주세요."],
+      ["습도", "사무실 건강", "공기 속에 수분이 얼마나 있는지 나타내는 정도예요.", "실내가 너무 건조하면 눈과 목이 쉽게 마를 수 있어요."],
+      ["체온", "신체", "몸이 지닌 따뜻한 정도로, 보통 36.5도 안팎이에요.", "열이 나는지 궁금하면 체온계로 재 보세요."],
+      ["역류성식도염", "질환", "위산이 거꾸로 올라와 가슴이 타는 듯 쓰린 질환이에요.", "식사 후 바로 눕지 않는 것이 좋아요."],
+      ["근감소증", "질환", "나이가 들며 근육량과 근력이 함께 줄어드는 상태예요.", "단백질을 챙기고 근력운동을 꾸준히 하면 예방에 도움이 돼요."],
+      ["관절", "신체", "뼈와 뼈가 만나 굽히고 펼 수 있는 부위예요.", "주변 근육을 튼튼히 하면 부담을 줄일 수 있어요."],
+      ["인대", "신체", "뼈와 뼈를 이어 관절을 단단히 붙잡아 주는 조직이에요.", "발목을 접질릴 때 다치기 쉬운 부위예요."],
+      ["힘줄", "신체", "근육을 뼈에 붙여 주는 질긴 조직이에요.", "발뒤꿈치의 아킬레스건도 그중 하나예요."],
+      ["수면무호흡증", "질환", "자는 동안 숨이 반복해서 멈추는 증상이에요.", "심하게 코를 골고 숨이 멎는 일이 잦다면 진료를 받아 보세요."],
+    ];
+
+    HKPlay.mountGame({
+      key: "chosung",
+      setup(stage, ctx) {
+        const COUNT = 5, LIMIT = 30, MAX_TRIES = 3, HINT_COST = 30, FEEDBACK_MS = 1500;
+        const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+        const esc = (s) => HKUI.escapeHtml(String(s));
+        const norm = (s) => String(s).replace(/\s+/g, "");
+
+        // 한글 음절(가~힣) → 초성. 그 밖의 글자는 그대로.
+        function choOf(ch) {
+          const code = ch.charCodeAt(0) - 0xac00;
+          return code >= 0 && code < 11172 ? CHO[Math.floor(code / 588)] : ch;
+        }
+        const toCho = (word) => Array.from(word).map((c) => (c === " " ? " " : choOf(c))).join("");
+
+        // 오늘의 5문제 — 같은 날이면 모든 직원이 같은 문제 (ctx.rng)
+        function todaysQuestions() {
+          const r = ctx.rng("bank");
+          const ids = BANK.map((_, i) => i);
+          for (let i = ids.length - 1; i > 0; i--) {
+            const j = Math.floor(r() * (i + 1));
+            [ids[i], ids[j]] = [ids[j], ids[i]];
+          }
+          // 짧은 낱말부터 → 뒤로 갈수록 어려워지게
+          return ids.slice(0, COUNT).map((i) => BANK[i]).sort((a, b) => norm(a[0]).length - norm(b[0]).length);
+        }
+
+        let qs = [], idx = 0, results = [], hintsTotal = 0;
+        let tries = 0, revealed = 0, remainMs = 0, lastTs = 0, raf = 0, timer = 0;
+        let phase = "intro"; // intro | play | feedback | paused | done
+        let lastSubmitAt = 0;
+
+        const correctPoints = () => results.reduce((s, r) => s + (r.ok ? 100 + r.sec * 3 : 0), 0);
+        const totalScore = () => Math.max(0, correctPoints() - hintsTotal * HINT_COST);
+
+        function stopLoops() {
+          cancelAnimationFrame(raf);
+          clearTimeout(timer);
+        }
+
+        function formatDate(iso) {
+          const [y, m, d] = iso.split("-").map(Number);
+          const wd = "일월화수목금토"[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+          return `${m}월 ${d}일 (${wd})`;
+        }
+
+        // ── 시작 화면 ──
+        function showIntro() {
+          stopLoops();
+          phase = "intro";
+          stage.innerHTML = `<div class="gm-cs">
+            <div class="gm-cs__intro">
+              <span class="gm-cs__date">${formatDate(ctx.today)} · 오늘의 5문제</span>
+              <div class="gm-cs__demo" aria-hidden="true">
+                <span class="gm-cs__tile">ㄱ</span><span class="gm-cs__tile">ㅂ</span><span class="gm-cs__tile">ㅁ</span>
+                <span class="gm-cs__arrow">${HKUI.icon("arrow-right", 26, "currentColor")}</span>
+                <span class="gm-cs__tile is-open">거</span><span class="gm-cs__tile is-open">북</span><span class="gm-cs__tile is-open">목</span>
+              </div>
+              <h2 class="gm-cs__h">건강 초성 퀴즈</h2>
+              <ul class="gm-cs__rules">
+                <li><span>1</span><span>초성과 분류, 뜻 설명을 보고 <b>건강 낱말</b>을 맞혀요. 띄어쓰기는 상관없어요.</span></li>
+                <li><span>2</span><span>문제마다 <b>30초</b>, 답은 <b>3번</b>까지 낼 수 있어요.</span></li>
+                <li><span>3</span><span>정답 <b>100점 + 남은 초×3</b> · 글자 힌트는 한 번에 <b>−30점</b></span></li>
+                <li><span>4</span><span>오늘 문제는 모든 직원이 같아요. 내일은 새 문제!</span></li>
+              </ul>
+              ${ctx.dailyDone ? `<div class="gm-cs__note">${HKUI.icon("info", 16, "currentColor")} 오늘 기록은 이미 반영됐어요 · 이번 판은 연습</div>` : ""}
+              <button type="button" class="gm-cs__start" data-start>시작하기</button>
+            </div>
+          </div>`;
+          stage.querySelector("[data-start]").onclick = async (e) => {
+            // 오늘의 도전 시작 신고 — 새로고침 후 다시 시작하면 연습으로 처리된다
+            e.currentTarget.disabled = true;
+            await ctx.begin();
+            startGame();
+          };
+          HKUI.refreshIcons(stage);
+        }
+
+        function startGame() {
+          qs = todaysQuestions();
+          idx = 0;
+          results = [];
+          hintsTotal = 0;
+          showQuestion();
+        }
+
+        // ── 문제 화면 ──
+        function showQuestion() {
+          stopLoops();
+          const [word, cat, desc] = qs[idx];
+          tries = 0;
+          revealed = 0;
+          remainMs = LIMIT * 1000;
+          phase = "play";
+          const dots = qs.map((_, i) => {
+            const r = results[i];
+            const cls = r ? (r.ok ? "is-ok" : "is-ng") : i === idx ? "is-now" : "";
+            return `<span class="gm-cs__dot ${cls}"></span>`;
+          }).join("");
+          stage.innerHTML = `<div class="gm-cs">
+            <div class="gm-cs__top"><b>${idx + 1} / ${COUNT}</b><span class="gm-cs__dots">${dots}</span><span class="gm-cs__score" data-score>${totalScore()}점</span></div>
+            <div class="gm-cs__timer" data-timer><i></i></div>
+            <div class="gm-cs__body">
+              <div class="gm-cs__meta"><span class="gm-cs__cat">${HKUI.icon("tag", 13, "currentColor")} ${esc(cat)}</span><span>남은 시간 <span class="gm-cs__sec" data-sec>${LIMIT}</span>초</span></div>
+              <div class="gm-cs__tiles" data-tiles aria-label="초성 ${esc(toCho(word))}"></div>
+              <p class="gm-cs__desc">${esc(desc)}</p>
+              <form class="gm-cs__form" data-form autocomplete="off">
+                <input class="gm-cs__input" data-input type="text" inputmode="text" enterkeyhint="done" placeholder="정답을 입력하세요" aria-label="정답 입력" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false">
+                <button type="submit" class="gm-cs__go">제출</button>
+              </form>
+              <p class="gm-cs__msg" data-msg>기회 ${MAX_TRIES}번</p>
+              <div class="gm-cs__actions">
+                <button type="button" class="gm-cs__btn" data-hint>${HKUI.icon("lightbulb", 16, "currentColor")} 글자 힌트 <small>−${HINT_COST}</small></button>
+                <button type="button" class="gm-cs__btn" data-skip>${HKUI.icon("skip-forward", 16, "currentColor")} 넘기기</button>
+              </div>
+            </div>
+          </div>`;
+          renderTiles();
+          const input = stage.querySelector("[data-input]");
+          const form = stage.querySelector("[data-form]");
+          form.addEventListener("submit", (e) => {
+            e.preventDefault();
+            tryAnswer();
+          });
+          // 한글 조합 중 Enter — 조합이 끝난 뒤 한 번만 제출
+          input.addEventListener("keydown", (e) => {
+            if (e.key !== "Enter") return;
+            e.preventDefault();
+            if (e.isComposing || e.keyCode === 229) setTimeout(tryAnswer, 0);
+            else tryAnswer();
+          });
+          stage.querySelector("[data-hint]").onclick = useHint;
+          stage.querySelector("[data-skip]").onclick = () => finishQuestion(false, "skip");
+          HKUI.refreshIcons(stage);
+          updateHintBtn();
+          input.focus({ preventScroll: true });
+          lastTs = performance.now();
+          raf = requestAnimationFrame(tick);
+        }
+
+        function renderTiles() {
+          const word = qs[idx][0];
+          let k = 0;
+          stage.querySelector("[data-tiles]").innerHTML = Array.from(word).map((c) => {
+            if (c === " ") return `<span class="gm-cs__gap"></span>`;
+            const open = k++ < revealed;
+            return `<span class="gm-cs__tile${open ? " is-open" : ""}">${esc(open ? c : choOf(c))}</span>`;
+          }).join("");
+        }
+
+        function maxHints() {
+          return Math.max(0, norm(qs[idx][0]).length - 1);
+        }
+        function updateHintBtn() {
+          const btn = stage.querySelector("[data-hint]");
+          if (btn) btn.disabled = revealed >= maxHints();
+        }
+
+        function useHint() {
+          if (phase !== "play" || revealed >= maxHints()) return;
+          revealed++;
+          hintsTotal++;
+          renderTiles();
+          updateHintBtn();
+          stage.querySelector("[data-score]").textContent = `${totalScore()}점`;
+          stage.querySelector("[data-input]").focus({ preventScroll: true });
+        }
+
+        function setMsg(text, bad) {
+          const m = stage.querySelector("[data-msg]");
+          if (!m) return;
+          m.textContent = text;
+          m.classList.toggle("is-bad", !!bad);
+        }
+
+        function tryAnswer() {
+          if (phase !== "play") return;
+          const now = performance.now();
+          if (now - lastSubmitAt < 250) return; // 한글 입력기 중복 Enter 방지
+          lastSubmitAt = now;
+          const input = stage.querySelector("[data-input]");
+          const guess = norm(input.value);
+          if (!guess) {
+            setMsg("정답을 입력해 주세요", true);
+            return;
+          }
+          if (guess === norm(qs[idx][0])) {
+            finishQuestion(true);
+            return;
+          }
+          tries++;
+          if (tries >= MAX_TRIES) {
+            finishQuestion(false, "wrong");
+            return;
+          }
+          input.value = "";
+          input.classList.remove("is-shake");
+          void input.offsetWidth;
+          input.classList.add("is-shake");
+          setMsg(`아쉬워요! 기회 ${MAX_TRIES - tries}번 남았어요`, true);
+          input.focus({ preventScroll: true });
+        }
+
+        function tick(ts) {
+          if (phase !== "play") return;
+          const dt = Math.min(ts - lastTs, 250);
+          lastTs = ts;
+          remainMs = Math.max(0, remainMs - dt);
+          const bar = stage.querySelector("[data-timer]");
+          if (bar) {
+            bar.firstElementChild.style.transform = `scaleX(${remainMs / (LIMIT * 1000)})`;
+            bar.classList.toggle("is-low", remainMs < 8000);
+            stage.querySelector("[data-sec]").textContent = Math.ceil(remainMs / 1000);
+          }
+          if (remainMs <= 0) {
+            finishQuestion(false, "time");
+            return;
+          }
+          raf = requestAnimationFrame(tick);
+        }
+
+        function finishQuestion(ok, why) {
+          if (phase !== "play") return;
+          stopLoops();
+          phase = "feedback";
+          const [word, , , tip] = qs[idx];
+          const sec = ok ? Math.floor(remainMs / 1000) : 0;
+          results[idx] = { ok, sec, why };
+          const card = stage.querySelector(".gm-cs");
+          const title = ok ? "정답이에요!" : why === "time" ? "시간이 다 됐어요" : why === "skip" ? "넘겼어요" : "아쉬워요";
+          const fb = document.createElement("div");
+          fb.className = "gm-cs__fb";
+          fb.innerHTML = `<div class="gm-cs__fb-badge ${ok ? "is-ok" : "is-ng"}">${HKUI.icon(ok ? "check" : "x", 34, "#fff")}</div>
+            <div class="gm-cs__fb-title">${title}</div>
+            <div class="gm-cs__fb-word">${esc(word)}</div>
+            ${ok ? `<div class="gm-cs__fb-pts">+${100 + sec * 3}점 (정답 100 + 남은 ${sec}초×3)</div>` : ""}
+            <p class="gm-cs__fb-tip">${esc(tip)}</p>`;
+          card.appendChild(fb);
+          HKUI.refreshIcons(fb);
+          stage.querySelector("[data-input]")?.blur();
+          timer = setTimeout(() => {
+            idx++;
+            if (idx < COUNT) showQuestion();
+            else showSummary();
+          }, FEEDBACK_MS);
+        }
+
+        // ── 요약 화면 → 기록 저장 ──
+        function showSummary() {
+          stopLoops();
+          phase = "done";
+          const okCount = results.filter((r) => r.ok).length;
+          const base = okCount * 100;
+          const timeBonus = results.reduce((s, r) => s + (r.ok ? r.sec * 3 : 0), 0);
+          const score = totalScore();
+          stage.innerHTML = `<div class="gm-cs">
+            <div class="gm-cs__intro">
+              <span class="gm-cs__date">${formatDate(ctx.today)} · 오늘의 5문제</span>
+              <div class="gm-cs__sum-big">${okCount}<small> / ${COUNT} 정답</small></div>
+              <div class="gm-cs__calc">
+                <span>정답 ${okCount}개 × 100</span><b>${base}</b>
+                <span>남은 시간 보너스</span><b>+${timeBonus}</b>
+                <span>글자 힌트 ${hintsTotal}번 × 30</span><b>−${hintsTotal * HINT_COST}</b>
+                <span class="is-total">합계</span><b class="is-total">${score}점</b>
+              </div>
+              <ul class="gm-cs__list">${qs.map((q, i) => `<li>
+                ${HKUI.icon(results[i].ok ? "circle-check" : "circle-x", 20, results[i].ok ? "#e0508a" : "#94a3b8")}
+                <div><b>${esc(q[0])}</b><span class="gm-cs__cho">${esc(toCho(q[0]))}</span><small>${esc(q[3])}</small></div>
+              </li>`).join("")}</ul>
+              <button type="button" class="gm-cs__start" data-again>처음 화면으로</button>
+            </div>
+          </div>`;
+          stage.querySelector("[data-again]").onclick = showIntro;
+          HKUI.refreshIcons(stage);
+          setTimeout(() => ctx.submit(score), 600);
+        }
+
+        // ── 일시정지 (탭을 떠나면) ──
+        function pause() {
+          if (phase !== "play") return;
+          stopLoops();
+          phase = "paused";
+          const p = document.createElement("div");
+          p.className = "gm-cs__pause";
+          p.innerHTML = `${HKUI.icon("pause", 30, "#e0508a")}<b>잠시 멈췄어요</b><span style="font-size:14px;color:var(--text-secondary)">돌아오면 이어서 풀 수 있어요</span><button type="button" class="gm-cs__start" data-resume>이어서 하기</button>`;
+          stage.querySelector(".gm-cs").appendChild(p);
+          HKUI.refreshIcons(p);
+          p.querySelector("[data-resume]").onclick = () => {
+            p.remove();
+            phase = "play";
+            lastTs = performance.now();
+            stage.querySelector("[data-input]")?.focus({ preventScroll: true });
+            raf = requestAnimationFrame(tick);
+          };
+        }
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+
+        ctx.onRestart(showIntro);
+        showIntro();
+      },
+    });
+  </script>
+</body>
+</html>

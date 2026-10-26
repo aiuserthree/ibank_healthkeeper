@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>출근길 대작전 — 점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-cx { display: flex; flex-direction: column; gap: 10px; user-select: none; -webkit-user-select: none; }
+    .gm-cx-hud { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .gm-cx-chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: #fff; border: 1px solid #e3e8ef; font-size: 14px; color: #0b3558; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .gm-cx-chip b { font-size: 17px; }
+    .gm-cx-chip--score { background: linear-gradient(135deg, #16a06a, #7bd389); color: #fff; border-color: transparent; }
+    .gm-cx-chip--gap { margin-left: auto; }
+    .gm-cx-chip--gap.is-warn { background: #fff1f0; border-color: #fecaca; color: #dc2626; }
+    .gm-cx-chip--gap.is-coffee { background: #fdf3e7; border-color: #f3d3a8; color: #9a5b13; }
+    .gm-cx-board { position: relative; border-radius: 16px; overflow: hidden; background: #e9eee6; box-shadow: 0 1px 3px rgba(15,23,42,.08); touch-action: none; }
+    .gm-cx-board canvas { display: block; width: 100%; touch-action: none; }
+    .gm-cx-over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(11, 53, 88, .38); }
+    .gm-cx-over[hidden] { display: none; }
+    .gm-cx-card { width: 100%; max-width: 340px; background: #fff; border-radius: 16px; padding: 22px 20px; text-align: center; box-shadow: 0 12px 32px rgba(15,23,42,.18); }
+    .gm-cx-card h2 { margin: 6px 0 6px; font-size: 22px; color: #0b3558; }
+    .gm-cx-card p { margin: 0 0 6px; font-size: 14px; line-height: 1.55; color: #475569; }
+    .gm-cx-card .hk-btn { width: 100%; margin-top: 12px; }
+    .gm-cx-badge { display: inline-flex; width: 52px; height: 52px; border-radius: 14px; align-items: center; justify-content: center; background: linear-gradient(135deg, #16a06a, #7bd389); }
+    .gm-cx-keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; margin: 12px 0 0; padding: 12px; border-radius: 12px; background: #f3f6f2; text-align: left; font-size: 13px; color: #334155; }
+    .gm-cx-keys dt { font-weight: 700; color: #0b3558; }
+    .gm-cx-keys dd { margin: 0; }
+    .gm-cx-big { font-size: 44px; font-weight: 800; letter-spacing: -1px; margin: 4px 0; }
+    .gm-cx-big.is-late { color: #dc2626; }
+    .gm-cx-big.is-hit { color: #ea580c; }
+    .gm-cx-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .gm-cx-btn { height: 52px; border: 1px solid #dbe3dc; background: #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #0b3558; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .gm-cx-btn:active, .gm-cx-btn.is-down { background: #e6f6ee; border-color: #16a06a; }
+    .gm-cx-btn--up { background: linear-gradient(135deg, #16a06a, #46b97a); border-color: transparent; color: #fff; }
+    .gm-cx-btn--up:active, .gm-cx-btn--up.is-down { background: #11875a; }
+    .gm-cx-sub { font-size: 13px; }
+    @media (min-width: 900px) { .gm-cx-pad { display: none; } }
+    @media (max-width: 480px) {
+      .gm-cx-over { padding: 10px; }
+      .gm-cx-card { padding: 16px 14px; }
+      .gm-cx-card h2 { font-size: 19px; margin: 4px 0; }
+      .gm-cx-card p { font-size: 13px; line-height: 1.5; }
+      .gm-cx-sub { font-size: 12.5px; }
+      .gm-cx-badge { width: 42px; height: 42px; border-radius: 12px; }
+      .gm-cx-keys { font-size: 12px; padding: 10px; margin-top: 8px; }
+      .gm-cx-card .hk-btn { margin-top: 10px; }
+      .gm-cx-chip { padding: 6px 10px; font-size: 13px; }
+      .gm-cx-chip b { font-size: 15px; }
+      .gm-cx-big { font-size: 36px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  HKPlay.mountGame({
+    key: "crossing",
+    setup(stage, ctx) {
+      // ───────────────────────── 화면 뼈대
+      stage.innerHTML = `<div class="gm-cx">
+        <div class="gm-cx-hud">
+          <span class="gm-cx-chip gm-cx-chip--score">${HKUI.icon("footprints", 16, "#fff")} <b id="gm-cx-score">0</b>칸</span>
+          <span class="gm-cx-chip">${HKUI.icon("coffee", 16, "#9a5b13")} <b id="gm-cx-coffee">0</b>잔</span>
+          <span class="gm-cx-chip gm-cx-chip--gap" id="gm-cx-gap">${HKUI.icon("alarm-clock", 16, "currentColor")} <span id="gm-cx-gaptext">지각선 여유 3칸</span></span>
+        </div>
+        <div class="gm-cx-board" id="gm-cx-board">
+          <canvas id="gm-cx-canvas"></canvas>
+          <div class="gm-cx-over" id="gm-cx-over"></div>
+        </div>
+        <div class="gm-cx-pad">
+          <button type="button" class="gm-cx-btn" data-dir="left" aria-label="왼쪽">${HKUI.icon("chevron-left", 26, "currentColor")}</button>
+          <button type="button" class="gm-cx-btn" data-dir="down" aria-label="뒤로">${HKUI.icon("chevron-down", 26, "currentColor")}</button>
+          <button type="button" class="gm-cx-btn gm-cx-btn--up" data-dir="up" aria-label="앞으로">${HKUI.icon("chevron-up", 28, "currentColor")}</button>
+          <button type="button" class="gm-cx-btn" data-dir="right" aria-label="오른쪽">${HKUI.icon("chevron-right", 26, "currentColor")}</button>
+        </div>
+      </div>`;
+      HKUI.refreshIcons(stage);
+
+      const $ = (s) => stage.querySelector(s);
+      const canvas = $("#gm-cx-canvas");
+      const g = canvas.getContext("2d");
+      const board = $("#gm-cx-board");
+      const over = $("#gm-cx-over");
+      const FONT = getComputedStyle(document.body).fontFamily || "sans-serif";
+
+      const COLS = 9;
+      const HOP = 0.12; // 한 칸 점프 시간(초)
+      let W = 0, H = 0, cell = 40, dpr = 1;
+
+      const rand = (a, b) => a + Math.random() * (b - a);
+      const randi = (a, b) => Math.floor(rand(a, b + 1));
+      const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const lerp = (a, b, t) => a + (b - a) * t;
+
+      // ───────────────────────── 상태
+      let state = "ready"; // ready | play | paused | over
+      let rows, genY, prevBlocked, lastWasRest;
+      let player, camY, lineY, elapsed, coffees, maxRow, slowT, queued, deathT, deathKind, floats;
+
+      const CAR_COLORS = ["#ef6461", "#3d8bfd", "#f6b93b", "#8e7cf0", "#ff8fab", "#2ec4b6", "#f1f5f9", "#64748b"];
+
+      function diff(y) { return clamp(y / 160, 0, 1); }
+
+      function newRow(type, y) {
+        return { type, y, blocked: new Array(COLS).fill(0), coffee: -1, vehicles: [], dir: 1, speed: 0, timer: 0, iMin: 1, iMax: 2, deco: Math.random() };
+      }
+
+      function placeObstacles(r, count, kind) {
+        const free = [];
+        for (let c = 0; c < COLS; c++) if (!prevBlocked[c]) free.push(c);
+        for (let i = 0; i < count && free.length > 3; i++) {
+          const idx = Math.floor(Math.random() * free.length);
+          r.blocked[free[idx]] = kind;
+          free.splice(idx, 1);
+        }
+      }
+
+      function laneSetup(r, kind) {
+        const d = diff(r.y);
+        r.dir = Math.random() < 0.5 ? 1 : -1;
+        if (kind === "road") {
+          r.speed = rand(1.4, 2.4) * (1 + 1.0 * d);
+          r.busChance = 0.25;
+          r.iMin = 1.5 / (1 + 0.6 * d); r.iMax = 3.4 / (1 + 0.6 * d);
+        } else if (kind === "bike") {
+          r.speed = rand(3.6, 4.6) * (1 + 0.5 * d);
+          r.iMin = 1.4 / (1 + 0.5 * d); r.iMax = 3.2 / (1 + 0.5 * d);
+        } else if (kind === "cross") {
+          r.speed = rand(2.6, 3.4) * (1 + 0.6 * d);
+          r.iMin = 0.9; r.iMax = 1.7;
+          r.phase = "red"; r.phaseT = rand(0.5, 3.2);
+          r.greenLen = 3.0 - 0.8 * d;
+        }
+      }
+
+      function spawnVehicle(r) {
+        let len, kind, color;
+        if (r.type === "bike") { len = 0.8; kind = "bike"; color = pick(["#16a06a", "#f97316", "#3d8bfd", "#e0508a"]); }
+        else if (r.type !== "cross" && Math.random() < r.busChance) { len = 2.5; kind = "bus"; color = pick(["#3767d6", "#0ea5a0"]); }
+        else { len = rand(1.15, 1.45); kind = "car"; color = pick(CAR_COLORS); }
+        // 앞차와 너무 붙지 않게
+        const entry = r.dir > 0 ? -len - 0.1 : COLS + 0.1;
+        for (const v of r.vehicles) {
+          const gap = r.dir > 0 ? v.x - (entry + len) : entry - (v.x + v.len);
+          if (gap < 0.9) return false;
+        }
+        r.vehicles.push({ x: entry, len, kind, color });
+        return true;
+      }
+
+      function laneStep(r, dt) {
+        if (r.type === "work") {
+          for (const v of r.vehicles) {
+            v.x += v.dir * r.speed * dt;
+            if (v.x < v.a) { v.x = v.a; v.dir = 1; }
+            if (v.x + v.len > v.b) { v.x = v.b - v.len; v.dir = -1; }
+          }
+          return;
+        }
+        if (!r.speed) return;
+        for (const v of r.vehicles) v.x += r.dir * r.speed * dt;
+        r.vehicles = r.vehicles.filter((v) => (r.dir > 0 ? v.x < COLS + 0.5 : v.x + v.len > -0.5));
+        let canSpawn = true;
+        if (r.type === "cross") {
+          r.phaseT -= dt;
+          if (r.phase === "red" && r.phaseT <= 0) { r.phase = "yellow"; r.phaseT = 0.6; }
+          else if (r.phase === "yellow" && r.phaseT <= 0 && r.vehicles.length === 0) { r.phase = "green"; r.phaseT = r.greenLen; }
+          else if (r.phase === "green" && r.phaseT <= 0) { r.phase = "red"; r.phaseT = rand(2.6, 3.6); r.timer = 0.15; }
+          canSpawn = r.phase === "red";
+        }
+        if (canSpawn) {
+          r.timer -= dt;
+          if (r.timer <= 0) {
+            spawnVehicle(r);
+            r.timer = rand(r.iMin, r.iMax);
+          }
+        }
+      }
+
+      function prewarm(r) {
+        if (r.type === "work") return;
+        for (let t = 0; t < 14; t += 0.1) laneStep(r, 0.1);
+      }
+
+      function pushRow(r) {
+        rows.set(r.y, r);
+        prevBlocked = r.blocked.map((b) => (b ? 1 : 0));
+        genY = r.y + 1;
+      }
+
+      function genRest(y) {
+        const r = newRow("walk", y);
+        if (y > 2) {
+          placeObstacles(r, Math.random() < 0.75 ? randi(1, 3) : 0, Math.random() < 0.55 ? "tree" : "pot");
+          if (Math.random() < 0.28) {
+            const free = [];
+            for (let c = 0; c < COLS; c++) if (!r.blocked[c]) free.push(c);
+            r.coffee = pick(free);
+          }
+        }
+        return r;
+      }
+
+      function genSegment() {
+        const y = genY;
+        const d = diff(y);
+        // 쉼터(인도)
+        if (!lastWasRest && (Math.random() > 0.3 * d || y < 30)) {
+          lastWasRest = true;
+          pushRow(genRest(y));
+          if (Math.random() < 0.25 - 0.15 * d) pushRow(genRest(genY));
+          return;
+        }
+        lastWasRest = false;
+        const roll = Math.random();
+        if (roll < 0.5 || y < 6) {
+          const n = clamp(1 + Math.floor(Math.random() * (2 + 2.2 * d)), 1, 4);
+          let dir = Math.random() < 0.5 ? 1 : -1;
+          for (let i = 0; i < n; i++) {
+            const r = newRow("road", genY);
+            laneSetup(r, "road");
+            r.dir = Math.random() < 0.75 ? dir : -dir;
+            dir = -dir;
+            prewarm(r);
+            r.blocked.fill(0);
+            pushRow(r);
+          }
+        } else if (roll < 0.66) {
+          const r = newRow("bike", y); laneSetup(r, "bike"); prewarm(r); pushRow(r);
+        } else if (roll < 0.82) {
+          const r = newRow("work", y);
+          const span = randi(4, 6);
+          const a = randi(0, COLS - span);
+          const b = a + span;
+          // 공사 구간 양 끝 콘(칸 밖이면 생략)
+          if (a - 1 >= 0 && !prevBlocked[a - 1]) r.blocked[a - 1] = "cone";
+          if (b < COLS && !prevBlocked[b]) r.blocked[b] = "cone";
+          r.zone = [a, b];
+          r.speed = rand(1.0, 1.6) * (1 + 0.7 * d);
+          const fl = { x: rand(a, b - 1.3), len: 1.3, kind: "forklift", dir: Math.random() < 0.5 ? 1 : -1, a, b };
+          r.vehicles.push(fl);
+          if (span >= 6 && d > 0.3) r.vehicles.push({ x: fl.x < a + span / 2 ? b - 1.3 : a, len: 1.3, kind: "forklift", dir: -fl.dir, a, b, half: true });
+          if (r.vehicles.length === 2) {
+            // 두 대면 반씩 나눠 맡는다
+            const mid = a + span / 2;
+            r.vehicles[0].a = a; r.vehicles[0].b = mid; r.vehicles[0].x = clamp(r.vehicles[0].x, a, mid - 1.3);
+            r.vehicles[1].a = mid; r.vehicles[1].b = b; r.vehicles[1].x = clamp(r.vehicles[1].x, mid, b - 1.3);
+          }
+          pushRow(r);
+        } else {
+          const r = newRow("cross", y); laneSetup(r, "cross"); prewarm(r); pushRow(r);
+        }
+      }
+
+      function getRow(y) {
+        while (genY <= y) genSegment();
+        return rows.get(y);
+      }
+
+      // ───────────────────────── 초기화
+      function reset() {
+        rows = new Map();
+        genY = -12;
+        prevBlocked = new Array(COLS).fill(0);
+        lastWasRest = true;
+        for (let y = -12; y <= 2; y++) {
+          const r = newRow("walk", y);
+          if (y < 0 && y > -6) { r.blocked[0] = "tree"; r.blocked[COLS - 1] = "tree"; }
+          pushRow(r);
+        }
+        player = { c: 4, r: 0, fc: 4, fr: 0, t: 1, face: "up", vc: 4, vr: 0 };
+        camY = -2.6;
+        lineY = -3.2;
+        elapsed = 0; coffees = 0; maxRow = 0; slowT = 0; queued = null; deathT = 0; deathKind = ""; floats = [];
+        getRow(30);
+        updateHud();
+      }
+
+      function score() { return maxRow + coffees * 5; }
+
+      // ───────────────────────── 크기
+      function resize() {
+        const w = Math.round(board.clientWidth || stage.clientWidth || 360);
+        dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        cell = w / COLS;
+        const avail = (window.innerHeight || 800) - (window.innerWidth >= 900 ? 300 : 230);
+        H = Math.round(clamp(avail, cell * 8.5, cell * 12));
+        W = w;
+        canvas.width = Math.round(W * dpr);
+        canvas.height = Math.round(H * dpr);
+        canvas.style.height = H + "px";
+        draw();
+      }
+
+      // ───────────────────────── 조작
+      function move(dir) {
+        if (state !== "play") return;
+        if (player.t < 1) { queued = dir; return; }
+        let { c, r } = player;
+        if (dir === "up") r++;
+        else if (dir === "down") r--;
+        else if (dir === "left") c--;
+        else if (dir === "right") c++;
+        player.face = dir;
+        if (c < 0 || c >= COLS) return;
+        if (r < Math.ceil(camY)) return; // 화면 아래로는 못 내려가요
+        const row = getRow(r);
+        if (row && row.blocked[c]) return;
+        player.fc = player.c; player.fr = player.r;
+        player.c = c; player.r = r; player.t = 0;
+        if (r > maxRow) maxRow = r;
+        if (row && row.coffee === c) {
+          row.coffee = -1;
+          coffees++;
+          slowT = 4;
+          floats.push({ c, r, t: 0, text: "+5 커피!" });
+        }
+        updateHud();
+      }
+
+      const KEYMAP = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
+      function onKey(e) {
+        const t = e.target;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+        if (document.querySelector(".hk-dialog__overlay")) return;
+        const dir = KEYMAP[e.code];
+        if (state === "ready" || state === "paused") {
+          if (e.code === "Space" || e.code === "Enter" || dir) { e.preventDefault(); state === "ready" ? start() : resume(); }
+          return;
+        }
+        if (state !== "play") return;
+        if (dir || e.code === "Space") e.preventDefault();
+        if (dir && !e.repeat) move(dir);
+      }
+      window.addEventListener("keydown", onKey);
+
+      // 판 위 스와이프/탭
+      let ptr = null;
+      board.addEventListener("pointerdown", (e) => {
+        if (state !== "play" || e.target !== canvas) return;
+        ptr = { x: e.clientX, y: e.clientY, id: e.pointerId };
+        e.preventDefault();
+      });
+      board.addEventListener("pointerup", (e) => {
+        if (!ptr || e.pointerId !== ptr.id) return;
+        const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
+        ptr = null;
+        if (Math.abs(dx) < 22 && Math.abs(dy) < 22) return move("up");
+        if (Math.abs(dx) > Math.abs(dy)) move(dx > 0 ? "right" : "left");
+        else move(dy > 0 ? "down" : "up");
+      });
+      board.addEventListener("pointercancel", () => (ptr = null));
+      // 판 위 스와이프가 페이지 스크롤·당겨서 새로고침으로 새지 않게
+      board.addEventListener("touchstart", (e) => { if (state === "play" && e.target === canvas) e.preventDefault(); }, { passive: false });
+      board.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+      document.documentElement.style.overscrollBehaviorY = "contain";
+      document.body.style.overscrollBehaviorY = "contain";
+
+      stage.querySelectorAll(".gm-cx-btn").forEach((b) => {
+        b.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          b.classList.add("is-down");
+          if (state === "ready") return start();
+          move(b.dataset.dir);
+        });
+        const up = () => b.classList.remove("is-down");
+        b.addEventListener("pointerup", up);
+        b.addEventListener("pointerleave", up);
+        b.addEventListener("click", (e) => e.preventDefault());
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && state === "play") pause();
+      });
+
+      // ───────────────────────── 겹침 화면
+      function showOver(html) {
+        over.innerHTML = html;
+        over.hidden = false;
+        HKUI.refreshIcons(over);
+      }
+      function hideOver() { over.hidden = true; over.innerHTML = ""; }
+
+      function showReady() {
+        state = "ready";
+        showOver(`<div class="gm-cx-card">
+          <span class="gm-cx-badge">${HKUI.icon("footprints", 26, "#fff")}</span>
+          <h2>출근길 대작전</h2>
+          <p>차도·자전거도로·공사 구간을 한 칸씩 건너 최대한 멀리 가요. 아래에서 <b style="color:#dc2626">9:00 지각선</b>이 따라오니 머뭇거리면 지각이에요!</p>
+          <p class="gm-cx-sub">횡단보도는 <b style="color:#16a06a">초록불</b>에 건너요. 커피를 주우면 지각선이 잠깐 느려지고 +5칸!</p>
+          <dl class="gm-cx-keys">
+            <dt>PC</dt><dd>방향키 또는 W·A·S·D</dd>
+            <dt>모바일</dt><dd>탭 = 앞으로 · 좌우 스와이프 = 옆 · 아래 스와이프 = 뒤</dd>
+          </dl>
+          <button type="button" class="hk-btn hk-btn--primary" id="gm-cx-start">${HKUI.icon("play", 16, "#fff")} 시작</button>
+        </div>`);
+        over.querySelector("#gm-cx-start").onclick = start;
+      }
+
+      function start() {
+        reset();
+        resize();
+        hideOver();
+        state = "play";
+        last = performance.now();
+      }
+
+      function pause() {
+        state = "paused";
+        showOver(`<div class="gm-cx-card"><span class="gm-cx-badge">${HKUI.icon("pause", 26, "#fff")}</span><h2>잠시 멈췄어요</h2><p>준비되면 계속해요. 지각선도 같이 멈춰 있어요.</p>
+          <button type="button" class="hk-btn hk-btn--primary" id="gm-cx-resume">${HKUI.icon("play", 16, "#fff")} 계속하기</button></div>`);
+        over.querySelector("#gm-cx-resume").onclick = resume;
+      }
+      function resume() {
+        hideOver();
+        state = "play";
+        last = performance.now();
+      }
+
+      function die(kind) {
+        if (state !== "play") return;
+        state = "over";
+        deathKind = kind;
+        deathT = 0;
+        const final = score();
+        setTimeout(() => {
+          showOver(`<div class="gm-cx-card">
+            <div class="gm-cx-big ${kind === "late" ? "is-late" : "is-hit"}">${kind === "late" ? "지각!" : "앗, 쿵!"}</div>
+            <p>${kind === "late" ? "9:00 지각선에 잡혔어요. 조금 더 서둘러 볼까요?" : "길 위 탈것과 부딪혔어요. 다음엔 좌우를 잘 살펴요."}</p>
+            <p><b style="color:#0b3558">${maxRow}칸</b> 전진 · 커피 ${coffees}잔(+${coffees * 5}) = <b style="color:#16a06a">${final}칸</b></p>
+            <button type="button" class="hk-btn hk-btn--primary" id="gm-cx-again">${HKUI.icon("rotate-ccw", 16, "#fff")} 다시 하기</button>
+          </div>`);
+          over.querySelector("#gm-cx-again").onclick = start;
+          ctx.submit(final);
+        }, 900);
+      }
+
+      ctx.onRestart(() => start());
+
+      // ───────────────────────── 갱신
+      function updateHud() {
+        $("#gm-cx-score").textContent = score();
+        $("#gm-cx-coffee").textContent = coffees;
+        const gap = Math.max(0, Math.floor(player.r + 0.45 - lineY));
+        const chip = $("#gm-cx-gap");
+        chip.classList.toggle("is-coffee", slowT > 0);
+        chip.classList.toggle("is-warn", slowT <= 0 && gap <= 2);
+        $("#gm-cx-gaptext").textContent = slowT > 0 ? `커피 효과 ${Math.ceil(slowT)}초` : `지각선 여유 ${gap}칸`;
+      }
+
+      function update(dt) {
+        elapsed += dt;
+        // 점프 애니메이션
+        if (player.t < 1) {
+          player.t = Math.min(1, player.t + dt / HOP);
+          if (player.t >= 1 && queued) { const q = queued; queued = null; move(q); }
+        }
+        const e = player.t < 1 ? 1 - Math.pow(1 - player.t, 2) : 1;
+        player.vc = lerp(player.fc, player.c, e);
+        player.vr = lerp(player.fr, player.r, e);
+
+        // 카메라
+        const target = player.vr - 2.6;
+        if (target > camY) camY += (target - camY) * Math.min(1, dt * 8);
+
+        // 줄 갱신
+        getRow(Math.ceil(camY + H / cell) + 3);
+        const lo = Math.floor(camY) - 2, hi = Math.ceil(camY + H / cell) + 2;
+        for (let y = lo; y <= hi; y++) { const r = rows.get(y); if (r) laneStep(r, dt); }
+        for (const [y] of rows) if (y < lo - 10) rows.delete(y);
+
+        // 지각선
+        if (slowT > 0) slowT = Math.max(0, slowT - dt);
+        const base = Math.min(1.6, 0.45 + elapsed * 0.0085);
+        lineY += base * (slowT > 0 ? 0.3 : 1) * dt;
+        if (lineY < player.r - 5) lineY = player.r - 5;
+
+        floats.forEach((f) => (f.t += dt));
+        floats = floats.filter((f) => f.t < 1.1);
+
+        // 충돌
+        const row = rows.get(player.r);
+        if (row && row.vehicles.length) {
+          const pl = player.c + 0.2, pr = player.c + 0.8;
+          for (const v of row.vehicles) {
+            if (v.x + 0.08 < pr && v.x + v.len - 0.08 > pl) { die("hit"); break; }
+          }
+        }
+        if (state === "play" && lineY >= player.r + 0.45) die("late");
+        updateHud();
+      }
+
+      // ───────────────────────── 그리기
+      function rr(x, y, w, h, r) {
+        g.beginPath();
+        g.roundRect ? g.roundRect(x, y, w, h, r) : g.rect(x, y, w, h);
+      }
+      const rowTop = (y) => H - (y + 1 - camY) * cell;
+
+      function drawRowBg(r, y0) {
+        const t = r.type;
+        if (t === "walk") {
+          g.fillStyle = r.y % 2 ? "#eef1ea" : "#e8ece3";
+          g.fillRect(0, y0, W, cell);
+          g.strokeStyle = "rgba(15,23,42,.05)"; g.lineWidth = 1;
+          for (let c = 1; c < COLS; c++) { g.beginPath(); g.moveTo(c * cell, y0); g.lineTo(c * cell, y0 + cell); g.stroke(); }
+          if (r.y === 0) {
+            g.fillStyle = "rgba(22,160,106,.18)";
+            g.font = `800 ${cell * 0.32}px ${FONT}`; g.textAlign = "left"; g.textBaseline = "middle";
+            g.fillText("출발", cell * 0.2, y0 + cell / 2);
+          }
+          if (r.y > 0 && r.y % 25 === 0) {
+            g.fillStyle = "rgba(11,53,88,.22)";
+            g.font = `800 ${cell * 0.3}px ${FONT}`; g.textAlign = "right"; g.textBaseline = "middle";
+            g.fillText(`${r.y}칸`, W - cell * 0.15, y0 + cell / 2);
+          }
+        } else if (t === "road" || t === "cross") {
+          g.fillStyle = "#454d5c";
+          g.fillRect(0, y0, W, cell);
+          const above = rows.get(r.y + 1), below = rows.get(r.y - 1);
+          // 차선
+          if (above && above.type === "road" && t === "road") {
+            g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = Math.max(1.5, cell * 0.04);
+            g.setLineDash([cell * 0.4, cell * 0.35]);
+            g.beginPath(); g.moveTo(0, y0); g.lineTo(W, y0); g.stroke(); g.setLineDash([]);
+          }
+          // 연석
+          g.fillStyle = "#c9cfd6";
+          if (!above || (above.type !== "road" && above.type !== "cross")) g.fillRect(0, y0, W, Math.max(2, cell * 0.06));
+          if (!below || (below.type !== "road" && below.type !== "cross")) g.fillRect(0, y0 + cell - Math.max(2, cell * 0.06), W, Math.max(2, cell * 0.06));
+          if (t === "cross") {
+            const green = r.phase === "green";
+            g.fillStyle = green ? "rgba(255,255,255,.92)" : "rgba(255,255,255,.6)";
+            const bw = cell * 0.28;
+            for (let x = cell * 0.12; x < W; x += cell * 0.56) g.fillRect(x, y0 + cell * 0.12, bw, cell * 0.76);
+            if (green) { g.fillStyle = "rgba(34,197,94,.18)"; g.fillRect(0, y0, W, cell); }
+          }
+        } else if (t === "bike") {
+          g.fillStyle = "#4f7fc0";
+          g.fillRect(0, y0, W, cell);
+          g.fillStyle = "rgba(255,255,255,.75)";
+          g.fillRect(0, y0 + cell * 0.04, W, Math.max(1.5, cell * 0.04));
+          g.fillRect(0, y0 + cell * 0.92, W, Math.max(1.5, cell * 0.04));
+          // 바닥 자전거 표시
+          g.strokeStyle = "rgba(255,255,255,.28)"; g.lineWidth = Math.max(1.5, cell * 0.05);
+          for (let c = 1; c < COLS; c += 3) {
+            const cx = (c + 0.5) * cell, cy = y0 + cell / 2;
+            g.beginPath(); g.arc(cx - cell * 0.2, cy + cell * 0.06, cell * 0.13, 0, Math.PI * 2); g.stroke();
+            g.beginPath(); g.arc(cx + cell * 0.2, cy + cell * 0.06, cell * 0.13, 0, Math.PI * 2); g.stroke();
+            g.beginPath(); g.moveTo(cx - cell * 0.2, cy + cell * 0.06); g.lineTo(cx, cy - cell * 0.08); g.lineTo(cx + cell * 0.2, cy + cell * 0.06); g.stroke();
+          }
+        } else if (t === "work") {
+          g.fillStyle = "#e9e1cf";
+          g.fillRect(0, y0, W, cell);
+          const [a, b] = r.zone;
+          g.fillStyle = "#f2d38a";
+          g.fillRect(a * cell, y0, (b - a) * cell, cell);
+          // 경고 줄무늬 띠
+          g.save();
+          g.beginPath(); g.rect(a * cell, y0, (b - a) * cell, cell * 0.12); g.rect(a * cell, y0 + cell * 0.88, (b - a) * cell, cell * 0.12); g.clip();
+          g.fillStyle = "#1f2937";
+          for (let x = a * cell - cell; x < b * cell + cell; x += cell * 0.36) {
+            g.beginPath(); g.moveTo(x, y0 + cell); g.lineTo(x + cell * 0.18, y0 + cell); g.lineTo(x + cell * 0.18 + cell, y0); g.lineTo(x + cell, y0); g.fill();
+          }
+          g.restore();
+        }
+      }
+
+      function drawTree(cx, cy) {
+        g.fillStyle = "rgba(15,23,42,.12)";
+        g.beginPath(); g.ellipse(cx + cell * 0.05, cy + cell * 0.08, cell * 0.36, cell * 0.3, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#3f9d63";
+        g.beginPath(); g.arc(cx, cy, cell * 0.36, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#5cbf7e";
+        g.beginPath(); g.arc(cx - cell * 0.08, cy - cell * 0.08, cell * 0.22, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#85d6a0";
+        g.beginPath(); g.arc(cx - cell * 0.13, cy - cell * 0.13, cell * 0.08, 0, Math.PI * 2); g.fill();
+      }
+      function drawPot(cx, cy) {
+        g.fillStyle = "rgba(15,23,42,.12)";
+        rr(cx - cell * 0.28, cy - cell * 0.22, cell * 0.6, cell * 0.56, cell * 0.12); g.fill();
+        g.fillStyle = "#c46a3c";
+        rr(cx - cell * 0.3, cy - cell * 0.28, cell * 0.6, cell * 0.56, cell * 0.12); g.fill();
+        g.fillStyle = "#4caf73";
+        g.beginPath(); g.arc(cx, cy - cell * 0.02, cell * 0.2, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#7bd389";
+        g.beginPath(); g.arc(cx - cell * 0.06, cy - cell * 0.08, cell * 0.09, 0, Math.PI * 2); g.fill();
+      }
+      function drawCone(cx, cy) {
+        g.fillStyle = "#c2410c";
+        rr(cx - cell * 0.3, cy - cell * 0.3, cell * 0.6, cell * 0.6, cell * 0.1); g.fill();
+        g.fillStyle = "#fb923c";
+        g.beginPath(); g.arc(cx, cy, cell * 0.24, 0, Math.PI * 2); g.fill();
+        g.strokeStyle = "#fff"; g.lineWidth = cell * 0.06;
+        g.beginPath(); g.arc(cx, cy, cell * 0.15, 0, Math.PI * 2); g.stroke();
+        g.fillStyle = "#ea580c";
+        g.beginPath(); g.arc(cx, cy, cell * 0.07, 0, Math.PI * 2); g.fill();
+      }
+      function drawCoffee(cx, cy, t) {
+        const bob = Math.sin(t * 4) * cell * 0.04;
+        cy += bob;
+        g.fillStyle = "rgba(15,23,42,.12)";
+        g.beginPath(); g.ellipse(cx, cy + cell * 0.3 - bob, cell * 0.2, cell * 0.06, 0, 0, Math.PI * 2); g.fill();
+        // 컵
+        g.fillStyle = "#ffffff";
+        g.beginPath();
+        g.moveTo(cx - cell * 0.18, cy - cell * 0.14); g.lineTo(cx + cell * 0.18, cy - cell * 0.14);
+        g.lineTo(cx + cell * 0.13, cy + cell * 0.26); g.lineTo(cx - cell * 0.13, cy + cell * 0.26); g.closePath(); g.fill();
+        g.strokeStyle = "#d6c3a8"; g.lineWidth = 1; g.stroke();
+        g.fillStyle = "#9a5b13";
+        g.beginPath();
+        g.moveTo(cx - cell * 0.165, cy - cell * 0.02); g.lineTo(cx + cell * 0.165, cy - cell * 0.02);
+        g.lineTo(cx + cell * 0.148, cy + cell * 0.12); g.lineTo(cx - cell * 0.148, cy + cell * 0.12); g.closePath(); g.fill();
+        g.fillStyle = "#5b3a1a";
+        rr(cx - cell * 0.21, cy - cell * 0.22, cell * 0.42, cell * 0.09, cell * 0.04); g.fill();
+        // 김
+        g.strokeStyle = "rgba(154,91,19,.45)"; g.lineWidth = Math.max(1.2, cell * 0.035); g.lineCap = "round";
+        for (const dx of [-0.07, 0.07]) {
+          g.beginPath();
+          g.moveTo(cx + dx * cell, cy - cell * 0.27);
+          g.quadraticCurveTo(cx + (dx + 0.06) * cell, cy - cell * 0.34, cx + dx * cell, cy - cell * 0.42);
+          g.stroke();
+        }
+        g.lineCap = "butt";
+      }
+
+      function drawVehicle(v, r, y0) {
+        const x = v.x * cell, w = v.len * cell;
+        const dir = r.type === "work" ? v.dir : r.dir;
+        const cy = y0 + cell / 2;
+        if (v.kind === "bike") {
+          const h = cell * 0.5;
+          g.fillStyle = "rgba(15,23,42,.18)";
+          g.beginPath(); g.ellipse(x + w / 2, cy + cell * 0.1, w * 0.5, h * 0.3, 0, 0, Math.PI * 2); g.fill();
+          g.strokeStyle = "#111827"; g.lineWidth = Math.max(2, cell * 0.07); g.lineCap = "round";
+          g.beginPath(); g.moveTo(x + w * 0.08, cy); g.lineTo(x + w * 0.92, cy); g.stroke();
+          g.lineCap = "butt";
+          g.fillStyle = "#111827";
+          g.beginPath(); g.ellipse(x + w * 0.1, cy, cell * 0.1, cell * 0.04, 0, 0, Math.PI * 2); g.fill();
+          g.beginPath(); g.ellipse(x + w * 0.9, cy, cell * 0.1, cell * 0.04, 0, 0, Math.PI * 2); g.fill();
+          // 몸 · 헬멧
+          g.fillStyle = v.color;
+          g.beginPath(); g.ellipse(x + w * 0.45, cy, cell * 0.14, cell * 0.22, 0, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#fff";
+          g.beginPath(); g.arc(x + w * (dir > 0 ? 0.6 : 0.3), cy, cell * 0.11, 0, Math.PI * 2); g.fill();
+          g.fillStyle = v.color;
+          g.beginPath(); g.arc(x + w * (dir > 0 ? 0.6 : 0.3), cy, cell * 0.06, 0, Math.PI * 2); g.fill();
+          return;
+        }
+        if (v.kind === "forklift") {
+          const h = cell * 0.62, top = cy - h / 2;
+          const bodyW = w * 0.72;
+          const bx = dir > 0 ? x : x + w - bodyW;
+          g.fillStyle = "rgba(15,23,42,.18)"; rr(bx + 2, top + 3, bodyW, h, cell * 0.12); g.fill();
+          // 포크
+          g.fillStyle = "#6b7280";
+          const fx = dir > 0 ? bx + bodyW : x;
+          g.fillRect(fx, cy - h * 0.32, w - bodyW, h * 0.12);
+          g.fillRect(fx, cy + h * 0.2, w - bodyW, h * 0.12);
+          g.fillStyle = "#374151";
+          g.fillRect(dir > 0 ? bx + bodyW - cell * 0.06 : bx, top + h * 0.08, cell * 0.06, h * 0.84);
+          g.fillStyle = "#f5b700"; rr(bx, top, bodyW, h, cell * 0.12); g.fill();
+          g.fillStyle = "#1f2937"; rr(bx + bodyW * 0.28, top + h * 0.18, bodyW * 0.42, h * 0.64, cell * 0.06); g.fill();
+          g.fillStyle = "#fde68a"; rr(bx + bodyW * 0.34, top + h * 0.26, bodyW * 0.3, h * 0.48, cell * 0.05); g.fill();
+          // 경광등
+          const blink = Math.floor(performance.now() / 300) % 2;
+          g.fillStyle = blink ? "#fb923c" : "#fdba74";
+          g.beginPath(); g.arc(bx + bodyW * 0.49, cy, cell * 0.06, 0, Math.PI * 2); g.fill();
+          return;
+        }
+        const h = v.kind === "bus" ? cell * 0.76 : cell * 0.64;
+        const top = cy - h / 2;
+        g.fillStyle = "rgba(15,23,42,.22)"; rr(x + 2, top + 4, w, h, cell * 0.16); g.fill();
+        // 바퀴
+        g.fillStyle = "#111827";
+        const wl = cell * 0.24, wh = cell * 0.08;
+        for (const wx of v.kind === "bus" ? [0.12, 0.78] : [0.14, 0.66]) {
+          g.fillRect(x + w * wx, top - wh * 0.4, wl, wh);
+          g.fillRect(x + w * wx, top + h - wh * 0.6, wl, wh);
+        }
+        g.fillStyle = v.color; rr(x, top, w, h, cell * 0.16); g.fill();
+        if (v.kind === "bus") {
+          g.fillStyle = "rgba(255,255,255,.85)";
+          const n = 5;
+          for (let i = 0; i < n; i++) {
+            rr(x + w * (0.12 + i * 0.15), top + h * 0.2, w * 0.1, h * 0.6, cell * 0.04); g.fill();
+          }
+          g.fillStyle = "#cfe8ff";
+          rr(dir > 0 ? x + w - cell * 0.18 : x + cell * 0.06, top + h * 0.12, cell * 0.12, h * 0.76, cell * 0.04); g.fill();
+        } else {
+          // 지붕 · 앞유리
+          g.fillStyle = "rgba(255,255,255,.22)";
+          rr(x + w * 0.26, top + h * 0.16, w * 0.46, h * 0.68, cell * 0.1); g.fill();
+          g.fillStyle = "#cfe8ff";
+          rr(dir > 0 ? x + w * 0.62 : x + w * 0.2, top + h * 0.18, w * 0.18, h * 0.64, cell * 0.06); g.fill();
+        }
+        // 전조등
+        g.fillStyle = "#fde68a";
+        const hx = dir > 0 ? x + w - cell * 0.06 : x;
+        g.fillRect(hx, top + h * 0.12, cell * 0.06, h * 0.18);
+        g.fillRect(hx, top + h * 0.7, cell * 0.06, h * 0.18);
+      }
+
+      function drawSignal(r, y0) {
+        const s = cell * 0.5;
+        for (const x of [cell * 0.04, W - s - cell * 0.04]) {
+          g.fillStyle = "#1f2937";
+          rr(x, y0 + (cell - s * 0.9) / 2 - s * 0.05, s, s, s * 0.22); g.fill();
+          const col = r.phase === "green" ? "#22c55e" : r.phase === "yellow" ? (Math.floor(performance.now() / 200) % 2 ? "#f59e0b" : "#78350f") : "#ef4444";
+          g.fillStyle = col;
+          g.beginPath(); g.arc(x + s / 2, y0 + cell / 2 - s * 0.05, s * 0.3, 0, Math.PI * 2); g.fill();
+          // 걷는 사람(초록) · 멈춤(빨강) 기호
+          g.fillStyle = "#fff";
+          const cx = x + s / 2, cy = y0 + cell / 2 - s * 0.05;
+          if (r.phase === "green") {
+            g.beginPath(); g.arc(cx, cy - s * 0.12, s * 0.06, 0, Math.PI * 2); g.fill();
+            g.fillRect(cx - s * 0.03, cy - s * 0.06, s * 0.06, s * 0.16);
+          } else {
+            g.fillRect(cx - s * 0.15, cy - s * 0.035, s * 0.3, s * 0.07);
+          }
+        }
+      }
+
+      function drawPlayer() {
+        const hop = player.t < 1 ? Math.sin(Math.PI * player.t) * cell * 0.22 : 0;
+        const cx = (player.vc + 0.5) * cell;
+        const base = H - (player.vr + 0.5 - camY) * cell;
+        let sq = 1;
+        if (state === "over" && deathKind === "hit") sq = 0.55;
+        // 그림자
+        g.fillStyle = "rgba(15,23,42,.22)";
+        g.beginPath(); g.ellipse(cx, base + cell * 0.3, cell * 0.24 * (1 - hop / cell), cell * 0.08, 0, 0, Math.PI * 2); g.fill();
+        g.save();
+        g.translate(cx, base + cell * 0.32 - hop);
+        g.scale(1 / Math.sqrt(sq), sq);
+        const y = -cell * 0.32;
+        // 다리
+        g.fillStyle = "#1e293b";
+        g.fillRect(-cell * 0.12, y + cell * 0.18, cell * 0.09, cell * 0.14);
+        g.fillRect(cell * 0.03, y + cell * 0.18, cell * 0.09, cell * 0.14);
+        // 몸(재킷)
+        g.fillStyle = "#1e3a5f";
+        rr(-cell * 0.22, y - cell * 0.12, cell * 0.44, cell * 0.36, cell * 0.12); g.fill();
+        // 셔츠 V
+        g.fillStyle = "#fff";
+        g.beginPath(); g.moveTo(-cell * 0.08, y - cell * 0.12); g.lineTo(cell * 0.08, y - cell * 0.12); g.lineTo(0, y + cell * 0.04); g.closePath(); g.fill();
+        // 목줄 + 사원증
+        g.strokeStyle = "#16a06a"; g.lineWidth = Math.max(1.4, cell * 0.035);
+        g.beginPath(); g.moveTo(-cell * 0.09, y - cell * 0.12); g.lineTo(-cell * 0.02, y + cell * 0.06); g.moveTo(cell * 0.09, y - cell * 0.12); g.lineTo(cell * 0.02, y + cell * 0.06); g.stroke();
+        g.fillStyle = "#fff";
+        rr(-cell * 0.07, y + cell * 0.05, cell * 0.14, cell * 0.12, cell * 0.025); g.fill();
+        g.fillStyle = "#16a06a";
+        g.fillRect(-cell * 0.07, y + cell * 0.05, cell * 0.14, cell * 0.035);
+        // 머리
+        const hy = y - cell * 0.27;
+        g.fillStyle = "#f3c9a0";
+        g.beginPath(); g.arc(0, hy, cell * 0.19, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#2b2118";
+        if (player.face === "up") {
+          g.beginPath(); g.arc(0, hy, cell * 0.19, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#3b2d22";
+          g.beginPath(); g.arc(0, hy + cell * 0.02, cell * 0.12, 0, Math.PI * 2); g.fill();
+        } else {
+          g.beginPath(); g.arc(0, hy, cell * 0.19, Math.PI * 1.05, Math.PI * 1.95); g.fill();
+          g.fillRect(-cell * 0.18, hy - cell * 0.07, cell * 0.36, cell * 0.04);
+          const ex = player.face === "left" ? -cell * 0.05 : player.face === "right" ? cell * 0.05 : 0;
+          g.fillStyle = "#1f2937";
+          if (state === "over") {
+            g.lineWidth = Math.max(1.2, cell * 0.03); g.strokeStyle = "#1f2937";
+            for (const s of [-1, 1]) {
+              const px = ex + s * cell * 0.07, py = hy + cell * 0.02;
+              g.beginPath(); g.moveTo(px - cell * 0.03, py - cell * 0.03); g.lineTo(px + cell * 0.03, py + cell * 0.03);
+              g.moveTo(px + cell * 0.03, py - cell * 0.03); g.lineTo(px - cell * 0.03, py + cell * 0.03); g.stroke();
+            }
+          } else {
+            g.beginPath(); g.arc(ex - cell * 0.07, hy + cell * 0.02, cell * 0.025, 0, Math.PI * 2); g.fill();
+            g.beginPath(); g.arc(ex + cell * 0.07, hy + cell * 0.02, cell * 0.025, 0, Math.PI * 2); g.fill();
+            g.fillStyle = "rgba(239,100,97,.35)";
+            g.beginPath(); g.arc(ex - cell * 0.12, hy + cell * 0.08, cell * 0.035, 0, Math.PI * 2); g.fill();
+            g.beginPath(); g.arc(ex + cell * 0.12, hy + cell * 0.08, cell * 0.035, 0, Math.PI * 2); g.fill();
+          }
+        }
+        g.restore();
+      }
+
+      function drawClock(x, y, s, color) {
+        g.strokeStyle = color; g.lineWidth = Math.max(1.5, s * 0.14);
+        g.beginPath(); g.arc(x, y, s / 2, 0, Math.PI * 2); g.stroke();
+        g.beginPath(); g.moveTo(x, y); g.lineTo(x, y - s * 0.3); g.moveTo(x, y); g.lineTo(x + s * 0.22, y); g.stroke();
+      }
+
+      function drawLateLine() {
+        const sy = H - (lineY - camY) * cell;
+        const coffee = slowT > 0;
+        const main = coffee ? "#9a5b13" : "#dc2626";
+        if (sy < H) {
+          const grd = g.createLinearGradient(0, sy, 0, H);
+          grd.addColorStop(0, coffee ? "rgba(154,91,19,.32)" : "rgba(220,38,38,.34)");
+          grd.addColorStop(1, coffee ? "rgba(154,91,19,.5)" : "rgba(220,38,38,.55)");
+          g.fillStyle = grd;
+          g.fillRect(0, Math.max(0, sy), W, H - Math.max(0, sy));
+          g.strokeStyle = main; g.lineWidth = 3;
+          g.setLineDash([10, 6]);
+          g.beginPath(); g.moveTo(0, sy); g.lineTo(W, sy); g.stroke(); g.setLineDash([]);
+        }
+        // 라벨
+        const ly = clamp(sy, 18, H - 16);
+        const label = coffee ? "9:00 지각선 · 커피 타임" : sy > H ? "9:00 지각선 ↓" : "9:00 지각선";
+        g.font = `700 ${Math.max(11, cell * 0.26)}px ${FONT}`;
+        const tw = g.measureText(label).width;
+        const pw = tw + 34, ph = Math.max(22, cell * 0.46);
+        const px = 8, py = ly - ph / 2;
+        g.fillStyle = main;
+        rr(px, py, pw, ph, ph / 2); g.fill();
+        drawClock(px + 14, ly, ph * 0.5, "#fff");
+        g.fillStyle = "#fff"; g.textAlign = "left"; g.textBaseline = "middle";
+        g.fillText(label, px + 25, ly + 1);
+      }
+
+      function draw() {
+        if (!rows || !W) return;
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, W, H);
+        const lo = Math.floor(camY) - 1, hi = Math.ceil(camY + H / cell) + 1;
+        for (let y = lo; y <= hi; y++) {
+          const r = rows.get(y);
+          if (r) drawRowBg(r, rowTop(y));
+        }
+        const now = performance.now() / 1000;
+        for (let y = hi; y >= lo; y--) {
+          const r = rows.get(y);
+          if (!r) continue;
+          const y0 = rowTop(y);
+          for (let c = 0; c < COLS; c++) {
+            const b = r.blocked[c];
+            const cx = (c + 0.5) * cell, cy = y0 + cell / 2;
+            if (b === "tree") drawTree(cx, cy);
+            else if (b === "pot") drawPot(cx, cy);
+            else if (b === "cone") drawCone(cx, cy);
+          }
+          if (r.coffee >= 0) drawCoffee((r.coffee + 0.5) * cell, y0 + cell / 2, now + y);
+          for (const v of r.vehicles) drawVehicle(v, r, y0);
+          if (r.type === "cross") drawSignal(r, y0);
+          if (y === player.r) drawPlayer();
+        }
+        // 띄우는 글자
+        for (const f of floats) {
+          const x = (f.c + 0.5) * cell, y = H - (f.r + 0.5 - camY) * cell - f.t * cell * 0.9;
+          g.globalAlpha = 1 - f.t / 1.1;
+          g.font = `800 ${Math.max(13, cell * 0.32)}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
+          g.lineWidth = 4; g.strokeStyle = "#fff"; g.strokeText(f.text, x, y);
+          g.fillStyle = "#9a5b13"; g.fillText(f.text, x, y);
+          g.globalAlpha = 1;
+        }
+        drawLateLine();
+        if (state === "over" && deathKind === "hit") {
+          g.fillStyle = `rgba(234,88,12,${Math.max(0, 0.35 - deathT * 0.5)})`;
+          g.fillRect(0, 0, W, H);
+        }
+      }
+
+      // ───────────────────────── 루프
+      let last = performance.now();
+      function frame(now) {
+        const dt = Math.min(0.05, (now - last) / 1000);
+        last = now;
+        if (state === "play") update(dt);
+        else if (state === "over") deathT += dt;
+        if (state !== "ready") draw();
+        requestAnimationFrame(frame);
+      }
+
+      window.addEventListener("resize", resize);
+      reset();
+      resize();
+      showReady();
+      requestAnimationFrame(frame);
+    },
+  });
+  </script>
+</body>
+</html>

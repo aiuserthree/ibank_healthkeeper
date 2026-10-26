@@ -67,6 +67,8 @@ ERROR_MESSAGES = {
     "COUPON_NOT_ALLOWED_SLOT": "이 시간대에는 무적 쿠폰을 사용할 수 없습니다.",
     "COUPON_NOT_REVOCABLE": "보유 중인 쿠폰만 회수할 수 있습니다.",
     "INVALID_NOTICE": "공지 제목과 내용을 입력해 주세요.",
+    "INVALID_SCORE": "점수가 올바르지 않습니다.",
+    "TOO_MANY_REQUESTS": "잠시 후 다시 시도해 주세요.",
     "NOT_SWAP_PERIOD": "교환 가능 시간(수요일 17:00 이후 ~ 예약 시작 전)이 아닙니다.",
     "NOT_SWAPPABLE": "교환할 수 없는 예약입니다.",
     "TARGET_NOT_SWAPPABLE": "선택한 회원과 교환할 수 없습니다. (확정·같은 주·시간 조건)",

@@ -25,10 +25,10 @@ location = / {
     return 301 /index;
 }
 
-# 메인 배너 → 별까지 계단 (점심시간 게임). 이 경로를 거쳐 access log로 클릭 수를 센다
+# 예전 메인 배너 링크 → 라운지 안으로 옮긴 별까지 계단
 location = /go/stairs {
     add_header Cache-Control "no-store";
-    return 302 https://stairs-to-the-star-zeta.vercel.app/;
+    return 302 /games/stairs;
 }
 
 # HTML·페이지 스크립트는 매번 재검증 — 배포 직후 로그인 리다이렉트 등에서 옛 페이지가 캐시로 뜨지 않게 함

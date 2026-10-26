@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>비타민 3매치 — 점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-wrap { margin: 0 auto; display: flex; flex-direction: column; gap: 10px; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    .gm-hud { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-radius: 14px; background: linear-gradient(135deg, #ff7a59, #ffb648); color: #fff; }
+    .gm-stat { display: flex; flex-direction: column; line-height: 1.15; }
+    .gm-stat small { font-size: 11.5px; opacity: .9; font-weight: 600; }
+    .gm-stat b { font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+    .gm-stat--score { flex: 1; min-width: 0; }
+    .gm-time { display: flex; align-items: center; gap: 5px; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; padding: 4px 10px; border-radius: 10px; background: rgba(255,255,255,.2); }
+    .gm-time.is-low { background: #fff; color: #e5484d; animation: gm-blink 1s infinite; }
+    @keyframes gm-blink { 50% { opacity: .65; } }
+    .gm-hud__btn { width: 38px; height: 38px; border-radius: 11px; border: 0; background: rgba(255,255,255,.22); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .gm-hud__btn:hover { background: rgba(255,255,255,.32); }
+    .gm-hud__btn:disabled { opacity: .45; cursor: default; }
+    .gm-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .gm-meter { background: var(--surface-card, #fff); border: 1px solid var(--border-default, #e3e8f2); border-radius: 12px; padding: 8px 10px; }
+    .gm-meter__top { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: 6px; }
+    .gm-meter__top em { margin-left: auto; font-style: normal; color: var(--text-muted, #64748b); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .gm-bar { height: 8px; border-radius: 99px; background: var(--color-mist, #eef2f8); overflow: hidden; }
+    .gm-bar i { display: block; height: 100%; width: 100%; border-radius: 99px; }
+    .gm-bar--time i { background: linear-gradient(90deg, #ffb648, #ff7a59); }
+    .gm-bar--time.is-low i { background: #e5484d; }
+    .gm-bar--vit i { width: 0; background: linear-gradient(90deg, #8bd450, #22c55e); transition: width .25s; }
+    .gm-meter.is-fever .gm-bar--vit i { background: linear-gradient(90deg, #ff7a59, #ffd23f, #ff7a59); background-size: 200% 100%; animation: gm-flow .8s linear infinite; transition: none; }
+    .gm-meter.is-fever .gm-meter__top em { color: #ff6a3d; font-weight: 800; }
+    @keyframes gm-flow { to { background-position: -200% 0; } }
+    .gm-boardwrap { position: relative; align-self: center; border-radius: 18px; padding: 6px; background: #fff3e6; border: 1px solid #ffe0c2; transition: box-shadow .3s; }
+    .gm-boardwrap.is-fever { animation: gm-fever .7s ease-in-out infinite alternate; border-color: #ffb648; }
+    @keyframes gm-fever { from { box-shadow: 0 0 0 3px #ffb648, 0 0 14px 2px rgba(255,122,89,.45); } to { box-shadow: 0 0 0 4px #ff7a59, 0 0 30px 8px rgba(255,182,72,.75); } }
+    .gm-board { position: relative; overflow: hidden; border-radius: 13px; touch-action: none; cursor: pointer;
+      background-color: #fffaf4; background-image: linear-gradient(45deg, #fff0e0 25%, transparent 25%, transparent 75%, #fff0e0 75%), linear-gradient(45deg, #fff0e0 25%, transparent 25%, transparent 75%, #fff0e0 75%); }
+    .gm-tile { position: absolute; left: 0; top: 0; transition-property: transform; transition-timing-function: ease; will-change: transform; }
+    .gm-ball { position: absolute; inset: 7%; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; overflow: hidden;
+      background: radial-gradient(circle at 32% 28%, var(--c2) 0%, var(--c) 62%); box-shadow: inset 0 -3px 0 rgba(0,0,0,.13), 0 2px 4px rgba(120,60,20,.18);
+      transition: transform .2s ease, opacity .2s ease; }
+    .gm-ball svg { width: 56%; height: 56%; position: relative; z-index: 1; }
+    .gm-tile.is-sel .gm-ball { transform: scale(1.08); box-shadow: 0 0 0 3px #fff, 0 0 0 5.5px #ff7a59, 0 4px 10px rgba(255,122,89,.4); }
+    .gm-tile.is-pop .gm-ball { transform: scale(.1); opacity: 0; transition: transform .22s ease-in, opacity .22s ease-in; }
+    .gm-tile.is-row .gm-ball::after, .gm-tile.is-col .gm-ball::after { content: ""; position: absolute; inset: 0; border-radius: 50%; }
+    .gm-tile.is-row .gm-ball::after { background: repeating-linear-gradient(0deg, transparent 0 17%, rgba(255,255,255,.5) 17% 25%); }
+    .gm-tile.is-col .gm-ball::after { background: repeating-linear-gradient(90deg, transparent 0 17%, rgba(255,255,255,.5) 17% 25%); }
+    .gm-tile.is-row .gm-ball, .gm-tile.is-col .gm-ball { box-shadow: 0 0 0 2.5px #fff, 0 0 10px 2px var(--c); }
+    .gm-tile.is-all .gm-ball { background: conic-gradient(from 20deg, #ef4444, #f97316, #eab308, #65a30d, #7c3aed, #db2777, #ef4444); box-shadow: 0 0 0 2.5px #fff, 0 0 12px 3px rgba(255,160,60,.7); }
+    .gm-tile.is-all .gm-ball svg { width: 62%; height: 62%; padding: 13%; box-sizing: border-box; border-radius: 50%; background: #fff; color: #ff6a3d; }
+    .gm-tile.is-born .gm-ball { animation: gm-born .4s ease-out; }
+    @keyframes gm-born { 0% { transform: scale(.4); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+    .gm-tile.is-hint .gm-ball { animation: gm-hint 1.1s ease-in-out infinite; }
+    @keyframes gm-hint { 0%, 60%, 100% { transform: scale(1); } 20% { transform: scale(1.12) rotate(-8deg); } 40% { transform: scale(1.12) rotate(8deg); } }
+    .gm-beam { position: absolute; pointer-events: none; border-radius: 99px; animation: gm-beam .38s ease-out forwards; }
+    .gm-beam { z-index: 4; }
+    .gm-beam--row { left: 0; right: 0; background: linear-gradient(90deg, rgba(255,122,89,.2), #fff 30%, #fff 70%, rgba(255,122,89,.2)); box-shadow: 0 0 0 3px rgba(255,182,72,.9), 0 0 22px 8px rgba(255,122,89,.75); }
+    .gm-beam--col { top: 0; bottom: 0; background: linear-gradient(180deg, rgba(255,122,89,.2), #fff 30%, #fff 70%, rgba(255,122,89,.2)); box-shadow: 0 0 0 3px rgba(255,182,72,.9), 0 0 22px 8px rgba(255,122,89,.75); }
+    @keyframes gm-beam { from { opacity: 1; } to { opacity: 0; } }
+    .gm-float { position: absolute; pointer-events: none; transform: translate(-50%, -50%); font-weight: 900; font-size: 17px; line-height: 1.15; color: #fff; white-space: nowrap; padding: 3px 10px; border-radius: 99px; background: rgba(240, 90, 50, .92); box-shadow: 0 3px 10px rgba(200,70,30,.35); animation: gm-float .9s ease-out forwards; z-index: 5; }
+    .gm-float small { display: block; text-align: center; font-size: 11px; font-weight: 800; color: #ffe7a8; }
+    @keyframes gm-float { 0% { opacity: 0; margin-top: 8px; } 15% { opacity: 1; margin-top: 0; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -26px; } }
+    .gm-banner { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); pointer-events: none; z-index: 6; padding: 10px 18px; border-radius: 14px; font-size: 18px; font-weight: 900; color: #fff; white-space: nowrap; background: linear-gradient(135deg, #ff7a59, #ffb648); box-shadow: 0 8px 20px rgba(255,122,89,.45); animation: gm-banner 1.3s ease-out forwards; }
+    @keyframes gm-banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 25% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70%); } }
+    .gm-overlay { position: absolute; inset: 0; z-index: 8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; text-align: center; border-radius: 18px; color: var(--color-midnight-navy, #0f1d3d); background: rgba(255, 250, 244, .9); backdrop-filter: blur(3px); }
+    .gm-overlay[hidden] { display: none; }
+    .gm-overlay h2 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
+    .gm-overlay p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary, #475569); }
+    .gm-rules { display: grid; gap: 6px; text-align: left; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary, #475569); background: #fff; border: 1px solid #ffe0c2; border-radius: 12px; padding: 10px 12px; max-width: 320px; }
+    .gm-rules div { display: flex; gap: 8px; align-items: flex-start; }
+    .gm-rules i, .gm-rules svg { flex-shrink: 0; margin-top: 1px; }
+    .gm-start { border: 0; border-radius: 12px; padding: 12px 30px; font-size: 16px; font-weight: 800; color: #fff; cursor: pointer; background: linear-gradient(135deg, #ff7a59, #ffb648); box-shadow: 0 6px 16px rgba(255, 122, 89, .4); display: inline-flex; align-items: center; gap: 6px; }
+    .gm-start:hover { filter: brightness(1.05); }
+    .gm-big { font-size: 30px; font-weight: 900; color: #ff6a3d; }
+    @media (max-width: 420px) {
+      .gm-stat b { font-size: 21px; } .gm-time { font-size: 19px; }
+      .gm-meters { gap: 8px; } .gm-meter { padding: 7px 8px; }
+      .gm-overlay { gap: 7px; padding: 10px; } .gm-overlay h2 { font-size: 19px; } .gm-overlay p { font-size: 12px; line-height: 1.5; }
+      .gm-rules { font-size: 11.5px; padding: 8px 10px; gap: 4px; } .gm-start { padding: 10px 26px; font-size: 15px; }
+      .gm-float { font-size: 15px; } .gm-banner { font-size: 16px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "match3",
+      setup(stage, ctx) {
+        const N = 8, GAME_MS = 60000, FEVER_MS = 5000;
+        const KINDS = [
+          { icon: "apple", c: "#ef4444" },
+          { icon: "cherry", c: "#db2777" },
+          { icon: "citrus", c: "#65a30d" },
+          { icon: "grape", c: "#7c3aed" },
+          { icon: "carrot", c: "#f97316" },
+          { icon: "banana", c: "#eab308" },
+        ];
+        const ALL = -1; // 종합 비타민(어느 종류도 아님)
+
+        // 아이콘 SVG를 한 번만 만들어 재사용
+        const SVG = {};
+        (function buildIcons() {
+          const tmp = document.createElement("div");
+          const names = KINDS.map((k) => k.icon).concat(["pill"]);
+          tmp.innerHTML = names.map((n) => HKUI.icon(n, 24, "currentColor")).join("");
+          tmp.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;visibility:hidden";
+          document.body.appendChild(tmp); // lucide는 문서 안의 요소만 바꿔 줌
+          HKUI.refreshIcons(tmp);
+          tmp.remove();
+          [...tmp.children].forEach((el, i) => {
+            if (el.tagName.toLowerCase() === "svg") {
+              el.removeAttribute("style");
+              el.setAttribute("stroke-width", "2.1");
+              SVG[names[i]] = el.outerHTML;
+            } else SVG[names[i]] = "";
+          });
+        })();
+        function lighten(hex, p) {
+          const n = parseInt(hex.slice(1), 16);
+          const f = (v) => Math.round(v + (255 - v) * p);
+          return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
+        }
+
+        stage.innerHTML = `<div class="gm-wrap">
+          <div class="gm-hud">
+            <div class="gm-stat gm-stat--score"><small>점수</small><b data-v="score">0</b></div>
+            <div class="gm-time" data-v="timebox">${HKUI.icon("timer", 18, "currentColor")}<span data-v="time">60</span></div>
+            <button type="button" class="gm-hud__btn" data-pause aria-label="일시정지" disabled>${HKUI.icon("pause", 18, "#fff")}</button>
+          </div>
+          <div class="gm-meters">
+            <div class="gm-meter"><div class="gm-meter__top">${HKUI.icon("hourglass", 14, "#ff7a59")}남은 시간<em data-v="time2">60초</em></div><div class="gm-bar gm-bar--time"><i data-v="timebar"></i></div></div>
+            <div class="gm-meter" data-v="vitbox"><div class="gm-meter__top">${HKUI.icon("pill", 14, "#22c55e")}비타민 게이지<em data-v="vitlbl">0%</em></div><div class="gm-bar gm-bar--vit"><i data-v="vitbar"></i></div></div>
+          </div>
+          <div class="gm-boardwrap">
+            <div class="gm-board"></div>
+            <div class="gm-overlay" data-ov></div>
+          </div>
+        </div>`;
+        HKUI.refreshIcons(stage);
+
+        const $ = (s) => stage.querySelector(s);
+        const wrapEl = $(".gm-wrap"), boardWrap = $(".gm-boardwrap"), boardEl = $(".gm-board"), ov = $("[data-ov]"), pauseBtn = $("[data-pause]");
+        const V = {};
+        stage.querySelectorAll("[data-v]").forEach((el) => (V[el.dataset.v] = el));
+
+        let S = 50;
+        let board = [], score = 0, timeLeft = GAME_MS, gauge = 0, feverLeft = 0;
+        let state = "idle", busy = false, sel = null, submitted = false, lastAct = 0, hintTiles = [], lastT = 0, uid = 0;
+        const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+        const key = (r, c) => r * N + c;
+        const inb = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
+
+        // ---------- 크기 ----------
+        function layout() {
+          const W = stage.clientWidth || 340;
+          const maxH = Math.max(280, window.innerHeight - 250);
+          const inner = Math.min(W - 14, 476, maxH);
+          S = Math.floor(inner / N);
+          boardEl.style.width = boardEl.style.height = S * N + "px";
+          boardEl.style.backgroundSize = `${S * 2}px ${S * 2}px`;
+          boardEl.style.backgroundPosition = `0 0, ${S}px ${S}px`;
+          wrapEl.style.maxWidth = Math.max(S * N + 14, 300) + "px";
+          for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+            const t = board[r] && board[r][c];
+            if (t) { t.el.style.width = t.el.style.height = S + "px"; place(t, 0); }
+          }
+        }
+
+        // ---------- 타일 ----------
+        function look(t) {
+          const el = t.el;
+          el.classList.toggle("is-row", t.sp === "row");
+          el.classList.toggle("is-col", t.sp === "col");
+          el.classList.toggle("is-all", t.sp === "all");
+          const ball = el.firstChild;
+          if (t.sp === "all") { ball.innerHTML = SVG.pill; ball.style.removeProperty("--c"); }
+          else {
+            const k = KINDS[t.k];
+            ball.innerHTML = SVG[k.icon];
+            ball.style.setProperty("--c", k.c);
+            ball.style.setProperty("--c2", lighten(k.c, 0.42));
+          }
+        }
+        function makeTile(k, r, c, startRow) {
+          const el = document.createElement("div");
+          el.className = "gm-tile";
+          el.innerHTML = `<div class="gm-ball"></div>`;
+          el.style.width = el.style.height = S + "px";
+          const t = { id: ++uid, k, sp: null, r, c, el };
+          look(t);
+          el.style.transitionDuration = "0ms";
+          el.style.transform = `translate(${c * S}px, ${(startRow ?? r) * S}px)`;
+          boardEl.appendChild(el);
+          return t;
+        }
+        function place(t, ms, ease) {
+          t.el.style.transitionDuration = ms + "ms";
+          t.el.style.transitionTimingFunction = ease || "ease";
+          t.el.style.transform = `translate(${t.c * S}px, ${t.r * S}px)`;
+        }
+        const kAt = (r, c) => (inb(r, c) && board[r][c] && board[r][c].sp !== "all" ? board[r][c].k : null);
+        const rnd = () => Math.floor(Math.random() * KINDS.length);
+
+        // 처음 판: 이미 맞춰진 3개가 없고, 움직일 수 있는 수가 있게
+        function freshKinds() {
+          for (let tries = 0; tries < 200; tries++) {
+            const g = [];
+            for (let r = 0; r < N; r++) {
+              g.push([]);
+              for (let c = 0; c < N; c++) {
+                let k;
+                do { k = rnd(); } while ((c >= 2 && g[r][c - 1] === k && g[r][c - 2] === k) || (r >= 2 && g[r - 1][c] === k && g[r - 2][c] === k));
+                g[r].push(k);
+              }
+            }
+            if (findMove(g)) return g;
+          }
+        }
+        function buildBoard() {
+          boardEl.innerHTML = "";
+          const g = freshKinds();
+          board = g.map((row, r) => row.map((k, c) => makeTile(k, r, c)));
+        }
+
+        // ---------- 판정 ----------
+        // 길이 3 이상 줄을 찾아 겹치는 것끼리 묶음
+        function findGroups() {
+          const runs = [];
+          for (let r = 0; r < N; r++) {
+            let c = 0;
+            while (c < N) {
+              const k = kAt(r, c); let e = c + 1;
+              if (k !== null) while (e < N && kAt(r, e) === k) e++;
+              if (k !== null && e - c >= 3) runs.push({ dir: "h", cells: Array.from({ length: e - c }, (_, i) => key(r, c + i)) });
+              c = e;
+            }
+          }
+          for (let c = 0; c < N; c++) {
+            let r = 0;
+            while (r < N) {
+              const k = kAt(r, c); let e = r + 1;
+              if (k !== null) while (e < N && kAt(e, c) === k) e++;
+              if (k !== null && e - r >= 3) runs.push({ dir: "v", cells: Array.from({ length: e - r }, (_, i) => key(r + i, c)) });
+              r = e;
+            }
+          }
+          const parent = runs.map((_, i) => i);
+          const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+          const owner = new Map();
+          runs.forEach((run, i) => run.cells.forEach((k) => {
+            if (owner.has(k)) parent[find(i)] = find(owner.get(k)); else owner.set(k, i);
+          }));
+          const groups = new Map();
+          runs.forEach((run, i) => {
+            const root = find(i);
+            if (!groups.has(root)) groups.set(root, { cells: new Set(), runs: [] });
+            const g = groups.get(root);
+            run.cells.forEach((k) => g.cells.add(k));
+            g.runs.push(run);
+          });
+          return [...groups.values()].map((g) => {
+            const longest = g.runs.reduce((a, b) => (b.cells.length > a.cells.length ? b : a));
+            const hasH = g.runs.some((x) => x.dir === "h"), hasV = g.runs.some((x) => x.dir === "v");
+            let spec = null;
+            if (longest.cells.length >= 5 || (g.cells.size >= 5 && hasH && hasV)) spec = "all";
+            else if (longest.cells.length === 4) spec = longest.dir === "h" ? "row" : "col";
+            // 특수 타일 자리 후보: 교차점 → 가장 긴 줄의 가운데부터
+            const counts = new Map();
+            g.runs.forEach((x) => x.cells.forEach((k) => counts.set(k, (counts.get(k) || 0) + 1)));
+            const cross = [...counts].filter(([, n]) => n > 1).map(([k]) => k);
+            const mid = Math.floor((longest.cells.length - 1) / 2);
+            const order = longest.cells.slice().sort((a, b) => Math.abs(longest.cells.indexOf(a) - mid) - Math.abs(longest.cells.indexOf(b) - mid));
+            return { cells: g.cells, spec, cand: cross.concat(order, [...g.cells]) };
+          });
+        }
+        function lineLen(g, r, c) {
+          const k = g[r][c]; if (k == null || k === ALL) return 0;
+          let h = 1, v = 1;
+          for (let x = c - 1; x >= 0 && g[r][x] === k; x--) h++;
+          for (let x = c + 1; x < N && g[r][x] === k; x++) h++;
+          for (let y = r - 1; y >= 0 && g[y][c] === k; y--) v++;
+          for (let y = r + 1; y < N && g[y][c] === k; y++) v++;
+          return Math.max(h, v);
+        }
+        // 움직일 수 있는 수 찾기 (g: 종류 2차원 배열, 종합 비타민은 ALL)
+        function findMove(g) {
+          for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+            for (const [dr, dc] of [[0, 1], [1, 0]]) {
+              const r2 = r + dr, c2 = c + dc;
+              if (!inb(r2, c2)) continue;
+              if (g[r][c] === ALL || g[r2][c2] === ALL) return [[r, c], [r2, c2]];
+              [g[r][c], g[r2][c2]] = [g[r2][c2], g[r][c]];
+              const ok = lineLen(g, r, c) >= 3 || lineLen(g, r2, c2) >= 3;
+              [g[r][c], g[r2][c2]] = [g[r2][c2], g[r][c]];
+              if (ok) return [[r, c], [r2, c2]];
+            }
+          }
+          return null;
+        }
+        const kindGrid = () => board.map((row) => row.map((t) => (t.sp === "all" ? ALL : t.k)));
+
+        // ---------- 터뜨리기 ----------
+        function mostCommonKind() {
+          const cnt = new Array(KINDS.length).fill(0);
+          board.forEach((row) => row.forEach((t) => t && t.sp !== "all" && cnt[t.k]++));
+          return cnt.indexOf(Math.max(...cnt));
+        }
+        async function blast(clear, births, chain) {
+          const protect = new Set(births.map((b) => b.key));
+          const all = new Set(clear), stack = [...clear], fired = new Set();
+          let bonus = 0;
+          while (stack.length) {
+            const k = stack.pop();
+            const t = board[Math.floor(k / N)][k % N];
+            if (!t || !t.sp || fired.has(k)) continue;
+            fired.add(k);
+            const targets = [];
+            if (t.sp === "row") { for (let c = 0; c < N; c++) targets.push(key(t.r, c)); bonus += 100; beam("row", t.r); }
+            else if (t.sp === "col") { for (let r = 0; r < N; r++) targets.push(key(r, t.c)); bonus += 100; beam("col", t.c); }
+            else {
+              const kind = t.target ?? mostCommonKind();
+              board.forEach((row) => row.forEach((x) => x && x.sp !== "all" && x.k === kind && targets.push(key(x.r, x.c))));
+              bonus += 300;
+            }
+            targets.forEach((k2) => { if (!protect.has(k2) && !all.has(k2)) { all.add(k2); stack.push(k2); } });
+          }
+          const fever = feverLeft > 0;
+          const pts = (all.size * 10 * chain + bonus) * (fever ? 2 : 1);
+          score += pts;
+          if (!fever) addGauge(all.size * 2.2 + (bonus ? 6 : 0));
+          // 점수 띄우기
+          let sr = 0, sc = 0;
+          all.forEach((k) => { sr += Math.floor(k / N); sc += k % N; });
+          if (all.size) floatText(`+${pts.toLocaleString("ko-KR")}${chain >= 2 ? `<small>연쇄 ×${chain}</small>` : ""}`, (sc / all.size + 0.5) * S, (sr / all.size + 0.5) * S);
+          births.forEach((b) => {
+            const t = board[Math.floor(b.key / N)][b.key % N];
+            t.sp = b.sp; t.target = undefined;
+            if (b.sp === "all") t.k = ALL;
+            look(t);
+            t.el.classList.remove("is-born"); void t.el.offsetWidth; t.el.classList.add("is-born");
+          });
+          all.forEach((k) => board[Math.floor(k / N)][k % N].el.classList.add("is-pop"));
+          updateHud();
+          await wait(240);
+          all.forEach((k) => {
+            const r = Math.floor(k / N), c = k % N;
+            board[r][c].el.remove();
+            board[r][c] = null;
+          });
+        }
+        async function collapse() {
+          let maxMs = 0;
+          for (let c = 0; c < N; c++) {
+            let w = N - 1;
+            for (let r = N - 1; r >= 0; r--) {
+              const t = board[r][c];
+              if (!t) continue;
+              if (r !== w) {
+                board[w][c] = t; board[r][c] = null; t.r = w;
+                const ms = 120 + 50 * (w - r);
+                place(t, ms, "cubic-bezier(.45,.05,.7,1)");
+                maxMs = Math.max(maxMs, ms);
+              }
+              w--;
+            }
+            const missing = w + 1;
+            for (let r = w; r >= 0; r--) {
+              const t = makeTile(rnd(), r, c, r - missing);
+              board[r][c] = t;
+              void t.el.offsetWidth;
+              const ms = 120 + 50 * missing;
+              place(t, ms, "cubic-bezier(.45,.05,.7,1)");
+              maxMs = Math.max(maxMs, ms);
+            }
+          }
+          await wait(maxMs + 30);
+        }
+        async function resolve(pref, chain = 0) {
+          for (;;) {
+            const groups = findGroups();
+            if (!groups.length) break;
+            chain++;
+            const clear = new Set(), births = [];
+            for (const g of groups) {
+              g.cells.forEach((k) => clear.add(k));
+              if (!g.spec) continue;
+              const ok = (k) => { const t = board[Math.floor(k / N)][k % N]; return !t.sp && !births.some((b) => b.key === k); };
+              const pos = (pref && [...g.cells].find((k) => pref.includes(k) && ok(k))) ?? g.cand.find(ok);
+              if (pos != null) births.push({ key: pos, sp: g.spec });
+            }
+            births.forEach((b) => clear.delete(b.key));
+            await blast(clear, births, chain);
+            await collapse();
+            pref = null;
+          }
+          return chain;
+        }
+
+        // ---------- 교환 ----------
+        function swapCells(a, b) {
+          const ta = board[a[0]][a[1]], tb = board[b[0]][b[1]];
+          board[a[0]][a[1]] = tb; board[b[0]][b[1]] = ta;
+          [ta.r, tb.r] = [tb.r, ta.r]; [ta.c, tb.c] = [tb.c, ta.c];
+          place(ta, 150); place(tb, 150);
+        }
+        async function trySwap(a, b) {
+          if (busy || state !== "play") return;
+          busy = true; clearSel(); clearHint(); lastAct = performance.now();
+          const ta = board[a[0]][a[1]], tb = board[b[0]][b[1]];
+          swapCells(a, b);
+          await wait(165);
+          if (ta.sp === "all" || tb.sp === "all") {
+            // 종합 비타민: 바꾼 상대와 같은 종류 전부 (둘 다면 판 전체)
+            let clear;
+            if (ta.sp === "all" && tb.sp === "all") clear = new Set(board.flat().map((t) => key(t.r, t.c)));
+            else {
+              const bomb = ta.sp === "all" ? ta : tb, other = bomb === ta ? tb : ta;
+              bomb.target = other.k;
+              clear = new Set([key(bomb.r, bomb.c)]);
+            }
+            banner("종합 비타민!");
+            await blast(clear, [], 1);
+            await collapse();
+            await resolve(null, 1);
+          } else if (findGroups().length) {
+            await resolve([key(...a), key(...b)]);
+          } else {
+            swapCells(a, b);
+            await wait(170);
+          }
+          busy = false;
+          lastAct = performance.now();
+          afterTurn();
+        }
+        async function afterTurn() {
+          if (state === "ending") { finish(); return; }
+          if (state === "idle" || state === "over") return;
+          if (!findMove(kindGrid())) await shuffle();
+        }
+        async function shuffle() {
+          busy = true;
+          banner("움직일 수 있는 칸이 없어 섞을게요");
+          await wait(500);
+          const tiles = board.flat();
+          for (let tries = 0; tries < 300; tries++) {
+            for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
+            const g = [];
+            for (let r = 0; r < N; r++) g.push(tiles.slice(r * N, r * N + N).map((t) => (t.sp === "all" ? ALL : t.k)));
+            let clean = true;
+            for (let r = 0; r < N && clean; r++) for (let c = 0; c < N; c++) if (lineLen(g, r, c) >= 3) { clean = false; break; }
+            if ((clean && findMove(g)) || tries === 299) break;
+          }
+          tiles.forEach((t, i) => { t.r = Math.floor(i / N); t.c = i % N; board[t.r][t.c] = t; place(t, 380, "cubic-bezier(.3,.7,.3,1)"); });
+          await wait(420);
+          if (findGroups().length) await resolve(null);
+          if (!findMove(kindGrid())) { // 아주 드물게: 종류를 새로 뽑음
+            const g = freshKinds();
+            board.forEach((row, r) => row.forEach((t, c) => { t.k = g[r][c]; t.sp = null; look(t); }));
+          }
+          busy = false;
+          if (state === "ending") finish();
+        }
+
+        // ---------- 비타민 게이지 · 피버 ----------
+        function addGauge(n) {
+          gauge = Math.min(100, gauge + n);
+          if (gauge >= 100 && feverLeft <= 0) {
+            feverLeft = FEVER_MS;
+            boardWrap.classList.add("is-fever");
+            V.vitbox.classList.add("is-fever");
+            banner("비타민 피버! 5초간 점수 2배");
+          }
+        }
+        function endFever() {
+          feverLeft = 0; gauge = 0;
+          boardWrap.classList.remove("is-fever");
+          V.vitbox.classList.remove("is-fever");
+        }
+
+        // ---------- 화면 ----------
+        function updateHud() {
+          V.score.textContent = score.toLocaleString("ko-KR");
+          const sec = Math.ceil(timeLeft / 1000);
+          V.time.textContent = sec; V.time2.textContent = sec + "초";
+          V.timebar.style.width = (timeLeft / GAME_MS) * 100 + "%";
+          const low = timeLeft <= 10000 && state !== "idle";
+          V.timebox.classList.toggle("is-low", low && timeLeft > 0);
+          V.timebar.parentNode.classList.toggle("is-low", low);
+          if (feverLeft > 0) { V.vitbar.style.width = (feverLeft / FEVER_MS) * 100 + "%"; V.vitlbl.textContent = `피버 ${Math.ceil(feverLeft / 1000)}초`; }
+          else { V.vitbar.style.width = gauge + "%"; V.vitlbl.textContent = Math.floor(gauge) + "%"; }
+        }
+        function floatText(html, x, y) {
+          const el = document.createElement("div");
+          el.className = "gm-float"; el.innerHTML = html;
+          el.style.left = x + "px"; el.style.top = y + "px";
+          boardEl.appendChild(el);
+          setTimeout(() => el.remove(), 950);
+        }
+        function beam(dir, i) {
+          const el = document.createElement("div");
+          el.className = "gm-beam gm-beam--" + dir;
+          if (dir === "row") { el.style.top = i * S + S * 0.3 + "px"; el.style.height = S * 0.4 + "px"; }
+          else { el.style.left = i * S + S * 0.3 + "px"; el.style.width = S * 0.4 + "px"; }
+          boardEl.appendChild(el);
+          setTimeout(() => el.remove(), 400);
+        }
+        function banner(text) {
+          boardWrap.querySelectorAll(".gm-banner").forEach((x) => x.remove());
+          const el = document.createElement("div");
+          el.className = "gm-banner"; el.textContent = text;
+          boardWrap.appendChild(el);
+          setTimeout(() => el.remove(), 1350);
+        }
+        function clearSel() { if (sel) { const t = board[sel[0]][sel[1]]; t && t.el.classList.remove("is-sel"); } sel = null; }
+        function clearHint() { hintTiles.forEach((t) => t.el.classList.remove("is-hint")); hintTiles = []; }
+        function showOverlay(html) { ov.hidden = false; ov.innerHTML = html; HKUI.refreshIcons(ov); }
+        function hideOverlay() { ov.hidden = true; ov.innerHTML = ""; }
+
+        // ---------- 흐름 ----------
+        function resetState() {
+          score = 0; timeLeft = GAME_MS; gauge = 0; feverLeft = 0; submitted = false; busy = false; sel = null; hintTiles = [];
+          boardWrap.classList.remove("is-fever"); V.vitbox.classList.remove("is-fever");
+          buildBoard();
+          updateHud();
+        }
+        function showStart() {
+          state = "idle";
+          resetState();
+          pauseBtn.disabled = true;
+          showOverlay(`<h2>비타민 3매치</h2>
+            <p>이웃한 두 칸을 바꿔 같은 그림을 3개 이상 맞춰요.<br>60초 안에 최고 점수에 도전해 보세요!</p>
+            <div class="gm-rules">
+              <div>${HKUI.icon("move-horizontal", 15, "#ff7a59")}<span><b>4개</b> → 줄 비타민 · 터지면 한 줄을 싹</span></div>
+              <div>${HKUI.icon("sparkles", 15, "#ff7a59")}<span><b>5개</b> → 종합 비타민 · 바꾼 그림을 전부</span></div>
+              <div>${HKUI.icon("pill", 15, "#22c55e")}<span>게이지가 차면 <b>5초 피버</b> · 점수 2배</span></div>
+              <div>${HKUI.icon("mouse-pointer-click", 15, "#64748b")}<span>클릭 두 번 · 끌기 · 휴대폰은 밀어서</span></div>
+            </div>
+            <button type="button" class="gm-start" data-go>${HKUI.icon("play", 18, "#fff")} 시작</button>`);
+          ov.querySelector("[data-go]").onclick = startGame;
+        }
+        function startGame() {
+          resetState();
+          hideOverlay();
+          state = "play";
+          pauseBtn.disabled = false;
+          lastAct = lastT = performance.now();
+          const r = boardWrap.getBoundingClientRect();
+          if (r.bottom > window.innerHeight || r.top < 0) stage.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        function finish() {
+          if (state === "over" || submitted) return;
+          state = "over"; submitted = true;
+          clearSel(); clearHint(); endFever();
+          pauseBtn.disabled = true;
+          updateHud();
+          showOverlay(`<h2>시간 끝!</h2>
+            <div class="gm-big">${score.toLocaleString("ko-KR")}점</div>
+            <p>점심 비타민 충전 완료예요</p>
+            <button type="button" class="gm-start" data-again>${HKUI.icon("rotate-ccw", 18, "#fff")} 다시 하기</button>`);
+          ov.querySelector("[data-again]").onclick = startGame;
+          ctx.submit(score);
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "pause";
+          clearSel();
+          showOverlay(`<h2>잠깐 쉬는 중</h2><p>시간은 멈춰 있어요. 준비되면 이어서 해요</p>
+            <button type="button" class="gm-start" data-resume>${HKUI.icon("play", 18, "#fff")} 계속하기</button>`);
+          ov.querySelector("[data-resume]").onclick = resume;
+        }
+        function resume() {
+          if (state !== "pause") return;
+          hideOverlay();
+          state = "play";
+          lastT = lastAct = performance.now();
+        }
+        pauseBtn.onclick = () => (state === "play" ? pause() : resume());
+
+        function frame(t) {
+          const dt = Math.min(100, t - lastT); lastT = t;
+          if (state === "play" || state === "ending") {
+            if (state === "play") {
+              timeLeft = Math.max(0, timeLeft - dt);
+              if (timeLeft <= 0) {
+                state = "ending"; clearSel(); clearHint();
+                banner("시간 끝!");
+                if (!busy) setTimeout(finish, 700);
+              }
+            }
+            if (feverLeft > 0) { feverLeft -= dt; if (feverLeft <= 0) endFever(); }
+            updateHud();
+            // 5초 동안 가만히 있으면 힌트
+            if (state === "play" && !busy && !hintTiles.length && t - lastAct > 5000) {
+              const m = findMove(kindGrid());
+              if (m) { hintTiles = m.map(([r, c]) => board[r][c]); hintTiles.forEach((x) => x.el.classList.add("is-hint")); }
+            }
+          }
+          requestAnimationFrame(frame);
+        }
+
+        // ---------- 입력 ----------
+        let drag = null;
+        function cellAt(e) {
+          const rc = boardEl.getBoundingClientRect();
+          const c = Math.floor((e.clientX - rc.left) / S), r = Math.floor((e.clientY - rc.top) / S);
+          return inb(r, c) ? [r, c] : null;
+        }
+        boardEl.addEventListener("pointerdown", (e) => {
+          if (state !== "play" || busy) return;
+          const cell = cellAt(e); if (!cell) return;
+          e.preventDefault();
+          drag = { cell, x: e.clientX, y: e.clientY, id: e.pointerId };
+          try { boardEl.setPointerCapture(e.pointerId); } catch (_) {}
+        });
+        boardEl.addEventListener("pointermove", (e) => {
+          if (!drag || e.pointerId !== drag.id) return;
+          const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+          if (Math.max(Math.abs(dx), Math.abs(dy)) < S * 0.32) return;
+          const [r, c] = drag.cell;
+          const to = Math.abs(dx) > Math.abs(dy) ? [r, c + Math.sign(dx)] : [r + Math.sign(dy), c];
+          drag = null;
+          if (inb(...to)) trySwap([r, c], to);
+        });
+        const up = (e) => {
+          if (!drag || e.pointerId !== drag.id) return;
+          const cell = drag.cell; drag = null;
+          if (e.type !== "pointerup" || state !== "play" || busy) return;
+          if (!sel) { sel = cell; board[cell[0]][cell[1]].el.classList.add("is-sel"); return; }
+          if (sel[0] === cell[0] && sel[1] === cell[1]) { clearSel(); return; }
+          if (Math.abs(sel[0] - cell[0]) + Math.abs(sel[1] - cell[1]) === 1) { const a = sel; clearSel(); trySwap(a, cell); return; }
+          clearSel(); sel = cell; board[cell[0]][cell[1]].el.classList.add("is-sel");
+        };
+        boardEl.addEventListener("pointerup", up);
+        boardEl.addEventListener("pointercancel", up);
+        boardEl.addEventListener("contextmenu", (e) => e.preventDefault());
+        document.addEventListener("keydown", (e) => {
+          if (state === "pause" && (e.key === "p" || e.key === "P" || e.key === "Escape")) { e.preventDefault(); resume(); }
+          else if (state === "play" && (e.key === "p" || e.key === "P" || e.key === "Escape")) { e.preventDefault(); pause(); }
+        });
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+        let rt = null;
+        window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(layout, 120); });
+
+        ctx.onRestart(startGame);
+        layout();
+        showStart();
+        requestAnimationFrame((t) => { lastT = t; requestAnimationFrame(frame); });
+      },
+    });
+  </script>
+</body>
+</html>

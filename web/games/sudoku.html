@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>오늘의 스도쿠 — 점심 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-sd { --gm-ink: #1e293b; --gm-main: #334155; --gm-soft: #64748b; --gm-line: #cbd5e1; --gm-sel: #dbe7ff; --gm-peer: #eef2f7; --gm-same: #c7d7f5; --gm-bad: #dc2626; --gm-given: #0f172a; --gm-mine: #2f6bff;
+      position: relative; user-select: none; -webkit-user-select: none; touch-action: manipulation; outline: none; }
+    .gm-sd__bar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .gm-sd__chip { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 12px; background: #f1f5f9; color: var(--gm-main); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .gm-sd__chip.is-bad { background: #fee2e2; color: var(--gm-bad); }
+    .gm-sd__bar-gap { flex: 1; }
+    .gm-sd__pause { border: 0; background: #f1f5f9; color: var(--gm-main); width: 36px; height: 36px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .gm-sd__pause:hover { background: #e2e8f0; }
+    .gm-sd__boardwrap { position: relative; }
+    .gm-sd__board { display: grid; grid-template-columns: repeat(9, 1fr); aspect-ratio: 1; border: 2.5px solid var(--gm-main); border-radius: 14px; overflow: hidden; background: #fff; }
+    .gm-sd__cell { position: relative; display: flex; align-items: center; justify-content: center; border-right: 1px solid var(--gm-line); border-bottom: 1px solid var(--gm-line); font-size: clamp(18px, 5.4vw, 28px); font-weight: 600; color: var(--gm-mine); cursor: pointer; background: #fff; transition: background .08s; font-variant-numeric: tabular-nums; }
+    .gm-sd__cell:nth-child(9n) { border-right: 0; }
+    .gm-sd__cell:nth-child(n+73) { border-bottom: 0; }
+    .gm-sd__cell.is-c3 { border-right: 2px solid var(--gm-main); }
+    .gm-sd__cell.is-r3 { border-bottom: 2px solid var(--gm-main); }
+    .gm-sd__cell.is-given { color: var(--gm-given); font-weight: 800; }
+    .gm-sd__cell.is-peer { background: var(--gm-peer); }
+    .gm-sd__cell.is-same { background: var(--gm-same); }
+    .gm-sd__cell.is-sel { background: var(--gm-sel); box-shadow: inset 0 0 0 2px var(--gm-mine); }
+    .gm-sd__cell.is-bad { color: var(--gm-bad); background: #fef2f2; }
+    .gm-sd__cell.is-bad.is-sel { background: #fde2e2; box-shadow: inset 0 0 0 2px var(--gm-bad); }
+    .gm-sd__cell.is-pop { animation: gm-sd-pop .28s ease-out; }
+    @keyframes gm-sd-pop { 0% { transform: scale(.6); } 70% { transform: scale(1.12); } 100% { transform: scale(1); } }
+    .gm-sd__notes { position: absolute; inset: 2px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); font-size: clamp(8px, 2.3vw, 11.5px); font-weight: 600; color: var(--gm-soft); line-height: 1; }
+    .gm-sd__notes span { display: flex; align-items: center; justify-content: center; }
+    .gm-sd__notes span.is-hl { color: var(--gm-mine); font-weight: 800; }
+    .gm-sd__cover { position: absolute; inset: 0; z-index: 3; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center; color: #fff;
+      background: linear-gradient(135deg, rgba(51,65,85,.97), rgba(100,116,139,.97)); backdrop-filter: blur(6px); }
+    .gm-sd__cover[hidden] { display: none; }
+    .gm-sd__cover h2 { margin: 0; font-size: 24px; color: #fff; }
+    .gm-sd__cover p { margin: 0; font-size: 14.5px; line-height: 1.6; color: rgba(255,255,255,.88); }
+    .gm-sd__cover .gm-sd__keys { font-size: 12.5px; color: rgba(255,255,255,.72); }
+    .gm-sd__cover .gm-sd__note { padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,.16); font-size: 13px; font-weight: 600; }
+    .gm-sd__go { border: 0; padding: 13px 34px; border-radius: 14px; background: #fff; color: var(--gm-main); font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+    .gm-sd__go:hover { background: #f1f5f9; }
+    .gm-sd__mini { display: grid; grid-template-columns: repeat(3, 18px); gap: 3px; opacity: .55; }
+    .gm-sd__mini i { width: 18px; height: 18px; border-radius: 4px; background: rgba(255,255,255,.5); }
+    .gm-sd__float { position: absolute; z-index: 2; pointer-events: none; padding: 4px 10px; border-radius: 10px; background: var(--gm-bad); color: #fff; font-size: 14px; font-weight: 800; transform: translate(-50%, -50%); animation: gm-sd-float 1s ease-out forwards; white-space: nowrap; }
+    @keyframes gm-sd-float { 0% { opacity: 0; transform: translate(-50%, -30%); } 15% { opacity: 1; transform: translate(-50%, -60%); } 100% { opacity: 0; transform: translate(-50%, -160%); } }
+    .gm-sd__pad { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; margin-top: 12px; }
+    .gm-sd__num { position: relative; border: 0; height: 52px; border-radius: 12px; background: #f1f5f9; color: var(--gm-ink); font-size: 22px; font-weight: 700; cursor: pointer; padding: 0; font-variant-numeric: tabular-nums; }
+    .gm-sd__num:hover { background: #e2e8f0; }
+    .gm-sd__num:active { transform: scale(.95); }
+    .gm-sd__num small { position: absolute; right: 5px; bottom: 3px; font-size: 10px; font-weight: 600; color: var(--gm-soft); }
+    .gm-sd__num.is-done { opacity: .35; }
+    .gm-sd.is-memo .gm-sd__num { background: #eef3ff; color: var(--gm-mine); font-size: 17px; }
+    .gm-sd__tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .gm-sd__tool { border: 0; height: 46px; border-radius: 12px; background: #f1f5f9; color: var(--gm-main); font-size: 14.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .gm-sd__tool:hover { background: #e2e8f0; }
+    .gm-sd__tool.is-on { background: var(--gm-main); color: #fff; }
+    .gm-sd__tool small { font-weight: 600; opacity: .7; font-size: 12px; }
+    .gm-sd__hint { margin: 10px 0 0; font-size: 12.5px; color: var(--text-muted); text-align: center; }
+    .gm-sd.is-clear .gm-sd__board { animation: gm-sd-clear .9s ease-out; }
+    @keyframes gm-sd-clear { 0% { box-shadow: 0 0 0 0 rgba(47,107,255,.5); } 100% { box-shadow: 0 0 0 18px rgba(47,107,255,0); } }
+    @media (max-width: 640px) {
+      .gm-sd__pad { gap: 4px; }
+      .gm-sd__num { height: 48px; font-size: 20px; border-radius: 10px; }
+      .gm-sd__num small { right: 3px; bottom: 2px; font-size: 9px; }
+      .gm-sd__hint { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // ── 스도쿠 생성 (시드 rng 만 사용) ───────────────────────────────
+    const SD = (function () {
+      const BOX = (i) => Math.floor(Math.floor(i / 9) / 3) * 3 + Math.floor((i % 9) / 3);
+      const PEERS = [];
+      for (let i = 0; i < 81; i++) {
+        const s = new Set();
+        const r = Math.floor(i / 9), c = i % 9, b = BOX(i);
+        for (let j = 0; j < 81; j++) {
+          if (j !== i && (Math.floor(j / 9) === r || j % 9 === c || BOX(j) === b)) s.add(j);
+        }
+        PEERS.push([...s]);
+      }
+      const ALL = 0x3fe; // 비트 1~9
+
+      function shuffle(arr, rng) {
+        for (let i = arr.length - 1; i > 0; i--) {
+          const j = Math.floor(rng() * (i + 1));
+          [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+      }
+
+      function candidates(grid, i) {
+        let used = 0;
+        for (const p of PEERS[i]) if (grid[p]) used |= 1 << grid[p];
+        return ALL & ~used;
+      }
+
+      // 해의 개수 (limit 개까지만 셈) — 후보가 가장 적은 칸부터
+      function countSolutions(grid, limit) {
+        let count = 0;
+        const g = grid.slice();
+        (function solve() {
+          if (count >= limit) return;
+          let best = -1, bestMask = 0, bestN = 10;
+          for (let i = 0; i < 81; i++) {
+            if (g[i]) continue;
+            const m = candidates(g, i);
+            let n = 0;
+            for (let x = m; x; x &= x - 1) n++;
+            if (n === 0) return;
+            if (n < bestN) { bestN = n; best = i; bestMask = m; if (n === 1) break; }
+          }
+          if (best < 0) { count++; return; }
+          for (let d = 1; d <= 9; d++) {
+            if (bestMask & (1 << d)) {
+              g[best] = d;
+              solve();
+              g[best] = 0;
+              if (count >= limit) return;
+            }
+          }
+        })();
+        return count;
+      }
+
+      function fullGrid(rng) {
+        const g = new Array(81).fill(0);
+        (function fill(i) {
+          if (i === 81) return true;
+          const m = candidates(g, i);
+          const ds = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9], rng).filter((d) => m & (1 << d));
+          for (const d of ds) {
+            g[i] = d;
+            if (fill(i + 1)) return true;
+          }
+          g[i] = 0;
+          return false;
+        })(0);
+        return g;
+      }
+
+      function generate(rng) {
+        const solution = fullGrid(rng);
+        const puzzle = solution.slice();
+        const target = 36 + Math.floor(rng() * 5); // 단서 36~40개
+        const order = shuffle([...Array(81).keys()], rng);
+        let clues = 81;
+        for (const i of order) {
+          if (clues <= target) break;
+          const keep = puzzle[i];
+          puzzle[i] = 0;
+          if (countSolutions(puzzle, 2) !== 1) puzzle[i] = keep;
+          else clues--;
+        }
+        return { solution, puzzle, clues };
+      }
+
+      return { generate, PEERS, BOX };
+    })();
+
+    HKPlay.mountGame({
+      key: "sudoku",
+      setup(stage, ctx) {
+        const PENALTY = 20;
+        const t0 = performance.now();
+        const { solution, puzzle } = SD.generate(ctx.rng());
+        console.debug("[sudoku] 생성", Math.round(performance.now() - t0), "ms");
+
+        let vals, notes, given, bad;
+        let sel = -1, memo = false, mistakes = 0;
+        let state = "ready"; // ready · play · pause · done
+        let elapsedMs = 0, runFrom = 0, tickId = 0;
+
+        stage.innerHTML = `<div class="gm-sd" tabindex="0">
+          <div class="gm-sd__bar">
+            <span class="gm-sd__chip">${HKUI.icon("timer", 16, "currentColor")}<span data-time>0:00</span></span>
+            <span class="gm-sd__chip" data-miss-chip>${HKUI.icon("circle-x", 16, "currentColor")}실수 <span data-miss>0</span></span>
+            <span class="gm-sd__bar-gap"></span>
+            <button type="button" class="gm-sd__pause" data-pause aria-label="일시정지">${HKUI.icon("pause", 18, "currentColor")}</button>
+          </div>
+          <div class="gm-sd__boardwrap">
+            <div class="gm-sd__board" data-board></div>
+            <div class="gm-sd__cover" data-cover></div>
+          </div>
+          <div class="gm-sd__pad" data-pad>${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<button type="button" class="gm-sd__num" data-n="${n}">${n}<small></small></button>`).join("")}</div>
+          <div class="gm-sd__tools">
+            <button type="button" class="gm-sd__tool" data-erase>${HKUI.icon("eraser", 18, "currentColor")} 지우기</button>
+            <button type="button" class="gm-sd__tool" data-memo>${HKUI.icon("pencil", 18, "currentColor")} 메모 <small data-memo-state>끔</small></button>
+          </div>
+          <p class="gm-sd__hint">숫자키 1~9 입력 · 방향키 이동 · Backspace 지우기 · M 메모 켜고 끄기</p>
+        </div>`;
+        const root = stage.querySelector(".gm-sd");
+        const boardEl = root.querySelector("[data-board]");
+        const cover = root.querySelector("[data-cover]");
+        const timeEl = root.querySelector("[data-time]");
+        const missEl = root.querySelector("[data-miss]");
+        const missChip = root.querySelector("[data-miss-chip]");
+        const memoBtn = root.querySelector("[data-memo]");
+        boardEl.innerHTML = Array.from({ length: 81 }, (_, i) => {
+          const r = Math.floor(i / 9), c = i % 9;
+          const cls = `${c === 2 || c === 5 ? " is-c3" : ""}${r === 2 || r === 5 ? " is-r3" : ""}`;
+          return `<div class="gm-sd__cell${cls}" data-i="${i}"></div>`;
+        }).join("");
+        const cells = [...boardEl.children];
+        HKUI.refreshIcons(root);
+
+        const fmt = (sec) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+        const elapsedSec = () => Math.floor((elapsedMs + (state === "play" ? performance.now() - runFrom : 0)) / 1000);
+        const totalSec = () => elapsedSec() + mistakes * PENALTY;
+        function drawTime() {
+          timeEl.textContent = fmt(totalSec());
+        }
+
+        function reset() {
+          vals = puzzle.slice();
+          given = puzzle.map((v) => v > 0);
+          notes = new Array(81).fill(0);
+          bad = new Array(81).fill(false);
+          sel = -1;
+          memo = false;
+          mistakes = 0;
+          elapsedMs = 0;
+          state = "ready";
+          clearInterval(tickId);
+          root.classList.remove("is-clear");
+          syncMemo();
+          missEl.textContent = "0";
+          missChip.classList.remove("is-bad");
+          drawTime();
+          render();
+          showCover("ready");
+        }
+
+        function showCover(kind) {
+          if (kind === "none") {
+            cover.hidden = true;
+            return;
+          }
+          cover.hidden = false;
+          if (kind === "ready") {
+            cover.innerHTML = `<div class="gm-sd__mini">${"<i></i>".repeat(9)}</div>
+              <h2>오늘의 스도쿠</h2>
+              <p>가로줄·세로줄·굵은 3×3 칸마다<br>1~9가 한 번씩 들어가게 채워요.<br>모두 같은 문제 · 빨리 푼 순서대로 순위가 정해져요.</p>
+              <p class="gm-sd__keys">틀린 숫자를 넣으면 +${PENALTY}초 · 시작하면 시간이 흘러요</p>
+              ${ctx.dailyDone ? `<div class="gm-sd__note">오늘 기록은 이미 반영됐어요 · 이번 판은 연습</div>` : ""}
+              <button type="button" class="gm-sd__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
+          } else if (kind === "pause") {
+            cover.innerHTML = `<h2>잠깐 쉬는 중</h2>
+              <p>시간이 멈춰 있어요. 판은 가려 둘게요.</p>
+              <button type="button" class="gm-sd__go" data-go>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
+          }
+          HKUI.refreshIcons(cover);
+          cover.querySelector("[data-go]").onclick = async (e) => {
+            if (state !== "ready") return resume();
+            // 오늘의 도전 시작 신고 — 새로고침 후 다시 시작하면 연습으로 처리된다
+            e.currentTarget.disabled = true;
+            await ctx.begin();
+            start();
+          };
+        }
+
+        function start() {
+          state = "play";
+          runFrom = performance.now();
+          showCover("none");
+          sel = vals.findIndex((v) => !v);
+          tickId = setInterval(drawTime, 250);
+          render();
+          root.focus({ preventScroll: true });
+        }
+        function pause() {
+          if (state !== "play") return;
+          elapsedMs += performance.now() - runFrom;
+          state = "pause";
+          clearInterval(tickId);
+          drawTime();
+          showCover("pause");
+        }
+        function resume() {
+          if (state !== "pause") return;
+          state = "play";
+          runFrom = performance.now();
+          tickId = setInterval(drawTime, 250);
+          showCover("none");
+          root.focus({ preventScroll: true });
+        }
+
+        function syncMemo() {
+          root.classList.toggle("is-memo", memo);
+          memoBtn.classList.toggle("is-on", memo);
+          root.querySelector("[data-memo-state]").textContent = memo ? "켬" : "끔";
+        }
+
+        function render() {
+          const sv = sel >= 0 ? vals[sel] : 0;
+          const sr = Math.floor(sel / 9), sc = sel % 9, sb = sel >= 0 ? SD.BOX(sel) : -1;
+          const hide = state === "ready";
+          for (let i = 0; i < 81; i++) {
+            const el = cells[i];
+            const v = hide ? 0 : vals[i];
+            const r = Math.floor(i / 9), c = i % 9;
+            const peer = sel >= 0 && i !== sel && (r === sr || c === sc || SD.BOX(i) === sb);
+            el.classList.toggle("is-given", given[i]);
+            el.classList.toggle("is-sel", i === sel && state !== "ready");
+            el.classList.toggle("is-peer", peer && state !== "ready");
+            el.classList.toggle("is-same", !!sv && v === sv && i !== sel);
+            el.classList.toggle("is-bad", !!v && bad[i]);
+            if (v) {
+              if (el.dataset.v !== String(v)) el.textContent = v;
+            } else if (notes[i] && !hide) {
+              let h = '<div class="gm-sd__notes">';
+              for (let d = 1; d <= 9; d++) h += `<span class="${d === sv ? "is-hl" : ""}">${notes[i] & (1 << d) ? d : ""}</span>`;
+              el.innerHTML = h + "</div>";
+            } else {
+              el.textContent = "";
+            }
+            el.dataset.v = v || "";
+          }
+          // 숫자별 남은 개수
+          const cnt = new Array(10).fill(0);
+          for (let i = 0; i < 81; i++) if (vals[i] && !bad[i]) cnt[vals[i]]++;
+          root.querySelectorAll("[data-n]").forEach((b) => {
+            const n = +b.dataset.n;
+            const left = 9 - cnt[n];
+            b.classList.toggle("is-done", left <= 0);
+            b.querySelector("small").textContent = left > 0 && state !== "ready" ? left : "";
+          });
+        }
+
+        function floatText(i, text) {
+          const wrap = root.querySelector(".gm-sd__boardwrap");
+          const cr = cells[i].getBoundingClientRect();
+          const wr = wrap.getBoundingClientRect();
+          const f = document.createElement("div");
+          f.className = "gm-sd__float";
+          f.textContent = text;
+          f.style.left = `${cr.left - wr.left + cr.width / 2}px`;
+          f.style.top = `${cr.top - wr.top + cr.height / 2}px`;
+          wrap.appendChild(f);
+          setTimeout(() => f.remove(), 1000);
+        }
+
+        function input(n) {
+          if (state !== "play" || sel < 0 || given[sel]) return;
+          if (memo) {
+            if (vals[sel]) return;
+            notes[sel] ^= 1 << n;
+            render();
+            return;
+          }
+          if (vals[sel] === n && !bad[sel]) return;
+          vals[sel] = n;
+          notes[sel] = 0;
+          if (n !== solution[sel]) {
+            bad[sel] = true;
+            mistakes++;
+            missEl.textContent = mistakes;
+            missChip.classList.add("is-bad");
+            drawTime();
+            render();
+            floatText(sel, `+${PENALTY}초`);
+            return;
+          }
+          bad[sel] = false;
+          // 맞힌 숫자는 같은 줄·칸의 메모에서 지워 줌
+          for (const p of SD.PEERS[sel]) notes[p] &= ~(1 << n);
+          render();
+          const el = cells[sel];
+          el.classList.remove("is-pop");
+          void el.offsetWidth;
+          el.classList.add("is-pop");
+          if (vals.every((v, i) => v === solution[i])) finish();
+        }
+
+        function erase() {
+          if (state !== "play" || sel < 0 || given[sel]) return;
+          vals[sel] = 0;
+          bad[sel] = false;
+          notes[sel] = 0;
+          render();
+        }
+
+        function finish() {
+          elapsedMs += performance.now() - runFrom;
+          state = "done";
+          clearInterval(tickId);
+          drawTime();
+          const score = totalSec();
+          sel = -1;
+          render();
+          root.classList.add("is-clear");
+          setTimeout(() => ctx.submit(score), 700);
+        }
+
+        function move(dr, dc) {
+          if (state !== "play") return;
+          if (sel < 0) sel = 0;
+          else {
+            const r = (Math.floor(sel / 9) + dr + 9) % 9;
+            const c = ((sel % 9) + dc + 9) % 9;
+            sel = r * 9 + c;
+          }
+          render();
+        }
+
+        boardEl.addEventListener("pointerdown", (e) => {
+          const el = e.target.closest("[data-i]");
+          if (!el || state !== "play") return;
+          sel = +el.dataset.i;
+          render();
+          root.focus({ preventScroll: true });
+        });
+        root.querySelector("[data-pad]").addEventListener("click", (e) => {
+          const b = e.target.closest("[data-n]");
+          if (b) input(+b.dataset.n);
+        });
+        root.querySelector("[data-erase]").onclick = erase;
+        memoBtn.onclick = () => {
+          memo = !memo;
+          syncMemo();
+        };
+        root.querySelector("[data-pause]").onclick = () => (state === "play" ? pause() : state === "pause" ? resume() : null);
+
+        function onKey(e) {
+          if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+          if (state === "ready" || state === "done") return;
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          const k = e.key;
+          if (state === "pause") {
+            if (k === "Enter" || k === " ") { e.preventDefault(); resume(); }
+            return;
+          }
+          if (/^[1-9]$/.test(k)) { e.preventDefault(); input(+k); }
+          else if (k === "ArrowUp") { e.preventDefault(); move(-1, 0); }
+          else if (k === "ArrowDown") { e.preventDefault(); move(1, 0); }
+          else if (k === "ArrowLeft") { e.preventDefault(); move(0, -1); }
+          else if (k === "ArrowRight") { e.preventDefault(); move(0, 1); }
+          else if (k === "Backspace" || k === "Delete" || k === "0") { e.preventDefault(); erase(); }
+          else if (k === "m" || k === "M" || k === "ㅡ" || k === " ") { e.preventDefault(); memo = !memo; syncMemo(); }
+          else if (k === "Escape" || k === "p" || k === "P") { e.preventDefault(); pause(); }
+        }
+        document.addEventListener("keydown", onKey);
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+        window.addEventListener("blur", () => pause());
+
+        ctx.onRestart(reset);
+        reset();
+      },
+    });
+  </script>
+</body>
+</html>

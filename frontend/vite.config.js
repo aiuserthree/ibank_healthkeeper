@@ -29,7 +29,7 @@ function extensionlessHtmlRoutes() {
   };
 }
 
-/** nginx 의 /go/stairs (별까지 계단 배너) 리다이렉트와 동일 */
+/** nginx 의 /go/stairs (예전 배너 링크 → 라운지의 별까지 계단) 리다이렉트와 동일 */
 function goRedirects() {
   return {
     name: "go-redirects",
@@ -37,7 +37,7 @@ function goRedirects() {
       server.middlewares.use((req, res, next) => {
         if ((req.url || "").split("?")[0] !== "/go/stairs") return next();
         res.statusCode = 302;
-        res.setHeader("Location", "https://stairs-to-the-star-zeta.vercel.app/");
+        res.setHeader("Location", "/games/stairs");
         res.end();
       });
     },

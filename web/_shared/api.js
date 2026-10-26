@@ -42,6 +42,11 @@ window.HKApi = (function () {
         method: "POST",
         body: JSON.stringify({ useCoupon: !!useCoupon }),
       }),
+    // 점심 라운지
+    playGames: () => request("/play/games"),
+    playLeaderboard: (game, period) => request(`/play/${encodeURIComponent(game)}/leaderboard?period=${encodeURIComponent(period || "today")}`),
+    playStart: (game) => request(`/play/${encodeURIComponent(game)}/start`, { method: "POST" }),
+    playSubmit: (game, score, token) => request(`/play/${encodeURIComponent(game)}/score`, { method: "POST", body: JSON.stringify({ score, token }) }),
     notices: (category) => request(category ? `/system/notices?category=${encodeURIComponent(category)}` : "/system/notices"),
     notice: (id) => request(`/system/notices/${id}`),
     adminNotices: () => request("/admin/notices"),
