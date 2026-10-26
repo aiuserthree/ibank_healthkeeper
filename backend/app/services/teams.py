@@ -239,6 +239,7 @@ def render_open_notice_body(
     site_url: str | None = None,
     notice_date: date | None = None,
     notice: Notice | None = None,
+    health: Notice | None = None,
 ) -> str:
     import html
 
@@ -255,12 +256,21 @@ def render_open_notice_body(
             f"{_notice_intro_html(notice.body)}<br>"
             f'<a href="{notice_url}">{notice_url}</a></p>'
         )
+    health_html = ""
+    if health is not None:
+        health_url = health_page_url(health.id)
+        health_html = (
+            f"<p>&nbsp;</p>"
+            f"<p><strong>💡 이번 주 건강 정보 · {html.escape(health.title)}</strong><br>"
+            f'<a href="{health_url}">{health_url}</a></p>'
+        )
     return (
         f"<p><strong>[헬스키퍼]</strong> 차주 안마 예약 신청 안내</p>"
         f"<p>{name}님, {week_label} 주간 예약 신청이 {open_label}에 시작됩니다.</p>"
         f"<p>마감: {close_label}</p>"
         f'<p><a href="{url}">{url}</a></p>'
         f"{notice_html}"
+        f"{health_html}"
         f"<p>&nbsp;</p>"
         f"<p><strong>오늘의 1분 스트레칭 · {tip_title}</strong><br>{tip_body}</p>"
     )
@@ -278,6 +288,7 @@ async def recent_pinned_notice(db: AsyncSession, send_date: date) -> Notice | No
         .where(Notice.category == "NOTICE")
         .where(Notice.pinned.is_(True))
         .where(Notice.published_at >= since)
+        .where(Notice.published_at <= now_kst())
         .order_by(Notice.published_at.desc())
         .limit(1)
     )
@@ -349,6 +360,25 @@ async def enqueue_reapply_notice(db: AsyncSession, cycle: ReservationCycle) -> t
     if enqueued:
         await db.commit()
     return enqueued, skipped
+
+
+async def recent_health_notice(db: AsyncSession, send_date: date) -> Notice | None:
+    """오픈 안내에 붙일 이번 주 건강 정보 — 발송일 기준 7일 안에 공개된 글 (가장 최근 것)."""
+    since = datetime.combine(send_date - timedelta(days=OPEN_NOTICE_RECENT_NOTICE_DAYS), time.min, tzinfo=KST)
+    result = await db.execute(
+        select(Notice)
+        .where(Notice.published.is_(True))
+        .where(Notice.category == "HEALTH")
+        .where(Notice.published_at >= since)
+        .where(Notice.published_at <= now_kst())
+        .order_by(Notice.published_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
+def health_page_url(notice_id: int) -> str:
+    return f"{get_settings().app_base_url.rstrip('/')}/health?id={notice_id}"
 
 
 def notice_page_url(notice_id: int) -> str:
@@ -863,6 +893,7 @@ async def enqueue_open_notice_broadcast(
     site_url = open_notice_site_url()
     send_date = notice_date or now_kst().date()
     notice = await recent_pinned_notice(db, send_date)
+    health = await recent_health_notice(db, send_date)
     for member in members:
         body = render_open_notice_body(
             name=member.name,
@@ -873,6 +904,7 @@ async def enqueue_open_notice_broadcast(
             site_url=site_url,
             notice_date=send_date,
             notice=notice,
+            health=health,
         )
         msg = await enqueue_teams_message(
             db,

@@ -32,6 +32,7 @@ from app.services.teams import (
     enqueue_open_notice_broadcast,
     load_open_notice_recipients,
     process_pending_teams_messages,
+    recent_health_notice,
     recent_pinned_notice,
     render_open_notice_body,
     resolve_open_notice_cycle,
@@ -114,6 +115,7 @@ async def main() -> int:
 
         open_kst = to_kst(cycle.open_at)
         notice = await recent_pinned_notice(db, to_kst(cycle.open_at).date())
+        health = await recent_health_notice(db, to_kst(cycle.open_at).date())
         sample = members[0] if members else None
         sample_body = (
             render_open_notice_body(
@@ -123,6 +125,7 @@ async def main() -> int:
                 week_start=cycle.target_week_start,
                 week_end=cycle.target_week_end,
                 notice=notice,
+                health=health,
             )
             if sample
             else "(no recipients)"

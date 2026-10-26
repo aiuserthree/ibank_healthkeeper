@@ -76,6 +76,7 @@ class NoticeSaveRequest(BaseModel):
     pinned: bool = False
     published: bool = True
     category: str = "NOTICE"
+    publishedAt: Optional[str] = None
 
 
 class CouponGrantRequest(BaseModel):

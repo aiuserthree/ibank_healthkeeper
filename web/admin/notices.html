@@ -22,15 +22,39 @@
       return iso ? HKUI.formatDate(String(iso).slice(0, 10)) : "";
     }
 
+    // 공개 일시 — KST ISO("2026-11-03T09:00:00+09:00")를 datetime-local 값으로
+    function localValue(iso) {
+      return iso ? String(iso).slice(0, 16) : "";
+    }
+
+    // 다음 화요일 09:00 — 건강 정보 정기 공개 시각
+    function nextTuesdayValue() {
+      const d = new Date();
+      d.setDate(d.getDate() + (((2 - d.getDay() + 7) % 7) || 7));
+      const p = (x) => String(x).padStart(2, "0");
+      return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T09:00`;
+    }
+
+    function openPreview(category, title, body) {
+      const { overlay, bodyEl } = HKUI.layerModal(category === "HEALTH" ? "건강 정보 미리보기" : "공지 미리보기", (el) => {
+        el.innerHTML = `<h1 style="font-size:20px;margin:0 0 16px;color:var(--color-midnight-navy)">${HKUI.escapeHtml(title || "(제목 없음)")}</h1>
+          <div class="hk-notice-body">${HKUI.noticeBodyHtml(body || "")}</div>`;
+      });
+      overlay.querySelector(".hk-dialog").style.maxWidth = "820px";
+      HKUI.refreshIcons(bodyEl);
+    }
+
     function listHtml(items) {
       if (!items.length) {
         return HKUI.emptyState({ iconName: "megaphone", title: "등록된 공지가 없어요", desc: "오른쪽 위 '새 공지'로 첫 공지를 작성해 보세요." });
       }
       return `<div class="hk-card" style="overflow:hidden">${items.map((n) => `
         <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--color-mist)">
-          ${n.category === "HEALTH" ? HKUI.badge("건강 정보", "success") : HKUI.badge("공지", "soft")}${n.pinned ? HKUI.badge("고정", "info") : ""}${n.published ? "" : HKUI.badge("숨김", "neutral")}
-          <div style="flex:1;min-width:0"><div style="font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(n.title)}</div><div style="font-size:12px;color:var(--text-muted)">${dateLabel(n.publishedAt)}</div></div>
-          <a href="${n.category === "HEALTH" ? "/health" : "/notice"}?id=${n.id}" target="_blank" rel="noopener" class="hk-btn hk-btn--ghost hk-btn--sm">보기</a>
+          ${n.category === "HEALTH" ? HKUI.badge("건강 정보", "success") : HKUI.badge("공지", "soft")}${n.pinned ? HKUI.badge("고정", "info") : ""}${n.published ? "" : HKUI.badge("숨김", "neutral")}${n.published && n.scheduled ? HKUI.badge("예약", "warning") : ""}
+          <div style="flex:1;min-width:0"><div style="font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(n.title)}</div><div style="font-size:12px;color:var(--text-muted)">${n.scheduled ? `${dateLabel(n.publishedAt)} ${String(n.publishedAt).slice(11, 16)} 공개 예정` : dateLabel(n.publishedAt)}</div></div>
+          ${n.scheduled
+            ? `<button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" data-preview="${n.id}">미리보기</button>`
+            : `<a href="${n.category === "HEALTH" ? "/health" : "/notice"}?id=${n.id}" target="_blank" rel="noopener" class="hk-btn hk-btn--ghost hk-btn--sm">보기</a>`}
           <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-edit="${n.id}">수정</button>
           <button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-delete="${n.id}">삭제</button>
         </div>`).join("")}</div>`;
@@ -52,7 +76,13 @@
           <label><input type="checkbox" id="nt-pinned" ${n?.pinned ? "checked" : ""}> 상단 고정 (목록 맨 위 · 공지는 수요일 오픈 안내에 한 번 소개)</label>
           <label><input type="checkbox" id="nt-published" ${!n || n.published ? "checked" : ""}> 공개</label>
         </div>
+        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px">공개 일시 <span style="font-weight:400;color:var(--text-muted)">— 비워 두면 저장 즉시 공개 · 미래 시각이면 그때 자동 공개 (게시 예약)</span></label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+          <input type="datetime-local" class="hk-input" id="nt-publish-at" style="width:240px" value="${localValue(n?.publishedAt)}">
+          <button type="button" class="hk-btn hk-btn--ghost hk-btn--sm" id="nt-next-tue">다음 화요일 09:00</button>
+        </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button type="button" class="hk-btn hk-btn--ghost" id="nt-preview" style="margin-right:auto">미리보기</button>
           <button type="button" class="hk-btn hk-btn--secondary" id="nt-cancel">취소</button>
           <button type="button" class="hk-btn hk-btn--primary" id="nt-save">저장</button>
         </div>
@@ -76,6 +106,9 @@
           formEl.innerHTML = formHtml(n);
           formEl.scrollIntoView({ behavior: "smooth", block: "start" });
           document.getElementById("nt-cancel").onclick = () => (formEl.innerHTML = "");
+          document.getElementById("nt-next-tue").onclick = () => (document.getElementById("nt-publish-at").value = nextTuesdayValue());
+          document.getElementById("nt-preview").onclick = () =>
+            openPreview(document.getElementById("nt-category").value, document.getElementById("nt-title").value, document.getElementById("nt-body").value);
           document.getElementById("nt-save").onclick = async () => {
             const payload = {
               category: document.getElementById("nt-category").value,
@@ -83,6 +116,7 @@
               body: document.getElementById("nt-body").value,
               pinned: document.getElementById("nt-pinned").checked,
               published: document.getElementById("nt-published").checked,
+              publishedAt: document.getElementById("nt-publish-at").value || null,
             };
             try {
               await HKApi.adminSaveNotice(editing?.id || null, payload);
@@ -100,6 +134,10 @@
             items = await HKApi.adminNotices();
             content.innerHTML = listHtml(items);
             content.querySelectorAll("[data-edit]").forEach((b) => (b.onclick = () => openForm(items.find((n) => n.id === Number(b.dataset.edit)))));
+            content.querySelectorAll("[data-preview]").forEach((b) => (b.onclick = () => {
+              const n = items.find((x) => x.id === Number(b.dataset.preview));
+              openPreview(n.category, n.title, n.body);
+            }));
             content.querySelectorAll("[data-delete]").forEach((b) => (b.onclick = async () => {
               const n = items.find((x) => x.id === Number(b.dataset.delete));
               if (!(await HKUI.confirmDialog("공지를 삭제할까요?", `<b>${HKUI.escapeHtml(n.title)}</b> 공지를 삭제합니다. 되돌릴 수 없어요.`, { confirmLabel: "삭제", confirmVariant: "danger" }))) return;
