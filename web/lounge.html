@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
-  <title>헬스키퍼 — 점심 라운지</title>
+  <title>헬스키퍼 — 게임 라운지</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -24,28 +24,30 @@
       ["STUDY", "어학"],
     ];
 
+    // 게임 가능 시간 안내 — 점심시간 · 퇴근 후 · 출근 전 · 주말
     function lunchChip() {
-      return HKLunch.isLunchTime()
-        ? `<span class="hk-lounge-lunch is-live">지금 점심시간 · 13:00까지</span>`
-        : `<span class="hk-lounge-lunch">${HKUI.icon("clock", 13, "currentColor")} 점심시간 11:30 ~ 13:00</span>`;
+      if (HKLunch.isLunchTime()) return `<span class="hk-lounge-lunch is-live">지금 점심시간 · 13:00까지</span>`;
+      if (HKLunch.isPlayTime()) return `<span class="hk-lounge-lunch is-live">지금 게임할 수 있어요</span>`;
+      return `<span class="hk-lounge-lunch">${HKUI.icon("clock", 13, "currentColor")} 점심 11:30~13:00 · 퇴근 후 18:00~</span>`;
     }
 
-    // 썸네일에서 보여 줄 부분 (기본은 가운데 조금 위)
-    const THUMB_POS = { stairs: "center 8%", blocks: "center 85%", typing: "center 35%", ox: "center 30%" };
+    // 썸네일에서 보여 줄 부분 (디자인 썸네일이라 기본 가운데)
+    const THUMB_POS = {};
 
     function cardHtml(g) {
       const top = g.todayTop
         ? `<span class="hk-lounge-card__top">${HKUI.icon("crown", 14, "#d49a00")}<span>오늘 1위 <b>${HKUI.escapeHtml(g.todayTop.name)}</b> ${HKPlay.formatScore(g, g.todayTop.score)}</span></span>`
         : `<span class="hk-lounge-card__top">${HKUI.icon("crown", 14, "var(--text-muted)")}<span>오늘 1위가 비어 있어요</span></span>`;
+      // 오늘의 도전 표시는 썸네일을 가리지 않게 제목 옆에
+      const flag = !g.dailyOnce ? ""
+        : g.playedToday ? `<span class="hk-lounge-card__flag is-done">${HKUI.icon("check", 12, "currentColor")} 참여 완료</span>`
+        : `<span class="hk-lounge-card__flag">${HKUI.icon("calendar-check", 12, "currentColor")} 오늘의 도전</span>`;
       return `<a class="hk-lounge-card" href="/games/${g.key}" data-cat="${g.category}">
           <div class="hk-lounge-card__art" style="${HKPlay.tintStyle(g.key)}">
-            <img src="/assets/lounge/${g.key}.jpg" alt="" loading="lazy" style="object-position:${THUMB_POS[g.key] || "center 40%"}" onerror="this.remove()">
-            ${g.dailyOnce ? `<span class="hk-lounge-card__flag">${HKUI.icon("calendar-check", 12, "currentColor")} 오늘의 도전</span>` : ""}
-            ${g.dailyOnce && g.playedToday ? `<span class="hk-lounge-card__done">참여 완료</span>` : ""}
-            <span class="hk-lounge-card__badge" style="${HKPlay.tintStyle(g.key)}">${HKUI.icon(g.icon, 18, "#fff")}</span>
+            <img src="/assets/lounge/${g.key}.jpg" alt="" loading="lazy" style="object-position:${THUMB_POS[g.key] || "center"}" onerror="this.remove()">
           </div>
           <div>
-            <div class="hk-lounge-card__body"><b>${HKUI.escapeHtml(g.title)}</b><p>${HKUI.escapeHtml(g.desc)}</p></div>
+            <div class="hk-lounge-card__body"><b>${HKUI.escapeHtml(g.title)}${flag}</b><p>${HKUI.escapeHtml(g.desc)}</p></div>
             <div class="hk-lounge-card__foot">${top}<span>${g.todayPlayers ? `${g.todayPlayers}명 참가` : ""}</span></div>
           </div>
         </a>`;
@@ -58,14 +60,20 @@
       render: () => `<div class="hk-lounge-hero">
           <div>
             ${lunchChip()}
-            <h1>점심 라운지</h1>
-            <p>점심 먹고 남은 10분, 동료들과 한 판. 오늘 사내 1위는 누구일까요?</p>
+            <h1>게임 라운지</h1>
+            <p>점심시간·퇴근 후 동료들과 한 판. 오늘 사내 1위는 누구일까요?</p>
           </div>
         </div>
         <div class="hk-lounge-tabs">${CATEGORIES.map(([k, l], i) => `<button type="button" class="hk-lounge-tab${i === 0 ? " is-active" : ""}" data-cat="${k}">${l}</button>`).join("")}</div>
         <div class="hk-lounge-grid" id="lounge-grid"><div style="grid-column:1/-1;text-align:center;padding:48px"><span class="hk-spin"></span></div></div>`,
       afterMount: async () => {
         const grid = document.getElementById("lounge-grid");
+        HKApi.playStatus().then((st) => {
+          if (st.open) return;
+          grid.classList.add("is-closed");
+          grid.insertAdjacentHTML("beforebegin", `<div class="hk-lounge-closed">${HKUI.icon("briefcase", 18, "currentColor")}<span>지금은 업무 시간이라 게임을 할 수 없어요. 순위는 볼 수 있어요 · 오늘 <b>${st.opensAt}</b>에 다시 열려요</span></div>`);
+          HKUI.refreshIcons();
+        }).catch(() => {});
         try {
           const games = await HKApi.playGames();
           grid.innerHTML = games.map(cardHtml).join("");

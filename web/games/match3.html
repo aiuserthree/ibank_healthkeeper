@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>비타민 3매치 — 점심 라운지</title>
+  <title>비타민 3매치 — 게임 라운지</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -14,35 +14,48 @@
   <script src="/_shared/play.js"></script>
   <style>
     .gm-wrap { margin: 0 auto; display: flex; flex-direction: column; gap: 10px; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
-    .gm-hud { display: flex; align-items: center; gap: 10px; padding: 10px 12px 10px 16px; border-radius: 14px; background: linear-gradient(135deg, #ff7a59, #ffb648); color: #fff; }
-    .gm-stat { display: flex; flex-direction: column; line-height: 1.15; }
-    .gm-stat small { font-size: 11.5px; opacity: .9; font-weight: 600; }
-    .gm-stat b { font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-    .gm-stat--score { flex: 1; min-width: 0; }
+    .gm-hud { position: relative; overflow: hidden; display: flex; align-items: center; gap: 10px; padding: 9px 12px 12px 16px; border-radius: 14px; background: linear-gradient(135deg, #ff7a59, #ffb648); color: #fff; }
+    .gm-hud__main { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.15; }
+    .gm-stagelbl { display: flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gm-stagelbl b { padding: 1px 7px; border-radius: 99px; background: rgba(255,255,255,.26); font-weight: 900; }
+    .gm-total { display: flex; align-items: baseline; gap: 6px; }
+    .gm-total b { font-size: 24px; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+    .gm-total small { font-size: 11.5px; opacity: .9; font-weight: 700; }
     .gm-time { display: flex; align-items: center; gap: 5px; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; padding: 4px 10px; border-radius: 10px; background: rgba(255,255,255,.2); }
     .gm-time.is-low { background: #fff; color: #e5484d; animation: gm-blink 1s infinite; }
     @keyframes gm-blink { 50% { opacity: .65; } }
     .gm-hud__btn { width: 38px; height: 38px; border-radius: 11px; border: 0; background: rgba(255,255,255,.22); color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
     .gm-hud__btn:hover { background: rgba(255,255,255,.32); }
     .gm-hud__btn:disabled { opacity: .45; cursor: default; }
-    .gm-meters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .gm-meter { background: var(--surface-card, #fff); border: 1px solid var(--border-default, #e3e8f2); border-radius: 12px; padding: 8px 10px; }
-    .gm-meter__top { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: 6px; }
-    .gm-meter__top em { margin-left: auto; font-style: normal; color: var(--text-muted, #64748b); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .gm-hud__timebar { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.25); }
+    .gm-hud__timebar i { display: block; height: 100%; width: 100%; background: #fff; border-radius: 0 99px 99px 0; }
+    .gm-hud__timebar.is-low i { background: #ffe1e1; }
+    .gm-meters { display: grid; grid-template-columns: 1.45fr 1fr; gap: 10px; }
+    .gm-meter { background: var(--surface-card, #fff); border: 1px solid var(--border-default, #e3e8f2); border-radius: 12px; padding: 8px 10px; min-width: 0; }
+    .gm-meter__top { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-secondary, #475569); margin-bottom: 6px; white-space: nowrap; }
+    .gm-meter__top em { margin-left: auto; font-style: normal; color: var(--text-muted, #64748b); font-weight: 600; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+    .gm-meter--goal .gm-meter__top em { color: var(--color-midnight-navy, #0f1d3d); font-weight: 800; }
     .gm-bar { height: 8px; border-radius: 99px; background: var(--color-mist, #eef2f8); overflow: hidden; }
     .gm-bar i { display: block; height: 100%; width: 100%; border-radius: 99px; }
-    .gm-bar--time i { background: linear-gradient(90deg, #ffb648, #ff7a59); }
-    .gm-bar--time.is-low i { background: #e5484d; }
+    .gm-bar--goal i { width: 0; background: linear-gradient(90deg, #ffb648, #ff7a59); transition: width .3s; }
+    .gm-meter--goal.is-done { border-color: #86efac; background: #f0fdf4; }
+    .gm-meter--goal.is-done .gm-bar--goal i { background: linear-gradient(90deg, #4ade80, #16a34a); }
+    .gm-meter--goal.is-done .gm-meter__top em { color: #15803d; }
     .gm-bar--vit i { width: 0; background: linear-gradient(90deg, #8bd450, #22c55e); transition: width .25s; }
     .gm-meter.is-fever .gm-bar--vit i { background: linear-gradient(90deg, #ff7a59, #ffd23f, #ff7a59); background-size: 200% 100%; animation: gm-flow .8s linear infinite; transition: none; }
     .gm-meter.is-fever .gm-meter__top em { color: #ff6a3d; font-weight: 800; }
     @keyframes gm-flow { to { background-position: -200% 0; } }
-    .gm-boardwrap { position: relative; align-self: center; border-radius: 18px; padding: 6px; background: #fff3e6; border: 1px solid #ffe0c2; transition: box-shadow .3s; }
+    .gm-boardwrap { position: relative; align-self: center; border-radius: 18px; padding: 6px; background: #fff7ef; border: 1px solid #ffe6cf; transition: box-shadow .3s; }
     .gm-boardwrap.is-fever { animation: gm-fever .7s ease-in-out infinite alternate; border-color: #ffb648; }
     @keyframes gm-fever { from { box-shadow: 0 0 0 3px #ffb648, 0 0 14px 2px rgba(255,122,89,.45); } to { box-shadow: 0 0 0 4px #ff7a59, 0 0 30px 8px rgba(255,182,72,.75); } }
-    .gm-board { position: relative; overflow: hidden; border-radius: 13px; touch-action: none; cursor: pointer;
-      background-color: #fffaf4; background-image: linear-gradient(45deg, #fff0e0 25%, transparent 25%, transparent 75%, #fff0e0 75%), linear-gradient(45deg, #fff0e0 25%, transparent 25%, transparent 75%, #fff0e0 75%); }
-    .gm-tile { position: absolute; left: 0; top: 0; transition-property: transform; transition-timing-function: ease; will-change: transform; }
+    .gm-board { position: relative; overflow: hidden; border-radius: 12px; touch-action: none; cursor: pointer; background: repeating-linear-gradient(135deg, rgba(205,150,105,.2) 0 4px, transparent 4px 10px); }
+    /* 판 모양 — 유효 칸만 칠하고, 구멍은 빗금으로 비워 둔다 */
+    .gm-cells { position: absolute; inset: 0; filter: drop-shadow(0 0 1px #e8925a) drop-shadow(0 0 1px #e8925a) drop-shadow(0 2px 4px rgba(200,110,50,.2)); }
+    .gm-cell { position: absolute; background: #fffdf9; }
+    .gm-cell.is-alt { background: #ffeedd; }
+    .gm-tile { position: absolute; left: 0; top: 0; z-index: 1; transition-property: transform; transition-timing-function: ease; will-change: transform; }
+    .gm-tile.is-new { animation: gm-in .22s ease-out; }
+    @keyframes gm-in { from { opacity: 0; } }
     .gm-ball { position: absolute; inset: 7%; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; overflow: hidden;
       background: radial-gradient(circle at 32% 28%, var(--c2) 0%, var(--c) 62%); box-shadow: inset 0 -3px 0 rgba(0,0,0,.13), 0 2px 4px rgba(120,60,20,.18);
       transition: transform .2s ease, opacity .2s ease; }
@@ -58,11 +71,62 @@
     .gm-tile.is-bomb .gm-ball { box-shadow: 0 0 0 2.5px #fff, 0 0 0 5px #111827, 0 0 14px 4px rgba(239,68,68,.7); animation: gm-bombpulse .9s ease-in-out infinite; }
     .gm-tile.is-bomb .gm-ball::before { content: ""; position: absolute; inset: 14%; border-radius: 50%; border: 2px dashed rgba(255,255,255,.85); }
     @keyframes gm-bombpulse { 50% { transform: scale(1.07); } }
+    /* 아이템 — 빛나는 비타민 · 시계 · 점수 2배 */
+    .gm-tile.is-glow::before { content: ""; position: absolute; inset: -4%; border-radius: 50%; pointer-events: none;
+      background: conic-gradient(from 0deg, transparent 0 6%, rgba(255,236,140,.95) 9%, transparent 13% 31%, rgba(255,255,255,.95) 34%, transparent 38% 56%, rgba(255,236,140,.95) 59%, transparent 63% 81%, rgba(255,255,255,.95) 84%, transparent 88%);
+      animation: gm-spin 2.6s linear infinite; }
+    @keyframes gm-spin { to { transform: rotate(360deg); } }
+    .gm-tile.is-glow .gm-ball { box-shadow: 0 0 0 2.5px #fff, 0 0 12px 4px rgba(255,214,90,.95), inset 0 0 10px rgba(255,255,255,.8); animation: gm-glow 1s ease-in-out infinite alternate; }
+    @keyframes gm-glow { to { filter: brightness(1.22) saturate(1.1); } }
+    .gm-tile.is-clock .gm-ball { box-shadow: 0 0 0 2.5px #fff, 0 0 0 5px #0ea5e9, 0 2px 6px rgba(14,165,233,.4); }
+    .gm-tile.is-x2 .gm-ball { box-shadow: 0 0 0 2.5px #fff, 0 0 0 5px #f59e0b, 0 2px 6px rgba(245,158,11,.45); }
+    .gm-badge { position: absolute; right: 2%; bottom: 2%; z-index: 2; width: 44%; height: 44%; border-radius: 50%; display: flex; align-items: center; justify-content: center; pointer-events: none;
+      background: #fff; color: #0284c7; box-shadow: 0 1px 4px rgba(15,23,42,.3); font-weight: 900; font-size: 11px; letter-spacing: -.04em; }
+    .gm-badge svg { width: 72%; height: 72%; }
+    .gm-badge--x2 { background: linear-gradient(135deg, #fde047, #f59e0b); color: #7c2d12; border: 1.5px solid #fff; }
+    .gm-tile.is-spawn .gm-ball { animation: gm-spawn .65s ease-out; }
+    @keyframes gm-spawn { 0% { transform: scale(.3) rotate(-30deg); filter: brightness(2); } 55% { transform: scale(1.3) rotate(10deg); filter: brightness(1.5); } 100% { transform: scale(1); } }
+    .gm-ring { position: absolute; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; z-index: 4; border: 3px solid #ffd23f; box-shadow: 0 0 14px 4px rgba(255,210,63,.7); animation: gm-ring .6s ease-out forwards; }
+    @keyframes gm-ring { from { transform: translate(-50%, -50%) scale(.2); opacity: 1; } to { transform: translate(-50%, -50%) scale(1.6); opacity: 0; } }
+    .gm-tile.is-zap .gm-ball { filter: brightness(1.8); box-shadow: 0 0 0 3px #fff, 0 0 16px 6px rgba(255,236,140,.95); }
+    .gm-x2 { padding: 1px 8px; border-radius: 99px; background: #fde047; color: #92400e; font-size: 12px; font-weight: 900; animation: gm-blink .8s infinite; }
+    .gm-x2[hidden] { display: none; }
+    /* 얼음 — 타일 위에 씌운 반투명 얼음 덮개 */
+    .gm-ice { position: absolute; inset: 3%; z-index: 2; border-radius: 24%; pointer-events: none;
+      background: linear-gradient(135deg, rgba(255,255,255,.75) 0 14%, transparent 14% 30%, rgba(255,255,255,.45) 30% 36%, transparent 36%), rgba(186,230,253,.55);
+      border: 2px solid rgba(255,255,255,.95); box-shadow: inset 0 0 0 2px rgba(56,189,248,.55), 0 0 0 1px rgba(14,165,233,.35), inset 0 -4px 8px rgba(14,165,233,.25); }
+    .gm-ice.is-break { animation: gm-icebreak .3s ease-in forwards; }
+    @keyframes gm-icebreak { to { transform: scale(1.25) rotate(8deg); opacity: 0; } }
+    .gm-tile.is-ice.is-nope .gm-ice { animation: gm-nope .3s ease-in-out; }
+    @keyframes gm-nope { 25% { translate: -3px 0; } 75% { translate: 3px 0; } }
+    /* 돌 — 칸을 막는 장애물, 두 번 맞으면 부서짐 */
+    .gm-stone { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
+    .gm-stone::before { content: ""; position: absolute; inset: 6%; border-radius: 30% 36% 28% 34%;
+      background: radial-gradient(circle at 34% 28%, #cbd5e1 0%, #94a3b8 45%, #64748b 100%);
+      box-shadow: inset 0 -4px 0 rgba(15,23,42,.22), inset 2px 2px 0 rgba(255,255,255,.35), 0 2px 4px rgba(15,23,42,.25); }
+    .gm-stone::after { content: ""; position: absolute; inset: 6%; border-radius: 30%; opacity: 0;
+      background: linear-gradient(118deg, transparent 47%, #334155 47% 52%, transparent 52%), linear-gradient(28deg, transparent 58%, #334155 58% 62%, transparent 62%), linear-gradient(72deg, transparent 30%, #334155 30% 34%, transparent 34%); }
+    .gm-stone.is-crack::after { opacity: .75; }
+    .gm-stone.is-hit { animation: gm-stonehit .25s ease-out; }
+    @keyframes gm-stonehit { 40% { transform: var(--pos) scale(.88); } }
+    .gm-stone.is-break { animation: gm-stonebreak .32s ease-in forwards; }
+    @keyframes gm-stonebreak { to { opacity: 0; transform: var(--pos) scale(.4) rotate(20deg); } }
     .gm-spark { position: absolute; width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; pointer-events: none; z-index: 4; animation: gm-spark .5s ease-out forwards; }
+    .gm-spark.is-shard { border-radius: 2px; }
     @keyframes gm-spark { to { transform: translate(var(--dx), var(--dy)) scale(.2); opacity: 0; } }
     .gm-boom { position: absolute; transform: translate(-50%, -50%); border-radius: 18px; pointer-events: none; z-index: 4; background: radial-gradient(circle, #fff 0%, rgba(255,214,102,.9) 35%, rgba(255,122,89,.5) 60%, transparent 72%); animation: gm-boom .45s ease-out forwards; }
     @keyframes gm-boom { from { transform: translate(-50%, -50%) scale(.3); opacity: 1; } to { transform: translate(-50%, -50%) scale(1.15); opacity: 0; } }
     .gm-boardwrap.is-shake { animation: gm-shake .32s ease-in-out; }
+    .gm-boardwrap.is-shake2 { animation: gm-shake2 .42s ease-in-out; }
+    .gm-boardwrap.is-fever.is-shake2 { animation: gm-shake2 .42s ease-in-out, gm-fever .7s ease-in-out infinite alternate; }
+    @keyframes gm-shake2 { 15% { translate: -9px 4px; rotate: -.6deg; } 30% { translate: 8px -4px; rotate: .6deg; } 50% { translate: -6px 3px; } 70% { translate: 5px -2px; } 85% { translate: -2px 1px; } }
+    .gm-spark.is-star { width: 12px; height: 12px; margin: -6px 0 0 -6px; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); box-shadow: none; }
+    .gm-chain { position: absolute; left: 50%; top: 22%; z-index: 7; pointer-events: none; transform: translate(-50%, -50%); text-align: center; line-height: 1.05; white-space: nowrap; animation: gm-chain .9s ease-out forwards; }
+    .gm-chain b { display: block; font-size: var(--fs, 26px); font-weight: 900; letter-spacing: -.02em; color: #fff; -webkit-text-stroke: 1.5px #ea580c; paint-order: stroke fill; text-shadow: 0 3px 0 #c2410c, 0 6px 16px rgba(234,88,12,.45); }
+    .gm-chain small { display: inline-block; margin-top: 4px; padding: 2px 10px; border-radius: 99px; background: #fff; color: #ea580c; font-size: 13px; font-weight: 900; box-shadow: 0 3px 10px rgba(234,88,12,.3); }
+    .gm-chain.is-hot b { color: #fff7c2; -webkit-text-stroke-color: #dc2626; text-shadow: 0 3px 0 #b91c1c, 0 0 22px rgba(255,200,60,.9); }
+    @keyframes gm-chain { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.4); } 18% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); } 30% { transform: translate(-50%, -50%) scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -80%) scale(.95); } }
+    .gm-float.is-big { font-size: 21px; padding: 4px 12px; background: rgba(220, 38, 38, .92); }
     .gm-boardwrap.is-fever.is-shake { animation: gm-shake .32s ease-in-out, gm-fever .7s ease-in-out infinite alternate; }
     @keyframes gm-shake { 20% { translate: -5px 2px; } 40% { translate: 5px -2px; } 60% { translate: -3px 1px; } 80% { translate: 3px 0; } }
     .gm-time.is-plus { animation: gm-plus .5s ease-out; }
@@ -71,32 +135,49 @@
     @keyframes gm-born { 0% { transform: scale(.4); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
     .gm-tile.is-hint .gm-ball { animation: gm-hint 1.1s ease-in-out infinite; }
     @keyframes gm-hint { 0%, 60%, 100% { transform: scale(1); } 20% { transform: scale(1.12) rotate(-8deg); } 40% { transform: scale(1.12) rotate(8deg); } }
-    .gm-beam { position: absolute; pointer-events: none; border-radius: 99px; animation: gm-beam .38s ease-out forwards; }
-    .gm-beam { z-index: 4; }
+    .gm-beam { position: absolute; pointer-events: none; border-radius: 99px; z-index: 4; animation: gm-beam .38s ease-out forwards; }
     .gm-beam--row { left: 0; right: 0; background: linear-gradient(90deg, rgba(255,122,89,.2), #fff 30%, #fff 70%, rgba(255,122,89,.2)); box-shadow: 0 0 0 3px rgba(255,182,72,.9), 0 0 22px 8px rgba(255,122,89,.75); }
     .gm-beam--col { top: 0; bottom: 0; background: linear-gradient(180deg, rgba(255,122,89,.2), #fff 30%, #fff 70%, rgba(255,122,89,.2)); box-shadow: 0 0 0 3px rgba(255,182,72,.9), 0 0 22px 8px rgba(255,122,89,.75); }
     @keyframes gm-beam { from { opacity: 1; } to { opacity: 0; } }
     .gm-float { position: absolute; pointer-events: none; transform: translate(-50%, -50%); font-weight: 900; font-size: 17px; line-height: 1.15; color: #fff; white-space: nowrap; padding: 3px 10px; border-radius: 99px; background: rgba(240, 90, 50, .92); box-shadow: 0 3px 10px rgba(200,70,30,.35); animation: gm-float .9s ease-out forwards; z-index: 5; }
+    .gm-float.is-time { background: rgba(14,165,233,.95); box-shadow: 0 3px 10px rgba(14,116,144,.35); }
     .gm-float small { display: block; text-align: center; font-size: 11px; font-weight: 800; color: #ffe7a8; }
     @keyframes gm-float { 0% { opacity: 0; margin-top: 8px; } 15% { opacity: 1; margin-top: 0; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -26px; } }
-    .gm-banner { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); pointer-events: none; z-index: 6; padding: 10px 18px; border-radius: 14px; font-size: 18px; font-weight: 900; color: #fff; white-space: nowrap; background: linear-gradient(135deg, #ff7a59, #ffb648); box-shadow: 0 8px 20px rgba(255,122,89,.45); animation: gm-banner 1.3s ease-out forwards; }
-    @keyframes gm-banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 25% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70%); } }
-    .gm-overlay { position: absolute; inset: 0; z-index: 8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; text-align: center; border-radius: 18px; color: var(--color-midnight-navy, #0f1d3d); background: rgba(255, 250, 244, .9); backdrop-filter: blur(3px); }
+    .gm-banner { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); pointer-events: none; z-index: 6; padding: 10px 18px; border-radius: 14px; font-size: 18px; font-weight: 900; line-height: 1.3; text-align: center; color: #fff; width: max-content; max-width: 92%; box-sizing: border-box; word-break: keep-all; background: linear-gradient(135deg, #ff7a59, #ffb648); box-shadow: 0 8px 20px rgba(255,122,89,.45); animation: gm-banner 1.3s ease-out forwards; }
+    .gm-banner small { display: block; font-size: 12.5px; font-weight: 800; opacity: .95; }
+    .gm-banner.is-long { animation-duration: 2.2s; }
+    @keyframes gm-banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 20% { transform: translate(-50%, -50%) scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -70%); } }
+    .gm-overlay { position: absolute; inset: 0; z-index: 8; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; text-align: center; border-radius: 18px; overflow: auto; color: var(--color-midnight-navy, #0f1d3d); background: rgba(255, 250, 244, .92); backdrop-filter: blur(3px); }
     .gm-overlay[hidden] { display: none; }
     .gm-overlay h2 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
     .gm-overlay p { margin: 0; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary, #475569); }
-    .gm-rules { display: grid; gap: 6px; text-align: left; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary, #475569); background: #fff; border: 1px solid #ffe0c2; border-radius: 12px; padding: 10px 12px; max-width: 320px; }
+    .gm-rules { display: grid; gap: 6px; text-align: left; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary, #475569); background: #fff; border: 1px solid #ffe0c2; border-radius: 12px; padding: 10px 12px; max-width: 340px; }
     .gm-rules div { display: flex; gap: 8px; align-items: flex-start; }
     .gm-rules i, .gm-rules svg { flex-shrink: 0; margin-top: 1px; }
     .gm-start { border: 0; border-radius: 12px; padding: 12px 30px; font-size: 16px; font-weight: 800; color: #fff; cursor: pointer; background: linear-gradient(135deg, #ff7a59, #ffb648); box-shadow: 0 6px 16px rgba(255, 122, 89, .4); display: inline-flex; align-items: center; gap: 6px; }
     .gm-start:hover { filter: brightness(1.05); }
     .gm-big { font-size: 30px; font-weight: 900; color: #ff6a3d; }
+    /* 단계 클리어 카드 */
+    .gm-overlay.is-clear { background: rgba(255, 250, 244, .8); }
+    .gm-clear { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px 22px; border-radius: 16px; background: #fff; border: 1px solid #ffe0c2; box-shadow: 0 10px 28px rgba(255,122,89,.25); animation: gm-pop .35s ease-out; }
+    @keyframes gm-pop { from { transform: scale(.8); opacity: 0; } }
+    .gm-clear__icon { width: 46px; height: 46px; border-radius: 14px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff7a59, #ffb648); box-shadow: 0 6px 14px rgba(255,122,89,.4); }
+    .gm-clear__bonus { font-size: 14px; font-weight: 700; color: var(--text-secondary, #475569); font-variant-numeric: tabular-nums; }
+    .gm-clear__bonus b { color: #16a34a; font-size: 18px; }
+    .gm-clear__next { margin-top: 4px; padding: 5px 12px; border-radius: 99px; background: #fff3e6; color: #c2410c; font-size: 13px; font-weight: 800; }
+    .gm-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .gm-chip { padding: 3px 10px; border-radius: 99px; background: #fff; border: 1px solid #ffe0c2; font-size: 12.5px; font-weight: 700; color: var(--text-secondary, #475569); }
+    .gm-chip b { color: #ff6a3d; }
     @media (max-width: 420px) {
-      .gm-stat b { font-size: 21px; } .gm-time { font-size: 19px; }
+      .gm-total b { font-size: 21px; } .gm-time { font-size: 19px; } .gm-stagelbl { font-size: 12px; }
       .gm-meters { gap: 8px; } .gm-meter { padding: 7px 8px; }
       .gm-overlay { gap: 7px; padding: 10px; } .gm-overlay h2 { font-size: 19px; } .gm-overlay p { font-size: 12px; line-height: 1.5; }
       .gm-rules { font-size: 11.5px; padding: 8px 10px; gap: 4px; } .gm-start { padding: 10px 26px; font-size: 15px; }
-      .gm-float { font-size: 15px; } .gm-banner { font-size: 16px; }
+      .gm-float { font-size: 15px; } .gm-banner { font-size: 16px; } .gm-big { font-size: 26px; }
+      .gm-clear { padding: 14px 16px; }
+    }
+    @media (max-width: 380px) {
+      .gm-overlay { gap: 5px; padding: 8px; } .gm-rules { line-height: 1.35; gap: 3px; padding: 7px 9px; } .gm-overlay h2 { font-size: 18px; }
     }
   </style>
 </head>
@@ -106,24 +187,77 @@
     HKPlay.mountGame({
       key: "match3",
       setup(stage, ctx) {
-        // 90초로 시작하고, 연쇄·특수 비타민이 터질 때마다 시간이 조금씩 늘어난다 (최대 99초)
-        const N = 8, GAME_MS = 90000, MAX_MS = 99000, FEVER_MS = 6000;
+        // 단계제 — 단계마다 목표 점수를 제한 시간 안에 채우면 다음 판(다른 모양의 판)으로 넘어간다
+        const FEVER_MS = 6000, CLEAR_BONUS = 20;
         const KINDS = [
-          // 빨강·주황·노랑·초록·파랑·보라 — 색만 봐도 바로 구분되게
+          // 빨강·주황·노랑·초록·파랑·보라 + 7단계부터 분홍 — 색만 봐도 바로 구분되게
           { icon: "apple", c: "#e11d48" },
           { icon: "carrot", c: "#f97316" },
           { icon: "banana", c: "#facc15" },
           { icon: "citrus", c: "#16a34a" },
           { icon: "milk", c: "#2563eb" },
           { icon: "grape", c: "#9333ea" },
+          { icon: "ice-cream-cone", c: "#f472b6" },
         ];
         const ALL = -1; // 종합 비타민(어느 종류도 아님)
+        // 아이템 — 플레이 중 몇 초마다 일반 비타민 하나가 아이템으로 변신한다. 같은 그림과 함께 맞춰 터뜨리면 발동
+        const ITEMS = {
+          bomb: { name: "비타민 폭탄", desc: "같이 터뜨리면 둘레 3×3", w: 22 },
+          glow: { name: "빛나는 비타민", desc: "터지면 같은 그림이 전부 사라져요", w: 16 },
+          row: { name: "가로 줄 비타민", desc: "터지면 가로 한 줄을 싹", w: 12 },
+          col: { name: "세로 줄 비타민", desc: "터지면 세로 한 줄을 싹", w: 12 },
+          clock: { name: "시계 비타민", desc: "터지면 남은 시간 +5초", w: 20 },
+          x2: { name: "점수 2배 비타민", desc: "터지면 5초 동안 점수 2배", w: 18 },
+        };
+        const MAX_ITEMS = 3, DOUBLE_MS = 5000, CLOCK_MS = 5000;
+        function pickItem() {
+          const list = Object.entries(ITEMS), sum = list.reduce((a, [, v]) => a + v.w, 0);
+          let x = Math.random() * sum;
+          for (const [k, v] of list) { x -= v.w; if (x < 0) return k; }
+          return "bomb";
+        }
+
+        // 판 모양 — '#' 칸, '.' 구멍
+        const MAPS = [
+          { name: "꽉 찬 사각", m: ["########", "########", "########", "########", "########", "########", "########", "########"] },
+          { name: "다이아몬드", m: ["...###...", "..#####..", ".#######.", "#########", "#########", "#########", ".#######.", "..#####..", "...###..."] },
+          { name: "하트", m: [".##...##.", "####.####", "#########", "#########", "#########", ".#######.", "..#####..", "...###...", "....#...."] },
+          { name: "십자", m: ["..#####..", "..#####..", "#########", "#########", "#########", "#########", "#########", "..#####..", "..#####.."] },
+          { name: "도넛", m: [".#######.", "#########", "#########", "###...###", "###...###", "###...###", "#########", "#########", ".#######."] },
+          { name: "계단", m: ["#####....", "######...", "#######..", "########.", "#########", "#########", ".########", "..#######", "...######"] },
+          { name: "모래시계", m: ["#########", "#########", ".#######.", "..#####..", "...###...", "..#####..", ".#######.", "#########", "#########"] },
+          { name: "지그재그", m: ["######...", "######...", "..######.", "..######.", "...######", "..######.", "..######.", "######...", "######..."] },
+          { name: "쌍둥이 기둥", m: ["#########", "#########", "#########", "##.###.##", "##.###.##", "##.###.##", "#########", "#########", "#########"] },
+          { name: "나비", m: ["###...###", "####.####", "#########", "#########", ".#######.", "#########", "#########", "####.####", "###...###"] },
+          { name: "징검다리", m: ["########", "#.####.#", "########", "##.##.##", "##.##.##", "########", "#.####.#", "########"] },
+          { name: "톱니 액자", m: ["#.#.#.#.#", ".#######.", "#########", ".#######.", "#########", ".#######.", "#########", ".#######.", "#.#.#.#.#"] },
+          { name: "화살표", m: ["....#....", "...###...", "..#####..", ".#######.", "#########", "..#####..", "..#####..", "..#####..", "..#####.."] },
+        ];
+
+        // 단계별 목표 점수 — 자동 플레이(사람 속도로 무작위 수)로 잰 득점 속도에 맞춤.
+        // 1~3단계는 시간의 절반 이상 남기고 넉넉히, 6단계부터 빠듯하게. 그림 종류가 늘면 득점이 크게 줄어서
+        // 단계 배율(×1.1씩)로 보정해 목표가 계속 오르게 했다
+        const TARGETS = [6000, 8000, 9000, 9500, 10000, 15000, 16000, 17000, 18000, 19000];
+        function cfg(n) {
+          const last = TARGETS[TARGETS.length - 1];
+          return {
+            timeMs: Math.max(60, 80 - 2 * (n - 1)) * 1000,
+            kinds: n <= 2 ? 5 : n <= 6 ? 6 : 7,
+            ice: n >= 4 ? Math.min(16, 4 + 2 * (n - 4)) : 0,
+            stones: n >= 7 ? Math.min(10, 3 + (n - 7)) : 0,
+            lucky: Math.max(0.03, 0.05 - 0.0025 * (n - 1)),
+            // 아이템 등장 간격 — 1단계 약 6초, 단계마다 0.4초씩 길어져 최대 10초 (±1초)
+            spawnMs: Math.min(10000, 6000 + 400 * (n - 1)),
+            target: TARGETS[n - 1] ?? last + 1500 * (n - TARGETS.length),
+            mult: Math.round((1 + 0.1 * (n - 1)) * 10) / 10, // 단계 배율 — 높은 단계일수록 한 번에 얻는 점수가 커짐
+          };
+        }
 
         // 아이콘 SVG를 한 번만 만들어 재사용
         const SVG = {};
         (function buildIcons() {
           const tmp = document.createElement("div");
-          const names = KINDS.map((k) => k.icon).concat(["pill"]);
+          const names = KINDS.map((k) => k.icon).concat(["pill", "alarm-clock"]);
           tmp.innerHTML = names.map((n) => HKUI.icon(n, 24, "currentColor")).join("");
           tmp.style.cssText = "position:absolute;width:0;height:0;overflow:hidden;visibility:hidden";
           document.body.appendChild(tmp); // lucide는 문서 안의 요소만 바꿔 줌
@@ -142,16 +276,21 @@
           const f = (v) => Math.round(v + (255 - v) * p);
           return `rgb(${f((n >> 16) & 255)},${f((n >> 8) & 255)},${f(n & 255)})`;
         }
+        const fmt = (n) => Math.round(n).toLocaleString("ko-KR");
 
         stage.innerHTML = `<div class="gm-wrap">
           <div class="gm-hud">
-            <div class="gm-stat gm-stat--score"><small>점수</small><b data-v="score">0</b></div>
-            <div class="gm-time" data-v="timebox">${HKUI.icon("timer", 18, "currentColor")}<span data-v="time">90</span></div>
+            <div class="gm-hud__main">
+              <div class="gm-stagelbl"><b data-v="stage">1단계</b><span data-v="mapname"></span></div>
+              <div class="gm-total"><b data-v="score">0</b><small>총점</small><span class="gm-x2" data-v="x2" hidden></span></div>
+            </div>
+            <div class="gm-time" data-v="timebox">${HKUI.icon("timer", 18, "currentColor")}<span data-v="time">80</span></div>
             <button type="button" class="gm-hud__btn" data-pause aria-label="일시정지" disabled>${HKUI.icon("pause", 18, "#fff")}</button>
+            <div class="gm-hud__timebar"><i data-v="timebar"></i></div>
           </div>
           <div class="gm-meters">
-            <div class="gm-meter"><div class="gm-meter__top">${HKUI.icon("hourglass", 14, "#ff7a59")}남은 시간<em data-v="time2">90초</em></div><div class="gm-bar gm-bar--time"><i data-v="timebar"></i></div></div>
-            <div class="gm-meter" data-v="vitbox"><div class="gm-meter__top">${HKUI.icon("pill", 14, "#22c55e")}비타민 게이지<em data-v="vitlbl">0%</em></div><div class="gm-bar gm-bar--vit"><i data-v="vitbar"></i></div></div>
+            <div class="gm-meter gm-meter--goal" data-v="goalbox"><div class="gm-meter__top">${HKUI.icon("target", 14, "#ff7a59")}목표<em data-v="goallbl">0 / 0</em></div><div class="gm-bar gm-bar--goal"><i data-v="goalbar"></i></div></div>
+            <div class="gm-meter" data-v="vitbox"><div class="gm-meter__top">${HKUI.icon("pill", 14, "#22c55e")}게이지<em data-v="vitlbl">0%</em></div><div class="gm-bar gm-bar--vit"><i data-v="vitbar"></i></div></div>
           </div>
           <div class="gm-boardwrap">
             <div class="gm-board"></div>
@@ -165,29 +304,40 @@
         const V = {};
         stage.querySelectorAll("[data-v]").forEach((el) => (V[el.dataset.v] = el));
 
-        let S = 50;
-        let board = [], score = 0, timeLeft = GAME_MS, gauge = 0, feverLeft = 0;
-        let state = "idle", busy = false, sel = null, submitted = false, lastAct = 0, hintTiles = [], lastT = 0, uid = 0;
+        let S = 50, NR = 8, NC = 8;
+        let mask = [], stoneHp = [], stoneEl = [], board = [], cellsEl = null;
+        let stageNo = 1, C = cfg(1), mapIdx = 0, mapOrder = [];
+        let score = 0, stageScore = 0, timeLeft = C.timeMs, gauge = 0, feverLeft = 0, doubleLeft = 0, spawnLeft = 0, seenItems = new Set();
+        let state = "idle", busy = false, sel = null, submitted = false, lastAct = 0, hintTiles = [], lastT = 0, uid = 0, runId = 0;
         const wait = (ms) => new Promise((r) => setTimeout(r, ms));
         // 효과음 — 판이 움직이는 동안만 (시작 전·일시정지 중에는 조용히)
         const sfx = (name, arg) => { if (state === "play" || state === "ending") ctx.sfx(name, arg); };
         let lastSec = 0;
-        const key = (r, c) => r * N + c;
-        const inb = (r, c) => r >= 0 && r < N && c >= 0 && c < N;
+        const key = (r, c) => r * NC + c;
+        const rOf = (k) => Math.floor(k / NC), cOf = (k) => k % NC;
+        const inb = (r, c) => r >= 0 && r < NR && c >= 0 && c < NC;
+        const valid = (r, c) => inb(r, c) && mask[r][c];
+        const at = (k) => board[rOf(k)][cOf(k)];
+        const N4 = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
-        // ---------- 크기 ----------
+        // ---------- 크기 (stage 폭에 맞춰 — 공통 틀이 화면 높이에 맞게 stage 폭을 정한다) ----------
         function layout() {
           const W = stage.clientWidth || 340;
-          const maxH = Math.max(280, window.innerHeight - 250);
-          const inner = Math.min(W - 14, 476, maxH);
-          S = Math.floor(inner / N);
-          boardEl.style.width = boardEl.style.height = S * N + "px";
-          boardEl.style.backgroundSize = `${S * 2}px ${S * 2}px`;
-          boardEl.style.backgroundPosition = `0 0, ${S}px ${S}px`;
-          wrapEl.style.maxWidth = Math.max(S * N + 14, 300) + "px";
-          for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+          const dim = Math.max(NR, NC);
+          const inner = Math.min(W - 14, 660);
+          S = Math.floor(inner / dim);
+          boardEl.style.width = S * NC + "px";
+          boardEl.style.height = S * NR + "px";
+          wrapEl.style.maxWidth = Math.max(S * dim + 14, 300) + "px";
+          if (cellsEl) cellsEl.querySelectorAll(".gm-cell").forEach((el) => {
+            const r = +el.dataset.r, c = +el.dataset.c;
+            el.style.cssText = `left:${c * S}px;top:${r * S}px;width:${S}px;height:${S}px`;
+          });
+          for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) {
             const t = board[r] && board[r][c];
             if (t) { t.el.style.width = t.el.style.height = S + "px"; place(t, 0); }
+            const st = stoneEl[r] && stoneEl[r][c];
+            if (st) posStone(st, r, c);
           }
         }
 
@@ -198,6 +348,19 @@
           el.classList.toggle("is-col", t.sp === "col");
           el.classList.toggle("is-all", t.sp === "all");
           el.classList.toggle("is-bomb", t.sp === "bomb");
+          el.classList.toggle("is-glow", t.sp === "glow");
+          el.classList.toggle("is-clock", t.sp === "clock");
+          el.classList.toggle("is-x2", t.sp === "x2");
+          const oldBadge = el.querySelector(".gm-badge");
+          if (oldBadge) oldBadge.remove();
+          if (t.sp === "clock" || t.sp === "x2") {
+            const b = document.createElement("span");
+            b.className = "gm-badge" + (t.sp === "x2" ? " gm-badge--x2" : "");
+            b.innerHTML = t.sp === "x2" ? "×2" : SVG["alarm-clock"];
+            el.appendChild(b);
+          }
+          el.dataset.k = t.sp === "all" ? ALL : t.k;
+          el.dataset.sp = t.sp || "";
           const ball = el.firstChild;
           if (t.sp === "all") { ball.innerHTML = SVG.pill; ball.style.removeProperty("--c"); }
           else {
@@ -207,15 +370,23 @@
             ball.style.setProperty("--c2", lighten(k.c, 0.42));
           }
         }
+        function setIce(t, on) {
+          t.ice = on;
+          t.el.classList.toggle("is-ice", on);
+          const old = t.el.querySelector(".gm-ice:not(.is-break)");
+          if (on && !old) { const ice = document.createElement("div"); ice.className = "gm-ice"; t.el.appendChild(ice); }
+          if (!on && old) { old.classList.add("is-break"); setTimeout(() => old.remove(), 320); }
+        }
         function makeTile(k, r, c, startRow) {
           const el = document.createElement("div");
           el.className = "gm-tile";
           el.innerHTML = `<div class="gm-ball"></div>`;
           el.style.width = el.style.height = S + "px";
-          const t = { id: ++uid, k, sp: null, r, c, el };
+          const t = { id: ++uid, k, sp: null, ice: false, r, c, el };
           look(t);
           el.style.transitionDuration = "0ms";
           el.style.transform = `translate(${c * S}px, ${(startRow ?? r) * S}px)`;
+          el.dataset.r = r; el.dataset.c = c;
           boardEl.appendChild(el);
           return t;
         }
@@ -223,55 +394,155 @@
           t.el.style.transitionDuration = ms + "ms";
           t.el.style.transitionTimingFunction = ease || "ease";
           t.el.style.transform = `translate(${t.c * S}px, ${t.r * S}px)`;
+          t.el.dataset.r = t.r; t.el.dataset.c = t.c;
         }
-        const kAt = (r, c) => (inb(r, c) && board[r][c] && board[r][c].sp !== "all" ? board[r][c].k : null);
-        const rnd = () => Math.floor(Math.random() * KINDS.length);
+        function posStone(el, r, c) {
+          const pos = `translate(${c * S}px, ${r * S}px)`;
+          el.style.width = el.style.height = S + "px";
+          el.style.transform = pos;
+          el.style.setProperty("--pos", pos);
+        }
+        const kAt = (r, c) => (valid(r, c) && board[r][c] && board[r][c].sp !== "all" ? board[r][c].k : null);
+        const rndKind = () => Math.floor(Math.random() * C.kinds);
 
+        // ---------- 종류 격자로 하는 판정 (g[r][c] = null | {k, sp, ice}) ----------
+        const gk = (g, r, c) => { if (!inb(r, c)) return null; const x = g[r] && g[r][c]; return x && x.sp !== "all" ? x.k : null; };
+        function lineLen(g, r, c) {
+          const k = gk(g, r, c); if (k == null) return 0;
+          let h = 1, v = 1;
+          for (let x = c - 1; gk(g, r, x) === k; x--) h++;
+          for (let x = c + 1; gk(g, r, x) === k; x++) h++;
+          for (let y = r - 1; gk(g, y, c) === k; y--) v++;
+          for (let y = r + 1; gk(g, y, c) === k; y++) v++;
+          return Math.max(h, v);
+        }
+        // (r, c)가 2×2 네모의 한 칸인지
+        function inSquare(g, r, c) {
+          const k = gk(g, r, c); if (k == null) return false;
+          for (const [dr, dc] of [[-1, -1], [-1, 0], [0, -1], [0, 0]]) {
+            const r0 = r + dr, c0 = c + dc;
+            if (gk(g, r0, c0) === k && gk(g, r0, c0 + 1) === k && gk(g, r0 + 1, c0) === k && gk(g, r0 + 1, c0 + 1) === k) return true;
+          }
+          return false;
+        }
+        function anyMatch(g) {
+          for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) if (lineLen(g, r, c) >= 3 || inSquare(g, r, c)) return true;
+          return false;
+        }
+        // 왼쪽·위쪽만 보고 이 칸에 k를 놓으면 바로 맞춰지는지 (줄 3개 · 2×2)
+        function makesMatch(g, r, c, k) {
+          return (gk(g, r, c - 1) === k && gk(g, r, c - 2) === k) || (gk(g, r - 1, c) === k && gk(g, r - 2, c) === k) ||
+            (gk(g, r - 1, c - 1) === k && gk(g, r - 1, c) === k && gk(g, r, c - 1) === k);
+        }
+        // 움직일 수 있는 수 찾기 — 얼음 칸·구멍·돌은 못 바꿈 (all 이면 전부)
+        function findMove(g, all) {
+          const list = [];
+          for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) {
+            for (const [dr, dc] of [[0, 1], [1, 0]]) {
+              const r2 = r + dr, c2 = c + dc;
+              if (!inb(r2, c2)) continue;
+              const a = g[r][c], b = g[r2][c2];
+              if (!a || !b || a.ice || b.ice) continue;
+              let ok = a.sp === "all" || b.sp === "all" || a.sp === "glow" || b.sp === "glow" || !!(a.sp && b.sp);
+              if (!ok) {
+                g[r][c] = b; g[r2][c2] = a;
+                ok = lineLen(g, r, c) >= 3 || lineLen(g, r2, c2) >= 3 || inSquare(g, r, c) || inSquare(g, r2, c2);
+                g[r][c] = a; g[r2][c2] = b;
+              }
+              if (ok) { if (!all) return [[r, c], [r2, c2]]; list.push([[r, c], [r2, c2]]); }
+            }
+          }
+          return all ? list : null;
+        }
+        const snap = () => board.map((row) => row.map((t) => (t ? { k: t.k, sp: t.sp, ice: t.ice } : null)));
+
+        // ---------- 판 만들기 ----------
+        function pickCells(n, avoid) {
+          const cells = [];
+          for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) if (mask[r][c] && !avoid(r, c)) cells.push(key(r, c));
+          for (let i = cells.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cells[i], cells[j]] = [cells[j], cells[i]]; }
+          return new Set(cells.slice(0, n));
+        }
         // 처음 판: 이미 맞춰진 3개·2×2 네모가 없고, 움직일 수 있는 수가 있게
-        function freshKinds() {
-          for (let tries = 0; tries < 200; tries++) {
-            const g = [];
-            for (let r = 0; r < N; r++) {
+        function freshGrid(iceSet) {
+          let g = null;
+          for (let tries = 0; tries < 300; tries++) {
+            g = [];
+            for (let r = 0; r < NR; r++) {
               g.push([]);
-              for (let c = 0; c < N; c++) {
-                let k;
-                do { k = rnd(); } while ((c >= 2 && g[r][c - 1] === k && g[r][c - 2] === k) || (r >= 2 && g[r - 1][c] === k && g[r - 2][c] === k) || (r >= 1 && c >= 1 && g[r - 1][c - 1] === k && g[r - 1][c] === k && g[r][c - 1] === k));
-                g[r].push(k);
+              for (let c = 0; c < NC; c++) {
+                if (!mask[r][c] || stoneHp[r][c]) { g[r].push(null); continue; }
+                let k, guard = 0;
+                do { k = rndKind(); } while (guard++ < 40 && makesMatch(g, r, c, k));
+                g[r].push({ k, sp: null, ice: iceSet.has(key(r, c)) });
               }
             }
-            if (findMove(g)) return g;
+            if (!anyMatch(g) && findMove(g)) return g;
           }
+          return g;
         }
-        function buildBoard() {
-          boardEl.innerHTML = "";
-          const g = freshKinds();
-          board = g.map((row, r) => row.map((k, c) => makeTile(k, r, c)));
+        function buildStage(drop) {
+          const mp = MAPS[mapIdx];
+          NR = mp.m.length; NC = mp.m[0].length;
+          mask = mp.m.map((row) => [...row].map((ch) => ch === "#"));
+          boardEl.innerHTML = `<div class="gm-cells"></div>`;
+          boardEl.dataset.nr = NR; boardEl.dataset.nc = NC;
+          cellsEl = boardEl.firstChild;
+          let html = "";
+          for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) if (mask[r][c]) html += `<div class="gm-cell${(r + c) % 2 ? " is-alt" : ""}" data-r="${r}" data-c="${c}"></div>`;
+          cellsEl.innerHTML = html;
+          board = []; stoneHp = []; stoneEl = [];
+          for (let r = 0; r < NR; r++) { board.push(new Array(NC).fill(null)); stoneHp.push(new Array(NC).fill(0)); stoneEl.push(new Array(NC).fill(null)); }
+          layout();
+          // 돌 (7단계부터) — 타일 대신 놓인 장애물
+          pickCells(C.stones, () => false).forEach((k) => {
+            const r = rOf(k), c = cOf(k);
+            stoneHp[r][c] = 2;
+            const el = document.createElement("div");
+            el.className = "gm-stone"; el.dataset.r = r; el.dataset.c = c;
+            posStone(el, r, c);
+            boardEl.appendChild(el);
+            stoneEl[r][c] = el;
+          });
+          // 얼음 (4단계부터) — 타일 위 덮개
+          const iceSet = pickCells(C.ice, (r, c) => stoneHp[r][c] > 0);
+          const g = freshGrid(iceSet);
+          for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) {
+            if (!g[r][c]) continue;
+            const t = makeTile(g[r][c].k, r, c, drop ? r - NR - 1 : r);
+            if (g[r][c].ice) setIce(t, true);
+            board[r][c] = t;
+          }
+          if (drop) {
+            void boardEl.offsetWidth;
+            board.forEach((row) => row.forEach((t) => t && place(t, 380 + 22 * (NR - t.r) + 12 * t.c, "cubic-bezier(.3,.6,.4,1)")));
+          }
         }
 
         // ---------- 판정 ----------
-        // 길이 3 이상 줄을 찾아 겹치는 것끼리 묶음
+        // 길이 3 이상 줄을 찾아 겹치는 것끼리 묶음 (구멍·돌에서 끊긴다)
         function findGroups() {
           const runs = [];
-          for (let r = 0; r < N; r++) {
+          for (let r = 0; r < NR; r++) {
             let c = 0;
-            while (c < N) {
+            while (c < NC) {
               const k = kAt(r, c); let e = c + 1;
-              if (k !== null) while (e < N && kAt(r, e) === k) e++;
+              if (k !== null) while (e < NC && kAt(r, e) === k) e++;
               if (k !== null && e - c >= 3) runs.push({ dir: "h", cells: Array.from({ length: e - c }, (_, i) => key(r, c + i)) });
               c = e;
             }
           }
-          for (let c = 0; c < N; c++) {
+          for (let c = 0; c < NC; c++) {
             let r = 0;
-            while (r < N) {
+            while (r < NR) {
               const k = kAt(r, c); let e = r + 1;
-              if (k !== null) while (e < N && kAt(e, c) === k) e++;
+              if (k !== null) while (e < NR && kAt(e, c) === k) e++;
               if (k !== null && e - r >= 3) runs.push({ dir: "v", cells: Array.from({ length: e - r }, (_, i) => key(r + i, c)) });
               r = e;
             }
           }
-          // 2×2 네모 — 같은 그림 네 칸이 정사각형으로 모여도 터진다 (특수 타일은 만들지 않음)
-          for (let r = 0; r < N - 1; r++) for (let c = 0; c < N - 1; c++) {
+          // 2×2 네모 — 같은 그림 네 칸이 정사각형으로 모여도 터진다
+          for (let r = 0; r < NR - 1; r++) for (let c = 0; c < NC - 1; c++) {
             const k = kAt(r, c);
             if (k !== null && kAt(r, c + 1) === k && kAt(r + 1, c) === k && kAt(r + 1, c + 1) === k) {
               runs.push({ dir: "sq", cells: [key(r, c), key(r, c + 1), key(r + 1, c), key(r + 1, c + 1)] });
@@ -309,141 +580,205 @@
             return { cells: g.cells, spec, cand: cross.concat(order, [...g.cells]) };
           });
         }
-        function lineLen(g, r, c) {
-          const k = g[r][c]; if (k == null || k === ALL) return 0;
-          let h = 1, v = 1;
-          for (let x = c - 1; x >= 0 && g[r][x] === k; x--) h++;
-          for (let x = c + 1; x < N && g[r][x] === k; x++) h++;
-          for (let y = r - 1; y >= 0 && g[y][c] === k; y--) v++;
-          for (let y = r + 1; y < N && g[y][c] === k; y++) v++;
-          return Math.max(h, v);
-        }
-        // (r, c)가 2×2 네모의 한 칸인지
-        function inSquare(g, r, c) {
-          const k = g[r][c]; if (k == null || k === ALL) return false;
-          for (const [dr, dc] of [[-1, -1], [-1, 0], [0, -1], [0, 0]]) {
-            const r0 = r + dr, c0 = c + dc;
-            if (r0 < 0 || c0 < 0 || r0 + 1 >= N || c0 + 1 >= N) continue;
-            if (g[r0][c0] === k && g[r0][c0 + 1] === k && g[r0 + 1][c0] === k && g[r0 + 1][c0 + 1] === k) return true;
-          }
-          return false;
-        }
-        // 움직일 수 있는 수 찾기 (g: 종류 2차원 배열, 종합 비타민은 ALL)
-        function findMove(g) {
-          for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
-            for (const [dr, dc] of [[0, 1], [1, 0]]) {
-              const r2 = r + dr, c2 = c + dc;
-              if (!inb(r2, c2)) continue;
-              if (g[r][c] === ALL || g[r2][c2] === ALL) return [[r, c], [r2, c2]];
-              [g[r][c], g[r2][c2]] = [g[r2][c2], g[r][c]];
-              const ok = lineLen(g, r, c) >= 3 || lineLen(g, r2, c2) >= 3 || inSquare(g, r, c) || inSquare(g, r2, c2);
-              [g[r][c], g[r2][c2]] = [g[r2][c2], g[r][c]];
-              if (ok) return [[r, c], [r2, c2]];
-            }
-          }
-          return null;
-        }
-        const kindGrid = () => board.map((row) => row.map((t) => (t.sp === "all" ? ALL : t.k)));
 
         // ---------- 터뜨리기 ----------
         function mostCommonKind() {
-          const cnt = new Array(KINDS.length).fill(0);
+          const cnt = new Array(C.kinds).fill(0);
           board.forEach((row) => row.forEach((t) => t && t.sp !== "all" && cnt[t.k]++));
           return cnt.indexOf(Math.max(...cnt));
         }
-        async function blast(clear, births, chain) {
+        // 특수 효과가 닿는 칸 (구멍은 빼고)
+        function cellsRows(rows) { const out = []; rows.forEach((r) => { for (let c = 0; c < NC; c++) if (valid(r, c)) out.push(key(r, c)); }); return out; }
+        function cellsCols(cols) { const out = []; cols.forEach((c) => { for (let r = 0; r < NR; r++) if (valid(r, c)) out.push(key(r, c)); }); return out; }
+        function cellsArea(r0, c0, rad) { const out = []; for (let dr = -rad; dr <= rad; dr++) for (let dc = -rad; dc <= rad; dc++) if (valid(r0 + dr, c0 + dc)) out.push(key(r0 + dr, c0 + dc)); return out; }
+        const kindCells = (kind) => board.flat().filter((x) => x && x.sp !== "all" && x.k === kind).map((x) => key(x.r, x.c));
+        // 터뜨리기 — 특수 비타민이 다른 특수 비타민을 치면 그것도 차례로 터진다 (한 물결씩 짧은 간격)
+        async function blast(clear, births, chain, extraBonus = 0) {
           const protect = new Set(births.map((b) => b.key));
-          const all = new Set(clear), stack = [...clear], fired = new Set();
-          let bonus = 0, firedLine = false, firedAll = false;
-          while (stack.length) {
-            const k = stack.pop();
-            const t = board[Math.floor(k / N)][k % N];
-            if (!t || !t.sp || fired.has(k)) continue;
-            fired.add(k);
-            const targets = [];
-            if (t.sp === "row") { for (let c = 0; c < N; c++) targets.push(key(t.r, c)); bonus += 100; beam("row", t.r); firedLine = true; }
-            else if (t.sp === "col") { for (let r = 0; r < N; r++) targets.push(key(r, t.c)); bonus += 100; beam("col", t.c); firedLine = true; }
-            else if (t.sp === "bomb") {
-              // 비타민 폭탄: 둘레 3×3 (가로·세로 줄 비타민과 같은 연쇄로 이어짐)
-              for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) if (inb(t.r + dr, t.c + dc)) targets.push(key(t.r + dr, t.c + dc));
-              bonus += 150; boom(t.r, t.c); firedAll = true;
+          const all = new Set(clear), fired = new Set();
+          let bonus = extraBonus, firedLine = false, firedAll = false, firedGlow = false, clocks = [], doubles = 0;
+          let wave = [...clear], waveNo = 0;
+          const popNow = (keys) => keys.forEach((k) => { const x = at(k); if (x && !x.ice && !protect.has(k)) { x.el.classList.add("is-pop"); sparks(rOf(k), cOf(k), null, chain); } });
+          popNow(wave);
+          while (wave.length) {
+            const next = [];
+            let waveFx = null;
+            for (const k of wave) {
+              const t = at(k);
+              if (!t || !t.sp || t.ice || fired.has(k)) continue;
+              fired.add(k);
+              let targets = [];
+              if (t.sp === "row") { targets = cellsRows([t.r]); bonus += 100; beam("row", t.r); firedLine = true; waveFx = waveFx || "line"; }
+              else if (t.sp === "col") { targets = cellsCols([t.c]); bonus += 100; beam("col", t.c); firedLine = true; waveFx = waveFx || "line"; }
+              else if (t.sp === "bomb") { targets = cellsArea(t.r, t.c, 1); bonus += 150; boom(t.r, t.c, 3.2); firedAll = true; waveFx = "explode"; }
+              else if (t.sp === "glow") {
+                // 빛나는 비타민: 판 위 같은 그림 전부 (맞바꾼 경우엔 바꾼 상대 그림)
+                targets = kindCells(t.target ?? t.k);
+                targets.forEach((k2) => { const x = at(k2); x && x.el.classList.add("is-zap"); });
+                ring(t.r, t.c, 2.2);
+                bonus += 250; firedGlow = true; waveFx = waveFx === "explode" ? waveFx : "laser";
+              }
+              else if (t.sp === "clock") { clocks.push(t); bonus += 50; }
+              else if (t.sp === "x2") { doubles++; bonus += 50; }
+              else {
+                firedAll = true; waveFx = "explode";
+                targets = kindCells(t.target ?? mostCommonKind());
+                targets.forEach((k2) => { const x = at(k2); x && x.el.classList.add("is-zap"); });
+                ring(t.r, t.c, 2.6);
+                bonus += 300;
+              }
+              targets.forEach((k2) => { if (!protect.has(k2) && !all.has(k2)) { all.add(k2); next.push(k2); } });
             }
-            else {
-              firedAll = true;
-              const kind = t.target ?? mostCommonKind();
-              board.forEach((row) => row.forEach((x) => x && x.sp !== "all" && x.k === kind && targets.push(key(x.r, x.c))));
-              bonus += 300;
-            }
-            targets.forEach((k2) => { if (!protect.has(k2) && !all.has(k2)) { all.add(k2); stack.push(k2); } });
+            // 두 번째 물결부터: 특수가 특수를 친 연쇄 폭발 — 소리·흔들림을 한 번 더
+            if (waveFx && waveNo <= 3) sfx(waveFx);
+            if (waveNo >= 1 && waveFx) shake(fired.size >= 4 ? 2 : 1);
+            popNow(next);
+            const more = next.some((k2) => { const x = at(k2); return x && x.sp && !x.ice && !fired.has(k2); });
+            if (more) await wait(110);
+            wave = next; waveNo++;
           }
-          if (firedAll) sfx("explode");
-          else if (firedLine) sfx("line");
-          else if (births.length) sfx("powerup");
-          else if (chain >= 2) sfx("combo", chain);
-          else sfx("pop");
+          // 특수끼리 이어 터진 만큼 보너스
+          if (fired.size >= 2) bonus += 60 * (fired.size - 1);
+          // 나눠 보기: 실제로 터지는 타일 / 얼음만 깨지는 칸(타일은 남음) / 맞는 돌
+          const removed = [], iceHit = new Set(), stoneHit = new Set();
+          all.forEach((k) => {
+            const r = rOf(k), c = cOf(k);
+            if (stoneHp[r][c] > 0) { stoneHit.add(k); return; }
+            const t = board[r][c];
+            if (!t) return;
+            if (t.ice) iceHit.add(k); else removed.push(k);
+          });
+          // 터지는 칸의 이웃 얼음·돌도 한 번씩
+          removed.forEach((k) => {
+            const r = rOf(k), c = cOf(k);
+            for (const [dr, dc] of N4) {
+              const r2 = r + dr, c2 = c + dc;
+              if (!valid(r2, c2) || protect.has(key(r2, c2))) continue;
+              if (stoneHp[r2][c2] > 0) stoneHit.add(key(r2, c2));
+              else if (board[r2][c2] && board[r2][c2].ice) iceHit.add(key(r2, c2));
+            }
+          });
+          let broken = 0;
+          stoneHit.forEach((k) => { if (stoneHp[rOf(k)][cOf(k)] === 1) broken++; });
+
+          // 첫 소리 — 연쇄 단계가 있으면 combo(n)이 주인공, 특수가 터지면 그 소리
+          // (특수 폭발 소리는 물결마다 위에서 냈다)
+          const first = clocks.length ? "coin" : doubles ? "jump" : null;
+          if (first) sfx(first);
+          const loud = fired.size || first || extraBonus;
+          if (chain >= 2) setTimeout(() => sfx("combo", Math.min(10, chain)), loud ? 70 : 0);
+          else if (!loud && births.length) sfx("powerup");
+          else if (!loud && removed.length) sfx("pop");
+          // 장애물 소리 — 본 소리와 겹치지 않게 살짝 늦게
+          if (broken && !firedAll) setTimeout(() => sfx("explode"), 140);
+          else if (iceHit.size || stoneHit.size) setTimeout(() => sfx("hit"), 140);
+
           const fever = feverLeft > 0;
-          const pts = (all.size * 10 * chain + bonus) * (fever ? 2 : 1);
-          score += pts;
-          if (!fever) addGauge(all.size * 3 + (bonus ? 8 : 0));
+          const obst = iceHit.size * 40 + stoneHit.size * 30 + broken * 60;
+          // 연쇄 단계가 곧 배율 (×2, ×3 …)
+          const pts = Math.round((removed.length * 10 * chain + bonus + obst) * C.mult) * (fever ? 2 : 1) * (doubleLeft > 0 ? 2 : 1);
+          score += pts; stageScore += pts;
+          if (!fever) addGauge(removed.length * 3 + (bonus ? 8 : 0) + iceHit.size * 2 + stoneHit.size * 2);
           // 시간 보너스 — 연쇄 2단계부터 0.5초씩, 특수 비타민이 터지면 1.5초
-          const addMs = (chain >= 2 ? 500 : 0) + (fired.size ? 1500 : 0);
+          const addMs = (chain >= 2 ? 500 : 0) + (fired.size ? 1500 : 0) + clocks.length * CLOCK_MS;
           if (addMs && state === "play") {
-            timeLeft = Math.min(MAX_MS, timeLeft + addMs);
+            timeLeft = Math.min(C.timeMs + 20000, timeLeft + addMs);
             V.timebox.classList.remove("is-plus"); void V.timebox.offsetWidth; V.timebox.classList.add("is-plus");
           }
-          // 터지는 칸마다 불꽃, 크게 터지면 판이 흔들림
-          all.forEach((k) => sparks(Math.floor(k / N), k % N));
-          if (fired.size || chain >= 3) { boardWrap.classList.remove("is-shake"); void boardWrap.offsetWidth; boardWrap.classList.add("is-shake"); }
-          if (chain >= 2) cheer(chain);
+          iceHit.forEach((k) => sparks(rOf(k), cOf(k), "#bae6fd"));
+          stoneHit.forEach((k) => sparks(rOf(k), cOf(k), "#94a3b8"));
+          // 흔들림 — 연쇄가 깊을수록·특수가 많이 터질수록 크게
+          if (chain >= 4 || fired.size >= 3) shake(2);
+          else if (fired.size || chain >= 2 || broken) shake(1);
+          if (chain >= 2) chainText(chain);
+          clocks.forEach((t) => floatText(`+${CLOCK_MS / 1000}초`, (t.c + 0.5) * S, (t.r - 0.2) * S, "is-time"));
+          // 점수 2배 — 이번에 얻은 점수 다음부터 5초 동안
+          if (doubles) { doubleLeft = DOUBLE_MS; banner("점수 2배! 5초"); }
           // 점수 띄우기
-          let sr = 0, sc = 0;
-          all.forEach((k) => { sr += Math.floor(k / N); sc += k % N; });
-          if (all.size) floatText(`+${pts.toLocaleString("ko-KR")}${chain >= 2 ? `<small>연쇄 ×${chain}</small>` : ""}`, (sc / all.size + 0.5) * S, (sr / all.size + 0.5) * S);
+          const shown = removed.concat([...iceHit], [...stoneHit]);
+          if (shown.length) {
+            let sr = 0, sc = 0;
+            shown.forEach((k) => { sr += rOf(k); sc += cOf(k); });
+            floatText(`+${fmt(pts)}${chain >= 2 ? `<small>연쇄 ×${chain}</small>` : ""}`, (sc / shown.length + 0.5) * S, (sr / shown.length + 0.5) * S, chain >= 3 ? "is-big" : "");
+          }
           births.forEach((b) => {
-            const t = board[Math.floor(b.key / N)][b.key % N];
+            const t = at(b.key);
             t.sp = b.sp; t.target = undefined;
             if (b.sp === "all") t.k = ALL;
             look(t);
             t.el.classList.remove("is-born"); void t.el.offsetWidth; t.el.classList.add("is-born");
           });
-          all.forEach((k) => board[Math.floor(k / N)][k % N].el.classList.add("is-pop"));
+          iceHit.forEach((k) => setIce(at(k), false));
+          stoneHit.forEach((k) => {
+            const r = rOf(k), c = cOf(k), el = stoneEl[r][c];
+            stoneHp[r][c]--;
+            if (stoneHp[r][c] <= 0) { el.classList.add("is-break"); stoneEl[r][c] = null; setTimeout(() => el.remove(), 340); }
+            else { el.classList.add("is-crack"); el.classList.remove("is-hit"); void el.offsetWidth; el.classList.add("is-hit"); }
+          });
+          removed.forEach((k) => at(k).el.classList.add("is-pop"));
           updateHud();
-          await wait(240);
-          all.forEach((k) => {
-            const r = Math.floor(k / N), c = k % N;
+          await wait(170);
+          boardEl.querySelectorAll(".is-zap").forEach((e) => e.classList.remove("is-zap"));
+          removed.forEach((k) => {
+            const r = rOf(k), c = cOf(k);
             board[r][c].el.remove();
             board[r][c] = null;
           });
         }
+        // 중력 — 같은 열에서 구멍·돌·얼음 칸을 건너뛰어 아래 빈칸으로. 새 타일은 맨 위 유효 칸에서 들어온다
         async function collapse() {
-          let maxMs = 0;
-          for (let c = 0; c < N; c++) {
-            let w = N - 1;
-            for (let r = N - 1; r >= 0; r--) {
-              const t = board[r][c];
-              if (!t) continue;
-              if (r !== w) {
-                board[w][c] = t; board[r][c] = null; t.r = w;
-                const ms = 120 + 50 * (w - r);
+          let maxMs = 0, items = itemCount();
+          const dur = (d) => 100 + 28 * Math.min(d, 8); // 연쇄 한 단계가 늘어지지 않게 짧게
+          for (let c = 0; c < NC; c++) {
+            const rows = [];
+            for (let r = 0; r < NR; r++) if (mask[r][c] && !stoneHp[r][c] && !(board[r][c] && board[r][c].ice)) rows.push(r);
+            if (!rows.length) continue;
+            const tiles = rows.map((r) => board[r][c]).filter(Boolean);
+            const missing = rows.length - tiles.length;
+            if (!missing) continue;
+            rows.forEach((r) => (board[r][c] = null));
+            tiles.forEach((t, i) => {
+              const r = rows[missing + i];
+              if (t.r !== r) {
+                const ms = dur(r - t.r);
+                t.r = r;
                 place(t, ms, "cubic-bezier(.45,.05,.7,1)");
                 maxMs = Math.max(maxMs, ms);
               }
-              w--;
-            }
-            const missing = w + 1;
-            for (let r = w; r >= 0; r--) {
-              const t = makeTile(rnd(), r, c, r - missing);
-              // 행운의 비타민 — 새로 떨어지는 칸의 4%는 줄 비타민·폭탄
-              if (state === "play" && Math.random() < 0.04) { t.sp = ["row", "col", "bomb"][Math.floor(Math.random() * 3)]; look(t); }
+              board[r][c] = t;
+            });
+            for (let i = 0; i < missing; i++) {
+              const r = rows[i], from = rows[0] - (missing - i);
+              const t = makeTile(rndKind(), r, c, from);
+              t.el.classList.add("is-new");
+              // 행운의 비타민 — 새로 떨어지는 칸의 일부(5% → 단계가 오를수록 3%)는 아이템
+              if (state === "play" && items < MAX_ITEMS + 2 && Math.random() < C.lucky) { t.sp = pickItem(); look(t); items++; }
               board[r][c] = t;
               void t.el.offsetWidth;
-              const ms = 120 + 50 * missing;
+              const ms = dur(r - from);
               place(t, ms, "cubic-bezier(.45,.05,.7,1)");
               maxMs = Math.max(maxMs, ms);
             }
           }
           await wait(maxMs + 30);
         }
+        const itemCount = () => board.reduce((a, row) => a + row.filter((t) => t && t.sp && t.sp !== "all").length, 0);
+        // 아이템 등장 — 일반 비타민 하나가 반짝이며 변신 (판 위에 3개까지)
+        function spawnItem(type) {
+          if (state !== "play" || busy || itemCount() >= MAX_ITEMS) return false;
+          const cand = board.flat().filter((t) => t && !t.sp && !t.ice && !hintTiles.includes(t) && !(sel && sel[0] === t.r && sel[1] === t.c));
+          if (!cand.length) return false;
+          const t = cand[Math.floor(Math.random() * cand.length)];
+          t.sp = type || pickItem();
+          look(t);
+          t.el.classList.remove("is-spawn"); void t.el.offsetWidth; t.el.classList.add("is-spawn");
+          ring(t.r, t.c);
+          sparks(t.r, t.c, "#ffd23f");
+          sfx("powerup");
+          if (!seenItems.has(t.sp)) { seenItems.add(t.sp); banner(`${ITEMS[t.sp].name} 등장!`, ITEMS[t.sp].desc); }
+          return true;
+        }
+        const nextSpawn = () => C.spawnMs - 1000 + Math.random() * 2000;
         async function resolve(pref, chain = 0) {
           for (;;) {
             const groups = findGroups();
@@ -452,8 +787,10 @@
             const clear = new Set(), births = [];
             for (const g of groups) {
               g.cells.forEach((k) => clear.add(k));
+              // 낙하로 생긴 연쇄(2단계부터)에서는 3개 매치도 35% 확률로 특수 비타민을 남긴다
+              if (!g.spec && chain >= 2 && Math.random() < 0.35) g.spec = ["row", "col", "bomb"][Math.floor(Math.random() * 3)];
               if (!g.spec) continue;
-              const ok = (k) => { const t = board[Math.floor(k / N)][k % N]; return !t.sp && !births.some((b) => b.key === k); };
+              const ok = (k) => { const t = at(k); return t && !t.sp && !t.ice && !births.some((b) => b.key === k); };
               const pos = (pref && [...g.cells].find((k) => pref.includes(k) && ok(k))) ?? g.cand.find(ok);
               if (pos != null) births.push({ key: pos, sp: g.spec });
             }
@@ -472,34 +809,66 @@
           [ta.r, tb.r] = [tb.r, ta.r]; [ta.c, tb.c] = [tb.c, ta.c];
           place(ta, 150); place(tb, 150);
         }
+        const movable = (r, c) => valid(r, c) && !!board[r][c] && !board[r][c].ice;
+        function nope(r, c) {
+          const t = valid(r, c) && board[r][c];
+          if (t && t.ice) { t.el.classList.remove("is-nope"); void t.el.offsetWidth; t.el.classList.add("is-nope"); }
+          sfx("invalid");
+        }
         async function trySwap(a, b) {
           if (busy || state !== "play") return;
+          if (!movable(...a) || !movable(...b)) { clearSel(); nope(...(movable(...a) ? b : a)); return; }
+          let maxChain = 0;
           busy = true; clearSel(); clearHint(); lastAct = performance.now();
           const ta = board[a[0]][a[1]], tb = board[b[0]][b[1]];
           swapCells(a, b);
           sfx("swap");
           await wait(165);
-          if (ta.sp === "all" || tb.sp === "all") {
-            // 종합 비타민: 바꾼 상대와 같은 종류 전부 (둘 다면 판 전체)
-            let clear;
-            if (ta.sp === "all" && tb.sp === "all") clear = new Set(board.flat().map((t) => key(t.r, t.c)));
-            else {
-              const bomb = ta.sp === "all" ? ta : tb, other = bomb === ta ? tb : ta;
-              bomb.target = other.k;
-              clear = new Set([key(bomb.r, bomb.c)]);
+          const colorish = (t) => t.sp === "all" || t.sp === "glow";
+          const lineish = (t) => t.sp === "row" || t.sp === "col";
+          if (colorish(ta) || colorish(tb)) {
+            // 빛나는·종합 비타민 + 아무거나: 바꾼 상대 그림 전부 / 둘 다면 판 전체 / 상대가 폭탄·줄이면 그 그림이 전부 같은 특수로 변해 한꺼번에
+            const cb = colorish(ta) ? ta : tb, other = cb === ta ? tb : ta;
+            let clear, extra = 0;
+            if (colorish(other)) {
+              clear = new Set(board.flat().filter(Boolean).map((t) => key(t.r, t.c)));
+              banner("판 전체 펑!"); extra = 800;
+            } else if (other.sp === "bomb" || lineish(other)) {
+              const kind = other.k;
+              board.flat().forEach((t) => { if (t && t !== other && !t.sp && !t.ice && t.k === kind) { t.sp = other.sp === "bomb" ? "bomb" : Math.random() < 0.5 ? "row" : "col"; look(t); t.el.classList.add("is-born"); } });
+              banner(other.sp === "bomb" ? "폭탄 대변신!" : "줄 비타민 대변신!");
+              sfx("powerup");
+              await wait(260);
+              cb.target = kind; cb.sp = "glow";
+              clear = new Set([key(cb.r, cb.c), key(other.r, other.c)]); extra = 400;
+            } else {
+              cb.target = other.k;
+              clear = new Set([key(cb.r, cb.c), key(other.r, other.c)]);
+              banner(cb.sp === "all" ? "종합 비타민!" : "빛나는 비타민!");
             }
-            banner("종합 비타민!");
-            await blast(clear, [], 1);
+            await blast(clear, [], 1, extra);
             await collapse();
-            await resolve(null, 1);
+            maxChain = await resolve(null, 1);
           } else if (ta.sp && tb.sp) {
-            // 특수 비타민끼리 바꾸면 둘 다 바로 터진다
-            banner("특수 비타민 합체!");
-            await blast(new Set([key(ta.r, ta.c), key(tb.r, tb.c)]), [], 1);
+            // 특수끼리 바꾸면 강한 조합: 폭탄+폭탄 5×5 · 줄+줄 십자 · 줄+폭탄 굵은 십자(3줄씩) · 그 밖은 둘 다 터짐
+            const r0 = ta.r, c0 = ta.c; // 옮긴 자리 중심
+            let cells = null, extra = 0;
+            if (ta.sp === "bomb" && tb.sp === "bomb") { cells = cellsArea(r0, c0, 2); boom(r0, c0, 5.4); banner("폭탄 합체! 5×5"); extra = 500; }
+            else if (lineish(ta) && lineish(tb)) { cells = cellsRows([r0]).concat(cellsCols([c0])); beam("row", r0); beam("col", c0); banner("십자 폭발!"); extra = 400; }
+            else if ((lineish(ta) && tb.sp === "bomb") || (ta.sp === "bomb" && lineish(tb))) {
+              cells = cellsRows([r0 - 1, r0, r0 + 1].filter((r) => r >= 0 && r < NR)).concat(cellsCols([c0 - 1, c0, c0 + 1].filter((c) => c >= 0 && c < NC)));
+              [r0 - 1, r0, r0 + 1].forEach((r) => r >= 0 && r < NR && beam("row", r)); [c0 - 1, c0, c0 + 1].forEach((c) => c >= 0 && c < NC && beam("col", c));
+              banner("대형 십자 폭발!"); extra = 600;
+            }
+            if (cells) { ta.sp = tb.sp = null; sfx("explode"); }
+            else banner("특수 비타민 합체!");
+            const clear = new Set(cells || [key(ta.r, ta.c), key(tb.r, tb.c)]);
+            clear.add(key(ta.r, ta.c)); clear.add(key(tb.r, tb.c));
+            await blast(clear, [], 1, extra);
             await collapse();
-            await resolve(null, 1);
+            maxChain = await resolve(null, 1);
           } else if (findGroups().length) {
-            await resolve([key(...a), key(...b)]);
+            maxChain = await resolve([key(...a), key(...b)]);
           } else {
             swapCells(a, b);
             sfx("invalid");
@@ -507,36 +876,61 @@
           }
           busy = false;
           lastAct = performance.now();
+          // 연쇄 3단계 이상이면 보상으로 아이템 하나
+          if (maxChain >= 3 && state === "play" && stageScore < C.target && spawnItem()) spawnLeft = nextSpawn();
           afterTurn();
         }
         async function afterTurn() {
-          if (state === "ending") { finish(); return; }
-          if (state === "idle" || state === "over") return;
-          if (!findMove(kindGrid())) await shuffle();
+          if (state === "ending") { stageScore >= C.target ? stageClear() : finish(); return; }
+          if (state !== "play" && state !== "pause") return;
+          if (state === "play" && stageScore >= C.target) { stageClear(); return; }
+          if (!findMove(snap())) {
+            await shuffle();
+            if (state === "ending") finish();
+            else if (state === "play" && stageScore >= C.target) stageClear();
+          }
         }
+        // 움직일 수 없으면 섞기 — 얼음 칸과 돌은 제자리, 나머지만 섞는다
         async function shuffle() {
           busy = true;
+          const my = runId;
           banner("움직일 수 있는 칸이 없어 섞을게요");
           sfx("whoosh");
           await wait(500);
-          const tiles = board.flat();
-          for (let tries = 0; tries < 300; tries++) {
-            for (let i = tiles.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tiles[i], tiles[j]] = [tiles[j], tiles[i]]; }
-            const g = [];
-            for (let r = 0; r < N; r++) g.push(tiles.slice(r * N, r * N + N).map((t) => (t.sp === "all" ? ALL : t.k)));
-            let clean = true;
-            for (let r = 0; r < N && clean; r++) for (let c = 0; c < N; c++) if (lineLen(g, r, c) >= 3 || inSquare(g, r, c)) { clean = false; break; }
-            if ((clean && findMove(g)) || tries === 299) break;
+          if (my !== runId) return;
+          const free = board.flat().filter((t) => t && !t.ice);
+          const spots = free.map((t) => [t.r, t.c]);
+          const base = snap();
+          let ok = false;
+          for (let tries = 0; tries < 300 && !ok; tries++) {
+            for (let i = free.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [free[i], free[j]] = [free[j], free[i]]; }
+            free.forEach((t, i) => (base[spots[i][0]][spots[i][1]] = { k: t.k, sp: t.sp, ice: false }));
+            ok = !anyMatch(base) && !!findMove(base);
           }
-          tiles.forEach((t, i) => { t.r = Math.floor(i / N); t.c = i % N; board[t.r][t.c] = t; place(t, 380, "cubic-bezier(.3,.7,.3,1)"); });
+          free.forEach((t, i) => { t.r = spots[i][0]; t.c = spots[i][1]; board[t.r][t.c] = t; place(t, 380, "cubic-bezier(.3,.7,.3,1)"); });
+          if (!ok) regenKinds(false) || regenKinds(true);
           await wait(420);
           if (findGroups().length) await resolve(null);
-          if (!findMove(kindGrid())) { // 아주 드물게: 종류를 새로 뽑음
-            const g = freshKinds();
-            board.forEach((row, r) => row.forEach((t, c) => { t.k = g[r][c]; t.sp = null; look(t); }));
-          }
           busy = false;
-          if (state === "ending") finish();
+        }
+        // 아주 드물게: 섞어도 안 되면 일반 타일의 종류를 새로 뽑음 (그래도 안 되면 얼음을 녹임)
+        function regenKinds(melt) {
+          if (melt) board.flat().forEach((t) => t && t.ice && setIce(t, false));
+          for (let tries = 0; tries < 300; tries++) {
+            const g = snap();
+            for (let r = 0; r < NR; r++) for (let c = 0; c < NC; c++) {
+              const x = g[r][c];
+              if (!x || x.ice || x.sp) continue;
+              let k, guard = 0;
+              do { k = rndKind(); } while (guard++ < 40 && makesMatch(g, r, c, k));
+              x.k = k;
+            }
+            if (!anyMatch(g) && findMove(g)) {
+              board.forEach((row, r) => row.forEach((t, c) => { if (t && !t.ice && !t.sp) { t.k = g[r][c].k; look(t); } }));
+              return true;
+            }
+          }
+          return false;
         }
 
         // ---------- 비타민 게이지 · 피버 ----------
@@ -558,48 +952,79 @@
 
         // ---------- 화면 ----------
         function updateHud() {
-          V.score.textContent = score.toLocaleString("ko-KR");
+          V.stage.textContent = `${stageNo}단계`;
+          V.mapname.textContent = MAPS[mapIdx].name + (C.mult > 1 ? ` · 점수 ×${C.mult}` : "");
+          V.score.textContent = fmt(score);
           const sec = Math.ceil(timeLeft / 1000);
-          V.time.textContent = sec; V.time2.textContent = sec + "초";
-          V.timebar.style.width = Math.min(100, (timeLeft / GAME_MS) * 100) + "%";
-          const low = timeLeft <= 10000 && state !== "idle";
+          V.time.textContent = sec;
+          V.timebar.style.width = Math.min(100, (timeLeft / C.timeMs) * 100) + "%";
+          const low = timeLeft <= 10000 && state !== "idle" && state !== "clear";
           V.timebox.classList.toggle("is-low", low && timeLeft > 0);
           V.timebar.parentNode.classList.toggle("is-low", low);
+          const done = stageScore >= C.target;
+          V.goallbl.textContent = done ? `달성! ${fmt(stageScore)}` : `${fmt(stageScore)} / ${fmt(C.target)}`;
+          V.goalbar.style.width = Math.min(100, (stageScore / C.target) * 100) + "%";
+          V.goalbox.classList.toggle("is-done", done);
+          V.x2.hidden = !(doubleLeft > 0);
+          if (doubleLeft > 0) V.x2.textContent = `점수 2배 ${Math.ceil(doubleLeft / 1000)}초`;
           if (feverLeft > 0) { V.vitbar.style.width = (feverLeft / FEVER_MS) * 100 + "%"; V.vitlbl.textContent = `피버 ${Math.ceil(feverLeft / 1000)}초`; }
           else { V.vitbar.style.width = gauge + "%"; V.vitlbl.textContent = Math.floor(gauge) + "%"; }
         }
-        function floatText(html, x, y) {
+        function floatText(html, x, y, cls) {
           const el = document.createElement("div");
-          el.className = "gm-float"; el.innerHTML = html;
+          el.className = "gm-float" + (cls ? " " + cls : ""); el.innerHTML = html;
           el.style.left = x + "px"; el.style.top = y + "px";
           boardEl.appendChild(el);
           setTimeout(() => el.remove(), 950);
         }
-        // 터지는 칸 불꽃 — 칸 색 조각이 사방으로
-        function sparks(r, c) {
-          const t = board[r][c];
-          const color = t && t.sp !== "all" && KINDS[t.k] ? KINDS[t.k].c : "#ffb648";
-          for (let i = 0; i < 5; i++) {
+        // 터지는 칸 불꽃 — 칸 색 조각이 사방으로 (얼음·돌은 조각). 연쇄가 깊을수록 많이·멀리
+        let liveSparks = 0;
+        function sparks(r, c, tint, chain = 1) {
+          const t = board[r] && board[r][c];
+          const color = tint || (t && t.sp !== "all" && KINDS[t.k] ? KINDS[t.k].c : "#ffb648");
+          const n = Math.min(4 + Math.min(chain, 6), liveSparks > 450 ? 2 : 10);
+          const far = 1 + Math.min(chain - 1, 4) * 0.18;
+          for (let i = 0; i < n; i++) {
             const el = document.createElement("i");
-            el.className = "gm-spark";
-            const a = Math.random() * Math.PI * 2, d = S * (0.5 + Math.random() * 0.7);
-            el.style.cssText = `left:${(c + 0.5) * S}px;top:${(r + 0.5) * S}px;background:${color};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px`;
+            el.className = "gm-spark" + (tint ? " is-shard" : "") + (chain >= 3 && i % 3 === 0 ? " is-star" : "");
+            const a = Math.random() * Math.PI * 2, d = S * (0.5 + Math.random() * 0.8) * far;
+            el.style.cssText = `left:${(c + 0.5) * S}px;top:${(r + 0.5) * S}px;background:${chain >= 3 && i % 3 === 0 ? "#fff3b0" : color};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px`;
             boardEl.appendChild(el);
-            setTimeout(() => el.remove(), 520);
+            liveSparks++;
+            setTimeout(() => { el.remove(); liveSparks--; }, 560);
           }
         }
-        // 폭탄 — 3×3 크게 번쩍
-        function boom(r, c) {
+        // 폭탄 — 크게 번쩍 (size 칸 너비)
+        function boom(r, c, size = 3.2) {
           const el = document.createElement("div");
           el.className = "gm-boom";
-          el.style.cssText = `left:${(c + 0.5) * S}px;top:${(r + 0.5) * S}px;width:${S * 3.2}px;height:${S * 3.2}px`;
+          el.style.cssText = `left:${(c + 0.5) * S}px;top:${(r + 0.5) * S}px;width:${S * size}px;height:${S * size}px`;
           boardEl.appendChild(el);
           setTimeout(() => el.remove(), 480);
         }
-        // 연쇄 응원 문구
-        function cheer(chain) {
-          const words = ["", "", "좋아요!", "멋져요!", "대박!", "미쳤다!!"];
-          banner(`${words[Math.min(5, chain)]} 연쇄 ×${chain}`);
+        // 아이템 등장·빛나는 비타민 — 퍼지는 고리
+        function ring(r, c, size = 1.4) {
+          const el = document.createElement("div");
+          el.className = "gm-ring";
+          el.style.cssText = `left:${(c + 0.5) * S}px;top:${(r + 0.5) * S}px;width:${S * size}px;height:${S * size}px`;
+          boardEl.appendChild(el);
+          setTimeout(() => el.remove(), 620);
+        }
+        // 판 흔들림 (1 보통 · 2 크게)
+        function shake(level) {
+          boardWrap.classList.remove("is-shake", "is-shake2"); void boardWrap.offsetWidth;
+          boardWrap.classList.add(level >= 2 ? "is-shake2" : "is-shake");
+        }
+        // 연쇄 단계 표시 — 단계가 오를수록 크게
+        function chainText(chain) {
+          const words = ["", "", "좋아요!", "멋져요!", "대박!", "미쳤다!!", "전설!!"];
+          boardWrap.querySelectorAll(".gm-chain").forEach((x) => x.remove());
+          const el = document.createElement("div");
+          el.className = "gm-chain" + (chain >= 4 ? " is-hot" : "");
+          el.style.setProperty("--fs", Math.min(46, 22 + chain * 4) + "px");
+          el.innerHTML = `<b>연쇄 ×${chain}</b><small>${words[Math.min(6, chain)]}</small>`;
+          boardWrap.appendChild(el);
+          setTimeout(() => el.remove(), 900);
         }
         function beam(dir, i) {
           const el = document.createElement("div");
@@ -609,62 +1034,128 @@
           boardEl.appendChild(el);
           setTimeout(() => el.remove(), 400);
         }
-        function banner(text) {
+        function banner(text, sub, long) {
           boardWrap.querySelectorAll(".gm-banner").forEach((x) => x.remove());
           const el = document.createElement("div");
-          el.className = "gm-banner"; el.textContent = text;
+          el.className = "gm-banner" + (long ? " is-long" : "");
+          el.textContent = text;
+          if (sub) { const s = document.createElement("small"); s.textContent = sub; el.appendChild(s); }
           boardWrap.appendChild(el);
-          setTimeout(() => el.remove(), 1350);
+          setTimeout(() => el.remove(), long ? 2250 : 1350);
         }
-        function clearSel() { if (sel) { const t = board[sel[0]][sel[1]]; t && t.el.classList.remove("is-sel"); } sel = null; }
+        function clearSel() { if (sel) { const t = board[sel[0]] && board[sel[0]][sel[1]]; t && t.el.classList.remove("is-sel"); } sel = null; }
         function clearHint() { hintTiles.forEach((t) => t.el.classList.remove("is-hint")); hintTiles = []; }
-        function showOverlay(html) { ov.hidden = false; ov.innerHTML = html; HKUI.refreshIcons(ov); }
+        function showOverlay(html, cls) { ov.hidden = false; ov.className = "gm-overlay" + (cls ? " " + cls : ""); ov.innerHTML = html; HKUI.refreshIcons(ov); }
         function hideOverlay() { ov.hidden = true; ov.innerHTML = ""; }
 
         // ---------- 흐름 ----------
-        function resetState() {
-          score = 0; timeLeft = GAME_MS; gauge = 0; feverLeft = 0; submitted = false; busy = false; sel = null; hintTiles = [];
-          boardWrap.classList.remove("is-fever"); V.vitbox.classList.remove("is-fever");
-          buildBoard();
-          updateHud();
+        // 판 순서: 처음엔 차례대로, 다 돌면 섞어서 (바로 앞 판과 겹치지 않게)
+        function mapFor(n) {
+          while (mapOrder.length < n) {
+            const ids = MAPS.map((_, i) => i);
+            if (mapOrder.length) {
+              for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+              if (ids[0] === mapOrder[mapOrder.length - 1]) ids.push(ids.shift());
+            }
+            mapOrder.push(...ids);
+          }
+          return mapOrder[n - 1];
         }
         function showStart() {
           state = "idle";
-          resetState();
+          runId++;
+          stageNo = 1; C = cfg(1); mapOrder = []; mapIdx = mapFor(1);
+          score = 0; stageScore = 0; timeLeft = C.timeMs; busy = false; sel = null; hintTiles = []; doubleLeft = 0;
+          endFever();
+          buildStage(false);
+          updateHud();
           pauseBtn.disabled = true;
           showOverlay(`<h2>비타민 3매치</h2>
-            <p>이웃한 두 칸을 바꿔 같은 그림을 3개 이상, 또는 <b>2×2 네모</b>로 맞춰요.<br>터뜨릴수록 시간이 늘어나요 · 90초에서 시작!</p>
+            <p>시간 안에 <b>목표 점수</b>를 채우면 다음 판으로! 판 모양이 바뀌고<br>단계마다 점수 배율이 올라가요 · 남은 시간은 1초에 20점</p>
             <div class="gm-rules">
-              <div>${HKUI.icon("move-horizontal", 15, "#ff7a59")}<span><b>4개</b> → 줄 비타민 · 터지면 한 줄을 싹</span></div>
-              <div>${HKUI.icon("bomb", 15, "#ff7a59")}<span><b>2×2 · ㄱ자</b> → 비타민 폭탄 · 둘레 3×3</span></div>
-              <div>${HKUI.icon("sparkles", 15, "#ff7a59")}<span><b>일자 5개</b> → 종합 비타민 · 바꾼 그림을 전부</span></div>
-              <div>${HKUI.icon("zap", 15, "#ff7a59")}<span>특수 비타민끼리 바꾸면 <b>둘 다 펑!</b></span></div>
-              <div>${HKUI.icon("pill", 15, "#22c55e")}<span>게이지가 차면 <b>5초 피버</b> · 점수 2배</span></div>
+              <div>${HKUI.icon("grid-2x2", 15, "#ff7a59")}<span>같은 그림 <b>3개 이상</b> 또는 <b>2×2 네모</b>로 맞춰요</span></div>
+              <div>${HKUI.icon("sparkles", 15, "#ff7a59")}<span><b>4개</b> 줄 비타민 · <b>네모·ㄱ자</b> 폭탄 · <b>일자 5개</b> 종합 비타민</span></div>
+              <div>${HKUI.icon("gift", 15, "#f59e0b")}<span>몇 초마다 <b>아이템</b> 등장 · 같이 맞추면 발동: 폭탄 · <b>빛나는 비타민</b>(같은 그림 전부) · 줄 · 시계 +5초 · 점수 2배</span></div>
+              <div>${HKUI.icon("zap", 15, "#ef4444")}<span>특수끼리 바꾸면 <b>합체</b>: 폭탄+폭탄 5×5 · 줄+줄 십자 · 빛나는+아무거나 그 그림 전부</span></div>
+              <div>${HKUI.icon("snowflake", 15, "#0ea5e9")}<span>4단계 <b>얼음</b>(못 움직임) · 7단계 <b>돌</b> — 옆에서 터뜨려 깨요</span></div>
+              <div>${HKUI.icon("pill", 15, "#22c55e")}<span>게이지가 차면 <b>6초 피버</b> · 점수 2배</span></div>
               <div>${HKUI.icon("mouse-pointer-click", 15, "#64748b")}<span>클릭 두 번 · 끌기 · 휴대폰은 밀어서</span></div>
             </div>
             <button type="button" class="gm-start" data-go>${HKUI.icon("play", 18, "#fff")} 시작</button>`);
           ov.querySelector("[data-go]").onclick = startGame;
         }
         function startGame() {
-          resetState();
+          runId++;
+          score = 0; stageNo = 0; mapOrder = []; submitted = false; busy = false; sel = null; doubleLeft = 0; seenItems = new Set();
+          endFever();
           hideOverlay();
-          state = "play";
           pauseBtn.disabled = false;
-          lastAct = lastT = performance.now();
-          lastSec = Math.ceil(GAME_MS / 1000);
-          sfx("go");
+          nextStage();
           const r = boardWrap.getBoundingClientRect();
           if (r.bottom > window.innerHeight || r.top < 0) stage.scrollIntoView({ behavior: "smooth", block: "start" });
         }
+        function nextStage() {
+          const prevKinds = C.kinds;
+          stageNo++; C = cfg(stageNo); mapIdx = mapFor(stageNo);
+          stageScore = 0; timeLeft = C.timeMs; doubleLeft = 0; spawnLeft = nextSpawn();
+          clearSel(); clearHint();
+          if (feverLeft > 0) endFever();
+          buildStage(true);
+          // 판이 떨어져 내려오는 동안은 잠깐 입력을 받지 않음
+          busy = true;
+          const my = runId;
+          setTimeout(() => { if (my === runId) busy = false; }, 700);
+          state = "play";
+          lastAct = lastT = performance.now();
+          lastSec = Math.ceil(timeLeft / 1000);
+          updateHud();
+          let sub = `목표 ${fmt(C.target)}점 · ${C.timeMs / 1000}초${C.mult > 1 ? ` · 점수 ×${C.mult}` : ""}`;
+          if (stageNo === 4) sub += " · 얼음 등장!";
+          else if (stageNo === 7) sub += " · 돌 등장!";
+          else if (C.kinds > prevKinds && stageNo > 1) sub += " · 새 과일 등장!";
+          banner(`${stageNo}단계 · ${MAPS[mapIdx].name}`, sub, true);
+          sfx("go");
+          if (document.hidden) pause();
+        }
+        // 단계 클리어 — 남은 시간 × 20점 보너스, 짧게 축하하고 다음 판으로
+        async function stageClear() {
+          if (state !== "play" && state !== "ending") return;
+          state = "clear";
+          const my = runId;
+          clearSel(); clearHint();
+          if (feverLeft > 0) { feverLeft = 0; boardWrap.classList.remove("is-fever"); V.vitbox.classList.remove("is-fever"); }
+          doubleLeft = 0;
+          const secs = Math.ceil(timeLeft / 1000), bonus = secs * CLEAR_BONUS;
+          score += bonus;
+          updateHud();
+          ctx.sfx("line");
+          setTimeout(() => my === runId && ctx.sfx("powerup"), 280);
+          const next = MAPS[mapFor(stageNo + 1)].name;
+          showOverlay(`<div class="gm-clear">
+              <span class="gm-clear__icon">${HKUI.icon("party-popper", 24, "#fff")}</span>
+              <h2>${stageNo}단계 클리어!</h2>
+              <div class="gm-clear__bonus">남은 시간 ${secs}초 × ${CLEAR_BONUS} = <b>+${fmt(bonus)}</b></div>
+              <div class="gm-clear__bonus">총점 ${fmt(score)}점</div>
+              <div class="gm-clear__next">다음 판 · ${stageNo + 1}단계 ${next}</div>
+            </div>`, "is-clear");
+          await wait(2100);
+          if (my !== runId || state !== "clear") return;
+          hideOverlay();
+          nextStage();
+        }
         function finish() {
-          if (state === "over" || submitted) return;
-          state = "over"; submitted = true;
+          if (state === "over" || submitted || state === "clear") return;
+          if (stageScore >= C.target && (state === "play" || state === "ending")) { stageClear(); return; }
+          state = "over"; submitted = true; doubleLeft = 0;
+          runId++;
           clearSel(); clearHint(); endFever();
           pauseBtn.disabled = true;
           updateHud();
+          const cleared = stageNo - 1;
           showOverlay(`<h2>시간 끝!</h2>
-            <div class="gm-big">${score.toLocaleString("ko-KR")}점</div>
-            <p>점심 비타민 충전 완료예요</p>
+            <p>${stageNo}단계 목표까지 <b>${fmt(Math.max(0, C.target - stageScore))}점</b> 남았어요</p>
+            <div class="gm-big">${fmt(score)}점</div>
+            <div class="gm-chips"><span class="gm-chip">클리어 <b>${cleared}단계</b></span><span class="gm-chip">마지막 판 <b>${MAPS[mapIdx].name}</b></span></div>
             <button type="button" class="gm-start" data-again>${HKUI.icon("rotate-ccw", 18, "#fff")} 다시 하기</button>`);
           ov.querySelector("[data-again]").onclick = startGame;
           ctx.submit(score);
@@ -682,6 +1173,7 @@
           hideOverlay();
           state = "play";
           lastT = lastAct = performance.now();
+          if (!busy && stageScore >= C.target) stageClear();
         }
         pauseBtn.onclick = () => (state === "play" ? pause() : resume());
 
@@ -695,18 +1187,26 @@
               if (timeLeft <= 0) {
                 state = "ending"; clearSel(); clearHint();
                 banner("시간 끝!");
-                sfx("whoosh");
-                if (!busy) setTimeout(finish, 700);
+                sfx("lose");
+                if (!busy) { const my = runId; setTimeout(() => my === runId && finish(), 700); }
               }
             }
             if (feverLeft > 0) { feverLeft -= dt; if (feverLeft <= 0) endFever(); }
+            if (doubleLeft > 0 && state === "play") doubleLeft = Math.max(0, doubleLeft - dt);
+            // 아이템 등장 시계 (판이 멈춰 있을 때만 변신)
+            if (state === "play") {
+              spawnLeft -= dt;
+              if (spawnLeft <= 0 && !busy) { spawnItem(); spawnLeft = nextSpawn(); }
+            }
             updateHud();
             // 5초 동안 가만히 있으면 힌트
             if (state === "play" && !busy && !hintTiles.length && t - lastAct > 5000) {
-              const m = findMove(kindGrid());
+              const m = findMove(snap());
               if (m) { hintTiles = m.map(([r, c]) => board[r][c]); hintTiles.forEach((x) => x.el.classList.add("is-hint")); }
             }
           }
+          wrapEl.dataset.state = state;
+          wrapEl.dataset.busy = busy ? "1" : "";
           requestAnimationFrame(frame);
         }
 
@@ -715,12 +1215,13 @@
         function cellAt(e) {
           const rc = boardEl.getBoundingClientRect();
           const c = Math.floor((e.clientX - rc.left) / S), r = Math.floor((e.clientY - rc.top) / S);
-          return inb(r, c) ? [r, c] : null;
+          return valid(r, c) && board[r][c] ? [r, c] : null;
         }
         boardEl.addEventListener("pointerdown", (e) => {
           if (state !== "play" || busy) return;
           const cell = cellAt(e); if (!cell) return;
           e.preventDefault();
+          if (!movable(...cell)) { clearSel(); nope(...cell); return; }
           drag = { cell, x: e.clientX, y: e.clientY, id: e.pointerId };
           try { boardEl.setPointerCapture(e.pointerId); } catch (_) {}
         });
@@ -731,7 +1232,7 @@
           const [r, c] = drag.cell;
           const to = Math.abs(dx) > Math.abs(dy) ? [r, c + Math.sign(dx)] : [r + Math.sign(dy), c];
           drag = null;
-          if (inb(...to)) trySwap([r, c], to);
+          if (valid(...to) && board[to[0]][to[1]]) trySwap([r, c], to);
         });
         const up = (e) => {
           if (!drag || e.pointerId !== drag.id) return;
@@ -746,15 +1247,18 @@
         boardEl.addEventListener("pointercancel", up);
         boardEl.addEventListener("contextmenu", (e) => e.preventDefault());
         document.addEventListener("keydown", (e) => {
+          // 게임 중 스페이스·방향키로 페이지가 움직이지 않게 (입력창은 그대로)
+          const tag = e.target && e.target.tagName;
+          if (state !== "idle" && state !== "over" && tag !== "INPUT" && tag !== "TEXTAREA" && [" ", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) e.preventDefault();
           if (state === "pause" && (e.key === "p" || e.key === "P" || e.key === "Escape")) { e.preventDefault(); resume(); }
           else if (state === "play" && (e.key === "p" || e.key === "P" || e.key === "Escape")) { e.preventDefault(); pause(); }
         });
         document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
-        let rt = null;
-        window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(layout, 120); });
+        // 공통 틀이 stage 폭을 바꾸면 바로 다시 그린다 (늦게 그리면 틀이 옛 비율로 폭을 다시 재서 출렁인다)
+        window.addEventListener("resize", layout);
 
         ctx.onRestart(startGame);
-        layout();
+        ctx.onPause(pause);
         showStart();
         requestAnimationFrame((t) => { lastT = t; requestAnimationFrame(frame); });
       },

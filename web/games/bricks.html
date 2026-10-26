@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>점심 라운지</title>
+  <title>게임 라운지</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -25,13 +25,13 @@
     .gm-life { width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff, #fde7d4); box-shadow: 0 0 0 1.5px rgba(255,255,255,.5); }
     .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #1c1917; }
     .gm-canvas { display: block; touch-action: none; cursor: none; }
-    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(28, 25, 23, .55); backdrop-filter: blur(2px); cursor: default; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; overflow-y: auto; background: rgba(28, 25, 23, .55); backdrop-filter: blur(2px); cursor: default; }
     .gm-overlay[hidden] { display: none; }
-    .gm-card { width: 100%; max-width: 300px; padding: 22px 20px 20px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+    .gm-card { width: 100%; max-width: 320px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 18px 16px 16px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
     .gm-card h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.02em; }
     .gm-card p { word-break: keep-all; margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary, #475569); }
     .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #c2410c; }
-    .gm-items { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; margin: 4px 0 12px; text-align: left; }
+    .gm-items { display: grid; grid-template-columns: 1fr 1fr; gap: 5px 8px; margin: 4px 0 10px; text-align: left; font-size: 12px; }
     .gm-items div { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary, #475569); }
     .gm-pill { flex-shrink: 0; padding: 1px 6px; border-radius: 999px; font-size: 10.5px; font-weight: 800; color: #fff; }
     .gm-keys { font-size: 12px; color: var(--text-muted, #64748b); margin: 0 0 14px; line-height: 1.6; }
@@ -51,7 +51,7 @@
       const TOP = 46;        // 벽돌 시작 y
       const PADDLE_Y = H - 38;
       const PH = 12;
-      const BALL_R = 6;
+      let BALL_R = 6; // 큰 공 아이템이면 10
       const FONT = "Pretendard, system-ui, sans-serif";
 
       // ---------- 스테이지 ----------
@@ -123,7 +123,17 @@
         multi: { label: "공×3", color: "#2563eb" },
         slow: { label: "느리게", color: "#7c3aed" },
         pierce: { label: "관통", color: "#dc2626" },
+        laser: { label: "레이저", color: "#0891b2" },
+        boom: { label: "폭발공", color: "#ea580c" },
+        big: { label: "큰 공", color: "#ca8a04" },
+        magnet: { label: "끈끈이", color: "#db2777" },
+        guard: { label: "보호막", color: "#0d9488" },
+        life: { label: "목숨+1", color: "#e11d48" },
       };
+      // 아이템이 나오는 비율 (합이 1)
+      const ITEM_TABLE = [["wide", 0.15], ["multi", 0.14], ["slow", 0.1], ["pierce", 0.09], ["laser", 0.13], ["boom", 0.12], ["big", 0.1], ["magnet", 0.08], ["guard", 0.06], ["life", 0.03]];
+      // 시간제 효과 — 오른쪽 위 칩에 남은 초 표시
+      const TIMED = ["pierce", "slow", "wide", "laser", "boom", "big", "magnet"];
 
       stage.innerHTML = `
         <div class="gm-shell">
@@ -136,7 +146,7 @@
             <canvas class="gm-canvas" aria-label="벽돌 깨기 게임 화면"></canvas>
             <div class="gm-overlay" data-overlay></div>
           </div>
-          <div class="gm-note">마우스·←→ 이동 · Space/클릭/탭 발사 · P 일시정지</div>
+          <div class="gm-note">마우스·←→ 이동 · Space/클릭/탭 발사 · Esc 일시정지</div>
         </div>`;
       const shell = stage.querySelector(".gm-shell");
       const canvas = stage.querySelector("canvas");
@@ -222,7 +232,8 @@
         S.def = def;
         S.bricks = buildStage(def);
         S.items = [];
-        S.wide = S.slow = S.pierce = 0;
+        S.wide = S.slow = S.pierce = S.laser = S.boom = S.big = S.magnet = 0;
+        S.guard = false; S.shots = []; S.laserCd = 0;
         S.hits = 0;
         S.stageT = 0;
         resetBall();
@@ -290,6 +301,25 @@
         if (S.wide > 0) S.wide -= dt;
         if (S.slow > 0) S.slow -= dt;
         if (S.pierce > 0) S.pierce -= dt;
+        for (const k of ["laser", "boom", "big", "magnet"]) if (S[k] > 0) S[k] -= dt;
+        BALL_R = S.big > 0 ? 10 : 6;
+        // 레이저 패들 — 양 끝에서 0.35초마다 위로 쏜다
+        if (S.laser > 0 && !S.clearT) {
+          S.laserCd -= dt;
+          if (S.laserCd <= 0) {
+            S.laserCd = 0.35;
+            for (const d of [-1, 1]) S.shots.push({ x: S.px + d * (S.pw / 2 - 6), y: PADDLE_Y - 4 });
+            sfxGap("shoot", 0.3);
+          }
+        }
+        for (const sh of S.shots) {
+          sh.y -= 620 * dt;
+          for (const k of S.bricks) {
+            if (k.dead || sh.hit) continue;
+            if (sh.x >= k.x && sh.x <= k.x + k.w && sh.y >= k.y && sh.y <= k.y + k.h) { sh.hit = true; hitBrick(k); }
+          }
+        }
+        S.shots = S.shots.filter((sh) => !sh.hit && sh.y > -10);
 
         // 패들
         const targetW = S.wide > 0 ? 116 : 76;
@@ -300,6 +330,33 @@
         if (mv) { S.px += mv * 460 * dt; S.mouseX = null; }
         else if (S.mouseX != null) S.px = S.mouseX;
         S.px = Math.max(S.pw / 2 + 4, Math.min(W - S.pw / 2 - 4, S.px));
+
+        // 마지막 3개 이하 — 공이 남은 벽돌 쪽으로 살짝 끌려간다 (하나 남으면 더 세게)
+        const leftN = S.bricks.length;
+        if (leftN > 0 && leftN <= 3 && !S.clearT) {
+          if (S.helpStage !== S.stageNo) {
+            S.helpStage = S.stageNo;
+            S.banner = { text: `마지막 ${leftN}개!`, sub: "공이 벽돌 쪽으로 끌려가요", t: 1.6 };
+          }
+          const turn = (leftN === 1 ? 2.4 : 1.5) * dt;
+          for (const b of S.balls) {
+            if (b.stuck) continue;
+            let tgt = null, best = 1e9;
+            for (const k of S.bricks) {
+              const d = (k.x + k.w / 2 - b.x) ** 2 + (k.y + k.h / 2 - b.y) ** 2;
+              if (d < best) { best = d; tgt = k; }
+            }
+            if (!tgt) continue;
+            const want = Math.atan2(tgt.y + tgt.h / 2 - b.y, tgt.x + tgt.w / 2 - b.x);
+            const cur = Math.atan2(b.vy, b.vx);
+            let diff = Math.atan2(Math.sin(want - cur), Math.cos(want - cur));
+            // 아래로 내려가는 공은 패들로 받아야 하니 위로 갈 때만 끌어당긴다
+            if (b.vy > 0) continue;
+            const a2 = cur + Math.max(-turn, Math.min(turn, diff));
+            const sp = Math.hypot(b.vx, b.vy);
+            b.vx = Math.cos(a2) * sp; b.vy = Math.sin(a2) * sp;
+          }
+        }
 
         // 공
         for (const b of S.balls) {
@@ -330,6 +387,12 @@
         if (b.x < BALL_R) { b.x = BALL_R; b.vx = Math.abs(b.vx); normalize(b); }
         if (b.x > W - BALL_R) { b.x = W - BALL_R; b.vx = -Math.abs(b.vx); normalize(b); }
         if (b.y < BALL_R) { b.y = BALL_R; b.vy = Math.abs(b.vy); normalize(b); }
+        if (S.guard && b.vy > 0 && b.y > PADDLE_Y + PH + 10) {
+          // 바닥 보호막 — 한 번 받아서 위로 튕기고 사라짐
+          b.y = PADDLE_Y + PH + 10; b.vy = -Math.abs(b.vy); normalize(b);
+          S.guard = false; sfxGap("hit", 0.1); burst(b.x, b.y, "#5eead4", 14, 140);
+          return;
+        }
         if (b.y > H + BALL_R * 2) { b.lost = true; return; }
         // 패들
         const half = S.pw / 2;
@@ -342,6 +405,7 @@
           b.vy = -Math.cos(a) * sp;
           b.y = PADDLE_Y - BALL_R;
           normalize(b);
+          if (S.magnet > 0) { b.stuck = true; b.vx = b.vy = 0; }
           S.paddleFlash = 0.12;
           sfxGap("tap", 0.06);
           return;
@@ -375,6 +439,15 @@
           }
           normalize(b);
           hitBrick(k);
+          if (S.boom > 0) {
+            const cx2 = k.x + k.w / 2, cy2 = k.y + k.h / 2;
+            for (const o of S.bricks) {
+              if (o === k || o.dead) continue;
+              if (Math.abs(o.x + o.w / 2 - cx2) <= o.w * 1.2 && Math.abs(o.y + o.h / 2 - cy2) <= o.h * 1.6) hitBrick(o);
+            }
+            burst(cx2, cy2, "#fb923c", 18, 200);
+            sfxGap("explode", 0.15);
+          }
           break;
         }
         S.bricks = S.bricks.filter((k) => !k.dead);
@@ -406,10 +479,8 @@
         S.texts.push({ x: k.x + k.w / 2, y: k.y + k.h / 2, text: `+${pts}`, life: 0.6, color: k.hard ? "#fde68a" : "#fff" });
         const falling = S.items.length;
         if (falling < 2 && Math.random() < (k.hard ? 0.22 : 0.12)) {
-          const kinds = ["wide", "multi", "slow", "pierce"];
-          const w = [0.32, 0.28, 0.24, 0.16];
           let r = Math.random(), kind = "wide";
-          for (let i = 0; i < kinds.length; i++) { if ((r -= w[i]) <= 0) { kind = kinds[i]; break; } }
+          for (const [k2, w2] of ITEM_TABLE) { if ((r -= w2) <= 0) { kind = k2; break; } }
           S.items.push({ x: k.x + k.w / 2, y: k.y + k.h / 2, kind });
         }
         hud();
@@ -419,7 +490,13 @@
         const I = ITEMS[it.kind];
         if (it.kind === "wide") S.wide = 12;
         else if (it.kind === "slow") { S.slow = 8; S.balls.forEach(normalize); }
-        else if (it.kind === "pierce") S.pierce = 5;
+        else if (it.kind === "pierce") S.pierce = 6;
+        else if (it.kind === "laser") S.laser = 9;
+        else if (it.kind === "boom") S.boom = 10;
+        else if (it.kind === "big") S.big = 12;
+        else if (it.kind === "magnet") S.magnet = 12;
+        else if (it.kind === "guard") S.guard = true;
+        else if (it.kind === "life") S.lives = Math.min(6, S.lives + 1);
         else if (it.kind === "multi") {
           const src = S.balls.find((b) => !b.stuck) || S.balls[0];
           if (src.stuck) launch();
@@ -443,7 +520,8 @@
         ctx.sfx("hurt");
         burst(S.px, PADDLE_Y, "#fb923c", 16, 160);
         S.items = [];
-        S.wide = S.slow = S.pierce = 0;
+        S.wide = S.slow = S.pierce = S.laser = S.boom = S.big = S.magnet = 0;
+        S.guard = false; S.shots = []; S.laserCd = 0;
         hud();
         if (S.lives <= 0) {
           S.dead = true;
@@ -538,7 +616,7 @@
           // 효과 칩
           let x = W - 10;
           g.textAlign = "right";
-          for (const [k, v] of [["pierce", S.pierce], ["slow", S.slow], ["wide", S.wide]]) {
+          for (const [k, v] of TIMED.map((k2) => [k2, S[k2]])) {
             if (v <= 0) continue;
             const label = `${ITEMS[k].label} ${Math.ceil(v)}초`;
             g.font = `700 10.5px ${FONT}`;
@@ -553,6 +631,19 @@
         }
         for (const k of S.bricks) drawBrick(k);
         for (const it of S.items) drawItem(it);
+        // 레이저 탄
+        g.fillStyle = "#67e8f9";
+        for (const sh of S.shots) { rr(sh.x - 1.5, sh.y - 8, 3, 12, 1.5); g.fill(); }
+        // 바닥 보호막
+        if (S.guard) {
+          g.fillStyle = `rgba(94, 234, 212, ${0.45 + 0.25 * Math.sin(S.t * 6)})`;
+          rr(6, PADDLE_Y + PH + 12, W - 12, 4, 2); g.fill();
+        }
+        // 끈끈이 패들 표시
+        if (S.magnet > 0 && !S.dead) {
+          g.fillStyle = "rgba(219, 39, 119, .55)";
+          rr(S.px - S.pw / 2 + 4, PADDLE_Y - 3, S.pw - 8, 3, 1.5); g.fill();
+        }
         if (!S.dead) drawPaddle(S.px, S.pw, S.paddleFlash > 0);
         for (const b of S.balls) drawBall(b.x, b.y, S.pierce > 0, b.trail);
         for (const p of S.parts) {
@@ -586,6 +677,15 @@
       }
 
       function drawBrick(k) {
+        // 마지막 3개 이하는 반짝이는 테두리로 눈에 띄게
+        if (S.bricks.length <= 3) {
+          const pulse = 0.5 + 0.5 * Math.sin(S.t * 7);
+          g.save();
+          g.shadowColor = "#fde047"; g.shadowBlur = 10 + pulse * 14;
+          g.strokeStyle = `rgba(253, 224, 71, ${0.55 + pulse * 0.45})`; g.lineWidth = 3;
+          g.strokeRect(k.x - 3, k.y - 3, k.w + 6, k.h + 6);
+          g.restore();
+        }
         const base = k.hard ? (k.hp >= 2 ? "#475569" : "#64748b") : k.color;
         const f = k.flash > 0;
         const grad = g.createLinearGradient(0, k.y, 0, k.y + k.h);
@@ -707,8 +807,14 @@
             <div>${pill("multi")}공 3개로</div>
             <div>${pill("slow")}공 느리게</div>
             <div>${pill("pierce")}잠깐 관통</div>
+            <div>${pill("laser")}패들에서 레이저</div>
+            <div>${pill("boom")}맞힌 곳 둘레까지 펑</div>
+            <div>${pill("big")}공이 커져요</div>
+            <div>${pill("magnet")}공이 패들에 붙어요</div>
+            <div>${pill("guard")}바닥 한 번 막아 줘요</div>
+            <div>${pill("life")}목숨 하나 더 (드물게)</div>
           </div>
-          <div class="gm-keys">PC 마우스·<kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>Space</kbd> 발사<br>모바일은 끌어서 이동 · 손을 떼면 발사</div>
+          <div class="gm-keys">PC 마우스·<kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>Space</kbd> 발사 · <kbd>Esc</kbd> 일시정지<br>모바일은 끌어서 이동 · 손을 떼면 발사</div>
           <button type="button" class="gm-go" data-act="start">시작</button>
         </div>`);
       }
@@ -801,6 +907,7 @@
       document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
 
       ctx.onRestart(start);
+      ctx.onPause(pause);
       if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
       window.addEventListener("resize", fit);
       fit();

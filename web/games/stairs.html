@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>별까지 계단 — 점심 라운지</title>
+<title>별까지 계단 — 게임 라운지</title>
 <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
 <meta name="theme-color" content="#10122b">
 <style>
@@ -32,15 +32,16 @@
   }
   #game{
     position:fixed;
-    inset:0;
-    width:100%;
+    top:0; left:0;
+    /* canvas 는 left/right 로 늘어나지 않아서 폭을 직접 준다 (순위표 자리만큼 뺌) */
+    width:calc(100% - var(--side));
     height:100%;
     display:block;
   }
   .hud{
     position:fixed;
     top:calc(env(safe-area-inset-top, 0px) + 14px);
-    left:0; right:0;
+    left:0; right:var(--side);
     display:flex;
     flex-direction:column;
     align-items:center;
@@ -80,7 +81,7 @@
   .mute{
     position:fixed;
     top:calc(env(safe-area-inset-top, 0px) + 14px);
-    right:14px;
+    right:calc(var(--side) + 14px);
     pointer-events:auto;
     font:inherit;
     font-size:12px;
@@ -95,10 +96,34 @@
     z-index:11;
   }
   .mute:focus-visible{ outline:2px solid var(--lamp); outline-offset:2px; }
+  /* 플레이 중에도 고양이 바꾸기 (누를 때마다 해금된 다음 고양이) */
+  .catBtn{
+    position:fixed;
+    top:calc(env(safe-area-inset-top, 0px) + 54px);
+    right:calc(var(--side) + 14px);
+    z-index:11;
+    display:flex; align-items:center; gap:4px;
+    font:inherit; font-size:12px; font-weight:700; letter-spacing:.04em;
+    color:var(--paper);
+    background:rgba(16,18,43,.55);
+    border:1px solid rgba(245,237,216,.3);
+    border-radius:999px;
+    padding:2px 12px 2px 4px;
+    cursor:pointer;
+  }
+  .catBtn canvas{ width:28px; height:28px; display:block; }
+  .catBtn:focus-visible{ outline:2px solid var(--lamp); outline-offset:2px; }
+  #catPick{ z-index:20; }
+  .catPickGo{
+    font:inherit; font-size:16px; font-weight:800; color:var(--ink);
+    background:var(--lamp); border:none; border-radius:999px;
+    padding:12px 34px; margin-top:16px; cursor:pointer;
+    box-shadow:0 5px 0 rgba(0,0,0,.3);
+  }
   .toast{
     position:fixed;
     top:26%;
-    left:0; right:0;
+    left:0; right:var(--side);
     text-align:center;
     font-size:clamp(22px, 6vw, 34px);
     font-weight:900;
@@ -118,15 +143,18 @@
   }
   .overlay{
     position:fixed;
-    inset:0;
+    top:0; left:0; bottom:0; right:var(--side);
     z-index:10;
-    display:grid;
-    place-items:center;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    overflow-y:auto;
     background:radial-gradient(ellipse at center, rgba(10,11,28,.45), rgba(8,9,24,.72));
     padding:24px;
   }
   .overlay.hidden{ display:none; }
-  .panel{ text-align:center; max-width:340px; }
+  /* 화면이 낮으면 위에서부터 보이고 스크롤된다 (가운데 정렬은 margin:auto 로) */
+  .panel{ text-align:center; width:100%; max-width:360px; margin:auto 0; }
   .eyebrow{
     font-size:13px;
     font-weight:700;
@@ -135,7 +163,7 @@
     margin-bottom:14px;
   }
   h1{
-    font-size:clamp(58px, 19vw, 96px);
+    font-size:clamp(48px, min(19vw, 11vh), 96px);
     font-weight:900;
     line-height:.98;
     letter-spacing:-0.03em;
@@ -235,6 +263,12 @@
   }
   .profileChip.show{ display:flex; }
   .profileChip .back{ opacity:.85; margin-right:2px; }
+  /* 휴대폰 — 가운데 점수를 가리지 않게 이름 없이 '‹ + 사진'만 */
+  @media (max-width: 520px){
+    .profileChip .nm, .profileChip .back .lbl{ display:none; }
+  }
+  /* 터치 화면에서는 키보드 안내 대신 탭 안내만 */
+  @media (pointer: coarse){ .panel .sub.kbd{ display:none; } }
   .profileChip img, .profileChip .ini{
     width:24px; height:24px;
     border-radius:50%;
@@ -350,10 +384,11 @@
     font-size:12px; font-weight:800; letter-spacing:.14em;
     color:var(--sunset); margin-bottom:10px;
   }
-  .skinRow{ display:flex; gap:8px; flex-wrap:wrap; }
+  .skinRow{ display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; }
   .skinBtn{
     position:relative;
-    width:52px; height:52px;
+    width:100%; height:auto; aspect-ratio:1;
+    max-width:52px;
     padding:0;
     border-radius:12px;
     border:2px solid rgba(245,237,216,.2);
@@ -361,7 +396,7 @@
     cursor:pointer;
     display:grid; place-items:center;
   }
-  .skinBtn canvas{ display:block; }
+  .skinBtn canvas{ display:block; max-width:88%; height:auto !important; }
   .skinBtn[aria-pressed="true"]{ border-color:var(--lamp); background:rgba(255,212,94,.14); }
   .skinBtn.locked{ cursor:not-allowed; }
   .skinBtn.locked canvas{ opacity:.25; filter:grayscale(1); }
@@ -425,6 +460,50 @@
     color:var(--paper);
     font-variant-numeric:tabular-nums;
   }
+  /* 넓은 화면 — 다른 게임처럼 오른쪽에 사내 순위 (게임 화면은 왼쪽 나머지) */
+  :root{ --side:0px; }
+  .sideBoard{ display:none; }
+  @media (min-width: 1100px){
+    :root{ --side:344px; }
+    #startLb, #overLb{ display:none !important; }
+    .sideBoard{
+      display:flex; position:fixed; top:0; right:0; bottom:0; width:var(--side); z-index:12;
+      padding:12px; background:#eef2f7;
+      touch-action:auto; -webkit-user-select:text; user-select:text;
+    }
+  }
+  .sb-card{
+    flex:1; min-height:0; display:flex; flex-direction:column;
+    background:#fff; border:1px solid #d4e0ed; border-radius:16px; padding:16px;
+    color:#0b3558; box-shadow:0 1px 3px rgba(15,23,42,.06);
+  }
+  .sb-head{ display:flex; align-items:center; gap:6px; font-size:15px; font-weight:700; margin-bottom:12px; }
+  .sb-head svg{ flex:none; }
+  .sb-count{ margin-left:auto; font-size:12.5px; font-weight:500; color:#a6bbd1; }
+  .sb-tabs{ display:grid; grid-template-columns:repeat(4, 1fr); gap:4px; padding:4px; border-radius:10px; background:#f8f9fb; margin-bottom:10px; }
+  .sb-tab{ font:inherit; border:0; background:transparent; padding:7px 0; border-radius:7px; font-size:13px; font-weight:600; color:#476788; cursor:pointer; }
+  .sb-tab.is-active{ background:#fff; color:#0b3558; box-shadow:0 1px 2px rgba(15,23,42,.08); }
+  .sb-body{ flex:1; min-height:0; overflow-y:auto; }
+  .sb-list{ list-style:none; }
+  .sb-row{ display:flex; align-items:center; gap:10px; padding:8px 6px; border-radius:10px; }
+  .sb-row.is-me{ background:#e6f0ff; }
+  .sb-rank{ width:24px; text-align:center; font-size:13px; font-weight:700; color:#a6bbd1; flex:none; }
+  .sb-rank.t1{ color:#d49a00; } .sb-rank.t2{ color:#8a94a6; } .sb-rank.t3{ color:#b8743d; }
+  .sb-av{ width:32px; height:32px; border-radius:50%; flex:none; object-fit:cover; display:grid; place-items:center; color:#fff; font-size:13px; font-weight:700; }
+  .sb-who{ flex:1; min-width:0; display:flex; flex-direction:column; }
+  .sb-who b{ font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sb-who small{ font-size:12px; color:#a6bbd1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sb-score{ font-size:14.5px; font-weight:700; white-space:nowrap; }
+  .sb-score small{ font-size:11px; font-weight:600; color:#a6bbd1; margin-left:1px; }
+  .sb-me{ margin-top:8px; padding:8px 10px; border-radius:10px; background:#f8f9fb; font-size:13px; color:#476788; }
+  .sb-empty{ padding:28px 8px; text-align:center; font-size:13.5px; color:#a6bbd1; line-height:1.5; }
+  .sb-note{ margin-top:10px; font-size:12px; color:#a6bbd1; text-align:center; }
+  @media (max-height: 820px){
+    .eyebrow{ margin-bottom:8px; }
+    h1{ margin-bottom:14px; }
+    .lbBox{ margin-top:12px; max-height:150px; }
+    .skinBox{ margin-top:10px; padding:10px 12px; }
+  }
   @media (prefers-reduced-motion: reduce){
     .cta{ animation:none; }
     .energy.low .fill{ animation:none; }
@@ -436,13 +515,39 @@
 <body>
 <canvas id="game"></canvas>
 
+<aside class="sideBoard" id="sideBoard" aria-label="사내 순위">
+  <div class="sb-card">
+    <div class="sb-head"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c2780c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>사내 순위<span class="sb-count" id="sbCount"></span></div>
+    <div class="sb-tabs" role="tablist">
+      <button type="button" role="tab" class="sb-tab is-active" data-period="today">오늘</button>
+      <button type="button" role="tab" class="sb-tab" data-period="week">이번 주</button>
+      <button type="button" role="tab" class="sb-tab" data-period="all">전체</button>
+      <button type="button" role="tab" class="sb-tab" data-period="dept">부서</button>
+    </div>
+    <div class="sb-body" id="sbBody"></div>
+  </div>
+</aside>
+
 <div class="hud">
   <div class="score" id="score">0</div>
   <div class="energy" id="energyBar"><div class="fill" id="energyFill"></div></div>
   <div class="targetChip" id="targetChip"></div>
 </div>
 <button class="mute" id="mute" type="button">소리 켬</button>
-<button class="profileChip" id="profileChip" type="button" title="점심 라운지로"></button>
+<button class="catBtn" id="catBtn" type="button" title="고양이 바꾸기 (C)"><canvas width="56" height="56"></canvas><span>고양이</span></button>
+<div class="overlay hidden" id="catPick">
+  <div class="panel">
+    <p class="eyebrow">일시정지</p>
+    <p class="sub" style="margin:6px 0 0">Esc·스페이스를 누르면 이어서 올라요</p>
+    <div class="skinBox" id="catPickBox" hidden>
+      <h3>고양이 고르기</h3>
+      <div class="skinRow" id="catPickRow"></div>
+      <p class="skinName" id="catPickName"></p>
+    </div>
+    <button id="catPickGo" type="button" class="catPickGo">계속하기</button>
+  </div>
+</div>
+<button class="profileChip" id="profileChip" type="button" title="게임 라운지로"></button>
 <div class="toast" id="toast"></div>
 
 <div class="overlay" id="start">
@@ -450,7 +555,7 @@
     <p class="eyebrow">노을 진 골목 끝, 계단은 하늘로</p>
     <h1>별까지<br>계단</h1>
     <p class="how"><span class="key">◀</span> 다음 계단이 있는 쪽을 탭 <span class="key">▶</span></p>
-    <p class="sub">키보드 ← → 도 됩니다 · 헛디디거나 숨이 다하면 추락!</p>
+    <p class="sub kbd">키보드 ← → 도 됩니다 · Esc 일시정지 · 헛디디거나 숨이 다하면 추락!</p>
     <p class="cta">화면을 누르면 시작</p>
     <p class="best" id="startBest"></p>
     <div id="loginArea">
@@ -494,6 +599,11 @@
         </div>
       </div>
       <div id="overLbRows"></div>
+    </div>
+    <div class="skinBox" id="skinBox2" hidden>
+      <h3>고양이 고르기</h3>
+      <div class="skinRow" id="skinRow2"></div>
+      <p class="skinName" id="skinName2"></p>
     </div>
     <button id="retry" type="button">다시 오르기</button>
   </div>
@@ -626,7 +736,7 @@
 
   function resize(){
     var oldSX = SX, oldSY = SY;
-    W = window.innerWidth; H = window.innerHeight;
+    W = canvas.clientWidth || window.innerWidth; H = window.innerHeight;
     DPR = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(W * DPR);
     canvas.height = Math.round(H * DPR);
@@ -812,6 +922,62 @@
     elToast.classList.add('show');
   }
 
+  // ---------- 고양이 바꾸기 (언제든) ----------
+  var elCatBtn = document.getElementById('catBtn');
+  function paintCatBtn(){
+    var c = elCatBtn.querySelector('canvas');
+    var g2 = c.getContext('2d');
+    g2.setTransform(1, 0, 0, 1, 0, 0);
+    g2.clearRect(0, 0, c.width, c.height);
+    g2.setTransform(2, 0, 0, 2, 0, 0);
+    g2.translate(13, 25);
+    g2.scale(0.55, 0.55);
+    try{ window.__drawCatPreview(0, 0, 1, 0, 0, currentSkin(), g2); }catch(err){}
+  }
+  // 고양이 버튼 → 게임을 잠깐 멈추고 고르기 창 (고르면 바로 이어서)
+  var catPaused = false;
+  var elCatPick = document.getElementById('catPick');
+  function openCatPicker(){
+    if(state === 'falling' || state === 'over' || catPaused) return;
+    catPaused = true;
+    if(window.__renderSkins) window.__renderSkins();
+    elCatPick.classList.remove('hidden');
+    document.getElementById('catPickGo').focus();
+  }
+  function closeCatPicker(){
+    if(!catPaused) return;
+    elCatPick.classList.add('hidden');
+    inputLockUntil = performance.now() + 250; // 닫는 클릭이 계단 입력으로 이어지지 않게
+    catPaused = false;
+    elCatBtn.blur();
+  }
+  ['pointerdown', 'click'].forEach(function(t){
+    elCatPick.addEventListener(t, function(e){ e.stopPropagation(); });
+  });
+  document.getElementById('catPickGo').addEventListener('click', function(e){ e.stopPropagation(); closeCatPicker(); });
+  // 고양이를 고르면 잠깐 보여 주고 바로 이어서
+  elCatPick.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('.skinBtn');
+    if(!b || b.classList.contains('locked')) return;
+    setTimeout(function(){
+      var sk = currentSkin();
+      var last = sk.name.charCodeAt(sk.name.length - 1) - 0xAC00;
+      var jong = last >= 0 && last < 11172 ? last % 28 : 0;
+      showToast(sk.name + (jong && jong !== 8 ? '으로' : '로') + ' 바꿨어요');
+      paintCatBtn();
+      closeCatPicker();
+    }, 180);
+  }, true);
+  window.__catPaused = function(){ return catPaused; };
+  function cycleSkin(){ openCatPicker(); }
+  window.__paintCatBtn = paintCatBtn;
+  ['pointerdown', 'click'].forEach(function(t){
+    elCatBtn.addEventListener(t, function(e){
+      e.stopPropagation(); // 계단 오르기 입력으로 처리되지 않게
+      if(t === 'click') openCatPicker();
+    });
+  });
+
   function setScoreDisplay(){
     if(score !== lastShownScore){
       elScore.textContent = String(score);
@@ -949,7 +1115,7 @@
   }
 
   function input(d){
-    if(state === 'falling' || state === 'over') return;
+    if(state === 'falling' || state === 'over' || catPaused) return;
     audio();
     if(startVisible){ hideStart(); return; }
     if(performance.now() < inputLockUntil) return;
@@ -969,12 +1135,22 @@
   });
   window.addEventListener('keydown', function(e){
     if(e.repeat) return;
+    if(catPaused){
+      // 고르기 창: 스페이스·엔터·Esc·C 로 닫고 이어 하기
+      if(e.key === ' ' || e.key === 'Enter' || e.key === 'Escape' || e.key === 'c' || e.key === 'C' || e.key === 'ㅊ'){ e.preventDefault(); closeCatPicker(); }
+      return;
+    }
     if(e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A'){
       e.preventDefault(); if(state !== 'over') input(-1);
     }else if(e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D'){
       e.preventDefault(); if(state !== 'over') input(1);
     }else if(e.key === ' ' || e.key === 'Enter'){
       if(state === 'over' && e.target !== elMute){ e.preventDefault(); resetGame(); }
+    }else if(e.key === 'Escape'){
+      // 플레이 중 Esc → 일시정지 (고양이도 여기서 고를 수 있음)
+      if((state === 'playing' || state === 'ready') && !startVisible){ e.preventDefault(); openCatPicker(); }
+    }else if(e.key === 'c' || e.key === 'C' || e.key === 'ㅊ'){
+      e.preventDefault(); cycleSkin();
     }
   });
   elRetry.addEventListener('click', function(e){
@@ -1236,6 +1412,7 @@
     ctx.restore();
   }
   window.__drawCatPreview = drawCat;
+  paintCatBtn();
 
   // 동료 최고 기록 깃발: 그 계단 위에 프로필 사진 + 이름 + 점수
   var FLAG_R = 19;   // 프로필 사진 반지름
@@ -1350,7 +1527,7 @@
 
     hopT += dt;
 
-    if(state === 'playing'){
+    if(state === 'playing' && !catPaused){
       energy -= drainRate() * dt;
       if(energy <= 0){
         energy = 0;
@@ -1634,7 +1811,7 @@
     elChip.innerHTML = '';
     var back = document.createElement('span');
     back.className = 'back';
-    back.textContent = '‹ 라운지';
+    back.innerHTML = '‹<span class="lbl"> 게임 라운지</span>';
     elChip.appendChild(back);
     if(me.photo){
       var im = document.createElement('img');
@@ -1647,7 +1824,10 @@
       d.textContent = me.name.charAt(0);
       elChip.appendChild(d);
     }
-    elChip.appendChild(document.createTextNode(me.name));
+    var nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = me.name;
+    elChip.appendChild(nm);
     elChip.classList.add('show');
   }
   ['pointerdown','click'].forEach(function(t){
@@ -1689,7 +1869,12 @@
   });
 
   // ---------- 고양이 스킨 고르기 ----------
+  var SKIN_SPOTS = [[elSkinBox, elSkinRow, elSkinName], [$('skinBox2'), $('skinRow2'), $('skinName2')], [$('catPickBox'), $('catPickRow'), $('catPickName')]];
   function renderSkins(){
+    SKIN_SPOTS.forEach(function(spot){ renderSkinsInto(spot[0], spot[1], spot[2]); });
+    if(window.__paintCatBtn) window.__paintCatBtn();
+  }
+  function renderSkinsInto(elSkinBox, elSkinRow, elSkinName){
     var api = window.__skins;
     if(!api){ elSkinBox.hidden = true; return; }
     elSkinBox.hidden = false;
@@ -1741,7 +1926,7 @@
   }
   window.__renderSkins = renderSkins;
   ['pointerdown', 'click'].forEach(function(t){
-    elSkinBox.addEventListener(t, function(e){ e.stopPropagation(); });
+    SKIN_SPOTS.forEach(function(spot){ spot[0].addEventListener(t, function(e){ e.stopPropagation(); }); });
   });
 
   function applyPlayers(){
@@ -1881,6 +2066,57 @@
     elTarget.classList.add('show');
   }, 300);
 
+  // ---------- 오른쪽 사내 순위 (넓은 화면) — 다른 게임과 같은 오늘 · 이번 주 · 전체 · 부서 ----------
+  var elSide = $('sideBoard'), elSbBody = $('sbBody'), elSbCount = $('sbCount');
+  var sidePeriod = 'today', sideSeq = 0;
+  if(embedded) elSide.remove();
+  function sbEsc(t){ return String(t == null ? '' : t).replace(/[&<>"']/g, function(c){ return '&#' + c.charCodeAt(0) + ';'; }); }
+  function sbAvatar(r){
+    if(r.avatarUrl) return '<img class="sb-av" src="' + sbEsc(r.avatarUrl) + '" alt="">';
+    return '<span class="sb-av" style="background:' + colorFor(r.memberId || r.name) + '">' + sbEsc(String(r.name).charAt(0)) + '</span>';
+  }
+  function sbRank(n){ return '<span class="sb-rank' + (n <= 3 ? ' t' + n : '') + '">' + n + '</span>'; }
+  function sbScore(n){ return Number(n).toLocaleString('ko-KR') + '<small>층</small>'; }
+  function renderSide(data){
+    if(sidePeriod === 'dept'){
+      elSbCount.textContent = '';
+      if(!data.departments || !data.departments.length){ elSbBody.innerHTML = '<div class="sb-empty">이번 주 부서 기록이 아직 없어요</div>'; return; }
+      elSbBody.innerHTML = '<ol class="sb-list">' + data.departments.map(function(d){
+        return '<li class="sb-row' + (d.isMine ? ' is-me' : '') + '">' + sbRank(d.rank)
+          + '<span class="sb-who"><b>' + sbEsc(d.name) + '</b><small>' + d.players + '명 참가</small></span>'
+          + '<span class="sb-score">' + sbScore(d.score) + '</span></li>';
+      }).join('') + '</ol><p class="sb-note">부서 상위 3명 기록의 평균이에요 · 이번 주 기준</p>';
+      return;
+    }
+    elSbCount.textContent = data.players + '명';
+    if(!data.rows.length){ elSbBody.innerHTML = '<div class="sb-empty">아직 기록이 없어요<br><b>첫 1위</b>에 도전해 보세요</div>'; return; }
+    var meOutside = data.me && !data.rows.some(function(r){ return r.self; });
+    elSbBody.innerHTML = '<ol class="sb-list">' + data.rows.map(function(r){
+      return '<li class="sb-row' + (r.self ? ' is-me' : '') + '">' + sbRank(r.rank) + sbAvatar(r)
+        + '<span class="sb-who"><b>' + sbEsc(r.name) + '</b><small>' + sbEsc(r.department || '') + '</small></span>'
+        + '<span class="sb-score">' + sbScore(r.score) + '</span></li>';
+    }).join('') + '</ol>'
+      + (meOutside ? '<div class="sb-me">내 순위 <b>' + data.me.rank + '위</b> · ' + sbScore(data.me.score) + '</div>' : '');
+  }
+  function loadSide(){
+    if(embedded || !window.matchMedia('(min-width: 1100px)').matches) return;
+    var seq = ++sideSeq, period = sidePeriod;
+    api('/play/stairs/leaderboard?period=' + (period === 'dept' ? 'week' : period)).then(function(data){
+      if(seq === sideSeq) renderSide(data);
+    }).catch(function(e){ if(seq === sideSeq) elSbBody.innerHTML = '<div class="sb-empty">' + sbEsc(e.message || '순위를 불러오지 못했어요') + '</div>'; });
+  }
+  // 순위표를 눌러도 계단을 밟지 않게
+  ['pointerdown', 'click'].forEach(function(t){ elSide.addEventListener(t, function(e){ e.stopPropagation(); }); });
+  elSide.querySelectorAll('.sb-tab').forEach(function(b){
+    b.addEventListener('click', function(){
+      sidePeriod = b.dataset.period;
+      elSide.querySelectorAll('.sb-tab').forEach(function(x){ x.classList.toggle('is-active', x === b); });
+      b.blur();
+      loadSide();
+    });
+  });
+  window.matchMedia('(min-width: 1100px)').addEventListener('change', function(m){ if(m.matches) loadSide(); });
+
   // ---------- 순위 불러오기 — 전체 · 이번 주 두 번 받아 계단 깃발용 목록으로 합친다 ----------
   function loadBoards(){
     return Promise.all([api('/play/stairs/leaderboard?period=all'), api('/play/stairs/leaderboard?period=week')])
@@ -1904,6 +2140,7 @@
     if(!me) return Promise.resolve();
     var seq = ++refreshSeq;
     lastRefreshAt = Date.now();
+    loadSide();
     return loadBoards().then(function(b){
       if(seq !== refreshSeq) return;
       players = b.players;
@@ -1934,6 +2171,24 @@
 
   // ---------- 부트 ----------
   elLogin.hidden = true;
+  // 업무 시간이면 게임 위에 안내를 덮는다 (점심·퇴근 후·출근 전·주말에만 플레이)
+  api('/play/status').then(function(st){
+    if(st.open) return;
+    var el = document.createElement('div');
+    el.className = 'overlay';
+    el.style.zIndex = 30;
+    el.style.background = 'rgba(16, 18, 43, .97)';
+    var st0 = document.getElementById('start'); if(st0) st0.classList.add('hidden');
+    var cb = document.getElementById('catBtn'); if(cb) cb.hidden = true;
+    el.innerHTML = '<div class="panel"><p class="eyebrow">잠깐!</p><h1 style="font-size:34px">지금은<br>업무 시간</h1>'
+      + '<p class="sub" style="margin-top:12px">게임은 점심시간(11:30~13:00), 퇴근 후(18:00~),<br>출근 전(~09:00), 주말·공휴일에 할 수 있어요.</p>'
+      + (st.opensAt ? '<p class="best" style="margin-top:10px">오늘 ' + st.opensAt + '에 다시 열려요</p>' : '')
+      + '<a href="/lounge" style="display:inline-block;margin-top:16px;color:var(--lamp);font-weight:800">‹ 게임 라운지로</a></div>';
+    ['pointerdown', 'click', 'keydown'].forEach(function(t){ el.addEventListener(t, function(e){ e.stopPropagation(); }, true); });
+    document.body.appendChild(el);
+    window.addEventListener('keydown', function(e){ e.stopImmediatePropagation(); e.preventDefault(); }, true);
+    window.addEventListener('pointerdown', function(e){ if(!e.target.closest('a')) e.stopImmediatePropagation(); }, true);
+  }).catch(function(){});
   api('/me/profile').then(function(p){
     me = { name: p.name, photo: p.avatarUrl || null };
     renderChip();

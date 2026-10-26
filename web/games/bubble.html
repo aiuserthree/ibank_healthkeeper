@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>점심 라운지</title>
+  <title>게임 라운지</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -27,16 +27,19 @@
     .gm-screen { position: relative; overflow: hidden; background: #0c2233; }
     .gm-screen.is-last { border-radius: 0 0 16px 16px; }
     .gm-canvas { display: block; touch-action: none; }
-    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(8, 24, 38, .55); backdrop-filter: blur(2px); }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: 16px; background: rgba(8, 24, 38, .55); backdrop-filter: blur(2px); }
     .gm-overlay[hidden] { display: none; }
-    .gm-card { width: 100%; max-width: 310px; padding: 20px 18px 18px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
+    .gm-card { width: 100%; max-width: 310px; margin: auto; padding: 20px 18px 18px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
     .gm-card h2 { margin: 0 0 6px; font-size: 21px; letter-spacing: -0.02em; }
+    /* 낮은 판 — 시작 카드가 잘리지 않게 줄이고, 그래도 넘치면 카드 안에서 스크롤 */
+    @media (max-width: 420px), (max-height: 760px) { .gm-overlay { padding: 8px; } .gm-card { padding: 14px 14px 12px; } .gm-card h2 { font-size: 18px; } .gm-card p { font-size: 12px; margin-bottom: 6px; } }
     .gm-card p { margin: 0 0 10px; font-size: 13px; line-height: 1.55; color: var(--text-secondary, #475569); }
     .gm-card .gm-big { font-size: 32px; font-weight: 800; margin: 2px 0 8px; color: #0e7490; }
     .gm-rules { display: grid; gap: 6px; margin: 4px 0 12px; text-align: left; }
     .gm-rules div { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.45; color: var(--text-secondary, #475569); }
     .gm-num { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 800; color: #fff; background: linear-gradient(135deg, #06b6d4, #a78bfa); margin-top: 1px; }
     .gm-keys { font-size: 12px; color: var(--text-muted, #64748b); margin: 0 0 14px; line-height: 1.7; }
+    @media (pointer: coarse) { .gm-keys { display: none; } .gm-rules { margin-bottom: 12px; } }
     .gm-keys kbd { display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #f8fafc; font: 600 11px/1.6 inherit; }
     .gm-go { width: 100%; border: 0; padding: 12px; border-radius: 12px; font-size: 15.5px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(135deg, #0891b2, #8b5cf6); }
     .gm-go:focus-visible { outline: 3px solid #a5f3fc; outline-offset: 2px; }
@@ -1134,7 +1137,7 @@
             <div><span class="gm-num">2</span><span>붙어 있는 방울은 <b>연쇄</b>로 터져요. 연쇄마다 점수 2배!</span></div>
             <div><span class="gm-num">3</span><span>방울은 위에서 밟으면 통통 튀어 올라요. 오래 두면 세균이 화나서 나와요.</span></div>
           </div>
-          <div class="gm-keys"><kbd>←</kbd> <kbd>→</kbd> 이동 · <kbd>↑</kbd>/<kbd>Space</kbd> 점프 · <kbd>X</kbd> 방울<br>모바일은 아래 버튼으로 조작해요</div>
+          <div class="gm-keys"><kbd>←</kbd> <kbd>→</kbd> 이동 · <kbd>↑</kbd>/<kbd>Space</kbd> 점프 · <kbd>Esc</kbd> 일시정지 · <kbd>X</kbd> 방울<br>모바일은 아래 버튼으로 조작해요</div>
           <button type="button" class="gm-go" data-act="start">시작</button>
         </div>`);
         if (!idleRaf) idleRaf = requestAnimationFrame(idle);
@@ -1225,6 +1228,7 @@
 
       // ---------- 시작 ----------
       ctx.onRestart(start);
+      ctx.onPause(pause);
       const refit = () => { usePad(); fit(); };
       if (window.ResizeObserver) new ResizeObserver(refit).observe(stage);
       window.addEventListener("resize", refit);

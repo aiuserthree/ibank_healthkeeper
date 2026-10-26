@@ -4,17 +4,19 @@ from __future__ import annotations
 
 import secrets
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from redis.asyncio import Redis
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
-from app.core.time import today_kst
+from app.config import get_settings
+from app.core.time import now_kst, today_kst
 from app.models import GamePlay, Member, MemberStatus
 from app.services.avatar import member_avatar_url
 from app.services.fun_stats import DEPARTMENT_RANKING_EXCLUDED
+from app.services.korean_holidays import is_public_holiday
 
 
 @dataclass(frozen=True)
@@ -34,19 +36,49 @@ class Game:
 GAMES: dict[str, Game] = {
     g.key: g
     for g in (
-        Game("stairs", "별까지 계단", "MINI", "고양이와 함께 끝없는 계단을 올라 별까지", "sparkles", "층", 100000),
-        Game("match3", "비타민 3매치", "MINI", "같은 과일 셋을 맞춰 터뜨리는 60초 퍼즐", "cherry", "점", 10_000_000),
-        Game("crossing", "출근길 대작전", "MINI", "차와 자전거를 피해 회사까지 한 칸씩", "footprints", "칸", 100000),
-        Game("blocks", "점심 블록", "MINI", "떨어지는 블록으로 줄을 채워 지우기", "blocks", "점", 10_000_000),
-        Game("pairs", "아이콘 짝 잇기", "MINI", "같은 그림 두 개를 두 번 이하로 꺾어 잇기", "link", "점", 1_000_000),
-        Game("bricks", "벽돌 깨기", "MINI", "공을 튕겨 벽돌을 모두 부수기", "brick-wall", "점", 10_000_000),
-        Game("shooter", "세균 격파", "MINI", "몰려오는 세균 편대를 비타민 레이저로", "rocket", "점", 10_000_000),
+        Game("stairs", "별까지 계단", "MINI", "좌우 계단을 골라 별까지 · 동료 기록 깃발 넘기", "sparkles", "층", 100000),
+        Game("match3", "비타민 3매치", "MINI", "3개·네모로 맞춰 펑! · 단계마다 새 맵과 목표", "cherry", "점", 10_000_000),
+        Game("crossing", "출근길 대작전", "MINI", "차·자전거·지각선을 피해 회사까지 한 칸씩", "footprints", "칸", 100000),
+        Game("blocks", "점심 블록", "MINI", "줄을 채워 지우기 · 10줄마다 도시락 블록", "blocks", "점", 10_000_000),
+        Game("pairs", "아이콘 짝 잇기", "MINI", "같은 그림을 두 번 이하로 꺾어 잇기 · 콤보", "link", "점", 1_000_000),
+        Game("bricks", "벽돌 깨기", "MINI", "공을 튕겨 야근·회의 벽돌 부수기", "brick-wall", "점", 10_000_000),
+        Game("shooter", "세균 격파", "MINI", "9가지 무기로 세균 편대 격파 · 같은 무기 3단계", "rocket", "점", 10_000_000),
         Game("bubble", "비눗방울 대작전", "MINI", "비눗방울에 세균을 가두고 톡 터뜨리기", "droplets", "점", 10_000_000),
         Game("sudoku", "오늘의 스도쿠", "MINI", "모두 같은 문제 · 빨리 푼 순서대로", "grid-3x3", "time", 24 * 3600, lower_better=True, daily_once=True),
-        Game("chosung", "건강 초성 퀴즈", "QUIZ", "ㄱㅂㅁ → 거북목 · 오늘의 5문제", "spell-check", "점", 100000, daily_once=True),
-        Game("typing", "영어 타자 레이스", "STUDY", "떨어지는 뜻을 보고 영어 단어 치기", "keyboard", "점", 1_000_000),
+        Game("chosung", "건강 초성 퀴즈", "QUIZ", "ㄱㅂㅁ → 거북목 · 오늘의 건강 낱말 5문제", "spell-check", "점", 100000, daily_once=True),
+        Game("trivia", "오늘의 상식 퀴즈", "QUIZ", "쉬움부터 결승까지 4단계 · 매일 새 20문제", "lightbulb", "점", 100000, daily_once=True),
+        Game("korean", "한국어 능력시험", "STUDY", "맞춤법·띄어쓰기·표준어 · 매일 새 20문제", "book-open-check", "점", 100000, daily_once=True),
+        Game("typing", "영어 타자 레이스", "STUDY", "뜻을 보고 영어 단어 치기 · 첫 글자 힌트", "keyboard", "점", 1_000_000),
     )
 }
+
+# ── 이용 시간 — 업무 시간에는 게임을 할 수 없다 ──
+# 평일(공휴일 제외) 09:00~11:30, 13:00~18:00 은 닫힘. 점심시간·퇴근 후·출근 전·주말·공휴일은 열림.
+# 개발(DEBUG) 환경은 테스트를 위해 늘 열림.
+CLOSED_WINDOWS = ((9 * 60, 11 * 60 + 30), (13 * 60, 18 * 60))
+SUBMIT_GRACE_MIN = 10  # 점심시간 끝(13:00) 직전에 시작한 판은 10분 안에 끝내면 기록 인정
+
+
+def play_window(now: datetime | None = None) -> dict:
+    now = now or now_kst()
+    if get_settings().debug:
+        return {"open": True, "opensAt": None}
+    minute = now.hour * 60 + now.minute
+    workday = now.weekday() < 5 and not is_public_holiday(now.date())
+    if workday:
+        for start, end in CLOSED_WINDOWS:
+            if start <= minute < end:
+                return {"open": False, "opensAt": f"{end // 60:02d}:{end % 60:02d}"}
+    return {"open": True, "opensAt": None}
+
+
+def ensure_open(grace: bool = False) -> None:
+    if play_window()["open"]:
+        return
+    if grace and play_window(now_kst() - timedelta(minutes=SUBMIT_GRACE_MIN))["open"]:
+        return
+    raise_app_error("GAME_CLOSED", 403)
+
 
 LEADERBOARD_SIZE = 30
 # 부서 순위 — 부서 상위 3명의 최고 기록 평균 (인원이 많은 부서가 무조건 이기지 않게)
@@ -231,6 +263,7 @@ async def start_daily(db: AsyncSession, redis: Redis, member: Member, key: str) 
     이후 판을 모두 연습(순위 미반영)으로 돌린다.
     """
     game = get_game(key)
+    ensure_open()
     if not game.daily_once:
         return {"ranked": True, "token": None}
     today = today_kst()
@@ -249,6 +282,7 @@ async def submit_score(
     db: AsyncSession, redis: Redis, member: Member, key: str, score: int, token: str | None = None
 ) -> dict:
     game = get_game(key)
+    ensure_open(grace=True)
     if not isinstance(score, int) or score < 0 or score > game.max_score:
         raise_app_error("INVALID_SCORE", 400)
     rate_key = f"hk:game:rate:{member.id}"

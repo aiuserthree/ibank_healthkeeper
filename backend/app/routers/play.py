@@ -20,6 +20,12 @@ class ScoreRequest(BaseModel):
     token: Optional[str] = None
 
 
+@router.get("/status")
+async def status(member: Member = Depends(get_current_active_member)):
+    """지금 게임을 할 수 있는 시간인지 — 닫혀 있으면 다시 열리는 시각(HH:MM)."""
+    return {"data": game_service.play_window()}
+
+
 @router.get("/games")
 async def games(
     db: AsyncSession = Depends(get_db),

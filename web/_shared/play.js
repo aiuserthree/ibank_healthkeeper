@@ -1,5 +1,5 @@
 /**
- * 점심 라운지 — 게임 페이지 공통 틀
+ * 라운지 — 게임 페이지 공통 틀
  *
  * HKPlay.mountGame({ key, setup(stage, ctx) })
  *   stage : 게임이 그릴 빈 영역 (가로 최대 560px)
@@ -11,12 +11,14 @@
  *                   이미 시작했던 날이면 false(연습) — 문제를 본 뒤 새로고침해 다시 하는 것을 막는다
  *     submit(score) → Promise — 점수 저장 + 결과 창 + 순위표 새로고침
  *     onRestart(fn) — 판이 끝난 뒤 스페이스를 누르면 부른다 (처음 상태로 되돌리는 함수)
+ *     onPause(fn)   — 게임 중 Esc 를 누르면 부른다 (게임의 일시정지 함수 — 플레이 중이 아니면 아무것도 안 하게).
+ *                     일시정지 화면에는 "계속하기" 글자가 든 버튼을 두면 Esc·스페이스로 이어 하기가 된다
  *     formatScore(n)
  *     sfx(name, arg) — 효과음 (HKSound 이름 목록 참고). 소리 켜고 끄기는 공통 버튼이 맡는다
  *   }
  */
 /**
- * 점심 라운지 효과음 — 소리 파일 없이 Web Audio 로 바로 만든다.
+ * 라운지 효과음 — 소리 파일 없이 Web Audio 로 바로 만든다.
  * HKPlay.sfx(name, arg) 로 부르고, 켜고 끄기는 게임 머리의 🔊 버튼(모든 게임 공통, 기억됨).
  * 기본은 켜짐. 브라우저 정책상 첫 클릭·키 입력 뒤부터 소리가 난다.
  *
@@ -181,6 +183,7 @@ window.HKPlay = (function () {
     sudoku: ["#334155", "#64748b"],
     chosung: ["#e0508a", "#ff9a8b"],
     typing: ["#4f46e5", "#a78bfa"],
+    trivia: ["#0891b2", "#22d3ee"],
     korean: ["#b45309", "#facc15"],
   };
 
@@ -302,16 +305,20 @@ window.HKPlay = (function () {
     let period = "today";
     const restartFns = [];
     let dailyToken = null;
-    // 스페이스 하나로 시작·다시 시작 (모든 게임 공통)
-    //  - 판이 끝난 뒤: 다시 하기 (게임이 onRestart 로 등록한 함수)
-    //  - 시작 화면·일시정지·끝 화면에 버튼이 보이면: 그 버튼(시작/출발/계속하기/다시 하기 …)을 누른다
+    // 키 약속 (모든 게임 공통)
+    //  - 스페이스: 시작 화면·끝 화면에서 시작/다시 하기 (게임 중에는 게임이 자유롭게 씀)
+    //  - Esc: 게임 중 일시정지 (게임이 onPause 로 등록한 함수), 일시정지 화면에서 다시 누르면 이어 하기
     let canRestart = false;
-    const GO_TEXT = /시작|출발|출근하기|도전|계속하기|다시 하기|다시 달리기|준비/;
-    function visibleGoButton() {
+    const pauseFns = [];
+    const GO_TEXT = /시작|출발|출근하기|도전|계속하기|이어서|다시 하기|다시 달리기|준비/;
+    const RESUME_TEXT = /계속하기|이어서/;
+    function visibleButton(re) {
       const stageEl = document.getElementById("hk-play-stage");
       if (!stageEl) return null;
       return [...stageEl.querySelectorAll("button")].find((b) => {
-        if (b.disabled || !GO_TEXT.test(b.textContent || "")) return false;
+        // 짧은 버튼 글자만 (퀴즈 보기처럼 긴 글자에 '시작'이 섞여 있어도 누르지 않게)
+        const label = (b.textContent || "").replace(/\s+/g, " ").trim();
+        if (b.disabled || label.length > 12 || !re.test(label)) return false;
         const r = b.getBoundingClientRect();
         return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
       });
@@ -320,6 +327,15 @@ window.HKPlay = (function () {
       "keydown",
       (e) => {
         if (e.repeat) return;
+        if (e.code === "Escape") {
+          // 입력창에 있어도 Esc 는 일시정지·이어 하기
+          const resume = visibleButton(RESUME_TEXT);
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if (resume) resume.click();
+          else pauseFns.forEach((fn) => fn());
+          return;
+        }
         if (e.code !== "Space") {
           canRestart = false; // 다른 키를 누르면(새 판을 이미 시작) 스페이스 재시작은 꺼진다
           return;
@@ -334,7 +350,7 @@ window.HKPlay = (function () {
           restartFns.forEach((fn) => fn());
           return;
         }
-        const btn = visibleGoButton();
+        const btn = visibleButton(GO_TEXT);
         if (btn) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -379,7 +395,7 @@ window.HKPlay = (function () {
         const meta = list.find((g) => g.key === key) || game || { key, title: key, unit: "" };
         game = { ...meta, ...(game || {}) };
         const dailyDone = !!(meta.dailyOnce && meta.playedToday);
-        document.getElementById("hk-play-head").innerHTML = `<a class="hk-pf__back" href="${HKRoutes.lounge}" aria-label="점심 라운지로">${HKUI.icon("chevron-left", 20, "currentColor")}<span>라운지</span></a>
+        document.getElementById("hk-play-head").innerHTML = `<a class="hk-pf__back" href="${HKRoutes.lounge}" aria-label="게임 라운지로">${HKUI.icon("chevron-left", 20, "currentColor")}<span>게임 라운지</span></a>
           <span class="hk-pf__icon" style="${tintStyle(key)}">${HKUI.icon(meta.icon || "gamepad-2", 18, "#fff")}</span>
           <div class="hk-pf__title"><b>${HKUI.escapeHtml(meta.title)}</b><small>${HKUI.escapeHtml(meta.desc || "")}</small></div>
           <div class="hk-pf__tools">
@@ -402,7 +418,7 @@ window.HKPlay = (function () {
           HKSound.play("select");
           soundBtn.blur();
         };
-        document.title = `${meta.title} — 점심 라운지`;
+        document.title = `${meta.title} — 게임 라운지`;
         document.querySelectorAll(".hk-play-tab").forEach((b) => {
           b.onclick = () => {
             period = b.dataset.period;
@@ -423,6 +439,7 @@ window.HKPlay = (function () {
           formatScore: (n) => formatScore(game, n).replace(/<[^>]+>/g, ""),
           sfx: (name, arg) => HKSound.play(name, arg),
           onRestart: (fn) => restartFns.push(fn),
+          onPause: (fn) => pauseFns.push(fn),
           begin: async () => {
             if (!game.dailyOnce) return true;
             try {
@@ -456,10 +473,34 @@ window.HKPlay = (function () {
           },
         };
         const stage = document.getElementById("hk-play-stage");
+        // 업무 시간에는 게임 대신 안내 (순위표는 그대로 볼 수 있다)
+        const status = await HKApi.playStatus().catch(() => ({ open: true }));
+        if (!status.open) {
+          stage.innerHTML = closedHtml(status.opensAt);
+          HKUI.refreshIcons(stage);
+          bindDrawer();
+          // 열리는 시각이 지나면 저절로 다시 불러온다
+          setInterval(async () => {
+            const st = await HKApi.playStatus().catch(() => null);
+            if (st && st.open) location.reload();
+          }, 60000);
+          return;
+        }
         setup(stage, ctx);
         fitStage(stage);
         bindDrawer();
     }
+  }
+
+  // 업무 시간 안내
+  function closedHtml(opensAt) {
+    return `<div class="hk-play-closed">
+        <span class="hk-play-closed__icon">${HKUI.icon("briefcase", 30, "currentColor")}</span>
+        <h2>지금은 업무 시간이에요</h2>
+        <p>게임은 <b>점심시간(11:30~13:00)</b>과 <b>퇴근 후(18:00~)</b>, <b>출근 전(~09:00)</b>, 주말·공휴일에 할 수 있어요.</p>
+        ${opensAt ? `<p class="hk-play-closed__next">${HKUI.icon("clock", 16, "currentColor")} 오늘 <b>${opensAt}</b>에 다시 열려요</p>` : ""}
+        <a class="hk-btn hk-btn--secondary" href="${HKRoutes.lounge}">게임 라운지로</a>
+      </div>`;
   }
 
   // 순위 버튼(좁은 화면) — 오른쪽에서 밀려 나오는 순위표
@@ -507,5 +548,5 @@ window.HKPlay = (function () {
     [80, 300, 800].forEach((ms) => setTimeout(fit, ms));
   }
 
-  return { mountGame, tintStyle, formatScore, seededRng, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
+  return { closedHtml, mountGame, tintStyle, formatScore, seededRng, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
 })();

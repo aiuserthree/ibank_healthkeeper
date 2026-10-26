@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>점심 라운지</title>
+  <title>게임 라운지</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -50,7 +50,9 @@
     key: "shooter",
     setup(stage, ctx) {
       const W = 360, H = 540;
-      const PY = H - 62; // 내 기체 y
+      // 내 기체 y — 위아래로도 움직인다 (화면 아래쪽 58% 안)
+      const PY0 = H - 62, PY_MIN = Math.round(H * 0.42), PY_MAX = H - 28;
+      let PY = PY0;
       stage.innerHTML = `
         <div class="gm-shell">
           <div class="gm-hud">
@@ -62,7 +64,7 @@
             <canvas class="gm-canvas" aria-label="세균 격파 게임 화면"></canvas>
             <div class="gm-overlay" data-overlay></div>
           </div>
-          <div class="gm-note">← → 또는 A·D 이동 · P 일시정지 · 모바일은 화면을 좌우로 끌기</div>
+          <div class="gm-note">방향키·WASD 이동 · Esc 일시정지 · 모바일은 화면을 끌어서 이동</div>
         </div>`;
       const shell = stage.querySelector(".gm-shell");
       const canvas = stage.querySelector("canvas");
@@ -97,8 +99,8 @@
       };
       let state = "ready"; // ready | play | paused | over
       let S = null; // 판 상태
-      const keys = { left: false, right: false };
-      let pointerX = null;
+      const keys = { left: false, right: false, up: false, down: false };
+      let pointerX = null, pointerY = null;
       let stars = [];
       function makeStars() {
         stars = [];
@@ -124,9 +126,11 @@
       // 동그라미 아이템 그림 — [바탕, 글자색, 글자]
       const ITEM_LOOK = { rapid: ["#7c4a1e", "#fff", "커"], laser: ["#facc15", "#713f12", "레"], homing: ["#ef4444", "#fff", "생"], orbit: ["#f5f5f4", "#57534e", "마"], chili: ["#dc2626", "#fff", "고"], ripple: ["#c084fc", "#fff", "양"], zap: ["#3b82f6", "#fff", "블"], slow: ["#f59e0b", "#fff", "꿀"], wing: ["#22c55e", "#fff", "균"], x2: ["#a855f7", "#fff", "D"], bomb: ["#0ea5e9", "#fff", "소"] };
       // 시간제 효과 — [상태 키, 이름, 막대 색, 최대 초]
-      const TIMED = [["triple", "확산탄", "#fb923c", 12], ["rapid", "연사", "#b45309", 12], ["laser", "관통 레이저", "#facc15", 12], ["homing", "유도탄", "#ef4444", 12], ["orbit", "마늘 방패", "#d6d3d1", 12], ["chili", "고추 화염", "#dc2626", 12], ["ripple", "파동탄", "#c084fc", 12], ["zap", "번개", "#3b82f6", 12], ["wing", "도우미", "#22c55e", 14], ["slow", "느리게", "#f59e0b", 6], ["x2", "점수 2배", "#a855f7", 8]];
+      const WEAPON_MAX = 40; // 무기는 겹쳐 먹어도 최대 40초
+      const TIMED = [["triple", "확산탄", "#fb923c", WEAPON_MAX], ["rapid", "연사", "#b45309", WEAPON_MAX], ["laser", "관통 레이저", "#facc15", WEAPON_MAX], ["homing", "유도탄", "#ef4444", WEAPON_MAX], ["orbit", "마늘 방패", "#d6d3d1", WEAPON_MAX], ["chili", "고추 화염", "#dc2626", WEAPON_MAX], ["ripple", "파동탄", "#c084fc", WEAPON_MAX], ["zap", "번개", "#3b82f6", WEAPON_MAX], ["wing", "도우미", "#22c55e", WEAPON_MAX], ["slow", "느리게", "#f59e0b", 9], ["x2", "점수 2배", "#a855f7", 14]];
       // 무기 — 같은 걸 또 먹으면 시간이 늘고 한 단계 세진다 (최대 3단계)
-      const WEAPONS = { triple: 8, rapid: 7, laser: 6, homing: 8, orbit: 8, chili: 7, ripple: 8, zap: 8, wing: 10 };
+      // 무기 지속 시간(초) — 먹을 때마다 이만큼 늘고 최대 WEAPON_MAX 초까지 쌓인다
+      const WEAPONS = { triple: 20, rapid: 18, laser: 16, homing: 20, orbit: 20, chili: 16, ripple: 20, zap: 20, wing: 24 };
       const WEAPON_NAME = { triple: "확산탄", rapid: "연사", laser: "관통 레이저", homing: "유도탄", orbit: "마늘 방패", chili: "고추 화염", ripple: "양파 파동탄", zap: "블루베리 번개", wing: "도우미" };
       // 고추 화염이 닿는 거리 (단계마다 길어짐)
       const flameLen = () => 90 + lvOf("chili") * 30;
@@ -163,6 +167,7 @@
       }
 
       function newGame() {
+        PY = PY0;
         S = {
           score: 0, lives: 3, wave: 0, t: 0,
           px: W / 2, fireCd: 0.3, triple: 0, shield: false, invul: 0,
@@ -203,6 +208,7 @@
           S.boss = { x: W / 2, y: -70, r: 44, hp, maxHp: hp, t: 0, spreadCd: 2.2, aimCd: 1.4, minionCd: 4, flash: 0, n };
           S.form = null;
           S.banner = { text: "큰 세균 등장!", sub: "체력 바를 다 깎아 주세요", t: 2 };
+          if (armedList().length === 0) dropItem(W / 2, 150, pickWeapon()); // 맨손이면 무기 하나
           ctx.sfx("whoosh");
         } else {
           const dx = 36, dy = 30;
@@ -260,16 +266,30 @@
         let mv = 0;
         if (keys.left) mv -= 1;
         if (keys.right) mv += 1;
-        if (mv) S.px += mv * speed * dt;
-        else if (pointerX != null) {
-          const d = pointerX - S.px;
+        let mvY = 0;
+        if (keys.up) mvY -= 1;
+        if (keys.down) mvY += 1;
+        if (mv || mvY) {
+          // 대각선도 같은 빠르기
+          const k = mv && mvY ? Math.SQRT1_2 : 1;
+          S.px += mv * speed * k * dt;
+          PY += mvY * speed * k * dt;
+        } else if (pointerX != null) {
           const step = 720 * dt;
+          const d = pointerX - S.px;
           S.px += Math.abs(d) < step ? d : Math.sign(d) * step;
+          if (pointerY != null) {
+            const dy = pointerY - PY;
+            PY += Math.abs(dy) < step ? dy : Math.sign(dy) * step;
+          }
         }
         S.px = Math.max(22, Math.min(W - 22, S.px));
+        PY = Math.max(PY_MIN, Math.min(PY_MAX, PY));
         if (S.invul > 0) S.invul -= dt;
         if (S.triple > 0) S.triple -= dt;
         for (const k of ["rapid", "laser", "homing", "orbit", "chili", "ripple", "zap", "slow", "wing", "x2"]) if (S[k] > 0) S[k] -= dt;
+        // 무기 없이 보낸 시간 (필요할 때 무기를 주기 위한 기준)
+        if (armedList().length === 0 && !S.clearT) S.unarmedT = (S.unarmedT || 0) + dt; else S.unarmedT = 0;
         if (S.flashT > 0) S.flashT -= dt;
 
         // 자동 연사
@@ -579,8 +599,6 @@
           if (!S.clearT) {
             const bonus = 300 + S.wave * 200;
             S.score += bonus;
-            // 웨이브를 깨면 무기 아이템 하나를 선물로
-            dropItem(W / 2, 140, ["vitc", "laser", "rapid", "homing", "orbit", "chili", "ripple", "zap", "wing"][Math.floor(Math.random() * 9)]);
             S.banner = { text: `웨이브 ${S.wave} 클리어!`, sub: `보너스 +${bonus.toLocaleString("ko-KR")}`, t: 1.7 };
             S.clearT = 1.8;
             S.ebullets = [];
@@ -631,11 +649,7 @@
         burst(e.x, e.y, T.c2, 12);
         S.texts.push({ x: e.x, y: e.y, text: `+${pts}`, life: 0.7, color: e.mode === "dive" ? "#fde047" : "#fff" });
         if (!crash) ctx.sfx(e.mode === "dive" ? "coin" : "pop");
-        // 아이템: 22% 확률, 그리고 7마리 연속으로 안 나오면 반드시 하나
-        if (!crash) {
-          S.dry = (S.dry || 0) + 1;
-          if (Math.random() < 0.22 || S.dry >= 7) { dropItem(e.x, e.y); S.dry = 0; }
-        }
+        if (!crash) maybeDrop(e.x, e.y);
         hud();
       }
 
@@ -654,11 +668,37 @@
         hud();
       }
 
+      // ── 아이템은 필요할 때 — 지금 상황을 보고 나올지, 무엇이 나올지 정한다
+      const WEAPON_ITEMS = ["vitc", "laser", "rapid", "homing", "orbit", "chili", "ripple", "zap", "wing"];
+      const ITEM_OF = { triple: "vitc", rapid: "rapid", laser: "laser", homing: "homing", orbit: "orbit", chili: "chili", ripple: "ripple", zap: "zap", wing: "wing" };
+      function armedList() { return Object.keys(WEAPONS).filter((k) => S[k] > 0); }
+      function maybeDrop(x, y) {
+        const armed = armedList();
+        const expiring = armed.length === 1 && S[armed[0]] < 2.5;
+        // 무기 없음 20% · 하나뿐인데 곧 끝남 15% · 하나 7% · 둘 이상 3%
+        let p = armed.length === 0 ? 0.2 : expiring ? 0.15 : armed.length === 1 ? 0.07 : 0.03;
+        if (S.lives <= 1 && !S.shield) p += 0.08; // 위험할 때 조금 더
+        if (S.items.length >= 2) p = 0; // 화면에 이미 두 개 떨어지는 중이면 그만
+        // 무기 없이 8초가 지나면 다음 세균은 반드시 무기
+        if (armed.length === 0 && S.unarmedT > 8 && S.items.length === 0) { dropItem(x, y, pickWeapon()); S.unarmedT = 0; return; }
+        if (Math.random() < p) dropItem(x, y);
+      }
+      // 무기 고르기 — 이미 쓰는 무기가 있으면 반쯤은 그 무기(단계 올리기)
+      function pickWeapon() {
+        const armed = armedList();
+        if (armed.length && Math.random() < 0.5) return ITEM_OF[armed[Math.floor(Math.random() * armed.length)]];
+        return WEAPON_ITEMS[Math.floor(Math.random() * WEAPON_ITEMS.length)];
+      }
+
       function dropItem(x, y, kind) {
         if (!kind) {
-          // 아이템 뽑기 — 숫자가 클수록 자주 나온다
-          let r = Math.random() * ITEM_TOTAL;
-          kind = ITEM_TABLE.find(([, w]) => (r -= w) < 0)[0];
+          if (S.lives <= 1 && !S.shield && Math.random() < 0.45) kind = Math.random() < 0.5 ? "mask" : "water"; // 목숨이 위험하면 지켜 주는 아이템
+          else {
+            // 아이템 뽑기 — 숫자가 클수록 자주 나온다
+            let r = Math.random() * ITEM_TOTAL;
+            kind = ITEM_TABLE.find(([, w]) => (r -= w) < 0)[0];
+            if (WEAPON_ITEMS.includes(kind)) kind = pickWeapon();
+          }
         }
         S.items.push({ x, y, kind, t: 0 });
       }
@@ -669,12 +709,12 @@
         if (wk) {
           // 무기: 켜져 있을 때 또 먹으면 한 단계 위 + 시간 연장
           S.lv[wk] = S[wk] > 0 ? Math.min(3, (S.lv[wk] || 1) + 1) : 1;
-          S[wk] = Math.min(12, Math.max(S[wk], 0) + WEAPONS[wk]);
+          S[wk] = Math.min(WEAPON_MAX, Math.max(S[wk], 0) + WEAPONS[wk]);
           label = `${WEAPON_NAME[wk]} ${S.lv[wk]}단계!`;
         }
         else if (it.kind === "mask") { S.shield = true; label = "마스크 · 보호막!"; }
-        else if (it.kind === "slow") { S.slow = 6; label = "꿀 · 세균이 느려져요"; }
-        else if (it.kind === "x2") { S.x2 = 8; label = "비타민D · 점수 2배!"; }
+        else if (it.kind === "slow") { S.slow = 9; label = "꿀 · 세균이 느려져요"; }
+        else if (it.kind === "x2") { S.x2 = 14; label = "비타민D · 점수 2배!"; }
         else if (it.kind === "bomb") { label = "손소독제 · 싹 소독!"; sanitize(); }
         else { S.lives = Math.min(6, S.lives + 1); label = "물방울 · 목숨 +1"; }
         S.score += 100;
@@ -1108,15 +1148,15 @@
             <div><span class="gm-dot" style="background:#0ea5e9">소</span>화면 소독</div>
           </div>
           <p class="gm-items-note">같은 무기를 또 먹으면 <b>최대 3단계</b> · 빨간 칩은 새 무기 · 가끔 마스크·물방울·비타민D·꿀</p>
-          <div class="gm-keys">PC <kbd>←</kbd> <kbd>→</kbd> 또는 <kbd>A</kbd> <kbd>D</kbd> · 자동 연사<br>모바일 화면을 좌우로 끌면 따라와요</div>
+          <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 자동 연사 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면을 끌면 그쪽으로 따라와요</div>
           <button type="button" class="gm-go" data-act="start">시작</button>
         </div>`);
       }
       function start() {
         overlay.hidden = true;
         overlay.innerHTML = "";
-        keys.left = keys.right = false;
-        pointerX = null;
+        keys.left = keys.right = keys.up = keys.down = false;
+        pointerX = pointerY = null;
         makeStars();
         newGame();
         state = "play";
@@ -1125,8 +1165,8 @@
       function pause() {
         if (state !== "play") return;
         state = "paused";
-        keys.left = keys.right = false;
-        pointerX = null;
+        keys.left = keys.right = keys.up = keys.down = false;
+        pointerX = pointerY = null;
         showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>현재 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점 · 웨이브 ${S.wave}</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
       }
       function resume() {
@@ -1165,6 +1205,8 @@
           if (gameKey) e.preventDefault();
           if (c === "ArrowLeft" || c === "KeyA") keys.left = true;
           if (c === "ArrowRight" || c === "KeyD") keys.right = true;
+          if (c === "ArrowUp" || c === "KeyW") keys.up = true;
+          if (c === "ArrowDown" || c === "KeyS") keys.down = true;
           if (c === "KeyP" || c === "Escape") pause();
         } else if (state === "paused") {
           if (gameKey) e.preventDefault();
@@ -1177,8 +1219,15 @@
       window.addEventListener("keyup", (e) => {
         if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
         if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+        if (e.code === "ArrowUp" || e.code === "KeyW") keys.up = false;
+        if (e.code === "ArrowDown" || e.code === "KeyS") keys.down = false;
       });
-      window.addEventListener("blur", () => { keys.left = keys.right = false; pointerX = null; });
+      window.addEventListener("blur", () => { keys.left = keys.right = keys.up = keys.down = false; pointerX = pointerY = null; });
+      // 손가락에 가리지 않게 기체는 누른 곳보다 조금 위로
+      function toWorldY(e) {
+        const rect = canvas.getBoundingClientRect();
+        return ((e.clientY - rect.top) / rect.height) * H - 48;
+      }
 
       function toWorldX(e) {
         const rect = canvas.getBoundingClientRect();
@@ -1189,14 +1238,16 @@
         if (state !== "play") return;
         dragging = true;
         pointerX = toWorldX(e);
+        pointerY = toWorldY(e);
         try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
         e.preventDefault();
       });
       canvas.addEventListener("pointermove", (e) => {
         if (!dragging || state !== "play") return;
         pointerX = toWorldX(e);
+        pointerY = toWorldY(e);
       });
-      const endDrag = () => { dragging = false; pointerX = null; };
+      const endDrag = () => { dragging = false; pointerX = pointerY = null; };
       canvas.addEventListener("pointerup", endDrag);
       canvas.addEventListener("pointercancel", endDrag);
 
@@ -1204,6 +1255,7 @@
 
       // ---------- 시작 ----------
       ctx.onRestart(start);
+      ctx.onPause(pause);
       if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
       window.addEventListener("resize", fit);
       fit();

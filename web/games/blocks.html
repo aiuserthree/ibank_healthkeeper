@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>점심 블록 — 점심 라운지</title>
+  <title>점심 블록 — 게임 라운지</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -36,6 +36,14 @@
     .gm-bar { height: 8px; border-radius: 99px; background: var(--color-mist, #eef2f8); overflow: hidden; margin-top: 6px; }
     .gm-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #ffb648, #ff8a3d); transition: width .3s; }
     .gm-bento-art { display: block; margin: 2px 0 6px; }
+    .gm-bento-row { display: flex; align-items: center; gap: 8px; }
+    .gm-bento-row .gm-bento-art { flex: 1; min-width: 0; }
+    /* 도시락 옆 D 키 — 도시락이 있으면 주황으로 빛나고, 눌러도 꺼내 쓴다 */
+    .gm-bkey { flex-shrink: 0; width: 44px; height: 44px; margin: 0 0 6px; border-radius: 10px; border: 1px solid #d5dbe6; border-bottom-width: 4px; background: #f8f9fb; color: #9aa6b8; font-family: inherit; font-size: 22px; font-weight: 900; line-height: 1; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
+    .gm-bkey.is-ready { background: #fff4e6; border-color: #ffa94d; color: #e8590c; box-shadow: 0 0 0 3px rgba(255, 169, 77, .25); animation: gm-bkey 1.4s ease-in-out infinite; }
+    .gm-bkey:active { transform: translateY(2px); border-bottom-width: 2px; }
+    @keyframes gm-bkey { 50% { box-shadow: 0 0 0 6px rgba(255, 169, 77, .12); } }
+    @media (prefers-reduced-motion: reduce) { .gm-bkey.is-ready { animation: none; } }
     .gm-tip { font-size: 11.5px; line-height: 1.45; color: var(--text-muted, #64748b); }
     .gm-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px 14px; text-align: center; color: #fff; background: rgba(8, 16, 40, .8); backdrop-filter: blur(2px); }
     .gm-overlay[hidden] { display: none; }
@@ -52,7 +60,9 @@
     @media (max-width: 420px) { .gm-pop { font-size: 16px; } .gm-pop--bento { font-size: 14px; } }
     .gm-pop--lv { color: #8fe3ff; }
     @keyframes gm-pop { 0% { opacity: 0; transform: translateY(10px) scale(.8); } 15% { opacity: 1; transform: translateY(0) scale(1.08); } 30% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px); } }
-    .gm-pad { display: none; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .gm-pad { display: none; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .gm-pad button[data-act="bento"] { background: #fff4e6; border-color: #ffd8a8; color: #e8590c; gap: 3px; font-weight: 800; }
+    .gm-pad button[data-act="bento"].is-empty { opacity: .45; }
     .gm-pad button { height: 56px; border-radius: 14px; border: 1px solid #d6e4ff; background: #eef4ff; color: #2f6bff; display: flex; align-items: center; justify-content: center; touch-action: none; cursor: pointer; }
     .gm-pad button:active, .gm-pad button.is-down { background: #2f6bff; color: #fff; }
     .gm-pad button[data-act="drop"] { background: #2f6bff; color: #fff; border-color: #2f6bff; }
@@ -69,7 +79,8 @@
         const COLS = 10, ROWS = 18;
         const CLEAR_MS = 220, LOCK_MS = 450, BENTO_FX_MS = 750, OVER_MS = 900;
         const LINE_PTS = [0, 100, 300, 500, 800];
-        // 우리만의 조각 세트: 3칸 2종 + 4칸 5종 (+ 10줄마다 도시락)
+        // 우리만의 조각 세트: 3칸 2종 + 4칸 5종 (+ 10줄마다 도시락 1개 적립 — 원할 때 B 로 꺼내 씀)
+        const BENTO_MAX = 3;
         const DEFS = {
           i3: { size: 3, cells: [[0, 1], [1, 1], [2, 1]], color: "#45c3ff" },
           v3: { size: 2, cells: [[0, 0], [1, 0], [1, 1]], color: "#7aa8ff" },
@@ -98,11 +109,12 @@
             <div class="gm-side">
               <div class="gm-card"><div class="gm-lbl">다음</div><canvas class="gm-next"></canvas></div>
               <div class="gm-card">
-                <div class="gm-lbl">도시락까지</div>
-                <canvas class="gm-bento-art"></canvas>
-                <div class="gm-bento-n" data-v="bento">10<small>줄</small></div>
+                <div class="gm-lbl">도시락</div>
+                <div class="gm-bento-row"><canvas class="gm-bento-art"></canvas><button type="button" class="gm-bkey gm-hidepc" data-v="bkey" aria-label="D 키 · 도시락 쓰기" title="D 키 · 도시락 쓰기">D</button></div>
+                <div class="gm-bento-n" data-v="bento">0<small>개</small></div>
                 <div class="gm-bar"><i data-v="bentobar"></i></div>
-                <div class="gm-tip" style="margin-top:8px">도시락이 착지하면 그 두 열의 아래 3줄을 비워 줘요</div>
+                <div class="gm-tip" style="margin-top:4px" data-v="bentonext">다음 도시락까지 10줄</div>
+                <div class="gm-tip" style="margin-top:6px"><b>D</b> 키로 원할 때 꺼내 써요 · 착지하면 두 열의 아래 3줄을 비워 줘요</div>
               </div>
             </div>
           </div>
@@ -111,6 +123,7 @@
             <button type="button" data-act="rot" aria-label="회전">${HKUI.icon("rotate-cw", 24, "currentColor")}</button>
             <button type="button" data-act="right" aria-label="오른쪽">${HKUI.icon("arrow-right", 24, "currentColor")}</button>
             <button type="button" data-act="drop" aria-label="바로 내리기">${HKUI.icon("arrow-down-to-line", 24, "currentColor")}</button>
+            <button type="button" data-act="bento" aria-label="도시락 쓰기">${HKUI.icon("package-open", 22, "currentColor")}<small data-v="bentopad">0</small></button>
           </div>
         </div>`;
         HKUI.refreshIcons(stage);
@@ -123,10 +136,13 @@
         const sideEl = $(".gm-side"), wrapEl = $(".gm-wrap");
         const V = {};
         stage.querySelectorAll("[data-v]").forEach((el) => (V[el.dataset.v] = el));
+        V.bkey.addEventListener("click", (e) => { e.currentTarget.blur(); useBento(); });
 
         let cell = 24, dpr = 1, sideW = 110;
         let grid, cur, queue, bag, score, lines, level, state, dropAcc, lockAcc, lockMoves;
         let clearing, bentoFx, nextBentoAt, overT, submitted, lastT = 0;
+        let bentoStock = 0; // 모아 둔 도시락 개수
+        let playMs = 0, speedStep = 0; // 플레이한 시간 · 30초마다 '빨라져요' 알림
         // 효과음 — 판을 하는 동안만 (시작 전·일시정지 중에는 조용히). 옮기기 소리는 몰리지 않게 간격을 둔다
         const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
         let lastMoveSfx = 0;
@@ -134,7 +150,7 @@
         // ---------- 크기 ----------
         function layout() {
           const W = stage.clientWidth || 360;
-          sideW = W < 420 ? 74 : 112;
+          sideW = W < 420 ? 74 : 140;
           const gap = 10;
           const maxW = W - sideW - gap;
           const coarse = window.matchMedia("(max-width: 640px), (pointer: coarse)").matches;
@@ -150,7 +166,7 @@
           const nw = sideW - 22, nh = nc * 7.4;
           nextCv.width = nw * dpr; nextCv.height = nh * dpr; nextCv.style.width = nw + "px"; nextCv.style.height = nh + "px";
           nextCv._c = nc;
-          const aw = sideW - 22, ah = Math.round(Math.min(aw * 0.5, 36));
+          const aw = sideW - 22 - (V.bkey && V.bkey.offsetParent ? 52 : 0), ah = Math.round(Math.min(aw * 0.5, 36));
           artCv.width = aw * dpr; artCv.height = ah * dpr; artCv.style.width = aw + "px"; artCv.style.height = ah + "px";
           drawArt();
           render();
@@ -164,7 +180,7 @@
           bag = []; queue = []; refill();
           cur = null; score = 0; lines = 0; level = 1;
           dropAcc = 0; lockAcc = 0; lockMoves = 0;
-          clearing = null; bentoFx = null; nextBentoAt = 10; overT = 0; submitted = false;
+          clearing = null; bentoFx = null; nextBentoAt = 10; bentoStock = 0; playMs = 0; speedStep = 0; overT = 0; submitted = false;
           fxEl.innerHTML = "";
           updateHud();
         }
@@ -177,7 +193,11 @@
             queue.push(bag.pop());
           }
         }
-        function gravity() { return Math.max(65, 650 * Math.pow(0.78, level - 1)); }
+        // 내려오는 간격(ms) — 레벨(10줄마다)에 더해 시간이 갈수록 빨라진다 (1분마다 20%씩, 최소 30%)
+        function gravity() {
+          const timeK = Math.max(0.3, Math.pow(0.8, playMs / 60000));
+          return Math.max(55, 650 * Math.pow(0.78, level - 1) * timeK);
+        }
 
         function collide(cells, px, py) {
           for (const [x, y] of cells) {
@@ -231,6 +251,23 @@
           lock(true);
         }
         function canAct() { return state === "play" && cur && !clearing; }
+        // 도시락 꺼내 쓰기 — 지금 떨어지는 조각을 다음 차례로 돌려 두고 도시락을 위에서 새로 떨어뜨린다
+        function useBento() {
+          if (!canAct() || cur.key === "bento") return;
+          if (bentoStock <= 0) { pop("아직 도시락이 없어요"); sfx("invalid"); return; }
+          const d = DEFS.bento;
+          const cells = d.cells.map((c) => c.slice());
+          const x = Math.max(0, Math.min(COLS - d.size, cur.x));
+          if (collide(cells, x, 0)) { sfx("invalid"); return; }
+          queue.unshift(cur.key);
+          cur = { key: "bento", cells, size: d.size, x, y: 0 };
+          dropAcc = 0; lockAcc = 0; lockMoves = 0;
+          bentoStock--;
+          sfx("powerup");
+          pop("도시락 출동!", "bento");
+          drawNext();
+          updateHud();
+        }
 
         function lock(hard) {
           const p = cur; cur = null;
@@ -268,9 +305,9 @@
           while (lines >= nextBentoAt) { bentos++; nextBentoAt += 10; }
           spawn();
           if (bentos && state === "play") {
-            for (let i = 0; i < bentos; i++) queue.unshift("bento");
-            pop("다음은 도시락 블록!", "bento");
-            drawNext();
+            const before = bentoStock;
+            bentoStock = Math.min(BENTO_MAX, bentoStock + bentos);
+            if (bentoStock > before) pop(`도시락 +1! D로 꺼내 써요 (${bentoStock}개)`, "bento");
           }
           updateHud();
         }
@@ -310,9 +347,14 @@
           V.level.textContent = level;
           V.lines.textContent = lines;
           const left = nextBentoAt - lines;
-          const bentoQueued = queue && queue.includes("bento");
-          V.bento.innerHTML = bentoQueued ? `<span style="font-size:14px">곧 나와요!</span>` : `${left}<small>줄</small>`;
-          V.bentobar.style.width = (bentoQueued ? 100 : ((10 - left) / 10) * 100) + "%";
+          V.bento.innerHTML = `${bentoStock}<small>개${bentoStock >= BENTO_MAX ? " (최대)" : ""}</small>`;
+          V.bentobar.style.width = ((10 - left) / 10) * 100 + "%";
+          V.bentonext.textContent = bentoStock >= BENTO_MAX ? "가득 찼어요 · 꺼내 써요!" : `다음 도시락까지 ${left}줄`;
+          if (V.bkey) V.bkey.classList.toggle("is-ready", bentoStock > 0);
+          if (V.bentopad) {
+            V.bentopad.textContent = bentoStock;
+            V.bentopad.closest("button").classList.toggle("is-empty", bentoStock <= 0);
+          }
         }
         function pop(text, kind) {
           const el = document.createElement("div");
@@ -455,12 +497,14 @@
           pauseBtn.disabled = true;
           render(); drawNext();
           showOverlay(`<h2>점심 블록</h2>
-            <p>떨어지는 조각으로 가로줄을 꽉 채우면 사라져요.<br>10줄마다 빨라지고, <b style="color:#ffcf8a">도시락 블록</b>이 한 번 나와요.</p>
+            <p>떨어지는 조각으로 가로줄을 꽉 채우면 사라져요.<br>시간이 갈수록·10줄마다 빨라지고 <b style="color:#ffcf8a">도시락</b>이 하나씩 모여요 — 필요할 때 <b>D</b>로!</p>
             <div class="gm-keys">
               <b>← →</b><span>옮기기</span>
-              <b>↑ ↓ / X</b><span>돌리기</span>
-              <b>S</b><span>빠르게</span>
+              <b>↑ / X</b><span>돌리기</span>
+              <b>↓</b><span>한 칸씩 내리기</span>
+              <b>D</b><span>도시락 쓰기</span>
               <b>스페이스</b><span>바로 내리기</span>
+              <b>Esc</b><span>일시정지</span>
             </div>
             <p style="font-size:12px">휴대폰은 좌우 밀기 · 톡 돌리기 · 아래로 휙 내리기</p>
             <button type="button" class="gm-start" data-go>${HKUI.icon("play", 18, "#fff")} 시작</button>`);
@@ -500,6 +544,12 @@
             return;
           }
           if (state !== "play") return;
+          playMs += dt;
+          if (Math.floor(playMs / 30000) > speedStep) {
+            speedStep = Math.floor(playMs / 30000);
+            pop("속도 UP! 더 빨리 내려와요", "lv");
+            sfx("whoosh");
+          }
           if (clearing) { clearing.t += dt; if (clearing.t >= CLEAR_MS) finishClear(); return; }
           if (!cur) return;
           if (grounded()) {
@@ -530,12 +580,13 @@
           if (state !== "play") return;
           const map = {
             ArrowLeft: () => move(-1), ArrowRight: () => move(1), ArrowUp: rotate, x: rotate, X: rotate, "ㅌ": rotate,
-            ArrowDown: rotate, s: softDrop, S: softDrop, "ㄴ": softDrop, " ": hardDrop, Spacebar: hardDrop, p: pause, P: pause, Escape: pause,
+            ArrowDown: softDrop, s: softDrop, S: softDrop, "ㄴ": softDrop, " ": hardDrop, Spacebar: hardDrop, Enter: hardDrop, p: pause, P: pause, Escape: pause,
+            d: useBento, D: useBento, "ㅇ": useBento,
           };
           const fn = map[k];
           if (!fn) return;
           e.preventDefault();
-          if ((k === " " || k === "ArrowUp" || k === "ArrowDown" || k === "x" || k === "X") && e.repeat) return;
+          if ((k === " " || k === "ArrowUp" || k === "x" || k === "X") && e.repeat) return;
           fn();
         });
 
@@ -571,7 +622,7 @@
         stage.querySelectorAll(".gm-pad button").forEach((b) => {
           let hold = null;
           const act = b.dataset.act;
-          const fire = () => (act === "left" ? move(-1) : act === "right" ? move(1) : act === "rot" ? rotate() : hardDrop());
+          const fire = () => (act === "left" ? move(-1) : act === "right" ? move(1) : act === "rot" ? rotate() : act === "bento" ? useBento() : hardDrop());
           const stop = () => { clearTimeout(hold); clearInterval(hold); hold = null; b.classList.remove("is-down"); };
           b.addEventListener("pointerdown", (e) => {
             e.preventDefault();
@@ -589,6 +640,7 @@
         window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(layout, 120); });
 
         ctx.onRestart(startGame);
+        ctx.onPause(pause);
         showStart();
         layout();
         requestAnimationFrame((t) => { lastT = t; requestAnimationFrame(frame); });

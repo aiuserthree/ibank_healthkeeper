@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>출근길 대작전 — 점심 라운지</title>
+  <title>출근길 대작전 — 게임 라운지</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -105,6 +105,7 @@
       let state = "ready"; // ready | play | paused | over
       let rows, genY, prevBlocked, lastWasRest;
       let player, camY, lineY, elapsed, coffees, maxRow, slowT, queued, deathT, deathKind, floats;
+      let S_lineStep = 0; // 지각선 빨라짐 알림 단계
       let warnT = 0; // 지각선 경고 tick 간격
 
       const CAR_COLORS = ["#ef6461", "#3d8bfd", "#f6b93b", "#8e7cf0", "#ff8fab", "#2ec4b6", "#f1f5f9", "#64748b"];
@@ -285,6 +286,7 @@
         player = { c: 4, r: 0, fc: 4, fr: 0, t: 1, face: "up", vc: 4, vr: 0 };
         camY = -2.6;
         lineY = -3.2;
+        S_lineStep = 0;
         elapsed = 0; coffees = 0; maxRow = 0; slowT = 0; queued = null; deathT = 0; deathKind = ""; floats = []; warnT = 0;
         getRow(30);
         updateHud();
@@ -458,6 +460,7 @@
       }
 
       ctx.onRestart(() => start());
+      ctx.onPause(() => state === "play" && pause());
 
       // ───────────────────────── 갱신
       function updateHud() {
@@ -499,8 +502,16 @@
           warnT -= dt;
           if (warnT <= 0) { ctx.sfx("tick"); warnT = gapNow <= 1 ? 0.4 : 0.7; }
         } else warnT = 0;
-        const base = Math.min(1.6, 0.45 + elapsed * 0.0085);
+        // 지각선 속도 — 시간이 갈수록 확실히 빨라진다 (초당 0.6칸 → 2분쯤 3칸)
+        const base = Math.min(3.2, 0.6 + elapsed * 0.022);
         lineY += base * (slowT > 0 ? 0.3 : 1) * dt;
+        // 20초마다 "더 빨라졌어요" 알림
+        const stepNow = Math.floor(elapsed / 20);
+        if (stepNow > (S_lineStep || 0)) {
+          S_lineStep = stepNow;
+          floats.push({ c: player.c, r: player.r + 1, t: 0, text: "지각선이 빨라져요!" });
+          ctx.sfx("whoosh");
+        }
         if (lineY < player.r - 5) lineY = player.r - 5;
 
         floats.forEach((f) => (f.t += dt));

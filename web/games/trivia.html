@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>오늘의 상식 퀴즈 — 게임 라운지</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-tv { --gm-a: #0e7490; --gm-b: #0891b2; --gm-c: #22d3ee; --gm-ink: #0e7490; --gm-soft: #ecfeff; --gm-line: #a5f3fc;
+      --gm-ok: #16a34a; --gm-ok-soft: #ecfdf3; --gm-ng: #e5484d; --gm-ng-soft: #fff1f1;
+      --gm-fs: 16px; --gm-qs: 20px;
+      position: relative; background: var(--surface-card, #fff); border: 1px solid var(--color-mist-border, #e3e8f0); border-radius: 16px; overflow: hidden; box-shadow: 0 6px 24px rgba(8, 145, 178, .12);
+      touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .gm-tv button { touch-action: manipulation; }
+
+    /* 위 막대 — 몇 번째 문제 · 진행 칸 · 점수 */
+    .gm-tv__top { display: flex; align-items: center; gap: 10px; padding: 12px 18px; color: #fff; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); }
+    .gm-tv__top b { font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .gm-tv__dots { flex: 1; display: flex; gap: 7px; min-width: 0; max-width: 400px; }
+    .gm-tv__seg { display: flex; flex-direction: column; gap: 3px; min-width: 0; opacity: .6; }
+    .gm-tv__seg small { font-size: 11px; font-weight: 700; line-height: 1; letter-spacing: -.01em; white-space: nowrap; }
+    .gm-tv__seg.is-cur { opacity: 1; }
+    .gm-tv__seg.is-cur small { color: #fff; }
+    .gm-tv__seg.is-past { opacity: .85; }
+    .gm-tv__segdots { display: flex; gap: 3px; }
+    .gm-tv__dot { flex: 1 1 0; min-width: 3px; height: 8px; border-radius: 4px; background: rgba(255,255,255,.28); }
+    .gm-tv__dot.is-now { background: var(--gm-c); box-shadow: 0 0 0 2px rgba(255,255,255,.55); }
+    .gm-tv__dot.is-ok { background: #fff; }
+    .gm-tv__dot.is-ng { background: rgba(10, 40, 60, .45); }
+    .gm-tv__score { margin-left: auto; font-size: 14px; font-weight: 700; background: rgba(255,255,255,.2); padding: 4px 10px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+    .gm-tv__body { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+    .gm-tv__meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13px; color: var(--text-secondary); }
+    .gm-tv__cat { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: var(--gm-soft); color: var(--gm-ink); font-weight: 700; }
+    .gm-tv__lv { padding: 3px 8px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+    .gm-tv__lv.lv-1 { background: #dcfce7; color: #166534; }
+    .gm-tv__lv.lv-2 { background: #e0f2fe; color: #075985; }
+    .gm-tv__lv.lv-3 { background: #fef3c7; color: #92400e; }
+    .gm-tv__lv.lv-4 { background: #ffe4e0; color: #b42318; }
+    .gm-tv__neg { font-style: normal; color: #b42318; text-decoration: underline; text-underline-offset: 4px; }
+    .gm-tv__streak { display: inline-flex; align-items: center; gap: 3px; font-weight: 800; color: #c2410c; }
+
+    .gm-tv__q { min-height: 96px; display: flex; align-items: center; justify-content: center; padding: 14px 16px; border-radius: 14px; background: var(--color-mist, #f3f6fa); text-align: center; word-break: keep-all; box-sizing: border-box; }
+    .gm-tv__qt { margin: 0; font-size: var(--gm-qs); line-height: 1.5; font-weight: 700; color: var(--color-midnight-navy); }
+
+    .gm-tv__opts { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .gm-tv__opts.is-grid { grid-template-columns: 1fr 1fr; }
+    .gm-tv__opt { position: relative; display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 9px 14px; border-radius: 14px; border: 2px solid var(--border-default, #d6dde8); background: #fff; color: var(--color-midnight-navy); font: inherit; font-size: var(--gm-fs); font-weight: 600; line-height: 1.35; text-align: left; cursor: pointer; word-break: keep-all; transition: border-color .12s, background .12s, transform .08s; }
+    .gm-tv__opt:hover:not([disabled]) { border-color: var(--gm-b); background: var(--gm-soft); }
+    .gm-tv__opt:active:not([disabled]) { transform: scale(.985); }
+    .gm-tv__opt[disabled] { cursor: default; }
+    .gm-tv__num { flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; background: var(--gm-soft); color: var(--gm-ink); font-size: 13.5px; font-weight: 800; }
+    .gm-tv__txt { flex: 1; min-width: 0; }
+    .gm-tv__mark { flex-shrink: 0; display: inline-flex; }
+    .gm-tv__opt.is-picked { border-color: var(--gm-b); background: var(--gm-soft); }
+    .gm-tv__opt.is-correct { border-color: var(--gm-ok); background: var(--gm-ok-soft); }
+    .gm-tv__opt.is-correct .gm-tv__num { background: var(--gm-ok); color: #fff; }
+    .gm-tv__opt.is-wrong { border-color: var(--gm-ng); background: var(--gm-ng-soft); animation: gm-tv-shake .35s; }
+    .gm-tv__opt.is-wrong .gm-tv__num { background: var(--gm-ng); color: #fff; }
+    .gm-tv__opt.is-dim { opacity: .5; }
+
+    .gm-tv__fb { min-height: 82px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 14px; border-radius: 12px; border: 1px dashed var(--color-mist-border, #e3e8f0); box-sizing: border-box; }
+    .gm-tv__hint { font-size: 13.5px; color: var(--text-muted, #8a94a6); text-align: center; }
+    .gm-tv__fb.is-ok { border: 0; background: var(--gm-ok-soft); animation: gm-tv-fade .18s ease-out; }
+    .gm-tv__fb.is-ng { border: 0; background: var(--gm-ng-soft); animation: gm-tv-fade .18s ease-out; }
+    .gm-tv__fb-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 15.5px; font-weight: 800; }
+    .gm-tv__fb.is-ok .gm-tv__fb-head { color: #087a35; }
+    .gm-tv__fb.is-ng .gm-tv__fb-head { color: #b42318; }
+    .gm-tv__fb-head em { font-style: normal; font-size: 13px; padding: 2px 8px; border-radius: 999px; background: #fff; color: #c2410c; }
+    .gm-tv__fb p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary); word-break: keep-all; }
+
+    /* 단계 알림 — 워밍업 · 본선 · 결승 */
+    .gm-tv__body { position: relative; }
+    .gm-tv__call { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; background: rgba(255, 255, 255, .93); animation: gm-tv-call .35s ease-out; text-align: center; }
+    .gm-tv__call b { font-size: 30px; font-weight: 900; letter-spacing: -.02em; color: var(--gm-a); }
+    .gm-tv__call span { font-size: 14.5px; font-weight: 700; color: var(--text-secondary); }
+    .gm-tv__call.s-0 b { color: #15803d; }
+    .gm-tv__call.s-2 b { color: #b45309; }
+    .gm-tv__call.s-3 b { color: #b42318; }
+    @keyframes gm-tv-call { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: none; } }
+    .gm-tv__ladder { display: flex; align-items: stretch; justify-content: center; gap: 2px; width: 100%; max-width: 500px; }
+    .gm-tv__rung { flex: 1; min-width: 0; display: flex; word-break: keep-all; flex-direction: column; gap: 2px; padding: 8px 3px; border-radius: 12px; background: var(--gm-soft); color: var(--gm-ink); font-size: 12.5px; }
+    .gm-tv__rung b { font-size: 15px; }
+    .gm-tv__rung em { font-style: normal; font-weight: 700; font-size: 12px; opacity: .85; }
+    .gm-tv__rung.s-0 { background: #dcfce7; color: #166534; }
+    .gm-tv__rung.s-2 { background: #fef3c7; color: #92400e; }
+    .gm-tv__rung.s-3 { background: #ffe4e0; color: #b42318; }
+    .gm-tv__arrow { display: flex; align-items: center; color: var(--text-muted, #8a94a6); }
+    .gm-tv.is-narrow .gm-tv__arrow { display: none; }
+    .gm-tv.is-narrow .gm-tv__rung { font-size: 11.5px; }
+    .gm-tv.is-narrow .gm-tv__rung b { font-size: 14px; }
+    .gm-tv.is-narrow .gm-tv__rung em { font-size: 11px; }
+    .gm-tv__stsum { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: -4px; }
+    .gm-tv__stchip { padding: 4px 10px; border-radius: 999px; font-size: 13px; font-weight: 700; background: var(--gm-soft); color: var(--gm-ink); font-variant-numeric: tabular-nums; }
+    .gm-tv__stchip.s-0 { background: #dcfce7; color: #166534; }
+    .gm-tv__stchip.s-2 { background: #fef3c7; color: #92400e; }
+    .gm-tv__stchip.s-3 { background: #ffe4e0; color: #b42318; }
+
+    /* 일시정지 */
+    .gm-tv__pause { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; background: rgba(236, 254, 255, .97); text-align: center; padding: 20px; }
+    .gm-tv__pause b { font-size: 20px; color: var(--color-midnight-navy); }
+
+    /* 시작 · 끝 화면 */
+    .gm-tv__intro { padding: 24px 22px 22px; display: flex; flex-direction: column; align-items: center; gap: 13px; text-align: center; }
+    .gm-tv__badge { width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--gm-b), var(--gm-c)); box-shadow: 0 8px 20px rgba(8, 145, 178, .3); }
+    .gm-tv__date { font-size: 13px; font-weight: 700; color: var(--gm-ink); background: var(--gm-soft); padding: 5px 12px; border-radius: 999px; }
+    .gm-tv__h { margin: 0; font-size: 24px; color: var(--color-midnight-navy); }
+    .gm-tv__sub { margin: -6px 0 0; font-size: 14px; color: var(--text-secondary); word-break: keep-all; }
+    .gm-tv__rules { margin: 0; padding: 14px 16px; list-style: none; width: 100%; max-width: 460px; text-align: left; border-radius: 12px; background: var(--color-mist, #f3f6fa); display: flex; flex-direction: column; gap: 7px; font-size: 14px; line-height: 1.5; color: var(--text-secondary); word-break: keep-all; box-sizing: border-box; }
+    .gm-tv__rules li { display: flex; gap: 8px; }
+    .gm-tv__rules li > span:first-child { flex-shrink: 0; width: 18px; height: 18px; border-radius: 6px; margin-top: 2px; background: var(--gm-soft); color: var(--gm-ink); font-size: 11.5px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+    .gm-tv__rules b { color: var(--color-midnight-navy); }
+    .gm-tv__chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 460px; }
+    .gm-tv__chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; background: #fff; border: 1px solid var(--gm-line); color: var(--gm-ink); font-size: 12.5px; font-weight: 700; }
+    .gm-tv__chip small { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+    .gm-tv__note { width: 100%; max-width: 460px; padding: 10px 14px; border-radius: 12px; background: #fff7e6; color: #9a6400; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; }
+    .gm-tv__start { min-width: 200px; height: 52px; border: 0; border-radius: 14px; color: #fff; font: inherit; font-size: 17px; font-weight: 800; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); box-shadow: 0 6px 18px rgba(8, 145, 178, .3); cursor: pointer; }
+    .gm-tv__start:hover:not([disabled]) { filter: brightness(1.07); }
+    .gm-tv__start[disabled] { opacity: .55; cursor: default; }
+    .gm-tv__kbd { font-size: 12.5px; color: var(--text-muted, #8a94a6); }
+
+    .gm-tv__sum-big { font-size: 40px; font-weight: 800; color: var(--color-midnight-navy); letter-spacing: -.02em; line-height: 1.1; }
+    .gm-tv__sum-big small { font-size: 18px; color: var(--text-secondary); font-weight: 700; }
+    .gm-tv__stats { width: 100%; max-width: 480px; display: grid; grid-template-columns: repeat(4, 1fr); border-radius: 12px; background: var(--color-mist, #f3f6fa); overflow: hidden; }
+    .gm-tv__stats > div { display: flex; flex-direction: column; gap: 2px; padding: 9px 4px; font-size: 12px; color: var(--text-secondary); }
+    .gm-tv__stats b { font-size: 16px; color: var(--color-midnight-navy); font-variant-numeric: tabular-nums; }
+    .gm-tv__stats .is-total { background: var(--gm-soft); }
+    .gm-tv__stats .is-total b { color: var(--gm-ink); }
+    .gm-tv__cats { width: 100%; max-width: 480px; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .gm-tv__catc { --p: 0%; display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; font-size: 12.5px; font-weight: 700; color: var(--gm-ink); border: 1px solid var(--gm-line); background: linear-gradient(90deg, var(--gm-soft) var(--p), #fff var(--p)); }
+    .gm-tv__catc b { font-variant-numeric: tabular-nums; color: var(--color-midnight-navy); }
+    .gm-tv__catc.is-zero { color: var(--text-secondary); border-color: var(--color-mist-border, #e3e8f0); }
+    .gm-tv__review { width: 100%; max-width: 540px; max-height: min(28vh, 300px); overflow-y: auto; border-radius: 12px; border: 1px solid var(--color-mist-border, #e3e8f0); text-align: left; overscroll-behavior: contain; }
+    .gm-tv__review ol { margin: 0; padding: 0; list-style: none; }
+    .gm-tv__review li { display: flex; gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--color-mist-border, #e3e8f0); }
+    .gm-tv__review li:last-child { border-bottom: 0; }
+    .gm-tv__review li > i, .gm-tv__review li > svg { flex-shrink: 0; margin-top: 2px; }
+    .gm-tv__rv { min-width: 0; display: flex; flex-direction: column; gap: 3px; word-break: keep-all; }
+    .gm-tv__rv-tag { font-size: 12px; font-weight: 700; color: var(--gm-ink); }
+    .gm-tv__rv-q { font-size: 14.5px; font-weight: 700; color: var(--color-midnight-navy); line-height: 1.45; }
+    .gm-tv__rv-a { font-size: 13.5px; color: var(--text-secondary); }
+    .gm-tv__rv-a b { color: #087a35; }
+    .gm-tv__rv-a s { color: #b42318; }
+    .gm-tv__rv-e { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+    .gm-tv__label { align-self: stretch; max-width: 540px; margin: 2px auto -4px; width: 100%; text-align: left; font-size: 13px; font-weight: 800; color: var(--color-midnight-navy); }
+
+    .gm-tv.is-narrow .gm-tv__body { padding: 14px 14px 16px; gap: 11px; }
+    .gm-tv.is-narrow .gm-tv__intro { padding: 20px 14px 18px; }
+    .gm-tv.is-narrow .gm-tv__top { padding: 11px 14px; gap: 8px; }
+    .gm-tv.is-narrow .gm-tv__dots { gap: 2px; }
+    .gm-tv.is-narrow .gm-tv__dot { height: 6px; }
+    .gm-tv.is-narrow .gm-tv__opt { gap: 10px; padding: 9px 12px; min-height: 56px; }
+    .gm-tv.is-narrow .gm-tv__h { font-size: 21px; }
+    .gm-tv.is-narrow .gm-tv__label { display: none; }
+    .gm-tv.is-narrow .gm-tv__catc { padding: 3px 8px; font-size: 12px; }
+
+    @keyframes gm-tv-shake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(3px); } }
+    @keyframes gm-tv-fade { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 문제 은행 — [분야, 난이도(1 쉬움 · 2 보통 · 3 어려움 · 4 아주 어려움), 문제, 정답, [오답 3개], 해설]
+    // 쉬움은 누구나 대부분 맞힐 가벼운 상식, 보통은 교양 있는 직장인 수준, 어려움·아주 어려움은 TV 퀴즈 본선 수준. 확립된 사실만 — 바뀌는 기록·순위·인구·현직 인물·최근 사건, 논란·정치적 내용은 넣지 않는다.
+    const BANK = [
+      // ── 과학: 물리 ──
+      ["sci", 3, "진공에서의 빛의 속력을 어떤 매질 속 빛의 속력으로 나눈 값은?", "굴절률", ["반사율", "투과율", "흡광도"], "굴절률 n = c / v 예요. 물은 약 1.33, 다이아몬드는 약 2.42예요."],
+      ["sci", 3, "섭씨로 나타낸 절대 영도(0 K)는?", "−273.15℃", ["−271.15℃", "−459.67℃", "−237.15℃"], "0 K는 −273.15℃예요. −459.67은 화씨로 나타낸 절대 영도예요."],
+      ["sci", 4, "물의 얼음·물·수증기가 함께 평형을 이루는 삼중점의 온도는 약 몇 ℃일까요?", "0.01℃", ["0℃", "4℃", "−0.01℃"], "물의 삼중점은 약 273.16 K, 곧 0.01℃(약 611 Pa)예요."],
+      ["sci", 4, "자기장의 세기(자속 밀도)를 나타내는 SI 단위는?", "테슬라(T)", ["웨버(Wb)", "헨리(H)", "가우스(G)"], "자속 밀도의 SI 단위는 테슬라예요. 가우스는 CGS 단위, 웨버는 자속의 단위예요."],
+      ["sci", 4, "코일의 자체 유도 계수(인덕턴스)를 나타내는 SI 단위는?", "헨리(H)", ["패럿(F)", "지멘스(S)", "웨버(Wb)"], "인덕턴스 단위 헨리는 미국 물리학자 조지프 헨리의 이름에서 왔어요. 패럿은 전기 용량 단위예요."],
+      ["sci", 4, "1초에 원자핵 하나가 붕괴하는 방사능의 세기를 뜻하는 SI 단위는?", "베크렐(Bq)", ["시버트(Sv)", "그레이(Gy)", "퀴리(Ci)"], "방사능의 SI 단위는 베크렐이에요. 시버트는 인체 영향(등가 선량), 그레이는 흡수 선량, 퀴리는 옛 단위예요."],
+      ["sci", 4, "‘행성과 태양을 잇는 선분은 같은 시간 동안 같은 넓이를 쓸고 지나간다’는 법칙은?", "케플러 제2법칙", ["케플러 제1법칙", "케플러 제3법칙", "뉴턴 제2법칙"], "면적 속도 일정 법칙이라 해요. 그래서 행성은 태양에 가까울수록 빨리 움직여요."],
+      ["sci", 3, "케플러 제3법칙에 따르면 행성 공전 주기의 제곱은 궤도 긴반지름의 몇 제곱에 비례할까요?", "세제곱", ["제곱", "네제곱", "한 제곱(정비례)"], "T² ∝ a³ 이에요. 조화의 법칙이라고도 불러요."],
+      ["sci", 3, "한 원자 안에서 두 전자가 똑같은 양자 상태를 가질 수 없다는 원리는?", "파울리 배타 원리", ["훈트 규칙", "하이젠베르크 불확정성 원리", "쌓음 원리"], "볼프강 파울리가 1925년에 제안했어요. 그래서 한 오비탈에는 전자가 최대 2개만 들어가요."],
+      ["sci", 3, "아인슈타인이 1921년 노벨 물리학상을 받은 직접적인 업적은?", "광전 효과 법칙의 발견", ["특수 상대성 이론", "일반 상대성 이론", "브라운 운동 설명"], "노벨상 선정 이유는 ‘광전 효과 법칙의 발견’이었어요. 상대성 이론은 수상 이유에 들어가지 않았어요."],
+      ["sci", 3, "이중 슬릿 실험으로 빛의 간섭무늬를 보여 빛의 파동성을 뒷받침한 과학자는?", "토머스 영", ["아이작 뉴턴", "크리스티안 하위헌스", "제임스 맥스웰"], "토머스 영이 1800년대 초 빛의 간섭 실험을 했어요. 그는 이집트 문자 연구로도 유명해요."],
+      ["sci", 3, "자석을 코일에 넣었다 뺄 때 전류가 흐르는 ‘전자기 유도’를 발견한 과학자는?", "마이클 패러데이", ["앙드레마리 앙페르", "한스 외르스테드", "알레산드로 볼타"], "패러데이가 1831년에 전자기 유도를 발견했어요. 발전기의 원리가 됐어요."],
+      ["sci", 4, "전류가 흐르는 도선 옆에서 나침반 바늘이 움직이는 것을 처음 발견해 전류의 자기 작용을 밝힌 사람은?", "한스 외르스테드", ["마이클 패러데이", "앙드레마리 앙페르", "게오르크 옴"], "덴마크의 외르스테드가 1820년에 발견했어요. 이 발견이 전자기학의 출발점이 됐어요."],
+      ["sci", 3, "맥스웰이 예언한 전자기파의 존재를 실험으로 처음 확인한 과학자는?", "하인리히 헤르츠", ["굴리엘모 마르코니", "니콜라 테슬라", "제임스 맥스웰"], "헤르츠가 1880년대 후반 전자기파를 만들고 검출했어요. 진동수 단위 Hz가 그의 이름이에요."],
+      ["sci", 4, "맑은 하늘이 파랗게 보이는 까닭인, 파장이 짧은 빛이 공기 분자에 더 많이 흩어지는 현상은?", "레일리 산란", ["미 산란", "라만 산란", "전반사"], "레일리 산란은 파장의 네제곱에 반비례해 파란빛이 더 많이 흩어져요. 구름이 흰 건 미 산란 때문이에요."],
+      ["sci", 4, "1911년 카메를링 오너스가 처음 초전도 현상을 발견한 물질은?", "수은", ["납", "니오븀", "구리"], "액체 헬륨으로 수은을 약 4.2 K까지 식히자 전기 저항이 사라졌어요."],
+      ["sci", 3, "‘고립계의 엔트로피는 줄어들지 않는다’는 내용의 열역학 법칙은?", "열역학 제2법칙", ["열역학 제0법칙", "열역학 제1법칙", "열역학 제3법칙"], "제2법칙은 자연 현상의 방향성을 말해요. 제1법칙은 에너지 보존이에요."],
+      ["sci", 3, "기름방울 실험으로 전자 하나의 전하량을 측정한 과학자는?", "로버트 밀리컨", ["J. J. 톰슨", "어니스트 러더퍼드", "막스 플랑크"], "밀리컨이 1909년 무렵 기름방울 실험으로 기본 전하량을 쟀어요."],
+      ["sci", 3, "알파 입자 산란 실험으로 원자 가운데에 작고 무거운 원자핵이 있다는 것을 밝힌 과학자는?", "어니스트 러더퍼드", ["J. J. 톰슨", "닐스 보어", "제임스 채드윅"], "러더퍼드의 금박 실험 결과로 원자핵 모형이 나왔어요."],
+      ["sci", 3, "1932년 중성자를 발견한 과학자는?", "제임스 채드윅", ["어니스트 러더퍼드", "엔리코 페르미", "닐스 보어"], "채드윅이 중성자를 발견해 1935년 노벨 물리학상을 받았어요."],
+      ["sci", 4, "X선 스펙트럼 연구로 원소의 순서를 원자량이 아닌 ‘원자 번호’로 정해야 함을 보인 영국 물리학자는?", "헨리 모즐리", ["드미트리 멘델레예프", "존 돌턴", "J. J. 톰슨"], "모즐리의 법칙 덕분에 주기율표가 원자 번호 순서로 정리됐어요. 그는 1915년 전쟁에서 전사했어요."],
+      ["sci", 3, "진공에서 빛이 1년 동안 가는 거리인 1광년은 약 몇 km일까요?", "약 9조 4,600억 km", ["약 1억 5,000만 km", "약 3조 km", "약 30조 km"], "초속 약 30만 km × 1년 ≈ 9.46 × 10¹² km예요. 1억 5천만 km는 지구–태양 거리(1 AU)예요."],
+      // ── 과학: 화학 ──
+      ["sci", 4, "상온(25℃)·1기압에서 액체로 존재하는 비금속 원소는?", "브로민", ["아이오딘", "염소", "플루오린"], "상온에서 액체인 원소는 금속 수은과 비금속 브로민이 대표적이에요."],
+      ["sci", 3, "건조한 공기의 부피 비율로 질소·산소 다음으로 많은 기체는?", "아르곤", ["이산화탄소", "네온", "헬륨"], "아르곤이 약 0.93%로 세 번째예요. 이산화탄소는 약 0.04%에 그쳐요."],
+      ["sci", 3, "지각을 이루는 원소 가운데 질량비로 가장 많은 것은?", "산소", ["규소", "알루미늄", "철"], "지각은 산소 약 46%, 규소 약 28%, 알루미늄 약 8% 순이에요."],
+      ["sci", 3, "지각에 가장 많이 들어 있는 금속 원소는?", "알루미늄", ["철", "칼슘", "나트륨"], "알루미늄이 지각 질량의 약 8%로 금속 중 가장 많아요. 철이 그다음이에요."],
+      ["sci", 4, "지구 전체(핵 포함) 질량으로 따질 때 가장 많은 원소는?", "철", ["산소", "규소", "마그네슘"], "지구 전체로는 핵에 몰린 철이 약 32%로 가장 많고, 산소가 약 30%로 뒤를 이어요."],
+      ["sci", 3, "다이아몬드·흑연·풀러렌처럼 같은 원소로 이루어졌지만 성질이 다른 물질끼리의 관계는?", "동소체", ["동위 원소", "이성질체", "동족체"], "동소체는 같은 원소의 다른 결합 형태예요. 산소(O₂)와 오존(O₃)도 동소체예요."],
+      ["sci", 3, "아보가드로수(물질 1몰의 입자 수)에 가장 가까운 값은?", "6.02 × 10²³", ["6.02 × 10²²", "3.00 × 10⁸", "1.60 × 10⁻¹⁹"], "1몰 = 약 6.02 × 10²³개예요. 3.00 × 10⁸은 빛의 속력(m/s), 1.60 × 10⁻¹⁹은 기본 전하(C)예요."],
+      ["sci", 3, "탄산음료 뚜껑을 열면 거품이 솟는 현상처럼, 기체의 용해도가 압력에 비례한다는 법칙은?", "헨리 법칙", ["보일 법칙", "샤를 법칙", "라울 법칙"], "압력이 낮아지면 녹아 있던 이산화탄소가 빠져나와요. 잠수병도 같은 원리예요."],
+      ["sci", 3, "할로젠 원소 가운데 상온에서 고체인 것은?", "아이오딘", ["염소", "브로민", "플루오린"], "아이오딘은 검은 보라색 고체이고 가열하면 승화해요."],
+      ["sci", 3, "전기 음성도가 가장 큰 원소는?", "플루오린", ["산소", "염소", "질소"], "폴링 척도로 플루오린이 약 4.0으로 가장 커요."],
+      ["sci", 4, "제1 이온화 에너지가 가장 큰 원소는?", "헬륨", ["수소", "네온", "플루오린"], "헬륨은 전자가 핵에 매우 단단히 붙들려 있어 이온화 에너지가 가장 커요."],
+      ["sci", 3, "금속 원소 가운데 녹는점이 가장 높아 전구 필라멘트로 쓰였던 것은?", "텅스텐", ["오스뮴", "백금", "철"], "텅스텐의 녹는점은 약 3,422℃예요. 원소 기호 W는 독일어 이름 볼프람에서 왔어요."],
+      ["sci", 4, "원소 기호가 Sn인 원소는?", "주석", ["안티모니", "스트론튬", "셀레늄"], "Sn은 라틴어 stannum에서 왔어요. 안티모니는 Sb, 스트론튬은 Sr, 셀레늄은 Se예요."],
+      ["sci", 4, "서로 다른 두 과학 분야에서 노벨상을 받은 유일한 사람은?", "마리 퀴리", ["라이너스 폴링", "존 바딘", "프레더릭 생어"], "퀴리는 물리학상(1903)과 화학상(1911)을 받았어요. 폴링은 화학·평화, 바딘은 물리 두 번, 생어는 화학 두 번이에요."],
+      ["sci", 4, "식물 엽록소 분자의 가운데에 자리한 금속 원소는?", "마그네슘", ["철", "구리", "아연"], "엽록소의 중심에는 마그네슘이 있어요. 혈액 헤모글로빈의 중심은 철이에요."],
+      // ── 과학: 생물 ──
+      ["sci", 3, "세포 소기관 가운데 자체 DNA를 가지고 있어 세포 내 공생설의 근거가 되는 것은?", "미토콘드리아", ["골지체", "리소좀", "소포체"], "미토콘드리아(와 엽록체)는 자기 DNA와 리보솜이 있어 옛 세균이 공생한 흔적으로 봐요."],
+      ["sci", 4, "세포 내 공생설을 체계화해 널리 알린 미국 생물학자는?", "린 마굴리스", ["레이철 카슨", "바버라 매클린톡", "로절린드 프랭클린"], "린 마굴리스가 1960년대에 세포 내 공생설을 정리했어요."],
+      ["sci", 4, "옥수수 연구로 ‘자리를 옮기는 유전자(트랜스포존)’를 발견해 노벨상을 받은 과학자는?", "바버라 매클린톡", ["로절린드 프랭클린", "린 마굴리스", "도러시 호지킨"], "매클린톡은 1983년 노벨 생리의학상을 단독으로 받았어요."],
+      ["sci", 4, "다음 중 피리미딘 계열 염기가 아닌 것은?", "구아닌", ["사이토신", "타이민", "유라실"], "구아닌과 아데닌은 고리가 두 개인 퓨린 염기예요. 사이토신·타이민·유라실이 피리미딘이에요."],
+      ["sci", 3, "ABO식 혈액형을 발견한 과학자는?", "카를 란트슈타이너", ["루이 파스퇴르", "로베르트 코흐", "윌리엄 하비"], "란트슈타이너가 1901년 ABO 혈액형을 발견하고 1930년 노벨상을 받았어요."],
+      ["sci", 3, "17세기에 혈액이 심장에서 나가 온몸을 돌아 다시 돌아온다는 혈액 순환설을 밝힌 사람은?", "윌리엄 하비", ["갈레노스", "안드레아스 베살리우스", "에드워드 제너"], "하비가 1628년 『심장과 혈액의 운동』에서 혈액 순환을 밝혔어요."],
+      ["sci", 3, "결핵균과 콜레라균을 발견한 독일 의학자는?", "로베르트 코흐", ["루이 파스퇴르", "조지프 리스터", "알렉산더 플레밍"], "코흐는 1882년 결핵균을 발견했고, 1883년 콜레라균을 분리해 원인균임을 밝혔어요. 3월 24일 ‘세계 결핵의 날’이 결핵균 발견 발표일이에요."],
+      ["sci", 4, "석탄산(페놀)으로 수술 도구와 상처를 소독하는 무균 수술법을 도입한 영국 외과의사는?", "조지프 리스터", ["이그나즈 제멜바이스", "에드워드 제너", "윌리엄 하비"], "리스터가 1860년대에 석탄산 소독법을 도입했어요. 구강 청결제 이름도 그에게서 왔어요."],
+      ["sci", 4, "광합성에서 빛 에너지를 받아 ATP를 만드는 명반응이 일어나는 엽록체 속 구조는?", "틸라코이드", ["스트로마", "크리스타", "리보솜"], "명반응은 틸라코이드 막, 탄소를 고정하는 캘빈 회로는 스트로마에서 일어나요."],
+      ["sci", 4, "미토콘드리아 안쪽 막이 안으로 접혀 들어가 생긴 주름 구조는?", "크리스타", ["틸라코이드", "그라나", "스트로마"], "크리스타는 막 넓이를 늘려 전자 전달계가 많이 자리 잡게 해요."],
+      ["sci", 4, "이자(췌장)의 알파 세포에서 분비되어 혈당을 높이는 호르몬은?", "글루카곤", ["인슐린", "소마토스타틴", "에피네프린"], "인슐린(베타 세포)은 혈당을 낮추고 글루카곤(알파 세포)은 높여요."],
+      ["sci", 4, "혈액 속 칼슘 농도가 낮을 때 분비되어 칼슘 농도를 높이는 호르몬은?", "파라토르몬", ["칼시토닌", "티록신", "알도스테론"], "부갑상샘의 파라토르몬은 칼슘을 높이고, 갑상샘의 칼시토닌은 낮춰요."],
+      ["sci", 4, "박쥐가 속한 포유류의 목(目)은?", "익수목(박쥐목)", ["설치목", "식충목", "유대목"], "박쥐는 날개 달린 손이라는 뜻의 익수목이에요. 포유류 중 유일하게 진짜 비행을 해요."],
+      ["sci", 3, "오리너구리·바늘두더지처럼 알을 낳는 포유류 무리는?", "단공류", ["유대류", "태반류", "빈치류"], "단공류는 배설·생식 구멍이 하나라서 붙은 이름이에요."],
+      ["sci", 4, "DNA 이중 나선 규명의 결정적 단서가 된 X선 회절 사진 ‘사진 51’을 만든 연구를 이끈 과학자는?", "로절린드 프랭클린", ["바버라 매클린톡", "도러시 호지킨", "리제 마이트너"], "프랭클린 연구실의 사진 51이 왓슨과 크릭의 모형에 큰 단서가 됐어요."],
+      // ── 과학: 지구과학·천문 ──
+      ["sci", 3, "두 천체의 중력과 원심력이 균형을 이뤄 작은 물체가 머물 수 있는 다섯 지점은?", "라그랑주점", ["로슈 한계", "근일점", "춘분점"], "제임스 웹 우주 망원경은 태양–지구의 L2 근처에 있어요."],
+      ["sci", 3, "멀리 있는 은하일수록 더 빨리 멀어진다는 관측 법칙은?", "허블 법칙", ["케플러 법칙", "티티우스–보데 법칙", "슈테판–볼츠만 법칙"], "후퇴 속도가 거리에 비례한다는 법칙으로, 우주 팽창의 증거예요."],
+      ["sci", 3, "태양계 행성 중 자전 방향이 공전 방향과 반대인(역행 자전하는) 행성은?", "금성", ["화성", "수성", "해왕성"], "금성은 거의 거꾸로 자전해서 해가 서쪽에서 떠요."],
+      ["sci", 4, "자전 주기(항성일)가 공전 주기보다 긴 행성은?", "금성", ["수성", "화성", "목성"], "금성은 자전에 약 243일, 공전에 약 225일이 걸려요."],
+      ["sci", 3, "거대한 방패 화산 ‘올림푸스 몬스’가 있는 천체는?", "화성", ["금성", "목성의 위성 이오", "달"], "올림푸스 몬스는 높이 약 22 km로 에베레스트의 두 배가 넘어요."],
+      ["sci", 3, "두꺼운 질소 대기와 메테인 호수가 있는 토성의 위성은?", "타이탄", ["엔켈라두스", "유로파", "가니메데"], "타이탄은 지구 말고 표면에 액체 호수가 확인된 유일한 천체예요."],
+      ["sci", 3, "태양계에서 가장 큰 위성은?", "가니메데", ["타이탄", "칼리스토", "이오"], "목성의 가니메데는 지름이 수성보다도 커요."],
+      ["sci", 4, "우리은하와 안드로메다은하가 속한 은하 무리는?", "국부 은하군", ["처녀자리 은하단", "머리털자리 은하단", "화로자리 은하단"], "국부 은하군에는 은하 수십 개가 있고, 더 큰 처녀자리 초은하단에 속해요."],
+      ["sci", 3, "별의 겉보기 등급이 1등급 차이 나면 밝기는 약 몇 배 차이일까요?", "약 2.5배", ["2배", "10배", "100배"], "5등급 차이가 100배라서 1등급은 100의 5제곱근, 약 2.5배예요."],
+      ["sci", 3, "대서양 중앙 해령처럼 두 판이 서로 멀어지는 경계는?", "발산형 경계", ["수렴형 경계", "보존형(변환) 경계", "충돌형 경계"], "발산형 경계에서는 맨틀 물질이 올라와 새 해양 지각이 생겨요."],
+      ["sci", 3, "미국 캘리포니아의 산안드레아스 단층은 어떤 판 경계일까요?", "보존형(변환) 경계", ["발산형 경계", "섭입형 경계", "충돌형 경계"], "두 판이 서로 어긋나 미끄러지는 변환 단층이에요. 지진이 잦아요."],
+      ["sci", 3, "지구 내부를 지나는 실체파 가운데, 액체를 통과하지 못해 외핵이 액체임을 알려 준 지진파는?", "S파", ["P파", "레일리파", "러브파"], "S파는 횡파라 액체를 지나지 못해요. 레일리파·러브파는 표면파예요."],
+      ["sci", 3, "모호로비치치 불연속면(모호면)은 어디와 어디의 경계일까요?", "지각과 맨틀", ["맨틀과 외핵", "외핵과 내핵", "암석권과 연약권"], "크로아티아 지진학자 모호로비치치가 1909년에 발견했어요."],
+      ["sci", 4, "외핵과 내핵 사이의 경계를 발견해 내핵의 존재를 처음 밝힌 덴마크 지진학자는?", "잉에 레만", ["베노 구텐베르크", "안드리야 모호로비치치", "알프레트 베게너"], "레만이 1936년에 내핵의 존재를 밝혔어요."],
+      ["sci", 3, "1912년 대륙 이동설을 제창한 독일 과학자는?", "알프레트 베게너", ["해리 헤스", "투조 윌슨", "찰스 라이엘"], "베게너는 대륙들이 원래 판게아라는 한 덩어리였다고 주장했어요."],
+      ["sci", 3, "모스 굳기계에서 굳기 1인 가장 무른 광물은?", "활석", ["석고", "방해석", "형석"], "활석(1)–석고(2)–방해석(3)–형석(4)… 다이아몬드(10) 순이에요."],
+      ["sci", 4, "모스 굳기계에서 굳기가 9인 광물은?", "강옥", ["황옥", "석영", "정장석"], "강옥(루비·사파이어)은 9, 황옥은 8, 석영은 7, 정장석은 6이에요."],
+      ["sci", 4, "해수면에서의 표준 대기압 1기압은 몇 헥토파스칼(hPa)일까요?", "1013.25 hPa", ["1000 hPa", "760 hPa", "1031.25 hPa"], "1기압 = 1013.25 hPa = 760 mmHg예요."],
+      // ── 생활·건강 ──
+      ["life", 3, "흰쌀밥 위주 식사로 흔했던 각기병은 어떤 비타민이 부족해서 생길까요?", "비타민 B1(티아민)", ["비타민 C", "비타민 B12", "비타민 K"], "도정한 쌀에는 티아민이 거의 없어 각기병이 흔했어요."],
+      ["life", 4, "피부염·설사·치매가 나타나는 ‘펠라그라’는 어떤 영양소가 부족해서 생길까요?", "나이아신(비타민 B3)", ["티아민(비타민 B1)", "리보플래빈(비타민 B2)", "코발라민(비타민 B12)"], "옥수수만 주식으로 먹던 지역에서 나이아신 부족으로 흔했던 병이에요."],
+      ["life", 3, "혈액이 굳는 데(응고) 꼭 필요한 비타민은?", "비타민 K", ["비타민 E", "비타민 D", "비타민 A"], "비타민 K는 응고 인자를 만드는 데 필요해요. 신생아에게 주사하기도 해요."],
+      ["life", 3, "피부를 빼고 우리 몸에서 가장 크고 무거운 장기는?", "간", ["뇌", "폐", "심장"], "어른의 간은 약 1.2~1.5 kg이에요."],
+      ["life", 3, "사람 몸에서 가장 긴 뼈는?", "넙다리뼈(대퇴골)", ["정강이뼈", "위팔뼈", "종아리뼈"], "넙다리뼈는 키의 약 4분의 1 길이예요."],
+      ["life", 3, "사람 몸에서 가장 작은 뼈는?", "등자뼈", ["망치뼈", "모루뼈", "손가락 끝마디뼈"], "가운데귀의 등자뼈는 길이 3 mm 안팎이에요."],
+      ["life", 3, "사랑니까지 모두 났을 때 성인의 영구치는 몇 개일까요?", "32개", ["28개", "30개", "24개"], "사랑니 4개를 빼면 28개예요. 젖니는 20개예요."],
+      ["life", 4, "쓸개즙(담즙)을 만드는 장기는?", "간", ["쓸개", "이자", "위"], "쓸개즙은 간에서 만들어지고 쓸개는 저장·농축만 해요."],
+      ["life", 3, "적혈구의 평균 수명은 약 며칠일까요?", "약 120일", ["약 30일", "약 7일", "약 1년"], "다 쓴 적혈구는 주로 지라와 간에서 분해돼요."],
+      ["life", 3, "응급 상황에서 혈액형 확인 없이 적혈구를 수혈할 때 쓰는 혈액형은?", "O형 Rh−", ["AB형 Rh+", "A형 Rh−", "B형 Rh+"], "O형 Rh− 적혈구에는 A·B·Rh 항원이 없어 ‘만능 공혈자’라 불려요."],
+      ["life", 3, "체온 조절 중추가 있는 뇌의 부위는?", "시상하부", ["소뇌", "연수", "대뇌 피질"], "시상하부는 체온·배고픔·갈증·호르몬을 조절해요."],
+      ["life", 4, "호흡과 심장 박동을 조절하는 생명 중추가 있는 뇌의 부위는?", "연수", ["소뇌", "시상하부", "중간뇌"], "연수는 숨뇌라고도 하며, 기침·재채기·삼킴 반사도 맡아요."],
+      ["life", 3, "어두운 곳에서 명암을 느끼는 시각 세포는?", "막대세포", ["원뿔세포", "신경절 세포", "수평 세포"], "막대세포는 빛에 예민해 밤눈을 맡고, 원뿔세포는 색을 구별해요."],
+      ["life", 4, "몸이 회전하는 것을 느끼는 귀의 기관은?", "반고리관", ["달팽이관", "고막", "귀인두관"], "반고리관은 회전, 전정 기관은 기울기, 달팽이관은 소리를 느껴요."],
+      ["life", 3, "비행기가 내려올 때 귀가 먹먹해지는 것을 풀어 주는, 가운데귀와 목을 잇는 관은?", "귀인두관(유스타키오관)", ["반고리관", "바깥귀길", "달팽이관"], "침을 삼키거나 하품하면 귀인두관이 열려 압력이 맞춰져요."],
+      ["life", 3, "혈압 단위 mmHg의 ‘Hg’는 무엇일까요?", "수은", ["헬륨", "수소", "헤모글로빈"], "수은 기둥을 몇 mm 밀어 올리는 압력인지로 나타낸 단위예요."],
+      ["life", 3, "기도가 막혀 숨을 못 쉬는 사람을 뒤에서 안고 명치 아래를 세게 밀어 올리는 응급 처치는?", "하임리히법", ["심폐 소생술", "회복 자세", "직접 압박 지혈"], "복부 밀어내기라고도 해요. 미국 의사 하임리히의 이름을 땄어요."],
+      ["life", 3, "성인 심폐 소생술에서 가슴 압박의 권장 속도는?", "분당 100~120회", ["분당 60~80회", "분당 140~160회", "분당 30~40회"], "약 5 cm 깊이로 분당 100~120회, 강하고 빠르게 눌러요."],
+      ["life", 3, "심폐 소생술에서 가슴 압박과 인공호흡의 비율은?", "30 : 2", ["15 : 1", "10 : 2", "5 : 1"], "가슴 압박 30회 뒤 인공호흡 2회를 반복해요."],
+      ["life", 4, "의학적으로 ‘저체온증’은 중심 체온이 몇 ℃ 아래로 떨어진 상태일까요?", "35℃", ["36℃", "34℃", "32℃"], "중심 체온 35℃ 미만을 저체온증이라 해요."],
+      ["life", 4, "체온이 40℃를 넘고 땀이 나지 않으며 의식이 흐려지는, 가장 위험한 온열 질환은?", "열사병", ["열탈진(일사병)", "열경련", "열부종"], "열사병은 체온 조절 기능이 무너진 응급 상황이라 바로 몸을 식히고 119에 알려야 해요."],
+      ["life", 3, "겨울철 굴 같은 익히지 않은 어패류를 먹고 흔히 걸리는 식중독의 원인 바이러스는?", "노로바이러스", ["살모넬라균", "보툴리누스균", "리스테리아균"], "노로바이러스는 적은 양으로도 감염되고 겨울에 많아요. 나머지는 세균이에요."],
+      ["life", 4, "부풀어 오른 통조림에서 특히 의심해야 하는 치명적인 신경 독소를 만드는 세균은?", "보툴리누스균", ["살모넬라균", "장염 비브리오균", "황색 포도상 구균"], "보툴리누스균은 산소 없는 곳에서 자라며 가스를 만들어 통조림을 부풀게 해요."],
+      ["life", 3, "싹이 나거나 초록색으로 변한 감자에 많아지는 독성 물질은?", "솔라닌", ["아미그달린", "테트로도톡신", "무스카린"], "싹과 초록 껍질 부분은 넉넉히 도려내고 먹어야 해요."],
+      ["life", 3, "복어의 간·난소 등에 들어 있는 맹독은?", "테트로도톡신", ["솔라닌", "아미그달린", "아코니틴"], "테트로도톡신은 열에 강해 끓여도 없어지지 않아요."],
+      ["life", 4, "카페인이 졸음을 쫓는 주된 원리는 뇌의 어떤 물질의 수용체를 막기 때문일까요?", "아데노신", ["도파민", "세로토닌", "히스타민"], "깨어 있는 동안 쌓이는 아데노신이 졸음을 부르는데, 카페인이 그 자리를 막아요."],
+      ["life", 3, "솔방울샘(송과선)에서 분비되며 밤에 늘어나 잠을 부르는 호르몬은?", "멜라토닌", ["세로토닌", "코르티솔", "아드레날린"], "밝은 빛, 특히 화면의 푸른빛은 멜라토닌 분비를 줄여요."],
+      ["life", 3, "영양학에서 1 kcal는 어떤 열량일까요?", "물 1 kg을 1℃ 올리는 열량", ["물 1 g을 1℃ 올리는 열량", "물 1 L를 10℃ 올리는 열량", "물 1 kg을 100℃ 올리는 열량"], "물 1 g을 1℃ 올리는 열량이 1 cal이고, 그 1000배가 1 kcal예요."],
+      ["life", 3, "지방 1 g이 내는 열량은 약 몇 kcal일까요?", "9 kcal", ["4 kcal", "7 kcal", "12 kcal"], "탄수화물·단백질은 1 g당 4 kcal, 지방은 9 kcal, 알코올은 7 kcal예요."],
+      ["life", 4, "알코올(에탄올) 1 g이 내는 열량은 약 몇 kcal일까요?", "7 kcal", ["4 kcal", "9 kcal", "0 kcal"], "알코올은 영양소는 아니지만 1 g당 약 7 kcal를 내요."],
+      ["life", 3, "다음 중 단당류가 아닌 것은?", "설탕", ["포도당", "과당", "갈락토스"], "설탕(자당)은 포도당과 과당이 결합한 이당류예요."],
+      ["life", 4, "우유 속 젖당(락토스)은 어떤 두 단당류로 이루어져 있을까요?", "포도당 + 갈락토스", ["포도당 + 과당", "포도당 + 포도당", "과당 + 갈락토스"], "포도당+과당은 설탕, 포도당+포도당은 엿당이에요."],
+      ["life", 3, "자외선 차단제의 SPF 지수는 주로 어떤 자외선을 막는 정도일까요?", "자외선 B(UVB)", ["자외선 A(UVA)", "자외선 C(UVC)", "적외선"], "SPF는 피부를 붉게 태우는 UVB, PA 등급은 피부를 검게 하고 노화시키는 UVA 차단 정도예요."],
+      ["life", 4, "가정용 전자레인지가 음식을 데우는 마이크로파의 주파수는 보통 얼마일까요?", "약 2.45 GHz", ["약 5 GHz", "약 900 MHz", "약 60 GHz"], "2.45 GHz 마이크로파가 음식 속 물 분자를 흔들어 열을 내요."],
+      ["life", 3, "침 속 소화 효소 아밀레이스가 분해하는 영양소는?", "녹말", ["단백질", "지방", "핵산"], "밥을 오래 씹으면 단맛이 나는 건 녹말이 엿당으로 분해되기 때문이에요."],
+      ["life", 4, "우리나라 소화기 표시 기준에서 ‘B급 화재’는 어떤 화재일까요?", "유류 화재", ["일반 화재", "전기 화재", "금속 화재"], "A 일반, B 유류, C 전기, K 주방(식용유) 화재예요. 금속 화재(D급)는 국제 분류에서 써요."],
+      ["life", 4, "우리나라에서 만든 상품의 바코드(GS1) 국가 코드는?", "880", ["820", "450", "690"], "880은 한국, 45~49는 일본, 690~699는 중국이에요. 생산지가 아니라 코드를 받은 곳을 뜻해요."],
+      ["life", 3, "현재 쓰는 국제 표준 도서 번호(ISBN)는 몇 자리일까요?", "13자리", ["10자리", "12자리", "16자리"], "2007년부터 10자리에서 13자리로 바뀌었어요."],
+      ["life", 4, "A4 용지의 크기는?", "210 × 297 mm", ["182 × 257 mm", "216 × 279 mm", "297 × 420 mm"], "A4는 210×297 mm, 미국 레터는 216×279 mm, A3는 297×420 mm예요."],
+      ["life", 4, "A 계열 종이에서 A0 한 장의 넓이는?", "1 ㎡", ["0.5 ㎡", "2 ㎡", "0.25 ㎡"], "A0는 넓이 1 ㎡이고, 반으로 접을 때마다 A1, A2…가 돼요. 가로세로 비는 1 : √2예요."],
+      ["life", 4, "물에 젖으면 오히려 더 질겨지는 천연 섬유는?", "면", ["레이온", "양모", "실크"], "면은 젖으면 강도가 커지지만, 레이온·양모·실크는 젖으면 약해져요."],
+      ["life", 3, "헤모글로빈이 산소와 결합할 수 있게 하는 중심 금속은?", "철", ["구리", "마그네슘", "아연"], "철이 모자라면 헤모글로빈을 못 만들어 빈혈이 생겨요."],
+      ["life", 4, "건강한 성인의 정상 공복 혈당 기준은?", "100 mg/dL 미만", ["140 mg/dL 미만", "200 mg/dL 미만", "70 mg/dL 미만"], "공복 혈당 100~125는 공복혈당장애, 126 이상은 당뇨병 진단 기준이에요."],
+      ["life", 4, "세계보건기구(WHO)가 권하는 성인 하루 소금 섭취량은?", "5 g 미만", ["10 g 미만", "2 g 미만", "15 g 미만"], "소금 5 g은 나트륨 약 2 g이에요."],
+      ["life", 4, "수많은 환자의 체온을 재 ‘정상 체온 약 37℃’를 처음 정리한 19세기 독일 의사는?", "카를 분더리히", ["로베르트 코흐", "루돌프 피르호", "빌헬름 뢴트겐"], "분더리히가 수많은 겨드랑이 체온을 재 37℃를 정상으로 제시했어요."],
+      // ── 한국사 ──
+      ["khist", 3, "고구려 광개토대왕릉비가 있는 곳은?", "중국 지린성 지안(집안)", ["평양", "중국 랴오닝성 랴오양", "중국 랴오닝성 단둥"], "고구려의 두 번째 수도 국내성이 있던 지안에 있어요."],
+      ["khist", 3, "광개토대왕릉비를 세운 왕은?", "장수왕", ["광개토대왕", "소수림왕", "문자명왕"], "아버지 광개토대왕의 업적을 기리려고 아들 장수왕이 414년에 세웠어요."],
+      ["khist", 4, "371년 백제 근초고왕의 평양성 공격 때 전사한 고구려 왕은?", "고국원왕", ["고국천왕", "미천왕", "소수림왕"], "근초고왕이 평양성을 쳐 고국원왕이 전사했어요. 고국천왕은 진대법을 시행한 왕이에요."],
+      ["khist", 3, "고구려에서 태학을 세우고 불교를 받아들이고 율령을 반포한 왕은?", "소수림왕", ["고국천왕", "장수왕", "미천왕"], "소수림왕은 372년 불교 수용·태학 설립, 373년 율령 반포로 나라 기틀을 다졌어요."],
+      ["khist", 3, "고구려 고국천왕 때 을파소의 건의로 시행된 빈민 구제 제도는?", "진대법", ["의창", "상평창", "환곡"], "봄에 곡식을 빌려주고 가을에 갚게 한 제도예요. 의창은 고려, 환곡은 조선 제도예요."],
+      ["khist", 3, "고구려의 첫 도읍지는?", "졸본", ["국내성", "평양", "환도성"], "주몽이 졸본에서 나라를 세웠고, 유리왕 때 국내성으로 옮겼어요."],
+      ["khist", 4, "‘신라’라는 국호를 확정하고 왕호를 ‘마립간’에서 ‘왕’으로 바꾼 왕은?", "지증왕", ["법흥왕", "눌지 마립간", "진흥왕"], "지증왕은 이사부를 보내 우산국도 복속했어요."],
+      ["khist", 4, "신라에서 처음으로 ‘건원’이라는 독자적인 연호를 쓴 왕은?", "법흥왕", ["지증왕", "진흥왕", "진평왕"], "법흥왕은 율령 반포, 불교 공인과 함께 536년 건원 연호를 썼어요."],
+      ["khist", 4, "다음 중 진흥왕 순수비가 아닌 것은?", "단양 신라 적성비", ["북한산비", "황초령비", "마운령비"], "적성비는 진흥왕 때 세웠지만 순수(왕이 둘러봄)를 기념한 비가 아니에요."],
+      ["khist", 3, "9주 5소경을 정비하고 녹읍을 폐지한 통일 신라의 왕은?", "신문왕", ["문무왕", "성덕왕", "경덕왕"], "신문왕은 김흠돌의 난을 진압하고 관료전을 지급하는 등 왕권을 강화했어요."],
+      ["khist", 4, "신문왕 때 폐지되었던 녹읍을 다시 부활시킨 신라 왕은?", "경덕왕", ["성덕왕", "혜공왕", "원성왕"], "757년 경덕왕 때 귀족 반발로 녹읍이 부활했어요."],
+      ["khist", 3, "발해가 ‘해동성국’이라 불릴 만큼 전성기를 누린 왕은?", "선왕", ["문왕", "무왕", "고왕"], "선왕(대인수) 때 영토가 가장 넓었어요."],
+      ["khist", 4, "장문휴를 보내 당나라 산둥 지방의 등주를 공격한 발해 왕은?", "무왕", ["문왕", "선왕", "고왕"], "무왕은 732년 당의 등주를 공격했어요. 문왕은 당과 친선을 맺었어요."],
+      ["khist", 3, "부석사를 세우고 화엄 사상을 펼친 신라 승려는?", "의상", ["원효", "자장", "혜초"], "의상은 당에서 화엄종을 배우고 돌아와 부석사를 세웠어요."],
+      ["khist", 3, "고려 광종이 호족 세력을 누르려고 시행한 제도로, 억울하게 노비가 된 사람을 풀어 준 것은?", "노비안검법", ["노비환천법", "기인 제도", "사심관 제도"], "956년 광종이 시행했어요. 노비환천법은 성종 때 일부를 되돌린 법이에요."],
+      ["khist", 4, "고려 광종에게 과거제 실시를 건의한 후주 출신 귀화인은?", "쌍기", ["최승로", "서희", "최충"], "958년 쌍기의 건의로 고려 최초의 과거가 치러졌어요."],
+      ["khist", 4, "고려 성종에게 시무 28조를 올린 인물은?", "최승로", ["쌍기", "김부식", "이제현"], "최승로의 시무 28조는 유교 정치 이념을 바탕으로 했어요."],
+      ["khist", 3, "993년 거란 장수 소손녕과의 외교 담판으로 서희가 얻어 낸 땅은?", "강동 6주", ["동북 9성", "쌍성총관부 지역", "4군 6진"], "서희는 고려가 고구려를 이었음을 내세워 압록강 동쪽 강동 6주를 얻었어요."],
+      ["khist", 3, "별무반을 이끌고 여진을 정벌해 동북 9성을 쌓은 고려 장수는?", "윤관", ["서희", "강감찬", "최영"], "1107년 윤관이 동북 9성을 쌓았지만 얼마 뒤 여진에게 돌려줬어요."],
+      ["khist", 3, "1019년 강감찬이 귀주 대첩에서 크게 물리친 외적은?", "거란", ["여진", "몽골", "홍건적"], "거란의 3차 침입 때 귀주에서 큰 승리를 거뒀어요."],
+      ["khist", 4, "1170년 무신 정변이 일어난 고려 왕의 시대는?", "의종", ["명종", "인종", "신종"], "정중부 등이 보현원에서 정변을 일으켜 의종을 폐하고 명종을 세웠어요."],
+      ["khist", 4, "최충헌이 설치해 최씨 무신 정권의 최고 권력 기구가 된 것은?", "교정도감", ["정방", "도방", "중방"], "교정도감은 최충헌, 정방은 아들 최우가 설치했어요."],
+      ["khist", 4, "고려 공민왕 때 신돈이 책임을 맡아 권문세족이 빼앗은 토지와 노비를 되돌린 기구는?", "전민변정도감", ["정치도감", "교정도감", "도평의사사"], "신돈은 전민변정도감을 운영하며 개혁을 추진했어요."],
+      ["khist", 3, "현존하는 세계에서 가장 오래된 금속 활자본으로 인정받는 책은?", "직지심체요절", ["상정고금예문", "무구정광대다라니경", "팔만대장경"], "1377년 청주 흥덕사에서 찍었어요. 상정고금예문은 기록만 남아 있어요."],
+      ["khist", 4, "『직지심체요절』 하권이 현재 소장된 곳은?", "프랑스 국립 도서관", ["국립중앙박물관", "영국 국립 도서관", "청주 고인쇄 박물관"], "구한말 프랑스 외교관이 가져갔고, 지금은 프랑스 국립 도서관에 있어요."],
+      ["khist", 3, "16세 이상 남자에게 신분증인 호패를 차게 하는 호패법을 처음 시행한 조선 왕은?", "태종", ["태조", "세종", "세조"], "태종은 1413년 호패법을 시행해 인구를 파악했어요."],
+      ["khist", 3, "현직 관리에게만 수조권을 준 ‘직전법’을 시행한 조선 왕은?", "세조", ["성종", "세종", "명종"], "1466년 세조가 과전법을 직전법으로 바꿨어요."],
+      ["khist", 3, "조선의 기본 법전 『경국대전』을 최종 완성해 시행(1485)한 왕은?", "성종", ["세조", "태종", "중종"], "세조 때 편찬을 시작해 성종 때 완성·시행했어요."],
+      ["khist", 3, "조광조 등 사림이 큰 화를 입은 사화는?", "기묘사화", ["무오사화", "갑자사화", "을사사화"], "1519년 중종 때 위훈 삭제에 반발한 훈구파가 일으켰어요."],
+      ["khist", 4, "임시 기구였던 비변사가 상설 기구가 된 계기는?", "을묘왜변", ["임진왜란", "삼포왜란", "정묘호란"], "삼포왜란 때 임시로 생겼고, 1555년 을묘왜변 뒤 상설화, 임진왜란 뒤 최고 기구가 됐어요."],
+      ["khist", 3, "임진왜란 때 행주산성에서 크게 이긴 장수는?", "권율", ["김시민", "곽재우", "신립"], "1593년 행주 대첩이에요. 김시민은 1차 진주성 전투에서 이겼어요."],
+      ["khist", 3, "대동법이 처음 시행된 지역은?", "경기도", ["충청도", "전라도", "황해도"], "1608년 광해군 때 경기도에서 처음 시행돼 100년에 걸쳐 전국으로 넓어졌어요."],
+      ["khist", 3, "군포를 1년에 2필에서 1필로 줄여 준 ‘균역법’을 시행한 왕은?", "영조", ["정조", "숙종", "효종"], "1750년 영조가 시행했어요. 줄어든 재정은 결작·선무군관포 등으로 채웠어요."],
+      ["khist", 3, "정조가 설치한 국왕 친위 부대는?", "장용영", ["훈련도감", "어영청", "금위영"], "장용영은 한양의 내영과 수원 화성의 외영으로 나뉘었어요."],
+      ["khist", 3, "1811년 홍경래의 난이 일어난 지역은?", "평안도", ["함경도", "경상도", "전라도"], "서북 지역 차별과 세도 정치의 수탈에 반발해 일어났어요."],
+      ["khist", 4, "1862년 임술 농민 봉기의 시작이 된 곳은?", "진주", ["고부", "익산", "함흥"], "경상 우병사 백낙신의 수탈에 맞서 진주에서 시작됐어요. 고부는 동학 농민 운동의 시작지예요."],
+      ["khist", 4, "흥선 대원군의 서원 정리 때 전국에 남긴 서원은 몇 곳일까요?", "47곳", ["27곳", "67곳", "107곳"], "흥선 대원군은 전국의 수많은 서원을 정리하고 47곳만 남겼어요."],
+      ["khist", 4, "1871년 신미양요 때 광성보에서 미군과 싸우다 순국한 조선 장수는?", "어재연", ["양헌수", "한성근", "이경하"], "양헌수·한성근은 1866년 병인양요 때 프랑스군과 싸웠어요."],
+      ["khist", 3, "1882년 조선이 미국과 수교 조약을 맺도록 알선한 나라는?", "청", ["일본", "러시아", "영국"], "청의 이홍장이 러시아·일본을 견제하려고 조미 수호 통상 조약을 주선했어요."],
+      ["khist", 4, "임오군란 뒤 조선이 일본과 맺은 조약은?", "제물포 조약", ["한성 조약", "톈진 조약", "시모노세키 조약"], "1882년 제물포 조약으로 일본 공사관에 경비병 주둔이 허용됐어요."],
+      ["khist", 4, "갑신정변 이후 청과 일본이 조선에서 함께 군대를 빼기로 맺은 조약은?", "톈진 조약", ["한성 조약", "제물포 조약", "시모노세키 조약"], "1885년 톈진 조약은 뒷날 청일 전쟁의 빌미가 됐어요."],
+      ["khist", 3, "동학 농민군이 전주 화약 뒤 전라도 각 고을에 설치한 자치 기구는?", "집강소", ["교정청", "군국기무처", "도평의사사"], "교정청은 정부가 세운 개혁 기구, 군국기무처는 갑오개혁 추진 기구예요."],
+      ["khist", 3, "단발령이 내려진 개혁은?", "을미개혁", ["갑오개혁(1차)", "광무개혁", "갑신정변"], "1895년 을미사변 뒤 추진된 을미개혁 때 단발령이 내려졌어요."],
+      ["khist", 3, "고종이 대한 제국 수립을 선포한 해는?", "1897년", ["1895년", "1899년", "1905년"], "고종은 경운궁으로 돌아와 환구단에서 황제 즉위식을 올렸어요."],
+      ["khist", 4, "1883년 우리나라 최초의 근대 신문인 『한성순보』를 발행한 기관은?", "박문국", ["전환국", "기기창", "우정총국"], "박문국은 출판 기관, 전환국은 화폐 주조, 기기창은 무기 제조 기관이에요."],
+      ["khist", 3, "을사늑약 체결을 비판한 장지연의 논설 「시일야방성대곡」이 실린 신문은?", "황성신문", ["대한매일신보", "독립신문", "제국신문"], "1905년 11월 20일 황성신문에 실렸어요."],
+      ["khist", 3, "1907년 국채 보상 운동이 처음 시작된 도시는?", "대구", ["서울", "평양", "부산"], "대구 광문사의 서상돈·김광제가 제안했어요."],
+      ["khist", 4, "안창호가 평양에 세운 학교는?", "대성학교", ["오산학교", "배재학당", "숭실학교"], "신민회 활동의 하나로 1908년 대성학교를 세웠어요. 오산학교는 이승훈이 정주에 세웠어요."],
+      ["khist", 3, "105인 사건으로 큰 타격을 입고 해체된 비밀 결사 단체는?", "신민회", ["독립협회", "보안회", "대한자강회"], "일제가 총독 암살 모의를 조작해 신민회 회원들을 대거 체포했어요."],
+      ["khist", 3, "1920년 봉오동 전투를 이끈 독립군 지도자는?", "홍범도", ["김좌진", "지청천", "양세봉"], "같은 해 청산리 전투는 김좌진의 북로 군정서가 중심이었어요."],
+      ["khist", 3, "1919년 만주에서 김원봉이 조직한 무장 독립운동 단체는?", "의열단", ["한인 애국단", "대한 광복회", "신간회"], "한인 애국단은 1931년 김구가 상하이에서 조직했어요."],
+      ["khist", 3, "의열단의 행동 강령인 「조선 혁명 선언」을 쓴 사람은?", "신채호", ["김원봉", "박은식", "안창호"], "신채호가 1923년 의열단의 요청으로 썼어요."],
+      ["khist", 3, "1932년 윤봉길 의사의 의거가 일어난 곳은?", "상하이 훙커우 공원", ["도쿄 사쿠라다몬", "하얼빈역", "다롄 부두"], "사쿠라다몬은 이봉창, 하얼빈역은 안중근 의거 장소예요."],
+      ["khist", 3, "1920년 조만식 등이 중심이 되어 물산 장려 운동을 처음 시작한 도시는?", "평양", ["서울", "대구", "부산"], "‘조선 사람 조선 것’을 구호로 국산품 애용을 내걸었어요."],
+      ["khist", 3, "1927년 민족주의 세력과 사회주의 세력이 손잡고 만든 민족 협동 전선 단체는?", "신간회", ["신민회", "조선어 학회", "대한 광복회"], "신간회는 광주 학생 항일 운동 때 진상 조사단을 보내기도 했어요."],
+      ["khist", 3, "1926년 6·10 만세 운동은 누구의 장례일(인산일)에 일어났을까요?", "순종", ["고종", "명성 황후", "영친왕"], "3·1 운동은 고종, 6·10 만세 운동은 순종의 인산일을 계기로 일어났어요."],
+      ["khist", 4, "임진왜란으로 불탄 경복궁이 흥선 대원군 때 다시 지어지기 전까지 조선의 법궁 역할을 한 궁궐은?", "창덕궁", ["경희궁", "창경궁", "덕수궁"], "광해군 때 다시 지은 창덕궁이 오랫동안 으뜸 궁궐이었어요."],
+      ["khist", 4, "‘고창·화순·강화 고인돌 유적’ 세계 유산에 포함되지 않은 지역은?", "경주", ["고창", "화순", "강화"], "2000년 고창·화순·강화의 고인돌이 함께 세계 유산이 됐어요."],
+      ["khist", 4, "벽돌무덤인 백제 무령왕릉은 중국 어느 나라 무덤 양식의 영향을 받았을까요?", "남조의 양", ["북위", "수", "당"], "무령왕릉은 남조 양나라의 벽돌무덤 양식이에요. 백제와 남조의 활발한 교류를 보여 줘요."],
+      ["khist", 4, "백제 금동 대향로가 출토된 곳은?", "부여 능산리 절터", ["공주 송산리 고분군", "익산 미륵사지", "서울 석촌동 고분군"], "1993년 부여 능산리 절터의 진흙 구덩이에서 발견됐어요."],
+      ["khist", 4, "허준의 『동의보감』이 완성된 때의 왕은?", "광해군", ["선조", "인조", "숙종"], "선조의 명으로 시작해 1610년 광해군 때 완성, 1613년 간행됐어요."],
+      ["khist", 3, "1653년 제주도에 표착해 조선에서 지낸 이야기를 남긴 하멜의 나라는?", "네덜란드", ["포르투갈", "영국", "스페인"], "하멜은 동인도 회사 선원이었고, 『하멜 표류기』로 조선을 유럽에 알렸어요."],
+      ["khist", 4, "마을 단위로 함께 농사짓고 일한 만큼 나누자는 ‘여전론’을 주장한 실학자는?", "정약용", ["유형원", "이익", "박지원"], "유형원은 균전론, 이익은 한전론, 정약용은 여전론을 주장했어요."],
+      ["khist", 3, "청나라의 문물을 받아들이자는 북학론을 담아 『북학의』를 쓴 실학자는?", "박제가", ["박지원", "홍대용", "유수원"], "박제가는 소비를 우물에 비유하며 상공업 진흥을 주장했어요."],
+      ["khist", 3, "1966년 불국사 석가탑 안에서 발견된 통일 신라 시대의 목판 인쇄물은?", "무구정광대다라니경", ["직지심체요절", "초조대장경", "삼국유사"], "8세기 중엽에 찍은 것으로 보이는 매우 이른 목판 인쇄물이에요."],
+      ["khist", 3, "인도와 중앙아시아를 여행하고 『왕오천축국전』을 남긴 신라 승려는?", "혜초", ["의상", "원효", "자장"], "이 책은 1908년 프랑스 학자 펠리오가 둔황에서 발견했어요."],
+      ["khist", 4, "1942년 일제가 조선어 학회 회원들을 대거 잡아들인 사건 때 편찬 중이던 것은?", "조선말 큰사전", ["훈민정음 해례본 번역", "조선왕조실록 번역", "한글 맞춤법 통일안"], "맞춤법 통일안은 1933년에 이미 발표됐고, 사건으로 사전 원고를 빼앗겼다가 해방 뒤 되찾았어요."],
+      // ── 세계사 ──
+      ["whist", 3, "‘눈에는 눈, 이에는 이’로 알려진 함무라비 법전을 만든 나라는?", "바빌로니아", ["아시리아", "히타이트", "페르시아"], "기원전 18세기 고바빌로니아의 함무라비 왕이 만들었어요."],
+      ["whist", 3, "점토판에 갈대 펜으로 새긴 쐐기 문자를 처음 만든 사람들은?", "수메르인", ["이집트인", "페니키아인", "히타이트인"], "기원전 3000년 무렵 메소포타미아 남부의 수메르인이 만들었어요."],
+      ["whist", 3, "오늘날 알파벳의 뿌리가 된 표음 문자를 만든 지중해의 해상 민족은?", "페니키아인", ["그리스인", "에트루리아인", "아람인"], "페니키아 문자가 그리스 문자를 거쳐 라틴 알파벳이 됐어요."],
+      ["whist", 3, "고대 오리엔트에서 일찍부터 철제 무기를 써서 강성했던 소아시아의 민족은?", "히타이트", ["아시리아", "메디아", "리디아"], "히타이트는 철기 기술로 이집트와 겨루었어요."],
+      ["whist", 4, "아케메네스 왕조 페르시아에서 ‘왕의 길’을 닦고 전국을 20여 개 주로 나눠 다스린 왕은?", "다리우스 1세", ["키루스 2세", "크세르크세스 1세", "캄비세스 2세"], "다리우스 1세는 사트라프(총독)를 두고 ‘왕의 눈’·‘왕의 귀’로 감시했어요."],
+      ["whist", 4, "아테네가 페르시아를 물리친 마라톤 전투가 벌어진 해는?", "기원전 490년", ["기원전 480년", "기원전 431년", "기원전 334년"], "기원전 480년은 테르모필레·살라미스 전투, 431년은 펠로폰네소스 전쟁이 시작된 해예요."],
+      ["whist", 4, "살라미스 해전에서 그리스 함대를 이끌어 페르시아 함대를 물리친 아테네의 지도자는?", "테미스토클레스", ["페리클레스", "밀티아데스", "알키비아데스"], "밀티아데스는 마라톤 전투의 지휘관이에요."],
+      ["whist", 3, "펠로폰네소스 전쟁(기원전 431~404년)에서 이긴 폴리스는?", "스파르타", ["아테네", "테베", "코린토스"], "스파르타가 페르시아의 지원을 받아 아테네를 꺾었어요."],
+      ["whist", 4, "알렉산드로스 대왕이 원정을 마친 뒤 숨을 거둔 도시는?", "바빌론", ["페르세폴리스", "알렉산드리아", "수사"], "기원전 323년 바빌론에서 서른두 살로 숨졌어요."],
+      ["whist", 4, "제2차 포에니 전쟁 때 한니발이 로마군을 포위해 크게 이긴 전투는?", "칸나이 전투", ["자마 전투", "악티움 해전", "필리피 전투"], "기원전 216년 칸나이에서 이겼지만, 기원전 202년 자마에서 스키피오에게 졌어요."],
+      ["whist", 3, "기원전 31년 악티움 해전에서 이긴 사람은?", "옥타비아누스", ["안토니우스", "카이사르", "폼페이우스"], "옥타비아누스가 안토니우스·클레오파트라 연합군을 물리치고 뒤에 아우구스투스가 됐어요."],
+      ["whist", 3, "313년 밀라노 칙령으로 크리스트교를 공인한 로마 황제는?", "콘스탄티누스 1세", ["테오도시우스 1세", "디오클레티아누스", "율리아누스"], "크리스트교를 국교로 정한 황제는 테오도시우스 1세예요."],
+      ["whist", 4, "476년 서로마 제국의 마지막 황제를 폐위한 게르만 용병 대장은?", "오도아케르", ["알라리크", "테오도리크", "가이세리크"], "알라리크는 410년 로마를 약탈한 서고트 왕이에요."],
+      ["whist", 3, "하기아 소피아 대성당을 지금의 거대한 돔 건물로 다시 지은 비잔티움 황제는?", "유스티니아누스 1세", ["콘스탄티누스 1세", "테오도시우스 2세", "헤라클레이오스"], "537년 완공됐어요. 유스티니아누스는 『로마법 대전』도 편찬했어요."],
+      ["whist", 3, "1453년 콘스탄티노폴리스를 함락해 비잔티움 제국을 무너뜨린 오스만 술탄은?", "메흐메트 2세", ["쉴레이만 1세", "바예지드 1세", "셀림 1세"], "메흐메트 2세는 거대한 대포와 배를 육지로 끌어 옮기는 작전으로 성을 함락했어요."],
+      ["whist", 4, "무함마드가 메카에서 메디나로 옮겨 간 ‘헤지라’가 있었던 해는?", "622년", ["610년", "632년", "570년"], "이 해가 이슬람력의 원년이에요. 610년은 첫 계시, 632년은 무함마드가 숨진 해예요."],
+      ["whist", 3, "아바스 왕조가 새로 세운 수도는?", "바그다드", ["다마스쿠스", "코르도바", "카이로"], "다마스쿠스는 우마이야 왕조, 코르도바는 후우마이야 왕조, 카이로는 파티마 왕조의 수도예요."],
+      ["whist", 3, "751년 당과 아바스 왕조가 맞붙어 제지술이 이슬람 세계로 전해진 계기로 알려진 전투는?", "탈라스 전투", ["투르·푸아티에 전투", "만지케르트 전투", "아인잘루트 전투"], "포로가 된 당 군사 가운데 종이 기술자가 있었다고 전해져요."],
+      ["whist", 4, "732년 투르·푸아티에 전투에서 이슬람군을 막아 낸 프랑크 왕국의 궁재는?", "카롤루스 마르텔", ["카롤루스 대제", "피핀 3세", "클로비스 1세"], "‘망치’라는 별명의 카롤루스 마르텔이에요. 카롤루스 대제의 할아버지예요."],
+      ["whist", 4, "카롤루스 대제가 교황 레오 3세에게 서로마 황제의 관을 받은 해는?", "800년", ["732년", "843년", "962년"], "843년은 베르됭 조약, 962년은 오토 1세의 대관이에요."],
+      ["whist", 4, "843년 프랑크 왕국을 셋으로 나눈 조약은?", "베르됭 조약", ["메르센 조약", "보름스 협약", "베스트팔렌 조약"], "베르됭 조약으로 동·서·중 프랑크로 나뉘었고, 870년 메르센 조약으로 다시 조정됐어요."],
+      ["whist", 3, "교황 그레고리우스 7세에게 파문당한 뒤 눈 속에서 용서를 빈 ‘카노사의 굴욕’의 황제는?", "하인리히 4세", ["프리드리히 1세", "오토 1세", "하인리히 5세"], "1077년의 일이에요. 서임권 다툼은 1122년 보름스 협약으로 정리됐어요."],
+      ["whist", 3, "1215년 귀족들의 압력에 마그나 카르타(대헌장)를 승인한 잉글랜드 왕은?", "존", ["헨리 2세", "리처드 1세", "헨리 3세"], "마그나 카르타는 왕도 법 아래에 있다는 원칙의 출발점이 됐어요."],
+      ["whist", 3, "백년 전쟁 때 잔 다르크가 영국군의 포위를 풀어 낸 도시는?", "오를레앙", ["랭스", "루앙", "파리"], "랭스는 샤를 7세의 대관식 장소, 루앙은 잔 다르크가 처형된 곳이에요."],
+      ["whist", 3, "장미 전쟁을 끝내고 튜더 왕조를 연 잉글랜드 왕은?", "헨리 7세", ["헨리 8세", "리처드 3세", "에드워드 4세"], "1485년 보즈워스 전투에서 리처드 3세를 꺾고 왕위에 올랐어요."],
+      ["whist", 4, "마젤란이 필리핀에서 숨진 뒤 남은 선단을 이끌고 첫 세계 일주를 마무리한 사람은?", "후안 세바스티안 엘카노", ["프랜시스 드레이크", "바스쿠 다가마", "페드루 카브랄"], "1522년 빅토리아호 한 척만 스페인으로 돌아왔어요."],
+      ["whist", 3, "1498년 바스쿠 다가마가 도착한 인도의 항구는?", "캘리컷(코지코드)", ["고아", "콜카타", "뭄바이"], "희망봉을 돌아 인도에 이르는 바닷길이 열렸어요."],
+      ["whist", 4, "1494년 스페인과 포르투갈이 새로 찾은 땅의 경계를 나누려고 맺은 조약은?", "토르데시야스 조약", ["베스트팔렌 조약", "위트레흐트 조약", "아우크스부르크 화의"], "이 조약 때문에 브라질은 포르투갈 땅이 됐어요."],
+      ["whist", 3, "1517년 루터가 95개조 반박문을 붙였다고 전해지는 도시는?", "비텐베르크", ["보름스", "아우크스부르크", "제네바"], "비텐베르크 성 교회 문에 붙였다고 전해져요. 제네바는 칼뱅의 무대예요."],
+      ["whist", 4, "제후가 자기 영지의 종교를 루터파와 가톨릭 중에서 고를 수 있게 한 1555년의 협정은?", "아우크스부르크 화의", ["베스트팔렌 조약", "낭트 칙령", "보름스 협약"], "칼뱅파까지 인정된 것은 1648년 베스트팔렌 조약 때예요."],
+      ["whist", 4, "1598년 낭트 칙령으로 위그노에게 신앙의 자유를 준 프랑스 왕은?", "앙리 4세", ["루이 14세", "루이 13세", "프랑수아 1세"], "루이 14세가 1685년 낭트 칙령을 폐지했어요."],
+      ["whist", 3, "30년 전쟁을 끝낸 1648년의 조약은?", "베스트팔렌 조약", ["위트레흐트 조약", "아헨 조약", "파리 조약"], "주권 국가 체제의 출발점으로 꼽혀요. 네덜란드·스위스의 독립도 인정됐어요."],
+      ["whist", 3, "영국 명예혁명 뒤 1689년 의회가 승인한 문서는?", "권리 장전", ["권리 청원", "대헌장", "인신 보호법"], "권리 청원은 1628년, 인신 보호법은 1679년이에요."],
+      ["whist", 4, "1794년 로베스피에르가 몰락하고 공포 정치가 끝난 사건은?", "테르미도르 반동", ["브뤼메르 쿠데타", "방데미에르 봉기", "2월 혁명"], "브뤼메르 쿠데타(1799)는 나폴레옹이 권력을 잡은 사건이에요."],
+      ["whist", 3, "워털루 전투에서 진 나폴레옹이 유배되어 생을 마친 섬은?", "세인트헬레나섬", ["엘바섬", "코르시카섬", "사르데냐섬"], "엘바섬은 첫 번째 유배지, 코르시카는 고향이에요."],
+      ["whist", 3, "나폴레옹 전쟁 뒤 빈 회의를 주도한 오스트리아 외무 장관은?", "메테르니히", ["비스마르크", "탈레랑", "카보우르"], "빈 체제는 혁명 이전 질서로 되돌리려는 보수 체제였어요."],
+      ["whist", 3, "제1차 아편 전쟁 뒤 청이 홍콩섬을 영국에 넘긴 조약은?", "난징 조약", ["톈진 조약", "베이징 조약", "시모노세키 조약"], "1842년 난징 조약으로 5개 항구도 열었어요."],
+      ["whist", 3, "청 말기 ‘태평천국 운동’을 일으킨 인물은?", "홍수전", ["이홍장", "증국번", "쑨원"], "증국번·이홍장은 태평천국을 진압한 쪽이에요."],
+      ["whist", 3, "1871년 독일 제국 수립이 선포된 장소는?", "베르사유 궁전 거울의 방", ["베를린 왕궁", "포츠담 상수시 궁전", "프랑크푸르트 성 바울 교회"], "프로이센이 프랑스를 이긴 뒤 프랑스 궁전에서 선포해 프랑스의 큰 반감을 샀어요."],
+      ["whist", 3, "1917년 러시아 2월 혁명으로 무너진 왕조는?", "로마노프 왕조", ["류리크 왕조", "합스부르크 왕조", "호엔촐레른 왕조"], "니콜라이 2세가 물러나며 300여 년의 로마노프 왕조가 끝났어요."],
+      ["whist", 4, "1944년 6월 노르망디 상륙을 포함한 연합군의 서유럽 침공 작전의 이름은?", "오버로드 작전", ["바르바로사 작전", "마켓 가든 작전", "횃불(토치) 작전"], "바르바로사는 독일의 소련 침공, 토치는 북아프리카 상륙 작전이에요."],
+      ["whist", 3, "1945년 2월 얄타 회담에 참석하지 않은 인물은?", "해리 트루먼", ["프랭클린 루스벨트", "윈스턴 처칠", "이오시프 스탈린"], "트루먼은 루스벨트가 숨진 뒤 대통령이 되어 7월 포츠담 회담에 참석했어요."],
+      ["whist", 4, "1945년 포츠담 회담 도중 총선 결과로 처칠 대신 영국 대표가 된 사람은?", "클레멘트 애틀리", ["앤서니 이든", "네빌 체임벌린", "해럴드 맥밀런"], "노동당이 총선에서 이겨 애틀리가 총리가 됐어요."],
+      ["whist", 3, "소련이 쿠바에 미사일 기지를 세우려다 미국과 핵전쟁 직전까지 갔던 쿠바 미사일 위기는 몇 년의 일일까요?", "1962년", ["1959년", "1961년", "1968년"], "1959년은 쿠바 혁명, 1961년은 피그스만 침공 사건이에요."],
+      ["whist", 4, "테무친이 칭기즈 칸으로 추대된 해는?", "1206년", ["1271년", "1234년", "1279년"], "1271년은 쿠빌라이가 국호를 원으로 정한 해, 1279년은 남송이 멸망한 해예요."],
+      ["whist", 3, "정화에게 대함대를 이끌고 남해 원정을 떠나도록 처음 명한 명나라 황제는?", "영락제", ["홍무제", "가정제", "만력제"], "1405년부터 시작된 원정은 아프리카 동해안까지 이르렀어요."],
+      ["whist", 4, "진시황 때 승상으로서 문자·도량형 통일과 분서를 주도한 법가 사상가는?", "이사", ["상앙", "한비자", "여불위"], "상앙은 그보다 앞선 진 효공 때의 개혁가예요."],
+      ["whist", 3, "한 무제의 명으로 서역에 다녀와 비단길이 열리는 계기를 만든 인물은?", "장건", ["반초", "정화", "현장"], "반초는 후한 때 서역을 경영한 인물이에요."],
+      ["whist", 3, "755년 당 현종 때 일어나 당나라가 기울게 된 반란은?", "안사의 난", ["황소의 난", "홍건적의 난", "팔왕의 난"], "안녹산과 사사명이 일으킨 난이에요. 황소의 난은 875년이에요."],
+      ["whist", 3, "북송에서 청묘법·모역법 등 개혁 정책인 ‘신법’을 추진한 재상은?", "왕안석", ["사마광", "주희", "구양수"], "사마광은 신법에 반대한 구법당의 지도자예요."],
+      ["whist", 3, "세상을 떠난 왕비를 위해 타지마할을 지은 무굴 황제는?", "샤 자한", ["악바르", "아우랑제브", "바부르"], "왕비 뭄타즈 마할을 기려 지었어요."],
+      ["whist", 3, "불교를 보호하고 곳곳에 돌기둥을 세워 칙령을 새긴 마우리아 왕조의 왕은?", "아소카왕", ["찬드라굽타", "카니슈카왕", "하르샤왕"], "카니슈카왕은 쿠샨 왕조의 불교 후원자예요."],
+      ["whist", 4, "그리스 조각의 영향을 받은 불상이 처음 만들어진 ‘간다라 미술’이 꽃핀 왕조는?", "쿠샨 왕조", ["굽타 왕조", "마우리아 왕조", "무굴 제국"], "굽타 왕조 때는 인도 고유의 굽타 양식이 발달했어요."],
+      ["whist", 3, "잉카 제국의 수도였던 도시는?", "쿠스코", ["테노치티틀란", "마추픽추", "리마"], "테노치티틀란은 아스테카의 수도였고 지금의 멕시코시티예요."],
+      ["whist", 3, "1530년대에 잉카 제국을 정복한 스페인 사람은?", "프란시스코 피사로", ["에르난 코르테스", "바스코 누녜스 데 발보아", "프란시스코 바스케스 데 코로나도"], "코르테스는 아스테카를 정복했어요."],
+      ["whist", 3, "로제타석을 연구해 이집트 상형 문자를 해독한 프랑스 학자는?", "장프랑수아 샹폴리옹", ["하인리히 슐리만", "하워드 카터", "아서 에번스"], "1822년 해독을 발표했어요. 슐리만은 트로이, 카터는 투탕카멘 무덤, 에번스는 크노소스를 발굴했어요."],
+      ["whist", 3, "미국 남북 전쟁 중 링컨의 노예 해방 선언이 공식 발효된 해는?", "1863년", ["1861년", "1865년", "1776년"], "1863년 1월 1일 발효됐어요. 1861년은 전쟁이 시작된 해, 1865년은 끝난 해예요."],
+      ["whist", 4, "80년 전쟁 끝에 1648년 스페인으로부터 독립을 공식 인정받은 나라는?", "네덜란드", ["포르투갈", "벨기에", "덴마크"], "80년 전쟁 끝에 베스트팔렌 조약(뮌스터 조약)으로 독립을 인정받았어요."],
+      ["whist", 4, "1588년 영국 해군에 패한 스페인 ‘무적함대’ 때의 영국 군주는?", "엘리자베스 1세", ["헨리 8세", "메리 1세", "제임스 1세"], "이 승리로 영국은 해양 강국으로 떠올랐어요."],
+      ["whist", 3, "제2차 세계 대전 뒤 미국이 서유럽 부흥을 위해 펼친 대규모 원조 계획은?", "마셜 계획", ["트루먼 독트린", "먼로주의", "뉴딜 정책"], "1947년 국무 장관 조지 마셜이 제안했어요. 트루먼 독트린은 공산주의 봉쇄 선언이에요."],
+      // ── 지리 ──
+      ["geo", 3, "세계에서 가장 깊은 호수는?", "바이칼호", ["탕가니카호", "카스피해", "슈피리어호"], "러시아 시베리아의 바이칼호는 최대 수심이 1,600 m가 넘어요. 탕가니카호가 두 번째예요."],
+      ["geo", 4, "면적 기준으로 흔히 세계 최대의 담수호로 꼽히는 호수는?", "슈피리어호", ["빅토리아호", "바이칼호", "탕가니카호"], "북아메리카 오대호의 슈피리어호예요. 물의 양으로는 바이칼호가 가장 많아요."],
+      ["geo", 3, "남아메리카 대륙의 최고봉은?", "아콩카과산", ["침보라소산", "코토팍시산", "우아스카란산"], "아르헨티나에 있는 아콩카과산은 높이 약 6,960 m예요."],
+      ["geo", 4, "북아메리카 대륙의 최고봉은?", "데날리산", ["로건산", "휘트니산", "레이니어산"], "알래스카의 데날리산이에요. 로건산은 캐나다 최고봉이에요."],
+      ["geo", 3, "유역 면적이 세계에서 가장 넓은 강은?", "아마존강", ["콩고강", "나일강", "미시시피강"], "아마존강 유역은 약 700만 ㎢로 남아메리카의 약 40%를 차지해요."],
+      ["geo", 4, "적도와 본초 자오선이 만나는 지점(위도 0°, 경도 0°)이 있는 바다는?", "기니만", ["아라비아해", "벵골만", "멕시코만"], "아프리카 서쪽 대서양의 기니만에 있어요."],
+      ["geo", 3, "북회귀선의 위도는 약 몇 도일까요?", "북위 약 23.4°", ["북위 약 33.5°", "북위 약 45°", "북위 약 66.6°"], "지구 자전축 기울기와 같아요. 66.6°는 북극권의 경계(북극선)예요."],
+      ["geo", 3, "하천이 깎은 골짜기가 바다에 잠겨 해안선이 톱니처럼 복잡해진 해안은?", "리아스 해안", ["피오르 해안", "사빈 해안", "해안 단구"], "우리나라 남해안과 서해안이 대표적이에요. 피오르는 빙하가 깎은 골짜기가 잠긴 거예요."],
+      ["geo", 4, "석회암 지대에서 땅이 녹아 꺼져 생긴 둥글고 우묵한 웅덩이는?", "돌리네", ["테라로사", "석회 동굴", "칼데라"], "돌리네는 카르스트 지형이에요. 테라로사는 석회암이 풍화된 붉은 흙이에요."],
+      ["geo", 3, "백두산 천지처럼 화산 꼭대기가 무너져 생긴 큰 분지에 물이 고인 호수는?", "칼데라호", ["화구호", "석호", "우각호"], "한라산 백록담은 분화구에 물이 고인 화구호예요."],
+      ["geo", 3, "구불구불 흐르던 강의 굽이가 잘려 남은 쇠뿔 모양의 호수는?", "우각호", ["석호", "칼데라호", "빙하호"], "자유 곡류 하천의 범람원에서 잘 생겨요."],
+      ["geo", 3, "강릉 경포호처럼 모래톱(사주)이 만의 입구를 막아 생긴 호수는?", "석호", ["우각호", "칼데라호", "화구호"], "동해안에는 경포호·화진포·송지호 같은 석호가 많아요."],
+      ["geo", 3, "산지의 골짜기에서 평지로 나오는 곳에 자갈과 모래가 부채꼴로 쌓인 지형은?", "선상지", ["삼각주", "범람원", "하안 단구"], "삼각주는 강 하구에 쌓이는 지형이에요."],
+      ["geo", 3, "여름에 덥고 건조하며 겨울에 비가 많이 오는 기후는?", "지중해성 기후", ["서안 해양성 기후", "온대 몬순 기후", "사바나 기후"], "올리브·포도·코르크참나무 같은 수목 농업이 발달해요."],
+      ["geo", 3, "늦봄에서 초여름에 동해 쪽에서 태백산맥을 넘어 영서 지방에 부는 고온 건조한 바람은?", "높새바람", ["하늬바람", "마파람", "꽃샘바람"], "바람이 산을 넘으며 덥고 메말라지는 푄 현상이에요."],
+      ["geo", 3, "세계에서 가장 높은(낙차가 가장 큰) 폭포인 앙헬 폭포가 있는 나라는?", "베네수엘라", ["브라질", "페루", "콜롬비아"], "낙차가 약 979 m예요."],
+      ["geo", 4, "빅토리아 폭포가 걸쳐 있는 강은?", "잠베지강", ["나일강", "콩고강", "니제르강"], "잠비아와 짐바브웨의 국경을 이루는 잠베지강에 있어요."],
+      ["geo", 3, "이과수 폭포는 어느 두 나라의 국경에 있을까요?", "아르헨티나–브라질", ["브라질–파라과이", "아르헨티나–칠레", "페루–볼리비아"], "폭포의 대부분은 아르헨티나 쪽에 있어요."],
+      ["geo", 3, "티티카카호는 어느 두 나라에 걸쳐 있을까요?", "페루–볼리비아", ["칠레–볼리비아", "페루–에콰도르", "아르헨티나–볼리비아"], "해발 약 3,800 m에 있어 큰 배가 다니는 호수 중 가장 높은 곳에 있어요."],
+      ["geo", 3, "유럽과 아프리카 사이에서 지중해와 대서양을 잇는 해협은?", "지브롤터 해협", ["보스포루스 해협", "다르다넬스 해협", "오트란토 해협"], "가장 좁은 곳의 폭이 약 14 km예요."],
+      ["geo", 4, "이스탄불을 가로지르는 보스포루스 해협이 잇는 두 바다는?", "흑해–마르마라해", ["에게해–마르마라해", "흑해–아조프해", "지중해–홍해"], "에게해와 마르마라해 사이는 다르다넬스 해협이에요."],
+      ["geo", 3, "말레이반도와 인도네시아 수마트라섬 사이의 해협은?", "믈라카(말라카) 해협", ["순다 해협", "롬복 해협", "마카사르 해협"], "순다 해협은 수마트라와 자와섬 사이에 있어요."],
+      ["geo", 4, "파나마 운하가 개통된 해는?", "1914년", ["1869년", "1903년", "1999년"], "1869년은 수에즈 운하 개통, 1999년은 운하가 파나마에 반환된 해예요."],
+      ["geo", 3, "흔히 세계에서 가장 큰 반도로 꼽히는 곳은?", "아라비아반도", ["인도차이나반도", "스칸디나비아반도", "이베리아반도"], "면적이 약 300만 ㎢로 한반도의 10배가 넘어요."],
+      ["geo", 3, "나이지리아의 수도는?", "아부자", ["라고스", "카노", "이바단"], "1991년 최대 도시 라고스에서 아부자로 수도를 옮겼어요."],
+      ["geo", 4, "미얀마의 수도는?", "네피도", ["양곤", "만달레이", "바고"], "2000년대 중반 양곤에서 네피도로 옮겼어요."],
+      ["geo", 4, "볼리비아의 헌법상 수도는?", "수크레", ["라파스", "코차밤바", "산타크루스"], "정부 기관 대부분은 라파스에 있지만 헌법상 수도는 수크레예요."],
+      ["geo", 4, "수도 기능이 세 도시에 나뉜 남아프리카 공화국에서 행정 수도는?", "프리토리아", ["케이프타운", "블룸폰테인", "요하네스버그"], "케이프타운은 입법, 블룸폰테인은 사법 수도예요."],
+      ["geo", 3, "스위스의 연방 수도(연방 도시)는?", "베른", ["취리히", "제네바", "바젤"], "최대 도시는 취리히, 국제기구가 많은 곳은 제네바예요."],
+      ["geo", 3, "뉴질랜드의 수도는?", "웰링턴", ["오클랜드", "크라이스트처치", "해밀턴"], "북섬 남쪽 끝에 있어요. 최대 도시는 오클랜드예요."],
+      ["geo", 3, "다음 중 바다에 접하지 않은 내륙국은?", "볼리비아", ["페루", "칠레", "에콰도르"], "남아메리카의 내륙국은 볼리비아와 파라과이예요."],
+      ["geo", 4, "둘러싼 이웃 나라들도 모두 내륙국인 ‘이중 내륙국’은?", "리히텐슈타인", ["룩셈부르크", "안도라", "산마리노"], "이중 내륙국은 리히텐슈타인과 우즈베키스탄 두 나라뿐이에요."],
+      ["geo", 3, "다음 중 적도가 지나지 않는 나라는?", "나이지리아", ["에콰도르", "케냐", "인도네시아"], "나이지리아는 북위 4° 이북에 있어요. 에콰도르라는 이름 자체가 ‘적도’라는 뜻이에요."],
+      ["geo", 3, "다음 중 본초 자오선(경도 0°)이 지나지 않는 나라는?", "이탈리아", ["영국", "프랑스", "스페인"], "본초 자오선은 영국·프랑스·스페인을 지나 알제리·말리·가나 등으로 이어져요."],
+      ["geo", 3, "육지에서 해발 고도가 가장 낮은 곳은?", "사해 연안", ["데스밸리", "카스피해 연안", "투루판 분지"], "사해 수면은 해발 −400 m보다 낮아요. 데스밸리는 약 −86 m예요."],
+      ["geo", 3, "남한에서 가장 긴 강은?", "낙동강", ["한강", "금강", "섬진강"], "낙동강은 약 510 km로 한강보다 조금 길어요."],
+      ["geo", 3, "한반도에서 가장 긴 강은?", "압록강", ["두만강", "낙동강", "대동강"], "압록강은 약 800 km예요."],
+      ["geo", 3, "제주도 다음으로 우리나라에서 큰 섬은?", "거제도", ["진도", "강화도", "남해도"], "거제도는 면적이 약 380 ㎢예요."],
+      ["geo", 3, "한라산의 높이는?", "1,947 m", ["1,915 m", "1,708 m", "2,744 m"], "1,915 m는 지리산 천왕봉, 1,708 m는 설악산 대청봉, 2,744 m는 백두산 병사봉(장군봉)이에요."],
+      ["geo", 3, "1967년 우리나라 제1호 국립 공원으로 지정된 곳은?", "지리산", ["설악산", "한라산", "경주"], "지리산 국립 공원은 3개 도에 걸친 가장 넓은 산악형 국립 공원이에요."],
+      ["geo", 4, "남아메리카 대륙의 서쪽 해안을 따라 길게 뻗어 남북 길이가 4,000 km가 넘는 나라는?", "칠레", ["페루", "아르헨티나", "에콰도르"], "칠레는 동서 폭은 평균 약 180 km에 불과하지만 남북으로 매우 길어요."],
+      ["geo", 4, "세계에서 가장 건조한 비극지 사막으로 꼽히는 아타카마 사막이 있는 나라는?", "칠레", ["이집트", "멕시코", "나미비아"], "아타카마 사막에는 수십 년 동안 비가 오지 않은 관측소도 있어요."],
+      ["geo", 4, "아프리카에서 가장 높은 산 킬리만자로가 있는 나라는?", "탄자니아", ["케냐", "에티오피아", "우간다"], "케냐 국경 가까이에 있지만 탄자니아 땅이에요."],
+      ["geo", 3, "남아메리카와 남극 대륙 사이의 해협으로, 거친 바다로 이름난 곳은?", "드레이크 해협", ["마젤란 해협", "베링 해협", "바스 해협"], "마젤란 해협은 남아메리카 본토와 티에라델푸에고섬 사이예요."],
+      ["geo", 3, "아시아와 북아메리카 대륙 사이의 해협은?", "베링 해협", ["드레이크 해협", "타타르 해협", "데이비스 해협"], "가장 좁은 곳의 폭은 약 82 km예요."],
+      ["geo", 4, "한 나라의 땅에 완전히 둘러싸인 나라가 아닌 것은?", "안도라", ["레소토", "산마리노", "바티칸 시국"], "레소토는 남아공, 산마리노와 바티칸은 이탈리아에 둘러싸여 있어요. 안도라는 프랑스·스페인과 맞닿아 있어요."],
+      // ── 경제·사회 ──
+      ["econ", 4, "애덤 스미스의 『국부론』이 출간된 해는?", "1776년", ["1817년", "1848년", "1936년"], "미국 독립 선언과 같은 해예요. 1817년은 리카도의 『정치 경제학 및 과세의 원리』, 1936년은 케인스의 『일반 이론』이에요."],
+      ["econ", 3, "두 나라가 각자 상대적으로 더 잘 만드는 것에 특화해 교역하면 모두 이익이라는 ‘비교 우위론’을 체계화한 경제학자는?", "데이비드 리카도", ["애덤 스미스", "토머스 맬서스", "존 스튜어트 밀"], "리카도는 영국 옷감과 포르투갈 포도주의 예로 설명했어요."],
+      ["econ", 3, "‘인구는 기하급수적으로, 식량은 산술급수적으로 늘어난다’고 주장한 경제학자는?", "토머스 맬서스", ["데이비드 리카도", "카를 마르크스", "존 메이너드 케인스"], "1798년 『인구론』에서 주장했어요."],
+      ["econ", 4, "혁신을 통해 낡은 것을 무너뜨리고 새것을 만드는 ‘창조적 파괴’를 강조한 경제학자는?", "조지프 슘페터", ["프리드리히 하이에크", "밀턴 프리드먼", "존 케네스 갤브레이스"], "슘페터는 기업가의 혁신을 경제 발전의 원동력으로 봤어요."],
+      ["econ", 4, "계획 경제가 개인의 자유를 위협한다고 경고한 『노예의 길』의 저자는?", "프리드리히 하이에크", ["밀턴 프리드먼", "루트비히 폰 미제스", "조지프 슘페터"], "1944년에 나온 책이에요. 하이에크는 1974년 노벨 경제학상을 받았어요."],
+      ["econ", 3, "값비싼 물건일수록 과시하려는 심리 때문에 가격이 올라도 오히려 수요가 늘어나는 현상은?", "베블런 효과", ["스놉 효과", "밴드왜건 효과", "립스틱 효과"], "소스타인 베블런이 『유한계급론』에서 ‘과시적 소비’를 설명한 데서 나왔어요."],
+      ["econ", 4, "남들이 많이 사는 물건은 오히려 사지 않으려는 소비 현상은?", "스놉 효과", ["밴드왜건 효과", "베블런 효과", "톱니 효과"], "‘속물 효과’ 또는 ‘백로 효과’라고도 해요. 밴드왜건 효과는 그 반대예요."],
+      ["econ", 3, "가계 소비 지출 가운데 식료품비가 차지하는 비율을 뜻하는 지수는?", "엥겔 지수", ["지니 계수", "슈바베 지수", "엔젤 계수"], "소득이 낮을수록 엥겔 지수가 높아지는 경향이 있어요."],
+      ["econ", 4, "가계 소비 지출에서 ‘슈바베 지수’가 나타내는 비율은 무엇의 비중일까요?", "주거비", ["식료품비", "교육비", "통신비"], "슈바베 지수는 주거비 비중이에요. 엥겔 지수는 식료품비 비중이에요."],
+      ["econ", 3, "‘악화(나쁜 돈)가 양화(좋은 돈)를 구축한다’는 법칙은?", "그레셤의 법칙", ["세이의 법칙", "엥겔의 법칙", "바그너의 법칙"], "금 함량이 높은 좋은 돈은 집에 쌓아 두고 나쁜 돈만 시장에 돈다는 뜻이에요."],
+      ["econ", 4, "‘공급은 스스로 수요를 창출한다’는 고전 경제학의 명제는?", "세이의 법칙", ["그레셤의 법칙", "바그너의 법칙", "오쿤의 법칙"], "프랑스 경제학자 장바티스트 세이의 이름을 땄어요. 케인스는 이를 비판했어요."],
+      ["econ", 3, "세율이 일정 수준을 넘으면 오히려 세금 수입이 줄어든다는 것을 나타낸 곡선은?", "래퍼 곡선", ["필립스 곡선", "로렌츠 곡선", "쿠즈네츠 곡선"], "경제학자 아서 래퍼의 이름을 딴 곡선이에요."],
+      ["econ", 3, "물가 상승률과 실업률 사이의 반비례 관계를 나타낸 곡선은?", "필립스 곡선", ["래퍼 곡선", "로렌츠 곡선", "무차별 곡선"], "뉴질랜드 출신 경제학자 윌리엄 필립스가 제시했어요."],
+      ["econ", 3, "경기 침체 속에서 물가가 오히려 오르는 현상은?", "스태그플레이션", ["디플레이션", "디스인플레이션", "리플레이션"], "1970년대 석유 파동 때 크게 나타났어요."],
+      ["econ", 4, "물가 상승률이 낮아지지만 여전히 물가 자체는 오르고 있는 상태는?", "디스인플레이션", ["디플레이션", "스태그플레이션", "하이퍼인플레이션"], "디플레이션은 물가 수준 자체가 내려가는 거예요."],
+      ["econ", 4, "재산권이 분명하고 거래 비용이 작으면 당사자끼리 협상으로 외부 효과를 해결할 수 있다는 이론은?", "코즈 정리", ["애로의 불가능성 정리", "피구세 이론", "중위 투표자 정리"], "로널드 코즈는 1991년 노벨 경제학상을 받았어요."],
+      ["econ", 3, "상대의 전략이 정해졌을 때 누구도 혼자 전략을 바꿔서 더 이득을 볼 수 없는 상태는?", "내시 균형", ["파레토 최적", "일반 균형", "비교 우위"], "영화 「뷰티풀 마인드」의 주인공 존 내시의 이름을 땄어요."],
+      ["econ", 3, "다른 누군가를 손해 보게 하지 않고는 아무도 더 나아질 수 없는 자원 배분 상태는?", "파레토 최적", ["내시 균형", "한계 효용 균등", "완전 경쟁"], "이탈리아 경제학자 빌프레도 파레토의 이름을 땄어요."],
+      ["econ", 4, "1968년 「공유지의 비극」이라는 논문을 쓴 생태학자는?", "개릿 하딘", ["엘리너 오스트롬", "레이철 카슨", "존 내시"], "오스트롬은 공동체가 공유 자원을 스스로 잘 관리할 수 있음을 보여 노벨상을 받았어요."],
+      ["econ", 4, "여성으로서 처음 노벨 경제학상을 받은 사람은?", "엘리너 오스트롬", ["에스테르 뒤플로", "클로디아 골딘", "조앤 로빈슨"], "2009년 공유 자원 관리 연구로 받았어요. 뒤플로는 2019년에 두 번째로 받았어요."],
+      ["econ", 4, "노벨 경제학상이 처음 수여된 해는?", "1969년", ["1901년", "1945년", "1980년"], "스웨덴 중앙은행이 노벨을 기념해 만든 상으로 1969년부터 수여됐어요."],
+      ["econ", 4, "1944년 브레턴우즈 체제에서 정한 금 1온스의 달러 가격은?", "35달러", ["20.67달러", "42.22달러", "100달러"], "달러만 금과 바꿔 주고 다른 통화는 달러에 고정하는 금 환 본위제였어요."],
+      ["econ", 3, "1971년 달러를 금으로 바꿔 주는 것을 멈추겠다고 발표해 ‘○○ 쇼크’를 일으킨 미국 대통령은?", "리처드 닉슨", ["존 F. 케네디", "제럴드 포드", "지미 카터"], "닉슨 쇼크로 브레턴우즈 체제가 사실상 무너졌어요."],
+      ["econ", 4, "1985년 주요 5개국이 달러 가치를 낮추고 엔화·마르크화 가치를 높이기로 한 합의는?", "플라자 합의", ["루브르 합의", "스미소니언 협정", "킹스턴 협정"], "뉴욕 플라자 호텔에서 맺었어요. 1987년 루브르 합의는 달러 하락을 멈추려 한 거예요."],
+      ["econ", 4, "우리나라에서 금융 실명제가 실시된 해는?", "1993년", ["1988년", "1997년", "2001년"], "1993년 8월 긴급 재정 경제 명령으로 전격 실시됐어요."],
+      ["econ", 4, "우리나라에 부가 가치세가 도입된 해는?", "1977년", ["1962년", "1988년", "1995년"], "1977년 7월부터 시행됐어요."],
+      ["econ", 4, "화폐 단위를 ‘환’에서 지금의 ‘원’으로 바꾼 화폐 개혁이 있었던 해는?", "1962년", ["1953년", "1950년", "1975년"], "1953년에는 반대로 ‘원’을 ‘환’으로 바꿨고, 1962년에 다시 ‘원’이 됐어요."],
+      ["econ", 4, "한국은행이 설립된 해는?", "1950년", ["1945년", "1948년", "1961년"], "1950년 6월 12일 문을 열었고, 곧바로 6·25 전쟁이 터졌어요."],
+      ["econ", 3, "세계 무역 기구(WTO)의 본부가 있는 도시는?", "제네바", ["브뤼셀", "뉴욕", "빈"], "1995년 관세 무역 일반 협정(GATT)을 이어 출범했어요."],
+      ["econ", 3, "다음 중 본부가 프랑스 파리에 있는 국제기구는?", "OECD", ["WTO", "NATO", "IAEA"], "WTO는 제네바, NATO는 브뤼셀, IAEA는 빈에 본부가 있어요."],
+      ["econ", 3, "국제 사법 재판소(ICJ)가 있는 도시는?", "헤이그", ["제네바", "스트라스부르", "뉴욕"], "네덜란드 헤이그의 평화궁에 있어요. 스트라스부르에는 유럽 인권 재판소가 있어요."],
+      ["econ", 4, "유럽 연합(EU)을 출범시킨 조약은?", "마스트리흐트 조약", ["리스본 조약", "로마 조약", "솅겐 협정"], "1992년 서명, 1993년 발효됐어요. 로마 조약(1957)은 유럽 경제 공동체를 만들었어요."],
+      ["econ", 4, "유로화 지폐와 동전이 실제로 쓰이기 시작한 해는?", "2002년", ["1999년", "1993년", "2008년"], "1999년에 장부상 통화로 먼저 도입됐고 2002년 1월 1일 현금이 풀렸어요."],
+      ["econ", 3, "관심을 받고 있다는 사실만으로 작업 능률이 오른 공장 실험에서 이름 붙은 효과는?", "호손 효과", ["피그말리온 효과", "플라세보 효과", "바넘 효과"], "1920~30년대 미국 호손 공장 실험에서 나온 말이에요."],
+      ["econ", 3, "누구에게나 들어맞는 막연한 성격 묘사를 자기 이야기라고 믿는 심리 현상은?", "바넘 효과", ["호손 효과", "후광 효과", "초두 효과"], "‘포러 효과’라고도 해요. 혈액형·별자리 성격 풀이가 대표적이에요."],
+      ["econ", 4, "‘일은 그것을 끝내는 데 주어진 시간만큼 늘어난다’는 법칙은?", "파킨슨의 법칙", ["피터의 원리", "머피의 법칙", "하인리히 법칙"], "영국 역사학자 노스코트 파킨슨이 관료 조직을 풍자하며 말했어요."],
+      ["econ", 3, "‘위계 조직에서 사람은 자신이 무능해지는 자리까지 승진한다’는 이론은?", "피터의 원리", ["파킨슨의 법칙", "파레토 법칙", "딜버트의 법칙"], "로런스 피터가 1969년에 제시했어요."],
+      ["econ", 3, "큰 사고 1건이 나기 전에 작은 사고 29건과 사소한 징후 300건이 있다는 법칙은?", "하인리히 법칙", ["머피의 법칙", "파레토 법칙", "샐리의 법칙"], "그래서 ‘1 : 29 : 300 법칙’이라고도 해요."],
+      ["econ", 3, "사회 규범이 무너져 혼란스러운 상태를 뜻하는 ‘아노미’ 개념을 사회학에 정립한 학자는?", "에밀 뒤르켐", ["막스 베버", "카를 마르크스", "오귀스트 콩트"], "뒤르켐은 『자살론』에서 아노미적 자살을 설명했어요."],
+      ["econ", 3, "『프로테스탄트 윤리와 자본주의 정신』을 쓴 사회학자는?", "막스 베버", ["에밀 뒤르켐", "게오르크 지멜", "탤컷 파슨스"], "칼뱅주의의 금욕 윤리가 자본주의 발전에 영향을 줬다고 봤어요."],
+      ["econ", 4, "‘사회학(sociologie)’이라는 말을 처음 만든 프랑스 학자는?", "오귀스트 콩트", ["에밀 뒤르켐", "알렉시 드 토크빌", "앙리 드 생시몽"], "콩트는 실증주의의 창시자로도 불려요."],
+      ["econ", 3, "유엔 총회에서 세계 인권 선언이 채택된 해는?", "1948년", ["1945년", "1919년", "1966년"], "12월 10일에 채택돼 이날이 ‘세계 인권의 날’이에요. 1966년은 국제 인권 규약이 채택된 해예요."],
+      ["econ", 3, "확정 판결이 난 같은 사건으로 다시 재판받거나 처벌받지 않는다는 원칙은?", "일사부재리", ["불고불리", "죄형 법정주의", "증거 재판주의"], "우리 헌법 제13조에도 담겨 있어요."],
+      ["econ", 3, "노동자가 마땅히 받아야 할 최소한의 임금을 법으로 정한 제도를 우리나라가 처음 시행한 해는?", "1988년", ["1975년", "1997년", "2000년"], "최저 임금법은 1986년에 만들어져 1988년부터 시행됐어요."],
+      ["econ", 4, "경제 성장 초기에는 소득 불평등이 커지다가 일정 수준을 넘으면 줄어든다는 역U자 곡선은?", "쿠즈네츠 곡선", ["로렌츠 곡선", "래퍼 곡선", "필립스 곡선"], "사이먼 쿠즈네츠는 국민 소득 통계(GNP) 연구로 1971년 노벨상을 받았어요."],
+      ["econ", 4, "어떤 재화의 가격이 오를 때 오히려 수요량이 늘어나는 열등재를 무엇이라 할까요?", "기펜재", ["사치재", "보완재", "공공재"], "19세기 아일랜드 감자 기근 때 감자가 예로 거론돼요."],
+      ["econ", 3, "중앙은행이 국채 등을 사들여 시중에 돈을 직접 대량으로 푸는 정책은?", "양적 완화", ["공개 시장 매도", "기준 금리 인상", "긴축 재정"], "금리를 더 내리기 어려울 때 쓰는 비전통적 통화 정책이에요."],
+      // ── 문학 ──
+      ["lit", 4, "돈키호테가 마음속으로 섬기는 귀부인의 이름은?", "둘시네아", ["로시난테", "줄리엣", "베아트리체"], "실제로는 이웃 마을 농사꾼 처녀예요. 로시난테는 돈키호테가 타는 말이에요."],
+      ["lit", 3, "단테의 『신곡』에서 단테를 지옥과 연옥으로 안내하는 시인은?", "베르길리우스", ["호메로스", "오비디우스", "페트라르카"], "천국에서는 베아트리체가 안내해요."],
+      ["lit", 3, "순례자들이 돌아가며 이야기를 들려주는 『캔터베리 이야기』의 작가는?", "제프리 초서", ["조반니 보카치오", "존 밀턴", "에드먼드 스펜서"], "초서는 ‘영시의 아버지’로 불려요."],
+      ["lit", 4, "흑사병을 피해 모인 젊은이들이 열흘 동안 이야기를 나누는 보카치오의 『데카메론』에는 이야기가 모두 몇 편 실려 있을까요?", "100편", ["1001편", "50편", "365편"], "열 명이 열흘 동안 하루 한 편씩 해서 100편이에요. ‘데카메론’은 그리스어로 ‘열흘’이라는 뜻이에요."],
+      ["lit", 3, "『베니스의 상인』에서 ‘살 1파운드’를 담보로 돈을 빌려주는 고리대금업자는?", "샤일록", ["안토니오", "바사니오", "이아고"], "재판에서 포샤가 ‘살은 주되 피는 한 방울도 안 된다’는 논리로 맞섰어요."],
+      ["lit", 3, "괴테의 『파우스트』에서 파우스트와 영혼을 건 계약을 맺는 악마는?", "메피스토펠레스", ["바알세불", "루시퍼", "아스모데우스"], "괴테는 이 작품을 60년 가까이 고쳐 쓰며 완성했어요."],
+      ["lit", 3, "도스토옙스키 『죄와 벌』의 주인공은?", "라스콜니코프", ["미시킨 공작", "알료샤 카라마조프", "예브게니 오네긴"], "미시킨은 『백치』, 알료샤는 『카라마조프가의 형제들』, 오네긴은 푸시킨 작품의 주인공이에요."],
+      ["lit", 3, "『레 미제라블』에서 끈질기게 장 발장을 쫓는 경감은?", "자베르", ["마리우스", "테나르디에", "앙졸라"], "자베르는 법과 정의 사이에서 갈등하다 스스로 생을 마감해요."],
+      ["lit", 3, "『보바리 부인』을 쓴 프랑스 작가는?", "귀스타브 플로베르", ["오노레 드 발자크", "스탕달", "에밀 졸라"], "사실주의 소설의 대표작으로, 출간 당시 풍기 문란으로 재판까지 받았어요."],
+      ["lit", 4, "2,000명이 넘는 인물이 등장하는 연작 소설 『인간 희극』을 쓴 작가는?", "오노레 드 발자크", ["에밀 졸라", "귀스타브 플로베르", "빅토르 위고"], "『고리오 영감』 등 90여 편이 『인간 희극』으로 묶여요. 졸라의 연작은 『루공마카르 총서』예요."],
+      ["lit", 3, "카뮈의 『이방인』의 주인공은?", "뫼르소", ["그레고르 잠자", "로캉탱", "홀든 콜필드"], "그레고르 잠자는 『변신』, 로캉탱은 사르트르 『구토』, 홀든은 『호밀밭의 파수꾼』의 주인공이에요."],
+      ["lit", 4, "『위대한 개츠비』에서 이야기를 들려주는 화자는?", "닉 캐러웨이", ["제이 개츠비", "톰 뷰캐넌", "데이지 뷰캐넌"], "개츠비의 이웃인 닉의 눈으로 이야기가 펼쳐져요."],
+      ["lit", 3, "『호밀밭의 파수꾼』을 쓴 작가는?", "J. D. 샐린저", ["어니스트 헤밍웨이", "F. 스콧 피츠제럴드", "존 스타인벡"], "1951년에 나온 이 소설의 주인공은 홀든 콜필드예요."],
+      ["lit", 4, "헤밍웨이의 『노인과 바다』에서 노인의 이름은?", "산티아고", ["마놀린", "에이해브", "이스마엘"], "마놀린은 노인을 따르는 소년이에요."],
+      ["lit", 3, "『모비 딕』에서 흰 고래에게 복수하려는 피쿼드호 선장은?", "에이해브", ["이스마엘", "퀴퀘그", "스타벅"], "이스마엘은 화자, 스타벅은 일등 항해사예요."],
+      ["lit", 4, "조지 오웰 『1984』의 주인공은?", "윈스턴 스미스", ["빅 브러더", "오브라이언", "버나드 마르크스"], "버나드 마르크스는 『멋진 신세계』의 등장인물이에요."],
+      ["lit", 3, "인간을 공장에서 계급별로 만들어 내는 미래를 그린 『멋진 신세계』의 작가는?", "올더스 헉슬리", ["조지 오웰", "레이 브래드버리", "H. G. 웰스"], "1932년 작품이에요. 브래드버리는 『화씨 451』을 썼어요."],
+      ["lit", 3, "마콘도 마을과 부엔디아 가문 이야기를 담은 『백년의 고독』의 작가는?", "가브리엘 가르시아 마르케스", ["호르헤 루이스 보르헤스", "파블로 네루다", "마리오 바르가스 요사"], "마술적 사실주의의 대표작이에요. 마르케스는 콜롬비아 작가예요."],
+      ["lit", 4, "1901년 첫 노벨 문학상을 받은 사람은?", "쉴리 프뤼돔", ["레프 톨스토이", "라빈드라나트 타고르", "러디어드 키플링"], "프랑스 시인 쉴리 프뤼돔이 첫 수상자예요. 톨스토이는 끝내 받지 못했어요."],
+      ["lit", 3, "아시아인으로 처음 노벨 문학상을 받은 사람은?", "라빈드라나트 타고르", ["가와바타 야스나리", "오에 겐자부로", "펄 벅"], "1913년 시집 『기탄잘리』로 받았어요."],
+      ["lit", 3, "우리나라 최초의 한문 소설로 알려진 『금오신화』의 작가는?", "김시습", ["허균", "김만중", "박지원"], "김시습이 경주 금오산에서 썼다고 해요."],
+      ["lit", 4, "김만중의 『구운몽』 주인공 ‘성진’의 본래 신분은?", "승려", ["선비", "무사", "신선"], "육관 대사의 제자인 성진이 꿈속에서 양소유로 살다 깨어나요."],
+      ["lit", 4, "박지원의 「허생전」이 실려 있는 책은?", "열하일기", ["북학의", "목민심서", "반계수록"], "『열하일기』의 「옥갑야화」에 실려 있어요."],
+      ["lit", 3, "다음 중 『청록집』을 함께 낸 ‘청록파’ 시인이 아닌 사람은?", "윤동주", ["박목월", "조지훈", "박두진"], "1946년 세 시인이 『청록집』을 함께 냈어요."],
+      ["lit", 4, "시인 이상의 본명은?", "김해경", ["김정식", "이원록", "윤해환"], "김정식은 김소월, 이원록은 이육사의 본명이에요."],
+      ["lit", 3, "윤동주의 유고 시집 제목은?", "하늘과 바람과 별과 시", ["님의 침묵", "사슴", "청록집"], "윤동주가 세상을 떠난 뒤 1948년에 출간됐어요."],
+      ["lit", 4, "1936년 시집 『사슴』을 낸 시인은?", "백석", ["정지용", "김기림", "오장환"], "백석은 평안도 방언과 토속적인 소재로 독특한 시 세계를 만들었어요."],
+      ["lit", 4, "‘넓은 벌 동쪽 끝으로’로 시작하는 시 「향수」의 시인은?", "정지용", ["김영랑", "백석", "김광균"], "정지용은 한국 현대시의 감각적 언어를 연 시인으로 꼽혀요."],
+      ["lit", 3, "1917년 매일신보에 연재된, 우리나라 최초의 근대 장편 소설로 꼽히는 작품은?", "무정", ["혈의 누", "탁류", "삼대"], "이광수의 작품이에요. 『혈의 누』는 이인직의 신소설이에요."],
+      ["lit", 4, "군산을 배경으로 한 채만식의 장편 소설은?", "탁류", ["태평천하", "삼대", "고향"], "『태평천하』도 채만식 작품이지만 서울이 배경이에요."],
+      ["lit", 3, "박경리의 『토지』가 시작되는 마을은?", "하동 평사리", ["남원 광한루", "통영 한산도", "강릉 대관령"], "경남 하동 평사리 최참판댁에서 이야기가 시작돼요."],
+      ["lit", 3, "이효석의 「메밀꽃 필 무렵」의 배경이 되는 고장은?", "봉평", ["정선", "영월", "춘천"], "강원도 평창 봉평에서 대화로 가는 밤길이 배경이에요."],
+      ["lit", 3, "인력거꾼 김첨지가 등장하는 「운수 좋은 날」의 작가는?", "현진건", ["김유정", "나도향", "이효석"], "1924년 작품이에요."],
+      ["lit", 3, "점순이가 나오는 「동백꽃」과 「봄·봄」의 작가는?", "김유정", ["현진건", "이효석", "채만식"], "김유정은 강원도 춘천 실레 마을 사람들의 이야기를 해학적으로 그렸어요."],
+      ["lit", 4, "트로이 전쟁이 끝난 뒤 오디세우스가 고향 이타카로 돌아오기까지 걸린 시간은?", "10년", ["7년", "20년", "3년"], "전쟁 10년, 귀향 10년으로 집을 떠난 지 20년 만에 돌아왔어요."],
+      ["lit", 3, "『오디세이아』에서 남편을 기다리며 낮에 짠 수의를 밤에 몰래 풀어 구혼자들을 물리친 오디세우스의 아내는?", "페넬로페", ["헬레네", "안드로마케", "클리타임네스트라"], "페넬로페는 정절의 상징으로 여겨져요."],
+      ["lit", 3, "다음 중 고대 그리스의 3대 비극 작가가 아닌 사람은?", "아리스토파네스", ["아이스킬로스", "소포클레스", "에우리피데스"], "아리스토파네스는 희극 작가예요."],
+      ["lit", 3, "『어린 왕자』의 어린 왕자가 살던 소행성의 이름은?", "B612", ["B329", "M31", "K2"], "어린 왕자는 B612에서 장미 한 송이와 함께 살았어요."],
+      ["lit", 3, "『걸리버 여행기』에서 걸리버가 처음 간 소인국의 이름은?", "릴리퍼트", ["브롭딩낵", "라퓨타", "후이늠"], "브롭딩낵은 거인국, 라퓨타는 하늘을 나는 섬, 후이늠은 말들의 나라예요."],
+      ["lit", 3, "『오만과 편견』의 여주인공은?", "엘리자베스 베넷", ["제인 에어", "에마 우드하우스", "캐서린 언쇼"], "에마 우드하우스는 오스틴의 『에마』, 캐서린 언쇼는 『폭풍의 언덕』의 인물이에요."],
+      ["lit", 3, "『폭풍의 언덕』을 쓴 작가는?", "에밀리 브론테", ["샬럿 브론테", "앤 브론테", "제인 오스틴"], "샬럿은 『제인 에어』, 앤은 『아그네스 그레이』를 썼어요."],
+      ["lit", 3, "『프랑켄슈타인』을 쓴 작가는?", "메리 셸리", ["브램 스토커", "에드거 앨런 포", "메리 울스턴크래프트"], "열여덟 살 때 쓰기 시작해 1818년에 냈어요. 울스턴크래프트는 그의 어머니예요."],
+      ["lit", 4, "셜록 홈스가 처음 등장한 작품은?", "주홍색 연구", ["네 개의 서명", "바스커빌가의 개", "셜록 홈스의 모험"], "1887년 작품으로, 왓슨과 홈스가 처음 만나는 장면이 나와요."],
+      ["lit", 3, "셜록 홈스가 사는 런던 베이커가의 번지수는?", "221B", ["10", "4", "12"], "지금은 221B 번호를 단 셜록 홈스 박물관이 있어요."],
+      ["lit", 4, "『그리스인 조르바』를 쓴 작가는?", "니코스 카잔차키스", ["콘스탄티노스 카바피스", "요르고스 세페리스", "오디세아스 엘리티스"], "카잔차키스의 묘비에는 ‘나는 아무것도 바라지 않는다…’는 글이 새겨져 있어요."],
+      ["lit", 3, "일본의 짧은 정형시 하이쿠의 글자 수(음수) 구성은?", "5·7·5", ["5·7·5·7·7", "7·5·7", "3·4·3"], "5·7·5·7·7은 단카예요."],
+      ["lit", 4, "평시조 종장의 첫 음보는 반드시 몇 음절일까요?", "3음절", ["2음절", "4음절", "5음절"], "종장 첫 음보는 3음절로 고정돼요."],
+      ["lit", 3, "서양의 정형시 소네트는 모두 몇 행일까요?", "14행", ["12행", "16행", "10행"], "셰익스피어식 소네트는 4행씩 세 번과 2행으로 이뤄져요."],
+      ["lit", 4, "현재 전승되는 판소리 다섯 마당이 아닌 것은?", "변강쇠가", ["춘향가", "심청가", "적벽가"], "다섯 마당은 춘향가·심청가·흥보가·수궁가·적벽가예요. 변강쇠가는 사설만 전해져요."],
+      ["lit", 4, "톨스토이의 『전쟁과 평화』에서 다루는 전쟁은?", "나폴레옹 전쟁", ["크림 전쟁", "러일 전쟁", "제1차 세계 대전"], "아우스터리츠 전투(1805)부터 나폴레옹의 러시아 원정(1812)까지 러시아 귀족 사회를 그렸어요."],
+      // ── 음악 ──
+      ["art", 3, "베토벤의 교향곡 ‘영웅’은 몇 번일까요?", "3번", ["5번", "6번", "9번"], "처음엔 나폴레옹에게 바치려 했다가 그가 황제가 되자 헌정을 거뒀다고 전해져요. 6번은 ‘전원’이에요."],
+      ["art", 4, "베토벤이 남긴 단 하나의 오페라는?", "피델리오", ["마술피리", "마탄의 사수", "돈 조반니"], "『마술피리』·『돈 조반니』는 모차르트, 『마탄의 사수』는 베버의 오페라예요."],
+      ["art", 3, "두 악장만 남은 ‘미완성 교향곡’으로 유명한 작곡가는?", "프란츠 슈베르트", ["요제프 하이든", "펠릭스 멘델스존", "요하네스 브람스"], "슈베르트는 이 교향곡을 두 악장까지만 완성했어요."],
+      ["art", 4, "하이든의 ‘놀람’ 교향곡은 몇 번일까요?", "94번", ["101번", "103번", "45번"], "101번은 ‘시계’, 103번은 ‘큰북 연타’, 45번은 ‘고별’이에요."],
+      ["art", 4, "모차르트 작품 번호 ‘K.’는 누구의 이름 머리글자일까요?", "루트비히 폰 쾨헬", ["오토 에리히 도이치", "안토니 판 호보켄", "볼프강 슈미더"], "도이치는 슈베르트(D.), 호보켄은 하이든(Hob.), 슈미더는 바흐(BWV) 작품 목록을 정리했어요."],
+      ["art", 4, "『사계』를 지은 비발디의 별명은?", "붉은 머리 사제", ["음악의 아버지", "가곡의 왕", "피아노의 시인"], "비발디는 사제 서품을 받았고 머리카락이 붉었어요."],
+      ["art", 3, "‘피아노의 왕’으로 불리며 「헝가리 광시곡」을 지은 작곡가는?", "프란츠 리스트", ["프레데리크 쇼팽", "로베르트 슈만", "요하네스 브람스"], "리스트는 피아노 독주회(리사이틀)라는 형식을 처음 연 사람으로도 알려져요."],
+      ["art", 3, "다음 중 차이콥스키의 3대 발레가 아닌 것은?", "지젤", ["백조의 호수", "잠자는 숲속의 미녀", "호두까기 인형"], "『지젤』은 프랑스 작곡가 아돌프 아당의 작품이에요."],
+      ["art", 3, "1913년 파리 초연 때 관객들의 소동이 일어난 발레 음악 「봄의 제전」의 작곡가는?", "이고르 스트라빈스키", ["모리스 라벨", "클로드 드뷔시", "세르게이 프로코피예프"], "원시적인 리듬과 불협화음이 당시 관객에게 큰 충격을 줬어요."],
+      ["art", 3, "같은 리듬 위에서 두 선율이 되풀이되며 점점 커지는 관현악곡 「볼레로」의 작곡가는?", "모리스 라벨", ["클로드 드뷔시", "에리크 사티", "조르주 비제"], "1928년 무용 음악으로 만들어졌어요."],
+      ["art", 3, "오페라 「카르멘」의 작곡가는?", "조르주 비제", ["주세페 베르디", "자코모 푸치니", "샤를 구노"], "1875년 파리에서 초연됐고, 비제는 석 달 뒤 세상을 떠났어요."],
+      ["art", 4, "푸치니의 오페라 「나비 부인」의 배경 도시는?", "나가사키", ["요코하마", "고베", "도쿄"], "미국 해군 장교 핑커턴과 일본 여인 초초상의 이야기예요."],
+      ["art", 4, "바그너가 자기 악극을 올리려고 세운 축제 극장이 있는 독일 도시는?", "바이로이트", ["잘츠부르크", "빈", "드레스덴"], "1876년부터 바이로이트 축제가 열리고 있어요."],
+      ["art", 4, "바그너의 「니벨룽의 반지」는 몇 편으로 이루어져 있을까요?", "4편", ["3편", "5편", "6편"], "라인의 황금·발퀴레·지크프리트·신들의 황혼, 공연에만 15시간가량 걸려요."],
+      ["art", 3, "오케스트라가 조율할 때 보통 기준음 ‘라(A)’를 먼저 내는 악기는?", "오보에", ["바이올린", "플루트", "클라리넷"], "오보에 소리가 뚜렷하고 음높이가 잘 변하지 않아서예요."],
+      ["art", 3, "표준 피아노의 건반은 모두 몇 개일까요?", "88개", ["76개", "85개", "96개"], "흰건반 52개와 검은건반 36개예요."],
+      ["art", 4, "오늘날 국제 표준 음높이로 쓰는 ‘라(A4)’의 진동수는?", "440 Hz", ["432 Hz", "415 Hz", "466 Hz"], "415 Hz는 바로크 음악 연주에서 흔히 쓰는 낮은 음높이예요."],
+      ["art", 3, "소나타 형식에서 제시부 바로 다음에 오는 부분은?", "전개부", ["재현부", "코다", "서주"], "제시부–전개부–재현부 순이고, 코다는 끝맺음이에요."],
+      ["art", 3, "다음 국악기 가운데 줄을 활로 문질러 소리 내는 것은?", "해금", ["가야금", "거문고", "대금"], "해금은 두 줄 사이에 활을 끼워 연주해요. 가야금은 뜯고 거문고는 술대로 쳐요."],
+      ["art", 3, "고구려의 왕산악이 만든 현악기는?", "거문고", ["가야금", "해금", "비파"], "가야금은 가야의 우륵이 신라에 전했어요."],
+      ["art", 3, "세종 때 편경을 만들고 궁중 음악인 아악을 정비한 음악가는?", "박연", ["우륵", "왕산악", "성삼문"], "박연은 고구려 왕산악, 신라 우륵과 함께 3대 악성으로 불려요."],
+      ["art", 3, "판소리에서 노래가 아니라 말하듯 이야기를 풀어 가는 부분은?", "아니리", ["창", "발림", "추임새"], "발림은 몸짓, 추임새는 고수와 청중이 넣는 ‘얼씨구’ 같은 소리예요."],
+      ["art", 4, "‘음악의 어머니’로도 불리며 「메시아」를 작곡한 바로크 작곡가는?", "헨델", ["바흐", "텔레만", "퍼셀"], "독일 태생으로 영국에서 활동했어요. ‘할렐루야’ 합창이 유명해요."],
+      ["art", 4, "쇼팽이 남긴 피아노 연습곡 「혁명」은 어떤 사건 소식을 듣고 지었다고 알려졌을까요?", "폴란드 11월 봉기의 실패", ["프랑스 2월 혁명", "나폴레옹의 몰락", "빈 회의"], "1831년 러시아에 맞선 폴란드 봉기가 진압됐다는 소식을 듣고 지었다고 전해져요."],
+      // ── 미술 ──
+      ["art", 3, "레오나르도 다빈치의 「최후의 만찬」이 있는 도시는?", "밀라노", ["피렌체", "로마", "베네치아"], "산타 마리아 델레 그라치에 성당 식당 벽에 그려져 있어요."],
+      ["art", 4, "시스티나 성당의 제단 뒤 벽면에 미켈란젤로가 그린 그림은?", "최후의 심판", ["아테네 학당", "천지 창조", "최후의 만찬"], "천장화 「천지 창조」를 그리고 20여 년 뒤에 제단 벽에 「최후의 심판」을 그렸어요."],
+      ["art", 3, "바티칸 궁의 방 벽에 플라톤과 아리스토텔레스를 가운데 그린 「아테네 학당」의 화가는?", "라파엘로", ["미켈란젤로", "레오나르도 다빈치", "티치아노"], "라파엘로는 플라톤 얼굴을 다빈치를 모델로 그렸다고 알려져요."],
+      ["art", 3, "조개껍데기 위에 선 여신을 그린 「비너스의 탄생」의 화가는?", "산드로 보티첼리", ["티치아노", "라파엘로", "조토"], "피렌체 우피치 미술관에 있어요."],
+      ["art", 3, "「진주 귀고리를 한 소녀」를 그린 네덜란드 화가는?", "요하네스 페르메이르", ["렘브란트", "페테르 파울 루벤스", "프란스 할스"], "‘북유럽의 모나리자’라고도 불러요."],
+      ["art", 3, "「야경」을 그린 네덜란드 화가는?", "렘브란트", ["요하네스 페르메이르", "페테르 파울 루벤스", "안토니 반 다이크"], "암스테르담 국립 미술관에 있어요. 원래 낮 장면인데 바니시가 어두워져 붙은 이름이에요."],
+      ["art", 3, "나폴레옹 군대의 민간인 학살을 그린 「1808년 5월 3일」의 화가는?", "프란시스코 고야", ["디에고 벨라스케스", "엘 그레코", "외젠 들라크루아"], "마드리드 프라도 미술관에 있어요."],
+      ["art", 3, "스페인 궁정 화가가 공주와 시녀들, 그림 그리는 자신까지 담은 「시녀들(라스 메니나스)」의 화가는?", "디에고 벨라스케스", ["프란시스코 고야", "엘 그레코", "바르톨로메 무리요"], "그림 속 거울에 왕과 왕비가 비쳐 보여요."],
+      ["art", 4, "들라크루아의 「민중을 이끄는 자유의 여신」이 그린 사건은?", "1830년 7월 혁명", ["1789년 프랑스 대혁명", "1848년 2월 혁명", "1871년 파리 코뮌"], "샤를 10세를 몰아낸 7월 혁명을 기념해 그렸어요."],
+      ["art", 3, "‘인상주의’라는 이름이 붙게 된 그림 「인상, 해돋이」의 화가는?", "클로드 모네", ["에두아르 마네", "피에르오귀스트 르누아르", "에드가 드가"], "한 비평가가 이 그림 제목을 비꼬며 ‘인상주의자’라 부른 데서 나왔어요."],
+      ["art", 4, "1863년 ‘낙선전’에 걸려 큰 논란을 일으킨 「풀밭 위의 점심 식사」의 화가는?", "에두아르 마네", ["클로드 모네", "귀스타브 쿠르베", "폴 세잔"], "옷을 입은 남자들 옆의 나체 여인이 큰 충격을 줬어요."],
+      ["art", 3, "작은 색 점을 찍어 그리는 점묘법으로 「그랑드자트섬의 일요일 오후」를 그린 화가는?", "조르주 쇠라", ["폴 시냐크", "폴 고갱", "앙리 마티스"], "시냐크도 점묘파였지만 이 작품은 쇠라가 그렸어요."],
+      ["art", 4, "반 고흐가 생애 마지막 두 달을 보내고 세상을 떠난 프랑스 마을은?", "오베르쉬르우아즈", ["아를", "생레미드프로방스", "지베르니"], "아를은 ‘노란 집’ 시절, 생레미는 요양원 시절을 보낸 곳이에요."],
+      ["art", 3, "모네가 연못을 만들고 「수련」 연작을 그린 마을은?", "지베르니", ["아를", "바르비종", "엑상프로방스"], "지베르니 정원은 지금도 많은 관광객이 찾아요."],
+      ["art", 4, "세잔이 고향에서 수십 번 되풀이해 그린 산은?", "생트빅투아르산", ["몽블랑", "마터호른", "몽마르트르 언덕"], "세잔의 고향 엑상프로방스 근처에 있는 산이에요."],
+      ["art", 3, "피카소의 「게르니카」가 고발한 사건이 일어난 전쟁은?", "스페인 내전", ["제1차 세계 대전", "프랑스 혁명", "나폴레옹 전쟁"], "1937년 독일 공군이 바스크 지방의 도시 게르니카를 폭격했어요."],
+      ["art", 3, "피카소와 함께 입체주의(큐비즘)를 이끈 프랑스 화가는?", "조르주 브라크", ["앙리 마티스", "살바도르 달리", "바실리 칸딘스키"], "마티스는 강렬한 색의 야수파를 이끌었어요."],
+      ["art", 3, "파이프 그림 아래 ‘이것은 파이프가 아니다’라고 적은 벨기에 화가는?", "르네 마그리트", ["살바도르 달리", "마르셀 뒤샹", "호안 미로"], "작품 제목은 「이미지의 배반」이에요."],
+      ["art", 3, "「절규」를 그린 에드바르 뭉크의 나라는?", "노르웨이", ["스웨덴", "덴마크", "핀란드"], "오슬로의 국립 미술관과 뭉크 미술관에 여러 판본이 있어요."],
+      ["art", 3, "금박을 화려하게 쓴 「키스」를 그린 오스트리아 화가는?", "구스타프 클림트", ["에곤 실레", "오스카어 코코슈카", "에드바르 뭉크"], "빈 벨베데레 궁전에 있어요."],
+      ["art", 4, "로댕의 「생각하는 사람」은 원래 어떤 대작의 일부로 구상됐을까요?", "지옥의 문", ["칼레의 시민", "발자크 상", "입맞춤"], "단테 『신곡』 지옥편을 주제로 한 「지옥의 문」 위에서 내려다보는 인물이에요."],
+      ["art", 3, "‘단원’이라는 호를 쓴 조선 화가는?", "김홍도", ["신윤복", "정선", "김정희"], "신윤복은 혜원, 정선은 겸재, 김정희는 추사예요."],
+      ["art", 3, "비 갠 뒤의 인왕산을 그린 「인왕제색도」의 화가는?", "정선", ["김홍도", "안견", "강희안"], "정선은 우리 산천을 직접 보고 그리는 진경산수화를 완성했어요."],
+      ["art", 4, "안견의 「몽유도원도」가 현재 소장된 곳은?", "일본 덴리 대학 도서관", ["국립중앙박물관", "간송 미술관", "리움 미술관"], "안평 대군의 꿈 이야기를 그린 그림으로, 일본 덴리 대학에 있어요."],
+      ["art", 3, "제주 유배 중 제자 이상적에게 그려 준 「세한도」의 화가는?", "김정희", ["정선", "김홍도", "강세황"], "추운 겨울에도 푸른 소나무와 잣나무로 변치 않는 의리를 나타냈어요."],
+      ["art", 4, "신윤복의 「미인도」를 소장한 곳은?", "간송 미술관", ["국립중앙박물관", "리움 미술관", "덴리 대학 도서관"], "간송 전형필이 일제 강점기에 지켜 낸 문화재 중 하나예요."],
+      ["art", 3, "그릇 표면을 파내고 그 자리에 다른 색 흙을 메워 무늬를 내는 고려청자 기법은?", "상감", ["분청", "철화", "음각"], "상감 기법은 고려에서 독창적으로 발달했어요."],
+      ["art", 3, "아기를 넣어 만들었다는 전설로 ‘에밀레종’이라 불리는 종의 정식 이름은?", "성덕대왕신종", ["상원사 동종", "보신각 종", "용주사 동종"], "771년 완성된 통일 신라의 종으로, 국립경주박물관에 있어요."],
+      ["art", 4, "현존하는 우리나라 범종 가운데 가장 오래된 것은?", "상원사 동종", ["성덕대왕신종", "보신각 종", "용주사 동종"], "725년에 만든 통일 신라 종으로 평창 오대산 상원사에 있어요."],
+      ["art", 4, "빨강·파랑·노랑과 검은 수직·수평선만으로 ‘차가운 추상’을 연 네덜란드 화가는?", "피트 몬드리안", ["바실리 칸딘스키", "카지미르 말레비치", "마크 로스코"], "칸딘스키는 ‘뜨거운 추상’의 선구자로 꼽혀요."],
+      // ── 스포츠 ──
+      ["sport", 4, "올림픽 오륜기가 경기장에 처음 게양된 대회는?", "1920년 앤트워프 올림픽", ["1896년 아테네 올림픽", "1912년 스톡홀름 올림픽", "1936년 베를린 올림픽"], "오륜기는 1913년에 고안됐고 1920년 앤트워프에서 처음 내걸렸어요."],
+      ["sport", 4, "올림픽 성화를 그리스에서 개최지까지 봉송하는 ‘성화 봉송’이 처음 열린 대회는?", "1936년 베를린 올림픽", ["1928년 암스테르담 올림픽", "1948년 런던 올림픽", "1896년 아테네 올림픽"], "성화를 경기장에 처음 밝힌 건 1928년, 봉송은 1936년이 처음이에요."],
+      ["sport", 3, "대한민국 국적으로 올림픽 첫 금메달을 딴 선수는?", "양정모", ["손기정", "김성집", "황영조"], "1976년 몬트리올 올림픽 레슬링 자유형에서 땄어요."],
+      ["sport", 3, "1988년 서울 올림픽은 제몇 회 하계 올림픽일까요?", "제24회", ["제23회", "제25회", "제22회"], "제23회는 1984년 LA, 제25회는 1992년 바르셀로나 대회예요."],
+      ["sport", 4, "축구에서 공을 직접 받을 때 오프사이드 반칙이 적용될 수 있는 경우는?", "간접 프리킥", ["골킥", "코너킥", "스로인"], "골킥·코너킥·스로인으로 직접 공을 받을 때는 오프사이드가 적용되지 않아요."],
+      ["sport", 4, "축구 골대의 안쪽 폭은?", "7.32 m", ["6.40 m", "8.00 m", "7.00 m"], "폭 8야드(7.32 m), 높이 8피트(2.44 m)예요."],
+      ["sport", 4, "축구 페널티 킥을 차는 페널티 마크는 골라인에서 몇 m 떨어져 있을까요?", "11 m", ["9.15 m", "12 m", "16.5 m"], "9.15 m는 프리킥 때 수비벽이 떨어져야 하는 거리, 16.5 m는 페널티 구역의 길이예요."],
+      ["sport", 3, "1930년 제1회 FIFA 월드컵 개최국은?", "우루과이", ["브라질", "이탈리아", "프랑스"], "개최국 우루과이가 첫 우승도 차지했어요."],
+      ["sport", 3, "야구에서 상대 타자를 한 명도 1루에 내보내지 않고 이긴 경기는?", "퍼펙트게임", ["노히트노런", "완봉승", "사이클링 히트"], "노히트노런은 안타는 없지만 볼넷·몸에 맞는 공 등으로 출루를 허용할 수 있어요."],
+      ["sport", 3, "야구에서 한 타자가 한 경기에서 단타·2루타·3루타·홈런을 모두 치는 것은?", "사이클링 히트", ["그랜드 슬램", "퍼펙트게임", "트리플 크라운"], "순서와 상관없이 네 가지를 모두 치면 돼요."],
+      ["sport", 4, "야구에서 홈 플레이트와 1루 사이의 거리는?", "약 27.43 m(90피트)", ["약 18.44 m(60.5피트)", "약 30 m(98피트)", "약 25 m(82피트)"], "18.44 m는 투수판에서 홈 플레이트까지의 거리예요."],
+      ["sport", 3, "프로 농구에서 공격 팀이 슛을 던져야 하는 제한 시간(샷 클록)은?", "24초", ["30초", "35초", "20초"], "NBA와 FIBA 모두 24초예요. 1954년 NBA가 경기를 빠르게 하려고 도입했어요."],
+      ["sport", 3, "1891년 농구를 처음 고안한 사람은?", "제임스 네이스미스", ["윌리엄 모건", "애브너 더블데이", "월터 캠프"], "YMCA 체육 교사였던 네이스미스가 복숭아 바구니를 골대로 썼어요. 모건은 배구를 만들었어요."],
+      ["sport", 4, "1895년 처음 만들어질 때 배구의 이름은?", "민토넷", ["바스켓 테니스", "핸드 테니스", "발리 핸드"], "윌리엄 모건이 ‘민토넷’이라고 지었다가 곧 ‘발리볼’로 바뀌었어요."],
+      ["sport", 3, "배구에서 수비만 전문으로 하며 다른 색 유니폼을 입는 선수는?", "리베로", ["세터", "아포짓 스파이커", "미들 블로커"], "국제 규칙에서 리베로는 서브와 블로킹을 할 수 없어요."],
+      ["sport", 3, "배구 5세트(마지막 세트)는 몇 점을 먼저 따면 이길까요?", "15점", ["21점", "25점", "11점"], "1~4세트는 25점, 5세트는 15점이에요. 두 점 차가 나야 끝나요."],
+      ["sport", 3, "테니스에서 0점을 부르는 말은?", "러브", ["듀스", "어드밴티지", "렛"], "0, 15, 30, 40으로 세고 0은 ‘러브’라 불러요."],
+      ["sport", 3, "테니스 4대 메이저 대회 가운데 잔디 코트에서 열리는 대회는?", "윔블던", ["프랑스 오픈", "US 오픈", "호주 오픈"], "프랑스 오픈은 클레이, US·호주 오픈은 하드 코트예요."],
+      ["sport", 3, "골프에서 한 홀의 기준 타수(파)보다 2타 적게 치는 것은?", "이글", ["버디", "앨버트로스", "보기"], "버디는 −1, 이글은 −2, 앨버트로스는 −3이에요."],
+      ["sport", 4, "골프에서 파5 홀을 2타 만에 끝내는 것은?", "앨버트로스", ["이글", "홀인원", "콘도르"], "기준보다 3타 적은 −3이에요. 콘도르는 −4예요."],
+      ["sport", 3, "탁구 한 게임은 몇 점을 먼저 내면 이길까요?", "11점", ["15점", "21점", "25점"], "2001년부터 21점제에서 11점제로 바뀌었어요."],
+      ["sport", 4, "배드민턴 셔틀콕에 꽂힌 깃털은 몇 개일까요?", "16개", ["12개", "14개", "18개"], "거위나 오리 깃털 16개를 코르크에 꽂아요."],
+      ["sport", 4, "마라톤 거리가 42.195 km가 된 계기로 알려진 대회는?", "1908년 런던 올림픽", ["1896년 아테네 올림픽", "1924년 파리 올림픽", "1936년 베를린 올림픽"], "윈저성에서 출발해 경기장 왕실 관람석 앞에서 끝나도록 정한 거리가 뒤에 표준이 됐어요."],
+      ["sport", 4, "육상 여자 7종 경기에 없는 종목은?", "장대높이뛰기", ["높이뛰기", "창던지기", "멀리뛰기"], "7종은 100 m 허들·높이뛰기·포환던지기·200 m·멀리뛰기·창던지기·800 m예요."],
+      ["sport", 4, "수영 개인 혼영의 영법 순서는?", "접영 → 배영 → 평영 → 자유형", ["배영 → 평영 → 접영 → 자유형", "자유형 → 접영 → 배영 → 평영", "평영 → 배영 → 접영 → 자유형"], "배영–평영–접영–자유형은 혼계영(릴레이)의 순서예요."],
+      ["sport", 3, "태권도가 올림픽 정식 종목으로 처음 치러진 대회는?", "2000년 시드니 올림픽", ["1988년 서울 올림픽", "1992년 바르셀로나 올림픽", "2004년 아테네 올림픽"], "서울·바르셀로나에서는 시범 종목이었어요."],
+      ["sport", 4, "펜싱에서 머리끝부터 발끝까지 온몸이 공격 유효 면인 종목은?", "에페", ["플뢰레", "사브르", "세 종목 모두"], "플뢰레는 몸통, 사브르는 허리 위 상체만 유효 면이에요."],
+      ["sport", 4, "컬링에서 마지막 스톤을 던질 수 있는 유리한 권리를 부르는 말은?", "해머", ["하우스", "엔드", "스킵"], "하우스는 표적 원, 엔드는 야구의 이닝, 스킵은 주장이에요."],
+      ["sport", 4, "쇼트트랙 스피드 스케이팅 트랙 한 바퀴의 길이는?", "111.12 m", ["400 m", "100 m", "125 m"], "400 m는 스피드 스케이팅 트랙이에요."],
+      ["sport", 4, "올림픽 양궁 리커브 종목의 사거리는?", "70 m", ["50 m", "90 m", "60 m"], "50 m는 컴파운드 종목 거리예요."],
+      ["sport", 4, "유도를 창시한 일본인은?", "가노 지고로", ["후나코시 기친", "우에시바 모리헤이", "미야모토 무사시"], "1882년 강도관을 열었어요. 후나코시는 가라테, 우에시바는 합기도를 퍼뜨렸어요."],
+      ["sport", 4, "럭비 유니언에서 트라이를 하면 몇 점일까요?", "5점", ["3점", "6점", "4점"], "트라이 5점, 이어지는 컨버전 킥 2점, 페널티 골 3점이에요."],
+      ["sport", 3, "미식축구에서 터치다운은 몇 점일까요?", "6점", ["7점", "3점", "5점"], "터치다운 6점 뒤 추가 득점 기회가 있어요. 필드골은 3점이에요."],
+      ["sport", 3, "축구 월드컵 트로피의 옛 이름으로, 브라질이 세 번째 우승으로 영구 보유하게 된 컵은?", "쥘 리메컵", ["앙리 들로네컵", "코파 아메리카컵", "스탠리컵"], "1970년 브라질이 세 번째 우승으로 차지했어요. 앙리 들로네컵은 유럽 선수권 트로피예요."],
+      ["sport", 4, "기계 체조에서 여홍철 선수의 이름을 딴 기술 ‘여 2’가 있는 종목은?", "도마", ["평행봉", "링", "안마"], "국제 대회에서 처음 성공한 선수의 이름이 기술 이름이 돼요. 양학선 선수의 ‘양학선’도 도마 기술이에요."],
+      ["sport", 3, "핸드볼 경기에서 한 팀이 코트에 내보내는 선수는 골키퍼를 포함해 몇 명일까요?", "7명", ["6명", "9명", "11명"], "필드 플레이어 6명과 골키퍼 1명이에요."],
+      ["sport", 3, "수구(워터 폴로)에서 한 팀이 물에 들어가는 선수는 골키퍼를 포함해 몇 명일까요?", "7명", ["6명", "5명", "9명"], "골키퍼 1명과 필드 플레이어 6명이에요."],
+      ["sport", 4, "역도 경기의 두 가지 들기 방식은 인상과 무엇일까요?", "용상", ["추상", "역상", "전상"], "인상은 한 번에 머리 위로, 용상은 어깨에 걸쳤다가 머리 위로 들어 올려요."],
+      // ── 언어·어원 ──
+      ["lang", 3, "영어 salary(봉급)의 어원인 라틴어 salarium과 관련 있는 것은?", "소금", ["은화", "곡식", "비단"], "라틴어 sal(소금)에서 나온 말이에요. 로마 병사의 소금값과 관련됐다는 설명이 널리 알려져 있어요."],
+      ["lang", 3, "영어 quarantine(검역·격리)은 어떤 숫자에서 나온 말일까요?", "40", ["14", "30", "100"], "흑사병 시절 베네치아에서 배를 40일(quaranta giorni) 동안 묶어 둔 데서 왔어요."],
+      ["lang", 4, "영어 sabotage(사보타주)의 어원이 된 프랑스어 sabot는 무엇일까요?", "나막신", ["망치", "톱니바퀴", "밧줄"], "나무로 만든 신발 sabot에서 나온 말이에요."],
+      ["lang", 3, "‘로봇’이라는 말을 처음 세상에 알린 희곡 『R.U.R.』의 작가는?", "카렐 차페크", ["아이작 아시모프", "쥘 베른", "H. G. 웰스"], "체코어 robota(고된 노동)에서 왔고, 형 요제프 차페크가 지어 준 말이라고 해요."],
+      ["lang", 4, "영어 boycott(불매·배척 운동)은 누구의 이름에서 나왔을까요?", "아일랜드에서 일하던 토지 관리인", ["프랑스의 장군", "영국의 국왕", "미국의 노동 운동가"], "1880년 아일랜드 소작인들에게 따돌림당한 토지 관리인 찰스 보이콧의 이름이에요."],
+      ["lang", 3, "단두대를 뜻하는 guillotine은 어떤 사람의 이름에서 왔을까요?", "사형 방식을 바꾸자고 제안한 의사", ["처음 처형된 왕", "처형을 맡은 집행인", "기구를 만든 목수"], "고통 없는 처형 도구를 쓰자고 제안한 의사 조제프 기요탱의 이름이에요."],
+      ["lang", 4, "거물 기업가를 뜻하는 영어 tycoon은 어느 언어에서 들어왔을까요?", "일본어", ["아랍어", "힌디어", "말레이어"], "에도 시대 쇼군을 외국에 부르던 말 ‘다이쿤(大君)’에서 왔어요."],
+      ["lang", 3, "alcohol, algebra, alkali 같은 영어 단어의 공통 기원 언어는?", "아랍어", ["라틴어", "그리스어", "페르시아어"], "앞의 al-은 아랍어 정관사예요."],
+      ["lang", 3, "영어 shampoo는 어느 언어에서 왔을까요?", "힌디어", ["아랍어", "프랑스어", "튀르키예어"], "‘누르다, 주무르다’라는 뜻의 힌디어 chāmpo에서 왔어요."],
+      ["lang", 4, "‘카스텔라’라는 이름은 어느 지역 이름에서 비롯됐을까요?", "카스티야", ["카탈루냐", "안달루시아", "갈리시아"], "포르투갈 사람들이 일본에 전한 ‘카스티야 지방의 빵’에서 나온 이름으로 알려져요."],
+      ["lang", 4, "tomato, chocolate, avocado의 어원이 된 아메리카 원주민 언어는?", "나와틀어", ["케추아어", "과라니어", "마야어"], "아스테카 사람들이 쓰던 말로, 멕시코에서 지금도 쓰여요."],
+      ["lang", 3, "막다른 상황을 뜻하는 ‘이판사판’은 어디에서 나온 말일까요?", "불교 승려의 두 부류", ["조선 관청의 두 부서", "바둑의 두 판", "장기의 두 진영"], "수행하는 이판승과 절 살림을 맡는 사판승을 합친 말이에요."],
+      ["lang", 4, "얌전하고 고루한 사람을 이르는 ‘샌님’은 어떤 말이 줄어든 걸까요?", "생원님", ["선생님", "서생님", "상전님"], "생원 시험에 합격한 선비를 높여 부르던 ‘생원님’에서 왔어요."],
+      ["lang", 4, "‘나락으로 떨어지다’의 ‘나락’은 원래 무엇을 뜻했을까요?", "지옥", ["낭떠러지", "깊은 우물", "감옥"], "산스크리트어 naraka(지옥)를 한자로 옮긴 말이에요."],
+      ["lang", 3, "불교에서 ‘찰나’와 반대로 헤아릴 수 없이 긴 시간을 뜻하는 단위는?", "겁(劫)", ["경각", "순식간", "탄지"], "‘억겁의 세월’이라는 말이 여기서 나왔어요."],
+      ["lang", 3, "훈민정음 창제 당시 자모는 모두 몇 자였을까요?", "28자", ["24자", "26자", "30자"], "자음 17자와 모음 11자예요. 지금은 그중 4자를 쓰지 않아 24자예요."],
+      ["lang", 3, "훈민정음 모음의 기본 세 글자(·, ㅡ, ㅣ)가 본뜬 것은?", "하늘·땅·사람", ["해·달·별", "물·불·흙", "입·혀·목"], "천지인(天地人)을 본떠 만들었어요."],
+      ["lang", 4, "훈민정음 초성(자음)의 기본자는 몇 자일까요?", "5자", ["3자", "8자", "17자"], "ㄱ·ㄴ·ㅁ·ㅅ·ㅇ 다섯 자에 획을 더해 나머지를 만들었어요."],
+      ["lang", 4, "다음 중 지금은 쓰지 않는 훈민정음 글자가 아닌 것은?", "ㅎ", ["ㆍ(아래아)", "ㅿ(반치음)", "ㆆ(여린히읗)"], "아래아·반치음·여린히읗·옛이응(ㆁ)이 지금은 쓰이지 않아요."],
+      ["lang", 3, "‘와신상담’ 고사에 나오는 두 나라는?", "오나라와 월나라", ["초나라와 한나라", "위나라와 촉나라", "진나라와 초나라"], "오왕 부차는 장작 위에서 자고, 월왕 구천은 쓸개를 핥으며 복수를 다짐했어요."],
+      ["lang", 3, "‘읍참마속’에서 울면서 마속의 목을 벤 사람은?", "제갈량", ["유비", "조조", "관우"], "가정 전투에서 명령을 어긴 마속을 군율에 따라 처벌했어요."],
+      ["lang", 3, "버리기도 아깝고 먹자니 먹을 게 없다는 ‘계륵’을 말한 인물은?", "조조", ["유비", "손권", "사마의"], "한중 땅을 두고 유비와 싸우던 조조가 암호로 썼다고 전해져요."],
+      ["lang", 4, "여럿 가운데 가장 뛰어난 것을 뜻하는 ‘백미’는 누구의 눈썹에서 나온 말일까요?", "마량", ["마속", "관우", "제갈량"], "다섯 형제 중 눈썹에 흰 털이 섞인 마량이 가장 뛰어났다는 데서 나왔어요."],
+      ["lang", 4, "글을 여러 번 고치는 ‘퇴고’는 어느 시인의 일화에서 나왔을까요?", "가도", ["한유", "이백", "두보"], "가도가 ‘민다(推)’와 ‘두드린다(敲)’ 사이에서 고민하다 한유의 행차에 부딪힌 일화예요."],
+      ["lang", 4, "‘조강지처’의 ‘조강’이 뜻하는 것은?", "술지게미와 쌀겨", ["아침과 저녁", "부엌과 마당", "비단과 무명"], "가난할 때 지게미와 겨를 함께 먹으며 고생한 아내를 뜻해요."],
+      ["lang", 4, "‘홍일점’은 원래 어떤 풍경 속의 붉은 꽃 한 송이를 가리켰을까요?", "푸른 수풀", ["흰 눈밭", "검은 바위", "누런 들판"], "왕안석의 시구로 전해지는 ‘만록총중홍일점(온통 푸른 가운데 붉은 점 하나)’에서 나왔어요."],
+      ["lang", 3, "영어 January(1월)는 어느 신의 이름에서 왔을까요?", "야누스", ["유노", "마르스", "마이아"], "문과 시작의 신 야누스예요. 유노는 June, 마르스는 March, 마이아는 May의 어원이에요."],
+      ["lang", 3, "영어 August(8월)는 누구의 이름에서 왔을까요?", "아우구스투스", ["율리우스 카이사르", "네로", "트라야누스"], "로마 첫 황제 아우구스투스예요. July는 율리우스 카이사르에서 왔어요."],
+      ["lang", 3, "September(9월)의 sept-는 원래 어떤 숫자를 뜻할까요?", "7", ["9", "8", "10"], "옛 로마력은 3월에 한 해가 시작돼 9월이 일곱째 달이었어요."],
+      ["lang", 4, "영어 Wednesday(수요일)는 어느 신의 이름에서 왔을까요?", "오딘(보탄)", ["토르", "티르", "프리그"], "‘보덴의 날’이라는 뜻이에요. Thursday는 토르, Tuesday는 티르, Friday는 프리그(프레이야)와 관련돼요."],
+      ["lang", 4, "영어 muscle(근육)의 어원인 라틴어 musculus의 원래 뜻은?", "작은 생쥐", ["작은 뱀", "작은 물고기", "작은 고양이"], "근육이 움직이는 모습이 피부 밑에서 생쥐가 움직이는 것 같다는 데서 왔어요."],
+      ["lang", 4, "영어 disaster(재난)의 어원에 들어 있는 것은?", "별", ["바다", "불", "땅"], "‘나쁜(dis-)’과 ‘별(astro)’이 합쳐진 말로, 별자리가 나쁘다는 뜻이었어요."],
+      ["lang", 4, "영어 companion(동료)의 어원은 ‘함께 ○을 나누는 사람’이라는 뜻이에요. ○은?", "빵", ["칼", "말(馬)", "술"], "com(함께) + panis(빵)에서 왔어요."],
+      ["lang", 4, "영어 mortgage(주택 담보 대출)의 어원에 들어 있는 뜻은?", "죽음", ["땅", "금", "집"], "고대 프랑스어 mort gage, ‘죽은 서약’이라는 뜻이에요."],
+      ["lang", 3, "영어 calculate(계산하다)의 어원인 라틴어 calculus의 원래 뜻은?", "작은 돌", ["손가락", "막대", "구슬"], "옛날에는 작은 돌을 늘어놓아 셈을 했어요. 의학에서 결석도 calculus예요."],
+      ["lang", 4, "영어 candidate(후보자)의 어원은 무엇을 입은 사람이라는 뜻일까요?", "흰 옷", ["붉은 띠", "월계관", "금반지"], "로마의 공직 후보자들이 하얗게 표백한 토가를 입은 데서 왔어요."],
+      ["lang", 3, "영어 algorithm(알고리즘)은 무엇에서 나온 말일까요?", "페르시아 수학자의 이름", ["그리스어 ‘숫자’", "라틴어 ‘계산’", "아랍어 ‘길’"], "9세기 수학자 알콰리즈미의 이름이 라틴어로 옮겨지며 생긴 말이에요."],
+      ["lang", 4, "zero와 cipher의 공통 어원인 아랍어 sifr의 뜻은?", "비어 있음", ["둥근 원", "끝", "하나"], "산스크리트어 śūnya(빈 것)를 아랍어로 옮긴 말이에요."],
+      ["lang", 4, "아주 큰 것을 뜻하는 jumbo는 원래 무엇의 이름이었을까요?", "서커스 코끼리", ["고래", "거대한 배", "기린"], "19세기 런던 동물원에서 미국 바넘 서커스로 팔려 간 코끼리 ‘점보’의 이름이에요."],
+      ["lang", 3, "갑작스러운 공포를 뜻하는 panic은 어느 신의 이름에서 왔을까요?", "판", ["아레스", "하데스", "헤르메스"], "숲과 목동의 신 판이 갑자기 나타나 사람들을 놀라게 한다는 데서 왔어요."],
+      ["lang", 3, "영어 volcano(화산)는 어느 신의 이름에서 왔을까요?", "불카누스", ["넵투누스", "유피테르", "메르쿠리우스"], "로마 신화의 불과 대장간의 신이에요. 그리스 신화의 헤파이스토스와 같아요."],
+      ["lang", 4, "영어 cereal(곡물)은 어느 여신의 이름에서 왔을까요?", "케레스", ["디아나", "베누스", "미네르바"], "로마 신화의 곡물·농업의 여신이에요."],
+      ["lang", 3, "청바지 천 denim은 ‘serge de Nîmes’에서 왔어요. Nîmes는 어디일까요?", "프랑스 남부의 도시", ["이탈리아의 항구", "영국의 공업 도시", "미국의 목화 농장"], "‘님에서 온 서지 천’이라는 뜻이에요."],
+      ["lang", 4, "영어 jeans는 어느 도시 이름에서 왔을까요?", "제노바", ["나폴리", "밀라노", "토리노"], "프랑스어로 제노바를 Gênes라 했고, 그곳 선원들이 입던 질긴 천에서 나왔어요."],
+      ["lang", 3, "수영복 이름 ‘비키니’는 무엇에서 따왔을까요?", "핵실험이 있었던 환초", ["프랑스의 해변 마을", "디자이너의 이름", "하와이의 섬"], "1946년 미국이 핵실험을 한 태평양의 비키니 환초에서 따왔어요."],
+      ["lang", 3, "우리말 ‘빵’은 어느 언어에서 들어왔을까요?", "포르투갈어", ["프랑스어", "독일어", "영어"], "포르투갈어 pão가 일본을 거쳐 들어왔어요."],
+      ["lang", 4, "‘고구마’라는 이름의 어원이 된 말이 쓰이던 곳은?", "일본 쓰시마(대마도)", ["중국 광둥", "필리핀 루손섬", "오키나와(류큐)"], "조선 통신사가 대마도에서 들여왔고, 그곳 말 ‘고코이모(효자 감자)’에서 이름이 왔다고 해요."],
+      ["lang", 4, "남성 정장 tuxedo는 무엇에서 나온 이름일까요?", "미국 뉴욕주의 지명", ["영국 귀족의 이름", "프랑스 재단사의 이름", "이탈리아의 도시"], "뉴욕주 턱시도 파크의 사교 클럽에서 유행한 옷이라 붙은 이름이에요."],
+      ["lang", 3, "‘샌드위치’라는 이름은 무엇에서 왔을까요?", "영국 백작의 작위 이름", ["프랑스 요리사의 이름", "미국 항구 도시", "독일 빵 이름"], "샌드위치 백작이 카드놀이를 하며 빵 사이에 고기를 끼워 먹었다는 이야기로 알려져요."],
+      // ══ 보통(2) — 교양 있는 직장인이 대략 알 법한 수준 ══
+      // ── 과학 ──
+      ["sci", 2, "1기압에서 물의 밀도가 가장 큰 온도는?", "약 4℃", ["0℃", "−4℃", "10℃"], "물은 약 4℃에서 가장 무거워서, 겨울 호수 바닥은 4℃ 안팎을 유지해요."],
+      ["sci", 2, "원소들을 성질에 따라 배열한 주기율표를 처음 만든 러시아 화학자는?", "드미트리 멘델레예프", ["앙투안 라부아지에", "존 돌턴", "마리 퀴리"], "1869년에 발표했고, 아직 발견되지 않은 원소의 자리까지 비워 뒀어요."],
+      ["sci", 2, "온도가 일정할 때 기체의 압력과 부피가 반비례한다는 법칙은?", "보일 법칙", ["샤를 법칙", "아보가드로 법칙", "옴의 법칙"], "풍선을 누르면 부피가 줄면서 안쪽 압력이 커지는 것과 같은 원리예요."],
+      ["sci", 2, "블랙홀에서 빛조차 빠져나올 수 없게 되는 경계를 부르는 말은?", "사건의 지평선", ["광자 고리", "오르트 구름", "적색 편이"], "이 경계 안쪽의 정보는 바깥으로 나올 수 없어요."],
+      ["sci", 2, "생물 분류 단계에서 ‘목(目)’ 바로 위의 단계는?", "강(綱)", ["과(科)", "속(屬)", "종(種)"], "계–문–강–목–과–속–종 순서예요."],
+      ["sci", 2, "다운 증후군은 몇 번 염색체가 하나 더 있어서 생길까요?", "21번", ["1번", "X 염색체", "Y 염색체"], "21번 염색체가 3개인 ‘21번 삼염색체증’이에요."],
+      ["sci", 2, "진공에서 빛의 속력은 초속 약 몇 km일까요?", "약 30만 km", ["약 3만 km", "약 300만 km", "약 340 km"], "초속 약 30만 km예요. 초속 약 340 m는 공기 중 소리의 속력이에요."],
+      ["sci", 2, "다음 중 소리가 가장 빠르게 전달되는 것은?", "철", ["공기", "물", "진공"], "소리는 고체에서 가장 빠르고, 진공에서는 전달되지 않아요."],
+      ["sci", 2, "태양에서 출발한 빛이 지구에 닿는 데 걸리는 시간은 약 얼마일까요?", "약 8분", ["약 8초", "약 1시간", "약 하루"], "약 1억 5천만 km를 약 8분 20초에 와요."],
+      ["sci", 2, "다음 중 고리가 없는 행성은?", "화성", ["토성", "목성", "천왕성"], "목성·토성·천왕성·해왕성 모두 고리가 있어요. 토성 고리가 가장 뚜렷할 뿐이에요."],
+      ["sci", 2, "원소 기호가 K인 원소는?", "칼륨(포타슘)", ["칼슘", "크립톤", "코발트"], "K는 라틴어 kalium에서 왔어요. 칼슘은 Ca, 크립톤은 Kr, 코발트는 Co예요."],
+      ["sci", 2, "식물 잎 뒷면에 많아 산소·이산화탄소·수증기가 드나드는 작은 구멍은?", "기공", ["엽록체", "물관", "체관"], "기공을 통해 김이 나가는 것을 증산 작용이라 해요."],
+      ["sci", 2, "푸른곰팡이에서 최초의 항생 물질 페니실린을 발견한 과학자는?", "알렉산더 플레밍", ["루이 파스퇴르", "로베르트 코흐", "에드워드 제너"], "1928년 배양 접시에 핀 곰팡이 주변에 세균이 자라지 않는 것을 보고 발견했어요."],
+      ["sci", 2, "소의 우두를 이용해 천연두 예방법(종두법)을 개발한 영국 의사는?", "에드워드 제너", ["알렉산더 플레밍", "로베르트 코흐", "윌리엄 하비"], "1796년의 일이에요. 백신(vaccine)은 라틴어 ‘소(vacca)’에서 왔어요."],
+      ["sci", 2, "다윈의 『종의 기원』이 출간된 해는?", "1859년", ["1759년", "1809년", "1909년"], "1809년은 다윈이 태어난 해예요."],
+      ["sci", 2, "지진이 낸 에너지의 크기를 나타내는 ‘규모’를 처음 고안한 학자는?", "찰스 리히터", ["주세페 메르칼리", "알프레트 베게너", "안드리야 모호로비치치"], "1935년에 고안했어요. 메르칼리는 장소마다 다른 흔들림 정도(진도)의 척도를 만들었어요."],
+      ["sci", 2, "25℃의 순수한 물의 pH는?", "7", ["0", "1", "14"], "pH 7이 중성이고, 낮을수록 산성, 높을수록 염기성이에요."],
+      ["sci", 2, "자외선을 막아 주는 오존층이 있는 대기층은?", "성층권", ["대류권", "중간권", "열권"], "오존층은 대략 지상 20~30 km 높이의 성층권에 있어요."],
+      ["sci", 2, "로켓이 가스를 뒤로 세게 뿜어 앞으로 나아가는 원리와 가장 관련 깊은 법칙은?", "작용·반작용 법칙", ["관성 법칙", "만유인력 법칙", "케플러 법칙"], "뉴턴 운동 제3법칙이에요. 가스를 밀어낸 힘만큼 로켓도 반대로 밀려나요."],
+      ["sci", 2, "1953년 DNA 이중 나선 구조 모형을 발표한 두 과학자는?", "왓슨과 크릭", ["멘델과 다윈", "퀴리 부부", "보어와 하이젠베르크"], "제임스 왓슨과 프랜시스 크릭이 『네이처』에 발표했어요."],
+      // ── 생활·건강 ──
+      ["life", 2, "옛 뱃사람들이 긴 항해에서 걸리던 괴혈병은 어떤 비타민이 부족해서 생길까요?", "비타민 C", ["비타민 A", "비타민 D", "비타민 K"], "신선한 채소·과일이 없으면 생겨요. 영국 해군은 라임을 먹여 예방했어요."],
+      ["life", 2, "햇빛을 받으면 피부에서 만들어져 뼈 건강을 돕는 비타민은?", "비타민 D", ["비타민 A", "비타민 C", "비타민 B12"], "비타민 D는 칼슘 흡수를 도와요."],
+      ["life", 2, "성인의 뼈는 보통 몇 개일까요?", "206개", ["106개", "306개", "406개"], "갓난아기는 약 300개지만 자라면서 붙어 206개가 돼요."],
+      ["life", 2, "체질량 지수(BMI)를 구하는 식은?", "몸무게(kg) ÷ 키(m)²", ["키(cm) − 몸무게(kg)", "몸무게(kg) ÷ 키(m)", "허리둘레 ÷ 엉덩이둘레"], "키를 미터로 바꿔 제곱한 값으로 몸무게를 나눠요."],
+      ["life", 2, "대한민국의 국제 전화 국가 번호는?", "82", ["81", "86", "1"], "81은 일본, 86은 중국, 1은 미국·캐나다예요."],
+      ["life", 2, "위에서 분비되는 위산의 주성분은?", "염산", ["황산", "질산", "탄산"], "강한 산성으로 음식 속 세균을 죽이고 소화를 도와요."],
+      ["life", 2, "흔히 ‘좋은 콜레스테롤’이라 부르는 것은?", "HDL 콜레스테롤", ["LDL 콜레스테롤", "중성 지방", "트랜스 지방"], "HDL은 혈관에 쌓인 콜레스테롤을 간으로 되돌려 보내요."],
+      ["life", 2, "눈동자가 빠르게 움직이며 꿈을 주로 꾸는 수면 단계는?", "렘(REM) 수면", ["깊은 수면", "얕은 수면", "낮잠 수면"], "REM은 ‘빠른 눈 운동(Rapid Eye Movement)’의 약자예요."],
+      ["life", 2, "음식의 영양분 대부분을 흡수하는 소화 기관은?", "작은창자(소장)", ["위", "큰창자(대장)", "식도"], "큰창자는 주로 물을 흡수해요."],
+      ["life", 2, "혈당을 낮추는 호르몬 인슐린을 분비하는 기관은?", "이자(췌장)", ["간", "쓸개", "콩팥"], "인슐린이 부족하거나 잘 듣지 않으면 당뇨병이 생겨요."],
+      ["life", 2, "건강한 성인이 쉬고 있을 때의 정상 맥박 수 범위는?", "분당 60~100회", ["분당 20~40회", "분당 120~160회", "분당 160~200회"], "운동선수는 60회보다 느린 경우도 많아요."],
+      ["life", 2, "사람의 심장은 몇 개의 방으로 나뉘어 있을까요?", "4개", ["2개", "3개", "6개"], "좌우 심방과 좌우 심실, 모두 네 개예요."],
+      ["life", 2, "감염병 예방을 위해 권장되는 비누 손 씻기 시간은?", "30초 이상", ["5초 이상", "10초 이상", "3분 이상"], "손바닥·손등·손가락 사이·엄지·손끝·손목까지 30초 이상 씻어요."],
+      ["life", 2, "심장이 멈춘 사람에게 전기 충격을 주는 ‘자동 심장 충격기’의 영문 약자는?", "AED", ["CPR", "ECG", "MRI"], "공공장소에 설치돼 있고, 음성 안내대로 따라 하면 돼요. CPR은 심폐 소생술이에요."],
+      ["life", 2, "독감(인플루엔자)의 원인은?", "바이러스", ["세균", "곰팡이", "기생충"], "바이러스라 항생제는 듣지 않아요. 매년 예방 접종을 권해요."],
+      ["life", 2, "우유를 비교적 낮은 온도로 데워 미생물을 줄이는 ‘저온 살균법’을 고안한 과학자는?", "루이 파스퇴르", ["로베르트 코흐", "알렉산더 플레밍", "에드워드 제너"], "그래서 저온 살균을 영어로 pasteurization이라 해요."],
+      ["life", 2, "녹차와 홍차를 가르는 가장 큰 차이는?", "찻잎의 발효(산화) 정도", ["차나무의 종류", "재배하는 나라", "찻잎을 따는 계절"], "같은 차나무 잎이라도 발효시키지 않으면 녹차, 충분히 발효시키면 홍차가 돼요."],
+      ["life", 2, "탄수화물 1 g이 내는 열량은 약 몇 kcal일까요?", "4 kcal", ["1 kcal", "9 kcal", "20 kcal"], "탄수화물·단백질은 4 kcal, 지방은 9 kcal예요."],
+      // ── 한국사 ──
+      ["khist", 2, "1907년 고종이 을사늑약의 부당함을 알리려 특사를 보낸 국제회의가 열린 도시는?", "헤이그", ["파리", "런던", "워싱턴"], "이준·이상설·이위종이 네덜란드 헤이그의 만국 평화 회의에 갔어요."],
+      ["khist", 2, "강화도 조약(조일 수호 조규)이 맺어진 해는?", "1876년", ["1866년", "1894년", "1910년"], "운요호 사건을 빌미로 맺은 우리나라 최초의 근대적 조약이에요."],
+      ["khist", 2, "고조선의 법으로, 지금은 세 조항만 전해지는 것은?", "8조법", ["경국대전", "율령", "대명률"], "사람을 죽인 자는 사형, 남을 다치게 하면 곡식으로 갚는다 등이 전해져요."],
+      ["khist", 2, "백제의 마지막 왕은?", "의자왕", ["무왕", "성왕", "근초고왕"], "660년 나당 연합군에 사비성이 함락됐어요."],
+      ["khist", 2, "을지문덕이 살수 대첩에서 물리친 나라는?", "수나라", ["당나라", "거란", "몽골"], "612년 살수(청천강)에서 수나라 대군을 크게 무찔렀어요."],
+      ["khist", 2, "645년 고구려가 안시성에서 물리친 나라는?", "당나라", ["수나라", "송나라", "거란"], "당 태종이 이끈 대군이 안시성을 끝내 함락하지 못하고 물러났어요."],
+      ["khist", 2, "당나라 세력까지 몰아내고 삼국 통일을 완성한 신라 왕은?", "문무왕", ["태종 무열왕", "진흥왕", "선덕 여왕"], "676년 기벌포 싸움 뒤 통일을 이뤘어요. 바다에 묻힌 수중릉으로도 유명해요."],
+      ["khist", 2, "고려의 수도는?", "개경(개성)", ["한양", "경주", "평양"], "몽골 침입 때 잠시 강화도로 옮긴 적이 있어요."],
+      ["khist", 2, "팔만대장경판이 보관된 사찰은?", "해인사", ["불국사", "통도사", "송광사"], "합천 해인사 장경판전은 세계 유산이에요."],
+      ["khist", 2, "세종이 훈민정음을 반포한 해는?", "1446년", ["1392년", "1418년", "1592년"], "1443년에 만들고 1446년에 반포했어요."],
+      ["khist", 2, "조선이 세워진 해는?", "1392년", ["1388년", "1418년", "1446년"], "1388년은 이성계의 위화도 회군이 있었던 해예요."],
+      ["khist", 2, "임진왜란이 일어난 해는?", "1592년", ["1597년", "1627년", "1636년"], "1597년은 정유재란, 1636년은 병자호란이 일어난 해예요."],
+      ["khist", 2, "병자호란 때 인조가 피신해 47일 동안 버틴 산성은?", "남한산성", ["북한산성", "행주산성", "수원 화성"], "결국 삼전도에서 청 태종에게 항복했어요."],
+      ["khist", 2, "수원 화성을 쌓은 조선 왕은?", "정조", ["영조", "세종", "숙종"], "아버지 사도 세자의 묘를 옮기며 1796년에 완공했어요."],
+      ["khist", 2, "3·1 운동 직후 중국 상하이에 세워진 정부는?", "대한민국 임시 정부", ["대한 제국", "통감부", "조선 총독부"], "1919년 4월에 세워졌어요."],
+      ["khist", 2, "1909년 안중근이 이토 히로부미를 저격한 곳은?", "하얼빈역", ["상하이 훙커우 공원", "도쿄역", "다롄항"], "안중근은 뤼순 감옥에서 『동양 평화론』을 쓰다 순국했어요."],
+      ["khist", 2, "한산도 대첩에서 이순신이 쓴, 학이 날개를 편 모양의 진법은?", "학익진", ["어린진", "장사진", "팔괘진"], "적을 반원으로 둘러싸 한꺼번에 공격하는 진법이에요."],
+      ["khist", 2, "동학을 창시한 인물은?", "최제우", ["최시형", "전봉준", "손병희"], "1860년에 창시했어요. 최시형은 2대, 손병희는 3대 교주예요."],
+      ["khist", 2, "세종 때 스스로 시각을 알리는 물시계 자격루를 만든 사람은?", "장영실", ["이천", "정초", "박연"], "관노 출신으로 측우기·앙부일구 제작에도 참여했어요."],
+      ["khist", 2, "경주 첨성대를 세운 신라 왕은?", "선덕 여왕", ["진덕 여왕", "진흥왕", "문무왕"], "동양에서 현존하는 가장 오래된 천문대로 꼽혀요."],
+      // ── 세계사 ──
+      ["whist", 2, "‘태양왕’이라 불리며 베르사유 궁전을 지은 프랑스 왕은?", "루이 14세", ["루이 16세", "나폴레옹 1세", "앙리 4세"], "72년 동안 왕위에 있어 유럽 역사상 가장 길게 다스린 군주로 꼽혀요."],
+      ["whist", 2, "대공황을 이겨 내려고 ‘뉴딜 정책’을 펼친 미국 대통령은?", "프랭클린 루스벨트", ["에이브러햄 링컨", "존 F. 케네디", "조지 워싱턴"], "1933년부터 대규모 공공사업과 사회 보장 제도를 추진했어요."],
+      ["whist", 2, "나이팅게일이 야전 병원에서 간호 활동을 펼친 전쟁은?", "크림 전쟁", ["제1차 세계 대전", "미국 남북 전쟁", "나폴레옹 전쟁"], "1850년대 위생을 개선해 부상병 사망률을 크게 낮췄어요."],
+      ["whist", 2, "제1차 세계 대전의 계기가 된 오스트리아 황태자 부부 암살 사건이 일어난 도시는?", "사라예보", ["베오그라드", "빈", "베를린"], "1914년 보스니아의 사라예보에서 일어났어요."],
+      ["whist", 2, "프랑스 혁명이 일어난 해는?", "1789년", ["1689년", "1776년", "1815년"], "7월 14일 바스티유 감옥 습격으로 시작됐어요."],
+      ["whist", 2, "미국 독립 선언이 발표된 해는?", "1776년", ["1620년", "1789년", "1812년"], "7월 4일 발표돼 이날이 미국 독립 기념일이에요."],
+      ["whist", 2, "1620년 메이플라워호를 타고 북아메리카로 건너간 사람들은 주로 어떤 사람들이었을까요?", "종교의 자유를 찾던 청교도", ["금을 찾던 스페인 군인", "가톨릭 선교사", "네덜란드 무역상"], "필그림 파더스라 불리며 플리머스에 정착했어요."],
+      ["whist", 2, "콜럼버스가 처음 아메리카 대륙 근처(카리브해)에 닿은 해는?", "1492년", ["1453년", "1517년", "1588년"], "그는 죽을 때까지 그곳을 인도의 일부라고 믿었어요."],
+      ["whist", 2, "베를린 장벽이 무너진 해는?", "1989년", ["1961년", "1991년", "1945년"], "1961년에 세워져 1989년 11월에 무너졌고, 이듬해 독일이 통일됐어요."],
+      ["whist", 2, "지금 남아 있는 만리장성의 대부분을 쌓은 중국 왕조는?", "명나라", ["진나라", "한나라", "청나라"], "진시황 때 성벽을 잇기 시작했지만, 지금 모습의 대부분은 명나라 때 쌓았어요."],
+      ["whist", 2, "이집트 기자에서 가장 큰 ‘대피라미드’의 주인으로 알려진 파라오는?", "쿠푸", ["투탕카멘", "람세스 2세", "클레오파트라 7세"], "약 4,500년 전에 지어졌고, 원래 높이는 약 146 m였어요."],
+      ["whist", 2, "카이사르가 루비콘강을 건너며 했다고 전해지는 말은?", "주사위는 던져졌다", ["왔노라, 보았노라, 이겼노라", "브루투스, 너마저", "로마는 하루아침에 이루어지지 않았다"], "기원전 49년 군대를 이끌고 로마로 향하며 한 말로 전해져요."],
+      ["whist", 2, "마르코 폴로가 찾아가 섬긴 원나라 황제는?", "쿠빌라이 칸", ["칭기즈 칸", "오고타이 칸", "티무르"], "그의 이야기는 『동방견문록』으로 남았어요."],
+      ["whist", 2, "18세기 후반 산업 혁명이 가장 먼저 일어난 나라는?", "영국", ["프랑스", "독일", "미국"], "면직물 공업과 증기 기관을 중심으로 시작됐어요."],
+      ["whist", 2, "증기 기관을 크게 개량해 산업 혁명을 이끈 사람은?", "제임스 와트", ["토머스 에디슨", "조지 스티븐슨", "벤저민 프랭클린"], "일률 단위 와트(W)가 그의 이름에서 왔어요. 스티븐슨은 증기 기관차를 실용화했어요."],
+      ["whist", 2, "십자군 전쟁에서 크리스트교 세력이 되찾으려 한 성지는?", "예루살렘", ["로마", "콘스탄티노폴리스", "메카"], "1096년 1차 원정부터 약 200년 동안 이어졌어요."],
+      ["whist", 2, "인도가 영국으로부터 독립한 해는?", "1947년", ["1919년", "1945년", "1950년"], "8월 15일에 독립했어요. 우리 광복절과 날짜가 같아요."],
+      ["whist", 2, "넬슨 만델라가 맞서 싸운 남아프리카 공화국의 인종 차별 정책은?", "아파르트헤이트", ["카스트 제도", "게토", "골품 제도"], "1990년대 초 폐지됐고, 만델라는 1994년 대통령이 됐어요."],
+      // ── 지리 ──
+      ["geo", 2, "튀르키예의 수도는?", "앙카라", ["이스탄불", "이즈미르", "안탈리아"], "가장 큰 도시는 이스탄불이지만 수도는 앙카라예요."],
+      ["geo", 2, "지중해와 홍해를 잇는 수에즈 운하가 있는 나라는?", "이집트", ["이스라엘", "사우디아라비아", "튀니지"], "1869년에 개통됐어요."],
+      ["geo", 2, "날짜 변경선은 대체로 몇 도 경선을 따라갈까요?", "경도 180°", ["경도 0°", "동경 90°", "서경 90°"], "태평양 한가운데를 지나요. 0°는 영국 그리니치를 지나는 본초 자오선이에요."],
+      ["geo", 2, "세계에서 가장 깊은 바다(해구)는?", "마리아나 해구", ["일본 해구", "푸에르토리코 해구", "자와 해구"], "가장 깊은 곳은 약 11,000 m예요."],
+      ["geo", 2, "캐나다의 수도는?", "오타와", ["토론토", "밴쿠버", "몬트리올"], "영어권과 프랑스어권 경계쯤에 있어요."],
+      ["geo", 2, "오스트레일리아의 수도는?", "캔버라", ["시드니", "멜버른", "브리즈번"], "시드니와 멜버른이 수도 자리를 다투다 그 사이에 새로 계획해 만든 도시예요."],
+      ["geo", 2, "브라질의 공용어는?", "포르투갈어", ["스페인어", "영어", "프랑스어"], "남아메리카 대부분은 스페인어를 쓰지만 브라질은 포르투갈 식민지였어요."],
+      ["geo", 2, "러시아 다음으로 면적이 넓은 나라는?", "캐나다", ["미국", "중국", "브라질"], "캐나다는 면적이 약 998만 ㎢로 세계 2위예요."],
+      ["geo", 2, "세계 최고봉 에베레스트산이 속한 산맥은?", "히말라야산맥", ["카라코람산맥", "안데스산맥", "알프스산맥"], "세계 2위봉 K2는 카라코람산맥에 있어요."],
+      ["geo", 2, "극지방을 빼고 세계에서 가장 넓은 사막은?", "사하라 사막", ["고비 사막", "아라비아 사막", "칼라하리 사막"], "아프리카 북부에 걸쳐 있으며 면적이 약 900만 ㎢예요."],
+      ["geo", 2, "아마존강 유역이 가장 넓게 걸쳐 있는 나라는?", "브라질", ["페루", "콜롬비아", "아르헨티나"], "아마존 유역의 약 60%가 브라질에 있어요."],
+      ["geo", 2, "대륙을 빼고 세계에서 가장 큰 섬은?", "그린란드", ["뉴기니섬", "보르네오섬", "마다가스카르섬"], "면적이 약 216만 ㎢예요. 오스트레일리아는 대륙으로 쳐요."],
+      ["geo", 2, "다음 중 지중해에 접하지 않은 나라는?", "포르투갈", ["스페인", "그리스", "튀르키예"], "포르투갈은 대서양에만 접해 있어요."],
+      ["geo", 2, "1968년 개통한 우리나라 최초의 고속 국도는?", "경인 고속 국도", ["경부 고속 국도", "영동 고속 국도", "호남 고속 국도"], "서울과 인천을 이어요. 경부 고속 국도는 1970년에 개통했어요."],
+      ["geo", 2, "우리나라 바다 가운데 밀물과 썰물의 차(조차)가 가장 큰 곳은?", "서해", ["동해", "남해", "세 바다 모두 비슷"], "그래서 서해안에는 넓은 갯벌이 발달했어요."],
+      ["geo", 2, "1911년 인류 최초로 남극점에 도달한 탐험가는?", "로알 아문센", ["로버트 스콧", "어니스트 섀클턴", "로버트 피어리"], "노르웨이의 아문센이 영국의 스콧보다 약 한 달 먼저 도착했어요."],
+      ["geo", 2, "면적이 세계에서 가장 작은 나라는?", "바티칸 시국", ["모나코", "산마리노", "리히텐슈타인"], "로마 안에 있으며 면적이 약 0.44 ㎢예요."],
+      ["geo", 2, "다음 중 스칸디나비아반도에 있는 나라는?", "노르웨이", ["덴마크", "아이슬란드", "에스토니아"], "스칸디나비아반도에는 노르웨이와 스웨덴이 있어요."],
+      ["geo", 2, "경도 0°인 본초 자오선이 지나는 영국의 천문대가 있는 곳은?", "그리니치", ["옥스퍼드", "케임브리지", "에든버러"], "세계 표준시(GMT)도 그리니치를 기준으로 했어요."],
+      // ── 경제·사회 ──
+      ["econ", 2, "매슬로의 욕구 단계 이론에서 가장 높은 단계의 욕구는?", "자아실현 욕구", ["생리적 욕구", "안전 욕구", "소속 욕구"], "생리–안전–소속과 사랑–존경–자아실현 순으로 올라가요."],
+      ["econ", 2, "소득 불평등 정도를 나타내는 지니 계수가 0이면?", "완전 평등", ["완전 불평등", "경제 성장률 0%", "물가 상승률 0%"], "1에 가까울수록 불평등이 커요."],
+      ["econ", 2, "이미 써 버려서 어떤 선택을 해도 되찾을 수 없는 비용은?", "매몰 비용", ["기회비용", "고정 비용", "가변 비용"], "합리적 판단에서는 매몰 비용에 얽매이지 않아야 해요."],
+      ["econ", 2, "체포할 때 진술을 거부할 권리와 변호인의 도움을 받을 권리를 알려야 한다는 원칙은?", "미란다 원칙", ["일사부재리 원칙", "무죄 추정의 원칙", "죄형 법정주의"], "1966년 미국 대법원의 미란다 판결에서 나왔어요."],
+      ["econ", 2, "어떤 것을 선택하느라 포기한 것 가운데 가장 가치가 큰 것을 무엇이라 할까요?", "기회비용", ["매몰 비용", "고정 비용", "한계 비용"], "점심시간에 운동을 택했다면 포기한 낮잠의 가치가 기회비용이에요."],
+      ["econ", 2, "『국부론』에서 시장의 ‘보이지 않는 손’을 말한 경제학자는?", "애덤 스미스", ["존 메이너드 케인스", "카를 마르크스", "데이비드 리카도"], "애덤 스미스는 ‘경제학의 아버지’로 불려요."],
+      ["econ", 2, "『자본론』을 쓴 사람은?", "카를 마르크스", ["애덤 스미스", "블라디미르 레닌", "존 메이너드 케인스"], "1867년 제1권이 나왔어요."],
+      ["econ", 2, "물가가 전반적으로 계속 오르는 현상은?", "인플레이션", ["디플레이션", "리세션", "디커플링"], "디플레이션은 반대로 물가가 계속 내리는 현상이에요."],
+      ["econ", 2, "우리나라 기준 금리를 정하는 곳은?", "한국은행 금융 통화 위원회", ["기획 재정부", "금융 감독원", "국회"], "금통위가 1년에 여러 차례 회의를 열어 기준 금리를 정해요."],
+      ["econ", 2, "주식 시장에서 주가가 오르는 ‘강세장’을 상징하는 동물은?", "황소", ["곰", "사자", "독수리"], "황소는 뿔을 아래에서 위로 치켜올리고, 약세장의 곰은 앞발을 위에서 아래로 내리친다고 흔히 설명해요."],
+      ["econ", 2, "국방·등대처럼 값을 내지 않은 사람도 함께 누리고, 여럿이 써도 줄지 않는 재화는?", "공공재", ["사치재", "열등재", "보완재"], "공공재는 무임승차 문제 때문에 주로 정부가 공급해요."],
+      ["econ", 2, "‘결과의 80%는 원인의 20%에서 나온다’는 경험 법칙은?", "파레토 법칙", ["머피의 법칙", "하인리히 법칙", "피터의 원리"], "‘80 대 20 법칙’이라고도 해요."],
+      ["econ", 2, "국제 연합(UN) 본부가 있는 도시는?", "뉴욕", ["제네바", "파리", "워싱턴 D.C."], "제네바에는 유엔 유럽 본부가 있어요."],
+      ["econ", 2, "GDP를 우리말로 옮긴 것은?", "국내 총생산", ["국민 총생산", "국민 총소득", "국가 총부채"], "한 나라 안에서 일정 기간 새로 만든 최종 생산물의 가치를 모두 더한 값이에요."],
+      ["econ", 2, "소득이 많을수록 더 높은 세율을 매기는 세금 방식은?", "누진세", ["역진세", "비례세", "정액세"], "우리나라 소득세가 대표적인 누진세예요."],
+      ["econ", 2, "기대와 칭찬을 받으면 실제로 그만큼 잘하게 되는 현상은?", "피그말리온 효과", ["플라세보 효과", "노시보 효과", "낙인 효과"], "자기가 만든 조각상을 사랑한 그리스 신화 속 조각가의 이름에서 왔어요."],
+      ["econ", 2, "남들이 많이 사니까 나도 따라 사는 소비 현상은?", "밴드왜건 효과", ["스놉 효과", "베블런 효과", "립스틱 효과"], "행렬 맨 앞에서 분위기를 띄우는 악대 마차(밴드왜건)에서 나온 말이에요."],
+      ["econ", 2, "실제 효과가 없는 가짜 약을 먹고도 믿음 때문에 증상이 좋아지는 현상은?", "플라세보 효과", ["노시보 효과", "호손 효과", "바넘 효과"], "반대로 해롭다고 믿어 나빠지는 건 노시보 효과예요."],
+      // ── 문학 ──
+      ["lit", 2, "다음 중 셰익스피어의 4대 비극이 아닌 것은?", "로미오와 줄리엣", ["햄릿", "리어왕", "맥베스"], "4대 비극은 햄릿·오셀로·리어왕·맥베스예요."],
+      ["lit", 2, "셰익스피어 『햄릿』의 주인공 햄릿은 어느 나라 왕자일까요?", "덴마크", ["영국", "스코틀랜드", "노르웨이"], "‘사느냐 죽느냐, 그것이 문제로다’라는 대사로 유명해요."],
+      ["lit", 2, "로빈슨 크루소가 무인도에서 구해 준 원주민에게 붙인 이름은?", "프라이데이", ["선데이", "먼데이", "크리스마스"], "금요일에 만나 프라이데이라고 불렀어요."],
+      ["lit", 2, "『젊은 베르테르의 슬픔』을 쓴 작가는?", "요한 볼프강 폰 괴테", ["프리드리히 실러", "헤르만 헤세", "토마스 만"], "1774년 작품으로 유럽에 ‘베르테르 열풍’을 일으켰어요."],
+      ["lit", 2, "『홍길동전』의 작가로 알려진 인물은?", "허균", ["김만중", "박지원", "김시습"], "적서 차별을 비판한 소설로, 최초의 한글 소설로 알려져 있어요."],
+      ["lit", 2, "『춘향전』에서 춘향과 사랑을 맺는 인물은?", "이몽룡", ["변학도", "방자", "심학규"], "변학도는 수청을 강요한 사또, 방자는 이몽룡의 하인이에요."],
+      ["lit", 2, "『심청전』에서 심청이 아버지 눈을 뜨게 하려고 몸을 던진 바다는?", "인당수", ["벽란도", "청해진", "울돌목"], "공양미 300석에 몸을 팔아 인당수에 뛰어들었어요."],
+      ["lit", 2, "『어린 왕자』를 쓴 작가는?", "앙투안 드 생텍쥐페리", ["쥘 베른", "알퐁스 도데", "빅토르 위고"], "생텍쥐페리는 비행기 조종사이기도 했어요."],
+      ["lit", 2, "『반지의 제왕』을 쓴 작가는?", "J. R. R. 톨킨", ["C. S. 루이스", "J. K. 롤링", "조지 R. R. 마틴"], "톨킨은 옥스퍼드 대학의 언어학 교수였어요."],
+      ["lit", 2, "『노인과 바다』를 쓴 작가는?", "어니스트 헤밍웨이", ["존 스타인벡", "윌리엄 포크너", "F. 스콧 피츠제럴드"], "이 작품으로 퓰리처상을 받았고, 이듬해 노벨 문학상을 받았어요."],
+      ["lit", 2, "카프카 『변신』의 주인공 그레고르 잠자가 어느 날 아침 깨어나 보니 변해 있던 것은?", "커다란 벌레", ["개", "고양이", "까마귀"], "가족의 짐이 된 그레고르를 통해 소외를 그렸어요."],
+      ["lit", 2, "『지킬 박사와 하이드 씨』를 쓴 작가는?", "로버트 루이스 스티븐슨", ["오스카 와일드", "찰스 디킨스", "H. G. 웰스"], "스티븐슨은 『보물섬』도 썼어요."],
+      ["lit", 2, "구두쇠 스크루지가 나오는 『크리스마스 캐럴』의 작가는?", "찰스 디킨스", ["오스카 와일드", "토머스 하디", "루이스 캐럴"], "디킨스는 『올리버 트위스트』, 『두 도시 이야기』도 썼어요."],
+      ["lit", 2, "‘님은 갔습니다’로 시작하는 시 「님의 침묵」의 시인은?", "한용운", ["김소월", "윤동주", "이육사"], "한용운은 3·1 운동 때 민족 대표 33인 가운데 한 명이었어요."],
+      ["lit", 2, "시 「진달래꽃」의 시인은?", "김소월", ["한용운", "김영랑", "정지용"], "1925년 시집 『진달래꽃』에 실렸어요."],
+      ["lit", 2, "소년과 소녀의 짧은 만남을 그린 소설 「소나기」의 작가는?", "황순원", ["김유정", "이효석", "현진건"], "1953년에 발표됐어요."],
+      ["lit", 2, "『난장이가 쏘아올린 작은 공』을 쓴 작가는?", "조세희", ["박완서", "이문열", "황석영"], "1970년대 도시 빈민의 삶을 그린 연작 소설이에요."],
+      ["lit", 2, "『삼국지연의』의 도원결의에 함께한 세 사람이 아닌 인물은?", "조자룡", ["유비", "관우", "장비"], "도원결의는 유비·관우·장비가 의형제를 맺은 장면이에요."],
+      ["lit", 2, "『서유기』에서 손오공·저팔계·사오정이 모시고 길을 떠나는 스승은?", "삼장 법사", ["우마왕", "옥황상제", "태상노군"], "삼장 법사는 당나라 승려 현장을 모델로 했어요."],
+      // ── 음악·미술 ──
+      ["art", 2, "판소리에서 북을 치며 장단을 맞추고 추임새를 넣는 사람은?", "고수", ["소리꾼", "광대", "악공"], "‘일고수 이명창’이라는 말이 있을 만큼 고수의 역할이 중요해요."],
+      ["art", 2, "다음 빠르기말 가운데 가장 빠른 것은?", "프레스토", ["알레그로", "안단테", "아다지오"], "느린 쪽부터 아다지오 < 안단테 < 알레그로 < 프레스토예요."],
+      ["art", 2, "캠벨 수프 통조림과 마릴린 먼로 얼굴을 반복해 찍어 낸 팝 아트 작가는?", "앤디 워홀", ["로이 리히텐슈타인", "키스 해링", "잭슨 폴록"], "실크스크린 기법으로 대량 생산 이미지를 작품으로 만들었어요."],
+      ["art", 2, "녹아내리는 시계가 등장하는 「기억의 지속」을 그린 초현실주의 화가는?", "살바도르 달리", ["르네 마그리트", "파블로 피카소", "호안 미로"], "1931년 작품으로 뉴욕 현대 미술관(MoMA)에 있어요."],
+      ["art", 2, "레오나르도 다빈치의 「모나리자」가 있는 미술관은?", "루브르 박물관", ["우피치 미술관", "프라도 미술관", "대영 박물관"], "파리 루브르 박물관에 있어요."],
+      ["art", 2, "흔히 ‘음악의 아버지’라고 부르는 작곡가는?", "요한 제바스티안 바흐", ["게오르크 프리드리히 헨델", "요제프 하이든", "루트비히 판 베토벤"], "바로크 음악을 완성한 작곡가로 꼽혀요."],
+      ["art", 2, "교향곡을 100곡 넘게 남겨 ‘교향곡의 아버지’라 불리는 작곡가는?", "요제프 하이든", ["요한 제바스티안 바흐", "볼프강 아마데우스 모차르트", "루트비히 판 베토벤"], "하이든의 교향곡은 104곡으로 정리돼 있어요."],
+      ["art", 2, "마지막 악장에 합창으로 「환희의 송가」가 나오는 베토벤 교향곡은?", "9번", ["3번", "5번", "7번"], "실러의 시에 곡을 붙였어요. 베토벤은 이 곡을 쓸 때 거의 듣지 못했어요."],
+      ["art", 2, "「사계」를 작곡한 바로크 작곡가는?", "안토니오 비발디", ["요한 제바스티안 바흐", "게오르크 프리드리히 헨델", "아르칸젤로 코렐리"], "봄·여름·가을·겨울 네 곡의 바이올린 협주곡이에요."],
+      ["art", 2, "오페라 「마술피리」를 작곡한 사람은?", "볼프강 아마데우스 모차르트", ["루트비히 판 베토벤", "리하르트 바그너", "주세페 베르디"], "1791년 초연됐고, 모차르트는 그해 세상을 떠났어요."],
+      ["art", 2, "현악 4중주에 들어가지 않는 악기는?", "콘트라베이스", ["바이올린", "비올라", "첼로"], "현악 4중주는 바이올린 2대, 비올라, 첼로로 이뤄져요."],
+      ["art", 2, "소용돌이치는 밤하늘을 그린 「별이 빛나는 밤」의 화가는?", "빈센트 반 고흐", ["폴 고갱", "폴 세잔", "클로드 모네"], "1889년 생레미의 요양원에서 그렸어요."],
+      ["art", 2, "프랑스를 떠나 남태평양 타히티에서 원주민의 삶을 그린 화가는?", "폴 고갱", ["빈센트 반 고흐", "앙리 마티스", "폴 세잔"], "고갱은 한때 아를에서 고흐와 함께 지내기도 했어요."],
+      ["art", 2, "바티칸 시스티나 성당 천장에 「천지 창조」를 그린 화가는?", "미켈란젤로", ["라파엘로", "레오나르도 다빈치", "보티첼리"], "약 4년 동안 천장 아래 비계에 올라가 그렸어요."],
+      ["art", 2, "「씨름」, 「서당」 같은 풍속화로 유명한 조선 화가는?", "김홍도", ["정선", "김정희", "장승업"], "호는 단원이에요."],
+      ["art", 2, "사물놀이에 쓰는 악기가 아닌 것은?", "피리", ["꽹과리", "장구", "징"], "사물놀이는 꽹과리·장구·북·징 네 가지 타악기로 연주해요."],
+      ["art", 2, "아리아 「공주는 잠 못 이루고(네순 도르마)」가 나오는 오페라 「투란도트」의 작곡가는?", "자코모 푸치니", ["주세페 베르디", "조르주 비제", "조아키노 로시니"], "푸치니가 마지막 부분을 완성하지 못하고 세상을 떠나 작곡가 알파노가 마무리했어요."],
+      // ── 스포츠 ──
+      ["sport", 2, "1896년 제1회 근대 올림픽이 열린 도시는?", "아테네", ["파리", "런던", "로마"], "고대 올림픽의 나라 그리스에서 열렸어요."],
+      ["sport", 2, "아이스하키 정규 경기는 몇 피리어드로 이루어질까요?", "3피리어드", ["2피리어드", "4피리어드", "5피리어드"], "20분씩 3피리어드, 모두 60분이에요."],
+      ["sport", 2, "19줄 바둑판의 교차점은 모두 몇 개일까요?", "361개", ["324개", "400개", "289개"], "19 × 19 = 361이에요."],
+      ["sport", 2, "근대 올림픽을 부활시킨 프랑스 교육자는?", "피에르 드 쿠베르탱", ["자크 로게", "후안 안토니오 사마란치", "쥘 리메"], "1894년 국제 올림픽 위원회(IOC)를 세웠어요. 쥘 리메는 월드컵을 만든 사람이에요."],
+      ["sport", 2, "철인 3종 경기의 진행 순서는?", "수영 → 사이클 → 달리기", ["사이클 → 수영 → 달리기", "달리기 → 사이클 → 수영", "수영 → 달리기 → 사이클"], "가장 위험한 수영을 체력이 남은 처음에 해요."],
+      ["sport", 2, "축구에서 한 선수가 한 경기에 3골을 넣는 것은?", "해트트릭", ["멀티골", "클린 시트", "더블"], "크리켓에서 공 3개로 타자 3명을 잡은 투수에게 모자를 준 데서 나왔다고 해요."],
+      ["sport", 2, "야구에서 주자가 모두 찬 만루 상황에서 친 홈런은?", "그랜드 슬램", ["솔로 홈런", "백투백 홈런", "장외 홈런"], "한 번에 4점이 들어와요."],
+      ["sport", 2, "농구에서 자유투 1개를 넣으면 몇 점일까요?", "1점", ["2점", "3점", "0.5점"], "일반 슛은 2점, 3점 라인 밖에서 넣으면 3점이에요."],
+      ["sport", 2, "다음 중 테니스 4대 메이저(그랜드 슬램) 대회가 아닌 것은?", "마스터스", ["윔블던", "US 오픈", "호주 오픈"], "테니스 4대 메이저는 호주 오픈·프랑스 오픈·윔블던·US 오픈이에요. 마스터스는 골프 대회예요."],
+      ["sport", 2, "골프에서 티샷 한 번에 공을 홀에 넣는 것은?", "홀인원", ["이글", "버디", "파"], "주로 짧은 파3 홀에서 나와요."],
+      ["sport", 2, "올림픽 오륜기의 고리 색이 아닌 것은?", "보라", ["파랑", "노랑", "초록"], "파랑·노랑·검정·초록·빨강 다섯 고리예요."],
+      ["sport", 2, "2018년 우리나라에서 처음 열린 동계 올림픽의 개최지 이름은?", "평창", ["무주", "춘천", "원주"], "설상 경기는 평창, 빙상 경기는 강릉 등에서 열렸어요."],
+      ["sport", 2, "2002년 한일 월드컵에서 우리나라 대표팀의 최종 성적은?", "4위", ["8강", "16강", "3위"], "3·4위전에서 튀르키예에 져서 4위를 했어요."],
+      ["sport", 2, "마라톤의 정식 거리는?", "42.195 km", ["40 km", "42 km", "45.195 km"], "1908년 런던 올림픽 때 쓴 거리가 뒤에 표준이 됐어요."],
+      ["sport", 2, "씨름에서 허리와 다리에 둘러 매고 상대가 잡게 하는 천은?", "샅바", ["도복 띠", "댕기", "허리띠"], "샅바를 잡고 기술을 겨뤄요."],
+      ["sport", 2, "배구에서 한 팀이 코트에 내보내는 선수는 몇 명일까요?", "6명", ["5명", "7명", "9명"], "앞줄 3명, 뒷줄 3명이 자리를 돌아가며 맡아요."],
+      ["sport", 2, "수영 영법 가운데 가장 빠른 것은?", "자유형(크롤)", ["접영", "배영", "평영"], "자유형 경기에서는 대부분 크롤 영법을 써요. 가장 느린 것은 평영이에요."],
+      // ── 언어·어원 ──
+      ["lang", 2, "몹시 시끄럽고 어지러운 곳을 뜻하는 ‘아수라장’은 어느 종교에서 온 말일까요?", "불교", ["유교", "도교", "크리스트교"], "싸움을 좋아하는 귀신 아수라가 싸우는 곳에서 나온 말이에요."],
+      ["lang", 2, "사방이 적에게 둘러싸인 처지를 뜻하는 ‘사면초가’의 주인공은?", "항우", ["유방", "조조", "제갈량"], "해하에서 포위된 항우가 사방에서 들려오는 초나라 노래를 듣고 탄식했어요."],
+      ["lang", 2, "쓸데없는 걱정을 뜻하는 ‘기우’는 기나라 사람이 무엇을 걱정한 데서 나왔을까요?", "하늘이 무너질까", ["비가 그치지 않을까", "강물이 마를까", "해가 사라질까"], "『열자』에 나오는 이야기예요."],
+      ["lang", 2, "출세의 관문을 뜻하는 ‘등용문’은 어떤 물고기가 용문을 오르면 용이 된다는 전설에서 왔을까요?", "잉어", ["메기", "연어", "붕어"], "황허강의 급류 용문을 거슬러 오른 잉어는 용이 된다고 했어요."],
+      ["lang", 2, "짙은 안개 속처럼 일의 갈피를 잡을 수 없음을 뜻하는 사자성어는?", "오리무중", ["오매불망", "우왕좌왕", "오비이락"], "‘5리에 걸친 안개 속’이라는 뜻이에요."],
+      ["lang", 2, "인생의 좋고 나쁨은 미리 알 수 없다는 뜻의 사자성어로, 변방 노인의 말 이야기에서 나온 것은?", "새옹지마", ["마이동풍", "견마지로", "주마간산"], "도망간 말이 좋은 말을 데려오고, 그 말 때문에 아들이 다치는 등 화와 복이 바뀌어요."],
+      ["lang", 2, "남의 말을 귀담아듣지 않고 흘려버림을 뜻하는 사자성어는?", "마이동풍", ["새옹지마", "주마간산", "견물생심"], "‘말의 귀에 동쪽 바람’이라는 뜻이에요. 우리 속담 ‘쇠귀에 경 읽기’와 비슷해요."],
+      ["lang", 2, "제자가 스승보다 더 나아짐을 뜻하는 사자성어는?", "청출어람", ["교학상장", "괄목상대", "형설지공"], "‘쪽에서 뽑은 푸른 물감이 쪽보다 더 푸르다’는 뜻이에요."],
+      ["lang", 2, "10월 9일 한글날이 기념하는 일은?", "훈민정음 반포", ["훈민정음 창제", "조선어 학회 창립", "한글 맞춤법 통일안 발표"], "『훈민정음』 해례본에 적힌 반포 시기를 양력으로 바꿔 정한 날이에요."],
+      ["lang", 2, "세계적 대유행 전염병을 뜻하는 pandemic의 pan-이 뜻하는 것은?", "모든", ["큰", "빠른", "나쁜"], "그리스어 pan(모든)과 demos(사람들)가 합쳐진 말이에요."],
+      ["lang", 2, "영어 alphabet은 무엇을 합친 말일까요?", "그리스 문자 알파와 베타", ["라틴어 ‘글자’와 ‘책’", "영어 A와 B의 옛 이름", "아랍어 ‘읽다’와 ‘쓰다’"], "그리스 문자의 첫 두 글자 α(알파)와 β(베타)에서 왔어요."],
+      ["lang", 2, "마라톤(marathon)이라는 이름은 무엇에서 왔을까요?", "그리스의 지명", ["그리스 전령의 이름", "아테네 왕의 이름", "그리스 신의 이름"], "기원전 490년 마라톤 전투의 승전보를 전하려 아테네까지 달렸다는 이야기에서 나왔어요."],
+      ["lang", 2, "‘구라파(歐羅巴)’는 어디를 한자로 옮긴 말일까요?", "유럽", ["아시아", "아프리카", "아메리카"], "아시아는 아세아(亞細亞), 아메리카는 아미리가(亞美利加)라고 썼어요."],
+      ["lang", 2, "‘화란(和蘭)’은 어느 나라를 가리키는 옛 이름일까요?", "네덜란드", ["프랑스", "독일", "영국"], "프랑스는 불란서, 독일은 독일(獨逸), 영국은 영길리라고도 했어요."],
+      ["lang", 2, "유치원을 뜻하는 kindergarten은 어느 언어에서 왔을까요?", "독일어", ["네덜란드어", "프랑스어", "덴마크어"], "‘어린이들의 정원’이라는 뜻으로, 독일 교육자 프뢰벨이 지은 이름이에요."],
+      ["lang", 2, "‘윤슬’은 무엇을 뜻하는 우리말일까요?", "햇빛이나 달빛에 비쳐 반짝이는 잔물결", ["이른 새벽의 옅은 안개", "해 질 녘 붉은 노을", "그해 처음 내리는 눈"], "물비늘이라고도 해요."],
+      // ── 어려움(3) 추가 ──
+      ["sport", 3, "피겨 스케이팅 점프 가운데 유일하게 앞을 보고 뛰어오르는 점프는?", "악셀", ["러츠", "플립", "루프"], "앞으로 뛰어올라 뒤로 내려와서 다른 점프보다 반 바퀴를 더 돌아요."],
+      ["sport", 3, "올림픽 금메달은 대부분 어떤 금속으로 만들까요?", "은", ["금", "구리", "청동"], "은메달 바탕에 순금 6 g 이상을 입혀요."],
+      // ══ 쉬움(1) — 누구나 대부분 맞힐 수 있는 가벼운 상식 ══
+      // ── 과학 ──
+      ["sci", 1, "무지개에서 가장 바깥쪽(위쪽)에 보이는 색은?", "빨강", ["보라", "노랑", "초록"], "무지개는 바깥쪽부터 빨·주·노·초·파·남·보 순이에요."],
+      ["sci", 1, "태양계 행성 가운데 태양과 가장 가까운 행성은?", "수성", ["금성", "화성", "지구"], "수성은 태양을 약 88일에 한 바퀴 돌아요."],
+      ["sci", 1, "밤하늘에서 달 다음으로 밝게 보이는 천체는?", "금성", ["화성", "목성", "북극성"], "새벽과 초저녁에 밝게 빛나서 ‘샛별’, ‘개밥바라기’라고도 불러요."],
+      ["sci", 1, "드라이아이스는 무엇을 얼린 것일까요?", "이산화탄소", ["물", "질소", "산소"], "드라이아이스는 −78.5℃에서 액체를 거치지 않고 바로 기체가 돼요."],
+      ["sci", 1, "소금의 주성분은?", "염화 나트륨", ["탄산칼슘", "탄산수소 나트륨", "염화 칼륨"], "탄산수소 나트륨은 베이킹 소다예요."],
+      ["sci", 1, "곤충의 다리는 몇 개일까요?", "6개", ["4개", "8개", "10개"], "다리가 8개인 거미는 곤충이 아니에요."],
+      ["sci", 1, "고래는 무엇으로 숨을 쉴까요?", "허파(폐)", ["아가미", "피부", "부레"], "고래는 포유류라서 물 위로 올라와 숨을 쉬어요."],
+      ["sci", 1, "다음 중 자석에 붙는 금속은?", "철", ["구리", "알루미늄", "금"], "철·니켈·코발트처럼 자석에 붙는 물질을 강자성체라 해요."],
+      ["sci", 1, "번개가 친 뒤 천둥소리가 늦게 들리는 이유는?", "빛이 소리보다 훨씬 빨라서", ["소리가 빛보다 빨라서", "천둥이 번개보다 나중에 생겨서", "구름이 소리를 잠시 막아서"], "번개 뒤 천둥까지 걸린 초에 약 340을 곱하면 대략의 거리(m)가 나와요."],
+      ["sci", 1, "달이 지구를 한 바퀴 도는 데 걸리는 시간은?", "약 27일", ["약 1일", "약 7일", "약 365일"], "공전 주기는 약 27.3일이고, 보름달에서 다음 보름달까지는 약 29.5일이에요."],
+      ["sci", 1, "공룡이 번성했던 지질 시대는?", "중생대", ["고생대", "신생대", "선캄브리아 시대"], "중생대는 트라이아스기·쥐라기·백악기로 나뉘어요."],
+      ["sci", 1, "얼음이 물에 뜨는 이유는?", "얼음이 물보다 밀도가 작아서", ["얼음이 물보다 밀도가 커서", "얼음이 더 차가워서", "얼음 속에 소금이 있어서"], "물은 얼면 부피가 약 9% 늘어나 더 가벼워져요."],
+      ["sci", 1, "땅 위에서 가장 빨리 달리는 동물은?", "치타", ["사자", "가젤", "말"], "짧은 거리에서 시속 100 km 안팎까지 낼 수 있어요."],
+      ["sci", 1, "펭귄이 주로 사는 곳은?", "남반구", ["북반구", "북극", "적도 북쪽 사막"], "펭귄은 대부분 남반구에 살아요. 북극에는 펭귄이 없어요."],
+      ["sci", 1, "지구 표면에서 바다가 차지하는 비율은 약 얼마일까요?", "약 70%", ["약 30%", "약 50%", "약 90%"], "그래서 지구를 ‘푸른 행성’이라 불러요."],
+      ["sci", 1, "북극성이 속한 별자리는?", "작은곰자리", ["큰곰자리", "카시오페이아자리", "오리온자리"], "큰곰자리의 북두칠성이나 카시오페이아자리를 이용해 북극성을 찾을 수 있어요."],
+      ["sci", 1, "사람 피를 빨아 먹는 모기는?", "알을 낳으려는 암컷", ["수컷", "암수 모두", "갓 태어난 모기"], "수컷은 꽃의 꿀이나 식물의 즙을 먹어요."],
+      // ── 생활·건강 ──
+      ["life", 1, "비타민 A가 부족하면 걸리기 쉬운 병은?", "야맹증", ["괴혈병", "각기병", "구루병"], "어두운 곳에서 잘 보지 못하게 돼요. 당근·간에 비타민 A가 많아요."],
+      ["life", 1, "어른 몸무게에서 가장 많은 비중을 차지하는 성분은?", "물", ["단백질", "지방", "칼슘"], "어른 몸의 약 60%가 물이에요."],
+      ["life", 1, "눈의 피로를 줄이는 ‘20-20-20 규칙’은 20분마다 20피트(약 6 m) 밖을 몇 초 동안 보라는 걸까요?", "20초", ["2초", "2분", "20분"], "화면을 오래 볼 때 20분마다 잠깐 먼 곳을 보면 눈이 쉬어요."],
+      ["life", 1, "우유·멸치에 많아 뼈와 이를 튼튼하게 하는 무기질은?", "칼슘", ["철", "아연", "나트륨"], "칼슘은 비타민 D와 함께 먹으면 더 잘 흡수돼요."],
+      ["life", 1, "부족하면 빈혈이 생기기 쉬운 무기질로, 시금치·간·붉은 고기에 많은 것은?", "철", ["칼슘", "나트륨", "칼륨"], "철은 혈액 속 헤모글로빈을 만드는 재료예요."],
+      ["life", 1, "미역·다시마에 많고 갑상샘 호르몬의 재료가 되는 무기질은?", "아이오딘(요오드)", ["칼슘", "철", "마그네슘"], "아이오딘은 해조류에 특히 많아요."],
+      ["life", 1, "기침이나 재채기가 나올 때 권장되는 예절은?", "옷소매 안쪽으로 입과 코를 가리기", ["손바닥으로 가리기", "고개만 돌리고 그냥 하기", "마스크를 내리고 하기"], "손으로 가리면 손에 묻은 균이 여기저기 옮겨 갈 수 있어요."],
+      ["life", 1, "약을 먹을 때 함께 마시기에 가장 알맞은 것은?", "물", ["우유", "커피", "자몽주스"], "우유·커피·자몽주스는 약의 흡수나 작용에 영향을 줄 수 있어요."],
+      ["life", 1, "음식을 안전하게 보관하려면 냉장실 온도를 몇 ℃ 이하로 두는 것이 좋을까요?", "5℃ 이하", ["10~15℃", "15~20℃", "영하 30℃ 이하"], "냉장실은 5℃ 이하, 냉동실은 영하 18℃ 이하가 권장돼요."],
+      ["life", 1, "가벼운 화상을 입었을 때 가장 먼저 할 일은?", "흐르는 시원한 물로 식히기", ["얼음을 바로 대기", "된장 바르기", "버터 바르기"], "흐르는 물에 10분 이상 식혀요. 얼음은 피부를 더 다치게 할 수 있어요."],
+      ["life", 1, "코피가 날 때 알맞은 자세는?", "고개를 약간 숙이고 콧방울을 눌러 주기", ["고개를 뒤로 젖히기", "똑바로 눕기", "코를 세게 풀기"], "고개를 젖히면 피가 목으로 넘어가요. 10분쯤 콧방울을 꾹 눌러요."],
+      ["life", 1, "부딪혀 붓고 멍이 든 직후(첫 하루 이틀)에 알맞은 찜질은?", "냉찜질", ["온찜질", "뜨거운 물 목욕", "세게 주무르기"], "처음에는 차갑게 해 붓기를 줄이고, 며칠 지나 온찜질로 풀어요."],
+      ["life", 1, "깎아 둔 사과가 갈색으로 변하는 주된 까닭은?", "공기 중 산소와 반응(산화)해서", ["물이 증발해서", "발효가 돼서", "세균이 자라서"], "소금물이나 설탕물에 담가 두면 갈변을 늦출 수 있어요."],
+      ["life", 1, "성인에게 권장되는 하루 수면 시간은?", "7~9시간", ["4~5시간", "10~12시간", "2~3시간"], "잠이 부족하면 집중력과 면역력이 떨어져요."],
+      ["life", 1, "건강한 사람의 정상 체온(겨드랑이)으로 가장 알맞은 것은?", "약 36.5℃", ["약 34.5℃", "약 38.5℃", "약 40℃"], "38℃가 넘으면 보통 열이 있다고 봐요."],
+      ["life", 1, "‘노로바이러스’ 예방에 가장 효과가 좋은 손 씻기 방법은?", "비누와 흐르는 물로 꼼꼼히 씻기", ["물티슈로 닦기", "물로만 헹구기", "손을 자주 털기"], "노로바이러스는 알코올 손 소독제가 잘 듣지 않아 비누로 씻는 게 좋아요."],
+      // ── 한국사 ──
+      ["khist", 1, "단군 신화에서 쑥과 마늘을 먹고 사람이 된 동물은?", "곰", ["호랑이", "여우", "늑대"], "호랑이는 참지 못하고 뛰쳐나갔어요."],
+      ["khist", 1, "세종 때 만든, 비가 내린 양을 재는 기구는?", "측우기", ["해시계", "혼천의", "자격루"], "1441년 무렵 만들어 전국에서 강우량을 쟀어요."],
+      ["khist", 1, "이순신이 임진왜란 동안 쓴 일기는?", "난중일기", ["징비록", "열하일기", "동의보감"], "『징비록』은 유성룡이 쓴 임진왜란 기록이에요."],
+      ["khist", 1, "신라의 수도였던 도시는?", "경주", ["공주", "부여", "개성"], "약 천 년 동안 신라의 수도였어요."],
+      ["khist", 1, "백제의 마지막 수도 사비가 있던 곳은?", "부여", ["공주", "서울", "경주"], "공주(웅진)에서 부여(사비)로 옮겼어요."],
+      ["khist", 1, "고구려를 세운 인물은?", "주몽", ["온조", "박혁거세", "대조영"], "온조는 백제, 박혁거세는 신라, 대조영은 발해를 세웠어요."],
+      ["khist", 1, "고구려 유민과 말갈인을 이끌고 발해를 세운 인물은?", "대조영", ["주몽", "왕건", "궁예"], "698년에 발해를 세웠어요."],
+      ["khist", 1, "신라를 세운 시조는?", "박혁거세", ["온조", "김수로", "주몽"], "김수로는 금관가야를 세웠다고 전해져요."],
+      ["khist", 1, "조선 시대 나라에서 세운 최고 교육 기관은?", "성균관", ["향교", "서원", "서당"], "향교는 지방 관립 학교, 서원은 사립 학교, 서당은 마을의 초등 교육 기관이에요."],
+      ["khist", 1, "임진왜란 때 붉은 옷을 입고 싸워 ‘홍의 장군’이라 불린 의병장은?", "곽재우", ["김시민", "권율", "신립"], "경상도 의령에서 가장 먼저 의병을 일으킨 사람 가운데 한 명이에요."],
+      ["khist", 1, "1919년 3월 1일 학생과 시민이 모여 독립 선언서를 읽고 만세를 부른 서울의 공원은?", "탑골 공원", ["남산 공원", "효창 공원", "어린이대공원"], "민족 대표들은 근처 태화관에서 선언식을 열었어요."],
+      ["khist", 1, "유관순이 고향에서 만세 운동을 이끈 장터는?", "아우내 장터", ["남대문 시장", "동대문 시장", "서문 시장"], "지금의 충남 천안시 병천면에 있었어요."],
+      ["khist", 1, "6·25 전쟁의 정전 협정이 맺어진 해는?", "1953년", ["1950년", "1951년", "1960년"], "1953년 7월 27일 판문점에서 맺어졌어요."],
+      ["khist", 1, "『조선왕조실록』이 등재된 유네스코 유산의 종류는?", "세계 기록 유산", ["세계 문화유산", "인류 무형 문화유산", "세계 자연유산"], "1997년 훈민정음 해례본과 함께 세계 기록 유산이 됐어요."],
+      ["khist", 1, "임진왜란 때 불탄 뒤 흥선 대원군이 다시 지은 조선의 으뜸 궁궐은?", "경복궁", ["창덕궁", "덕수궁", "창경궁"], "1867년 무렵 다시 지어졌어요."],
+      ["khist", 1, "신사임당의 아들로, 조선의 대표 학자인 사람은?", "율곡 이이", ["퇴계 이황", "다산 정약용", "우암 송시열"], "이이는 과거에 아홉 번 장원해 ‘구도장원공’이라 불렸어요."],
+      ["khist", 1, "고려를 세운 왕건이 처음 섬겼던 후고구려의 왕은?", "궁예", ["견훤", "대조영", "온조"], "견훤은 후백제를 세운 인물이에요."],
+      // ── 세계사 ──
+      ["whist", 1, "이집트 기자의 피라미드 옆에 있는, 사람 얼굴에 사자 몸을 한 거대한 석상은?", "스핑크스", ["오벨리스크", "미라", "파피루스"], "오벨리스크는 끝이 뾰족한 돌기둥이에요."],
+      ["whist", 1, "로마 제국의 첫 황제는?", "아우구스투스", ["율리우스 카이사르", "네로", "콘스탄티누스"], "카이사르는 독재관이었지만 황제가 되지는 못했어요."],
+      ["whist", 1, "중국을 처음 통일하고 만리장성을 잇기 시작한 왕은?", "진시황", ["한 무제", "당 태종", "쿠빌라이 칸"], "기원전 221년 중국을 통일했어요."],
+      ["whist", 1, "프랑스 혁명 때 단두대에서 처형된 루이 16세의 왕비는?", "마리 앙투아네트", ["조제핀", "클레오파트라", "엘리자베스 1세"], "오스트리아 합스부르크 가문 출신이에요."],
+      ["whist", 1, "나폴레옹이 태어난 섬은?", "코르시카섬", ["시칠리아섬", "크레타섬", "몰타섬"], "지중해에 있는 프랑스 섬이에요."],
+      ["whist", 1, "미국의 첫 번째 대통령은?", "조지 워싱턴", ["에이브러햄 링컨", "토머스 제퍼슨", "벤저민 프랭클린"], "수도 워싱턴 D.C.도 그의 이름에서 왔어요."],
+      ["whist", 1, "제1차 세계 대전이 시작된 해는?", "1914년", ["1904년", "1918년", "1939년"], "1918년에 끝났어요. 1939년은 제2차 세계 대전이 시작된 해예요."],
+      ["whist", 1, "1969년 인류 최초로 달에 발을 디딘 사람은?", "닐 암스트롱", ["버즈 올드린", "유리 가가린", "존 글렌"], "올드린은 두 번째로 달에 내렸어요."],
+      ["whist", 1, "1961년 인류 최초로 우주 비행을 한 사람은?", "유리 가가린", ["닐 암스트롱", "존 글렌", "발렌티나 테레시코바"], "보스토크 1호를 타고 지구를 한 바퀴 돌았어요. 테레시코바는 최초의 여성 우주인이에요."],
+      ["whist", 1, "미국 뉴욕의 자유의 여신상을 선물한 나라는?", "프랑스", ["영국", "스페인", "네덜란드"], "미국 독립 100주년을 기념해 선물했어요."],
+      ["whist", 1, "타이태닉호가 빙산에 부딪혀 침몰한 해는?", "1912년", ["1898년", "1925년", "1939년"], "첫 항해에서 북대서양에 가라앉았어요."],
+      ["whist", 1, "전설에서 늑대의 젖을 먹고 자라 로마를 세웠다는 쌍둥이는?", "로물루스와 레무스", ["카스토르와 폴룩스", "아폴론과 아르테미스", "카인과 아벨"], "로마라는 이름은 로물루스에서 왔다고 해요."],
+      ["whist", 1, "다음 중 중국의 4대 발명품이 아닌 것은?", "비단", ["종이", "나침반", "화약"], "4대 발명품은 종이·인쇄술·나침반·화약이에요."],
+      ["whist", 1, "안데스산맥 높은 곳의 유적 마추픽추를 세운 문명은?", "잉카 문명", ["마야 문명", "아스테카 문명", "올멕 문명"], "페루에 있고, 15세기 무렵 지어졌어요."],
+      ["whist", 1, "8~11세기 배를 타고 유럽 곳곳을 누빈 바이킹의 고향은?", "스칸디나비아", ["지중해 연안", "발칸반도", "이베리아반도"], "지금의 노르웨이·스웨덴·덴마크 일대예요."],
+      ["whist", 1, "르네상스가 처음 시작된 나라는?", "이탈리아", ["프랑스", "영국", "독일"], "14세기 피렌체 등 이탈리아 도시들에서 시작됐어요."],
+      ["whist", 1, "고대 그리스에서 올림픽 경기가 처음 열린 곳은?", "올림피아", ["아테네", "스파르타", "델포이"], "기원전 776년부터 제우스를 기리며 열렸다고 해요."],
+      // ── 지리 ──
+      ["geo", 1, "스페인의 수도는?", "마드리드", ["바르셀로나", "세비야", "발렌시아"], "이베리아반도 한가운데에 있어요."],
+      ["geo", 1, "미국의 수도는?", "워싱턴 D.C.", ["뉴욕", "로스앤젤레스", "시카고"], "가장 큰 도시는 뉴욕이지만 수도는 워싱턴 D.C.예요."],
+      ["geo", 1, "베트남의 수도는?", "하노이", ["호찌민", "다낭", "후에"], "가장 큰 도시는 남부의 호찌민이에요."],
+      ["geo", 1, "독일의 수도는?", "베를린", ["뮌헨", "프랑크푸르트", "본"], "본은 통일 전 서독의 수도였어요."],
+      ["geo", 1, "면적이 가장 넓은 대륙은?", "아시아", ["아프리카", "북아메리카", "남극"], "아시아는 지구 육지의 약 30%를 차지해요."],
+      ["geo", 1, "세계에서 가장 넓은 바다(대양)는?", "태평양", ["대서양", "인도양", "북극해"], "태평양은 모든 대륙을 합친 것보다도 넓어요."],
+      ["geo", 1, "고대 원형 경기장 콜로세움이 있는 도시는?", "로마", ["아테네", "이스탄불", "나폴리"], "약 2천 년 전에 지어졌어요."],
+      ["geo", 1, "타지마할이 있는 나라는?", "인도", ["파키스탄", "방글라데시", "이란"], "인도 아그라에 있는 무덤 건축물이에요."],
+      ["geo", 1, "거대한 사원 유적 앙코르 와트가 있는 나라는?", "캄보디아", ["태국", "베트남", "라오스"], "캄보디아 국기에도 앙코르 와트가 그려져 있어요."],
+      ["geo", 1, "조개껍데기 모양 지붕의 오페라 하우스로 유명한 도시 시드니가 있는 나라는?", "오스트레일리아", ["뉴질랜드", "영국", "캐나다"], "시드니는 오스트레일리아에서 가장 큰 도시예요."],
+      ["geo", 1, "울릉도가 속한 광역 자치 단체는?", "경상북도", ["강원도", "경상남도", "전라남도"], "경상북도 울릉군이에요."],
+      ["geo", 1, "제주도를 ‘삼다도’라 부를 때 많다는 세 가지는?", "돌·바람·여자", ["돌·물·말", "바람·귤·말", "돌·바람·말"], "도둑·거지·대문이 없다고 해서 ‘삼무도’라고도 해요."],
+      ["geo", 1, "다음 중 적도가 지나지 않는 대륙은?", "유럽", ["아프리카", "남아메리카", "아시아"], "적도는 아시아에서는 인도네시아를 지나요."],
+      ["geo", 1, "나일강이 흘러 들어가는 바다는?", "지중해", ["홍해", "아라비아해", "대서양"], "이집트 북쪽 하구에 큰 삼각주를 만들어요."],
+      ["geo", 1, "날지 못하는 새 ‘키위’가 나라의 상징인 나라는?", "뉴질랜드", ["오스트레일리아", "남아프리카 공화국", "칠레"], "뉴질랜드 사람들을 ‘키위’라는 별명으로 부르기도 해요."],
+      ["geo", 1, "다음 중 알프스산맥에 걸쳐 있지 않은 나라는?", "스페인", ["스위스", "오스트리아", "이탈리아"], "스페인과 프랑스 사이에는 피레네산맥이 있어요."],
+      ["geo", 1, "우리나라가 위치한 곳은?", "북반구·동반구", ["남반구·동반구", "북반구·서반구", "남반구·서반구"], "적도 북쪽, 본초 자오선 동쪽에 있어요."],
+      // ── 경제·사회 ──
+      ["econ", 1, "주식회사의 주인은?", "주주", ["사장", "직원", "거래 은행"], "주식을 가진 만큼 회사의 주인 몫을 가져요."],
+      ["econ", 1, "사려는 사람은 늘었는데 물건의 양이 그대로라면 가격은 보통 어떻게 될까요?", "오른다", ["내린다", "그대로다", "0이 된다"], "수요가 공급보다 많아지면 가격이 올라요."],
+      ["econ", 1, "은행에 돈을 맡기면 그 대가로 받는 돈은?", "이자", ["배당금", "세금", "수수료"], "배당금은 회사가 주주에게 나눠 주는 이익이에요."],
+      ["econ", 1, "물건값에 포함되어 소비자가 내는 대표적인 간접세는?", "부가 가치세", ["소득세", "재산세", "법인세"], "영수증에 ‘부가세’로 따로 적혀 있기도 해요."],
+      ["econ", 1, "회사가 번 이익의 일부를 주주에게 나눠 주는 돈은?", "배당금", ["이자", "연금", "보험금"], "주가가 오르는 것과 별개로 받는 수익이에요."],
+      ["econ", 1, "일본의 화폐 단위는?", "엔", ["위안", "바트", "루피"], "위안은 중국, 바트는 태국, 루피는 인도 등의 화폐예요."],
+      ["econ", 1, "영국의 화폐 단위는?", "파운드", ["유로", "프랑", "마르크"], "영국은 유로를 쓰지 않았어요."],
+      ["econ", 1, "결제하면 연결된 통장에서 바로 돈이 빠져나가는 카드는?", "체크 카드", ["신용 카드", "기프트 카드", "포인트 카드"], "신용 카드는 나중에 몰아서 갚는 방식이에요."],
+      ["econ", 1, "다음 중 우리나라 4대 사회 보험이 아닌 것은?", "자동차 보험", ["국민연금", "건강 보험", "고용 보험"], "4대 보험은 국민연금·건강 보험·고용 보험·산업 재해 보상 보험이에요."],
+      ["econ", 1, "원금뿐 아니라 이미 붙은 이자에도 다시 이자가 붙는 방식은?", "복리", ["단리", "고리", "저리"], "단리는 원금에만 이자가 붙어요."],
+      ["econ", 1, "미국의 대규모 할인 행사 ‘블랙 프라이데이’가 열리는 달은?", "11월", ["12월", "10월", "1월"], "11월 넷째 목요일 추수 감사절 다음 날이에요."],
+      ["econ", 1, "‘워라밸’은 무엇의 줄임말일까요?", "일과 삶의 균형", ["일과 휴식의 반복", "직장 내 서열", "주 4일 근무"], "Work-Life Balance를 줄인 말이에요."],
+      ["econ", 1, "‘기업의 사회적 책임’을 뜻하는 영문 약자는?", "CSR", ["CEO", "CFO", "IPO"], "Corporate Social Responsibility의 약자예요."],
+      ["econ", 1, "회사가 주식을 증권 거래소에 처음 내놓아 누구나 사고팔 수 있게 하는 것은?", "상장", ["합병", "분할", "감자"], "기업 공개(IPO)라고도 해요."],
+      ["econ", 1, "한 나라의 법 가운데 가장 높은 지위에 있는 법은?", "헌법", ["민법", "형법", "조례"], "다른 법률은 헌법에 어긋날 수 없어요."],
+      ["econ", 1, "우리나라 선거의 4대 원칙이 아닌 것은?", "의무 선거", ["보통 선거", "평등 선거", "비밀 선거"], "4대 원칙은 보통·평등·직접·비밀 선거예요."],
+      ["econ", 1, "휴대폰 카메라로 찍으면 웹 주소 등을 읽어 주는 네모난 2차원 코드는?", "QR 코드", ["NFC", "RFID", "바코드"], "QR은 ‘빠른 응답(Quick Response)’의 약자예요."],
+      // ── 문학 ──
+      ["lit", 1, "『춘향전』의 배경이 되는 고을은?", "남원", ["전주", "경주", "안동"], "남원 광한루에서 춘향과 이몽룡이 처음 만나요."],
+      ["lit", 1, "『흥부전』에서 흥부에게 박씨를 물어다 준 새는?", "제비", ["까치", "참새", "비둘기"], "흥부가 고쳐 준 제비 다리 덕분이에요."],
+      ["lit", 1, "『별주부전』에서 토끼를 꾀어 용궁으로 데려간 동물은?", "자라", ["거북", "문어", "잉어"], "‘별주부(鼈主簿)’는 ‘자라 주부(벼슬)’라는 뜻이에요."],
+      ["lit", 1, "피노키오가 거짓말을 하면 길어지는 것은?", "코", ["귀", "혀", "다리"], "이탈리아 작가 콜로디의 동화예요."],
+      ["lit", 1, "『이상한 나라의 앨리스』에서 앨리스가 따라 굴로 들어간 동물은?", "흰 토끼", ["체셔 고양이", "애벌레", "도도새"], "시계를 보며 ‘늦었다’고 서두르던 토끼예요."],
+      ["lit", 1, "해리 포터가 다니는 마법 학교는?", "호그와트", ["덤스트랭", "보바통", "나니아"], "덤스트랭과 보바통은 소설 속 다른 마법 학교예요."],
+      ["lit", 1, "셜록 홈스의 친구이자 사건을 기록하는 의사는?", "왓슨", ["레스트레이드", "모리아티", "허드슨"], "모리아티는 홈스의 최대 적수예요."],
+      ["lit", 1, "『로미오와 줄리엣』의 배경 도시는?", "베로나", ["베네치아", "피렌체", "로마"], "베로나에는 ‘줄리엣의 집’이라 불리는 관광지가 있어요."],
+      ["lit", 1, "신데렐라가 자정에 서둘러 떠나며 남긴 것은?", "유리 구두", ["금 목걸이", "은반지", "장갑"], "왕자는 구두에 발이 맞는 사람을 찾아 나서요."],
+      ["lit", 1, "백설 공주가 먹고 쓰러진 과일은?", "사과", ["배", "복숭아", "포도"], "왕비가 독을 넣은 사과였어요."],
+      ["lit", 1, "『천일야화(아라비안나이트)』에서 왕에게 밤마다 이야기를 들려준 왕비는?", "셰에라자드", ["재스민", "클레오파트라", "시바의 여왕"], "이야기를 끝내지 않고 다음 날로 넘겨 목숨을 지켰어요."],
+      ["lit", 1, "『톰 소여의 모험』을 쓴 작가는?", "마크 트웨인", ["찰스 디킨스", "오 헨리", "잭 런던"], "『허클베리 핀의 모험』도 그의 작품이에요."],
+      ["lit", 1, "담쟁이 잎 하나에 희망을 건 이야기 『마지막 잎새』의 작가는?", "오 헨리", ["마크 트웨인", "에드거 앨런 포", "너새니얼 호손"], "반전 있는 결말로 유명한 단편 작가예요."],
+      ["lit", 1, "『빨간 머리 앤』의 배경인 프린스에드워드섬이 있는 나라는?", "캐나다", ["영국", "미국", "아일랜드"], "작가 루시 모드 몽고메리도 그 섬 출신이에요."],
+      ["lit", 1, "『어린 왕자』에게 ‘길들인다’는 것의 의미를 가르쳐 준 동물은?", "여우", ["양", "뱀", "개"], "‘네가 길들인 것에 너는 언제까지나 책임이 있어’라고 말해요."],
+      ["lit", 1, "단군 신화가 실린 『삼국유사』를 쓴 승려는?", "일연", ["의상", "원효", "의천"], "『삼국사기』는 김부식이 썼어요."],
+      ["lit", 1, "‘죽는 날까지 하늘을 우러러’로 시작하는 「서시」의 시인은?", "윤동주", ["이육사", "한용운", "김소월"], "일제 강점기 말 일본 감옥에서 스물일곱에 세상을 떠났어요."],
+      // ── 음악·미술 ──
+      ["art", 1, "4분음표 두 개를 합친 길이의 음표는?", "2분음표", ["온음표", "8분음표", "16분음표"], "온음표는 4분음표 네 개 길이예요."],
+      ["art", 1, "다음 중 현악기가 아닌 것은?", "플루트", ["바이올린", "첼로", "하프"], "플루트는 금속으로 만들지만 목관 악기로 분류해요."],
+      ["art", 1, "다음 중 금관 악기가 아닌 것은?", "색소폰", ["트럼펫", "트롬본", "호른"], "색소폰은 금속으로 만들지만 리드로 소리를 내는 목관 악기예요."],
+      ["art", 1, "‘빠바바 밤’ 하는 첫 동기로 유명한 베토벤의 「운명」 교향곡은 몇 번일까요?", "5번", ["3번", "6번", "9번"], "3번은 ‘영웅’, 6번은 ‘전원’, 9번은 ‘합창’이에요."],
+      ["art", 1, "피아노곡 「엘리제를 위하여」의 작곡가는?", "베토벤", ["모차르트", "쇼팽", "슈베르트"], "베토벤이 죽은 뒤 악보가 발견돼 알려졌어요."],
+      ["art", 1, "발레 음악 「백조의 호수」의 작곡가는?", "차이콥스키", ["스트라빈스키", "라흐마니노프", "쇼팽"], "1877년 모스크바에서 초연됐어요."],
+      ["art", 1, "전통 가야금(정악 가야금)의 줄은 몇 줄일까요?", "12줄", ["6줄", "3줄", "30줄"], "요즘은 줄을 늘린 개량 가야금도 많이 써요."],
+      ["art", 1, "노란 꽃병 그림 「해바라기」 연작을 그린 화가는?", "빈센트 반 고흐", ["폴 고갱", "클로드 모네", "르누아르"], "아를에서 고갱을 맞이하려고 방을 꾸미며 그렸어요."],
+      ["art", 1, "조각 「생각하는 사람」을 만든 조각가는?", "오귀스트 로댕", ["미켈란젤로", "베르니니", "도나텔로"], "파리 로댕 미술관에서 볼 수 있어요."],
+      ["art", 1, "빛의 3원색은?", "빨강·초록·파랑", ["빨강·노랑·파랑", "노랑·초록·보라", "흰색·검정·회색"], "세 빛을 모두 섞으면 흰빛이 돼요. 화면 픽셀도 이 세 색으로 만들어요."],
+      ["art", 1, "국악 장단 가운데 가장 느린 것은?", "진양조", ["중모리", "자진모리", "휘모리"], "느린 순서로 진양조 → 중모리 → 중중모리 → 자진모리 → 휘모리예요."],
+      ["art", 1, "‘피아노의 시인’이라 불리는 작곡가는?", "쇼팽", ["리스트", "슈만", "베토벤"], "피아노 독주곡을 특히 많이 남겼어요."],
+      ["art", 1, "600곡이 넘는 가곡을 남겨 ‘가곡의 왕’이라 불리는 작곡가는?", "슈베르트", ["슈만", "브람스", "말러"], "「송어」, 「마왕」, 「들장미」가 유명해요."],
+      ["art", 1, "오페라 「라 트라비아타(춘희)」의 작곡가는?", "주세페 베르디", ["자코모 푸치니", "조아키노 로시니", "리하르트 바그너"], "‘축배의 노래’가 유명해요."],
+      ["art", 1, "보름달처럼 둥글고 하얀 조선 백자 항아리를 부르는 이름은?", "달항아리", ["해항아리", "별항아리", "구름항아리"], "위아래를 따로 빚어 붙여서 모양이 살짝 비대칭이에요."],
+      ["art", 1, "음계 ‘도레미파솔라시’에서 ‘솔’ 바로 다음 음은?", "라", ["시", "파", "도"], "도–레–미–파–솔–라–시–도 순서예요."],
+      // ── 스포츠 ──
+      ["sport", 1, "축구 경기에서 한 팀은 골키퍼를 포함해 몇 명이 뛸까요?", "11명", ["9명", "10명", "12명"], "선수가 7명보다 적어지면 경기를 할 수 없어요."],
+      ["sport", 1, "야구 정규 경기는 몇 회(이닝)까지 할까요?", "9회", ["7회", "8회", "10회"], "동점이면 연장전을 해요."],
+      ["sport", 1, "농구에서 한 팀은 몇 명이 코트에서 뛸까요?", "5명", ["4명", "6명", "7명"], "3대3 농구라는 종목도 따로 있어요."],
+      ["sport", 1, "축구에서 심판이 퇴장을 명령할 때 보여 주는 카드는?", "레드카드", ["옐로카드", "블루카드", "그린카드"], "옐로카드는 경고이고, 두 장이면 퇴장이에요."],
+      ["sport", 1, "태권도에서 정해진 동작을 순서대로 펼쳐 보이는 것은?", "품새", ["겨루기", "격파", "호신술"], "겨루기는 상대와 맞서 싸우는 경기예요."],
+      ["sport", 1, "골프에서 한 홀의 기준 타수보다 1타 적게 끝내는 것은?", "버디", ["이글", "보기", "파"], "기준 타수와 같으면 파, 1타 많으면 보기예요."],
+      ["sport", 1, "테니스에서 40 대 40 동점을 부르는 말은?", "듀스", ["러브", "타이", "어드밴티지"], "이후 두 점을 연달아 따야 게임을 가져가요."],
+      ["sport", 1, "하계 올림픽은 몇 년마다 열릴까요?", "4년", ["2년", "3년", "5년"], "동계 올림픽도 4년마다 열리고, 하계와 2년씩 엇갈려 열려요."],
+      ["sport", 1, "볼링 한 게임은 몇 프레임으로 이루어질까요?", "10프레임", ["8프레임", "9프레임", "12프레임"], "만점은 300점이에요."],
+      ["sport", 1, "볼링에서 첫 투구로 핀 10개를 모두 쓰러뜨리는 것은?", "스트라이크", ["스페어", "거터", "터키"], "두 번에 걸쳐 모두 쓰러뜨리면 스페어예요."],
+      ["sport", 1, "양궁 과녁 한가운데(노란색)를 맞히면 몇 점일까요?", "10점", ["5점", "9점", "100점"], "가운데 노란 부분이 10점과 9점이에요."],
+      ["sport", 1, "배드민턴에서 라켓으로 치는 깃털 달린 공의 이름은?", "셔틀콕", ["퍽", "스톤", "셔틀볼"], "퍽은 아이스하키, 스톤은 컬링에서 써요."],
+      ["sport", 1, "야구에서 타자가 스트라이크 세 개를 당해 아웃되는 것은?", "삼진", ["볼넷", "몸에 맞는 공", "병살"], "볼이 네 개면 볼넷으로 1루에 나가요."],
+      ["sport", 1, "올림픽 성화를 처음 불붙이는(채화하는) 곳은?", "그리스 올림피아", ["그리스 아테네", "이탈리아 로마", "그 대회 개최 도시"], "올림피아의 헤라 신전 터에서 햇빛을 모아 불을 붙여요."],
+      ["sport", 1, "씨름 대회에서 체급 구분 없이 가장 힘센 장사를 가리는 대회의 우승자 칭호는?", "천하장사", ["백두장사", "한라장사", "금강장사"], "백두·한라·금강·태백 등은 체급별 장사 이름이에요."],
+      ["sport", 1, "탁구의 다른 이름으로, 공 치는 소리에서 나온 말은?", "핑퐁", ["틱택", "퐁당", "탁탁"], "‘핑’, ‘퐁’ 하는 소리에서 나온 이름이에요."],
+      // ── 언어·어원 ──
+      ["lang", 1, "‘아메리카’라는 대륙 이름은 누구의 이름에서 왔을까요?", "아메리고 베스푸치", ["크리스토퍼 콜럼버스", "페르디난드 마젤란", "존 캐벗"], "그곳이 아시아가 아닌 새 대륙이라고 처음 주장한 이탈리아 항해자예요."],
+      ["lang", 1, "돌 하나를 던져 새 두 마리를 잡는다는 뜻의 사자성어는?", "일석이조", ["일취월장", "일편단심", "일사천리"], "한 가지 일로 두 가지 이득을 본다는 뜻이에요."],
+      ["lang", 1, "좋은 일에 또 좋은 일이 더해진다는 뜻의 사자성어는?", "금상첨화", ["설상가상", "전화위복", "자업자득"], "비단 위에 꽃을 더한다는 뜻이에요. 반대는 설상가상이에요."],
+      ["lang", 1, "고생 끝에 즐거움이 온다는 뜻의 사자성어는?", "고진감래", ["동고동락", "자업자득", "유비무환"], "쓴 것이 다하면 단 것이 온다는 뜻이에요."],
+      ["lang", 1, "속담 ‘가는 ○이 고와야 오는 ○이 곱다’에서 ○에 들어갈 말은?", "말", ["정", "손", "길"], "내가 남에게 잘해야 남도 나에게 잘한다는 뜻이에요."],
+      ["lang", 1, "속담 ‘○ 잃고 외양간 고친다’에서 ○에 들어갈 동물은?", "소", ["말", "돼지", "닭"], "일이 잘못된 뒤에 손을 써도 소용없다는 뜻이에요."],
+      ["lang", 1, "‘카페라테’의 ‘라테(latte)’는 이탈리아어로 무슨 뜻일까요?", "우유", ["커피", "거품", "설탕"], "에스프레소에 데운 우유를 넣은 커피예요."],
+      ["lang", 1, "‘에펠탑’이라는 이름은 무엇에서 왔을까요?", "탑을 지은 회사를 이끈 기술자의 이름", ["파리의 옛 이름", "프랑스 왕의 이름", "센강의 다리 이름"], "구스타브 에펠의 회사가 1889년 파리 만국 박람회에 맞춰 세웠어요."],
+      ["lang", 1, "영어 goodbye는 원래 어떤 말이 줄어든 것일까요?", "신이 함께하시길", ["좋은 하루 되길", "잘 가 친구", "곧 다시 만나"], "‘God be with ye’가 줄면서 good day 같은 인사의 영향을 받아 goodbye가 됐어요."],
+      ["lang", 1, "영어 breakfast(아침밥)의 원래 뜻은?", "밤새 굶은 것을 깨다", ["빵을 쪼개다", "아침을 맞이하다", "빨리 먹다"], "break(깨다) + fast(단식)예요."],
+      ["lang", 1, "그림 문자 ‘이모지(emoji)’는 어느 나라 말에서 왔을까요?", "일본어", ["영어", "중국어", "프랑스어"], "그림(絵, e)과 글자(文字, moji)를 합친 일본어예요. 영어 emotion과는 관계없어요."],
+      ["lang", 1, "지진 해일을 뜻하는 tsunami는 어느 나라 말에서 왔을까요?", "일본어", ["하와이어", "인도네시아어", "중국어"], "‘항구(津)의 파도(波)’라는 뜻이에요."],
+      ["lang", 1, "‘한글’이라는 이름을 처음 지어 쓴 것으로 알려진 국어학자는?", "주시경", ["최현배", "이희승", "세종대왕"], "1910년대에 ‘큰 글’, ‘하나뿐인 글’이라는 뜻을 담아 썼다고 알려져요."],
+      ["lang", 1, "일하는 사이사이 먹는 간단한 음식을 뜻하는 우리말이 아닌 것은?", "후식", ["새참", "곁두리", "샛밥"], "후식은 식사 뒤에 먹는 디저트예요."],
+      ["lang", 1, "‘손이 크다’는 무슨 뜻일까요?", "씀씀이가 후하고 크다", ["손재주가 좋다", "힘이 세다", "도둑질을 잘한다"], "‘손’이 들어간 관용구가 많아요. ‘손이 맵다’는 때리는 힘이 세다는 뜻이에요."],
+    ];
+
+    // 하루 구성 — 쉬운 단계부터: 워밍업(쉬움 5) → 예선(보통 5) → 본선(어려움 5) → 결승(아주 어려움 5)
+    const STAGES = [
+      { lv: 1, n: 5, name: "워밍업", call: "워밍업 시작!" },
+      { lv: 2, n: 5, name: "예선", call: "예선 시작!" },
+      { lv: 3, n: 5, name: "본선", call: "본선 시작!" },
+      { lv: 4, n: 5, name: "결승", call: "결승 시작!" },
+    ];
+    const COUNT = STAGES.reduce((s, st) => s + st.n, 0);
+    const BASE_DAY = "2026-10-27";
+
+    function shuffleWith(r, arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(r() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    // ── 오늘의 20문제 고르기 (난이도마다 따로) ──
+    // 난이도 L의 문항들을 고정 시드로 한 번 섞은 순열을 만들고, 기준일(2026-10-27)부터 d일째 되는 날은
+    // 그 순열의 [d*n, d*n+n) 구간을 낸다(n = 그 단계 문제 수 5). 순열 끝에 닿으면(한 바퀴 = floor(문항 수/n)일)
+    // 처음으로 돌아가되 바퀴 번호를 시드에 넣어 다시 섞는다 → 가장 짧은 바퀴(쉬움 165개 ÷ 5 = 33일) 동안
+    // 같은 문제가 한 번도 겹치지 않는다. 날짜는 ctx.today(KST)라 같은 날은 모든 직원이 같은 문제(보기 순서는 ctx.rng).
+    const permCache = {};
+    function dayIndex(iso) {
+      const [y, m, d] = iso.split("-").map(Number);
+      const [by, bm, bd] = BASE_DAY.split("-").map(Number);
+      return Math.round((Date.UTC(y, m - 1, d) - Date.UTC(by, bm - 1, bd)) / 86400000);
+    }
+    function pickLevel(lv, n, d) {
+      const pool = BANK.map((_, i) => i).filter((i) => BANK[i][1] === lv);
+      const days = Math.floor(pool.length / n); // 한 바퀴에 며칠
+      const round = Math.floor(d / days); // 몇 번째 바퀴 (기준일 전은 음수 바퀴)
+      const k = d - round * days; // 이번 바퀴 안에서 며칠째
+      const key = `${lv}:${round}`;
+      if (!permCache[key]) permCache[key] = shuffleWith(HKPlay.seededRng(`trivia-bank:${lv}:${round}`), pool);
+      return permCache[key].slice(k * n, k * n + n);
+    }
+    // 단계 순서대로 이어 붙인 오늘의 문제 번호 (쉬움 5 → 보통 5 → 어려움 5 → 아주 어려움 5)
+    function pickDay(iso) {
+      const d = dayIndex(iso);
+      return STAGES.flatMap((st) => pickLevel(st.lv, st.n, d));
+    }
+    const stageOf = (i) => {
+      let end = 0;
+      for (let si = 0; si < STAGES.length; si++) if (i < (end += STAGES[si].n)) return si;
+      return STAGES.length - 1;
+    };
+    const stageStart = (si) => STAGES.slice(0, si).reduce((s, st) => s + st.n, 0);
+
+    HKPlay.mountGame({
+      key: "trivia",
+      setup(stage, ctx) {
+        const FEEDBACK_MS = 1500, JUDGE_MS = 180;
+        const BASE_PTS = { 1: 60, 2: 80, 3: 100, 4: 150 }, STREAK_N = 5, STREAK_BONUS = 100, CALL_MS = 1100;
+        const CATS = {
+          sci: { label: "과학", icon: "atom" },
+          khist: { label: "한국사", icon: "landmark" },
+          whist: { label: "세계사", icon: "scroll-text" },
+          geo: { label: "지리", icon: "globe" },
+          econ: { label: "경제·사회", icon: "scale" },
+          lit: { label: "문학", icon: "book-open" },
+          art: { label: "음악·미술", icon: "palette" },
+          sport: { label: "스포츠", icon: "trophy" },
+          lang: { label: "언어·어원", icon: "languages" },
+          life: { label: "생활·건강", icon: "heart-pulse" },
+        };
+        const LV = { 1: "쉬움", 2: "보통", 3: "어려움", 4: "아주 어려움" };
+        const esc = (s) => HKUI.escapeHtml(String(s));
+        const coarse = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+
+        // 오늘 문제 — 쉬운 것(어려움)부터, 같은 분야가 연달아 나오지 않게 한 번 고르고, 보기는 ctx.rng 로 섞는다
+        function todaysQuestions() {
+          const r = ctx.rng("opts");
+          const list = pickDay(ctx.today); // 이미 쉬운 단계부터 순서대로
+          for (let k = 1; k < list.length; k++) {
+            if (BANK[list[k]][0] !== BANK[list[k - 1]][0]) continue;
+            for (let j = k + 1; j < list.length && BANK[list[j]][1] === BANK[list[k]][1]; j++) {
+              if (BANK[list[j]][0] !== BANK[list[k - 1]][0]) { [list[k], list[j]] = [list[j], list[k]]; break; }
+            }
+          }
+          return list.map((i) => {
+            const [c, d, q, a, w, e] = BANK[i];
+            return { c, d, q, a, e, opts: shuffleWith(r, [a, ...w]) };
+          });
+        }
+
+        let qs = [], idx = 0, results = [], streak = 0;
+        let timer = 0;
+        let phase = "intro"; // intro | play | judge | feedback | paused | done
+        let pausedFrom = "";
+
+        const totalScore = () => results.reduce((s, r) => s + (r ? r.pts + r.bonus : 0), 0);
+        function stopLoops() {
+          clearTimeout(timer);
+        }
+        function formatDate(iso) {
+          const [y, m, d] = iso.split("-").map(Number);
+          const wd = "일월화수목금토"[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+          return `${m}월 ${d}일 (${wd})`;
+        }
+        const catChip = (c, n) => `<span class="gm-tv__chip">${HKUI.icon(CATS[c].icon, 13, "currentColor")} ${CATS[c].label}${n ? ` <small>${n}</small>` : ""}</span>`;
+        const qText = (q) => esc(q.q).replace(/아닌|않는|않은|없는/.test(q.q) && q.q.includes("아닌") ? /(아닌)/ : /(않는|않은|없는)/, `<em class="gm-tv__neg">$1</em>`);
+
+        // stage 폭에 맞춰 글자 크기와 보기 배치(2열/1열)를 다시 정한다 — 공통 틀이 폭을 바꾸면 resize 가 온다
+        function layout() {
+          const card = stage.querySelector(".gm-tv");
+          if (!card) return;
+          const w = stage.clientWidth || 360;
+          card.style.setProperty("--gm-fs", `${Math.max(15, Math.min(18, w / 32)).toFixed(1)}px`);
+          card.style.setProperty("--gm-qs", `${Math.max(17, Math.min(23, w / 26)).toFixed(1)}px`);
+          card.classList.toggle("is-narrow", w < 460);
+          const box = stage.querySelector("[data-opts]");
+          if (box) box.classList.toggle("is-grid", +box.dataset.max <= (w >= 600 ? 12 : w >= 440 ? 8 : 5));
+        }
+        window.addEventListener("resize", layout);
+
+        // ── 시작 화면 ──
+        function showIntro() {
+          stopLoops();
+          phase = "intro";
+          const today = pickDay(ctx.today);
+          const counts = {};
+          today.forEach((i) => (counts[BANK[i][0]] = (counts[BANK[i][0]] || 0) + 1));
+          stage.innerHTML = `<div class="gm-tv">
+            <div class="gm-tv__intro">
+              <span class="gm-tv__badge">${HKUI.icon("lightbulb", 34, "#fff")}</span>
+              <span class="gm-tv__date">${formatDate(ctx.today)} · 오늘의 ${COUNT}문제</span>
+              <h2 class="gm-tv__h">오늘의 상식 퀴즈</h2>
+              <p class="gm-tv__sub">단계를 올라갈수록 어려워져요.</p>
+              <div class="gm-tv__ladder">${STAGES.map((st, si) => `<div class="gm-tv__rung s-${si}"><b>${st.name}</b><span>${LV[st.lv]}</span><em>${st.n}문제 · ${BASE_PTS[st.lv]}점</em></div>`).join(`<span class="gm-tv__arrow">${HKUI.icon("chevron-right", 16, "currentColor")}</span>`)}</div>
+              <div class="gm-tv__chips">${Object.keys(CATS).filter((c) => counts[c]).map((c) => catChip(c, counts[c])).join("")}</div>
+              <ul class="gm-tv__rules">
+                <li><span>1</span><span>시간 제한 없이 천천히 풀어요. 보기 4개 중 하나를 골라요. PC는 숫자 <b>1~4</b> 키나 클릭, 휴대폰은 보기를 눌러요.</span></li>
+                <li><span>2</span><span>정답 기본점 <b>쉬움 ${BASE_PTS[1]} · 보통 ${BASE_PTS[2]} · 어려움 ${BASE_PTS[3]} · 아주 어려움 ${BASE_PTS[4]}</b> · <b>${STREAK_N}연속</b> 정답마다 <b>+${STREAK_BONUS}</b></span></li>
+                <li><span>3</span><span>오늘 문제는 모든 직원이 같고, 날마다 겹치지 않는 새 문제가 나와요.</span></li>
+              </ul>
+              ${ctx.dailyDone ? `<div class="gm-tv__note">${HKUI.icon("info", 16, "currentColor")} 오늘 기록은 이미 반영됐어요 · 이번 판은 연습</div>` : ""}
+              <button type="button" class="gm-tv__start" data-start>시작하기</button>
+              ${coarse ? "" : `<span class="gm-tv__kbd">스페이스 키로도 시작할 수 있어요</span>`}
+            </div>
+          </div>`;
+          stage.querySelector("[data-start]").onclick = (e) => begin(e.currentTarget);
+          HKUI.refreshIcons(stage);
+          layout();
+        }
+
+        // 오늘의 도전 시작 신고 — 새로고침 후 다시 시작하면 연습으로 처리된다
+        async function begin(btn) {
+          if (phase !== "intro" && phase !== "done") return;
+          if (btn) btn.disabled = true;
+          phase = "starting";
+          await ctx.begin();
+          qs = todaysQuestions();
+          idx = 0;
+          results = [];
+          streak = 0;
+          ctx.sfx("go");
+          showQuestion();
+        }
+
+        // ── 문제 화면 ──
+        function showQuestion() {
+          stopLoops();
+          const q = qs[idx];
+          const cat = CATS[q.c];
+          phase = "play";
+          const cur = stageOf(idx);
+          const dots = STAGES.map((st, si) => {
+            const from = stageStart(si);
+            const row = Array.from({ length: st.n }, (_, k) => {
+              const i = from + k, r = results[i];
+              const cls = r ? (r.ok ? "is-ok" : "is-ng") : i === idx ? "is-now" : "";
+              return `<span class="gm-tv__dot ${cls}"></span>`;
+            }).join("");
+            return `<span class="gm-tv__seg${si === cur ? " is-cur" : si < cur ? " is-past" : ""}" style="flex:${st.n}"><small>${st.name}</small><span class="gm-tv__segdots">${row}</span></span>`;
+          }).join("");
+          const maxLen = Math.max(...q.opts.map((o) => o.length));
+          stage.innerHTML = `<div class="gm-tv">
+            <div class="gm-tv__top"><b>${idx + 1} / ${qs.length}</b><span class="gm-tv__dots" aria-hidden="true">${dots}</span><span class="gm-tv__score">${totalScore().toLocaleString("ko-KR")}점</span></div>
+            <div class="gm-tv__body">
+              <div class="gm-tv__meta">
+                <span class="gm-tv__cat">${HKUI.icon(cat.icon, 14, "currentColor")} ${cat.label}</span>
+                <span class="gm-tv__lv lv-${q.d}">${LV[q.d]}</span>
+                ${streak >= 2 ? `<span class="gm-tv__streak">${HKUI.icon("flame", 14, "currentColor")} ${streak}연속</span>` : ""}
+              </div>
+              <div class="gm-tv__q"><p class="gm-tv__qt">${qText(q)}</p></div>
+              <div class="gm-tv__opts" data-opts data-max="${maxLen}" role="group" aria-label="보기">${q.opts.map((o, i) => `<button type="button" class="gm-tv__opt" data-opt="${i}"><span class="gm-tv__num">${i + 1}</span><span class="gm-tv__txt">${esc(o)}</span><span class="gm-tv__mark" data-mark></span></button>`).join("")}</div>
+              <div class="gm-tv__fb" data-fb><span class="gm-tv__hint">${coarse ? "보기를 눌러 골라요" : "숫자 1~4 키나 클릭으로 골라요"}</span></div>
+            </div>
+          </div>`;
+          stage.querySelectorAll(".gm-tv__opt").forEach((b) => (b.onclick = () => choose(+b.dataset.opt)));
+          HKUI.refreshIcons(stage);
+          layout();
+          // 단계가 바뀌는 첫 문제 — "본선 시작!" 알림을 잠깐 띄운 뒤에 보기를 고를 수 있다
+          if (idx === stageStart(cur)) {
+            phase = "call";
+            const st = STAGES[cur];
+            const c = document.createElement("div");
+            c.className = `gm-tv__call s-${cur}`;
+            c.innerHTML = `<b>${st.call}</b><span>${LV[st.lv]} ${st.n}문제 · 정답 ${BASE_PTS[st.lv]}점</span>`;
+            stage.querySelector(".gm-tv__body").appendChild(c);
+            if (cur > 0) ctx.sfx("powerup");
+            timer = setTimeout(startClock, CALL_MS);
+            return;
+          }
+          startClock();
+        }
+        function startClock() {
+          if (phase !== "play" && phase !== "call") return;
+          stage.querySelector(".gm-tv__call")?.remove();
+          phase = "play";
+        }
+
+        // 보기를 고르면 잠깐 표시하고(선택음) 곧바로 채점
+        let pickIdx = -1;
+        function choose(i) {
+          if (phase !== "play" || i < 0 || i >= qs[idx].opts.length) return;
+          stopLoops();
+          phase = "judge";
+          pickIdx = i;
+          ctx.sfx("select");
+          const btns = stage.querySelectorAll(".gm-tv__opt");
+          btns.forEach((b) => (b.disabled = true));
+          btns[i]?.classList.add("is-picked");
+          timer = setTimeout(() => reveal(i), JUDGE_MS);
+        }
+
+        function reveal(i) {
+          if (phase !== "play" && phase !== "judge") return;
+          stopLoops();
+          phase = "feedback";
+          const q = qs[idx];
+          const ok = i >= 0 && q.opts[i] === q.a;
+          const pts = ok ? BASE_PTS[q.d] : 0;
+          streak = ok ? streak + 1 : 0;
+          const bonus = ok && streak % STREAK_N === 0 ? STREAK_BONUS : 0;
+          results[idx] = { ok, pts, bonus, base: ok ? BASE_PTS[q.d] : 0, pick: i >= 0 ? q.opts[i] : null };
+          if (ok) ctx.sfx(streak >= 2 ? "combo" : "success", Math.min(streak, 10));
+          else ctx.sfx("fail");
+
+          // 보기 색칠 — 정답은 초록, 고른 오답은 빨강
+          stage.querySelectorAll(".gm-tv__opt").forEach((b, k) => {
+            b.disabled = true;
+            b.classList.remove("is-picked");
+            const mark = b.querySelector("[data-mark]");
+            if (q.opts[k] === q.a) {
+              b.classList.add("is-correct");
+              mark.innerHTML = HKUI.icon("circle-check", 20, "var(--gm-ok)");
+            } else if (k === i) {
+              b.classList.add("is-wrong");
+              mark.innerHTML = HKUI.icon("circle-x", 20, "var(--gm-ng)");
+            } else {
+              b.classList.add("is-dim");
+            }
+          });
+          const score = stage.querySelector(".gm-tv__score");
+          if (score) score.textContent = `${totalScore().toLocaleString("ko-KR")}점`;
+          const dot = stage.querySelectorAll(".gm-tv__dot")[idx];
+          if (dot) dot.className = `gm-tv__dot ${ok ? "is-ok" : "is-ng"}`;
+          const fb = stage.querySelector("[data-fb]");
+          fb.className = `gm-tv__fb ${ok ? "is-ok" : "is-ng"}`;
+          fb.innerHTML = ok
+            ? `<div class="gm-tv__fb-head">${HKUI.icon("check", 18, "currentColor")} 정답이에요! +${pts}점${bonus ? ` <em>${streak}연속 보너스 +${bonus}</em>` : ""}</div><p>${esc(q.e)}</p>`
+            : `<div class="gm-tv__fb-head">${HKUI.icon("x", 18, "currentColor")} 아쉬워요 · 정답은 ‘${esc(q.a)}’</div><p>${esc(q.e)}</p>`;
+          HKUI.refreshIcons(stage);
+          timer = setTimeout(next, FEEDBACK_MS);
+        }
+
+        function next() {
+          idx++;
+          if (idx < qs.length) showQuestion();
+          else showSummary();
+        }
+
+        // ── 끝 화면(요약 · 분야별 정답 · 문제별 해설) → 기록 저장 ──
+        async function showSummary() {
+          stopLoops();
+          phase = "done";
+          const okCount = results.filter((r) => r.ok).length;
+          const baseSum = results.reduce((s, r) => s + r.base, 0);
+          const stageSum = STAGES.map((st, si) => {
+            const from = stageStart(si);
+            const ok = results.slice(from, from + st.n).filter((r) => r.ok).length;
+            return `<span class="gm-tv__stchip s-${si}"><b>${st.name}</b> ${ok}/${st.n}</span>`;
+          }).join("");
+          const streakBonus = results.reduce((s, r) => s + r.bonus, 0);
+          const score = totalScore();
+          const byCat = {};
+          qs.forEach((q, i) => {
+            byCat[q.c] = byCat[q.c] || { n: 0, ok: 0 };
+            byCat[q.c].n++;
+            if (results[i].ok) byCat[q.c].ok++;
+          });
+          const cats = Object.keys(CATS).filter((c) => byCat[c]).map((c) => `<span class="gm-tv__catc${byCat[c].ok ? "" : " is-zero"}" style="--p:${Math.round((byCat[c].ok / byCat[c].n) * 100)}%">${HKUI.icon(CATS[c].icon, 13, "currentColor")} ${CATS[c].label} <b>${byCat[c].ok}/${byCat[c].n}</b></span>`).join("");
+          const review = qs.map((q, i) => {
+            const r = results[i];
+            const mine = r.ok ? "" : ` · 내 답 <s>${esc(r.pick)}</s>`;
+            return `<li>
+              ${HKUI.icon(r.ok ? "circle-check" : "circle-x", 20, r.ok ? "#16a34a" : "#94a3b8")}
+              <div class="gm-tv__rv">
+                <span class="gm-tv__rv-tag">${i + 1}번 · ${STAGES[stageOf(i)].name} · ${CATS[q.c].label} · ${LV[q.d]}${r.ok ? ` · +${r.pts + r.bonus}점` : ""}</span>
+                <span class="gm-tv__rv-q">${esc(q.q)}</span>
+                <span class="gm-tv__rv-a">정답 <b>${esc(q.a)}</b>${mine}</span>
+                <span class="gm-tv__rv-e">${esc(q.e)}</span>
+              </div>
+            </li>`;
+          }).join("");
+          stage.innerHTML = `<div class="gm-tv">
+            <div class="gm-tv__intro">
+              <span class="gm-tv__date">${formatDate(ctx.today)} · 오늘의 상식 퀴즈</span>
+              <div class="gm-tv__sum-big">${okCount}<small> / ${qs.length} 정답 · ${score.toLocaleString("ko-KR")}점</small></div>
+              <div class="gm-tv__stsum">${stageSum}</div>
+              <div class="gm-tv__stats" data-calc>
+                <div><span>정답 기본점</span><b>${baseSum.toLocaleString("ko-KR")}</b></div>
+                <div><span>연속 보너스</span><b>+${streakBonus}</b></div>
+                <div class="is-total"><span>합계</span><b>${score.toLocaleString("ko-KR")}</b></div>
+              </div>
+              <div class="gm-tv__label">분야별 정답</div>
+              <div class="gm-tv__cats">${cats}</div>
+              <div class="gm-tv__label">문제별 해설</div>
+              <div class="gm-tv__review" tabindex="0" aria-label="문제별 해설"><ol>${review}</ol></div>
+              <button type="button" class="gm-tv__start" data-again disabled>다시 하기</button>
+            </div>
+          </div>`;
+          const again = stage.querySelector("[data-again]");
+          again.onclick = () => begin(again);
+          HKUI.refreshIcons(stage);
+          layout();
+          // 기록 저장이 끝난 뒤에 다시 하기를 열어 둔다 (저장 전에 새 판이 시작되지 않게)
+          try {
+            await ctx.submit(score);
+          } finally {
+            if (phase === "done") again.disabled = false;
+          }
+        }
+
+        // ── 일시정지 (탭을 떠나면) ──
+        function pause() {
+          if (phase === "judge") reveal(pickIdx); // 채점은 마저 하고 멈춘다
+          if (phase !== "play" && phase !== "feedback" && phase !== "call") return;
+          stopLoops();
+          stage.querySelector(".gm-tv__call")?.remove();
+          if (phase === "call") phase = "play";
+          pausedFrom = phase;
+          phase = "paused";
+          const p = document.createElement("div");
+          p.className = "gm-tv__pause";
+          p.innerHTML = `${HKUI.icon("pause", 30, "#0e7490")}<b>잠시 멈췄어요</b><span style="font-size:14px;color:var(--text-secondary)">돌아오면 이어서 풀 수 있어요</span><button type="button" class="gm-tv__start" data-resume>계속하기</button>`;
+          stage.querySelector(".gm-tv").appendChild(p);
+          HKUI.refreshIcons(p);
+          p.querySelector("[data-resume]").onclick = () => {
+            if (phase !== "paused") return;
+            p.remove();
+            if (pausedFrom === "feedback") {
+              phase = "feedback";
+              next();
+              return;
+            }
+            phase = "play";
+          };
+        }
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+
+        // PC — 숫자 1~4 (윗줄·숫자 패드). 문제를 푸는 동안 스페이스는 화면이 굴러가지 않게만 막는다
+        window.addEventListener("keydown", (e) => {
+          if (e.ctrlKey || e.metaKey || e.altKey) return;
+          const tag = (e.target && e.target.tagName) || "";
+          if (tag === "INPUT" || tag === "TEXTAREA" || (e.target && e.target.isContentEditable)) return;
+          if (e.code === "Space" && ["play", "judge", "feedback", "starting", "call"].includes(phase)) {
+            e.preventDefault();
+            return;
+          }
+          if (phase !== "play" || e.repeat) return;
+          const m = /^(?:Digit|Numpad)([1-4])$/.exec(e.code || "") || /^([1-4])$/.exec(e.key || "");
+          if (!m) return;
+          e.preventDefault();
+          choose(+m[1] - 1);
+        });
+
+        ctx.onRestart(() => {
+          if (phase === "done") begin(stage.querySelector("[data-again]"));
+        });
+        showIntro();
+      },
+    });
+  </script>
+</body>
+</html>

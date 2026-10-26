@@ -68,6 +68,7 @@ ERROR_MESSAGES = {
     "COUPON_NOT_REVOCABLE": "보유 중인 쿠폰만 회수할 수 있습니다.",
     "INVALID_NOTICE": "공지 제목과 내용을 입력해 주세요.",
     "INVALID_SCORE": "점수가 올바르지 않습니다.",
+    "GAME_CLOSED": "지금은 업무 시간이라 게임을 할 수 없어요. (점심 11:30~13:00 · 18:00 이후 · 9:00 이전)",
     "TOO_MANY_REQUESTS": "잠시 후 다시 시도해 주세요.",
     "NOT_SWAP_PERIOD": "교환 가능 시간(수요일 17:00 이후 ~ 예약 시작 전)이 아닙니다.",
     "NOT_SWAPPABLE": "교환할 수 없는 예약입니다.",
