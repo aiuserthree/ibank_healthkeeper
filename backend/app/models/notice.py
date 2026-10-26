@@ -16,6 +16,8 @@ class Notice(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    # NOTICE: 공지사항 · HEALTH: 건강 정보
+    category: Mapped[str] = mapped_column(String(20), default="NOTICE", server_default="NOTICE", nullable=False)
     pinned: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     published_at: Mapped[datetime] = mapped_column(

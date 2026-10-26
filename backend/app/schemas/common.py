@@ -75,6 +75,7 @@ class NoticeSaveRequest(BaseModel):
     body: str
     pinned: bool = False
     published: bool = True
+    category: str = "NOTICE"
 
 
 class CouponGrantRequest(BaseModel):

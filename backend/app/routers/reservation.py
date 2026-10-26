@@ -71,10 +71,14 @@ async def fun_stats(
 
 
 @system_router.get("/notices")
-async def notices(db: AsyncSession = Depends(get_db)):
+async def notices(
+    category: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """공지사항(NOTICE) · 건강 정보(HEALTH) — category 없으면 전체."""
     from app.services.notice import list_notices
 
-    return {"data": await list_notices(db)}
+    return {"data": await list_notices(db, category=category)}
 
 
 @system_router.get("/notices/{notice_id}")

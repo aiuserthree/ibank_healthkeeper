@@ -275,6 +275,7 @@ async def recent_pinned_notice(db: AsyncSession, send_date: date) -> Notice | No
     result = await db.execute(
         select(Notice)
         .where(Notice.published.is_(True))
+        .where(Notice.category == "NOTICE")
         .where(Notice.pinned.is_(True))
         .where(Notice.published_at >= since)
         .order_by(Notice.published_at.desc())

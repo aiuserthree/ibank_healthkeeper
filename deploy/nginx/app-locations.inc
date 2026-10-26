@@ -49,6 +49,7 @@ location = /reapply.html { return 301 /reapply; }
 location = /mypage.html { return 301 /mypage; }
 location = /profile.html { return 301 /profile; }
 location = /notice.html { return 301 /notice; }
+location = /health.html { return 301 /health; }
 
 # 구 admin 한글 경로 → 영문 URL
 location = /관리자/로그인.html { return 301 /admin/login; }

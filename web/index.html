@@ -126,19 +126,28 @@
       </div>`;
     }
 
-    // 메인 맨 위 — 가장 최근에 게시된 공지 한 줄
+    // 메인 히어로 아래 — 가장 최근 공지 · 건강 정보 한 줄씩
     async function renderLatestNotice() {
       const el = document.getElementById("home-notice");
       if (!el) return;
-      try {
-        const notices = (await HKApi.notices()) || [];
-        const latest = notices.slice().sort((a, b) => String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")))[0];
-        if (!latest) return;
-        el.innerHTML = `<a class="hk-notice-strip" href="${HKRoutes.notice}?id=${latest.id}">
-          <span class="hk-badge hk-badge--soft" style="flex-shrink:0">공지</span>
-          <span class="hk-notice-strip__title">${HKUI.escapeHtml(latest.title)}</span>
+      const latest = (items) => (items || []).slice().sort((a, b) => String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")))[0];
+      const strip = (n, route, label, style) => `<a class="hk-notice-strip" href="${route}?id=${n.id}">
+          <span class="hk-badge hk-badge--soft" style="flex-shrink:0;${style || ""}">${label}</span>
+          <span class="hk-notice-strip__title">${HKUI.escapeHtml(n.title)}</span>
           <span class="hk-notice-strip__more">자세히 보기 ${HKUI.icon("chevron-right", 15, "currentColor")}</span>
         </a>`;
+      try {
+        const [notices, health] = await Promise.all([
+          HKApi.notices("NOTICE").catch(() => []),
+          HKApi.notices("HEALTH").catch(() => []),
+        ]);
+        const n = latest(notices);
+        const h = latest(health);
+        if (!n && !h) return;
+        el.innerHTML = [
+          n ? strip(n, HKRoutes.notice, "공지") : "",
+          h ? strip(h, HKRoutes.health, "건강 정보", "background:#e6f6ec;color:#1a7f45") : "",
+        ].join("");
         el.hidden = false;
         HKUI.refreshIcons();
       } catch (_) {

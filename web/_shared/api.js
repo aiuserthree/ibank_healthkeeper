@@ -42,7 +42,7 @@ window.HKApi = (function () {
         method: "POST",
         body: JSON.stringify({ useCoupon: !!useCoupon }),
       }),
-    notices: () => request("/system/notices"),
+    notices: (category) => request(category ? `/system/notices?category=${encodeURIComponent(category)}` : "/system/notices"),
     notice: (id) => request(`/system/notices/${id}`),
     adminNotices: () => request("/admin/notices"),
     adminSaveNotice: (id, notice) =>

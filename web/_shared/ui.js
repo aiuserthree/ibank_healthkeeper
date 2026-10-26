@@ -391,9 +391,25 @@ window.HKUI = (function () {
    * - "| 표 | 머리 |" 다음 줄 "|---|---|" 로 표
    * - ":::cards" / ":::flow" … ":::"  — 각 줄 "아이콘 | 제목 | 설명"
    * - ":::stamps 전체 채움" … ":::" — 도장 진행 그림 (다음 줄은 설명)
+   * - ":::compare 왼쪽 제목 | 오른쪽 제목" … ":::" — 줄마다 "x | 피할 것" 다음 "o | 바꿀 것" (O/X 비교)
+   * - ":::bars 단위" … ":::" — 줄마다 "이름 | 숫자 | 메모" (가로 막대 그래프)
+   * - ":::check 안내 문구" … ":::" — 줄마다 항목 (눌러서 체크하는 자가 진단)
+   * - ":::stats" … ":::" — 줄마다 "큰 숫자 | 설명" (숫자 인포그래픽)
    * - "[[아이콘 | 버튼 글자 | /경로]]" — 바로가기 버튼 (사이트 안 경로만)
    * - 인라인: **굵게**, {icon:이름}, {badge:누적횟수}, {br} 줄바꿈
    */
+  // 공지·건강 정보 체크리스트 — 체크한 개수 표시 (한 번만 위임)
+  if (!document.documentElement.dataset.hkCheckBound) {
+    document.documentElement.dataset.hkCheckBound = "1";
+    document.addEventListener("change", (e) => {
+      const box = e.target.closest?.(".hk-nb-check");
+      if (!box) return;
+      const n = box.querySelectorAll("input:checked").length;
+      box.querySelector(".hk-nb-check__count b").textContent = n;
+      box.classList.toggle("is-some", n > 0);
+    });
+  }
+
   function noticeBodyHtml(text) {
     const safeIcon = (name) => (/^[a-z0-9-]+$/.test(name || "") ? name : "sparkles");
     const inline = (t) =>
@@ -423,7 +439,7 @@ window.HKUI = (function () {
     for (let k = 0; k < lines.length; k++) {
       const line = lines[k].trim();
       if (!line) { flush(); continue; }
-      const block = line.match(/^:::(cards|flow|stamps)\s*(.*)$/);
+      const block = line.match(/^:::(cards|flow|stamps|compare|bars|check|stats)\s*(.*)$/);
       if (block) {
         flush();
         const body = [];
@@ -440,6 +456,46 @@ window.HKUI = (function () {
             ${n ? `<div class="hk-nb-flow__arrow" aria-hidden="true">${icon("chevron-right", 22, "currentColor")}</div>` : ""}
             <div class="hk-nb-step"><div class="hk-nb-step__no">${n + 1}</div><div class="hk-nb-step__icon">${icon(c.ic, 22, "currentColor")}</div>
             <div class="hk-nb-step__title">${inline(c.title)}</div><div class="hk-nb-step__desc">${inline(c.desc)}</div></div>`).join("")}</div>`);
+        } else if (kind === "compare") {
+          const [badHead, goodHead] = (block[2] || "피해요 | 이렇게 바꿔요").split("|").map((x) => x.trim());
+          const rows = [];
+          body.forEach((b) => {
+            const m = b.match(/^([ox])\s*\|\s*(.+)$/i);
+            if (!m) return;
+            if (m[1].toLowerCase() === "x" || !rows.length || rows[rows.length - 1].good != null) rows.push({ bad: null, good: null });
+            rows[rows.length - 1][m[1].toLowerCase() === "x" ? "bad" : "good"] = m[2];
+          });
+          out.push(`<div class="hk-nb-compare">
+            <div class="hk-nb-compare__head is-bad">${icon("x", 16, "currentColor")} ${inline(badHead || "피해요")}</div>
+            <div class="hk-nb-compare__head is-good">${icon("check", 16, "currentColor")} ${inline(goodHead || "이렇게 바꿔요")}</div>
+            ${rows.map((r) => `<div class="hk-nb-compare__cell is-bad">${r.bad ? inline(r.bad) : ""}</div><div class="hk-nb-compare__cell is-good">${r.good ? inline(r.good) : ""}</div>`).join("")}
+          </div>`);
+        } else if (kind === "bars") {
+          const unit = block[2] || "";
+          const rows = body.map((b) => {
+            const [label, value, note] = b.split("|").map((x) => x.trim());
+            return { label, value: Number(value) || 0, note };
+          });
+          const max = Math.max(1, ...rows.map((r) => r.value));
+          out.push(`<div class="hk-nb-bars">${rows.map((r) => {
+            const pct = Math.round((r.value / max) * 100);
+            return `<div class="hk-nb-bar">
+              <div class="hk-nb-bar__label">${inline(r.label)}</div>
+              <div class="hk-nb-bar__track"><span style="width:${pct}%;opacity:${(0.45 + 0.55 * (r.value / max)).toFixed(2)}"></span></div>
+              <div class="hk-nb-bar__value"><b>${r.value}</b>${escapeHtml(unit)}${r.note ? `<small>${inline(r.note)}</small>` : ""}</div>
+            </div>`;
+          }).join("")}</div>`);
+        } else if (kind === "check") {
+          out.push(`<div class="hk-nb-check" data-total="${body.length}">
+            ${block[2] ? `<div class="hk-nb-check__title">${icon("clipboard-check", 17, "currentColor")} ${inline(block[2])}</div>` : ""}
+            <ul>${body.map((b) => `<li><label><input type="checkbox"><span class="hk-nb-check__box">${icon("check", 14, "currentColor")}</span><span>${inline(b)}</span></label></li>`).join("")}</ul>
+            <div class="hk-nb-check__count">체크한 항목 <b>0</b> / ${body.length}</div>
+          </div>`);
+        } else if (kind === "stats") {
+          out.push(`<div class="hk-nb-stats">${body.map((b) => {
+            const [value, label] = b.split("|").map((x) => x.trim());
+            return `<div class="hk-nb-stat"><div class="hk-nb-stat__value">${inline(value)}</div><div class="hk-nb-stat__label">${inline(label || "")}</div></div>`;
+          }).join("")}</div>`);
         } else {
           const [total, filled] = block[2].split(/\s+/).map((x) => Math.max(0, Math.min(10, Number(x) || 0)));
           const dots = Array.from({ length: total }, (_, n) =>
