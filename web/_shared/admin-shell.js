@@ -10,6 +10,7 @@ window.HKAdminRoutes = {
   settings: "/admin/settings",
   coupons: "/admin/coupons",
   notices: "/admin/notices",
+  health: "/admin/health",
 };
 
 window.HKAdmin = (function () {
@@ -23,6 +24,7 @@ window.HKAdmin = (function () {
     { k: "vacation", label: "휴가 관리", href: R.vacation, icon: "palmtree" },
     { k: "coupons", label: "무적 쿠폰", href: R.coupons, icon: "ticket" },
     { k: "notices", label: "공지사항", href: R.notices, icon: "megaphone" },
+    { k: "health", label: "건강 정보", href: R.health, icon: "heart-pulse" },
     { k: "settings", label: "운영 설정", href: R.settings, icon: "settings" },
   ];
 
