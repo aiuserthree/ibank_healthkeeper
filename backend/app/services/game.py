@@ -45,6 +45,7 @@ GAMES: dict[str, Game] = {
         Game("bricks", "벽돌 깨기", "MINI", "공을 튕겨 야근·회의 벽돌 부수기", "brick-wall", "점", 10_000_000),
         Game("bubble", "비눗방울 대작전", "MINI", "비눗방울에 세균을 가두고 톡 터뜨리기", "droplets", "점", 10_000_000),
         Game("snake", "줄줄이 점심", "MINI", "비타민 먹고 길어지는 점심 줄 · 책상·벽 피하기", "utensils", "점", 1_000_000),
+        Game("coffee", "커피 나르기", "MINI", "레인으로 커피를 밀어 동료에게 · 빈 잔은 받아 내기", "coffee", "점", 1_000_000),
         Game("stack", "점심 찬합 탑", "MINI", "타이밍 맞춰 찬합 쌓기 · 어긋난 만큼 잘려요", "layers", "점", 1_000_000),
         Game("sudoku", "오늘의 스도쿠", "MINI", "모두 같은 문제 · 빨리 푼 순서대로", "grid-3x3", "time", 24 * 3600, lower_better=True, daily_once=True),
         Game("mines", "칼퇴 지뢰찾기", "MINI", "야근 폭탄을 피해 칼퇴 자리 모두 열기 · 모두 같은 판", "bomb", "점", 1_000_000, daily_once=True),
