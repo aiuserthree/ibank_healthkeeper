@@ -50,8 +50,8 @@
     key: "shooter",
     setup(stage, ctx) {
       const W = 360, H = 540;
-      // 내 기체 y — 위아래로도 움직인다 (화면 아래쪽 58% 안)
-      const PY0 = H - 62, PY_MIN = Math.round(H * 0.42), PY_MAX = H - 28;
+      // 내 기체 y — 위아래로 화면 거의 끝까지 움직인다 (세균·큰 세균 몸에 부딪히면 목숨이 깎인다)
+      const PY0 = H - 62, PY_MIN = 40, PY_MAX = H - 28;
       let PY = PY0;
       stage.innerHTML = `
         <div class="gm-shell">
@@ -582,10 +582,16 @@
         }
         if (S.invul <= 0) {
           for (const e of S.enemies) {
-            if (e.mode !== "dive") continue;
+            if (e.dead || (e.mode === "enter" && e.delay > 0)) continue;
             if (Math.hypot(e.x - S.px, e.y - PY) < e.r + 10) { e.hp = 0; killEnemy(e, true); hitPlayer(); break; }
           }
           S.enemies = S.enemies.filter((e) => !e.dead);
+          // 큰 세균 몸에 부딪히면 피해 + 아래로 밀려난다
+          const BB = S.boss;
+          if (S.invul <= 0 && BB && BB.hp > 0 && Math.hypot(BB.x - S.px, BB.y - PY) < BB.r + 10) {
+            hitPlayer();
+            PY = Math.min(PY_MAX, BB.y + BB.r + 40);
+          }
         }
         // 아이템 줍기
         for (const it of S.items) {
@@ -627,7 +633,8 @@
       function aimShot(x, y, sp, offset = 0, spreadLimit = 1) {
         let a = Math.atan2(PY - y, S.px - x) + offset;
         const down = Math.PI / 2;
-        a = Math.max(down - spreadLimit * 1.2, Math.min(down + spreadLimit * 1.2, a));
+        // 내 기체가 아래에 있으면 아래쪽 부채꼴로만, 세균보다 위로 올라가 있으면 그대로 겨눈다 (맨 위가 안전지대가 되지 않게)
+        if (PY > y) a = Math.max(down - spreadLimit * 1.2, Math.min(down + spreadLimit * 1.2, a));
         S.ebullets.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 3.5 });
       }
 
