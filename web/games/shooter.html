@@ -286,8 +286,12 @@
         S.px = Math.max(22, Math.min(W - 22, S.px));
         PY = Math.max(PY_MIN, Math.min(PY_MAX, PY));
         if (S.invul > 0) S.invul -= dt;
-        if (S.triple > 0) S.triple -= dt;
-        for (const k of ["rapid", "laser", "homing", "orbit", "chili", "ripple", "zap", "slow", "wing", "x2"]) if (S[k] > 0) S[k] -= dt;
+        // 웨이브 사이(클리어 뒤 ~ 다음 세균이 다 들어와 자리 잡기 전)에는 아이템 남은 시간을 줄이지 않는다
+        const between = S.clearT > 0 || (S.boss ? S.boss.y < 110 : S.enemies.length > 0 && S.enemies.every((e) => e.mode === "enter"));
+        if (!between) {
+          if (S.triple > 0) S.triple -= dt;
+          for (const k of ["rapid", "laser", "homing", "orbit", "chili", "ripple", "zap", "slow", "wing", "x2"]) if (S[k] > 0) S[k] -= dt;
+        }
         // 무기 없이 보낸 시간 (필요할 때 무기를 주기 위한 기준)
         if (armedList().length === 0 && !S.clearT) S.unarmedT = (S.unarmedT || 0) + dt; else S.unarmedT = 0;
         if (S.flashT > 0) S.flashT -= dt;
