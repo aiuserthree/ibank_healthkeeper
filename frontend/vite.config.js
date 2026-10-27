@@ -29,15 +29,17 @@ function extensionlessHtmlRoutes() {
   };
 }
 
-/** nginx 의 /go/stairs (예전 배너 링크 → 라운지의 별까지 계단) 리다이렉트와 동일 */
+/** nginx 의 예전 주소 리다이렉트와 동일 — /go/stairs(예전 배너 링크), /lounge(아케이드 옛 주소) */
+const REDIRECTS = { "/go/stairs": "/games/stairs", "/lounge": "/arcade", "/lounge.html": "/arcade" };
 function goRedirects() {
   return {
     name: "go-redirects",
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if ((req.url || "").split("?")[0] !== "/go/stairs") return next();
+        const to = REDIRECTS[(req.url || "").split("?")[0]];
+        if (!to) return next();
         res.statusCode = 302;
-        res.setHeader("Location", "/games/stairs");
+        res.setHeader("Location", to);
         res.end();
       });
     },

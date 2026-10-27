@@ -31,6 +31,12 @@ location = /go/stairs {
     return 302 /games/stairs;
 }
 
+# 아케이드 옛 주소(라운지) → 새 주소
+location ~ ^/lounge(\.html)?$ {
+    add_header Cache-Control "no-store";
+    return 301 /arcade;
+}
+
 # HTML·페이지 스크립트는 매번 재검증 — 배포 직후 로그인 리다이렉트 등에서 옛 페이지가 캐시로 뜨지 않게 함
 location / {
     add_header Cache-Control "no-cache, must-revalidate";

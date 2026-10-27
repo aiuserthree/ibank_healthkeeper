@@ -9,7 +9,7 @@ window.HKRoutes = {
   profile: "/profile",
   notice: "/notice",
   health: "/health",
-  lounge: "/lounge",
+  lounge: "/arcade",
 };
 
 /**
@@ -55,7 +55,7 @@ window.HKMember = (function () {
     const avatarUrl = profile?.avatarUrl || "";
     const navStyle = (id) =>
       `text-decoration:none;font-size:15px;font-weight:600;padding:8px 4px;white-space:nowrap;color:${active === id ? "var(--color-signal-blue)" : "var(--color-midnight-navy)"}`;
-    return `<header style="background:var(--surface-card);border-bottom:1px solid var(--border-default);position:sticky;top:0;z-index:50">
+    return `<header class="hk-site-header" style="background:var(--surface-card);border-bottom:1px solid var(--border-default);position:sticky;top:0;z-index:50">
       <div class="hk-mheader" style="max-width:1200px;margin:0 auto;height:72px;padding:0 32px;display:flex;align-items:center;gap:32px">
         <a href="${R.home}" style="display:flex;align-items:center;padding:0"><img src="/assets/logo-lockup.svg" alt="헬스키퍼" height="34"></a>
         <nav class="hk-mnav" style="display:flex;gap:24px;margin-left:8px">
@@ -118,6 +118,7 @@ window.HKMember = (function () {
   function bindShell(profile) {
     const logout = async () => {
       try { await HKApi.logout(); } catch (_) {}
+      rememberProfile(null);
       window.location.href = R.home;
     };
     document.getElementById("hk-logout")?.addEventListener("click", logout);
@@ -129,10 +130,20 @@ window.HKMember = (function () {
     document.getElementById("hk-drawer-backdrop")?.addEventListener("click", close);
   }
 
+  // 내 정보는 탭 안에서 잠깐 기억해 둔다 — 페이지를 옮길 때 머리 메뉴를 기다림 없이 바로 그려 깜빡임을 줄인다
+  const PROFILE_KEY = "hk-profile-cache";
+  function cachedProfile() {
+    try { return JSON.parse(sessionStorage.getItem(PROFILE_KEY) || "null"); } catch (_) { return null; }
+  }
+  function rememberProfile(p) {
+    try { p ? sessionStorage.setItem(PROFILE_KEY, JSON.stringify(p)) : sessionStorage.removeItem(PROFILE_KEY); } catch (_) {}
+  }
+
   async function requireAuth(redirectTo) {
-    try { return await HKApi.profile(); }
+    try { const p = await HKApi.profile(); rememberProfile(p); return p; }
     catch (e) {
       if (e.status === 401 || e.status === 403) {
+        rememberProfile(null);
         window.location.href = `${R.login}?returnTo=${encodeURIComponent(redirectTo || window.location.pathname)}`;
         return null;
       }
@@ -141,15 +152,21 @@ window.HKMember = (function () {
   }
 
   async function mountPage({ active, auth = false, render, afterMount, landing = false, authPage = false, mainStyle = "" }) {
+    const root = document.getElementById("app");
+    // 기억해 둔 내 정보가 있으면 머리 메뉴부터 바로 그린다 (본문은 아래에서 확인 후 채움)
+    const early = authPage ? null : cachedProfile();
+    if (early && !root.firstChild) {
+      root.innerHTML = renderHeader(active, early) + `<main style="${mainStyle || "min-height:60vh"}"></main>`;
+      HKUI.refreshIcons(root);
+    }
     await HKUI.loadLucide();
     let profile = null;
     if (auth) {
       profile = await requireAuth(window.location.pathname);
       if (!profile) return;
     } else if (!authPage) {
-      try { profile = await HKApi.profile(); } catch (_) { profile = null; }
+      try { profile = await HKApi.profile(); rememberProfile(profile); } catch (_) { profile = null; rememberProfile(null); }
     }
-    const root = document.getElementById("app");
     const body = landing
       ? render(profile)
       : mainStyle

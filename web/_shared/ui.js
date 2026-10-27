@@ -395,6 +395,7 @@ window.HKUI = (function () {
    * - ":::bars 단위" … ":::" — 줄마다 "이름 | 숫자 | 메모" (가로 막대 그래프)
    * - ":::check 안내 문구" … ":::" — 줄마다 항목 (눌러서 체크하는 자가 진단)
    * - ":::stats" … ":::" — 줄마다 "큰 숫자 | 설명" (숫자 인포그래픽)
+   * - ":::shots 열 수" … ":::" — 줄마다 "/이미지 경로 | 설명" (예시 화면 묶음, 사이트 안 이미지만)
    * - "[[아이콘 | 버튼 글자 | /경로]]" — 바로가기 버튼 (사이트 안 경로만)
    * - 인라인: **굵게**, {icon:이름}, {badge:누적횟수}, {br} 줄바꿈
    */
@@ -439,7 +440,7 @@ window.HKUI = (function () {
     for (let k = 0; k < lines.length; k++) {
       const line = lines[k].trim();
       if (!line) { flush(); continue; }
-      const block = line.match(/^:::(cards|flow|stamps|compare|bars|check|stats)\s*(.*)$/);
+      const block = line.match(/^:::(cards|flow|stamps|compare|bars|check|stats|shots)\s*(.*)$/);
       if (block) {
         flush();
         const body = [];
@@ -491,6 +492,15 @@ window.HKUI = (function () {
             <ul>${body.map((b) => `<li><label><input type="checkbox"><span class="hk-nb-check__box">${icon("check", 14, "currentColor")}</span><span>${inline(b)}</span></label></li>`).join("")}</ul>
             <div class="hk-nb-check__count">체크한 항목 <b>0</b> / ${body.length}</div>
           </div>`);
+        } else if (kind === "shots") {
+          const cols = Math.max(1, Math.min(4, Number(block[2]) || 2));
+          const shots = body.map((b) => {
+            const [src, cap] = b.split("|").map((x) => x.trim());
+            // 이 사이트 안의 이미지 파일만 ("/경로.jpg", "//" 제외)
+            if (!/^\/(?!\/)[A-Za-z0-9/_.-]+\.(png|jpe?g|webp|svg)$/i.test(src || "")) return "";
+            return `<figure class="hk-nb-shot"><img src="${escapeHtml(src)}" alt="${escapeHtml(cap || "")}" loading="lazy">${cap ? `<figcaption>${inline(cap)}</figcaption>` : ""}</figure>`;
+          }).join("");
+          out.push(`<div class="hk-nb-shots" style="--cols:${cols}">${shots}</div>`);
         } else if (kind === "stats") {
           out.push(`<div class="hk-nb-stats">${body.map((b) => {
             const [value, label] = b.split("|").map((x) => x.trim());

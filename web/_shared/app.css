@@ -1,3 +1,8 @@
+/* 스크롤바 자리를 늘 비워 둔다 — 페이지 길이·내용 로딩에 따라 스크롤바가 생겼다 없어지며 머리 메뉴가 옆으로 흔들리지 않게
+   (게임 전체 화면은 스크롤이 없으니 제외) */
+html { scrollbar-gutter: stable; background: var(--color-mist, #f8f9fb); }
+html:has(> body.hk-pf-body) { scrollbar-gutter: auto; }
+
 /* height:100% + overflow-x 숨김 조합은 iOS에서 본문이 잘려 보일 수 있어
    문서 높이는 min-height로만 잡고 세로 스크롤은 브라우저에 맡긴다. */
 html { height: 100%; }
@@ -483,7 +488,6 @@ body {
 .hk-game-banner { position: relative; overflow: hidden; display: flex; align-items: center; gap: 16px; margin-top: 6px; padding: 18px 22px; border-radius: 14px; text-decoration: none; color: #fff; background: radial-gradient(circle at 12% 20%, rgba(255,255,255,.18) 0 1px, transparent 2px), radial-gradient(circle at 38% 70%, rgba(255,255,255,.14) 0 1px, transparent 2px), radial-gradient(circle at 63% 28%, rgba(255,255,255,.16) 0 1px, transparent 2px), radial-gradient(circle at 86% 78%, rgba(255,255,255,.12) 0 1px, transparent 2px), linear-gradient(115deg, #1b2459 0%, #3b2a86 60%, #5a36b8 100%); box-shadow: 0 6px 18px rgba(40, 30, 110, .18); transition: transform .15s ease, box-shadow .15s ease; }
 .hk-game-banner:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(40, 30, 110, .26); }
 .hk-game-banner__icon { flex-shrink: 0; width: 46px; height: 46px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; color: #ffd75e; background: rgba(255,255,255,.12); }
-.hk-game-banner__icon svg { fill: #ffd75e; }
 .hk-game-banner__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .hk-game-banner__text b { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
 .hk-game-banner__text small { font-size: 13.5px; color: rgba(255,255,255,.78); }
@@ -563,6 +567,11 @@ body {
 .hk-nb-check input:focus-visible + .hk-nb-check__box { outline: 2px solid var(--color-signal-blue); outline-offset: 2px; }
 .hk-nb-check__count { margin-top: 10px; font-size: 13px; color: var(--text-secondary); text-align: right; }
 .hk-nb-check__count b { color: var(--color-ultraviolet); font-size: 15px; }
+.hk-nb-shots { display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); gap: 12px; margin: 6px 0 18px; }
+.hk-nb-shot { margin: 0; }
+.hk-nb-shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border-default); background: var(--color-mist); }
+.hk-nb-shot figcaption { margin-top: 6px; font-size: 13px; color: var(--text-secondary); text-align: center; line-height: 1.45; }
+@media (max-width: 640px) { .hk-nb-shots { grid-template-columns: repeat(min(var(--cols, 2), 2), minmax(0, 1fr)); } }
 .hk-nb-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin: 6px 0 18px; }
 .hk-nb-stat { padding: 18px 14px; border-radius: 14px; background: linear-gradient(160deg, #eef4ff, #f6f1ff); text-align: center; }
 .hk-nb-stat__value { font-size: 30px; font-weight: 800; line-height: 1.1; color: var(--color-signal-blue); letter-spacing: -0.01em; }
@@ -816,3 +825,18 @@ body {
 .hk-play-closed__next { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #fef3c7; color: #92400e !important; }
 .hk-lounge-closed { display: flex; align-items: center; gap: 10px; padding: 12px 16px; margin-bottom: 16px; border-radius: 12px; background: #fef3c7; color: #92400e; font-size: 14px; line-height: 1.5; }
 .hk-lounge-grid.is-closed .hk-lounge-card__art img { filter: grayscale(.6); opacity: .75; }
+
+/* 예약하기 — '선택한 예약' 상자 위 러그에서 자는 고양이 (숨 쉬기 · 꼬리 끝 · z) */
+.hk-box-cat { position: absolute; right: 10px; top: -70px; width: 150px; height: 80px; z-index: 2; pointer-events: none; overflow: visible; }
+.hk-box-cat__breath { transform-box: view-box; transform-origin: 86px 68px; animation: hk-cat-breath 3.4s ease-in-out infinite; }
+.hk-box-cat__head { transform-box: view-box; animation: hk-cat-head 3.4s ease-in-out infinite; }
+.hk-box-cat__tail { transform-box: view-box; transform-origin: 126px 62px; animation: hk-cat-tail 5.2s ease-in-out infinite; }
+.hk-box-cat__z { opacity: 0; animation: hk-cat-z 3.4s ease-out infinite; }
+.hk-box-cat__z.is-2 { animation-delay: 1.7s; }
+@keyframes hk-cat-breath { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.012, 1.06); } }
+@keyframes hk-cat-head { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.2px); } }
+@keyframes hk-cat-tail { 0%, 70%, 100% { transform: rotate(0deg); } 78% { transform: rotate(-4deg); } 86% { transform: rotate(1.5deg); } 92% { transform: rotate(-2deg); } }
+@keyframes hk-cat-z { 0% { opacity: 0; transform: translate(0, 0) scale(.7); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(10px, -16px) scale(1.15); } }
+@media (prefers-reduced-motion: reduce) { .hk-box-cat__breath, .hk-box-cat__head, .hk-box-cat__tail, .hk-box-cat__z { animation: none; } }
+/* 휴대폰 — 상자들이 세로로 쌓이므로 고양이 자리만큼 위를 띄운다 */
+@media (max-width: 640px) { .hk-card:has(> .hk-box-cat) { margin-top: 48px; } }
