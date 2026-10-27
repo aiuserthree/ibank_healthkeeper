@@ -418,7 +418,7 @@ window.HKUI = (function () {
         .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
         .replace(/\{icon:([a-z0-9-]+)\}/g, (_, n) => icon(safeIcon(n), 16, "currentColor", "vertical-align:-3px"))
         .replace(/\{badge:(\d+)\}/g, (_, n) => usageBadgeChip(Number(n)))
-        .replace(/\{br\}/g, "<br>");
+        .replace(/\{br\}/g, " <br>"); // 휴대폰에서 줄바꿈을 숨겨도 낱말이 붙지 않게
     const cells = (line) => line.replace(/^\|/, "").replace(/\|\s*$/, "").split("|").map((c) => c.trim());
     const parts = (line) => {
       const [ic, title, ...rest] = line.split("|").map((x) => x.trim());

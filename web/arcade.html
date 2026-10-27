@@ -74,6 +74,40 @@
         </div>`;
     }
 
+    // 참여 도장 — 어떤 게임이든 30초 넘게 끝까지 하면 그날 도장 1개, 한 달 10개면 무적 쿠폰
+    function stampHtml(sp) {
+      if (!sp) return "";
+      const days = sp.days || [];
+      const full = sp.count >= sp.goal;
+      const md = (iso) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`;
+      const cells = Array.from({ length: sp.goal }, (_, i) => days[i]
+        ? `<span class="hk-aa-stamp__cell is-on${i === sp.goal - 1 ? " is-goal" : ""}" style="--r:${((i * 37) % 21) - 10}deg">${HKUI.icon(i === sp.goal - 1 ? "ticket" : "paw-print", 22, "currentColor")}<small>${md(days[i])}</small></span>`
+        : `<span class="hk-aa-stamp__cell${i === sp.goal - 1 ? " is-goal" : ""}">${i === sp.goal - 1 ? HKUI.icon("ticket", 20, "currentColor") : `<em>${i + 1}</em>`}</span>`).join("");
+      const left = Math.max(0, sp.goal - sp.count);
+      const state = sp.coupon
+        ? `${HKUI.icon("party-popper", 16, "currentColor")} 이번 달 무적 쿠폰을 받았어요 · 예약 신청 때 써요`
+        : full ? `${HKUI.icon("ticket", 16, "currentColor")} 도장을 다 모았어요`
+        : sp.today ? `${HKUI.icon("check", 16, "currentColor")} 오늘 도장 완료 · 쿠폰까지 ${left}개`
+        : `${HKUI.icon("sparkles", 16, "currentColor")} 오늘 한 판 하면 도장 쾅 · 쿠폰까지 ${left}개`;
+      return `<div class="hk-aa-stamps">
+          <div class="hk-aa-wrap">
+            <div class="hk-aa-stamp">
+              <div class="hk-aa-stamp__copy">
+                <span class="hk-aa-offer__eyebrow">${HKUI.icon("stamp", 16, "currentColor")} 참여 도장 · ${Number(sp.month.slice(5))}월</span>
+                <h2 class="hk-aa-h2">하루 한 판,<br>도장 하나.</h2>
+                <p>어떤 게임이든 <b>${sp.minSeconds}초 넘게</b> 끝까지 하면 그날 도장이 찍혀요. 이번 달 <b>${sp.goal}개</b>를 모으면 <b>무적 쿠폰 1장</b>을 드려요.</p>
+                <small>쿠폰은 한 달에 1장 · 받은 달 말일까지 쓸 수 있어요.</small>
+              </div>
+              <div class="hk-aa-stamp__board">
+                <div class="hk-aa-stamp__count"><b>${Math.min(sp.count, sp.goal)}</b> / ${sp.goal}</div>
+                <div class="hk-aa-stamp__grid">${cells}</div>
+                <div class="hk-aa-stamp__state${sp.today || sp.coupon ? " is-done" : ""}">${state}</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
     function tileHtml(g) {
       return `<a class="hk-aa-tile" href="/games/${g.key}">
           <img src="/assets/lounge/${g.key}.jpg" alt="" loading="lazy" onerror="this.remove()">
@@ -163,6 +197,7 @@
       ["언제 할 수 있나요?", "평일 점심시간(11:30~13:00)과 출근 전(~09:00), 퇴근 후(18:00~), 그리고 주말·공휴일에 열려요.<br>업무 시간에는 게임과 순위가 모두 쉬어요."],
       ["순위는 어떻게 정해지나요?", "게임마다 내 최고 기록으로 오늘 · 이번 주 · 전체 순위를 매겨요. 부서 순위는 이번 주 부서 상위 3명 기록의 평균이에요.<br>판이 끝나면 순위표가 열려요."],
       ["오늘의 도전은 무엇인가요?", "스도쿠·퀴즈·지뢰찾기처럼 직원 모두가 같은 판을 받는 게임이에요. 하루에 처음 시작한 판만 순위에 들어가고,<br>그다음 판은 기록에 안 남아요."],
+      ["참여 도장은 어떻게 모으나요?", "어떤 게임이든 30초 넘게 하고 끝까지 마치면 그날 도장 1개가 찍혀요. 하루에 여러 판을 해도 도장은 1개예요.<br>한 달에 10개를 모으면 무적 쿠폰 1장을 드리고, 쿠폰은 그달 말일까지 쓸 수 있어요."],
       ["퀴즈에 시간 제한이 있나요?", "상식 · 한국어 퀴즈는 문제마다 20초, 건강 초성 퀴즈는 40초예요. 빨리 맞힐수록 보너스가 조금 붙어요."],
       ["휴대폰에서도 할 수 있나요?", "네. 화면을 끌거나 눌러서 조작해요. 영어 타자 레이스처럼 키보드를 많이 쓰는 게임은 PC가 더 편해요."],
     ];
@@ -199,9 +234,9 @@
       afterMount: async () => {
         const body = document.getElementById("arcade-body");
         try {
-          const [st, games] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames()]);
+          const [st, games, sp] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null)]);
           status = st;
-          body.innerHTML = heroHtml(games, st) + offersHtml(st) + collectionHtml(games) + dailyHtml(games) + faqHtml() + endHtml();
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + collectionHtml(games) + dailyHtml(games) + faqHtml() + endHtml();
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
         }

@@ -47,6 +47,8 @@ window.HKApi = (function () {
     playStatus: () => request("/play/status"),
     playLeaderboard: (game, period) => request(`/play/${encodeURIComponent(game)}/leaderboard?period=${encodeURIComponent(period || "today")}`),
     playStart: (game) => request(`/play/${encodeURIComponent(game)}/start`, { method: "POST" }),
+    playRun: (game, fresh) => request(`/play/${encodeURIComponent(game)}/run${fresh ? "?fresh=1" : ""}`, { method: "POST" }),
+    playStamps: () => request("/play/stamps"),
     playSubmit: (game, score, token) => request(`/play/${encodeURIComponent(game)}/score`, { method: "POST", body: JSON.stringify({ score, token }) }),
     notices: (category) => request(category ? `/system/notices?category=${encodeURIComponent(category)}` : "/system/notices"),
     notice: (id) => request(`/system/notices/${id}`),

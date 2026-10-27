@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+import time
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
@@ -13,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import raise_app_error
 from app.config import get_settings
 from app.core.time import now_kst, today_kst
-from app.models import GamePlay, Member, MemberStatus
+from app.models import ArcadeStamp, Coupon, CouponSource, CouponStatus, GamePlay, Member, MemberStatus
 from app.services.avatar import member_avatar_url
 from app.services.fun_stats import DEPARTMENT_RANKING_EXCLUDED
 from app.services.korean_holidays import is_public_holiday
@@ -262,6 +263,87 @@ async def leaderboard(db: AsyncSession, member: Member, key: str, period: str) -
     }
 
 
+# ── 참여 도장 — 하루에 한 판이라도 끝까지 하면 도장 1개, 한 달에 STAMP_GOAL 개면 무적 쿠폰 1장(월 1장)
+STAMP_GOAL = 10
+STAMP_MIN_SEC = 30  # 시작부터 끝까지 이보다 짧은 판은 도장 없음 (게임 없이 점수만 보내는 꼼수 막기)
+
+
+def _run_key(member: Member, key: str) -> str:
+    return f"hk:game:run:{member.id}:{key}"
+
+
+async def start_run(redis: Redis, member: Member, key: str, fresh: bool = False) -> None:
+    """판 시작 시각. fresh 면 새 판이라 다시 잰다, 아니면(시작 화면 준비·이어 하기) 이미 있으면 그대로 둔다."""
+    get_game(key)
+    await redis.set(_run_key(member, key), str(int(time.time() * 1000)), nx=not fresh, ex=3 * 3600)
+
+
+def _month_bounds(day: date) -> tuple[date, date]:
+    start = day.replace(day=1)
+    nxt = (start + timedelta(days=32)).replace(day=1)
+    return start, nxt
+
+
+async def stamp_status(db: AsyncSession, member: Member, day: date | None = None) -> dict:
+    day = day or today_kst()
+    start, nxt = _month_bounds(day)
+    rows = (
+        await db.execute(
+            select(ArcadeStamp.stamp_date)
+            .where(ArcadeStamp.member_id == member.id, ArcadeStamp.stamp_date >= start, ArcadeStamp.stamp_date < nxt)
+            .order_by(ArcadeStamp.stamp_date)
+        )
+    ).scalars().all()
+    month = f"{day.year:04d}-{day.month:02d}"
+    coupon = await db.scalar(
+        select(func.count()).select_from(Coupon).where(
+            Coupon.member_id == member.id, Coupon.source == CouponSource.ARCADE, Coupon.grant_month == month
+        )
+    )
+    return {
+        "month": month,
+        "days": [d.isoformat() for d in rows],
+        "count": len(rows),
+        "goal": STAMP_GOAL,
+        "today": day.isoformat() in {d.isoformat() for d in rows},
+        "coupon": bool(coupon),
+        "minSeconds": STAMP_MIN_SEC,
+    }
+
+
+async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -> dict:
+    """오늘 첫 도장이면 찍고, 이번 달 목표를 채우면 쿠폰을 준다."""
+    from app.services.coupon import _next_month_start
+
+    has = await db.scalar(
+        select(func.count()).select_from(ArcadeStamp).where(ArcadeStamp.member_id == member.id, ArcadeStamp.stamp_date == today)
+    )
+    new = False
+    issued = False
+    if not has:
+        db.add(ArcadeStamp(member_id=member.id, stamp_date=today, game=key))
+        await db.flush()
+        new = True
+        st = await stamp_status(db, member, today)
+        if st["count"] >= STAMP_GOAL and not st["coupon"]:
+            now = now_kst()
+            db.add(
+                Coupon(
+                    member_id=member.id,
+                    source=CouponSource.ARCADE,
+                    status=CouponStatus.AVAILABLE,
+                    grant_month=st["month"],
+                    issued_at=now,
+                    expires_at=_next_month_start(now),
+                    note="아케이드 도장 10개",
+                )
+            )
+            issued = True
+        await db.commit()
+    st = await stamp_status(db, member, today)
+    return {"new": new, "count": st["count"], "goal": st["goal"], "coupon": issued, "today": st["today"]}
+
+
 def _daily_key(game: Game, member: Member, day: date) -> str:
     return f"hk:game:daily:{game.key}:{member.id}:{day.isoformat()}"
 
@@ -274,6 +356,7 @@ async def start_daily(db: AsyncSession, redis: Redis, member: Member, key: str) 
     """
     game = get_game(key)
     ensure_open()
+    await start_run(redis, member, key)
     if not game.daily_once:
         return {"ranked": True, "token": None}
     today = today_kst()
@@ -303,6 +386,13 @@ async def submit_score(
         raise_app_error("TOO_MANY_REQUESTS", 429)
 
     today = today_kst()
+    # 판 길이 — 시작(또는 준비) 시각부터. 쓰고 나면 지워 다음 판이 새로 잰다
+    run_key = _run_key(member, key)
+    started_ms = await redis.get(run_key)
+    await redis.delete(run_key)
+    if isinstance(started_ms, bytes):
+        started_ms = started_ms.decode()
+    played_sec = (time.time() * 1000 - int(started_ms)) / 1000 if started_ms and str(started_ms).isdigit() else 0
     counted = True
     if game.daily_once:
         already = await db.scalar(
@@ -325,8 +415,16 @@ async def submit_score(
         ranked = _ranked(await _bests(db, game, since))
         return next((r for r, mid, _ in ranked if mid == member.id), None)
 
+    # 참여 도장 — 연습 판(오늘의 도전 두 번째 판부터)도 끝까지 했으면 인정
+    if played_sec >= STAMP_MIN_SEC:
+        stamp = await _give_stamp(db, member, key, today)
+    else:
+        st = await stamp_status(db, member, today)
+        stamp = {"new": False, "count": st["count"], "goal": st["goal"], "coupon": False, "today": st["today"], "short": True}
+
     better = prev_best is None or (score < prev_best if game.lower_better else score > prev_best)
     return {
+        "stamp": stamp,
         "counted": counted,
         "score": score,
         "newBest": counted and better,

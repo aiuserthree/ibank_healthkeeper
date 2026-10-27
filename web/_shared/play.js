@@ -292,6 +292,7 @@ window.HKPlay = (function () {
       <div class="hk-play-result__text">
         <b>${title} · ${formatScore(game, result.score)}</b>
         <span>${ranks.join(" · ") || (result.counted ? "순위를 불러오는 중이에요" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.best != null && !result.newBest ? ` · 내 최고 ${formatScore(game, result.best)}` : ""}</span>
+        ${result.stamp ? `<span class="hk-play-result__stamp${result.stamp.new ? " is-new" : ""}">${HKUI.icon("stamp", 13, "currentColor")} ${result.stamp.new ? "오늘 도장 쾅!" : result.stamp.today ? "오늘 도장은 이미 찍었어요" : "30초 이상 해야 도장이 찍혀요"} · ${result.stamp.count >= result.stamp.goal ? `이번 달 <b>${result.stamp.goal}개 완성</b>` : `이번 달 <b>${result.stamp.count}/${result.stamp.goal}</b>`}</span>` : ""}
       </div>
       <button type="button" class="hk-play-result__close" aria-label="닫기">${HKUI.icon("x", 16, "currentColor")}</button>`;
     const close = () => {
@@ -303,6 +304,14 @@ window.HKPlay = (function () {
     HKUI.refreshIcons(el);
     requestAnimationFrame(() => el.classList.add("is-in"));
     resultTimer = setTimeout(close, 7000);
+  }
+
+  // 도장으로 쿠폰을 받으면 한 번 더 크게 알려 준다
+  function stampToast(stamp) {
+    if (stamp && stamp.coupon) {
+      HKSound.play("win");
+      HKUI.toast(`도장 ${stamp.goal}개 달성! 무적 쿠폰 1장을 받았어요 · 이번 달 안에 예약 신청에 써요`);
+    }
   }
 
   async function mountGame({ key, setup }) {
@@ -319,10 +328,16 @@ window.HKPlay = (function () {
     const RESUME_TEXT = /계속하기|이어서/;
     // 순위표는 판이 끝났을 때만 오른쪽에서 열린다 — 새 판을 시작하면 닫는다
     let runNo = 0; // 새 판마다 1씩 — 순위를 받아 오는 사이에 새 판이 시작됐으면 열지 않는다
+    // 참여 도장용 판 길이 — 새 판을 시작하면 그때부터 다시 잰다(이어 하기는 그대로).
+    // 시작 화면·결과 화면에서도 미리 알려 두어, 시작을 못 알아채는 게임도 길이가 잡히게 한다
+    let inRun = false;
+    const armRun = (fresh) => HKApi.playRun(key, fresh).catch(() => {});
     function setPlaying(on) {
       // 휴대폰 머리의 일시정지 버튼은 판이 도는 동안만
       document.querySelector(".hk-pf")?.classList.toggle("is-playing", on);
       if (!on) return;
+      if (!inRun) armRun(true);
+      inRun = true;
       endQuit(false);
       runNo++;
       openBoard(false);
@@ -575,6 +590,9 @@ window.HKPlay = (function () {
             }
             if (result.counted && game.dailyOnce) ctx.dailyDone = true;
             resultBanner(game, result);
+            stampToast(result.stamp);
+            inRun = false;
+            armRun(); // 다음 판 길이 재기
             canRestart = true;
             endQuit(true);
             const run = runNo;
@@ -615,6 +633,7 @@ window.HKPlay = (function () {
         );
         loadBoard();
         setup(stage, ctx);
+        armRun();
         fitStage(stage);
         bindDrawer();
     }

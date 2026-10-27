@@ -35,6 +35,27 @@ async def games(
     return {"data": await game_service.list_games(db, member)}
 
 
+@router.get("/stamps")
+async def stamps(
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """이번 달 아케이드 참여 도장 — 찍힌 날짜 · 개수 · 목표 · 이번 달 쿠폰 받았는지."""
+    return {"data": await game_service.stamp_status(db, member)}
+
+
+@router.post("/{game}/run")
+async def run(
+    game: str,
+    fresh: bool = False,
+    redis: Redis = Depends(get_redis_client),
+    member: Member = Depends(get_current_active_member),
+):
+    """판 준비·시작 신고 — 도장용 판 길이를 재기 시작한다 (순위와 무관)."""
+    await game_service.start_run(redis, member, game, fresh=fresh)
+    return {"data": {"ok": True}}
+
+
 @router.get("/{game}/leaderboard")
 async def leaderboard(
     game: str,

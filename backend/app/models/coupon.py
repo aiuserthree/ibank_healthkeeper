@@ -13,6 +13,7 @@ class CouponSource:
     DROP = "DROP"  # 탈락 주 5회 누적마다
     BADGE = "BADGE"  # 배지 등급 월간 지급 (매월 초기화)
     ADMIN = "ADMIN"  # 관리자 수동 지급
+    ARCADE = "ARCADE"  # 아케이드 도장 한 달 10개 (월 1장, 그달 말 만료)
 
 
 class CouponStatus:
