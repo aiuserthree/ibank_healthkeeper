@@ -217,7 +217,7 @@
           const n = S.wave / 5;
           const kind = BOSS_KINDS[(n - 1) % BOSS_KINDS.length];
           const hp = Math.round((80 + (n - 1) * 60) * kind.hp);
-          S.boss = { kind: kind.id, x: W / 2, y: -70, r: kind.r, hp, maxHp: hp, t: 0, spreadCd: 2.2, aimCd: 1.4, minionCd: 4, spinA: 0, spinCd: 0, chargeCd: 3.5, mode: "move", curtainCd: 2, flash: 0, n, angry: false };
+          S.boss = { kind: kind.id, x: W / 2, y: -70, r: kind.r, hp, maxHp: hp, t: 0, spreadCd: 2.2, aimCd: 1.4, minionCd: 4, spinA: 0, spinCd: 0, chargeCd: 3.5, mode: "move", curtainCd: 2, itemCd: 3, flash: 0, n, angry: false };
           S.form = null;
           S.banner = { text: `${kind.name} 등장!`, sub: kind.tip, t: 2.2 };
           if (armedList().length === 0) dropItem(W / 2, 150, pickWeapon()); // 맨손이면 무기 하나
@@ -477,6 +477,16 @@
             B.angry = true;
             S.banner = { text: "화가 났어요!", sub: "공격이 더 빨라져요", t: 1.4 };
             ctx.sfx("whoosh");
+            // 화난 순간 버티기용 아이템 하나 (마스크·물방울·손소독제 중)
+            dropItem(Math.max(30, Math.min(W - 30, B.x)), B.y + B.r + 10, ["mask", "water", "bomb"][Math.floor(Math.random() * 3)]);
+          }
+          // 큰 세균 전에는 아이템이 몇 초마다 떨어진다 (무기 위주, 화나면 더 자주)
+          if (B.entered) {
+            B.itemCd -= dt;
+            if (B.itemCd <= 0) {
+              B.itemCd = (B.angry ? 4.5 : 6) * (0.85 + Math.random() * 0.3);
+              if (S.items.length < 3) dropItem(30 + Math.random() * (W - 60), 40);
+            }
           }
           const rage = B.angry ? 0.7 : 1; // 쿨타임 배율
           const sp = Math.min(300, 150 + B.n * 25) * (B.angry ? 1.12 : 1);
