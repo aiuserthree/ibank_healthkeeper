@@ -655,6 +655,20 @@
   var inLounge = window.parent !== window;
   if(inLounge) document.documentElement.classList.add('embedded');
   // 새 판 시작을 바깥 틀에 알린다 (열려 있던 순위표를 닫는다)
+  // 아이폰 사파리 — 빠르게 연달아 톡톡 치면(계단 오르기) 화면 전체가 확대되는 것을 막는다.
+  // 창 안 게임이라 바깥 페이지의 touch-action 이 먹지 않아, 짧은 간격의 두 번째 터치 끝(touchend)을 직접 막는다 (버튼은 그대로 눌리게)
+  (function(){
+    var lastEnd = 0;
+    document.addEventListener('touchend', function(e){
+      var now = Date.now();
+      var t = e.target;
+      var ui = t && t.closest && t.closest('button, a, input, select, textarea, label');
+      if(!ui && now - lastEnd < 400) e.preventDefault();
+      lastEnd = now;
+    }, { passive: false });
+    document.addEventListener('dblclick', function(e){ e.preventDefault(); });
+    document.addEventListener('gesturestart', function(e){ e.preventDefault(); });
+  })();
   function tellStart(){ if(inLounge) window.parent.postMessage({ type: 'hk-game-start' }, location.origin); }
   function loadMuted(){
     try{ return localStorage.getItem('hk-play-muted') === '1'; }catch(e){ return false; }

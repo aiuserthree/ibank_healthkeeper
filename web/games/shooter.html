@@ -578,7 +578,7 @@
 
         // 충돌: 유도탄 → 적 (한 발에 2 피해)
         for (const m of S.missiles) {
-          if (B && B.y > 40 && Math.hypot(m.x - B.x, m.y - B.y) < B.r) {
+          if (B && !B.dead && B.y > 40 && Math.hypot(m.x - B.x, m.y - B.y) < B.r) {
             m.hit = true; B.hp -= 2; B.flash = 0.06;
             if (B.hp <= 0) killBoss(); else sfxGap("hit", 0.4);
             continue;
@@ -604,7 +604,7 @@
               if (e.hp <= 0) killEnemy(e);
             }
           }
-          if (B && B.y > 40 && PY - 20 - B.y < len + B.r && Math.abs(B.x - S.px) < B.r + 30 && (B.fireCd || 0) <= S.t) {
+          if (B && !B.dead && B.y > 40 && PY - 20 - B.y < len + B.r && Math.abs(B.x - S.px) < B.r + 30 && (B.fireCd || 0) <= S.t) {
             B.fireCd = S.t + 0.2; B.hp--; B.flash = 0.05; if (B.hp <= 0) killBoss();
           }
         }
@@ -617,7 +617,7 @@
               if (e.hp <= 0) killEnemy(e); else sfxGap("hit", 0.12);
             }
           }
-          if (B && B.y > 40 && !wv.hits.has(B) && Math.abs(B.y - wv.y) < B.r && Math.abs(B.x - wv.x) < wv.w / 2 + B.r) {
+          if (B && !B.dead && B.y > 40 && !wv.hits.has(B) && Math.abs(B.y - wv.y) < B.r && Math.abs(B.x - wv.x) < wv.w / 2 + B.r) {
             wv.hits.add(B); B.hp -= 2; B.flash = 0.06; if (B.hp <= 0) killBoss();
           }
         }
@@ -636,7 +636,7 @@
         S.enemies = S.enemies.filter((e) => !e.dead);
         // 충돌: 내 탄 → 적
         for (const b of S.bullets) {
-          if (B && B.y > 40 && Math.hypot(b.x - B.x, b.y - B.y) < B.r) {
+          if (B && !B.dead && B.y > 40 && Math.hypot(b.x - B.x, b.y - B.y) < B.r) {
             b.hit = true; B.hp--; B.flash = 0.06;
             if (B.hp <= 0) killBoss();
             else sfxGap("hit", 0.4);
@@ -747,6 +747,9 @@
 
       function killBoss() {
         const B = S.boss;
+        // 같은 순간 여러 무기에 맞아 두 번 불려도 한 번만 (예전엔 두 번째에 사라진 보스를 읽다 오류로 게임이 멈췄다)
+        if (!B || B.dead) return;
+        B.dead = true;
         const pts = 3000 * B.n * (S.x2 > 0 ? 2 : 1);
         ctx.sfx("explode");
         S.score += pts;
@@ -832,7 +835,7 @@
         S.enemies = S.enemies.filter((e) => !e.dead);
         S.ebullets = [];
         const B = S.boss;
-        if (B && B.y > 40) {
+        if (B && !B.dead && B.y > 40) {
           B.hp -= Math.ceil(B.maxHp * 0.2);
           B.flash = 0.2;
           if (B.hp <= 0) killBoss();
@@ -1208,8 +1211,11 @@
         let dt = Math.min(0.1, (now - last) / 1000);
         last = now;
         const steps = Math.max(1, Math.ceil(dt / 0.017));
-        for (let i = 0; i < steps && state === "play"; i++) update(dt / steps);
-        draw();
+        // 한 프레임에서 오류가 나도 게임이 멈추지 않게 — 오류는 콘솔에만 남기고 다음 프레임을 이어 간다
+        try {
+          for (let i = 0; i < steps && state === "play"; i++) update(dt / steps);
+          draw();
+        } catch (err) { console.error(err); }
         if (state === "play") raf = requestAnimationFrame(frame);
       }
       function run() {

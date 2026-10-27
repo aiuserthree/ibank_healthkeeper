@@ -385,6 +385,14 @@ window.HKPlay = (function () {
     // 판 안을 눌러 새 판을 시작했으면 스페이스 재시작은 꺼진다 (순위표·머리·그만하기 버튼을 누른 건 상관없음)
     // 게임 화면에서 두 손가락 확대(iOS 사파리)는 막는다 — 게임 조작 중 화면이 커지지 않게
     document.addEventListener("gesturestart", (e) => e.preventDefault());
+    // 빠르게 연달아 톡톡 쳐도 화면이 확대되지 않게 — 짧은 간격의 두 번째 터치 끝을 막는다 (버튼·입력창은 그대로)
+    let lastTouchEnd = 0;
+    document.addEventListener("touchend", (e) => {
+      const now = Date.now();
+      const ui = e.target.closest && e.target.closest("button, a, input, select, textarea, label");
+      if (!ui && now - lastTouchEnd < 400 && e.target.closest && e.target.closest(".hk-pf")) e.preventDefault();
+      lastTouchEnd = now;
+    }, { passive: false });
     window.addEventListener("pointerdown", (e) => {
       const stageEl = document.getElementById("hk-play-stage");
       if (stageEl && stageEl.contains(e.target) && !e.target.closest(".hk-quit-btn, .hk-endbar")) canRestart = false;
