@@ -121,7 +121,7 @@
 
       // 아이템 — [종류, 나오는 비율]
       // 무기 아이템이 대부분(약 80%), 보조 아이템은 드물게
-      const ITEM_TABLE = [["vitc", 12], ["laser", 10], ["rapid", 10], ["homing", 10], ["orbit", 9], ["wing", 9], ["chili", 9], ["ripple", 9], ["zap", 9], ["bomb", 5], ["mask", 5], ["x2", 4], ["slow", 3], ["water", 2]];
+      const ITEM_TABLE = [["vitc", 12], ["laser", 10], ["rapid", 10], ["homing", 10], ["orbit", 9], ["wing", 9], ["chili", 9], ["ripple", 9], ["zap", 9], ["bomb", 7], ["mask", 6], ["x2", 6], ["slow", 5], ["water", 2]];
       const ITEM_TOTAL = ITEM_TABLE.reduce((a, [, w]) => a + w, 0);
       // 동그라미 아이템 그림 — [바탕, 글자색, 글자]
       const ITEM_LOOK = { rapid: ["#7c4a1e", "#fff", "커"], laser: ["#facc15", "#713f12", "레"], homing: ["#ef4444", "#fff", "생"], orbit: ["#f5f5f4", "#57534e", "마"], chili: ["#dc2626", "#fff", "고"], ripple: ["#c084fc", "#fff", "양"], zap: ["#3b82f6", "#fff", "블"], slow: ["#f59e0b", "#fff", "꿀"], wing: ["#22c55e", "#fff", "균"], x2: ["#a855f7", "#fff", "D"], bomb: ["#0ea5e9", "#fff", "소"] };
@@ -683,11 +683,15 @@
         if (armed.length === 0 && S.unarmedT > 8 && S.items.length === 0) { dropItem(x, y, pickWeapon()); S.unarmedT = 0; return; }
         if (Math.random() < p) dropItem(x, y);
       }
-      // 무기 고르기 — 이미 쓰는 무기가 있으면 반쯤은 그 무기(단계 올리기)
+      // 무기 고르기 — 가끔(25%)은 3단계가 안 된 지금 무기를 올려 주고, 나머지는 안 들고 있는 무기에서. 방금 나온 무기는 연달아 안 나온다
       function pickWeapon() {
         const armed = armedList();
-        if (armed.length && Math.random() < 0.5) return ITEM_OF[armed[Math.floor(Math.random() * armed.length)]];
-        return WEAPON_ITEMS[Math.floor(Math.random() * WEAPON_ITEMS.length)];
+        const pick = (a) => a[Math.floor(Math.random() * a.length)];
+        const up = armed.filter((k) => (S.lv[k] || 1) < 3).map((k) => ITEM_OF[k]).filter((k) => k !== S.lastWeapon);
+        if (up.length && Math.random() < 0.25) return pick(up);
+        const held = armed.map((k) => ITEM_OF[k]);
+        const fresh = WEAPON_ITEMS.filter((k) => !held.includes(k) && k !== S.lastWeapon);
+        return pick(fresh.length ? fresh : WEAPON_ITEMS.filter((k) => k !== S.lastWeapon));
       }
 
       function dropItem(x, y, kind) {
@@ -700,6 +704,7 @@
             if (WEAPON_ITEMS.includes(kind)) kind = pickWeapon();
           }
         }
+        if (WEAPON_ITEMS.includes(kind)) S.lastWeapon = kind;
         S.items.push({ x, y, kind, t: 0 });
       }
 

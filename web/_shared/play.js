@@ -318,6 +318,7 @@ window.HKPlay = (function () {
       if (!on) return;
       runNo++;
       openBoard(false);
+      showRankBtn(false);
     }
         function visibleButton(re) {
       const stageEl = document.getElementById("hk-play-stage");
@@ -409,7 +410,7 @@ window.HKPlay = (function () {
           <div class="hk-pf__tools">
             ${meta.dailyOnce ? `<span class="hk-badge ${dailyDone ? "hk-badge--neutral" : "hk-badge--warning"} hk-pf__daily">${dailyDone ? "오늘 도전 완료 · 연습" : "오늘의 도전"}</span>` : ""}
             <button type="button" class="hk-play-sound" id="hk-play-sound"></button>
-            <button type="button" class="hk-play-sound hk-pf__rank-btn" id="hk-pf-rank">${HKUI.icon("trophy", 18, "currentColor")}<span>순위</span></button>
+            <button type="button" class="hk-play-sound hk-pf__rank-btn" id="hk-pf-rank" hidden>${HKUI.icon("trophy", 18, "currentColor")}<span>순위</span></button>
           </div>`;
         const soundBtn = document.getElementById("hk-play-sound");
         const paintSound = () => {
@@ -482,7 +483,10 @@ window.HKPlay = (function () {
             const run = runNo;
             await loadBoard();
             // 넓은 화면은 끝나자마자 순위표를 연다 (휴대폰은 '순위' 버튼으로)
-            if (run === runNo && window.matchMedia("(min-width: 900px)").matches) openBoard(true);
+            if (run === runNo) {
+              showRankBtn(true);
+              if (window.matchMedia("(min-width: 900px)").matches) openBoard(true);
+            }
             return result;
           },
         };
@@ -538,6 +542,11 @@ window.HKPlay = (function () {
     if (!board) return;
     board.classList.toggle("is-open", on);
     if (scrim) scrim.hidden = !on || window.matchMedia("(min-width: 900px)").matches;
+  }
+  // 순위 버튼은 판이 끝났을 때만 — 게임 중·시작 전에는 숨긴다
+  function showRankBtn(on) {
+    const btn = document.getElementById("hk-pf-rank");
+    if (btn) btn.hidden = !on;
   }
   function bindDrawer() {
     const board = document.querySelector(".hk-pf .hk-play-board");
