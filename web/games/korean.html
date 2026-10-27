@@ -17,6 +17,12 @@
       --gm-ok: #16a34a; --gm-ok-soft: #ecfdf3; --gm-ng: #e5484d; --gm-ng-soft: #fff1f1;
       --gm-fs: 16px; --gm-qs: 21px;
       position: relative; background: var(--surface-card, #fff); border: 1px solid var(--color-mist-border, #e3e8f0); border-radius: 16px; overflow: hidden; box-shadow: 0 6px 24px rgba(180, 83, 9, .10); }
+    .gm-ko__timer { height: 7px; background: var(--gm-soft); }
+    .gm-ko__timer i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--gm-a), var(--gm-b)); border-radius: 0 6px 6px 0; transform-origin: left center; }
+    .gm-ko__timer.is-low i { background: var(--gm-ng); }
+    .gm-ko__sec { margin-left: auto; white-space: nowrap; }
+    .gm-ko__sec b { font-variant-numeric: tabular-nums; font-size: 15px; color: var(--color-midnight-navy); }
+    .gm-ko__sec.is-low b { color: var(--gm-ng); }
     .gm-ko__top { display: flex; align-items: center; gap: 10px; padding: 13px 18px; color: #fff; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); }
     .gm-ko__top b { font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .gm-ko__dots { flex: 1; display: flex; gap: 4px; min-width: 0; max-width: 260px; }
@@ -606,8 +612,8 @@
     HKPlay.mountGame({
       key: "korean",
       setup(stage, ctx) {
-        const COUNT = 20, FEEDBACK_MS = 1500, JUDGE_MS = 180;
-        const PER_OK = 100, STREAK_N = 3, STREAK_BONUS = 50;
+        const COUNT = 20, LIMIT = 20, FEEDBACK_MS = 1500, JUDGE_MS = 180;
+        const PER_OK = 100, PER_SEC = 2, STREAK_N = 3, STREAK_BONUS = 50;
         const MIX = { 2: 6, 3: 10, 4: 4 }; // 보통 6 · 어려움 10 · 아주 어려움 4
         const TYPES = {
           spell: { label: "맞춤법", icon: "spell-check", ask: "맞춤법이 바른 것은?" },
@@ -705,12 +711,13 @@
         const todaysQuestions = () => questionsForDay(ctx.today, ctx.rng("bank"));
 
         let qs = [], idx = 0, results = [], streak = 0;
-        let timer = 0;
+        let remainMs = 0, lastTs = 0, raf = 0, timer = 0, lastSec = 0;
         let phase = "intro"; // intro | play | judge | feedback | paused | done
 
         const totalScore = () => results.reduce((s, r) => s + r.pts + r.bonus, 0);
 
         function stopLoops() {
+          cancelAnimationFrame(raf);
           clearTimeout(timer);
         }
 
@@ -758,8 +765,8 @@
               <h2 class="gm-ko__h">한국어 능력시험</h2>
               <ul class="gm-ko__rules">
                 <li><span>1</span><span>맞춤법·띄어쓰기·표준어·어휘·높임말·외래어 표기 <b>${COUNT}문제</b>. <b>보통 ${MIX[2]} → 어려움 ${MIX[3]} → 아주 어려움 ${MIX[4]}</b> 순서로 나와요.</span></li>
-                <li><span>2</span><span>시간 제한 없이 천천히 풀어요. PC는 숫자 <b>1~4</b> 키나 클릭, 휴대폰은 보기를 눌러요.</span></li>
-                <li><span>3</span><span>정답 <b>${PER_OK}점</b> · <b>${STREAK_N}연속</b> 정답마다 <b>+${STREAK_BONUS}</b></span></li>
+                <li><span>2</span><span>문제마다 <b>${LIMIT}초</b>. PC는 숫자 <b>1~4</b> 키나 클릭, 휴대폰은 보기를 눌러요.</span></li>
+                <li><span>3</span><span>정답 <b>${PER_OK}점 + 남은 초×${PER_SEC}</b> · <b>${STREAK_N}연속</b> 정답마다 <b>+${STREAK_BONUS}</b></span></li>
                 <li><span>4</span><span>오늘 문제는 모든 직원이 같아요. 내일은 새 문제!</span></li>
               </ul>
               ${ctx.dailyDone ? `<div class="gm-ko__note">${HKUI.icon("info", 16, "currentColor")} 오늘 기록은 이미 반영됐어요 · 이번 판은 연습</div>` : ""}
@@ -790,6 +797,8 @@
           stopLoops();
           const q = qs[idx];
           const ty = TYPES[q.t];
+          remainMs = LIMIT * 1000;
+          lastSec = LIMIT;
           phase = "play";
           const dots = qs.map((_, i) => {
             const r = results[i];
@@ -800,11 +809,13 @@
           const maxLen = Math.max(...q.opts.map((o) => o.length));
           stage.innerHTML = `<div class="gm-ko">
             <div class="gm-ko__top"><b>${idx + 1} / ${qs.length}</b><span class="gm-ko__dots">${dots}</span><span class="gm-ko__score">${totalScore().toLocaleString("ko-KR")}점</span></div>
+            <div class="gm-ko__timer" data-timer><i></i></div>
             <div class="gm-ko__body">
               <div class="gm-ko__meta">
                 <span class="gm-ko__type">${HKUI.icon(ty.icon, 14, "currentColor")} ${ty.label}</span>
                 <span class="gm-ko__lv lv-${q.d}">${LV[q.d]}</span>
                 ${streak >= 2 ? `<span class="gm-ko__streak">${HKUI.icon("flame", 14, "currentColor")} ${streak}연속</span>` : ""}
+                <span class="gm-ko__sec" data-secbox><b data-sec>${LIMIT}</b>초</span>
               </div>
               <div class="gm-ko__q">${qh.ask ? `<span class="gm-ko__ask">${qh.ask}</span>` : ""}<p class="gm-ko__qt" data-qt>${qh.text}</p></div>
               <div class="gm-ko__opts" data-opts data-max="${maxLen}" role="group" aria-label="보기">${q.opts.map((o, i) => `<button type="button" class="gm-ko__opt" data-i="${i}"><span class="gm-ko__num">${i + 1}</span><span class="gm-ko__txt">${esc(o)}</span><span class="gm-ko__mark" data-mark></span></button>`).join("")}</div>
@@ -814,6 +825,33 @@
           stage.querySelectorAll(".gm-ko__opt").forEach((b) => (b.onclick = () => choose(+b.dataset.i)));
           HKUI.refreshIcons(stage);
           layout();
+          lastTs = performance.now();
+          raf = requestAnimationFrame(tick);
+        }
+
+        function tick(ts) {
+          if (phase !== "play") return;
+          const dt = Math.min(ts - lastTs, 250);
+          lastTs = ts;
+          remainMs = Math.max(0, remainMs - dt);
+          const bar = stage.querySelector("[data-timer]");
+          const secNow = Math.ceil(remainMs / 1000);
+          if (bar) {
+            bar.firstElementChild.style.transform = `scaleX(${remainMs / (LIMIT * 1000)})`;
+            bar.classList.toggle("is-low", remainMs <= 5000);
+            stage.querySelector("[data-sec]").textContent = secNow;
+            stage.querySelector("[data-secbox]").classList.toggle("is-low", remainMs <= 5000);
+          }
+          // 마지막 3초는 초가 바뀔 때마다 똑딱
+          if (secNow !== lastSec) {
+            lastSec = secNow;
+            if (secNow >= 1 && secNow <= 3) ctx.sfx("tick");
+          }
+          if (remainMs <= 0) {
+            reveal(-1);
+            return;
+          }
+          raf = requestAnimationFrame(tick);
         }
 
         // 보기를 고르면 잠깐 표시하고(선택음) 곧바로 채점
@@ -834,10 +872,11 @@
           phase = "feedback";
           const q = qs[idx];
           const ok = i >= 0 && q.opts[i] === q.a;
-          const pts = ok ? PER_OK : 0;
+          const sec = ok ? Math.floor(remainMs / 1000) : 0;
+          const pts = ok ? PER_OK + sec * PER_SEC : 0;
           streak = ok ? streak + 1 : 0;
           const bonus = ok && streak % STREAK_N === 0 ? STREAK_BONUS : 0;
-          results[idx] = { ok, pts, bonus, pick: i >= 0 ? q.opts[i] : null };
+          results[idx] = { ok, sec, pts, bonus, pick: i >= 0 ? q.opts[i] : null };
           if (ok) ctx.sfx(streak >= 2 ? "combo" : "success", Math.min(streak, 10));
           else ctx.sfx("fail");
 
@@ -864,7 +903,7 @@
           fb.className = `gm-ko__fb ${ok ? "is-ok" : "is-ng"}`;
           fb.innerHTML = ok
             ? `<div class="gm-ko__fb-head">${HKUI.icon("check", 18, "currentColor")} 정답이에요! +${pts}점${bonus ? ` <em>${streak}연속 보너스 +${bonus}</em>` : ""}</div><p>${esc(q.e)}</p>`
-            : `<div class="gm-ko__fb-head">${HKUI.icon("x", 18, "currentColor")} 아쉬워요 · 정답은 ‘${esc(q.a)}’</div><p>${esc(q.e)}</p>`;
+            : `<div class="gm-ko__fb-head">${HKUI.icon(i < 0 ? "timer-off" : "x", 18, "currentColor")} ${i < 0 ? "시간이 다 됐어요" : "아쉬워요"} · 정답은 ‘${esc(q.a)}’</div><p>${esc(q.e)}</p>`;
           HKUI.refreshIcons(stage);
           timer = setTimeout(() => {
             idx++;
@@ -878,6 +917,7 @@
           stopLoops();
           phase = "done";
           const okCount = results.filter((r) => r.ok).length;
+          const timeBonus = results.reduce((s, r) => s + (r.ok ? r.sec * PER_SEC : 0), 0);
           const streakBonus = results.reduce((s, r) => s + r.bonus, 0);
           const score = totalScore();
           const review = qs.map((q, i) => {
@@ -885,7 +925,7 @@
             const ty = TYPES[q.t];
             const qText = !q.q ? esc(ty.ask) : q.q.includes(BLANK) ? q.q.split(BLANK).map(esc).join(`<mark>${esc(q.a)}</mark>`) : esc(q.q);
             const showAnswer = !q.q || !q.q.includes(BLANK);
-            const mine = r.ok ? "" : ` · 내 답 <s>${esc(r.pick)}</s>`;
+            const mine = r.ok ? "" : r.pick == null ? " · 시간 초과" : ` · 내 답 <s>${esc(r.pick)}</s>`;
             return `<li>
               ${HKUI.icon(r.ok ? "circle-check" : "circle-x", 20, r.ok ? "#16a34a" : "#94a3b8")}
               <div class="gm-ko__rv">
@@ -902,6 +942,7 @@
               <div class="gm-ko__sum-big">${okCount}<small> / ${qs.length} 정답</small></div>
               <div class="gm-ko__calc">
                 <span>정답 ${okCount}개 × ${PER_OK}</span><b>${okCount * PER_OK}</b>
+                <span>남은 시간 보너스 (초×${PER_SEC})</span><b>+${timeBonus}</b>
                 <span>연속 정답 보너스</span><b>+${streakBonus}</b>
                 <span class="is-total">합계</span><b class="is-total">${score.toLocaleString("ko-KR")}점</b>
               </div>
@@ -928,6 +969,8 @@
           p.querySelector("[data-resume]").onclick = () => {
             p.remove();
             phase = "play";
+            lastTs = performance.now();
+            raf = requestAnimationFrame(tick);
           };
         }
         document.addEventListener("visibilitychange", () => {

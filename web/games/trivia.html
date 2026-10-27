@@ -21,6 +21,12 @@
     .gm-tv button { touch-action: manipulation; }
 
     /* 위 막대 — 몇 번째 문제 · 진행 칸 · 점수 */
+    .gm-tv__timer { height: 7px; background: var(--gm-soft); }
+    .gm-tv__timer i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--gm-b), var(--gm-c)); border-radius: 0 6px 6px 0; transform-origin: left center; }
+    .gm-tv__timer.is-low i { background: var(--gm-ng); }
+    .gm-tv__sec { margin-left: auto; white-space: nowrap; }
+    .gm-tv__sec b { font-variant-numeric: tabular-nums; font-size: 15px; color: var(--color-midnight-navy); }
+    .gm-tv__sec.is-low b { color: var(--gm-ng); }
     .gm-tv__top { display: flex; align-items: center; gap: 10px; padding: 12px 18px; color: #fff; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); }
     .gm-tv__top b { font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .gm-tv__dots { flex: 1; display: flex; gap: 7px; min-width: 0; max-width: 400px; }
@@ -1138,8 +1144,8 @@
     HKPlay.mountGame({
       key: "trivia",
       setup(stage, ctx) {
-        const FEEDBACK_MS = 1500, JUDGE_MS = 180;
-        const BASE_PTS = { 1: 60, 2: 80, 3: 100, 4: 150 }, STREAK_N = 5, STREAK_BONUS = 100, CALL_MS = 1100;
+        const LIMIT = 20, FEEDBACK_MS = 1500, JUDGE_MS = 180;
+        const BASE_PTS = { 1: 60, 2: 80, 3: 100, 4: 150 }, PER_SEC = 2, STREAK_N = 5, STREAK_BONUS = 100, CALL_MS = 1100;
         const CATS = {
           sci: { label: "과학", icon: "atom" },
           khist: { label: "한국사", icon: "landmark" },
@@ -1173,12 +1179,13 @@
         }
 
         let qs = [], idx = 0, results = [], streak = 0;
-        let timer = 0;
+        let remainMs = 0, lastTs = 0, raf = 0, timer = 0, lastSec = 0, pickSec = 0;
         let phase = "intro"; // intro | play | judge | feedback | paused | done
         let pausedFrom = "";
 
         const totalScore = () => results.reduce((s, r) => s + (r ? r.pts + r.bonus : 0), 0);
         function stopLoops() {
+          cancelAnimationFrame(raf);
           clearTimeout(timer);
         }
         function formatDate(iso) {
@@ -1218,8 +1225,8 @@
               <div class="gm-tv__ladder">${STAGES.map((st, si) => `<div class="gm-tv__rung s-${si}"><b>${st.name}</b><span>${LV[st.lv]}</span><em>${st.n}문제 · ${BASE_PTS[st.lv]}점</em></div>`).join(`<span class="gm-tv__arrow">${HKUI.icon("chevron-right", 16, "currentColor")}</span>`)}</div>
               <div class="gm-tv__chips">${Object.keys(CATS).filter((c) => counts[c]).map((c) => catChip(c, counts[c])).join("")}</div>
               <ul class="gm-tv__rules">
-                <li><span>1</span><span>시간 제한 없이 천천히 풀어요. 보기 4개 중 하나를 골라요. PC는 숫자 <b>1~4</b> 키나 클릭, 휴대폰은 보기를 눌러요.</span></li>
-                <li><span>2</span><span>정답 기본점 <b>쉬움 ${BASE_PTS[1]} · 보통 ${BASE_PTS[2]} · 어려움 ${BASE_PTS[3]} · 아주 어려움 ${BASE_PTS[4]}</b> · <b>${STREAK_N}연속</b> 정답마다 <b>+${STREAK_BONUS}</b></span></li>
+                <li><span>1</span><span>문제마다 <b>${LIMIT}초</b>, 보기 4개 중 하나를 골라요. PC는 숫자 <b>1~4</b> 키나 클릭, 휴대폰은 보기를 눌러요.</span></li>
+                <li><span>2</span><span>정답 기본점 <b>쉬움 ${BASE_PTS[1]} · 보통 ${BASE_PTS[2]} · 어려움 ${BASE_PTS[3]} · 아주 어려움 ${BASE_PTS[4]}</b> + 남은 초×${PER_SEC} · <b>${STREAK_N}연속</b> 정답마다 <b>+${STREAK_BONUS}</b></span></li>
                 <li><span>3</span><span>오늘 문제는 모든 직원이 같고, 날마다 겹치지 않는 새 문제가 나와요.</span></li>
               </ul>
               ${ctx.dailyDone ? `<div class="gm-tv__note">${HKUI.icon("info", 16, "currentColor")} 오늘 기록은 이미 반영됐어요 · 이번 판은 연습</div>` : ""}
@@ -1252,6 +1259,8 @@
           const q = qs[idx];
           const cat = CATS[q.c];
           phase = "play";
+          remainMs = LIMIT * 1000;
+          lastSec = LIMIT;
           const cur = stageOf(idx);
           const dots = STAGES.map((st, si) => {
             const from = stageStart(si);
@@ -1265,11 +1274,13 @@
           const maxLen = Math.max(...q.opts.map((o) => o.length));
           stage.innerHTML = `<div class="gm-tv">
             <div class="gm-tv__top"><b>${idx + 1} / ${qs.length}</b><span class="gm-tv__dots" aria-hidden="true">${dots}</span><span class="gm-tv__score">${totalScore().toLocaleString("ko-KR")}점</span></div>
+            <div class="gm-tv__timer" data-timer><i></i></div>
             <div class="gm-tv__body">
               <div class="gm-tv__meta">
                 <span class="gm-tv__cat">${HKUI.icon(cat.icon, 14, "currentColor")} ${cat.label}</span>
                 <span class="gm-tv__lv lv-${q.d}">${LV[q.d]}</span>
                 ${streak >= 2 ? `<span class="gm-tv__streak">${HKUI.icon("flame", 14, "currentColor")} ${streak}연속</span>` : ""}
+                <span class="gm-tv__sec" data-secbox><b data-sec>${LIMIT}</b>초</span>
               </div>
               <div class="gm-tv__q"><p class="gm-tv__qt">${qText(q)}</p></div>
               <div class="gm-tv__opts" data-opts data-max="${maxLen}" role="group" aria-label="보기">${q.opts.map((o, i) => `<button type="button" class="gm-tv__opt" data-opt="${i}"><span class="gm-tv__num">${i + 1}</span><span class="gm-tv__txt">${esc(o)}</span><span class="gm-tv__mark" data-mark></span></button>`).join("")}</div>
@@ -1279,7 +1290,7 @@
           stage.querySelectorAll(".gm-tv__opt").forEach((b) => (b.onclick = () => choose(+b.dataset.opt)));
           HKUI.refreshIcons(stage);
           layout();
-          // 단계가 바뀌는 첫 문제 — "본선 시작!" 알림을 잠깐 띄운 뒤에 보기를 고를 수 있다
+          // 단계가 바뀌는 첫 문제 — "본선 시작!" 알림을 잠깐 띄우고 그 뒤에 시간이 간다
           if (idx === stageStart(cur)) {
             phase = "call";
             const st = STAGES[cur];
@@ -1297,15 +1308,43 @@
           if (phase !== "play" && phase !== "call") return;
           stage.querySelector(".gm-tv__call")?.remove();
           phase = "play";
+          lastTs = performance.now();
+          raf = requestAnimationFrame(tick);
         }
 
-        // 보기를 고르면 잠깐 표시하고(선택음) 곧바로 채점
+        function tick(ts) {
+          if (phase !== "play") return;
+          const dt = Math.min(ts - lastTs, 250);
+          lastTs = ts;
+          remainMs = Math.max(0, remainMs - dt);
+          const secNow = Math.ceil(remainMs / 1000);
+          const bar = stage.querySelector("[data-timer]");
+          if (bar) {
+            bar.firstElementChild.style.transform = `scaleX(${remainMs / (LIMIT * 1000)})`;
+            bar.classList.toggle("is-low", remainMs <= 5000);
+            stage.querySelector("[data-sec]").textContent = secNow;
+            stage.querySelector("[data-secbox]").classList.toggle("is-low", remainMs <= 5000);
+          }
+          // 마지막 3초는 초가 바뀔 때마다 똑딱
+          if (secNow !== lastSec) {
+            lastSec = secNow;
+            if (secNow >= 1 && secNow <= 3) ctx.sfx("tick");
+          }
+          if (remainMs <= 0) {
+            reveal(-1);
+            return;
+          }
+          raf = requestAnimationFrame(tick);
+        }
+
+        // 보기를 고르면 잠깐 표시하고(선택음) 곧바로 채점 — 남은 초는 고른 순간 화면에 보이던 값
         let pickIdx = -1;
         function choose(i) {
           if (phase !== "play" || i < 0 || i >= qs[idx].opts.length) return;
           stopLoops();
           phase = "judge";
           pickIdx = i;
+          pickSec = Math.ceil(remainMs / 1000);
           ctx.sfx("select");
           const btns = stage.querySelectorAll(".gm-tv__opt");
           btns.forEach((b) => (b.disabled = true));
@@ -1319,10 +1358,11 @@
           phase = "feedback";
           const q = qs[idx];
           const ok = i >= 0 && q.opts[i] === q.a;
-          const pts = ok ? BASE_PTS[q.d] : 0;
+          const sec = ok ? pickSec : 0;
+          const pts = ok ? BASE_PTS[q.d] + sec * PER_SEC : 0;
           streak = ok ? streak + 1 : 0;
           const bonus = ok && streak % STREAK_N === 0 ? STREAK_BONUS : 0;
-          results[idx] = { ok, pts, bonus, base: ok ? BASE_PTS[q.d] : 0, pick: i >= 0 ? q.opts[i] : null };
+          results[idx] = { ok, sec, pts, bonus, base: ok ? BASE_PTS[q.d] : 0, pick: i >= 0 ? q.opts[i] : null };
           if (ok) ctx.sfx(streak >= 2 ? "combo" : "success", Math.min(streak, 10));
           else ctx.sfx("fail");
 
@@ -1349,7 +1389,7 @@
           fb.className = `gm-tv__fb ${ok ? "is-ok" : "is-ng"}`;
           fb.innerHTML = ok
             ? `<div class="gm-tv__fb-head">${HKUI.icon("check", 18, "currentColor")} 정답이에요! +${pts}점${bonus ? ` <em>${streak}연속 보너스 +${bonus}</em>` : ""}</div><p>${esc(q.e)}</p>`
-            : `<div class="gm-tv__fb-head">${HKUI.icon("x", 18, "currentColor")} 아쉬워요 · 정답은 ‘${esc(q.a)}’</div><p>${esc(q.e)}</p>`;
+            : `<div class="gm-tv__fb-head">${HKUI.icon(i < 0 ? "timer-off" : "x", 18, "currentColor")} ${i < 0 ? "시간이 다 됐어요" : "아쉬워요"} · 정답은 ‘${esc(q.a)}’</div><p>${esc(q.e)}</p>`;
           HKUI.refreshIcons(stage);
           timer = setTimeout(next, FEEDBACK_MS);
         }
@@ -1371,6 +1411,7 @@
             const ok = results.slice(from, from + st.n).filter((r) => r.ok).length;
             return `<span class="gm-tv__stchip s-${si}"><b>${st.name}</b> ${ok}/${st.n}</span>`;
           }).join("");
+          const timeBonus = results.reduce((s, r) => s + (r.ok ? r.sec * PER_SEC : 0), 0);
           const streakBonus = results.reduce((s, r) => s + r.bonus, 0);
           const score = totalScore();
           const byCat = {};
@@ -1382,7 +1423,7 @@
           const cats = Object.keys(CATS).filter((c) => byCat[c]).map((c) => `<span class="gm-tv__catc${byCat[c].ok ? "" : " is-zero"}" style="--p:${Math.round((byCat[c].ok / byCat[c].n) * 100)}%">${HKUI.icon(CATS[c].icon, 13, "currentColor")} ${CATS[c].label} <b>${byCat[c].ok}/${byCat[c].n}</b></span>`).join("");
           const review = qs.map((q, i) => {
             const r = results[i];
-            const mine = r.ok ? "" : ` · 내 답 <s>${esc(r.pick)}</s>`;
+            const mine = r.ok ? "" : r.pick == null ? " · 시간 초과" : ` · 내 답 <s>${esc(r.pick)}</s>`;
             return `<li>
               ${HKUI.icon(r.ok ? "circle-check" : "circle-x", 20, r.ok ? "#16a34a" : "#94a3b8")}
               <div class="gm-tv__rv">
@@ -1400,6 +1441,7 @@
               <div class="gm-tv__stsum">${stageSum}</div>
               <div class="gm-tv__stats" data-calc>
                 <div><span>정답 기본점</span><b>${baseSum.toLocaleString("ko-KR")}</b></div>
+                <div><span>남은 초×${PER_SEC}</span><b>+${timeBonus.toLocaleString("ko-KR")}</b></div>
                 <div><span>연속 보너스</span><b>+${streakBonus}</b></div>
                 <div class="is-total"><span>합계</span><b>${score.toLocaleString("ko-KR")}</b></div>
               </div>
@@ -1445,6 +1487,8 @@
               return;
             }
             phase = "play";
+            lastTs = performance.now();
+            raf = requestAnimationFrame(tick);
           };
         }
         document.addEventListener("visibilitychange", () => {

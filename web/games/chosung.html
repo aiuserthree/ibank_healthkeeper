@@ -27,6 +27,10 @@
     .gm-cs__meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text-secondary); }
     .gm-cs__cat { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; background: var(--gm-soft); color: var(--gm-ink); font-weight: 700; font-size: 13px; }
     .gm-cs__tiles { display: flex; justify-content: center; gap: 6px; padding: 6px 0; }
+    .gm-cs__timer { height: 8px; background: var(--gm-soft); }
+    .gm-cs__timer i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--gm-a), var(--gm-b)); border-radius: 0 6px 6px 0; transform-origin: left center; }
+    .gm-cs__timer.is-low i { background: #e5484d; }
+    .gm-cs__sec { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--color-midnight-navy); }
     .gm-cs__tile { flex: 0 1 58px; min-width: 0; aspect-ratio: 5 / 6; display: flex; align-items: center; justify-content: center; border-radius: 14px; background: var(--gm-soft); border: 2px solid var(--gm-line); color: var(--gm-ink); font-weight: 800; font-size: clamp(18px, 6.2vw, 30px); line-height: 1; }
     .gm-cs__tile.is-open { background: #fff; border-color: var(--gm-a); color: var(--color-midnight-navy); animation: gm-pop .28s ease-out; }
     .gm-cs__gap { flex: 0 0 12px; }
@@ -196,7 +200,7 @@
     HKPlay.mountGame({
       key: "chosung",
       setup(stage, ctx) {
-        const COUNT = 5, MAX_TRIES = 3, HINT_COST = 30, FEEDBACK_MS = 1500;
+        const COUNT = 5, LIMIT = 40, PER_SEC = 2, MAX_TRIES = 3, HINT_COST = 30, FEEDBACK_MS = 1500;
         const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
         const esc = (s) => HKUI.escapeHtml(String(s));
         const norm = (s) => String(s).replace(/\s+/g, "");
@@ -225,14 +229,16 @@
         }
 
         let qs = [], idx = 0, results = [], hintsTotal = 0;
-        let tries = 0, revealed = 0, timer = 0;
+        let tries = 0, revealed = 0, remainMs = 0, lastTs = 0, raf = 0, timer = 0;
+        let lastSec = 0; // 마지막 5초 똑딱용
         let phase = "intro"; // intro | play | feedback | paused | done
         let lastSubmitAt = 0;
 
-        const correctPoints = () => results.reduce((s, r) => s + (r.ok ? 100 : 0), 0);
+        const correctPoints = () => results.reduce((s, r) => s + (r.ok ? 100 + r.sec * PER_SEC : 0), 0);
         const totalScore = () => Math.max(0, correctPoints() - hintsTotal * HINT_COST);
 
         function stopLoops() {
+          cancelAnimationFrame(raf);
           clearTimeout(timer);
         }
 
@@ -257,8 +263,8 @@
               <h2 class="gm-cs__h">건강 초성 퀴즈</h2>
               <ul class="gm-cs__rules">
                 <li><span>1</span><span>초성과 분류, 뜻 설명을 보고 <b>건강 낱말</b>을 맞혀요. 띄어쓰기는 상관없어요.</span></li>
-                <li><span>2</span><span>시간 제한 없이 천천히 풀어요. 답은 <b>3번</b>까지 낼 수 있어요.</span></li>
-                <li><span>3</span><span>정답 <b>100점</b> · 글자 힌트는 한 번에 <b>−30점</b></span></li>
+                <li><span>2</span><span>문제마다 <b>${LIMIT}초</b>, 답은 <b>3번</b>까지 낼 수 있어요.</span></li>
+                <li><span>3</span><span>정답 <b>100점 + 남은 초×${PER_SEC}</b> · 글자 힌트는 한 번에 <b>−30점</b></span></li>
                 <li><span>4</span><span>오늘 문제는 모든 직원이 같아요. 내일은 새 문제!</span></li>
               </ul>
               ${ctx.dailyDone ? `<div class="gm-cs__note">${HKUI.icon("info", 16, "currentColor")} 오늘 기록은 이미 반영됐어요 · 이번 판은 연습</div>` : ""}
@@ -289,6 +295,8 @@
           const [word, cat, desc] = qs[idx];
           tries = 0;
           revealed = 0;
+          remainMs = LIMIT * 1000;
+          lastSec = LIMIT;
           phase = "play";
           const dots = qs.map((_, i) => {
             const r = results[i];
@@ -297,8 +305,9 @@
           }).join("");
           stage.innerHTML = `<div class="gm-cs">
             <div class="gm-cs__top"><b>${idx + 1} / ${COUNT}</b><span class="gm-cs__dots">${dots}</span><span class="gm-cs__score" data-score>${totalScore()}점</span></div>
+            <div class="gm-cs__timer" data-timer><i></i></div>
             <div class="gm-cs__body">
-              <div class="gm-cs__meta"><span class="gm-cs__cat">${HKUI.icon("tag", 13, "currentColor")} ${esc(cat)}</span></div>
+              <div class="gm-cs__meta"><span class="gm-cs__cat">${HKUI.icon("tag", 13, "currentColor")} ${esc(cat)}</span><span>남은 시간 <span class="gm-cs__sec" data-sec>${LIMIT}</span>초</span></div>
               <div class="gm-cs__tiles" data-tiles aria-label="초성 ${esc(toCho(word))}"></div>
               <p class="gm-cs__desc">${esc(desc)}</p>
               <form class="gm-cs__form" data-form autocomplete="off">
@@ -331,6 +340,8 @@
           HKUI.refreshIcons(stage);
           updateHintBtn();
           input.focus({ preventScroll: true });
+          lastTs = performance.now();
+          raf = requestAnimationFrame(tick);
         }
 
         function renderTiles() {
@@ -399,21 +410,46 @@
           input.focus({ preventScroll: true });
         }
 
+        function tick(ts) {
+          if (phase !== "play") return;
+          const dt = Math.min(ts - lastTs, 250);
+          lastTs = ts;
+          remainMs = Math.max(0, remainMs - dt);
+          const bar = stage.querySelector("[data-timer]");
+          if (bar) {
+            bar.firstElementChild.style.transform = `scaleX(${remainMs / (LIMIT * 1000)})`;
+            bar.classList.toggle("is-low", remainMs < 8000);
+            stage.querySelector("[data-sec]").textContent = Math.ceil(remainMs / 1000);
+          }
+          // 마지막 5초는 초가 바뀔 때마다 똑딱
+          const secNow = Math.ceil(remainMs / 1000);
+          if (secNow !== lastSec) {
+            lastSec = secNow;
+            if (secNow >= 1 && secNow <= 5) ctx.sfx("tick");
+          }
+          if (remainMs <= 0) {
+            finishQuestion(false, "time");
+            return;
+          }
+          raf = requestAnimationFrame(tick);
+        }
+
         function finishQuestion(ok, why) {
           if (phase !== "play") return;
           stopLoops();
           phase = "feedback";
           const [word, , , tip] = qs[idx];
-          results[idx] = { ok, why };
+          const sec = ok ? Math.floor(remainMs / 1000) : 0;
+          results[idx] = { ok, sec, why };
           ctx.sfx(ok ? "success" : why === "skip" ? "whoosh" : "fail");
           const card = stage.querySelector(".gm-cs");
-          const title = ok ? "정답이에요!" : why === "skip" ? "넘겼어요" : "아쉬워요";
+          const title = ok ? "정답이에요!" : why === "time" ? "시간이 다 됐어요" : why === "skip" ? "넘겼어요" : "아쉬워요";
           const fb = document.createElement("div");
           fb.className = "gm-cs__fb";
           fb.innerHTML = `<div class="gm-cs__fb-badge ${ok ? "is-ok" : "is-ng"}">${HKUI.icon(ok ? "check" : "x", 34, "#fff")}</div>
             <div class="gm-cs__fb-title">${title}</div>
             <div class="gm-cs__fb-word">${esc(word)}</div>
-            ${ok ? `<div class="gm-cs__fb-pts">+100점</div>` : ""}
+            ${ok ? `<div class="gm-cs__fb-pts">+${100 + sec * PER_SEC}점 (정답 100 + 남은 ${sec}초×${PER_SEC})</div>` : ""}
             <p class="gm-cs__fb-tip">${esc(tip)}</p>`;
           card.appendChild(fb);
           HKUI.refreshIcons(fb);
@@ -431,6 +467,7 @@
           phase = "done";
           const okCount = results.filter((r) => r.ok).length;
           const base = okCount * 100;
+          const timeBonus = results.reduce((s, r) => s + (r.ok ? r.sec * PER_SEC : 0), 0);
           const score = totalScore();
           stage.innerHTML = `<div class="gm-cs">
             <div class="gm-cs__intro">
@@ -438,6 +475,7 @@
               <div class="gm-cs__sum-big">${okCount}<small> / ${COUNT} 정답</small></div>
               <div class="gm-cs__calc">
                 <span>정답 ${okCount}개 × 100</span><b>${base}</b>
+                <span>남은 시간 보너스</span><b>+${timeBonus}</b>
                 <span>글자 힌트 ${hintsTotal}번 × 30</span><b>−${hintsTotal * HINT_COST}</b>
                 <span class="is-total">합계</span><b class="is-total">${score}점</b>
               </div>
@@ -466,7 +504,9 @@
           p.querySelector("[data-resume]").onclick = () => {
             p.remove();
             phase = "play";
+            lastTs = performance.now();
             stage.querySelector("[data-input]")?.focus({ preventScroll: true });
+            raf = requestAnimationFrame(tick);
           };
         }
         document.addEventListener("visibilitychange", () => {
