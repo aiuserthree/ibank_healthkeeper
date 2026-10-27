@@ -383,6 +383,8 @@ window.HKPlay = (function () {
       true
     );
     // 판 안을 눌러 새 판을 시작했으면 스페이스 재시작은 꺼진다 (순위표·머리·그만하기 버튼을 누른 건 상관없음)
+    // 게임 화면에서 두 손가락 확대(iOS 사파리)는 막는다 — 게임 조작 중 화면이 커지지 않게
+    document.addEventListener("gesturestart", (e) => e.preventDefault());
     window.addEventListener("pointerdown", (e) => {
       const stageEl = document.getElementById("hk-play-stage");
       if (stageEl && stageEl.contains(e.target) && !e.target.closest(".hk-quit-btn, .hk-endbar")) canRestart = false;
