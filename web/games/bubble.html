@@ -44,14 +44,18 @@
     .gm-go { width: 100%; border: 0; padding: 12px; border-radius: 12px; font-size: 15.5px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(135deg, #0891b2, #8b5cf6); }
     .gm-go:focus-visible { outline: 3px solid #a5f3fc; outline-offset: 2px; }
     /* 휴대폰 조작 — 왼쪽은 쏘기 버튼 하나, 오른쪽은 누른 채로 좌우 이동·위로 밀어 점프하는 스틱 */
-    .gm-pad { display: none; grid-template-columns: 1fr 1.9fr; gap: 10px; padding: 10px; border-radius: 0 0 16px 16px; background: #102a3c; touch-action: none; }
+    .gm-pad { display: none; grid-template-columns: 1fr 2fr; gap: 10px; padding: 10px; border-radius: 0 0 16px 16px; background: #102a3c; touch-action: none; }
     .gm-pad.is-on { display: grid; }
-    .gm-stick { position: relative; height: 72px; border-radius: 14px; background: rgba(255,255,255,.08); touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: stretch; overflow: hidden; }
-    .gm-stick span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 700; color: rgba(224,247,250,.7); pointer-events: none; transition: background .08s, color .08s; }
-    .gm-stick span.u { color: rgba(221,214,254,.85); }
-    .gm-stick.is-left .l, .gm-stick.is-right .r { background: rgba(103,232,249,.35); color: #fff; }
-    .gm-stick.is-jump .u { background: rgba(167,139,250,.5); color: #fff; }
-    .gm-pad button { height: 72px; border: 0; border-radius: 14px; background: rgba(255,255,255,.1); color: #e0f7fa; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    /* 오른쪽 조이스틱 — 아무 데나 손가락을 대면 그 자리가 가운데, 좌우로 끌면 이동, 위로 튕기면 점프 */
+    .gm-stick { position: relative; height: 96px; border-radius: 16px; background: rgba(255,255,255,.07); touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; overflow: hidden; }
+    .gm-stick__hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 12.5px; font-weight: 700; color: rgba(224,247,250,.55); pointer-events: none; text-align: center; line-height: 1.35; }
+    .gm-stick.is-on .gm-stick__hint { opacity: 0; }
+    .gm-stick__base, .gm-stick__knob { position: absolute; left: 0; top: 0; border-radius: 50%; pointer-events: none; opacity: 0; transform: translate(-50%, -50%); }
+    .gm-stick__base { width: 76px; height: 76px; border: 2px solid rgba(165,243,252,.35); background: rgba(165,243,252,.08); }
+    .gm-stick__knob { width: 40px; height: 40px; background: rgba(103,232,249,.75); box-shadow: 0 0 0 4px rgba(103,232,249,.2); }
+    .gm-stick.is-on .gm-stick__base, .gm-stick.is-on .gm-stick__knob { opacity: 1; }
+    .gm-stick.is-jump .gm-stick__knob { background: rgba(196,181,253,.95); box-shadow: 0 0 0 6px rgba(167,139,250,.3); }
+    .gm-pad button { height: 96px; border: 0; border-radius: 14px; background: rgba(255,255,255,.1); color: #e0f7fa; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; touch-action: none; -webkit-tap-highlight-color: transparent; }
     .gm-pad button.is-down { background: rgba(103,232,249,.35); }
     .gm-pad button[data-k="jump"] { background: rgba(167,139,250,.28); }
     .gm-pad button[data-k="shoot"] { background: rgba(34,211,238,.28); }
@@ -81,10 +85,9 @@
           </div>
           <div class="gm-pad" data-pad>
             <button type="button" data-k="shoot">${HKUI.icon("droplets", 20, "currentColor")} 쏘기</button>
-            <div class="gm-stick" data-stick aria-label="이동·점프 스틱">
-              <span class="l">${HKUI.icon("chevron-left", 24, "currentColor")}</span>
-              <span class="u">${HKUI.icon("chevron-up", 22, "currentColor")}점프</span>
-              <span class="r">${HKUI.icon("chevron-right", 24, "currentColor")}</span>
+            <div class="gm-stick" data-stick aria-label="이동·점프 조이스틱">
+              <span class="gm-stick__hint">${HKUI.icon("move-horizontal", 20, "currentColor")}<span>누른 채로 좌우로 끌면 이동<br>위로 튕기면 점프</span></span>
+              <i class="gm-stick__base"></i><i class="gm-stick__knob"></i>
             </div>
           </div>
           <div class="gm-note">← → 이동 · ↑ 또는 스페이스 점프 · X(Z) 비눗방울 · P 일시정지</div>
@@ -1230,22 +1233,31 @@
         btn.addEventListener("contextmenu", (e) => e.preventDefault());
       });
 
-      // 오른쪽 스틱 — 누른 채로: 가운데보다 왼쪽이면 ←, 오른쪽이면 → · 위쪽 띠를 누르거나 손가락을 위로 밀면 점프(위에 있는 동안 높이 점프)
+      // 오른쪽 조이스틱 — 손가락을 댄 자리가 가운데. 좌우로 14px 넘게 끌면 이동(멀리 끌면 가운데가 따라와 반대로 바로 꺾임),
+      // 위로 22px 튕기면 점프(위에 둔 채면 높이 점프) · 다시 조금 내렸다 튕기면 또 점프
       const stick = pad.querySelector("[data-stick]");
+      const base = stick.querySelector(".gm-stick__base"), knob = stick.querySelector(".gm-stick__knob");
       let stk = null;
       function stickSet(k, on) { if (!!keys[k] === on) return; on ? press(k) : release(k); }
-      function stickReset() { stk = null; stick.classList.remove("is-left", "is-right", "is-jump"); }
+      function stickReset() { stk = null; stick.classList.remove("is-on", "is-jump"); }
       function stickUpdate(x, y) {
         const rc = stick.getBoundingClientRect();
-        const cx = rc.left + rc.width / 2, dead = Math.max(10, rc.width * 0.07);
-        const l = x < cx - dead, r = x > cx + dead;
-        const jump = y < rc.top + rc.height * 0.42 || (stk && stk.y0 - y > 22);
-        stickSet("left", l); stickSet("right", r); stickSet("jump", jump);
-        stick.classList.toggle("is-left", l); stick.classList.toggle("is-right", r); stick.classList.toggle("is-jump", jump);
+        let dx = x - stk.ox;
+        if (dx > 34) { stk.ox = x - 34; dx = 34; }
+        if (dx < -34) { stk.ox = x + 34; dx = -34; }
+        // 점프: 가장 낮게 내려간 곳(lowY)보다 22px 위로 가면 켜고, 켠 뒤 12px 내려오면 끔
+        if (!stk.jump) { stk.lowY = Math.max(stk.lowY, y); if (stk.lowY - y > 22) { stk.jump = true; stk.jumpY = y; } }
+        else { stk.jumpY = Math.min(stk.jumpY, y); if (y - stk.jumpY > 12) { stk.jump = false; stk.lowY = y; } }
+        stickSet("left", dx < -14); stickSet("right", dx > 14); stickSet("jump", stk.jump);
+        stick.classList.toggle("is-jump", stk.jump);
+        const bx = stk.ox - rc.left, by = stk.oy - rc.top;
+        base.style.left = bx + "px"; base.style.top = by + "px";
+        knob.style.left = bx + dx + "px"; knob.style.top = by + Math.max(-30, Math.min(30, y - stk.oy)) + "px";
       }
       stick.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        stk = { id: e.pointerId, y0: e.clientY };
+        stk = { id: e.pointerId, ox: e.clientX, oy: e.clientY, lowY: e.clientY, jump: false, jumpY: 0 };
+        stick.classList.add("is-on");
         try { stick.setPointerCapture(e.pointerId); } catch (_) {}
         stickUpdate(e.clientX, e.clientY);
       });
