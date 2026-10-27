@@ -97,6 +97,13 @@
         b: { r: 12, hp: 2, pts: 80, c1: "#c4b5fd", c2: "#7c3aed", spikes: 10, oval: true },
         c: { r: 13, hp: 3, pts: 150, c1: "#fda4af", c2: "#e11d48", spikes: 12, sharp: true },
       };
+      // 큰 세균 — 5웨이브마다 이 순서로 돌아가며 나온다 (hp: 체력 배율)
+      const BOSS_KINDS = [
+        { id: "spore", name: "포자 세균", tip: "부채꼴 탄과 졸개를 피해요", r: 44, hp: 1, c1: "#fbcfe8", c2: "#ec4899", c3: "#9d174d", spike: "#a3e635" },
+        { id: "spiral", name: "소용돌이 세균", tip: "빙글빙글 도는 탄 사이로 빠져나가요", r: 40, hp: 0.95, c1: "#bae6fd", c2: "#0ea5e9", c3: "#075985", spike: "#fde047" },
+        { id: "charge", name: "돌진 세균", tip: "부르르 떨면 곧 돌진해요 — 옆으로 피해요", r: 46, hp: 1.15, c1: "#fed7aa", c2: "#f97316", c3: "#9a3412", spike: "#fca5a5" },
+        { id: "queen", name: "여왕 세균", tip: "탄 커튼의 빈틈으로 빠져나가요", r: 48, hp: 1.3, c1: "#ddd6fe", c2: "#8b5cf6", c3: "#4c1d95", spike: "#f0abfc" },
+      ];
       let state = "ready"; // ready | play | paused | over
       let S = null; // 판 상태
       const keys = { left: false, right: false, up: false, down: false };
@@ -180,16 +187,20 @@
         hud();
       }
 
+      // 웨이브가 오를수록 계속 어려워진다 — 예전엔 8~10웨이브에서 상한에 닿아 그 뒤로는 같았다
       function waveParams(w) {
         return {
           rows: Math.min(5, 3 + Math.floor((w - 1) / 2)),
           cols: Math.min(8, 6 + Math.floor((w - 1) / 3)),
-          sway: 0.7 + w * 0.09,
-          diveEvery: Math.max(1.1, 3.6 - w * 0.28),
-          diveCount: Math.min(3, 1 + Math.floor(w / 3)),
-          shotEvery: Math.max(0.32, 1.9 - w * 0.16),
-          ebSpeed: Math.min(300, 150 + w * 14),
-          diveSpeed: Math.min(300, 140 + w * 14),
+          sway: Math.min(2.4, 0.7 + w * 0.09),
+          diveEvery: Math.max(0.7, 3.6 - w * 0.24),
+          diveCount: Math.min(5, 1 + Math.floor(w / 3)),
+          shotEvery: Math.max(0.2, 1.9 - w * 0.13),
+          volley: Math.min(3, 1 + Math.floor((w - 1) / 6)), // 한 번에 쏘는 세균 수 (7웨이브 2, 13웨이브 3)
+          ebSpeed: Math.min(380, 150 + w * 14),
+          diveSpeed: Math.min(380, 140 + w * 14),
+          hpBonus: Math.floor((w - 1) / 8), // 9웨이브부터 세균마다 체력 +1, 17웨이브 +2 …
+          armored: w >= 11, // 11웨이브부터 둘째 줄도 단단한 세균
         };
       }
 
@@ -204,10 +215,11 @@
         S.shotCd = 1.6;
         if (S.wave % 5 === 0) {
           const n = S.wave / 5;
-          const hp = 70 + (n - 1) * 45;
-          S.boss = { x: W / 2, y: -70, r: 44, hp, maxHp: hp, t: 0, spreadCd: 2.2, aimCd: 1.4, minionCd: 4, flash: 0, n };
+          const kind = BOSS_KINDS[(n - 1) % BOSS_KINDS.length];
+          const hp = Math.round((80 + (n - 1) * 60) * kind.hp);
+          S.boss = { kind: kind.id, x: W / 2, y: -70, r: kind.r, hp, maxHp: hp, t: 0, spreadCd: 2.2, aimCd: 1.4, minionCd: 4, spinA: 0, spinCd: 0, chargeCd: 3.5, mode: "move", curtainCd: 2, flash: 0, n, angry: false };
           S.form = null;
-          S.banner = { text: "큰 세균 등장!", sub: "체력 바를 다 깎아 주세요", t: 2 };
+          S.banner = { text: `${kind.name} 등장!`, sub: kind.tip, t: 2.2 };
           if (armedList().length === 0) dropItem(W / 2, 150, pickWeapon()); // 맨손이면 무기 하나
           ctx.sfx("whoosh");
         } else {
@@ -218,18 +230,19 @@
             for (let c = 0; c < P.cols; c++) {
               let type = "a";
               if (r === 0 && S.wave >= 2) type = "c";
-              else if (r <= 1) type = "b";
+              else if (r === 1 && P.armored) type = "c";
+              else if (r <= 1 || (r === 2 && S.wave >= 7)) type = "b";
               const T = TYPES[type];
               const fromLeft = (r + c) % 2 === 0;
               S.enemies.push({
-                type, hp: T.hp, r: T.r, col: c, row: r, x: fromLeft ? -30 : W + 30, y: -20,
+                type, hp: T.hp + P.hpBonus, r: T.r, col: c, row: r, x: fromLeft ? -30 : W + 30, y: -20,
                 mode: "enter", delay: 0.25 + r * 0.32 + c * 0.06, p: 0,
                 sx: fromLeft ? -30 : W + 30, sy: 40 + r * 10, cx: fromLeft ? W * 0.75 : W * 0.25, cy: 240,
                 flash: 0, spin: Math.random() * 6,
               });
             }
           }
-          S.banner = { text: `웨이브 ${S.wave}`, sub: S.wave === 1 ? "세균 편대가 몰려와요" : "더 빠르고 촘촘해져요", t: 1.6 };
+          S.banner = { text: `웨이브 ${S.wave}`, sub: S.wave === 1 ? "세균 편대가 몰려와요" : P.hpBonus && (S.wave - 1) % 8 === 0 ? "세균이 더 단단해졌어요!" : "더 빠르고 촘촘해져요", t: 1.6 };
           ctx.sfx("go");
         }
         hud();
@@ -448,41 +461,99 @@
           if (S.shotCd <= 0) {
             S.shotCd = P.shotEvery * (0.7 + Math.random() * 0.6);
             const shooters = S.enemies.filter((e) => e.mode === "form");
-            if (shooters.length) {
-              const e = shooters[Math.floor(Math.random() * shooters.length)];
+            for (let v = 0; v < P.volley && shooters.length; v++) {
+              const e = shooters.splice(Math.floor(Math.random() * shooters.length), 1)[0];
               aimShot(e.x, e.y + 8, P.ebSpeed, 0, 0.35);
             }
           }
         }
 
-        // 보스
+        // 보스 — 종류마다 공격이 다르고, 체력이 절반 아래면 화가 나서 더 빨라진다
         const B = S.boss;
         if (B) {
           B.t += dt;
           if (B.flash > 0) B.flash -= dt;
-          if (B.y < 110) B.y = Math.min(110, B.y + 70 * dt);
+          if (!B.angry && B.hp <= B.maxHp / 2) {
+            B.angry = true;
+            S.banner = { text: "화가 났어요!", sub: "공격이 더 빨라져요", t: 1.4 };
+            ctx.sfx("whoosh");
+          }
+          const rage = B.angry ? 0.7 : 1; // 쿨타임 배율
+          const sp = Math.min(300, 150 + B.n * 25) * (B.angry ? 1.12 : 1);
+          // 등장 — 한 번 자리 잡으면 끝 (예전엔 위아래로 흔들리며 110 위로 올라갈 때마다 '등장 중'으로 돌아가 공격을 반쯤 쉬었다)
+          if (!B.entered) { B.y = Math.min(110, B.y + 90 * dt); if (B.y >= 110) { B.entered = true; B.t = 0; } }
           else {
-            B.x = W / 2 + Math.sin(B.t * (0.6 + B.n * 0.08)) * (W / 2 - 64);
-            B.y = 110 + Math.sin(B.t * 1.3) * 14;
-            B.spreadCd -= dt; B.aimCd -= dt; B.minionCd -= dt;
-            const sp = Math.min(260, 140 + B.n * 25);
-            if (B.spreadCd <= 0) {
-              B.spreadCd = Math.max(1.1, 2.1 - B.n * 0.2);
-              const k = 5 + Math.min(4, B.n);
-              for (let i = 0; i < k; i++) {
-                const a = Math.PI / 2 + (i - (k - 1) / 2) * 0.22 + Math.sin(B.t) * 0.15;
-                S.ebullets.push({ x: B.x, y: B.y + 30, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 4.5 });
-              }
+            // 이동
+            if (B.mode === "move") {
+              const spd = (0.6 + B.n * 0.08) * (B.kind === "spiral" ? 1.4 : 1) * (B.angry ? 1.25 : 1);
+              B.x = W / 2 + Math.sin(B.t * spd) * (W / 2 - 64);
+              B.y = 110 + Math.sin(B.t * 1.3) * 14;
             }
-            if (B.aimCd <= 0) { B.aimCd = Math.max(0.6, 1.2 - B.n * 0.1); aimShot(B.x, B.y + 30, sp * 1.25); }
-            if (B.minionCd <= 0) {
-              B.minionCd = 5;
-              for (const d of [-1, 1]) {
-                const T = TYPES.a;
-                const e = { type: "a", hp: T.hp, r: T.r, col: null, x: B.x + d * 36, y: B.y + 10, flash: 0, spin: 0 };
-                startDive(e, 170 + B.n * 15, 0);
+            B.spreadCd -= dt; B.aimCd -= dt; B.minionCd -= dt;
+            const minions = (count, type, vy) => {
+              for (let i = 0; i < count; i++) {
+                const d = count === 1 ? 0 : (i / (count - 1)) * 2 - 1;
+                const T = TYPES[type];
+                const e = { type, hp: T.hp, r: T.r, col: null, x: B.x + d * 40, y: B.y + 10, flash: 0, spin: 0 };
+                startDive(e, vy, i * 0.12);
                 S.enemies.push(e);
               }
+            };
+            if (B.kind === "spore") {
+              // 포자 세균 — 부채꼴 탄 + 조준탄 + 졸개
+              if (B.spreadCd <= 0) {
+                B.spreadCd = Math.max(0.9, 2.1 - B.n * 0.2) * rage;
+                const k = 5 + Math.min(5, B.n);
+                for (let i = 0; i < k; i++) {
+                  const a = Math.PI / 2 + (i - (k - 1) / 2) * 0.22 + Math.sin(B.t) * 0.15;
+                  S.ebullets.push({ x: B.x, y: B.y + 30, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, r: 4.5 });
+                }
+              }
+              if (B.aimCd <= 0) { B.aimCd = Math.max(0.5, 1.2 - B.n * 0.1) * rage; aimShot(B.x, B.y + 30, sp * 1.25); }
+              if (B.minionCd <= 0) { B.minionCd = 5 * rage; minions(2 + (B.angry ? 1 : 0), "a", 170 + B.n * 15); }
+            } else if (B.kind === "spiral") {
+              // 소용돌이 세균 — 빙글빙글 도는 탄 줄기 (화나면 두 줄기)
+              B.spinCd -= dt;
+              if (B.spinCd <= 0) {
+                B.spinCd = 0.11 * (B.angry ? 0.8 : 1);
+                B.spinA += 0.38;
+                const arms = B.angry ? 3 : 2;
+                for (let k = 0; k < arms; k++) {
+                  const a = B.spinA + (k * Math.PI * 2) / arms;
+                  if (Math.sin(a) < -0.3) continue; // 위로 가는 탄은 빼서 화면이 너무 빽빽하지 않게
+                  S.ebullets.push({ x: B.x + Math.cos(a) * 30, y: B.y + Math.sin(a) * 30, vx: Math.cos(a) * sp * 0.75, vy: Math.sin(a) * sp * 0.75, r: 4 });
+                }
+              }
+              if (B.aimCd <= 0) { B.aimCd = 2.2 * rage; for (const o of [-0.18, 0, 0.18]) aimShot(B.x, B.y + 30, sp * 1.2, o); }
+            } else if (B.kind === "charge") {
+              // 돌진 세균 — 잠깐 떨다가 내 쪽으로 돌진하고 돌아간다 (몸에 닿으면 피해)
+              if (B.mode === "move") {
+                B.chargeCd -= dt;
+                if (B.aimCd <= 0) { B.aimCd = 1.4 * rage; for (const o of [-0.25, 0, 0.25]) aimShot(B.x, B.y + 30, sp * 1.1, o); }
+                if (B.chargeCd <= 0) { B.mode = "wind"; B.modeT = 0.6; B.tx = S.px; B.ty = Math.min(PY - 40, H * 0.72); ctx.sfx("tick"); }
+              } else if (B.mode === "wind") {
+                B.modeT -= dt;
+                B.x += Math.sin(B.t * 60) * 1.2; // 부르르
+                if (B.modeT <= 0) { B.mode = "dash"; ctx.sfx("whoosh"); }
+              } else if (B.mode === "dash") {
+                const dx = B.tx - B.x, dy = B.ty - B.y, d = Math.hypot(dx, dy), v = (420 + B.n * 30) * (B.angry ? 1.15 : 1) * dt;
+                if (d <= v) { B.x = B.tx; B.y = B.ty; B.mode = "back"; for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; S.ebullets.push({ x: B.x, y: B.y, vx: Math.cos(a) * sp * 0.7, vy: Math.sin(a) * sp * 0.7, r: 4 }); } }
+                else { B.x += (dx / d) * v; B.y += (dy / d) * v; }
+              } else if (B.mode === "back") {
+                const ty = 110, dy = ty - B.y, v = 200 * dt;
+                if (Math.abs(dy) <= v) { B.y = ty; B.mode = "move"; B.chargeCd = (3.4 - Math.min(1.4, B.n * 0.15)) * rage; B.t = Math.asin(Math.max(-1, Math.min(1, (B.x - W / 2) / (W / 2 - 64)))) / ((0.6 + B.n * 0.08) * (B.angry ? 1.25 : 1)); }
+                else B.y += Math.sign(dy) * v;
+              }
+            } else {
+              // 여왕 세균 — 틈 하나 남긴 탄 커튼 + 단단한 졸개 호위
+              B.curtainCd -= dt;
+              if (B.curtainCd <= 0) {
+                B.curtainCd = Math.max(1.5, 2.8 - B.n * 0.12) * rage;
+                const gap = 64, gx = 40 + Math.random() * (W - 80);
+                for (let x = 12; x < W; x += 22) if (Math.abs(x - gx) > gap / 2) S.ebullets.push({ x, y: B.y + 34, vx: 0, vy: sp * 0.62, r: 4 });
+              }
+              if (B.aimCd <= 0) { B.aimCd = 1.6 * rage; aimShot(B.x, B.y + 30, sp * 1.3); }
+              if (B.minionCd <= 0) { B.minionCd = 4.5 * rage; minions(3, B.angry ? "c" : "b", 160 + B.n * 15); }
             }
           }
         }
@@ -1029,12 +1100,14 @@
       }
 
       function drawBoss(B) {
-        const T = { c1: "#f9a8d4", c2: "#9d174d", spikes: 18 };
+        const K = BOSS_KINDS.find((k) => k.id === B.kind) || BOSS_KINDS[0];
+        const T = { spikes: 18 };
         g.save();
         g.translate(B.x, B.y);
         const flash = B.flash > 0;
-        g.strokeStyle = flash ? "#fff" : "#be185d";
-        g.fillStyle = flash ? "#fff" : "#a3e635";
+        if (B.mode === "wind") g.translate(Math.sin(B.t * 70) * 2, 0);
+        g.strokeStyle = flash ? "#fff" : K.c3;
+        g.fillStyle = flash ? "#fff" : K.spike;
         g.lineWidth = 3;
         for (let i = 0; i < T.spikes; i++) {
           const a = (i / T.spikes) * Math.PI * 2 + B.t * 0.5;
@@ -1043,9 +1116,9 @@
           g.beginPath(); g.arc(Math.cos(a) * (B.r + len), Math.sin(a) * (B.r + len), 3.2, 0, Math.PI * 2); g.fill();
         }
         const grad = g.createRadialGradient(-B.r * 0.35, -B.r * 0.4, B.r * 0.15, 0, 0, B.r);
-        grad.addColorStop(0, flash ? "#fff" : "#fbcfe8");
-        grad.addColorStop(0.6, flash ? "#fff" : "#ec4899");
-        grad.addColorStop(1, flash ? "#fde68a" : "#9d174d");
+        grad.addColorStop(0, flash ? "#fff" : K.c1);
+        grad.addColorStop(0.6, flash ? "#fff" : B.angry ? "#ef4444" : K.c2);
+        grad.addColorStop(1, flash ? "#fde68a" : K.c3);
         g.fillStyle = grad;
         g.beginPath(); g.arc(0, 0, B.r, 0, Math.PI * 2); g.fill();
         g.fillStyle = "rgba(255,255,255,.18)";
@@ -1071,7 +1144,7 @@
         g.font = "700 10px Pretendard, system-ui, sans-serif";
         g.textAlign = "center"; g.textBaseline = "middle";
         g.fillStyle = "#fbcfe8";
-        g.fillText(`큰 세균 Lv.${B.n}`, W / 2, by + 18);
+        g.fillText(`${K.name} Lv.${B.n}${B.angry ? " · 화남" : ""}`, W / 2, by + 18);
       }
 
       function drawItem(it) {
