@@ -14,7 +14,6 @@ window.HKBoard = (function () {
       }
       return `<ul class="hk-notice-list">${items.map((n) => `
         <li><a href="${route}?id=${n.id}" data-id="${n.id}" class="${n.id === activeId ? "is-active" : ""}">
-          ${n.pinned ? '<span class="hk-badge hk-badge--soft">공지</span>' : ""}
           <span class="hk-notice-list__title">${HKUI.escapeHtml(n.title)}</span>
           <span class="hk-notice-list__date">${dateLabel(n.publishedAt)}</span>
         </a></li>`).join("")}</ul>`;
@@ -41,7 +40,8 @@ window.HKBoard = (function () {
       afterMount: async () => {
         const root = document.getElementById("notice-root");
         try {
-          const items = await HKApi.notices(cfg.category);
+          // 목록은 고정 여부와 상관없이 최신 글이 맨 위
+          const items = (await HKApi.notices(cfg.category)).slice().sort((a, b) => String(b.publishedAt || "").localeCompare(String(a.publishedAt || "")));
           const wanted = Number(new URLSearchParams(location.search).get("id"));
           const current = items.find((n) => n.id === wanted) || items[0];
           root.innerHTML = current
