@@ -275,7 +275,7 @@
           S.px += mv * speed * k * dt;
           PY += mvY * speed * k * dt;
         } else if (pointerX != null) {
-          const step = 720 * dt;
+          const step = 1400 * dt; // 끈 만큼 바로 따라오게
           const d = pointerX - S.px;
           S.px += Math.abs(d) < step ? d : Math.sign(d) * step;
           if (pointerY != null) {
@@ -1164,7 +1164,7 @@
             <div><span class="gm-dot" style="background:#0ea5e9">소</span>화면 소독</div>
           </div>
           <p class="gm-items-note">같은 무기를 또 먹으면 <b>최대 3단계</b> · 빨간 칩은 새 무기 · 가끔 마스크·물방울·비타민D·꿀</p>
-          <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 자동 연사 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면을 끌면 그쪽으로 따라와요</div>
+          <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 자동 연사 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면 아무 데나 대고 끌면 끈 만큼 움직여요</div>
           <button type="button" class="gm-go" data-act="start">시작</button>
         </div>`);
       }
@@ -1249,19 +1249,22 @@
         const rect = canvas.getBoundingClientRect();
         return ((e.clientX - rect.left) / rect.width) * W;
       }
-      let dragging = false;
+      // 휴대폰 — 누른 곳으로 날아가지 않고, 손가락을 끈 만큼만 같은 방향으로 움직인다 (화면 어디를 눌러도 됨)
+      let dragging = false, lastFX = 0, lastFY = 0;
       canvas.addEventListener("pointerdown", (e) => {
         if (state !== "play") return;
         dragging = true;
-        pointerX = toWorldX(e);
-        pointerY = toWorldY(e);
+        lastFX = toWorldX(e); lastFY = toWorldY(e);
+        pointerX = S.px; pointerY = PY;
         try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
         e.preventDefault();
       });
       canvas.addEventListener("pointermove", (e) => {
         if (!dragging || state !== "play") return;
-        pointerX = toWorldX(e);
-        pointerY = toWorldY(e);
+        const fx = toWorldX(e), fy = toWorldY(e);
+        pointerX = Math.max(22, Math.min(W - 22, (pointerX ?? S.px) + fx - lastFX));
+        pointerY = Math.max(PY_MIN, Math.min(PY_MAX, (pointerY ?? PY) + fy - lastFY));
+        lastFX = fx; lastFY = fy;
       });
       const endDrag = () => { dragging = false; pointerX = pointerY = null; };
       canvas.addEventListener("pointerup", endDrag);
