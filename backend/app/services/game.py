@@ -47,8 +47,6 @@ GAMES: dict[str, Game] = {
         Game("snake", "줄줄이 점심", "MINI", "비타민 먹고 길어지는 점심 줄 · 책상·벽 피하기", "utensils", "점", 1_000_000),
         Game("stack", "점심 찬합 탑", "MINI", "타이밍 맞춰 찬합 쌓기 · 어긋난 만큼 잘려요", "layers", "점", 1_000_000),
         Game("sudoku", "오늘의 스도쿠", "MINI", "모두 같은 문제 · 빨리 푼 순서대로", "grid-3x3", "time", 24 * 3600, lower_better=True, daily_once=True),
-        # 1/100초 단위 — 1부터 100까지 순서대로 누르는 데 걸린 시간
-        Game("fifty", "번호순 도장 찍기", "MINI", "1부터 100까지 순서대로 결재 도장 · 모두 같은 판", "stamp", "centi", 24 * 3600 * 100, lower_better=True, daily_once=True),
         Game("mines", "칼퇴 지뢰찾기", "MINI", "야근 폭탄을 피해 칼퇴 자리 모두 열기 · 모두 같은 판", "bomb", "점", 1_000_000, daily_once=True),
         Game("promote", "승진 합치기", "MINI", "같은 직급을 밀어 합쳐 승진 · 오늘의 인사 판", "briefcase-business", "점", 1_000_000, daily_once=True),
         Game("chosung", "건강 초성 퀴즈", "QUIZ", "ㄱㅂㅁ → 거북목 · 오늘의 건강 낱말 5문제", "spell-check", "점", 100000, daily_once=True),

@@ -187,7 +187,6 @@ window.HKPlay = (function () {
     korean: ["#b45309", "#facc15"],
     snake: ["#15803d", "#84cc16"],
     stack: ["#0e7490", "#67e8f9"],
-    fifty: ["#9a3412", "#fb923c"],
     mines: ["#1f2937", "#f43f5e"],
     promote: ["#312e81", "#818cf8"],
   };
