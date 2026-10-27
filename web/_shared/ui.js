@@ -989,7 +989,7 @@ window.HKUI = (function () {
     const common = {
       이름: "김민수",
       name: "김민수",
-      logoUrl: base + "/assets/logo-lockup.svg",
+      logoUrl: base + "/assets/logo-lockup.svg?v=2",
       mypageUrl: base + "/api/mypage/enter",
       reapplyUrl: base + "/api/reapply/enter",
       재신청시작: "목요일 09:00",

@@ -57,7 +57,7 @@ window.HKMember = (function () {
       `text-decoration:none;font-size:15px;font-weight:600;padding:8px 4px;white-space:nowrap;color:${active === id ? "var(--color-signal-blue)" : "var(--color-midnight-navy)"}`;
     return `<header class="hk-site-header" style="background:var(--surface-card);border-bottom:1px solid var(--border-default);position:sticky;top:0;z-index:50">
       <div class="hk-mheader" style="max-width:1200px;margin:0 auto;height:72px;padding:0 32px;display:flex;align-items:center;gap:32px">
-        <a href="${R.home}" style="display:flex;align-items:center;padding:0"><img src="/assets/logo-lockup.svg" alt="헬스키퍼" height="34"></a>
+        <a href="${R.home}" style="display:flex;align-items:center;padding:0"><img src="/assets/logo-lockup.svg?v=2" alt="헬스키퍼" height="34"></a>
         <nav class="hk-mnav" style="display:flex;gap:24px;margin-left:8px">
           <a href="${R.home}" style="${navStyle("home")}">서비스 소개</a>
           <a href="${R.reserve}" style="${navStyle("reserve")}">예약하기</a>
@@ -84,7 +84,7 @@ window.HKMember = (function () {
       <div class="hk-drawer-backdrop" id="hk-drawer-backdrop"></div>
       <aside class="hk-drawer">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border-default)">
-          <img src="/assets/logo-lockup.svg" alt="헬스키퍼" height="28">
+          <img src="/assets/logo-lockup.svg?v=2" alt="헬스키퍼" height="28">
           <button type="button" aria-label="닫기" id="hk-drawer-close" style="border:none;background:transparent;cursor:pointer;padding:6px;display:flex">${HKUI.icon("x", 22, "var(--color-slate-blue)")}</button>
         </div>
         <div style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column">
@@ -110,7 +110,7 @@ window.HKMember = (function () {
   function authHeader() {
     return `<header style="height:72px;background:var(--surface-card);border-bottom:1px solid var(--border-default)">
       <div style="max-width:1200px;margin:0 auto;height:100%;padding:0 32px;display:flex;align-items:center">
-        <a href="${R.home}"><img src="/assets/logo-lockup.svg" alt="헬스키퍼" height="34"></a>
+        <a href="${R.home}"><img src="/assets/logo-lockup.svg?v=2" alt="헬스키퍼" height="34"></a>
       </div>
     </header>`;
   }
