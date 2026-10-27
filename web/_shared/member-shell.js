@@ -36,10 +36,6 @@ window.HKLunch = {
     if (day === 0 || day === 6) return true;
     return min < 9 * 60 || this.isLunchTime() || min >= 18 * 60;
   },
-  // 상단 메뉴 「라운지」 — 게임을 할 수 있는 시간에만
-  isOpen() {
-    return this.isLocal() || this.isPlayTime();
-  },
   // 메인 배너("점심 먹고 남은 10분") — 점심시간에만
   isBannerTime() {
     return this.isLocal() || this.isLunchTime();
@@ -64,7 +60,7 @@ window.HKMember = (function () {
           ${loggedIn ? `<a href="${R.profile}" style="${navStyle("mypage")}">마이페이지</a>` : ""}
           <a href="${R.health}" style="${navStyle("health")}">건강 정보</a>
           <a href="${R.notice}" style="${navStyle("notice")}">공지사항</a>
-          ${HKLunch.isOpen() || active === "lounge" ? `<a href="${R.lounge}" style="${navStyle("lounge")}">아케이드</a>` : ""}
+          <a href="${R.lounge}" style="${navStyle("lounge")}">아케이드</a>
         </nav>
         <div style="flex:1"></div>
         ${
@@ -90,7 +86,7 @@ window.HKMember = (function () {
         <div style="flex:1;overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column">
           ${!loggedIn ? `<div style="display:flex;flex-direction:column;gap:8px;padding-bottom:16px;margin-bottom:8px;border-bottom:1px solid var(--color-mist)"><a href="${R.login}"><button type="button" class="hk-btn hk-btn--primary hk-btn--block">로그인</button></a></div>` : ""}
           <nav style="display:flex;flex-direction:column">
-            ${[[R.home, "home", "서비스 소개"], [R.reserve, "reserve", "예약하기"]].concat(loggedIn ? [[R.profile, "mypage", "마이페이지"]] : []).concat([[R.health, "health", "건강 정보"], [R.notice, "notice", "공지사항"]]).concat(HKLunch.isOpen() || active === "lounge" ? [[R.lounge, "lounge", "아케이드"]] : []).map(([h, id, l]) => `<a href="${h}" style="display:block;padding:14px 4px;font-size:16px;font-weight:600;text-decoration:none;border-bottom:1px solid var(--color-mist);color:${active === id ? "var(--color-signal-blue)" : "var(--color-midnight-navy)"}">${l}</a>`).join("")}
+            ${[[R.home, "home", "서비스 소개"], [R.reserve, "reserve", "예약하기"]].concat(loggedIn ? [[R.profile, "mypage", "마이페이지"]] : []).concat([[R.health, "health", "건강 정보"], [R.notice, "notice", "공지사항"]]).concat([[R.lounge, "lounge", "아케이드"]]).map(([h, id, l]) => `<a href="${h}" style="display:block;padding:14px 4px;font-size:16px;font-weight:600;text-decoration:none;border-bottom:1px solid var(--color-mist);color:${active === id ? "var(--color-signal-blue)" : "var(--color-midnight-navy)"}">${l}</a>`).join("")}
           </nav>
         </div>
         ${loggedIn ? `<div style="border-top:1px solid var(--border-default);padding:14px 18px;display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px">${HKUI.avatar(name, "sm", avatarUrl)}<span style="font-size:14px;font-weight:600;color:var(--color-midnight-navy)">${HKUI.escapeHtml(name)}님</span>${HKUI.usageBadgeChip(profile.totalUses)}</div><button type="button" class="hk-btn hk-btn--secondary hk-btn--block" id="hk-logout-mobile">로그아웃</button></div>` : ""}

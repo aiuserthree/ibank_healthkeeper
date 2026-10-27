@@ -42,9 +42,8 @@
         const imgs = list.map((k) => `<img src="/assets/lounge/${k}.jpg" alt="">`).join("");
         return `<div class="hk-aa-wall__row">${imgs}${imgs}</div>`;
       };
-      const cta = st.open
-        ? `<a class="hk-aa-pill" href="#aa-games" data-scroll>지금 플레이</a>`
-        : `<span class="hk-aa-pill is-off">${esc(st.opensAt || "")}에 열려요</span>`;
+      // 업무 시간에도 버튼은 그대로 — 누르면 안내 창 (아래 click 처리)
+      const cta = `<a class="hk-aa-pill" href="#aa-games" data-scroll data-play>지금 플레이</a>`;
       return `<div class="hk-aa-hero">
           <div class="hk-aa-wall" aria-hidden="true">${row(0)}${row(4)}${row(8)}${row(2)}${row(6)}${row(10)}</div>
           <div class="hk-aa-hero__in">
@@ -60,7 +59,6 @@
           <span class="hk-aa-offer__eyebrow">${HKUI.icon(icon, 16, "currentColor")} ${eyebrow}</span>
           <b>${title}</b>
           <p>${desc}</p>
-          <a class="hk-aa-pill is-sm" href="#aa-games" data-scroll>게임 고르기</a>
         </div>`;
       return `<div class="hk-aa-offers">
           <div class="hk-aa-wrap">
@@ -183,6 +181,15 @@
         </div>`;
     }
 
+    let status = { open: true };
+    function closedAlert(st) {
+      HKUI.confirmDialog(
+        "지금은 업무 시간이에요",
+        `게임은 <b>점심시간(11:30~13:00)</b>과 <b>퇴근 후(18:00~)</b>, <b>출근 전(~09:00)</b>, 주말·공휴일에 할 수 있어요.${st.opensAt ? `<br>오늘 <b>${esc(st.opensAt)}</b>에 다시 열려요.` : ""}`,
+        { hideCancel: true, confirmLabel: "확인" }
+      );
+    }
+
     HKMember.mountPage({
       active: "lounge",
       auth: true,
@@ -192,11 +199,20 @@
         const body = document.getElementById("arcade-body");
         try {
           const [st, games] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames()]);
+          status = st;
           body.innerHTML = heroHtml(games, st) + offersHtml(st) + collectionHtml(games) + dailyHtml(games) + faqHtml() + endHtml();
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
         }
-        body.addEventListener("click", (e) => {
+        body.addEventListener("click", async (e) => {
+          // 업무 시간 — 플레이·시작하기(게임 링크)를 누르면 안내 창. 그사이 열렸으면 그대로 진행
+          const play = e.target.closest('[data-play], a[href^="/games/"]');
+          if (play && !status.open) {
+            e.preventDefault();
+            status = await HKApi.playStatus().catch(() => status);
+            if (!status.open) return closedAlert(status);
+            if (play.matches('a[href^="/games/"]')) return void (location.href = play.getAttribute("href"));
+          }
           const a = e.target.closest("[data-scroll]");
           if (!a) return;
           e.preventDefault();
