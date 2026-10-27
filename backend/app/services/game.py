@@ -192,7 +192,8 @@ async def list_games(db: AsyncSession, member: Member) -> list[dict]:
                 "todayTop": top,
                 "todayPlayers": len(rows),
                 "myBest": mine.get(game.key),
-                "playedToday": any(mid == member.id for mid, _ in rows),
+                # 내 참여 여부는 내 기록이라 업무 시간에도 알려 준다 (아케이드 '오늘의 도전' 표시)
+                "playedToday": any(mid == member.id for mid, _ in by_game.get(game.key, [])),
             }
         )
     return out

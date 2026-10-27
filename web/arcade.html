@@ -17,7 +17,7 @@
 <body>
   <div id="app"></div>
   <script>
-    // 아케이드 — 소개 페이지처럼: 첫 화면 → 큰 문장 → 이용 시간 → 게임 모음(대표 + 흐르는 타일) → 사내 순위 → 자주 묻는 질문
+    // 아케이드 — 소개 페이지처럼: 첫 화면 → 이용 시간 → 게임 모음(대표 + 흐르는 타일) → 오늘의 도전 → 자주 묻는 질문
     const GENRE = {
       blocks: "퍼즐", shooter: "슈팅", match3: "퍼즐", stairs: "액션", crossing: "액션", pairs: "퍼즐", bricks: "액션",
       bubble: "캐주얼", sudoku: "퍼즐", chosung: "퀴즈", trivia: "퀴즈", korean: "퀴즈", typing: "어학",
@@ -52,16 +52,6 @@
             <span class="hk-aa-tag">점심엔, 한 판</span>
             <div class="hk-aa-hero__cta">${cta}<span class="hk-aa-hero__note">${liveNote(st)}</span></div>
           </div>
-        </div>`;
-    }
-
-    function propsHtml(games) {
-      return `<div class="hk-aa-props hk-aa-wrap">
-          <p><em>${games.length}가지</em> 게임을 즐길 수 있는 곳.</p>
-          <p><em>점심시간</em>에도, <em>퇴근 후</em>에도<br>PC와 휴대폰을 넘나들며 플레이.</p>
-          <p><em>설치도 제로.</em><br>결제도 제로.<br>광고도 제로.</p>
-          <p><em>사내 순위</em>로 동료와 함께.</p>
-          <p>메뉴의 <span class="hk-aa-inline-icon">${HKUI.icon("gamepad-2", 26, "#fff")}</span> <em>아케이드</em>에서 바로 시작.</p>
         </div>`;
     }
 
@@ -104,7 +94,7 @@
       return `<div class="hk-aa-collection" id="aa-games">
           <div class="hk-aa-collection__head hk-aa-wrap">
             <h2>블록, 슈팅, 퀴즈 등.<br>게임이 고플 땐.</h2>
-            <p>줄을 지우는 퍼즐과 세균을 쓸어버리는 슈팅부터 매일 새로 나오는 상식·한국어·건강 퀴즈, 영어 타자까지. 판이 끝나면 점수가 바로 사내 순위에 올라가요.</p>
+            <p>줄을 지우는 퍼즐과 세균을 쓸어버리는 슈팅부터 매일 새로 나오는 상식·한국어·건강 퀴즈,<br>영어 타자까지. 판이 끝나면 점수가 바로 사내 순위에 올라가요.</p>
           </div>
           <a class="hk-aa-feature" href="/games/${lead.key}">
             <img src="/assets/lounge/${lead.key}.jpg" alt="">
@@ -122,22 +112,51 @@
         </div>`;
     }
 
-    function ranksHtml(games, st) {
-      const body = !st.open
-        ? `<div class="hk-aa-dark__off">업무 시간에는 순위도 쉬어요 · 오늘 ${esc(st.opensAt || "")}에 다시 열려요</div>`
-        : `<div class="hk-aa-ranks">${games.map((g) => `<a class="hk-aa-rank" href="/games/${g.key}" style="${tintVars(g.key)}">
-              <span class="hk-aa-rank__icon">${HKUI.icon(g.icon || "gamepad-2", 24, "#fff")}</span>
-              <span class="hk-aa-rank__text"><small>${esc(g.title)} · 오늘 1위</small>${g.todayTop ? `<b>${esc(g.todayTop.name)}</b>` : `<b class="is-empty">아직 1위가 없어요</b>`}</span>
-              ${g.todayTop ? `<span class="hk-aa-rank__score">${HKPlay.formatScore(g, g.todayTop.score)}</span>` : ""}
-            </a>`).join("")}</div>`;
+    // 오늘의 도전 — 모두 같은 문제 · 하루 첫 판만 순위. 새 문제까지 남은 시간과 내 참여 여부
+    function dailyHtml(games) {
+      const daily = games.filter((g) => g.dailyOnce);
+      if (!daily.length) return "";
+      const done = daily.filter((g) => g.playedToday).length;
+      const card = (g) => `<a class="hk-aa-daily" href="/games/${g.key}">
+          <span class="hk-aa-daily__art"><img src="/assets/lounge/${g.key}.jpg" alt="" loading="lazy" onerror="this.remove()"></span>
+          <span class="hk-aa-daily__body">
+            <small>${GENRE[g.key] || ""}</small>
+            <b>${esc(g.title)}</b>
+            <p>${esc(g.desc)}</p>
+            <span class="hk-aa-daily__foot">
+              ${g.playedToday
+                ? `<span class="hk-aa-daily__state is-done">${HKUI.icon("check", 14, "currentColor")} 오늘 참여 완료</span>`
+                : `<span class="hk-aa-daily__state">${HKUI.icon("sparkles", 14, "currentColor")} 아직 도전 전</span>`}
+              <span class="hk-aa-daily__go">${g.playedToday ? "연습하기" : "도전하기"} ›</span>
+            </span>
+          </span>
+        </a>`;
       return `<div class="hk-aa-dark">
           <div class="hk-aa-wrap">
-            <div class="hk-aa-dark__eyebrow">사내 순위</div>
-            <h2>동료와 함께하는 즐거움.</h2>
-            <p>게임마다 <b>오늘 · 이번 주 · 전체</b> 순위와 <b>부서 순위</b>가 있어요. 부서 순위는 부서 상위 3명 기록의 평균이라, 인원이 적은 부서도 1위를 노릴 수 있어요.</p>
-            ${body}
+            <div class="hk-aa-dark__eyebrow">오늘의 도전</div>
+            <h2>매일 새 문제,<br>단 한 번의 기회.</h2>
+            <p>스도쿠와 퀴즈는 모두가 <b>같은 문제</b>를 받아요. 하루에 <b>처음 시작한 판만</b> 순위에 들어가니, 마음의 준비를 하고 시작해 보세요.</p>
+            <div class="hk-aa-daily__status">
+              <span class="hk-aa-daily__clock">${HKUI.icon("timer", 18, "currentColor")} 새 문제까지 <b id="aa-reset">--:--:--</b></span>
+              <span class="hk-aa-daily__progress"><span>오늘 <b>${done}</b> / ${daily.length} 완료</span><i><em style="width:${Math.round((done / daily.length) * 100)}%"></em></i></span>
+            </div>
+            <div class="hk-aa-dailies">${daily.map(card).join("")}</div>
           </div>
         </div>`;
+    }
+
+    // 한국 시간 자정까지 남은 시간 — 1초마다
+    function startResetClock() {
+      const el = document.getElementById("aa-reset");
+      if (!el) return;
+      const tick = () => {
+        const kst = new Date(Date.now() + 9 * 3600 * 1000);
+        const left = 86400 - (kst.getUTCHours() * 3600 + kst.getUTCMinutes() * 60 + kst.getUTCSeconds());
+        const p = (n) => String(n).padStart(2, "0");
+        el.textContent = `${p(Math.floor(left / 3600))}:${p(Math.floor((left % 3600) / 60))}:${p(left % 60)}`;
+      };
+      tick();
+      setInterval(tick, 1000);
     }
 
     const FAQ = [
@@ -173,7 +192,7 @@
         const body = document.getElementById("arcade-body");
         try {
           const [st, games] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames()]);
-          body.innerHTML = heroHtml(games, st) + propsHtml(games) + offersHtml(st) + collectionHtml(games) + ranksHtml(games, st) + faqHtml() + endHtml();
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + collectionHtml(games) + dailyHtml(games) + faqHtml() + endHtml();
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
         }
@@ -183,6 +202,7 @@
           e.preventDefault();
           document.getElementById("aa-games")?.scrollIntoView({ behavior: "smooth" });
         });
+        startResetClock();
         // 모든 게임 보기 — 흐르는 타일 대신 바둑판으로
         document.getElementById("aa-all")?.addEventListener("click", (e) => {
           e.preventDefault();
