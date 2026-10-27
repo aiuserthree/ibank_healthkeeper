@@ -43,9 +43,15 @@
     .gm-keys kbd { display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #f8fafc; font: 600 11px/1.6 inherit; }
     .gm-go { width: 100%; border: 0; padding: 12px; border-radius: 12px; font-size: 15.5px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(135deg, #0891b2, #8b5cf6); }
     .gm-go:focus-visible { outline: 3px solid #a5f3fc; outline-offset: 2px; }
-    .gm-pad { display: none; grid-template-columns: 1fr 1fr .35fr 1.15fr 1.15fr; gap: 8px; padding: 10px; border-radius: 0 0 16px 16px; background: #102a3c; touch-action: none; }
+    /* 휴대폰 조작 — 왼쪽은 쏘기 버튼 하나, 오른쪽은 누른 채로 좌우 이동·위로 밀어 점프하는 스틱 */
+    .gm-pad { display: none; grid-template-columns: 1fr 1.9fr; gap: 10px; padding: 10px; border-radius: 0 0 16px 16px; background: #102a3c; touch-action: none; }
     .gm-pad.is-on { display: grid; }
-    .gm-pad button { height: 58px; border: 0; border-radius: 14px; background: rgba(255,255,255,.1); color: #e0f7fa; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    .gm-stick { position: relative; height: 72px; border-radius: 14px; background: rgba(255,255,255,.08); touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: stretch; overflow: hidden; }
+    .gm-stick span { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 12px; font-weight: 700; color: rgba(224,247,250,.7); pointer-events: none; transition: background .08s, color .08s; }
+    .gm-stick span.u { color: rgba(221,214,254,.85); }
+    .gm-stick.is-left .l, .gm-stick.is-right .r { background: rgba(103,232,249,.35); color: #fff; }
+    .gm-stick.is-jump .u { background: rgba(167,139,250,.5); color: #fff; }
+    .gm-pad button { height: 72px; border: 0; border-radius: 14px; background: rgba(255,255,255,.1); color: #e0f7fa; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; touch-action: none; -webkit-tap-highlight-color: transparent; }
     .gm-pad button.is-down { background: rgba(103,232,249,.35); }
     .gm-pad button[data-k="jump"] { background: rgba(167,139,250,.28); }
     .gm-pad button[data-k="shoot"] { background: rgba(34,211,238,.28); }
@@ -74,11 +80,12 @@
             <div class="gm-overlay" data-overlay></div>
           </div>
           <div class="gm-pad" data-pad>
-            <button type="button" data-k="left" aria-label="왼쪽">${HKUI.icon("chevron-left", 26, "currentColor")}</button>
-            <button type="button" data-k="right" aria-label="오른쪽">${HKUI.icon("chevron-right", 26, "currentColor")}</button>
-            <span></span>
-            <button type="button" data-k="jump">점프</button>
-            <button type="button" data-k="shoot">쏘기</button>
+            <button type="button" data-k="shoot">${HKUI.icon("droplets", 20, "currentColor")} 쏘기</button>
+            <div class="gm-stick" data-stick aria-label="이동·점프 스틱">
+              <span class="l">${HKUI.icon("chevron-left", 24, "currentColor")}</span>
+              <span class="u">${HKUI.icon("chevron-up", 22, "currentColor")}점프</span>
+              <span class="r">${HKUI.icon("chevron-right", 24, "currentColor")}</span>
+            </div>
           </div>
           <div class="gm-note">← → 이동 · ↑ 또는 스페이스 점프 · X(Z) 비눗방울 · P 일시정지</div>
         </div>`;
@@ -1122,7 +1129,7 @@
         const btn = overlay.querySelector("button");
         if (btn) btn.focus({ preventScroll: true });
       }
-      function clearKeys() { keys.left = keys.right = keys.jump = keys.shoot = false; pad.querySelectorAll(".is-down").forEach((b) => b.classList.remove("is-down")); }
+      function clearKeys() { keys.left = keys.right = keys.jump = keys.shoot = false; pad.querySelectorAll(".is-down").forEach((b) => b.classList.remove("is-down")); stickReset(); }
       function showReady() {
         state = "ready";
         S = null;
@@ -1222,6 +1229,37 @@
         btn.addEventListener("lostpointercapture", up);
         btn.addEventListener("contextmenu", (e) => e.preventDefault());
       });
+
+      // 오른쪽 스틱 — 누른 채로: 가운데보다 왼쪽이면 ←, 오른쪽이면 → · 위쪽 띠를 누르거나 손가락을 위로 밀면 점프(위에 있는 동안 높이 점프)
+      const stick = pad.querySelector("[data-stick]");
+      let stk = null;
+      function stickSet(k, on) { if (!!keys[k] === on) return; on ? press(k) : release(k); }
+      function stickReset() { stk = null; stick.classList.remove("is-left", "is-right", "is-jump"); }
+      function stickUpdate(x, y) {
+        const rc = stick.getBoundingClientRect();
+        const cx = rc.left + rc.width / 2, dead = Math.max(10, rc.width * 0.07);
+        const l = x < cx - dead, r = x > cx + dead;
+        const jump = y < rc.top + rc.height * 0.42 || (stk && stk.y0 - y > 22);
+        stickSet("left", l); stickSet("right", r); stickSet("jump", jump);
+        stick.classList.toggle("is-left", l); stick.classList.toggle("is-right", r); stick.classList.toggle("is-jump", jump);
+      }
+      stick.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        stk = { id: e.pointerId, y0: e.clientY };
+        try { stick.setPointerCapture(e.pointerId); } catch (_) {}
+        stickUpdate(e.clientX, e.clientY);
+      });
+      stick.addEventListener("pointermove", (e) => { if (stk && e.pointerId === stk.id) stickUpdate(e.clientX, e.clientY); });
+      const stickUp = (e) => {
+        if (!stk || (e.pointerId != null && e.pointerId !== stk.id)) return;
+        e.preventDefault();
+        release("left"); release("right"); release("jump");
+        stickReset();
+      };
+      stick.addEventListener("pointerup", stickUp);
+      stick.addEventListener("pointercancel", stickUp);
+      stick.addEventListener("lostpointercapture", stickUp);
+      stick.addEventListener("contextmenu", (e) => e.preventDefault());
 
       document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
 

@@ -185,6 +185,12 @@ window.HKPlay = (function () {
     typing: ["#4f46e5", "#a78bfa"],
     trivia: ["#0891b2", "#22d3ee"],
     korean: ["#b45309", "#facc15"],
+    snake: ["#15803d", "#84cc16"],
+    stack: ["#0e7490", "#67e8f9"],
+    fifty: ["#9a3412", "#fb923c"],
+    mines: ["#1f2937", "#f43f5e"],
+    pipes: ["#6b4423", "#d4a373"],
+    promote: ["#312e81", "#818cf8"],
   };
 
   function todayKst() {
@@ -315,10 +321,19 @@ window.HKPlay = (function () {
     // 순위표는 판이 끝났을 때만 오른쪽에서 열린다 — 새 판을 시작하면 닫는다
     let runNo = 0; // 새 판마다 1씩 — 순위를 받아 오는 사이에 새 판이 시작됐으면 열지 않는다
     function setPlaying(on) {
+      // 휴대폰 머리의 일시정지 버튼은 판이 도는 동안만
+      document.querySelector(".hk-pf")?.classList.toggle("is-playing", on);
       if (!on) return;
+      endQuit(false);
       runNo++;
       openBoard(false);
       showRankBtn(false);
+    }
+    // 일시정지 — Esc 와 같다 (이미 일시정지 화면이면 이어 하기)
+    function togglePause() {
+      const resume = visibleButton(RESUME_TEXT);
+      if (resume) resume.click();
+      else pauseFns.forEach((fn) => fn());
     }
         function visibleButton(re) {
       const stageEl = document.getElementById("hk-play-stage");
@@ -336,10 +351,13 @@ window.HKPlay = (function () {
       (e) => {
         if (e.repeat) return;
         if (e.code === "Escape") {
-          // 입력창에 있어도 Esc 는 일시정지·이어 하기
-          const resume = visibleButton(RESUME_TEXT);
           e.preventDefault();
           e.stopImmediatePropagation();
+          // 순위표가 열려 있으면 먼저 닫는다
+          const board = document.querySelector(".hk-pf .hk-play-board");
+          if (board && board.classList.contains("is-open")) { openBoard(false); return; }
+          // 입력창에 있어도 Esc 는 일시정지·이어 하기
+          const resume = visibleButton(RESUME_TEXT);
           if (resume) resume.click();
           else pauseFns.forEach((fn) => fn());
           return;
@@ -353,10 +371,7 @@ window.HKPlay = (function () {
         if (canRestart) {
           e.preventDefault();
           e.stopImmediatePropagation();
-          canRestart = false;
-          document.querySelector(".hk-play-result")?.remove();
-          setPlaying(true);
-          restartFns.forEach((fn) => fn());
+          doRestart();
           return;
         }
         const btn = visibleButton(GO_TEXT);
@@ -368,7 +383,73 @@ window.HKPlay = (function () {
       },
       true
     );
-    window.addEventListener("pointerdown", () => (canRestart = false), true);
+    // 판 안을 눌러 새 판을 시작했으면 스페이스 재시작은 꺼진다 (순위표·머리·그만하기 버튼을 누른 건 상관없음)
+    window.addEventListener("pointerdown", (e) => {
+      const stageEl = document.getElementById("hk-play-stage");
+      if (stageEl && stageEl.contains(e.target) && !e.target.closest(".hk-quit-btn, .hk-endbar")) canRestart = false;
+    }, true);
+
+    // ── 판이 끝나면 '다시 하기' 옆에 '그만하기' — 게임의 다시 하기 버튼 옆에 붙이고, 없으면(창 안 게임 등) 창 아래에 둘 다 띄운다
+    let endTimer = null;
+    function goQuit() { location.href = HKRoutes.lounge; }
+    function doRestart() {
+      if (!canRestart) return;
+      canRestart = false;
+      document.querySelector(".hk-play-result")?.remove();
+      setPlaying(true);
+      restartFns.forEach((fn) => fn());
+    }
+    function quitBtnFor(btn) {
+      const q = document.createElement("button");
+      q.type = "button";
+      q.className = `${btn.className} hk-quit-btn`;
+      q.innerHTML = `${HKUI.icon("log-out", 16, "currentColor")}<span>그만하기</span>`;
+      q.onclick = (e) => { e.preventDefault(); e.stopPropagation(); goQuit(); };
+      return q;
+    }
+    function endQuit(on) {
+      clearInterval(endTimer);
+      endTimer = null;
+      document.querySelectorAll(".hk-quit-wrap > .hk-quit-btn, .hk-quit-btn").forEach((b) => b.remove());
+      document.querySelectorAll(".hk-quit-wrap").forEach((w) => { while (w.firstChild) w.parentNode.insertBefore(w.firstChild, w); w.remove(); });
+      document.querySelectorAll(".hk-endbar").forEach((b) => b.remove());
+      if (!on) return;
+      let tries = 0;
+      const place = () => {
+        tries++;
+        const stageEl = document.getElementById("hk-play-stage");
+        if (!stageEl || stageEl.querySelector(".hk-quit-btn, .hk-endbar")) return;
+        const again = visibleButton(/다시|처음 화면으로/);
+        if (again) {
+          // 다시 하기와 그만하기를 한 줄로 묶는다
+          const wrap = document.createElement("span");
+          wrap.className = "hk-quit-wrap";
+          again.parentNode.insertBefore(wrap, again);
+          wrap.appendChild(again);
+          wrap.appendChild(quitBtnFor(again));
+          HKUI.refreshIcons(wrap);
+          clearInterval(endTimer);
+          return;
+        }
+        if (tries >= 6) {
+          // 게임 안에 다시 하기 버튼이 없으면 창 아래에 두 버튼을 띄운다
+          clearInterval(endTimer);
+          const bar = document.createElement("div");
+          bar.className = "hk-endbar";
+          // 창 안 게임(별까지 계단)은 안에 다시 하기 버튼이 따로 있어 그만하기만
+          const framed = !!stageEl.querySelector("iframe");
+          bar.innerHTML = `${framed ? "" : `<button type="button" class="hk-endbar__again">${HKUI.icon("rotate-ccw", 16, "currentColor")}<span>다시 하기</span><kbd>Space</kbd></button>`}
+            <button type="button" class="hk-endbar__quit hk-quit-btn">${HKUI.icon("log-out", 16, "currentColor")}<span>그만하기</span></button>`;
+          if (framed) bar.classList.add("is-framed");
+          bar.querySelector(".hk-endbar__again")?.addEventListener("click", () => doRestart());
+          bar.querySelector(".hk-endbar__quit").onclick = goQuit;
+          stageEl.parentElement.appendChild(bar);
+          HKUI.refreshIcons(bar);
+        }
+      };
+      place();
+      endTimer = setInterval(place, 400);
+    }
 
     async function loadBoard() {
       const body = document.getElementById("hk-play-board-body");
@@ -409,9 +490,11 @@ window.HKPlay = (function () {
           <div class="hk-pf__title"><b>${HKUI.escapeHtml(meta.title)}</b><small>${HKUI.escapeHtml(meta.desc || "")}</small></div>
           <div class="hk-pf__tools">
             ${meta.dailyOnce ? `<span class="hk-badge ${dailyDone ? "hk-badge--neutral" : "hk-badge--warning"} hk-pf__daily">${dailyDone ? "오늘 도전 완료 · 연습" : "오늘의 도전"}</span>` : ""}
+            <button type="button" class="hk-play-sound hk-pf__pause" id="hk-pf-pause" hidden aria-label="일시정지">${HKUI.icon("pause", 18, "currentColor")}<span>일시정지</span></button>
             <button type="button" class="hk-play-sound" id="hk-play-sound"></button>
             <button type="button" class="hk-play-sound hk-pf__rank-btn" id="hk-pf-rank" hidden>${HKUI.icon("trophy", 18, "currentColor")}<span>순위</span></button>
           </div>`;
+        document.getElementById("hk-pf-pause").onclick = (e) => { e.currentTarget.blur(); togglePause(); };
         const soundBtn = document.getElementById("hk-play-sound");
         const paintSound = () => {
           const m = HKSound.isMuted();
@@ -448,7 +531,11 @@ window.HKPlay = (function () {
           formatScore: (n) => formatScore(game, n).replace(/<[^>]+>/g, ""),
           sfx: (name, arg) => HKSound.play(name, arg),
           onRestart: (fn) => restartFns.push(fn),
-          onPause: (fn) => pauseFns.push(fn),
+          onPause: (fn) => {
+            pauseFns.push(fn);
+            // 일시정지를 지원하는 게임만 휴대폰 머리에 버튼을 보인다
+            document.getElementById("hk-pf-pause")?.removeAttribute("hidden");
+          },
           // 버튼 없이 시작하는 게임(예: iframe 안의 게임)이 새 판 시작을 알릴 때
           started: () => setPlaying(true),
           begin: async () => {
@@ -480,6 +567,7 @@ window.HKPlay = (function () {
             if (result.counted && game.dailyOnce) ctx.dailyDone = true;
             resultBanner(game, result);
             canRestart = true;
+            endQuit(true);
             const run = runNo;
             await loadBoard();
             // 넓은 화면은 끝나자마자 순위표를 연다 (휴대폰은 '순위' 버튼으로)
@@ -553,7 +641,6 @@ window.HKPlay = (function () {
     document.getElementById("hk-pf-rank").onclick = () => openBoard(!board.classList.contains("is-open"));
     document.getElementById("hk-pf-scrim").onclick = () => openBoard(false);
     board.querySelector(".hk-play-board__close").onclick = () => openBoard(false);
-    window.addEventListener("keydown", (e) => e.key === "Escape" && board.classList.contains("is-open") && openBoard(false));
   }
 
   // 게임 판이 쓸 수 있는 높이 — 가운데 영역 높이에서 판 밖(점수 줄·안내 줄 등) 높이를 뺀다
@@ -572,9 +659,12 @@ window.HKPlay = (function () {
     const main = document.getElementById("hk-pf-main");
     const frame = stage.parentElement;
     function fit() {
-      const pad = parseFloat(getComputedStyle(main).paddingTop) * 2;
-      const H = Math.max(360, main.clientHeight - pad);
-      const W = Math.max(280, Math.min(main.clientWidth - pad, Math.round(H * FRAME_RATIO)));
+      // 세로·가로 여백을 따로 잰다 (휴대폰은 responsive.css 가 좌우 여백을 다르게 강제한다)
+      const cs = getComputedStyle(main);
+      const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+      const padH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const H = Math.max(360, main.clientHeight - padV);
+      const W = Math.max(280, Math.min(main.clientWidth - padH, Math.round(H * FRAME_RATIO)));
       if (frame.style.width === `${W}px` && frame.style.height === `${H}px`) return;
       frame.style.width = `${W}px`;
       frame.style.height = `${H}px`;

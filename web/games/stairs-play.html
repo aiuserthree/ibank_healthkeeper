@@ -674,7 +674,13 @@
   if(inLounge){
     elMute.hidden = true;
     window.addEventListener('message', function(e){
-      if(e.origin !== location.origin || !e.data || e.data.type !== 'hk-mute') return;
+      if(e.origin !== location.origin || !e.data) return;
+      if(e.data.type === 'hk-pause'){
+        // 공통 틀의 일시정지 — Esc 와 같이 고양이 고르기 창(일시정지)을 연다
+        if((state === 'playing' || state === 'ready') && !startVisible) openCatPicker();
+        return;
+      }
+      if(e.data.type !== 'hk-mute') return;
       muted = !!e.data.muted;
       if(master) master.gain.value = muted ? 0 : 0.5;
       updateMuteBtn();
