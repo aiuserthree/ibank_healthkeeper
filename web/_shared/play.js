@@ -397,8 +397,8 @@ window.HKPlay = (function () {
         <div class="hk-pf__scrim" id="hk-pf-scrim" hidden></div>
       </div>`;
     {
-        // 순위표는 기다리지 않는다 — 게임 목록(오늘 참여 여부)만 받고 바로 게임을 띄운다
-        loadBoard();
+        // 업무 시간 여부를 먼저 본다 — 닫혀 있으면 게임도 순위도 보이지 않는다
+        const statusP = HKApi.playStatus().catch(() => ({ open: true }));
         const list = await HKApi.playGames().catch(() => []);
         const meta = list.find((g) => g.key === key) || game || { key, title: key, unit: "" };
         game = { ...meta, ...(game || {}) };
@@ -487,12 +487,14 @@ window.HKPlay = (function () {
           },
         };
         const stage = document.getElementById("hk-play-stage");
-        // 업무 시간에는 게임 대신 안내 (순위표는 그대로 볼 수 있다)
-        const status = await HKApi.playStatus().catch(() => ({ open: true }));
+        // 업무 시간에는 게임 대신 안내 — 순위표·순위 버튼도 숨긴다
+        const status = await statusP;
         if (!status.open) {
           stage.innerHTML = closedHtml(status.opensAt);
+          stage.parentElement.classList.add("is-plain");
           HKUI.refreshIcons(stage);
-          bindDrawer();
+          document.querySelector(".hk-pf .hk-play-board")?.remove();
+          document.getElementById("hk-pf-rank")?.remove();
           // 열리는 시각이 지나면 저절로 다시 불러온다
           setInterval(async () => {
             const st = await HKApi.playStatus().catch(() => null);
@@ -510,6 +512,7 @@ window.HKPlay = (function () {
           },
           true
         );
+        loadBoard();
         setup(stage, ctx);
         fitStage(stage);
         bindDrawer();

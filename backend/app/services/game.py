@@ -177,11 +177,13 @@ async def list_games(db: AsyncSession, member: Member) -> list[dict]:
     members = await _members(db, list({mid for mid, _ in tops.values()}))
     mine = {g: (lo if GAMES[g].lower_better else hi) for g, hi, lo in mine_rows if g in GAMES}
 
+    # 업무 시간에는 오늘 1위·참가자 수도 숨긴다
+    show_ranks = play_window()["open"]
     out = []
     for game in GAMES.values():
-        rows = by_game.get(game.key, [])
+        rows = by_game.get(game.key, []) if show_ranks else []
         top = None
-        if game.key in tops and tops[game.key][0] in members:
+        if show_ranks and game.key in tops and tops[game.key][0] in members:
             m = members[tops[game.key][0]]
             top = {"name": m.name, "score": tops[game.key][1], "avatarUrl": member_avatar_url(m.id)}
         out.append(
@@ -221,6 +223,8 @@ async def _department_board(db: AsyncSession, game: Game, since: date | None, me
 
 
 async def leaderboard(db: AsyncSession, member: Member, key: str, period: str) -> dict:
+    # 업무 시간에는 순위도 닫는다 (막 끝난 판의 순위는 볼 수 있게 저장과 같은 여유를 둔다)
+    ensure_open(grace=True)
     game = get_game(key)
     if period not in ("today", "week", "all"):
         period = "today"
