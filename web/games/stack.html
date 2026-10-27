@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>점심 찬합 탑 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 점심 찬합 탑 전용 */
+    .gm-shell { --gm-a: #0e7490; --gm-b: #67e8f9; display: flex; flex-direction: column; margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    .gm-shell * { -webkit-tap-highlight-color: transparent; } /* 폰에서 캔버스를 탭할 때마다 파란 하이라이트가 덮이지 않게 */
+    .gm-hud { height: 44px; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 0 12px; border-radius: 16px 16px 0 0; background: #fff; border-bottom: 1px solid #cffafe; touch-action: manipulation; }
+    .gm-hud > * { min-width: 0; white-space: nowrap; }
+    .gm-hud__score { font-size: 18px; font-weight: 800; color: var(--gm-a); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+    .gm-hud__score small { font-size: 12px; font-weight: 700; color: #155e75; margin-right: 4px; opacity: .8; }
+    .gm-hud__floor { font-size: 16px; font-weight: 700; color: var(--color-midnight-navy, #0f172a); font-variant-numeric: tabular-nums; }
+    .gm-hud__chip { justify-self: end; font-size: 13px; font-weight: 700; line-height: 22px; padding: 0 9px; border-radius: 12px; background: #ecfeff; color: #155e75; font-variant-numeric: tabular-nums; }
+    .gm-hud__chip i { font-style: normal; letter-spacing: 1px; }
+    /* 좁은 화면: 칩이 가운데 층수를 덮지 않게 가운데 칸을 남는 폭으로 */
+    @media (max-width: 479px) { .gm-hud { grid-template-columns: auto minmax(0, 1fr) auto; padding: 0 10px; gap: 6px; } .gm-hud__floor { text-align: center; overflow: hidden; text-overflow: ellipsis; } .gm-hud__chip { font-size: 12px; padding: 0 8px; } }
+    @media (max-width: 379px) { .gm-hud { padding: 0 8px; } .gm-hud__chip { font-size: 11.5px; padding: 0 7px; } .gm-hud__score { font-size: 16px; } .gm-hud__score small { font-size: 11px; } .gm-hud__floor { font-size: 15px; } }
+    .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #e0f2fe; }
+    .gm-canvas { display: block; touch-action: none; cursor: pointer; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; overflow-y: auto; background: rgba(8, 47, 73, .38); backdrop-filter: blur(2px); touch-action: manipulation; cursor: default; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 300px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 20px; border-radius: 16px; background: #fff; color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(8, 47, 73, .35); }
+    .gm-card h2 { margin: 0 0 10px; font-size: 20px; letter-spacing: -0.02em; color: var(--gm-a); display: flex; align-items: center; justify-content: center; gap: 6px; }
+    .gm-card p { word-break: keep-all; margin: 0 0 8px; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary, #475569); }
+    .gm-card p b { color: var(--color-midnight-navy, #0f172a); }
+    .gm-card .gm-sub { font-size: 14px; margin-bottom: 4px; }
+    .gm-card .gm-big { font-size: 28px; font-weight: 800; margin: 2px 0 12px; color: var(--gm-a); font-variant-numeric: tabular-nums; }
+    .gm-keys { font-size: 12px; color: var(--text-muted, #64748b); margin: 2px 0 14px; line-height: 1.6; }
+    .gm-keys kbd { display: inline-block; min-width: 18px; padding: 1px 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #f8fafc; font: 600 11px/1.5 inherit; }
+    .gm-go { display: block; width: 100%; max-width: 260px; height: 48px; margin: 0 auto; border: 0; border-radius: 12px; font-size: 16px; font-weight: 700; color: #fff; cursor: pointer; background: var(--gm-a); touch-action: manipulation; }
+    .gm-go:hover { background: #0c637a; }
+    .gm-go:focus-visible { outline: 3px solid var(--gm-b); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  HKPlay.mountGame({
+    key: "stack",
+    setup(stage, ctx) {
+      // ---------- 상수(논리 좌표 u: 캔버스 폭 360u 고정) ----------
+      const WU = 360;
+      const W0 = 200, T = 22, GAP = 18;
+      const DROP_MS = 90, CAM_MS = 150, LOCK_MS = 300;
+      const HESITATE_SHOW = 3000, HESITATE_FROM = 4000, AUTO_DROP = 10000;
+      const SPILL_MIN = 6, MAX_LAYERS = 150, REC_MAX = 3;
+      const BONUS_W = 1.25, BONUS_V = 1.25;
+      const V0 = 110, DV = 3, VCAP = 330;
+      const COUNTDOWN_STEP = 600, OVER_SPILL_MS = 700, OVER_FINISH_MS = 300;
+      const TOWER_L = 80, TOWER_R = 280, BASE_CX = 180, BASE_H = 14;
+      const MAX_SCORE = 1_000_000;
+      const FONT = "Pretendard, system-ui, sans-serif";
+
+      stage.innerHTML = `
+        <div class="gm-shell">
+          <div class="gm-hud">
+            <div class="gm-hud__score"><small>점수</small><span data-score>0</span></div>
+            <div class="gm-hud__floor" data-floor>0층</div>
+            <div class="gm-hud__chip" data-chip>딱 맞춤 ×0 · 회복 <i>●●●</i></div>
+          </div>
+          <div class="gm-screen">
+            <canvas class="gm-canvas" aria-label="점심 찬합 탑 게임 화면"></canvas>
+            <div class="gm-overlay" data-overlay hidden></div>
+          </div>
+        </div>`;
+      const shell = stage.querySelector(".gm-shell");
+      const canvas = stage.querySelector("canvas");
+      const g = canvas.getContext("2d");
+      const overlay = stage.querySelector("[data-overlay]");
+      const elScore = stage.querySelector("[data-score]");
+      const elFloor = stage.querySelector("[data-floor]");
+      const elChip = stage.querySelector("[data-chip]");
+
+      // ---------- 크기 맞추기 ----------
+      let scale = 1, Hu = 500, cwPx = 360;
+      function fit() {
+        const cw = stage.clientWidth;
+        if (!cw) return;
+        const room = HKPlay.roomFor(stage, canvas);
+        const ch = Math.max(240, Math.min(room, Math.round(cw * 1.78)));
+        cwPx = cw;
+        shell.style.width = cw + "px";
+        canvas.style.width = cw + "px";
+        canvas.style.height = ch + "px";
+        const dpr = Math.min(window.devicePixelRatio || 1, 3);
+        canvas.width = Math.round(cw * dpr);
+        canvas.height = Math.round(ch * dpr);
+        scale = canvas.width / WU;
+        Hu = canvas.height / scale;
+        draw(performance.now());
+      }
+
+      // ---------- 상태 ----------
+      let state = "ready"; // ready | play | paused | countdown | over
+      let S = null;
+      let raf = 0;
+      let overTimer = 0, finishTimer = 0;
+      const sfxAt = {};
+      function sfx(name, arg) {
+        const now = performance.now();
+        if (sfxAt[name] != null && now - sfxAt[name] < 90) return;
+        sfxAt[name] = now;
+        ctx.sfx(name, arg);
+      }
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+      const fmt = (n) => n.toLocaleString("ko-KR");
+
+      function newState() {
+        return {
+          n: 1, w: W0, cx: BASE_CX, streak: 0, bestStreak: 0, rec: REC_MAX, score: 0,
+          layers: [], piece: null, falling: [], fx: [], texts: [],
+          lock: 0, camH: 0, cam: null, dropAnim: null, unfold: null, shake: null,
+          countdownTimers: [], cdLabel: null, overKind: null, overAt: 0, now: performance.now(),
+        };
+      }
+      const topY = () => (S ? S.layers.length * T : 0);
+
+      // ---------- 규칙(순수 함수) ----------
+      const speedFor = (n) => Math.min(VCAP, V0 + DV * (n - 1));
+      const kindFor = (n) => (n % 10 === 0 ? "bonus" : n >= 40 && n % 10 === 5 ? "night" : "normal");
+      function tol(n, w) {
+        const [pct, floor] = n <= 30 ? [0.07, 9] : n <= 60 ? [0.06, 8] : n <= 90 ? [0.05, 7] : [0.04, 6];
+        return Math.max(pct * w, floor);
+      }
+      // 슬라이더 위치 — 닫힌 식(적분 없음). tMs: 조각 등장 후 지난 ms
+      function sliderX(piece, tMs) {
+        const t = Math.max(0, tMs) / 1000;
+        const v = piece.v;
+        let s;
+        if (t < 4) s = v * t;
+        else if (t < 8) s = v * (t + 0.125 * (t - 4) * (t - 4));
+        else s = v * (10 + 2 * (t - 8));
+        const span = piece.R - piece.L;
+        if (span <= 0) return piece.L;
+        const u = (piece.p0 - piece.L) + piece.d0 * s;
+        const m2 = ((u % (2 * span)) + 2 * span) % (2 * span);
+        return piece.L + (m2 <= span ? m2 : 2 * span - m2);
+      }
+      // 판정 — st: { n, w, cx, rec }, piece: { pw, kind }
+      function judge(st, x, piece) {
+        const { w, cx, n, rec } = st;
+        const pw = piece.pw;
+        const off = x - cx;
+        if (Math.abs(off) <= tol(n, w)) {
+          let w2 = w, recovered = false;
+          if (piece.kind === "bonus") {
+            if (rec > 0 && w < W0) { w2 = W0; recovered = true; }
+            else w2 = pw;
+          }
+          const cx2 = clamp(cx, TOWER_L + w2 / 2, TOWER_R - w2 / 2);
+          return { kind: "perfect", lo: cx2 - w2 / 2, hi: cx2 + w2 / 2, w2, cx2, recovered, off };
+        }
+        const lo = Math.max(cx - w / 2, x - pw / 2);
+        const hi = Math.min(cx + w / 2, x + pw / 2);
+        const ov = hi - lo;
+        if (ov < SPILL_MIN) return { kind: "spill", lo, hi, w2: 0, cx2: cx, recovered: false, off };
+        return { kind: "cut", lo, hi, w2: ov, cx2: (lo + hi) / 2, recovered: false, off };
+      }
+
+      // ---------- 진행 ----------
+      function spawn() {
+        const n = S.n;
+        const kind = kindFor(n);
+        const pw = kind === "bonus" ? Math.min(W0, Math.round(BONUS_W * S.w)) : S.w;
+        const v = speedFor(n) * (kind === "bonus" ? BONUS_V : 1);
+        const L = pw / 2 + 6, R = WU - 6 - pw / 2;
+        const fromLeft = Math.random() < 0.5;
+        S.piece = { n, kind, pw, v, L, R, p0: fromLeft ? L : R, d0: fromLeft ? 1 : -1, t0: performance.now(), ticked: false };
+        S.lock = 0; // 시작·재개는 이 뒤에 300ms 잠금을 다시 건다
+        if (kind === "bonus") sfx("whoosh");
+        else if (kind === "night") sfx("tick");
+      }
+
+      function addFalling(cx, w, kind, idx, side, life) {
+        S.falling.push({ cx, w, kind, idx, hBottom: topY() + GAP, vy: 0, vx: side * 40, rot: 0, rotV: side * 2.5, born: S.now, life });
+      }
+
+      // 낙하 확정 — 호출 즉시 판정·점수·층·상태가 정해진다(연출과 무관)
+      function land(x) {
+        if (state !== "play" || !S.piece) return;
+        const p = S.piece;
+        S.piece = null;
+        S.now = performance.now();
+        const r = judge(S, x, p);
+        if (r.kind === "spill") {
+          state = "over";
+          S.overKind = "spill";
+          S.overAt = S.now;
+          S.lock = Infinity;
+          addFalling(x, p.pw, p.kind, S.layers.length, r.off >= 0 ? 1 : -1, OVER_SPILL_MS);
+          S.shake = { start: S.now };
+          sfx("explode");
+          overTimer = setTimeout(() => { if (state === "over") sfx("lose"); }, 350);
+          finishTimer = setTimeout(finishOver, OVER_SPILL_MS);
+          return;
+        }
+        const perfect = r.kind === "perfect";
+        if (perfect) { S.streak += 1; if (r.recovered) S.rec -= 1; }
+        else S.streak = 0;
+        S.bestStreak = Math.max(S.bestStreak, S.streak);
+        const base = p.kind === "bonus" ? 200 : 100;
+        const bonus = perfect ? 50 * Math.min(S.streak, 10) : 0;
+        S.score = Math.min(MAX_SCORE, S.score + base + bonus);
+        const idx = S.layers.length;
+        // 잘린 조각 — 바깥쪽으로 떨어진다
+        if (!perfect) {
+          const pl = x - p.pw / 2, pr = x + p.pw / 2;
+          if (r.lo - pl > 2) addFalling((pl + r.lo) / 2, r.lo - pl, p.kind, idx, -1, 600);
+          if (pr - r.hi > 2) addFalling((r.hi + pr) / 2, pr - r.hi, p.kind, idx, 1, 600);
+        }
+        // 낙하 그림: 딱 맞춤은 꼭대기 중심에 스냅(재중심·펼침은 카메라 때)
+        const dropCx = perfect ? S.cx : r.cx2;
+        const dropW = perfect ? p.pw : r.w2;
+        S.dropAnim = { start: S.now, cx: dropCx, w: dropW, kind: p.kind, idx, perfect, recovered: r.recovered, toCx: r.cx2, toW: r.w2 };
+        S.w = r.w2; S.cx = r.cx2;
+        S.layers.push({ cx: r.cx2, w: r.w2, kind: p.kind });
+        S.n += 1;
+        S.lock = Infinity; // 조각이 다시 나올 때까지
+        S.texts.push({ x: r.cx2, h: topY() + 6, text: `+${base + bonus}`, start: S.now });
+        if (r.recovered) sfx("powerup");
+        else if (perfect) sfx("combo", Math.min(S.streak, 10));
+        else sfx("land");
+        hud();
+        if (S.layers.length >= MAX_LAYERS) {
+          state = "over";
+          S.overKind = "finish";
+          S.overAt = S.now;
+          finishTimer = setTimeout(finishOver, OVER_FINISH_MS);
+        }
+      }
+
+      // 낙하·카메라 연출을 즉시 끝 상태로(일시정지가 끼어들 때)
+      function settleAnims() {
+        if (S.dropAnim) { S.dropAnim = null; }
+        S.cam = null; S.unfold = null;
+        S.camH = topY();
+      }
+
+      function finishOver() {
+        if (state !== "over" || !S) return;
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        settleAnims();
+        S.falling = []; S.shake = null; S.fx = []; S.texts = [];
+        draw(performance.now());
+        const score = S.score;
+        const floors = S.layers.length;
+        if (S.overKind === "finish") {
+          showOverlay(`<div class="gm-card"><h2>점심시간 끝!</h2><p class="gm-sub"><b>${floors}층 완주</b> · 딱 맞춤 최고 ×${S.bestStreak}</p><div class="gm-big">${fmt(score)}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+        } else {
+          showOverlay(`<div class="gm-card"><h2>찬합이 쏟아졌어요</h2><p class="gm-sub"><b>${floors}층</b> · 딱 맞춤 최고 ×${S.bestStreak}</p><div class="gm-big">${fmt(score)}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+        }
+        ctx.submit(score);
+      }
+
+      function hud() {
+        if (!S) return;
+        elScore.textContent = fmt(S.score);
+        elFloor.textContent = `${S.layers.length}층`;
+        elChip.innerHTML = `딱 맞춤 ×${S.streak} · 회복 <i>${"●".repeat(S.rec)}${"○".repeat(REC_MAX - S.rec)}</i>`;
+      }
+
+      // ---------- 화면 전환 ----------
+      function showOverlay(html) {
+        overlay.innerHTML = html;
+        overlay.hidden = false;
+        HKUI.refreshIcons(overlay);
+        const btn = overlay.querySelector("button");
+        if (btn) btn.focus({ preventScroll: true });
+      }
+      function hideOverlay() { overlay.hidden = true; overlay.innerHTML = ""; }
+
+      function showReady() {
+        state = "ready";
+        S = newState();
+        hud();
+        draw(performance.now());
+        showOverlay(`<div class="gm-card">
+          <h2>${HKUI.icon("layers", 20, "currentColor")}점심 찬합 탑</h2>
+          <p>찬합이 왔다 갔다 해요. 탭·스페이스로 내려놓으면 아래 층보다 튀어나온 만큼 잘려요.</p>
+          <p>10층마다 오는 <b>덤 반찬 층</b>을 딱 맞추면 찬합이 원래 크기로 돌아와요(3번까지).</p>
+          <div class="gm-keys">PC: <kbd>Space</kbd>·<kbd>↓</kbd> · 폰: 화면 탭 · <kbd>Esc</kbd> 일시정지</div>
+          <button type="button" class="gm-go" data-act="start">시작하기</button>
+        </div>`);
+      }
+
+      function start() {
+        if (state !== "ready" && state !== "over") return;
+        clearTimeout(overTimer); clearTimeout(finishTimer);
+        S = newState();
+        hideOverlay();
+        hud();
+        state = "play";
+        spawn();
+        sfx("go");
+        S.lock = performance.now() + LOCK_MS;
+        run();
+      }
+
+      function clearCountdown() {
+        S.countdownTimers.forEach(clearTimeout);
+        S.countdownTimers = [];
+        S.cdLabel = null;
+      }
+
+      function pause() {
+        if (!S) return;
+        if (state === "play") {
+          state = "paused";
+          if (raf) { cancelAnimationFrame(raf); raf = 0; }
+          settleAnims();
+          S.piece = null;
+        } else if (state === "countdown") {
+          clearCountdown();
+          state = "paused";
+        } else return;
+        draw(performance.now());
+        showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p class="gm-sub">현재 <b>${fmt(S.score)}점</b> · ${S.layers.length}층</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+      }
+
+      function resume() {
+        if (state !== "paused") return;
+        hideOverlay();
+        state = "countdown";
+        clearCountdown();
+        const step = (label) => { S.cdLabel = label; sfx("countdown"); draw(performance.now()); };
+        step("3");
+        S.countdownTimers = [
+          setTimeout(() => step("2"), COUNTDOWN_STEP),
+          setTimeout(() => step("1"), COUNTDOWN_STEP * 2),
+          setTimeout(() => {
+            S.countdownTimers = [];
+            S.cdLabel = null;
+            state = "play";
+            spawn();
+            sfx("go");
+            S.lock = performance.now() + LOCK_MS;
+            run();
+          }, COUNTDOWN_STEP * 3),
+        ];
+      }
+
+      // ---------- 입력 ----------
+      function dropNow(tEvt) {
+        if (state !== "play" || !S || !S.piece) return;
+        const now = performance.now();
+        if (now < S.lock) return;
+        let t = tEvt;
+        if (!(t <= now + 5 && t >= now - 1000)) t = now;
+        land(sliderX(S.piece, t - S.piece.t0));
+      }
+      function typing(e) {
+        const t = e.target;
+        return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      }
+      window.addEventListener("keydown", (e) => {
+        if (typing(e)) return;
+        const c = e.code;
+        if (c !== "Space" && c !== "ArrowDown") return;
+        if (state === "play" || state === "countdown") {
+          e.preventDefault();
+          if (e.repeat) return;
+          if (state === "play") dropNow(e.timeStamp);
+        } else if (c === "ArrowDown") {
+          e.preventDefault(); // 화면 스크롤 방지 — 스페이스는 공통 틀이 시작·계속하기·다시 하기에 쓴다
+        }
+      });
+      canvas.addEventListener("pointerdown", (e) => {
+        if (!e.isPrimary) return;
+        e.preventDefault();
+        if (state !== "play") return;
+        dropNow(e.timeStamp);
+      });
+      overlay.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-act]");
+        if (!b) return;
+        sfx("tap");
+        if (b.dataset.act === "start") start();
+        else if (b.dataset.act === "resume") resume();
+      });
+      document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+      // ---------- 루프 ----------
+      function frame(now) {
+        raf = 0;
+        if (!S || (state !== "play" && state !== "over")) return;
+        S.now = now;
+        if (state === "play") {
+          if (S.dropAnim && now - S.dropAnim.start >= DROP_MS) finishDrop(now);
+          if (S.cam && now - S.cam.start >= CAM_MS) {
+            S.camH = S.cam.to; S.cam = null; S.unfold = null;
+            if (state === "play" && !S.piece) spawn();
+          }
+          if (S.piece) {
+            const t = now - S.piece.t0;
+            if (!S.piece.ticked && t >= HESITATE_FROM) { S.piece.ticked = true; sfx("tick"); }
+            if (t >= AUTO_DROP) land(sliderX(S.piece, AUTO_DROP));
+          }
+        } else {
+          // over 연출 — 낙하·카메라는 마저 끝낸다
+          if (S.dropAnim && now - S.dropAnim.start >= DROP_MS) finishDrop(now);
+          if (S.cam && now - S.cam.start >= CAM_MS) { S.camH = S.cam.to; S.cam = null; S.unfold = null; }
+        }
+        updateFalling(now);
+        try { draw(now); } catch (err) { console.error(err); } // 그리기 오류가 나도 다음 조각은 나오게
+        const overDur = S.overKind === "finish" ? OVER_FINISH_MS : OVER_SPILL_MS;
+        if (state === "play" || (state === "over" && now - S.overAt < overDur + 40)) raf = requestAnimationFrame(frame);
+      }
+      function finishDrop(now) {
+        const d = S.dropAnim;
+        S.dropAnim = null;
+        S.cam = { from: S.camH, to: topY(), start: now };
+        if (d.perfect) {
+          const changed = Math.abs(d.toW - d.w) > 0.01 || Math.abs(d.toCx - d.cx) > 0.01;
+          if (changed) S.unfold = { from: { cx: d.cx, w: d.w }, to: { cx: d.toCx, w: d.toW }, start: now };
+          S.fx.push({ idx: d.idx, color: d.recovered ? "#fde68a" : "#a5f3fc", start: now, dur: 400 });
+        }
+      }
+      let lastFall = 0;
+      function updateFalling(now) {
+        const dt = Math.min(0.05, lastFall ? (now - lastFall) / 1000 : 0.016);
+        lastFall = now;
+        for (const f of S.falling) {
+          f.vy -= 900 * dt;
+          f.hBottom += f.vy * dt;
+          f.cx += f.vx * dt;
+          f.rot += f.rotV * dt;
+        }
+        S.falling = S.falling.filter((f) => now - f.born < f.life);
+        S.fx = S.fx.filter((f) => now - f.start < f.dur);
+        S.texts = S.texts.filter((t) => now - t.start < 600);
+      }
+      function run() {
+        if (raf) cancelAnimationFrame(raf);
+        lastFall = 0;
+        raf = requestAnimationFrame(frame);
+      }
+
+      // ---------- 그리기 ----------
+      function rr(x, y, w, h, r) {
+        // 아주 얇은 조각도 그릴 수 있게 — 반지름이 음수면 canvas 가 오류를 던져 게임이 멈춘다
+        w = Math.max(0, w); h = Math.max(0, h);
+        const rad = Math.max(0, Math.min(r, w / 2, h / 2));
+        g.beginPath();
+        g.moveTo(x + rad, y);
+        g.arcTo(x + w, y, x + w, y + h, rad);
+        g.arcTo(x + w, y + h, x, y + h, rad);
+        g.arcTo(x, y + h, x, y, rad);
+        g.arcTo(x, y, x + w, y, rad);
+        g.closePath();
+      }
+      const easeOut = (k) => 1 - (1 - k) * (1 - k);
+
+      // 찬합 한 층 — 화면 좌표(u), 왼쪽 위 (x, y), 너비 w, 두께 T
+      function drawLayer(x, y, w, idx, kind, alpha) {
+        if (w <= 0) return;
+        g.save();
+        if (alpha != null) g.globalAlpha = alpha;
+        rr(x, y, w, T, 4);
+        g.save();
+        g.clip();
+        if (kind === "bonus") {
+          g.fillStyle = "#f59e0b";
+          g.fillRect(x, y, w, T);
+          g.fillStyle = "#fde68a";
+          const n = clamp(Math.round(w / 40), 3, 5);
+          for (let i = 0; i < n; i++) {
+            const px = x + (w * (i + 0.5)) / n;
+            const r = Math.min(7, (w / n) * 0.42);
+            g.beginPath(); g.arc(px, y + T - 5, r, Math.PI, 0); g.fill();
+          }
+          g.fillStyle = "rgba(255,255,255,.25)";
+          g.fillRect(x, y, w, 3);
+        } else {
+          g.fillStyle = idx % 2 === 0 ? "#0e7490" : "#0891b2";
+          g.fillRect(x, y, w, 7);
+          g.fillStyle = "#fffbeb";
+          g.fillRect(x, y + 7, w, 8);
+          g.fillStyle = "#67e8f9";
+          g.fillRect(x, y + 15, w, 7);
+          g.fillStyle = "rgba(255,255,255,.22)";
+          g.fillRect(x, y + 1, w, 2.5);
+        }
+        g.restore();
+        if (w > 2) {
+          g.lineWidth = 1.5;
+          g.strokeStyle = kind === "bonus" ? "#b45309" : "#155e75";
+          rr(x + 0.75, y + 0.75, w - 1.5, T - 1.5, 3.5);
+          g.stroke();
+        }
+        g.restore();
+      }
+      function drawLayerDashed(x, y, w) {
+        g.save();
+        g.setLineDash([5, 4]);
+        g.lineWidth = 2;
+        g.strokeStyle = "#67e8f9";
+        rr(x, y, w, T, 4);
+        g.stroke();
+        g.setLineDash([]);
+        g.fillStyle = "rgba(103,232,249,.12)";
+        g.fill();
+        g.restore();
+      }
+
+      // 벽·창문·시계 — 카메라(camH)보다 느리게(PARALLAX 배) 내려가는 배경. 벽은 캔버스 전체를 채워 책상이 화면 밖으로 나가도 비지 않는다
+      const PARALLAX = 0.4, SEAM = 96;
+      function drawBackground(anchor, camH) {
+        const bg = g.createLinearGradient(0, 0, 0, Hu);
+        bg.addColorStop(0, "#e0f2fe");
+        bg.addColorStop(1, "#f0f9ff");
+        g.fillStyle = bg;
+        g.fillRect(0, 0, WU, Hu);
+        const py = PARALLAX * camH; // 배경 장식이 내려간 거리
+        // 벽 패널 이음새 — 끝없이 이어지는 벽, 카메라가 오르는 느낌
+        g.strokeStyle = "rgba(125,211,252,.28)"; g.lineWidth = 1;
+        g.beginPath();
+        for (let y = ((py % SEAM) + SEAM) % SEAM - SEAM; y < Hu + SEAM; y += SEAM) { g.moveTo(0, y + 0.5); g.lineTo(WU, y + 0.5); }
+        g.stroke();
+        // 창문·블라인드
+        const wx = 222, wy = 22 + py, ww = 116, wh = Math.min(112, Math.max(60, anchor - GAP - T - 36 - 22));
+        if (wy - 5 < Hu) {
+          g.fillStyle = "#bae6fd";
+          rr(wx, wy, ww, wh, 6); g.fill();
+          g.strokeStyle = "#7dd3fc"; g.lineWidth = 1.5;
+          g.beginPath();
+          for (let y = wy + 8; y < wy + wh - 4; y += 8) { g.moveTo(wx + 4, y); g.lineTo(wx + ww - 4, y); }
+          g.stroke();
+          g.lineWidth = 3; g.strokeStyle = "#7dd3fc";
+          rr(wx, wy, ww, wh, 6); g.stroke();
+          g.fillStyle = "#7dd3fc";
+          g.fillRect(wx - 6, wy - 5, ww + 12, 5);
+        }
+        // 벽시계 12:10 — 점심시간
+        const cxk = 70, cyk = 60 + py, rk = 19;
+        if (cyk - rk < Hu) {
+          g.fillStyle = "#fff"; g.beginPath(); g.arc(cxk, cyk, rk, 0, Math.PI * 2); g.fill();
+          g.strokeStyle = "#94a3b8"; g.lineWidth = 2.5; g.stroke();
+          g.strokeStyle = "#cbd5e1"; g.lineWidth = 1.5;
+          g.beginPath();
+          for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.moveTo(cxk + Math.cos(a) * (rk - 3), cyk + Math.sin(a) * (rk - 3)); g.lineTo(cxk + Math.cos(a) * (rk - 6), cyk + Math.sin(a) * (rk - 6)); }
+          g.stroke();
+          g.strokeStyle = "#475569"; g.lineWidth = 2; g.lineCap = "round";
+          g.beginPath(); g.moveTo(cxk, cyk); g.lineTo(cxk + 0.5, cyk - 9); g.stroke(); // 시침(12)
+          g.beginPath(); g.moveTo(cxk, cyk); g.lineTo(cxk + 13 * Math.sin(Math.PI / 3), cyk - 13 * Math.cos(Math.PI / 3)); g.stroke(); // 분침(10분)
+          g.lineCap = "butt";
+        }
+      }
+      // 책상 — 받침 바로 아래에 붙어 카메라와 함께 움직인다(탑이 높아지면 화면 아래로 나간다)
+      function drawDesk(deskY) {
+        if (deskY >= Hu) return;
+        g.fillStyle = "#a16207";
+        g.fillRect(0, deskY, WU, 10);
+        g.fillStyle = "#854d0e";
+        g.fillRect(0, deskY + 10, WU, Math.max(0, Hu - deskY - 10));
+        g.fillStyle = "rgba(255,255,255,.12)";
+        g.fillRect(0, deskY, WU, 2);
+      }
+
+      function drawScale(anchor, camH) {
+        g.strokeStyle = "#cbd5e1";
+        g.lineWidth = 1;
+        g.beginPath(); g.moveTo(22, 0); g.lineTo(22, Hu); g.stroke();
+        g.font = `700 10px ${FONT}`;
+        g.textAlign = "right"; g.textBaseline = "alphabetic";
+        for (let k = 5; k <= MAX_LAYERS; k += 5) {
+          const sy = anchor + camH - k * T;
+          if (sy < -12 || sy > Hu + 4) continue;
+          const big = k % 10 === 0;
+          g.beginPath(); g.moveTo(big ? 6 : 14, sy + 0.5); g.lineTo(22, sy + 0.5); g.stroke();
+          if (big) { g.fillStyle = "#94a3b8"; g.font = `700 ${k >= 100 ? 8.5 : 10}px ${FONT}`; g.fillText(`${k}F`, 20, sy - 3); }
+        }
+      }
+
+      function draw(now) {
+        g.setTransform(scale, 0, 0, scale, 0, 0);
+        const anchor = 0.55 * Hu;
+        const camH = !S ? 0 : S.cam ? S.cam.from + (S.cam.to - S.cam.from) * easeOut(clamp((now - S.cam.start) / CAM_MS, 0, 1)) : S.camH;
+        drawBackground(anchor, camH);
+        drawScale(anchor, camH);
+        drawDesk(anchor + camH + BASE_H); // 받침 아랫면 = 책상 윗면, 눈금 선은 책상이 덮는다
+        if (!S) return;
+        let shakeX = 0;
+        if (S.shake) {
+          const a = (now - S.shake.start) / 300;
+          if (a < 1) shakeX = Math.sin(a * 40) * 3 * (1 - a); else S.shake = null;
+        }
+        const hToY = (h) => anchor + camH - h;
+        // 탑 층(아래부터) — 낙하 중인 마지막 층은 조각으로 그린다
+        const L = S.layers;
+        const lastIdx = L.length - 1;
+        for (let i = 0; i < L.length; i++) {
+          const ly = L[i];
+          const y = hToY((i + 1) * T);
+          if (y > Hu + T || y < -T) continue;
+          if (S.dropAnim && i === S.dropAnim.idx) continue;
+          let cx = ly.cx, w = ly.w;
+          if (S.unfold && i === lastIdx) {
+            const k = easeOut(clamp((now - S.unfold.start) / CAM_MS, 0, 1));
+            cx = S.unfold.from.cx + (S.unfold.to.cx - S.unfold.from.cx) * k;
+            w = S.unfold.from.w + (S.unfold.to.w - S.unfold.from.w) * k;
+          }
+          drawLayer(cx - w / 2 + shakeX, y, w, i, ly.kind);
+        }
+        // 받침(밥상)
+        {
+          const by = hToY(0);
+          if (by < Hu + BASE_H) {
+            g.fillStyle = "rgba(8,47,73,.18)";
+            rr(TOWER_L - 4 + shakeX, by + BASE_H - 2, W0 + 8, 5, 3); g.fill();
+            g.fillStyle = "#155e75";
+            rr(TOWER_L + shakeX, by, W0, BASE_H, 4); g.fill();
+            g.fillStyle = "rgba(255,255,255,.18)";
+            rr(TOWER_L + 4 + shakeX, by + 2, W0 - 8, 3, 1.5); g.fill();
+          }
+        }
+        // 잘린 조각(떨어짐)
+        for (const f of S.falling) {
+          const age = (now - f.born) / f.life;
+          const y = hToY(f.hBottom + T);
+          g.save();
+          g.translate(f.cx, y + T / 2);
+          g.rotate(f.rot);
+          drawLayer(-f.w / 2, -T / 2, f.w, f.idx, f.kind, 0.7 * clamp(1 - age, 0, 1));
+          g.restore();
+        }
+        // 슬라이더 조각 / 낙하 중 조각
+        const rowY = anchor - GAP - T;
+        let nightPiece = null;
+        if (S.dropAnim) {
+          const k = clamp((now - S.dropAnim.start) / DROP_MS, 0, 1);
+          const y = rowY + GAP * k * k;
+          drawLayer(S.dropAnim.cx - S.dropAnim.w / 2, y, S.dropAnim.w, S.dropAnim.idx, S.dropAnim.kind);
+        } else if (S.piece && state === "play") {
+          const x = sliderX(S.piece, now - S.piece.t0);
+          if (S.piece.kind === "night") nightPiece = { x: x - S.piece.pw / 2, y: rowY, w: S.piece.pw };
+          else drawLayer(x - S.piece.pw / 2, rowY, S.piece.pw, S.layers.length, S.piece.kind);
+          // 머뭇거림 바
+          const t = now - S.piece.t0;
+          if (t >= HESITATE_SHOW) {
+            const p = clamp((t - HESITATE_SHOW) / (AUTO_DROP - HESITATE_SHOW), 0, 1);
+            g.fillStyle = "rgba(251,146,60,.22)";
+            rr(6, rowY - 9, WU - 12, 3, 1.5); g.fill();
+            g.fillStyle = "#fb923c";
+            rr(6, rowY - 9, (WU - 12) * p, 3, 1.5); g.fill();
+          }
+        }
+        // 글로우 · 「+N」
+        for (const f of S.fx) {
+          const ly = L[f.idx];
+          if (!ly) continue;
+          const a = 1 - (now - f.start) / f.dur;
+          let cx = ly.cx, w = ly.w;
+          if (S.unfold && f.idx === lastIdx) {
+            const k = easeOut(clamp((now - S.unfold.start) / CAM_MS, 0, 1));
+            cx = S.unfold.from.cx + (S.unfold.to.cx - S.unfold.from.cx) * k;
+            w = S.unfold.from.w + (S.unfold.to.w - S.unfold.from.w) * k;
+          }
+          g.save();
+          g.globalAlpha = clamp(a, 0, 1);
+          g.strokeStyle = f.color; g.lineWidth = 6;
+          rr(cx - w / 2 - 3, hToY((f.idx + 1) * T) - 3, w + 6, T + 6, 7); g.stroke();
+          g.restore();
+        }
+        g.textAlign = "center"; g.textBaseline = "middle";
+        for (const t of S.texts) {
+          const age = (now - t.start) / 600;
+          g.save();
+          g.globalAlpha = clamp(1.4 - age * 1.4, 0, 1);
+          g.font = `800 14px ${FONT}`;
+          const ty = hToY(t.h) - 10 - age * 40;
+          g.lineJoin = "round"; g.lineWidth = 3.5; g.strokeStyle = "rgba(255,255,255,.9)";
+          g.strokeText(t.text, t.x, ty); // 움직이는 조각 위를 지나도 읽히게 흰 외곽선
+          g.fillStyle = "#0e7490";
+          g.fillText(t.text, t.x, ty);
+          g.restore();
+        }
+        // 야근 층 덮개 — 꼭대기 주변 60u만 밝다
+        if ((S.piece && S.piece.kind === "night" && state === "play") || (S.dropAnim && S.dropAnim.kind === "night")) {
+          const lx = S.cx, lyy = hToY(topY());
+          const cover = g.createRadialGradient(lx, lyy, 0, lx, lyy, 60);
+          cover.addColorStop(0, "rgba(8,47,73,0)");
+          cover.addColorStop(1, "rgba(8,47,73,.72)");
+          g.fillStyle = cover;
+          g.fillRect(0, 0, WU, Hu);
+          const light = g.createRadialGradient(lx, lyy, 0, lx, lyy, 60);
+          light.addColorStop(0, "rgba(103,232,249,.25)");
+          light.addColorStop(1, "rgba(103,232,249,0)");
+          g.fillStyle = light;
+          g.fillRect(lx - 60, lyy - 60, 120, 120);
+          if (nightPiece) drawLayerDashed(nightPiece.x, nightPiece.y, nightPiece.w);
+        }
+        // 카운트다운 숫자
+        if (S.cdLabel) {
+          const cy = Math.max(60, rowY - 56);
+          g.fillStyle = "rgba(255,255,255,.95)";
+          g.beginPath(); g.arc(180, cy, 30, 0, Math.PI * 2); g.fill();
+          g.strokeStyle = "#a5f3fc"; g.lineWidth = 4; g.stroke();
+          g.fillStyle = "#0e7490";
+          g.font = `800 34px ${FONT}`;
+          g.textAlign = "center"; g.textBaseline = "middle";
+          g.fillText(S.cdLabel, 180, cy + 1);
+        }
+        // 150층 라벨 — 완주 카드(세로 가운데)와 겹치지 않게 슬라이더 행보다 충분히 위에
+        if (state === "over" && S.overKind === "finish") {
+          const cy = Math.max(50, rowY - 84);
+          g.fillStyle = "rgba(255,255,255,.95)";
+          rr(180 - 110, cy - 24, 220, 48, 14); g.fill();
+          g.strokeStyle = "#a5f3fc"; g.lineWidth = 3; g.stroke();
+          g.fillStyle = "#0e7490";
+          g.font = `800 24px ${FONT}`;
+          g.textAlign = "center"; g.textBaseline = "middle";
+          g.fillText("점심시간 끝!", 180, cy + 1);
+        }
+      }
+
+      // ---------- 연결 ----------
+      ctx.onRestart(start);
+      ctx.onPause(pause);
+      if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+      window.addEventListener("resize", fit);
+      fit();
+      requestAnimationFrame(fit);
+      showReady();
+    },
+  });
+  </script>
+</body>
+</html>

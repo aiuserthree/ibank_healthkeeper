@@ -189,7 +189,6 @@ window.HKPlay = (function () {
     stack: ["#0e7490", "#67e8f9"],
     fifty: ["#9a3412", "#fb923c"],
     mines: ["#1f2937", "#f43f5e"],
-    pipes: ["#6b4423", "#d4a373"],
     promote: ["#312e81", "#818cf8"],
   };
 

@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>칼퇴 지뢰찾기 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* ── 칼퇴 지뢰찾기 — 세로 컬럼: 머리 줄 36 · 판 9×12 · 발 줄 44 (여백 8+8 → 판 밖 높이 96) ── */
+    /* width:0 + min-width:100% — 판의 고정 폭이 창(공통 틀)의 최소 폭을 키우지 않게 (창이 화면에 맞춰 줄어들면 판도 따라 줄어든다) */
+    .gm-mn { --gm-a: #1f2937; --gm-b: #f43f5e; --gm-cell: 30px; --gm-num: 16px; --gm-icon: 18px; --gm-flag-h: 15px; --gm-flag-fs: 10px; --gm-flag-x: 4px;
+      position: relative; width: 0; min-width: 100%; box-sizing: border-box; display: flex; flex-direction: column; outline: none; color: #334155;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+
+    /* 머리 줄 */
+    .gm-mn__hud { height: 36px; flex: 0 0 36px; display: flex; align-items: center; gap: 6px; margin-bottom: 8px; min-width: 0; }
+    .gm-mn__chip { height: 32px; box-sizing: border-box; flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 12px; background: #f1f5f9; color: #334155; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; line-height: 1; }
+    .gm-mn__chip svg { flex-shrink: 0; }
+    .gm-mn__tag { font-size: 11px; font-weight: 700; color: var(--gm-b); }
+    .gm-mn__tag[hidden] { display: none; }
+    .gm-mn__time.is-late { color: var(--gm-b); }
+    .gm-mn__dots { display: inline-flex; align-items: center; gap: 4px; }
+    .gm-mn__dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gm-b); display: inline-flex; align-items: center; justify-content: center; }
+    .gm-mn__dot.is-hit { width: 12px; height: 12px; background: none; }
+    .gm-mn--narrow .gm-mn__chip-label { display: none; }
+    .gm-mn__pause { margin-left: auto; flex-shrink: 0; border: 0; padding: 0; width: 36px; height: 36px; border-radius: 12px; background: #f1f5f9; color: #334155; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .gm-mn__pause:hover { background: #e2e8f0; }
+
+    /* 판 — 정확히 9s × 12s, 테두리는 크기에 안 들어가게 덧그림 */
+    .gm-mn__board { position: relative; flex: 0 0 auto; width: calc(var(--gm-cell) * 9); height: calc(var(--gm-cell) * 12); margin: 0 auto; display: grid; grid-template-columns: repeat(9, var(--gm-cell)); grid-auto-rows: var(--gm-cell); border-radius: 12px; overflow: hidden; background: #fff; }
+    .gm-mn__board::after { content: ""; position: absolute; inset: 0; box-sizing: border-box; border: 2px solid var(--gm-a); border-radius: 12px; pointer-events: none; z-index: 3; }
+    .gm-mn__board.is-shake { animation: gm-mn-shake .32s ease-in-out; }
+    @keyframes gm-mn-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-4px); } 40% { transform: translateX(4px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+
+    .gm-mn__cell { position: relative; width: var(--gm-cell); height: var(--gm-cell); box-sizing: border-box; display: flex; align-items: center; justify-content: center; font-size: var(--gm-num); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; background: #fff; }
+    .gm-mn.is-play .gm-mn__cell { cursor: pointer; }
+    /* 닫힌 책상 타일 */
+    .gm-mn__cell::before { content: ""; position: absolute; inset: 1.5px; border-radius: 6px; background: linear-gradient(#eef2f7 0 2px, #dbe3ee 2px calc(100% - 3px), #c4cfdc calc(100% - 3px)); }
+    @media (hover: hover) { .gm-mn.is-play .gm-mn__cell:not(.is-open):not(.is-hit):not(.is-mine):hover::before { background: #cbd5e1; } }
+    .gm-mn__cell.is-open { background: #f8fafc; box-shadow: inset 0 0 0 .5px #eef2f7; }
+    .gm-mn__cell.is-open::before { display: none; }
+    .gm-mn__cell.is-pop { animation: gm-mn-pop .16s ease-out; }
+    @keyframes gm-mn-pop { 0% { transform: scale(.7); } 100% { transform: scale(1); } }
+    .gm-mn__cell.is-pulse::before { animation: gm-mn-pulse .2s ease-out; }
+    @keyframes gm-mn-pulse { 0% { transform: scale(1); } 50% { transform: scale(.84); background: #cbd5e1; } 100% { transform: scale(1); } }
+    .gm-mn__cell[data-n="1"] { color: #2563eb; }
+    .gm-mn__cell[data-n="2"] { color: #16a34a; }
+    .gm-mn__cell[data-n="3"] { color: #e11d48; }
+    .gm-mn__cell[data-n="4"] { color: #7c3aed; }
+    .gm-mn__cell[data-n="5"] { color: #b45309; }
+    .gm-mn__cell[data-n="6"] { color: #0891b2; }
+    .gm-mn__cell[data-n="7"] { color: #1f2937; }
+    .gm-mn__cell[data-n="8"] { color: #64748b; }
+    /* 연차 딱지 */
+    .gm-mn__flag { position: absolute; left: var(--gm-flag-x); right: var(--gm-flag-x); top: 50%; height: var(--gm-flag-h); margin-top: calc(var(--gm-flag-h) / -2); border-radius: 6px; background: var(--gm-b); color: #fff; font-size: var(--gm-flag-fs); font-weight: 700; line-height: 1; letter-spacing: .02em; display: flex; align-items: center; justify-content: center; z-index: 1; }
+    .gm-mn__cell.is-wrong::before { box-shadow: inset 0 0 0 2px #e11d48; }
+    .gm-mn__cell.is-wrong .gm-mn__flag { opacity: .55; }
+    /* 야근(밟은 칸) · 흐린 폭탄(종료 공개) */
+    .gm-mn__cell.is-hit::before { background: var(--gm-a); }
+    .gm-mn__cell.is-mine::before { background: #e2e8f0; }
+    .gm-mn__cell svg { position: relative; z-index: 1; width: var(--gm-icon) !important; height: var(--gm-icon) !important; }
+    /* 키보드 커서 */
+    .gm-mn__cell.is-cursor::after { content: ""; position: absolute; inset: 1.5px; border-radius: 6px; box-shadow: inset 0 0 0 2px var(--gm-b); z-index: 2; pointer-events: none; }
+
+    /* 발 줄 — [열기 | 연차] 토글 + [여기까지] */
+    .gm-mn__foot { height: 44px; flex: 0 0 44px; display: flex; align-items: stretch; gap: 6px; margin-top: 8px; min-width: 0; }
+    .gm-mn__modes { flex: 1 1 200px; min-width: 200px; display: flex; border-radius: 12px; overflow: hidden; background: #f1f5f9; }
+    .gm-mn__mode { flex: 1; min-width: 100px; height: 44px; border: 0; padding: 0; background: #f1f5f9; color: #334155; font-family: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+    .gm-mn__mode.is-on[data-mode="open"] { background: var(--gm-a); color: #fff; }
+    .gm-mn__mode.is-on[data-mode="flag"] { background: var(--gm-b); color: #fff; }
+    .gm-mn__quit { flex: 0 0 auto; min-width: 84px; height: 44px; padding: 0 12px; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 12px; background: #fff; color: #334155; font-family: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+    .gm-mn__quit:hover { background: #f8fafc; }
+    .gm-mn__quit.is-arm { border-color: var(--gm-b); color: var(--gm-b); background: #fff1f2; }
+    /* 종료 뒤 발 줄 — 토글·여기까지 자리에 [결과 한 줄] + [다시 하기] (판은 공개된 채 그대로 보인다) */
+    .gm-mn__over { flex: 1 1 auto; min-width: 0; display: flex; align-items: stretch; gap: 6px; }
+    .gm-mn__foot:not(.is-over) .gm-mn__over { display: none; }
+    .gm-mn__foot.is-over .gm-mn__modes, .gm-mn__foot.is-over .gm-mn__quit { display: none; }
+    .gm-mn__over-text { flex: 1 1 auto; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 10px; border-radius: 12px; background: #f1f5f9; color: #334155; font-size: 14px; font-weight: 700; line-height: 44px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+    .gm-mn__over-text.is-win { background: #fff1f2; color: var(--gm-b); }
+    .gm-mn--narrow .gm-mn__over-text { font-size: 13px; padding: 0 8px; }
+    .gm-mn__again { flex: 0 0 auto; min-width: 100px; height: 44px; padding: 0 14px; border: 0; border-radius: 12px; background: var(--gm-b); color: #fff; font-family: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; }
+    .gm-mn__again:hover { background: #e11d48; }
+    /* 공통 틀이 [다시 하기] 옆에 붙이는 [그만하기](.hk-quit-wrap 으로 묶고 같은 클래스를 복사) — 한 줄에 들어가게 줄바꿈 금지·아이콘 없이 */
+    .gm-mn__over > .hk-quit-wrap { flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
+    .gm-mn__again.hk-quit-btn { min-width: 0; padding: 0 12px; }
+    .gm-mn__again.hk-quit-btn svg { display: none; }
+
+    /* 시작 화면 · 일시정지 막 — 컬럼 전체를 불투명하게 덮는다 */
+    /* 막은 컬럼(.gm-mn)이 창 가운데 떠 있어도 창(stage) 전체를 덮도록 위아래로 늘린다 (fit 에서 top/bottom 계산) */
+    .gm-mn__cover { position: absolute; inset: 0; z-index: 5; box-sizing: border-box; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; padding: 18px 20px; text-align: center; color: #fff; background: linear-gradient(150deg, #1f2937, #3b4454); overflow: auto; word-break: keep-all; }
+    .gm-mn__cover[hidden] { display: none; }
+    /* 내용이 창보다 길면 줄어들지 않고(버튼 높이 유지) 위부터 스크롤 — 들어가면 auto 여백으로 세로 가운데 */
+    .gm-mn__cover { justify-content: flex-start; }
+    .gm-mn__cover > * { flex-shrink: 0; }
+    .gm-mn__cover > :first-child { margin-top: auto; }
+    .gm-mn__cover > :last-child { margin-bottom: auto; }
+    .gm-mn__cover h2 { margin: 0; font-size: 24px; color: #fff; }
+    .gm-mn__cover p { margin: 0; font-size: 14px; line-height: 1.55; color: rgba(255,255,255,.9); }
+    .gm-mn__cover .gm-mn__sub { font-size: 13px; color: rgba(255,255,255,.72); margin-top: -4px; }
+    .gm-mn__cover .gm-mn__keys { font-size: 12.5px; line-height: 1.6; color: rgba(255,255,255,.7); }
+    .gm-mn__note { padding: 7px 12px; border-radius: 12px; background: rgba(255,255,255,.14); font-size: 12.5px; font-weight: 600; line-height: 1.5; }
+    .gm-mn__note--practice { background: rgba(244,63,94,.32); }
+    .gm-mn__mark { width: 48px; height: 48px; border-radius: 16px; background: rgba(244,63,94,.26); display: inline-flex; align-items: center; justify-content: center; }
+    .gm-mn__go { border: 0; height: 48px; padding: 0 30px; border-radius: 14px; background: var(--gm-b); color: #fff; font-family: inherit; font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; }
+    .gm-mn__go:hover { background: #e11d48; }
+    .gm-mn__go:disabled { opacity: .7; cursor: default; }
+    .gm-mn__go--resume { height: 44px; }
+    .gm-mn__ptime { font-size: 40px; font-weight: 800; letter-spacing: .02em; font-variant-numeric: tabular-nums; line-height: 1; margin: 4px 0; }
+    @media (max-width: 640px) {
+      .gm-mn__cover { padding: 14px 14px; gap: 8px; }
+      .gm-mn__cover h2 { font-size: 22px; }
+      .gm-mn__cover p { font-size: 13.5px; }
+    }
+    /* 창이 낮아 시작 화면이 다 안 들어가면(360×584 폰·작은 PC 창) 촘촘하게 — 시작 버튼이 막 안에서 스크롤 없이 보이게 */
+    .gm-mn--short .gm-mn__cover { gap: 6px; padding: 10px 12px; }
+    .gm-mn--short .gm-mn__mark { display: none; }
+    .gm-mn--short .gm-mn__cover > h2 { margin-top: auto; } /* 숨긴 그림 대신 제목이 첫 줄 — 세로 가운데 유지 */
+    .gm-mn--short .gm-mn__cover h2 { font-size: 20px; }
+    .gm-mn--short .gm-mn__cover p { font-size: 13px; line-height: 1.45; }
+    .gm-mn--short .gm-mn__cover .gm-mn__sub { margin-top: -2px; }
+    .gm-mn--short .gm-mn__cover .gm-mn__keys { font-size: 12px; line-height: 1.5; }
+    .gm-mn--short .gm-mn__note { font-size: 12px; padding: 6px 10px; }
+    .gm-mn--short .gm-mn__go { height: 44px; padding: 0 24px; font-size: 15px; margin-top: 2px; }
+    .gm-mn--short .gm-mn__ptime { font-size: 34px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // ── 판 생성 · 노게스 솔버 (난수는 넘겨받은 rng 하나만 — Math.random 0회) ─────────────
+    const MN = (function () {
+      const COLS = 9, ROWS = 12, N = COLS * ROWS, MINES = 20, SAFE = N - MINES;
+      const BANDS = [[0, 4, 4], [4, 8, 7], [8, 12, 9]]; // [시작행, 끝행, 폭탄 수] — 아침·낮·저녁 띠
+      const NB = [];
+      for (let i = 0; i < N; i++) {
+        const r = Math.floor(i / COLS), c = i % COLS, a = [];
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+          if (!dr && !dc) continue;
+          const rr = r + dr, cc = c + dc;
+          if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) a.push(rr * COLS + cc);
+        }
+        NB.push(a);
+      }
+
+      function numbers(isMine) {
+        const num = new Int8Array(N);
+        for (let i = 0; i < N; i++) {
+          if (isMine[i]) { num[i] = -1; continue; }
+          let k = 0;
+          for (const j of NB[i]) if (isMine[j]) k++;
+          num[i] = k;
+        }
+        return num;
+      }
+
+      // 출발 영역: 0칸 연결 영역(8방향) + 둘레 숫자 칸. 12~40칸, 1~4행 포함. 여러 개면 칸 수 최대 → anchor 최소
+      function pickStart(num) {
+        const seen = new Uint8Array(N);
+        let best = null;
+        for (let i = 0; i < N; i++) {
+          if (num[i] !== 0 || seen[i]) continue;
+          const inR = new Uint8Array(N), cells = [], stack = [i];
+          inR[i] = 1; seen[i] = 1;
+          while (stack.length) {
+            const x = stack.pop();
+            cells.push(x);
+            if (num[x] !== 0) continue;
+            for (const j of NB[x]) {
+              if (inR[j]) continue;
+              inR[j] = 1;
+              if (num[j] === 0) seen[j] = 1;
+              stack.push(j);
+            }
+          }
+          if (cells.length < 12 || cells.length > 40) continue;
+          let anchor = N, top = false;
+          for (const c of cells) { if (c < anchor) anchor = c; if (c < 4 * COLS) top = true; }
+          if (!top) continue;
+          if (!best || cells.length > best.cells.length || (cells.length === best.cells.length && anchor < best.anchor)) best = { cells, anchor };
+        }
+        return best ? best.cells.sort((a, b) => a - b) : null;
+      }
+
+      // 솔버 — R1 단일 숫자 → R2 남은 폭탄 수 → R3 두 숫자 부분집합. 단조 규칙이라 순서와 무관하게 같은 고정점
+      function solve(num, isMine, start, useSubset) {
+        const op = new Uint8Array(N), fl = new Uint8Array(N);
+        let opened = 0, flags = 0;
+        const openOne = (i) => {
+          if (op[i] || fl[i]) return;
+          op[i] = 1; opened++;
+          if (num[i] !== 0) return;
+          const st = [i];
+          while (st.length) {
+            const x = st.pop();
+            for (const j of NB[x]) {
+              if (op[j] || fl[j] || isMine[j]) continue;
+              op[j] = 1; opened++;
+              if (num[j] === 0) st.push(j);
+            }
+          }
+        };
+        const flagOne = (i) => { if (!fl[i] && !op[i]) { fl[i] = 1; flags++; } };
+        for (const i of start) { if (!op[i]) { op[i] = 1; opened++; } }
+        for (;;) {
+          if (opened >= SAFE) return { done: true, opened };
+          let progress = false;
+          // R1
+          for (let i = 0; i < N; i++) {
+            if (!op[i] || num[i] <= 0) continue;
+            let unk = 0, fc = 0;
+            for (const j of NB[i]) { if (fl[j]) fc++; else if (!op[j]) unk++; }
+            if (!unk) continue;
+            const need = num[i] - fc;
+            if (need === 0) { for (const j of NB[i]) if (!op[j] && !fl[j]) openOne(j); progress = true; }
+            else if (need === unk) { for (const j of NB[i]) if (!op[j] && !fl[j]) flagOne(j); progress = true; }
+          }
+          if (progress) continue;
+          // R2
+          let unkAll = 0;
+          for (let i = 0; i < N; i++) if (!op[i] && !fl[i]) unkAll++;
+          const left = MINES - flags;
+          if (unkAll > 0 && left === 0) { for (let i = 0; i < N; i++) if (!op[i] && !fl[i]) openOne(i); continue; }
+          if (unkAll > 0 && left === unkAll) { for (let i = 0; i < N; i++) if (!op[i] && !fl[i]) flagOne(i); continue; }
+          if (!useSubset) return { done: false, opened };
+          // R3
+          const front = [];
+          for (let i = 0; i < N; i++) {
+            if (!op[i] || num[i] <= 0) continue;
+            const U = []; let fc = 0;
+            for (const j of NB[i]) { if (fl[j]) fc++; else if (!op[j]) U.push(j); }
+            if (U.length) front.push({ U, need: num[i] - fc });
+          }
+          outer: for (const a of front) {
+            for (const b of front) {
+              if (a === b || a.U.length >= b.U.length) continue;
+              if (!a.U.every((x) => b.U.includes(x))) continue;
+              const D = b.U.filter((x) => !a.U.includes(x));
+              const d = b.need - a.need;
+              if (d === 0) { for (const j of D) openOne(j); progress = true; break outer; }
+              if (d === D.length) { for (const j of D) flagOne(j); progress = true; break outer; }
+            }
+          }
+          if (!progress) return { done: false, opened };
+        }
+      }
+
+      function generate(rng) {
+        let chosen = null, best = null, tries = 0, lastCand = null;
+        const genT0 = performance.now();
+        for (let k = 0; k < 400; k++) {
+          tries = k + 1;
+          // (1) 띠마다 36칸을 부분 Fisher–Yates 로 m개 — 후보 하나에 rng 정확히 20회
+          const isMine = new Uint8Array(N);
+          for (const [r0, r1, m] of BANDS) {
+            const cells = [];
+            for (let r = r0; r < r1; r++) for (let c = 0; c < COLS; c++) cells.push(r * COLS + c);
+            for (let i = 0; i < m; i++) {
+              const j = i + Math.floor(rng() * (cells.length - i));
+              [cells[i], cells[j]] = [cells[j], cells[i]];
+              isMine[cells[i]] = 1;
+            }
+          }
+          const num = numbers(isMine);
+          lastCand = { isMine, num };
+          // (2) 출발 영역
+          const start = pickStart(num);
+          if (!start) continue;
+          // (3) 노게스 검사
+          const full = solve(num, isMine, start, true);
+          if (!best || full.opened > best.opened) best = { isMine, num, start, opened: full.opened };
+          if (!full.done) continue;
+          // (4) 시시한 판 거르기 — 부분집합 규칙 없이도 완주되면 버린다
+          if (solve(num, isMine, start, false).done) continue;
+          chosen = { isMine, num, start };
+          break;
+        }
+        if (!chosen) chosen = best;
+        if (!chosen) {
+          // 400개 전부 출발 영역조차 없는 극단 — 마지막 후보에서 가장 큰 0영역으로 (이론상 거의 불가능)
+          const { isMine, num } = lastCand;
+          let big = null;
+          const seen = new Uint8Array(N);
+          for (let i = 0; i < N; i++) {
+            if (num[i] !== 0 || seen[i]) continue;
+            const inR = new Uint8Array(N), cells = [], st = [i];
+            inR[i] = 1; seen[i] = 1;
+            while (st.length) { const x = st.pop(); cells.push(x); if (num[x] !== 0) continue; for (const j of NB[x]) { if (inR[j]) continue; inR[j] = 1; if (num[j] === 0) seen[j] = 1; st.push(j); } }
+            if (!big || cells.length > big.length) big = cells;
+          }
+          chosen = { isMine, num, start: (big || [num.findIndex((v) => v >= 0)]).sort((a, b) => a - b) };
+        }
+        console.debug("[mines] 생성", tries, "후보", Math.round(performance.now() - genT0), "ms");
+        return chosen;
+      }
+
+      return { COLS, ROWS, N, MINES, SAFE, NB, generate };
+    })();
+
+    HKPlay.mountGame({
+      key: "mines",
+      setup(stage, ctx) {
+        const { COLS, ROWS, N, MINES, SAFE, NB } = MN;
+        const LIMIT_MS = 600000;
+        // 오늘의 판 — setup 때 한 번, 다시 하기에서는 그대로 재사용
+        const BOARD = MN.generate(ctx.rng("board"));
+        const ISMINE = BOARD.isMine, NUM = BOARD.num, START = BOARD.start;
+
+        let open, flag, hit, openedCount, hits, mode, state, practice;
+        let t0 = 0, tickId = 0, lastSec = -1, cellPx = 0;
+        let cur = START[0], cursorOn = false, lastPointerType = "mouse";
+        let armed = false, armTimer = 0;
+        // 플레이 중 소리만 — 시작 전·일시정지·숨은 탭에서는 조용히
+        const sfx = (name, arg) => { if (state === "play" && !document.hidden) ctx.sfx(name, arg); };
+
+        stage.innerHTML = `<div class="gm-mn" tabindex="0" aria-label="칼퇴 지뢰찾기">
+          <div class="gm-mn__hud" data-hud>
+            <span class="gm-mn__chip" title="남은 야근 폭탄">${HKUI.icon("bomb", 14, "currentColor")}<span data-bombs>${MINES}</span></span>
+            <span class="gm-mn__chip" title="걸린 시간"><span class="gm-mn__tag" data-tag hidden>연습</span>${HKUI.icon("timer", 14, "currentColor")}<span class="gm-mn__time" data-time>0:00</span></span>
+            <span class="gm-mn__chip" title="정시퇴근 여유"><span class="gm-mn__chip-label">정시퇴근</span><span class="gm-mn__dots" data-dots></span></span>
+            <button type="button" class="gm-mn__pause" data-pause aria-label="일시정지">${HKUI.icon("pause", 18, "currentColor")}</button>
+          </div>
+          <div class="gm-mn__board" data-board role="grid" aria-label="사무실 평면도"></div>
+          <div class="gm-mn__foot">
+            <div class="gm-mn__modes" role="group" aria-label="탭 동작">
+              <button type="button" class="gm-mn__mode is-on" data-mode="open">${HKUI.icon("mouse-pointer-click", 16, "currentColor")}열기</button>
+              <button type="button" class="gm-mn__mode" data-mode="flag">${HKUI.icon("flag", 16, "currentColor")}연차</button>
+            </div>
+            <button type="button" class="gm-mn__quit" data-quit>여기까지</button>
+            <div class="gm-mn__over" data-over><span class="gm-mn__over-text" data-over-text></span><button type="button" class="gm-mn__again" data-again>${HKUI.icon("rotate-ccw", 16, "currentColor")}다시 하기</button></div>
+          </div>
+          <div class="gm-mn__cover" data-cover hidden></div>
+        </div>`;
+        const root = stage.querySelector(".gm-mn");
+        const hudEl = root.querySelector("[data-hud]");
+        const boardEl = root.querySelector("[data-board]");
+        const cover = root.querySelector("[data-cover]");
+        const bombsEl = root.querySelector("[data-bombs]");
+        const timeEl = root.querySelector("[data-time]");
+        const tagEl = root.querySelector("[data-tag]");
+        const dotsEl = root.querySelector("[data-dots]");
+        const quitBtn = root.querySelector("[data-quit]");
+        const footEl = root.querySelector(".gm-mn__foot");
+        const overTextEl = root.querySelector("[data-over-text]");
+        const againBtn = root.querySelector("[data-again]");
+        let overTimer = 0;
+        const modeBtns = [...root.querySelectorAll("[data-mode]")];
+        boardEl.innerHTML = Array.from({ length: N }, (_, i) => `<div class="gm-mn__cell" data-i="${i}" role="gridcell"></div>`).join("");
+        const cells = [...boardEl.children];
+        HKUI.refreshIcons(root);
+
+        // ── 크기 맞추기: 칸 s = clamp(30, min(폭/9, 남은 높이/12), 48) ──
+        function fit() {
+          const w = stage.clientWidth;
+          const room = HKPlay.roomFor(stage, boardEl);
+          // 하한은 30 — 다만 30 이 안 들어가는 아주 낮은 PC 창(높이 ≈ 545px 미만, 폰은 해당 없음)에서는 26 까지 줄여 창 안 스크롤을 줄인다
+          const s = Math.max(26, Math.min(Math.floor(w / COLS), Math.floor(room / ROWS), 48));
+          if (s !== cellPx) {
+            cellPx = s;
+            root.style.setProperty("--gm-cell", `${s}px`);
+            root.style.setProperty("--gm-num", `${Math.round(s * 0.52)}px`);
+            root.style.setProperty("--gm-icon", `${Math.round(s * 0.6)}px`);
+            root.style.setProperty("--gm-flag-h", `${Math.round(s * 0.5)}px`);
+            root.style.setProperty("--gm-flag-fs", `${s < 30 ? 9 : s < 36 ? 10 : 11}px`);
+            root.style.setProperty("--gm-flag-x", `${s < 30 ? 3 : 4}px`);
+          }
+          fitHud();
+          // 컬럼이 창 가운데 떠 있으면 막을 창 끝까지 늘린다. 컬럼이 창보다 크면(아주 작은 창, 칸 30 하한) 막을 창 높이에 맞춘다
+          const over = root.offsetHeight - stage.clientHeight;
+          if (over > 0) { cover.style.top = "0px"; cover.style.bottom = `${over}px`; }
+          else { const extra = Math.floor(-over / 2); cover.style.top = `${-extra}px`; cover.style.bottom = `${-extra}px`; }
+          fitCover();
+        }
+        // 좁은 창(360폰, stage ≈ 310~332)에서는 "정시퇴근" 글자를 숨기고 점 3개만 — 390폰(stage 340~362)은 글자를 보인다.
+        // 그래도 머리 줄이 넘치면(연습 태그가 붙은 애매한 폭) 글자를 숨긴다
+        function fitHud() {
+          root.classList.toggle("gm-mn--narrow", stage.clientWidth < 340);
+          if (!root.classList.contains("gm-mn--narrow") && hudEl.scrollWidth > hudEl.clientWidth + 1) root.classList.add("gm-mn--narrow");
+        }
+        // 막(시작 화면·일시정지)이 창 높이를 넘치면 촘촘한 판으로 — 시작 버튼이 스크롤 없이 보이게
+        function fitCover() {
+          root.classList.remove("gm-mn--short");
+          if (cover.hidden) return;
+          if (cover.scrollHeight > cover.clientHeight + 1) root.classList.add("gm-mn--short");
+        }
+        window.addEventListener("resize", fit);
+        requestAnimationFrame(fit);
+
+        // ── 그리기 ──
+        const fmt = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+        function draw(i) {
+          const el = cells[i];
+          let cls = "gm-mn__cell", html = "", sig;
+          if (open[i]) { cls += " is-open"; html = NUM[i] > 0 ? String(NUM[i]) : ""; sig = `o${NUM[i]}`; }
+          else if (hit[i]) { cls += " is-hit"; html = HKUI.icon("bomb", 24, "#f43f5e"); sig = "h"; }
+          else if (state === "over" && ISMINE[i] && !flag[i]) { cls += " is-mine"; html = HKUI.icon("bomb", 24, "#94a3b8"); sig = "m"; }
+          else if (flag[i]) { const wrong = state === "over" && !ISMINE[i]; cls += " is-flag" + (wrong ? " is-wrong" : ""); html = `<span class="gm-mn__flag">연차</span>`; sig = wrong ? "fw" : "f"; }
+          else sig = "c";
+          if (el.dataset.s === sig) return;
+          el.dataset.s = sig;
+          el.className = cls + (cursorOn && state === "play" && i === cur ? " is-cursor" : "");
+          if (open[i] && NUM[i] > 0) el.dataset.n = NUM[i]; else el.removeAttribute("data-n");
+          el.innerHTML = html;
+          if (sig === "h" || sig === "m") HKUI.refreshIcons(el);
+        }
+        function drawAll() { for (let i = 0; i < N; i++) draw(i); }
+        let prevCur = -1;
+        function drawCursor() {
+          if (prevCur >= 0) cells[prevCur].classList.remove("is-cursor");
+          prevCur = -1;
+          if (cursorOn && state === "play") { cells[cur].classList.add("is-cursor"); prevCur = cur; }
+        }
+        function popCell(el) { el.classList.remove("is-pop"); void el.offsetWidth; el.classList.add("is-pop"); }
+        function pulse(list) {
+          for (const j of list) { const el = cells[j]; el.classList.remove("is-pulse"); void el.offsetWidth; el.classList.add("is-pulse"); }
+          setTimeout(() => list.forEach((j) => cells[j].classList.remove("is-pulse")), 220);
+        }
+        function shake() { boardEl.classList.remove("is-shake"); void boardEl.offsetWidth; boardEl.classList.add("is-shake"); }
+        function updateHud() {
+          let flags = 0;
+          for (let i = 0; i < N; i++) if (flag[i]) flags++;
+          bombsEl.textContent = String(MINES - flags - hits);
+          dotsEl.innerHTML = [0, 1, 2].map((k) => (k < hits ? `<span class="gm-mn__dot is-hit">${HKUI.icon("bomb", 12, "#1f2937")}</span>` : `<span class="gm-mn__dot"></span>`)).join("");
+          HKUI.refreshIcons(dotsEl);
+        }
+        function drawTime(ms) {
+          const sec = Math.floor(ms / 1000);
+          timeEl.textContent = fmt(ms);
+          timeEl.classList.toggle("is-late", sec >= 170 && sec < 180);
+          const pt = cover.querySelector("[data-ptime]");
+          if (pt && !cover.hidden) pt.textContent = fmt(ms);
+        }
+        function setMode(m) {
+          if (mode === m) return;
+          mode = m;
+          modeBtns.forEach((b) => b.classList.toggle("is-on", b.dataset.mode === m));
+        }
+
+        // ── 시작 화면 · 일시정지 막 ──
+        function showCover(kind) {
+          if (kind === "none") { cover.hidden = true; return; }
+          cover.hidden = false;
+          stage.scrollTop = 0; // 아주 작은 창에서 판을 내려 보던 중이라도 막은 창 위쪽에 맞춘다
+          if (kind === "ready") {
+            const [, m, d] = ctx.today.split("-").map(Number);
+            cover.innerHTML = `<span class="gm-mn__mark">${HKUI.icon("bomb", 26, "#fff")}</span>
+              <h2>칼퇴 지뢰찾기</h2>
+              <p class="gm-mn__sub">야근 폭탄 20개 · 책상 88자리 · 오늘의 판 ${m}월 ${d}일</p>
+              <p>숫자는 둘레 8칸에 숨은 야근 폭탄 수예요.<br>안전한 책상 88자리를 모두 열면 칼퇴!</p>
+              <p>폭탄을 밟아도 야근 3번까지는 계속해요.<br>찍지 않아도 끝까지 풀리는 판이에요.</p>
+              <p class="gm-mn__keys">PC — 클릭 열기 · 우클릭 연차 딱지 · 숫자 클릭으로 둘레 한꺼번에<br>폰 — 탭 열기 · 아래 [열기/연차] 토글</p>
+              <div class="gm-mn__note">순위 판은 일시정지해도 시계가 계속 가요<br>10분이 지나면 자동으로 여기까지로 기록돼요</div>
+              ${ctx.dailyDone ? `<div class="gm-mn__note gm-mn__note--practice">오늘 기록은 이미 반영됐어요 · 이번 판은 연습</div>` : ""}
+              <button type="button" class="gm-mn__go" data-go>${HKUI.icon("play", 18, "currentColor")} 칼퇴 도전 시작</button>`;
+            HKUI.refreshIcons(cover);
+            fitCover();
+            cover.querySelector("[data-go]").onclick = async (e) => {
+              if (state !== "ready") return;
+              e.currentTarget.disabled = true;
+              // 오늘의 도전 시작 신고 — false 면 이미 시작했던 날이라 이번 판은 연습
+              let ranked = false;
+              try { ranked = await ctx.begin(); } catch (_) { ranked = false; }
+              if (state !== "ready") return;
+              practice = !ranked;
+              if (practice) HKUI.toast("오늘 기록은 이미 반영됐어요 · 이번 판은 연습", "info");
+              start();
+            };
+          } else {
+            cover.innerHTML = `<h2>잠깐 쉬는 중</h2>
+              <div class="gm-mn__ptime" data-ptime>${fmt(Date.now() - t0)}</div>
+              <p>시계는 계속 가요 · 판은 가려 둘게요</p>
+              <button type="button" class="gm-mn__go gm-mn__go--resume" data-resume>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
+            HKUI.refreshIcons(cover);
+            fitCover();
+            cover.querySelector("[data-resume]").onclick = resume;
+          }
+        }
+
+        // ── 상태 기계: ready → play ⇄ paused → over ──
+        function reset() {
+          clearInterval(tickId); tickId = 0;
+          clearTimeout(overTimer); overTimer = 0;
+          footEl.classList.remove("is-over");
+          open = new Uint8Array(N); flag = new Uint8Array(N); hit = new Uint8Array(N);
+          openedCount = 0; hits = 0; practice = false; lastSec = -1; t0 = 0;
+          state = "ready";
+          cur = START[0]; cursorOn = false; prevCur = -1;
+          disarm();
+          setMode("open");
+          root.classList.remove("is-play");
+          tagEl.hidden = true;
+          fitHud();
+          cells.forEach((el) => { el.dataset.s = ""; });
+          drawAll();
+          updateHud();
+          drawTime(0);
+          showCover("ready");
+        }
+        function start() {
+          state = "play";
+          root.classList.add("is-play");
+          showCover("none");
+          for (const i of START) open[i] = 1;
+          openedCount = START.length;
+          cur = START[0]; cursorOn = false;
+          drawAll();
+          tagEl.hidden = !practice;
+          fitHud();
+          updateHud();
+          ctx.sfx("go");
+          t0 = Date.now(); lastSec = -1;
+          drawTime(0);
+          clearInterval(tickId);
+          tickId = setInterval(tick, 250);
+          root.focus({ preventScroll: true });
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          disarm();
+          root.classList.remove("is-play");
+          drawCursor();
+          showCover("pause");
+          tick();
+        }
+        function resume() {
+          if (state !== "paused") return;
+          state = "play";
+          root.classList.add("is-play");
+          showCover("none");
+          drawCursor();
+          root.focus({ preventScroll: true });
+          tick(); // 돌아오는 순간 시계 갱신 + 10분 판정
+        }
+        function tick() {
+          if (state !== "play" && state !== "paused") return;
+          const el = Date.now() - t0;
+          drawTime(el);
+          const sec = Math.floor(el / 1000);
+          if (sec !== lastSec) {
+            lastSec = sec;
+            if (sec >= 170 && sec <= 179) sfx("tick");
+          }
+          checkTimeout();
+        }
+        function checkTimeout() {
+          if (state !== "play" && state !== "paused") return;
+          if (Date.now() - t0 < LIMIT_MS) return;
+          if (state === "paused") showCover("none");
+          finish("timeout");
+        }
+        function finish(kind) {
+          if (state === "over") return;
+          state = "over";
+          clearInterval(tickId); tickId = 0;
+          disarm();
+          root.classList.remove("is-play");
+          cursorOn = false; drawCursor();
+          const endAt = Date.now();
+          drawTime(endAt - t0);
+          let score, delay = 500;
+          if (kind === "win") {
+            // 남은 닫힌 칸(= 폭탄)을 자동 연차 표시
+            for (let i = 0; i < N; i++) if (!open[i] && !hit[i]) flag[i] = 1;
+            const ds = Math.floor((endAt - t0) / 100);
+            score = SAFE * 10 + 1000 + Math.max(0, 1800 - ds) + (3 - hits) * 600;
+            console.debug("[mines] 칼퇴 성공", `열린 칸 ${openedCount} · 야근 ${hits} · ${ds / 10}초 · 점수 ${score}`);
+          } else {
+            score = openedCount * 10;
+            if (kind === "lose") { ctx.sfx("lose"); delay = 700; }
+            else {
+              if (kind === "timeout") HKUI.toast("10분이 지나 여기까지로 기록해요", "info");
+              if (!document.hidden) ctx.sfx("whoosh");
+            }
+            console.debug("[mines] 종료", kind, `열린 칸 ${openedCount} · 야근 ${hits} · 점수 ${score}`);
+          }
+          drawAll(); // over 상태 — 폭탄 공개 · 틀린 깃발 표시
+          updateHud();
+          const label = { win: "칼퇴 성공", lose: "야근 3회", quit: "여기까지", timeout: "10분 경과" }[kind];
+          // 결과와 함께 발 줄을 [결과 · 점수] + [다시 하기] 로 — 폰·PC 어디서나 새로고침 없이 다시 할 수 있게 (스페이스로도 눌린다).
+          // 연습 여부는 시계 칩의 "연습" 태그가 그대로 보여 준다. 공통 틀이 이 버튼 옆에 [그만하기]를 붙인다
+          clearTimeout(overTimer);
+          overTimer = setTimeout(() => {
+            if (state !== "over") return;
+            overTextEl.textContent = `${label} · ${Math.round(score).toLocaleString("ko-KR")}점`;
+            overTextEl.classList.toggle("is-win", kind === "win");
+            footEl.classList.add("is-over");
+            ctx.submit(Math.round(score));
+          }, delay);
+        }
+        againBtn.onclick = () => {
+          if (state !== "over") return;
+          ctx.sfx("tap");
+          reset();
+        };
+
+        // ── 플레이 규칙 ──
+        function reveal(i) { // 0이면 8방향 연쇄(깃발 칸은 건너뜀) — 새로 연 칸 수
+          if (open[i] || flag[i] || hit[i] || ISMINE[i]) return 0;
+          const q = [i], popped = [i];
+          open[i] = 1; openedCount++;
+          while (q.length) {
+            const x = q.pop();
+            if (NUM[x] !== 0) continue;
+            for (const j of NB[x]) {
+              if (open[j] || flag[j] || hit[j] || ISMINE[j]) continue;
+              open[j] = 1; openedCount++; popped.push(j);
+              if (NUM[j] === 0) q.push(j);
+            }
+          }
+          for (const j of popped) { draw(j); popCell(cells[j]); }
+          return popped.length;
+        }
+        function openSound(n) {
+          if (n <= 0) return;
+          if (n === 1) sfx("tap");
+          else if (n <= 7) sfx("pop");
+          else sfx("combo", Math.min(10, Math.floor(n / 4)));
+        }
+        function checkWin() { if (state === "play" && openedCount >= SAFE) finish("win"); }
+        function stepMine(j) {
+          hit[j] = 1; hits++;
+          draw(j); updateHud(); shake();
+          if (hits >= 3) { finish("lose"); return; }
+          sfx("explode");
+        }
+        function openCell(i) {
+          if (state !== "play") return;
+          if (open[i]) { if (NUM[i] > 0) chord(i); return; }
+          if (hit[i]) return;
+          if (flag[i]) { sfx("invalid"); return; }
+          if (ISMINE[i]) { stepMine(i); return; }
+          openSound(reveal(i));
+          checkWin();
+        }
+        // 코드 — 둘레 8칸: ① 깃발+밟은 ≠ 숫자 → invalid+펄스 ② 닫힌 칸 T 에 폭탄 없으면 모두 열기 / 있으면 행 우선 첫 폭탄 하나만 밟음
+        function chord(i) {
+          if (state !== "play" || !open[i] || NUM[i] <= 0) return;
+          let marked = 0; const T = [];
+          for (const j of NB[i]) { if (flag[j] || hit[j]) marked++; else if (!open[j]) T.push(j); }
+          if (marked !== NUM[i]) { sfx("invalid"); pulse(T); return; }
+          if (!T.length) return;
+          T.sort((a, b) => a - b);
+          const firstMine = T.find((j) => ISMINE[j]);
+          if (firstMine !== undefined) { stepMine(firstMine); return; }
+          let n = 0;
+          for (const j of T) n += reveal(j);
+          openSound(n);
+          checkWin();
+        }
+        function toggleFlag(i) {
+          if (state !== "play" || open[i] || hit[i]) return;
+          flag[i] = flag[i] ? 0 : 1;
+          draw(i); updateHud();
+          if (flag[i]) { sfx("select"); try { navigator.vibrate?.(20); } catch (_) { /* 진동은 부가 기능 */ } }
+          else sfx("swap");
+        }
+        function act(i) { // 현재 모드 동작 (열린 숫자는 모드 무관 코드)
+          if (state !== "play") return;
+          if (open[i]) { if (NUM[i] > 0) chord(i); return; }
+          if (mode === "flag") toggleFlag(i); else openCell(i);
+        }
+
+        // ── 여기까지 — 3초 안 두 번 ──
+        function disarm() {
+          clearTimeout(armTimer); armTimer = 0; armed = false;
+          quitBtn.textContent = "여기까지";
+          quitBtn.classList.remove("is-arm");
+        }
+        quitBtn.onclick = () => {
+          if (state !== "play") return;
+          if (!armed) {
+            armed = true;
+            quitBtn.textContent = "정말요? 3초";
+            quitBtn.classList.add("is-arm");
+            armTimer = setTimeout(disarm, 3000);
+            return;
+          }
+          disarm();
+          finish("quit");
+        };
+
+        // ── 입력 ──
+        boardEl.addEventListener("pointerdown", (e) => {
+          lastPointerType = e.pointerType || "mouse";
+          if (cursorOn) { cursorOn = false; drawCursor(); }
+        });
+        boardEl.addEventListener("click", (e) => {
+          const el = e.target.closest("[data-i]");
+          if (!el || state !== "play") return;
+          act(+el.dataset.i);
+          root.focus({ preventScroll: true });
+        });
+        boardEl.addEventListener("contextmenu", (e) => {
+          e.preventDefault(); // 브라우저 메뉴·롱프레스 메뉴 차단
+          if (state !== "play" || lastPointerType === "touch") return;
+          const el = e.target.closest("[data-i]");
+          if (el) toggleFlag(+el.dataset.i);
+        });
+        modeBtns.forEach((b) => {
+          b.onclick = () => {
+            if (mode === b.dataset.mode) return;
+            setMode(b.dataset.mode);
+            sfx("select");
+            root.focus({ preventScroll: true });
+          };
+        });
+        root.querySelector("[data-pause]").onclick = () => { if (state === "play") pause(); };
+
+        function move(dr, dc) {
+          const r = Math.min(ROWS - 1, Math.max(0, Math.floor(cur / COLS) + dr));
+          const c = Math.min(COLS - 1, Math.max(0, (cur % COLS) + dc));
+          cur = r * COLS + c;
+          cursorOn = true;
+          drawCursor();
+        }
+        document.addEventListener("keydown", (e) => {
+          if (e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          if (state !== "play") return; // 시작 화면·일시정지·종료 뒤 스페이스/Esc 는 공통 틀 몫
+          const k = e.key;
+          if (e.code === "Space") { e.preventDefault(); return; } // 조작키 아님 — 스크롤만 막는다
+          if (k === "ArrowUp") { e.preventDefault(); move(-1, 0); }
+          else if (k === "ArrowDown") { e.preventDefault(); move(1, 0); }
+          else if (k === "ArrowLeft") { e.preventDefault(); move(0, -1); }
+          else if (k === "ArrowRight") { e.preventDefault(); move(0, 1); }
+          // Enter·F 는 커서가 보일 때만 — 포인터로 하다가(커서 숨김) 누르면 안 보이는 칸을 건드리지 않고 커서만 보여 준다
+          else if (k === "Enter") { e.preventDefault(); if (!cursorOn) { cursorOn = true; drawCursor(); return; } if (open[cur]) { if (NUM[cur] > 0) chord(cur); } else openCell(cur); }
+          else if (k === "f" || k === "F" || k === "ㄹ") { e.preventDefault(); if (!cursorOn) { cursorOn = true; drawCursor(); return; } toggleFlag(cur); }
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+          else tick(); // 돌아오면 자동 재개는 안 하고 시계 갱신 + 10분 판정만
+        });
+        window.addEventListener("blur", () => pause());
+
+        ctx.onRestart(reset);
+        ctx.onPause(pause);
+        reset();
+        root.focus({ preventScroll: true });
+      },
+    });
+  </script>
+</body>
+</html>

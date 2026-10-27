@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>승진 합치기 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-pm { --gm-a: #312e81; --gm-b: #818cf8; --gm-ink: #1e1b4b; --gm-soft: #64748b; --gm-chip: #eef2ff; --tile: 72px; --gap: 8px; --tfs: 22px;
+      display: flex; flex-direction: column; gap: 10px; padding: 8px; color: var(--gm-ink); outline: none;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    /* 1. HUD */
+    .gm-pm__hud { height: 56px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    .gm-pm__stat { display: flex; flex-direction: column; gap: 3px; line-height: 1.05; }
+    .gm-pm__stat small { font-size: 11px; font-weight: 700; color: var(--gm-soft); }
+    .gm-pm__stat b { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--gm-ink); }
+    .gm-pm__stat--left { align-items: flex-end; text-align: right; }
+    .gm-pm__stat--left b { font-size: 26px; transition: color .2s; }
+    .gm-pm__stat--left b.is-warn { color: #d97706; }
+    .gm-pm__stat--left b.is-danger { color: #dc2626; }
+    .gm-pm__best { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    .gm-pm__best small { font-size: 11px; font-weight: 700; color: var(--gm-soft); line-height: 1; }
+    /* 미니 명패 — HUD 64×32, 다음 입사자 56×28 */
+    .gm-pm__mini { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 32px; border-radius: 8px; font-size: 14px; font-weight: 800; box-sizing: border-box; overflow: hidden; line-height: 1; }
+    .gm-pm__mini::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--band, transparent); }
+    .gm-pm__mini--s { width: 56px; height: 28px; font-size: 13px; border-radius: 7px; }
+    .gm-pm__mini.is-r0 { background: #eef2ff; color: #94a3b8; }
+    /* 2. 분기 막대 */
+    .gm-pm__quarters { display: flex; flex-direction: column; gap: 4px; }
+    .gm-pm__qbar { display: flex; gap: 4px; height: 6px; }
+    .gm-pm__qbar i { flex: 1; position: relative; border-radius: 999px; background: #e0e7ff; overflow: hidden; --p: 0; }
+    .gm-pm__qbar i::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: calc(var(--p) * 100%); background: var(--gm-b); border-radius: 999px; transition: width .15s ease-out; }
+    .gm-pm__qrow { height: 14px; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #475569; line-height: 1; }
+    .gm-pm__practice { display: inline-flex; align-items: center; font-size: 11px; font-weight: 700; background: #fef3c7; color: #92400e; border-radius: 999px; padding: 2px 8px; line-height: 1.2; }
+    .gm-pm__practice[hidden] { display: none; }
+    /* 3. 다음 줄 */
+    .gm-pm__next { height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .gm-pm__nextl { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #475569; }
+    .gm-pm__undo { height: 36px; min-width: 110px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--gm-chip); color: var(--gm-a); font-size: 13px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+    .gm-pm__undo:hover:not(:disabled) { background: #e0e7ff; }
+    .gm-pm__undo:disabled { opacity: .5; cursor: default; }
+    /* 4. 판 */
+    .gm-pm__board { position: relative; align-self: center; flex-shrink: 0; width: 328px; height: 328px; border-radius: 14px; background: #e0e7ff; touch-action: none; }
+    .gm-pm__board.is-shake { animation: gm-pm-shake 120ms ease-in-out; }
+    @keyframes gm-pm-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+    /* 칸·타일 자리는 --x/--y 로 — scale 개별 속성을 쓰면 translate 까지 곱해져 칸 밖으로 튀므로 keyframes 안에서 translate 와 함께 쓴다 */
+    .gm-pm__cell { position: absolute; left: 0; top: 0; width: var(--tile); height: var(--tile); border-radius: 10px; background: rgba(199, 210, 254, .6); transform: translate(var(--x, 0px), var(--y, 0px)); }
+    .gm-pm__tiles { position: absolute; inset: 0; }
+    .gm-pm__tile { position: absolute; left: 0; top: 0; z-index: 1; width: var(--tile); height: var(--tile); border-radius: 10px; box-sizing: border-box; overflow: hidden;
+      display: flex; align-items: center; justify-content: center; font-size: var(--tfs); font-weight: 800; line-height: 1; letter-spacing: -.01em;
+      transform: translate(var(--x, 0px), var(--y, 0px)); transition: transform 110ms ease-out; will-change: transform; }
+    .gm-pm__tile::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--band, transparent); }
+    .gm-pm__tile.is-under { z-index: 0; }
+    .gm-pm__tile.is-pop { animation: gm-pm-pop 120ms ease-out; }
+    .gm-pm__tile.is-new { animation: gm-pm-new 100ms ease-out; }
+    .gm-pm.is-resizing .gm-pm__tile { transition: none; }
+    @keyframes gm-pm-pop { 0%, 100% { transform: translate(var(--x, 0px), var(--y, 0px)) scale(1); } 50% { transform: translate(var(--x, 0px), var(--y, 0px)) scale(1.15); } }
+    @keyframes gm-pm-new { 0% { transform: translate(var(--x, 0px), var(--y, 0px)) scale(.6); } 100% { transform: translate(var(--x, 0px), var(--y, 0px)) scale(1); } }
+    /* 직급 색 (명패·타일 공통) */
+    .is-r1 { background: #f1f5f9; color: #475569; --band: #cbd5e1; }
+    .is-r2 { background: #e0e7ff; color: #312e81; --band: #a5b4fc; }
+    .is-r3 { background: #c7d2fe; color: #312e81; --band: #818cf8; }
+    .is-r4 { background: #a5b4fc; color: #1e1b4b; --band: #6366f1; }
+    .is-r5 { background: #818cf8; color: #fff; --band: #4f46e5; }
+    .is-r6 { background: #6366f1; color: #fff; --band: #4338ca; }
+    .is-r7 { background: #4f46e5; color: #fff; --band: #3730a3; }
+    .is-r8 { background: #4338ca; color: #fff; --band: #312e81; }
+    .is-r9 { background: #312e81; color: #fde68a; --band: #f59e0b; border: 2px solid #f59e0b; }
+    .is-r10 { background: #1e1b4b; color: #fbbf24; --band: #f59e0b; border: 2px solid #f59e0b; box-shadow: 0 0 0 4px rgba(245, 158, 11, .35); }
+    .gm-pm__tile.is-r1 { background: #f8fafc; }
+    /* 덮개 — 시작·일시정지·종료 */
+    .gm-pm__cover { position: absolute; inset: 0; z-index: 5; border-radius: 14px; background: rgba(255, 255, 255, .93); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; text-align: center; }
+    .gm-pm__cover[hidden] { display: none; }
+    .gm-pm__cover h2 { margin: 0; font-size: 22px; font-weight: 800; color: var(--gm-a); line-height: 1.3; word-break: keep-all; }
+    .gm-pm__cover p { margin: 0; font-size: 14px; line-height: 1.55; color: #334155; word-break: keep-all; }
+    .gm-pm__keys { font-size: 12px; color: var(--gm-soft); }
+    .gm-pm__note { display: inline-block; padding: 5px 12px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 12px; font-weight: 700; }
+    .gm-pm__go { border: 0; height: 48px; padding: 0 26px; margin-top: 4px; border-radius: 12px; background: var(--gm-a); color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+    .gm-pm__go:hover:not(:disabled) { background: #3730a3; }
+    .gm-pm__go:disabled { opacity: .6; cursor: default; }
+    /* 5. 방향 버튼 */
+    .gm-pm__dpad { height: 48px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .gm-pm__dir { width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px; background: var(--gm-chip); color: var(--gm-a); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+    .gm-pm__dir:hover { background: #e0e7ff; }
+    .gm-pm__dir:active { transform: scale(.94); background: #c7d2fe; }
+    /* PC(마우스) — 방향 버튼을 키보드처럼 십자 모양으로 */
+    @media (hover: hover) and (pointer: fine) {
+      .gm-pm__dpad { height: auto; display: grid; grid-template-columns: repeat(3, 40px); grid-template-rows: repeat(3, 40px); gap: 4px; justify-content: center; }
+      .gm-pm__dir { width: 40px; height: 40px; }
+      .gm-pm__dir[data-dir="up"] { grid-area: 1 / 2; }
+      .gm-pm__dir[data-dir="left"] { grid-area: 2 / 1; }
+      .gm-pm__dir[data-dir="right"] { grid-area: 2 / 3; }
+      .gm-pm__dir[data-dir="down"] { grid-area: 3 / 2; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "promote",
+      setup(stage, ctx) {
+        // ── 상수 ───────────────────────────────────────────────
+        const NAMES = ["", "인턴", "사원", "주임", "대리", "과장", "차장", "부장", "이사", "사장", "회장"];
+        const TOP = 10;                                              // 회장
+        const P = [0, 0, 10, 20, 40, 80, 160, 320, 640, 1280, 2560]; // 합치기 점수 — 만들어진 직급
+        const B = [0, 0, 0, 0, 0, 0, 0, 20000, 40000, 80000, 160000]; // 직급 보너스 — 최종 최고 직급
+        const MAX_MOVES = 120;
+        const QUARTER = [[1, 2, .9], [2, 3, .7], [3, 4, .7], [4, 5, .7]]; // [낮은 직급, 높은 직급, 낮은 직급 확률]
+        const INIT = [6, 5, 4, 3, 2, 1, 1];                          // 오늘의 인사 판 7장
+        const MOVE_MS = 110;
+        const DIRS = ["left", "right", "up", "down"];
+        const LINES = { left: [], right: [], up: [], down: [] };
+        for (let r = 0; r < 4; r++) {
+          const row = [0, 1, 2, 3].map((c) => r * 4 + c);
+          LINES.left.push(row);
+          LINES.right.push(row.slice().reverse());
+        }
+        for (let c = 0; c < 4; c++) {
+          const col = [0, 1, 2, 3].map((r) => r * 4 + c);
+          LINES.up.push(col);
+          LINES.down.push(col.slice().reverse());
+        }
+        const DIR_KEYS = { ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down" };
+        const DPAD = [["left", "arrow-left", "왼쪽으로 밀기"], ["up", "arrow-up", "위로 밀기"], ["down", "arrow-down", "아래로 밀기"], ["right", "arrow-right", "오른쪽으로 밀기"]];
+        const fmt = (n) => n.toLocaleString("ko-KR");
+
+        // ── 화면 ───────────────────────────────────────────────
+        stage.innerHTML = `<div class="gm-pm" tabindex="0">
+          <div class="gm-pm__hud">
+            <div class="gm-pm__stat"><small>점수</small><b data-score>0</b></div>
+            <div class="gm-pm__best"><small>최고 직급</small><span class="gm-pm__mini is-r6" data-best>차장</span></div>
+            <div class="gm-pm__stat gm-pm__stat--left"><small>남은 수</small><b data-left>120</b></div>
+          </div>
+          <div class="gm-pm__quarters">
+            <div class="gm-pm__qbar"><i></i><i></i><i></i><i></i></div>
+            <div class="gm-pm__qrow"><span data-qlabel>1분기 · 인턴/사원 입사</span><span class="gm-pm__practice" data-practice hidden>연습 · 순위 미반영</span></div>
+          </div>
+          <div class="gm-pm__next">
+            <div class="gm-pm__nextl"><span>다음 입사자</span><span class="gm-pm__mini gm-pm__mini--s is-r1" data-next>인턴</span></div>
+            <button type="button" class="gm-pm__undo" data-undo>${HKUI.icon("undo-2", 16, "currentColor")}<span data-undo-label>인사 번복 1회</span></button>
+          </div>
+          <div class="gm-pm__board" data-board>
+            ${Array.from({ length: 16 }, () => `<i class="gm-pm__cell"></i>`).join("")}
+            <div class="gm-pm__tiles" data-tiles></div>
+            <div class="gm-pm__cover" data-cover hidden></div>
+          </div>
+          <div class="gm-pm__dpad">${DPAD.map(([d, ic, label]) => `<button type="button" class="gm-pm__dir" data-dir="${d}" aria-label="${label}">${HKUI.icon(ic, 20, "currentColor")}</button>`).join("")}</div>
+        </div>`;
+        const root = stage.querySelector(".gm-pm");
+        const boardEl = root.querySelector("[data-board]");
+        const tilesEl = root.querySelector("[data-tiles]");
+        const cover = root.querySelector("[data-cover]");
+        const cellEls = [...root.querySelectorAll(".gm-pm__cell")];
+        const scoreEl = root.querySelector("[data-score]");
+        const bestEl = root.querySelector("[data-best]");
+        const leftEl = root.querySelector("[data-left]");
+        const qLabel = root.querySelector("[data-qlabel]");
+        const qSegs = [...root.querySelectorAll(".gm-pm__qbar i")];
+        const practiceEl = root.querySelector("[data-practice]");
+        const nextEl = root.querySelector("[data-next]");
+        const undoBtn = root.querySelector("[data-undo]");
+        const undoLabel = root.querySelector("[data-undo-label]");
+        HKUI.refreshIcons(root);
+
+        // ── 상태 ───────────────────────────────────────────────
+        let state = "ready"; // ready · starting · play · pause · over
+        let cells;           // (타일|null)[16] — 타일 = { rank, i, el }
+        let moves = 0, merged = 0, best = 6, undoLeft = 1, snapshot = null;
+        let initial = [], queue = [];
+        let busy = false;
+        let practice = !!ctx.dailyDone;
+        let tilePx = 72, gapPx = 8;
+
+        // ── 오늘의 인사 판 — 같은 날 모두 같은 판·같은 입사 명단 ──
+        function makeDaily() {
+          const r = ctx.rng("v1");
+          const empties = [...Array(16).keys()];
+          initial = INIT.map((rank) => {
+            const k = Math.floor(r() * empties.length);
+            const cell = empties.splice(k, 1)[0];
+            return { cell, rank };
+          });
+          queue = [];
+          for (let m = 1; m <= MAX_MOVES; m++) {
+            const [lo, hi, p] = QUARTER[Math.ceil(m / 30) - 1];
+            const rank = r() < p ? lo : hi;
+            const pref = Math.floor(r() * 16);
+            queue.push({ rank, pref });
+          }
+        }
+
+        // ── 크기 맞추기 — 창 안에 스크롤 없이 ───────────────────
+        function place(el, i) {
+          const r = Math.floor(i / 4), c = i % 4;
+          el.style.setProperty("--x", `${c * (tilePx + gapPx) + gapPx}px`);
+          el.style.setProperty("--y", `${r * (tilePx + gapPx) + gapPx}px`);
+        }
+        function fit() {
+          const room = HKPlay.roomFor(stage, boardEl);
+          let size = Math.max(240, Math.min(stage.clientWidth - 16, room, 480));
+          gapPx = size < 400 ? 8 : 10;
+          tilePx = Math.floor((size - 5 * gapPx) / 4);
+          size = tilePx * 4 + gapPx * 5;
+          root.classList.add("is-resizing");
+          boardEl.style.width = boardEl.style.height = `${size}px`;
+          root.style.setProperty("--tile", `${tilePx}px`);
+          root.style.setProperty("--gap", `${gapPx}px`);
+          root.style.setProperty("--tfs", `${Math.min(30, Math.max(16, Math.round(tilePx * 0.3)))}px`);
+          cellEls.forEach(place);
+          if (cells) for (const t of cells) if (t && t.el) place(t.el, t.i);
+          void root.offsetWidth;
+          root.classList.remove("is-resizing");
+        }
+        window.addEventListener("resize", fit);
+        requestAnimationFrame(fit);
+
+        // ── 그리기 ─────────────────────────────────────────────
+        function makeTileEl(t) {
+          const el = document.createElement("div");
+          el.className = `gm-pm__tile is-r${t.rank}`;
+          el.textContent = NAMES[t.rank];
+          return el;
+        }
+        function restyle(t) {
+          t.el.className = `gm-pm__tile is-r${t.rank}`;
+          t.el.textContent = NAMES[t.rank];
+        }
+        function renderAll() {
+          tilesEl.innerHTML = "";
+          for (const t of cells) {
+            if (!t) continue;
+            t.el = makeTileEl(t);
+            place(t.el, t.i);
+            tilesEl.appendChild(t.el);
+          }
+        }
+        function setMini(el, rank, small) {
+          el.className = `gm-pm__mini${small ? " gm-pm__mini--s" : ""} is-r${rank}`;
+          el.textContent = rank ? NAMES[rank] : "—";
+        }
+        function updateHud() {
+          scoreEl.textContent = fmt(merged + B[best]);
+          setMini(bestEl, best, false);
+          const left = MAX_MOVES - moves;
+          leftEl.textContent = left;
+          leftEl.classList.toggle("is-warn", left <= 30 && left > 10);
+          leftEl.classList.toggle("is-danger", left <= 10);
+          const q = Math.min(4, Math.floor(moves / 30) + 1);
+          const [lo, hi] = QUARTER[q - 1];
+          qLabel.textContent = `${q}분기 · ${NAMES[lo]}/${NAMES[hi]} 입사`;
+          qSegs.forEach((el, k) => el.style.setProperty("--p", Math.max(0, Math.min(1, (moves - 30 * k) / 30))));
+          const nq = queue[moves];
+          setMini(nextEl, nq ? nq.rank : 0, true);
+          practiceEl.hidden = !practice;
+          undoLabel.textContent = undoLeft ? "인사 번복 1회" : "인사 번복 사용함";
+          undoBtn.disabled = !(state === "play" && undoLeft && moves > 0);
+        }
+        function shake() {
+          boardEl.classList.remove("is-shake");
+          void boardEl.offsetWidth;
+          boardEl.classList.add("is-shake");
+        }
+
+        // ── 덮개 ───────────────────────────────────────────────
+        function showCover(mode, kind, score) {
+          cover.hidden = false;
+          if (mode === "ready") {
+            cover.innerHTML = `<h2>승진 합치기</h2>
+              <p>같은 직급 명패를 밀어 합치면 한 단계 승진해요.<br>120수 안에 회장까지 올라가 보세요!</p>
+              <p class="gm-pm__keys">방향키·WASD / 스와이프 / Z 인사 번복</p>
+              ${ctx.dailyDone ? `<span class="gm-pm__note">오늘 기록은 이미 반영됐어요 · 이번 판은 연습</span>` : ""}
+              <button type="button" class="gm-pm__go" data-start>${HKUI.icon("play", 18, "currentColor")} 오늘의 인사 시작</button>`;
+            cover.querySelector("[data-start]").addEventListener("click", start);
+          } else if (mode === "pause") {
+            cover.innerHTML = `<h2>잠시 쉬는 중</h2>
+              <p>어깨 한 번 돌리고 와요</p>
+              <p class="gm-pm__keys">남은 ${MAX_MOVES - moves}수</p>
+              <button type="button" class="gm-pm__go" data-resume>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
+            cover.querySelector("[data-resume]").addEventListener("click", resume);
+          } else {
+            const line = kind === "top" ? `회장 취임! 남은 ${MAX_MOVES - moves}수 × 100 보너스`
+              : kind === "year" ? `연말 인사 마감 — 최고 직급 ${NAMES[best]}`
+              : `자리가 없어요 — 최고 직급 ${NAMES[best]}`;
+            // 제목에 직급이 이미 있는 마감·자리 없음은 둘째 줄을 점수만으로 (겹치는 글 줄이기)
+            // [다시 하기] — 공통 틀의 스페이스 재시작(canRestart)은 종료 뒤 화면을 한 번 클릭하거나 다른 키를 누르면
+            // 꺼지므로, 순위표를 눌러 본 뒤에도 돌아올 길이 있게 버튼을 둔다(글자 '다시 하기'는 GO_TEXT 에 있어 스페이스로도 눌린다)
+            cover.innerHTML = `<h2>${line}</h2>
+              <p>${kind === "top" ? `최고 직급 ${NAMES[best]} · ` : ""}${fmt(score)}점</p>
+              ${practice ? `<span class="gm-pm__note">연습 · 순위 미반영</span>` : ""}
+              <button type="button" class="gm-pm__go" data-again>${HKUI.icon("rotate-ccw", 18, "currentColor")} 다시 하기</button>`;
+            cover.querySelector("[data-again]").addEventListener("click", again);
+          }
+          HKUI.refreshIcons(cover);
+        }
+
+        // ── 판 처음으로 ────────────────────────────────────────
+        function reset() {
+          makeDaily();
+          cells = new Array(16).fill(null);
+          for (const { cell, rank } of initial) cells[cell] = { rank, i: cell, el: null };
+          moves = 0; merged = 0; undoLeft = 1; snapshot = null; busy = false;
+          best = Math.max(...initial.map((t) => t.rank));
+          practice = !!ctx.dailyDone;
+          state = "ready";
+          renderAll();
+          updateHud();
+          showCover("ready");
+        }
+
+        // ── 다시 하기 — 종료 덮개 버튼. 처음 상태로(같은 오늘의 인사 판) ──
+        function again() {
+          if (state !== "over") return;
+          ctx.sfx("tap");
+          reset();
+        }
+
+        // ── 시작 — 재진입 가드: 클릭 즉시 disabled, begin() 은 한 판에 1번 ──
+        async function start(e) {
+          if (state !== "ready") return;
+          const btn = (e && e.currentTarget) || cover.querySelector("[data-start]");
+          if (btn) btn.disabled = true;
+          state = "starting";
+          ctx.sfx("go");
+          let counted = false;
+          try {
+            counted = await ctx.begin();
+          } finally {
+            if (!counted) practice = true;
+            cover.hidden = true;
+            state = "play";
+            updateHud();
+            root.focus({ preventScroll: true });
+          }
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "pause";
+          ctx.sfx("select");
+          showCover("pause");
+          updateHud();
+        }
+        function resume() {
+          if (state !== "pause") return;
+          cover.hidden = true;
+          state = "play";
+          ctx.sfx("go");
+          updateHud();
+          root.focus({ preventScroll: true });
+        }
+
+        // ── 밀기 — 미는 쪽이 앞, 한 수에 한 타일은 한 번만 합쳐진다 ──
+        function slide(src, d) {
+          const next = new Array(16).fill(null);
+          let score = 0, count = 0, changed = false;
+          for (const line of LINES[d]) {
+            const t = line.map((i) => src[i]).filter(Boolean);
+            const out = [];
+            for (let k = 0; k < t.length; k++) {
+              if (k + 1 < t.length && t[k].rank === t[k + 1].rank) {
+                const rank = t[k].rank + 1;
+                out.push({ rank, i: -1, el: null, from: [t[k], t[k + 1]] });
+                score += P[rank];
+                count++;
+                k++;
+              } else out.push(t[k]);
+            }
+            out.forEach((tile, k) => {
+              next[line[k]] = tile;
+              if (src[line[k]] !== tile) changed = true; // 합친 타일은 새 객체라 늘 '바뀜'
+            });
+          }
+          return { next, score, count, changed };
+        }
+        const canMove = () => DIRS.some((d) => slide(cells, d).changed);
+        function findEmpty(pref) {
+          for (let k = 0; k < 16; k++) {
+            const i = (pref + k) % 16;
+            if (!cells[i]) return i;
+          }
+          return -1;
+        }
+        // 한 수의 소리 — 최대 3개, 80ms 간격
+        function moveSounds(count, promoted, left, end) {
+          const tickDue = left <= 10 || left === 30;
+          const s = [];
+          if (count === 0) s.push(tickDue && !end ? ["tick"] : ["swap"]);
+          else if (count === 1) s.push(["pop"]);
+          else s.push(["combo", Math.min(10, count)]);
+          s.push(promoted ? ["powerup"] : null);
+          if (end === "year") s.push(["drop"]);
+          else if (end === "stuck") s.push(["lose"]);
+          else if (end === "top") s.push(null);
+          else s.push(count > 0 && tickDue ? ["tick"] : null);
+          s.forEach((x, k) => x && setTimeout(() => ctx.sfx(x[0], x[1]), k * 80));
+        }
+
+        function doMove(d) {
+          if (state !== "play" || busy) return;
+          const res = slide(cells, d);
+          if (!res.changed) {
+            ctx.sfx("invalid");
+            shake();
+            return;
+          }
+          snapshot = { grid: cells.map((t) => (t ? t.rank : 0)), merged, best, moves };
+          moves += 1;
+          busy = true;
+          const prevBest = best;
+          merged += res.score;
+          for (const t of res.next) if (t && t.rank > best) best = t.rank;
+          const promoted = best > prevBest;
+          // 이동 애니메이션 — 합쳐지는 둘은 같은 칸으로
+          res.next.forEach((t, i) => {
+            if (!t) return;
+            if (t.from) {
+              t.i = i;
+              t.from[0].i = i; place(t.from[0].el, i);
+              t.from[1].i = i; place(t.from[1].el, i); t.from[1].el.classList.add("is-under");
+            } else {
+              t.i = i;
+              place(t.el, i);
+            }
+          });
+          cells = res.next;
+          let end = null, spawn = null;
+          if (best >= TOP) end = "top";                           // 회장 — 스폰 없이 종료
+          else {
+            const q = queue[moves - 1];
+            spawn = { rank: q.rank, i: findEmpty(q.pref), el: null };
+            cells[spawn.i] = spawn;
+            if (moves === MAX_MOVES) end = "year";
+            else if (!canMove()) end = "stuck";
+          }
+          moveSounds(res.count, promoted, MAX_MOVES - moves, end);
+          updateHud();
+          setTimeout(() => {
+            for (const t of cells) {
+              if (!t || !t.from) continue;
+              const [a, b] = t.from;
+              b.el.remove();
+              t.el = a.el;
+              delete t.from;
+              restyle(t);
+              void t.el.offsetWidth; // 연속 합침이면 같은 요소라 리플로우 없이는 pop 이 다시 안 돈다
+              t.el.classList.add("is-pop");
+            }
+            if (spawn) {
+              spawn.el = makeTileEl(spawn);
+              spawn.el.classList.add("is-new");
+              place(spawn.el, spawn.i);
+              tilesEl.appendChild(spawn.el);
+            }
+            busy = false;
+            if (end) finish(end);
+            else updateHud();
+          }, MOVE_MS);
+        }
+
+        // ── 인사 번복 — 한 판에 1회, 직전 수로 ────────────────
+        function undo() {
+          if (state !== "play" || busy || !undoLeft || moves === 0 || !snapshot) return;
+          cells = snapshot.grid.map((rank, i) => (rank ? { rank, i, el: null } : null));
+          merged = snapshot.merged; best = snapshot.best; moves = snapshot.moves;
+          snapshot = null;
+          undoLeft = 0;
+          ctx.sfx("whoosh");
+          renderAll();
+          updateHud();
+        }
+
+        // ── 종료 — ctx.submit 은 딱 한 번 ──────────────────────
+        function finish(kind) {
+          state = "over";
+          const bonus = kind === "top" ? (MAX_MOVES - moves) * 100 : 0;
+          const score = merged + B[best] + bonus;
+          updateHud();
+          setTimeout(() => {
+            showCover("over", kind, score);
+            ctx.submit(score);
+          }, 420);
+        }
+
+        // ── 입력 — 키보드(e.code), 스와이프, 버튼 ──────────────
+        document.addEventListener("keydown", (e) => {
+          if (e.target && e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+          if (state !== "play") return;
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          if (e.code === "Space") { e.preventDefault(); return; }
+          if (DIR_KEYS[e.code]) {
+            e.preventDefault();
+            if (!e.repeat) doMove(DIR_KEYS[e.code]);
+          } else if (e.code === "KeyZ" || e.code === "Backspace") {
+            e.preventDefault();
+            if (!e.repeat) undo();
+          }
+        });
+        let swipe = null;
+        boardEl.addEventListener("pointerdown", (e) => {
+          if (state !== "play" || !e.isPrimary) return;
+          swipe = { id: e.pointerId, x: e.clientX, y: e.clientY };
+        });
+        document.addEventListener("pointerup", (e) => {
+          if (!swipe || e.pointerId !== swipe.id) return;
+          const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+          swipe = null;
+          const ax = Math.abs(dx), ay = Math.abs(dy);
+          if (Math.max(ax, ay) < 30) return;
+          if (ax >= ay) { if (ax >= ay * 1.5) doMove(dx > 0 ? "right" : "left"); }
+          else if (ay >= ax * 1.5) doMove(dy > 0 ? "down" : "up");
+        });
+        document.addEventListener("pointercancel", () => (swipe = null));
+        root.querySelectorAll("[data-dir]").forEach((b) => b.addEventListener("click", () => doMove(b.dataset.dir)));
+        undoBtn.addEventListener("click", undo);
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+
+        ctx.onRestart(reset);
+        ctx.onPause(pause);
+        reset();
+
+      },
+    });
+  </script>
+</body>
+</html>

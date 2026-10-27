@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>줄줄이 점심 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-sn { --gm-a: #15803d; --gm-b: #84cc16; display: flex; flex-direction: column; gap: 10px; align-self: center; box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    .gm-sn-hud { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; height: 36px; min-width: 0; overflow: hidden; }
+    .gm-sn-chip { display: inline-flex; align-items: center; gap: 4px; height: 100%; box-sizing: border-box; padding: 0 12px; border-radius: 999px; background: #fff; border: 1px solid #e3e8ef; font-size: 14px; color: #0b3558; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+    .gm-sn-chip b { font-size: 17px; }
+    .gm-sn-chip svg, .gm-sn-chip i { flex: none; }
+    .gm-sn-chip--score { background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); color: #fff; border-color: transparent; }
+    .gm-sn-chip--time { margin-left: auto; flex: none; }
+    .gm-sn-chip--time.is-warn { background: #fff1f0; border-color: #fecaca; color: #dc2626; }
+    .gm-sn.is-compact .gm-sn-hud { gap: 4px; }
+    .gm-sn.is-compact .gm-sn-chip { padding: 0 8px; font-size: 13px; }
+    .gm-sn.is-compact .gm-sn-chip b { font-size: 15px; }
+    .gm-sn.is-compact .gm-sn-chip svg, .gm-sn.is-compact .gm-sn-chip i { display: none !important; }
+    /* 아주 좁은 창(320px 폰 — 공통 틀 스테이지 270px): 칩 패딩·간격을 한 번 더 줄인다 */
+    .gm-sn.is-tight .gm-sn-hud { gap: 3px; }
+    .gm-sn.is-tight .gm-sn-chip { padding: 0 6px; }
+    .gm-sn-board { position: relative; margin: 0 auto; border-radius: 16px; overflow: hidden; background: #f3f6f2; box-shadow: 0 1px 3px rgba(15,23,42,.08); touch-action: none; }
+    .gm-sn-board canvas { display: block; touch-action: none; }
+    .gm-sn-toast { position: absolute; z-index: 2; top: 10px; left: 50%; transform: translateX(-50%); max-width: calc(100% - 20px); box-sizing: border-box; padding: 6px 14px; border-radius: 999px; background: rgba(11,53,88,.78); color: #fff; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; opacity: 0; transition: opacity .15s; }
+    .gm-sn-toast.is-on { opacity: 1; }
+    .gm-sn-over { position: absolute; inset: 0; z-index: 3; display: flex; padding: 16px; box-sizing: border-box; background: rgba(11,53,88,.38); overflow: auto; }
+    .gm-sn-over[hidden] { display: none; }
+    .gm-sn-card { width: 100%; max-width: 340px; margin: auto; box-sizing: border-box; background: #fff; border-radius: 16px; padding: 22px 20px; text-align: center; box-shadow: 0 12px 32px rgba(15,23,42,.18); }
+    .gm-sn-card h2 { margin: 6px 0 6px; font-size: 22px; color: #0b3558; }
+    .gm-sn-card p { margin: 0 0 6px; font-size: 14px; line-height: 1.55; color: #475569; word-break: keep-all; overflow-wrap: anywhere; }
+    .gm-sn-card .hk-btn { width: 100%; margin-top: 12px; }
+    .gm-sn-badge { display: inline-flex; width: 52px; height: 52px; border-radius: 14px; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); }
+    .gm-sn-keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; margin: 12px 0 0; padding: 12px; border-radius: 12px; background: #f3f6f2; text-align: left; font-size: 13px; color: #334155; }
+    .gm-sn-keys dt { font-weight: 700; color: #0b3558; }
+    .gm-sn-keys dd { margin: 0; }
+    .gm-sn-sub { font-size: 13px; }
+    .gm-sn-reason { margin: 2px 0 4px; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; color: #dc2626; }
+    .gm-sn-reason.is-time { color: #0b3558; }
+    .gm-sn-big { font-size: 40px; font-weight: 800; letter-spacing: -1px; margin: 4px 0 2px; color: var(--gm-a); line-height: 1.1; }
+    .gm-sn-big small { font-size: 18px; font-weight: 700; margin-left: 2px; }
+    .gm-sn-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .gm-sn-pad.is-hidden { display: none; }
+    .gm-sn-btn { height: 52px; padding: 0; border: 1px solid #dbe3dc; background: #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #0b3558; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .gm-sn-btn:active, .gm-sn-btn.is-down { background: #ecfccb; border-color: var(--gm-a); }
+    /* 판이 낮을 때(가로 폰·320px 폰): 시작 카드를 줄여 버튼까지 판 안에 보이게 */
+    .gm-sn.is-small .gm-sn-over { padding: 8px; }
+    .gm-sn.is-small .gm-sn-card { padding: 12px 12px; }
+    .gm-sn.is-small .gm-sn-card h2 { font-size: 18px; margin: 2px 0 4px; }
+    .gm-sn.is-small .gm-sn-card p { font-size: 12.5px; line-height: 1.45; margin-bottom: 4px; }
+    .gm-sn.is-small .gm-sn-badge { display: none; }
+    .gm-sn.is-small .gm-sn-keys { margin-top: 6px; padding: 8px 10px; gap: 4px 8px; }
+    .gm-sn.is-small .gm-sn-card .hk-btn { margin-top: 8px; }
+    .gm-sn.is-small .gm-sn-big { font-size: 30px; }
+    .gm-sn.is-mini .gm-sn-keys { display: none; }
+    @media (min-width: 900px) { .gm-sn-pad { display: none; } }
+    @media (max-width: 640px) {
+      .gm-sn { gap: 8px; }
+      .gm-sn-hud { height: 32px; }
+    }
+    @media (max-width: 480px) {
+      .gm-sn-over { padding: 10px; }
+      .gm-sn-card { padding: 16px 14px; }
+      .gm-sn-card h2 { font-size: 19px; margin: 4px 0; }
+      .gm-sn-card p { font-size: 13px; line-height: 1.5; }
+      .gm-sn-sub { font-size: 12.5px; }
+      .gm-sn-badge { width: 42px; height: 42px; border-radius: 12px; }
+      .gm-sn-keys { font-size: 12px; padding: 10px; margin-top: 8px; }
+      .gm-sn-card .hk-btn { margin-top: 10px; }
+      .gm-sn-reason { font-size: 21px; }
+      .gm-sn-big { font-size: 34px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  HKPlay.mountGame({
+    key: "snake",
+    setup(stage, ctx) {
+      // ───────────────────────── 화면 뼈대
+      stage.innerHTML = `<div class="gm-sn">
+        <div class="gm-sn-hud">
+          <span class="gm-sn-chip gm-sn-chip--score">${HKUI.icon("utensils", 16, "#fff")}<b id="gm-sn-score">0</b>점</span>
+          <span class="gm-sn-chip">줄 <b id="gm-sn-len">6</b>명</span>
+          <span class="gm-sn-chip"><b id="gm-sn-floor">1</b>층</span>
+          <span class="gm-sn-chip gm-sn-chip--time" id="gm-sn-time">${HKUI.icon("alarm-clock", 16, "currentColor")}<b id="gm-sn-timetext">3:00</b></span>
+        </div>
+        <div class="gm-sn-board" id="gm-sn-board">
+          <canvas id="gm-sn-canvas"></canvas>
+          <div class="gm-sn-toast" id="gm-sn-toast" role="status"></div>
+          <div class="gm-sn-over" id="gm-sn-over" hidden></div>
+        </div>
+        <div class="gm-sn-pad" id="gm-sn-pad">
+          <button type="button" class="gm-sn-btn" data-dir="left" aria-label="왼쪽">${HKUI.icon("chevron-left", 26, "currentColor")}</button>
+          <button type="button" class="gm-sn-btn" data-dir="up" aria-label="위">${HKUI.icon("chevron-up", 26, "currentColor")}</button>
+          <button type="button" class="gm-sn-btn" data-dir="down" aria-label="아래">${HKUI.icon("chevron-down", 26, "currentColor")}</button>
+          <button type="button" class="gm-sn-btn" data-dir="right" aria-label="오른쪽">${HKUI.icon("chevron-right", 26, "currentColor")}</button>
+        </div>
+      </div>`;
+      HKUI.refreshIcons(stage);
+
+      const $ = (s) => stage.querySelector(s);
+      const root = $(".gm-sn");
+      const boardEl = $("#gm-sn-board");
+      const canvas = $("#gm-sn-canvas");
+      const g = canvas.getContext("2d");
+      const over = $("#gm-sn-over");
+      const toastEl = $("#gm-sn-toast");
+      const pad = $("#gm-sn-pad");
+      const hudScore = $("#gm-sn-score"), hudLen = $("#gm-sn-len"), hudFloor = $("#gm-sn-floor"), hudTime = $("#gm-sn-time"), hudTimeText = $("#gm-sn-timetext");
+      const FONT = getComputedStyle(document.body).fontFamily || "sans-serif";
+
+      // ───────────────────────── 상수
+      const COLS = 13, ROWS = 17, N = COLS * ROWS;
+      const TOTAL_MS = 180000, MAX_SCORE = 1000000;
+      const COL_A = "#15803d", COL_B = "#84cc16";
+      const DIR = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+      const OPP = { up: "down", down: "up", left: "right", right: "left" };
+      const NB = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      const REASONS = {
+        wall: ["벽에 쾅!", "벽이 보이면 한 칸 먼저 꺾어요"],
+        desk: ["책상에 쿵!", "새 책상은 1초 동안 깜빡이고 굳어요"],
+        sulk: ["삐진 동료에게 막혔어요", "새치기한 자리는 10초 동안 피해 다녀요"],
+        time: ["퇴근 종이 울렸어요!", "3분을 꽉 채웠어요. 대단해요!"],
+        full: ["점심 줄 완성!", "바닥이 꽉 찼어요. 대단해요!"],
+      };
+
+      const idx = (c, r) => r * COLS + c;
+      const cellOf = (i) => ({ c: i % COLS, r: Math.floor(i / COLS) });
+      const inside = (c, r) => c >= 0 && c < COLS && r >= 0 && r < ROWS;
+      const manh = (a, b) => Math.abs(a.c - b.c) + Math.abs(a.r - b.r);
+      const shuffle = (arr) => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); const t = arr[i]; arr[i] = arr[j]; arr[j] = t; } return arr; };
+      const fmt = (n) => Number(n).toLocaleString("ko-KR");
+
+      // ───────────────────────── 상태
+      let state = "ready"; // ready | go | play | paused | count | over
+      let snake, dir, queue, pending, vitamin, lunch, desks, sulks, puffs;
+      let score, vitCount, floor, maxLen, boostUntil, playMs, acc, phaseT, countStep, overReason, overT;
+      let log, unreach, lastCheck, lastCountSec;
+      let anim = 0, last = null;
+      let cell = 24, bw = 0, bh = 0, dpr = 1;
+      let boardRows = null, targets = null, lastOvertake = -1e9;
+
+      const live = () => state === "play" || state === "go" || state === "count";
+      const speedOf = (f) => Math.min(10, 8 + 0.4 * (f - 1));
+      const tickMs = () => 1000 / speedOf(floor) / (playMs < boostUntil ? 1.25 : 1);
+      const snakeAt = (c, r) => snake.some((s) => s.c === c && s.r === r);
+      const sulkBlocks = (s) => s.solid && playMs - s.born < 9700;
+
+      // 추월 토스트(선택) — 이번 주 순위표를 한 번만 받아 둔다
+      try {
+        HKApi.playLeaderboard("snake", "week").then((d) => {
+          boardRows = ((d && d.rows) || []).filter((r) => !r.self && r.score > 0).map((r) => ({ name: String(r.name || ""), score: r.score })).sort((a, b) => a.score - b.score);
+          if (targets === null) targets = boardRows.slice();
+        }).catch(() => {});
+      } catch (_) { /* 순위표 없이도 게임은 된다 */ }
+
+      // ───────────────────────── 점유 · BFS
+      function buildOcc() {
+        const occ = new Uint8Array(N);
+        for (const s of snake) occ[idx(s.c, s.r)] = 1;
+        for (const d of desks) occ[idx(d.c, d.r)] = 2;
+        for (const s of sulks) occ[idx(s.c, s.r)] = 3;
+        if (lunch) occ[idx(lunch.c, lunch.r)] = 4;
+        if (vitamin) occ[idx(vitamin.c, vitamin.r)] = 5;
+        return occ;
+      }
+      // 머리에서 닿는 칸(1) — blocked(i) 가 true 인 칸은 막힘. 출발 칸은 항상 닿음
+      function bfs(from, blocked) {
+        const reach = new Uint8Array(N);
+        const q = [idx(from.c, from.r)];
+        reach[q[0]] = 1;
+        for (let qi = 0; qi < q.length; qi++) {
+          const i = q[qi], c = i % COLS, r = (i - c) / COLS;
+          for (const [dx, dy] of NB) {
+            const nc = c + dx, nr = r + dy;
+            if (!inside(nc, nr)) continue;
+            const j = idx(nc, nr);
+            if (reach[j] || blocked(j)) continue;
+            reach[j] = 1;
+            q.push(j);
+          }
+        }
+        return reach;
+      }
+      function freeNeighbors(occ, p) {
+        let n = 0;
+        for (const [dx, dy] of NB) { const c = p.c + dx, r = p.r + dy; if (inside(c, r) && !occ[idx(c, r)]) n++; }
+        return n;
+      }
+
+      // ───────────────────────── 생성 규칙
+      // 비타민: 머리에서 맨해튼 ≥4 · 막다른 칸 금지 · 머리에서 닿는 칸. 빈 칸이 없으면 false
+      function spawnVitamin() {
+        const head = snake[0];
+        const occ = buildOcc();
+        const free = [];
+        for (let i = 0; i < N; i++) if (!occ[i]) free.push(i);
+        if (!free.length) return false;
+        shuffle(free);
+        const reach = bfs(head, (j) => occ[j] !== 0);
+        let pick = free.find((i) => { const p = cellOf(i); return manh(p, head) >= 4 && freeNeighbors(occ, p) >= 2 && reach[i] === 1; });
+        if (pick == null) pick = free.find((i) => manh(cellOf(i), head) >= 4);
+        if (pick == null) pick = free[0];
+        vitamin = cellOf(pick);
+        return true;
+      }
+      // 책상: 머리에서 ≥5 · 진행 방향 직선 제외 · 줄과 8방향 인접 금지 · 비타민·도시락 직교 인접 금지 · 막았다 치고 BFS 통과
+      function spawnDesk(solidNow) {
+        const head = snake[0], v = DIR[dir];
+        const occ = buildOcc();
+        const near = new Uint8Array(N);
+        for (const s of snake) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const c = s.c + dx, r = s.r + dy; if (inside(c, r)) near[idx(c, r)] = 1; }
+        const cand = [];
+        for (let i = 0; i < N; i++) {
+          if (occ[i] || near[i]) continue;
+          const p = cellOf(i);
+          if (manh(p, head) < 5) continue;
+          const dc = p.c - head.c, dr = p.r - head.r;
+          if ((v[0] === 0 && dc === 0 && Math.sign(dr) === v[1]) || (v[1] === 0 && dr === 0 && Math.sign(dc) === v[0])) continue;
+          if (vitamin && manh(p, vitamin) === 1) continue;
+          if (lunch && manh(p, lunch) === 1) continue;
+          cand.push(i);
+        }
+        shuffle(cand);
+        const vi = vitamin ? idx(vitamin.c, vitamin.r) : -1, li = lunch ? idx(lunch.c, lunch.r) : -1;
+        const tries = Math.min(30, cand.length);
+        for (let t = 0; t < tries; t++) {
+          const i = cand[t];
+          const reach = bfs(head, (j) => j === i || occ[j] === 1 || occ[j] === 2 || occ[j] === 3);
+          if (vi >= 0 && !reach[vi]) continue;
+          if (li >= 0 && !reach[li]) continue;
+          desks.push({ c: i % COLS, r: Math.floor(i / COLS), born: playMs, solid: !!solidNow });
+          return true;
+        }
+        return false;
+      }
+      // 도시락: 머리에서 8~12(없으면 6~14) · 닿는 칸 · 진행 방향 뒤쪽 우선
+      function spawnLunch() {
+        const head = snake[0], v = DIR[dir];
+        const occ = buildOcc();
+        const reach = bfs(head, (j) => occ[j] === 1 || occ[j] === 2 || occ[j] === 3);
+        const pool = (lo, hi) => { const a = []; for (let i = 0; i < N; i++) { if (occ[i] || !reach[i]) continue; const m = manh(cellOf(i), head); if (m >= lo && m <= hi) a.push(i); } return a; };
+        let cand = pool(8, 12);
+        if (!cand.length) cand = pool(6, 14);
+        if (!cand.length) return false;
+        const behind = cand.filter((i) => { const p = cellOf(i); return (p.c - head.c) * v[0] + (p.r - head.r) * v[1] <= 0; });
+        const list = behind.length ? behind : cand;
+        const i = list[Math.floor(Math.random() * list.length)];
+        lunch = { c: i % COLS, r: Math.floor(i / COLS), born: playMs, expo: Math.max(3000, 5000 - 300 * (floor - 1)) };
+        ctx.sfx("select");
+        return true;
+      }
+
+      // ───────────────────────── 초기화
+      function reset() {
+        snake = [];
+        for (let r = 10; r <= 15; r++) snake.push({ c: 6, r });
+        dir = "up"; queue = []; pending = 0;
+        vitamin = null; lunch = null; desks = []; sulks = []; puffs = [];
+        score = 0; vitCount = 0; floor = 1; maxLen = 6; boostUntil = -1;
+        playMs = 0; acc = 0; phaseT = 0; countStep = 0; overReason = ""; overT = 0;
+        log = { vit: [], lunch: [], floors: [] };
+        unreach = 0; lastCheck = 0; lastCountSec = 99;
+        targets = boardRows ? boardRows.slice() : null; lastOvertake = -1e9;
+        spawnVitamin();
+        spawnDesk(true);
+        spawnDesk(true);
+        toastEl.classList.remove("is-on");
+        updateHud();
+      }
+
+      // ───────────────────────── 크기
+      function resize() {
+        root.style.width = "";
+        pad.classList.remove("is-hidden");
+        const sw = stage.clientWidth;
+        let avail = HKPlay.roomFor(stage, boardEl);
+        let c = Math.floor(Math.min(sw / COLS, avail / ROWS));
+        const padShown = getComputedStyle(pad).display !== "none";
+        if (c < 18 && padShown) {
+          // 낮은 창(가로 폰 등): 버튼 줄을 숨기고 다시 잰다 — 스와이프는 그대로
+          pad.classList.add("is-hidden");
+          const avail2 = HKPlay.roomFor(stage, boardEl);
+          const c2 = Math.floor(Math.min(sw / COLS, avail2 / ROWS));
+          if (c2 > c) { c = c2; avail = avail2; } else pad.classList.remove("is-hidden");
+        }
+        cell = Math.max(12, Math.min(40, c));
+        bw = cell * COLS; bh = cell * ROWS;
+        const rootW = Math.max(bw, Math.min(sw, 300));
+        root.style.width = rootW + "px";
+        root.classList.toggle("is-compact", rootW < 400);
+        root.classList.toggle("is-tight", rootW < 290);
+        root.classList.toggle("is-small", bh < 420);
+        root.classList.toggle("is-mini", bh < 360);
+        boardEl.style.width = canvas.style.width = bw + "px";
+        boardEl.style.height = canvas.style.height = bh + "px";
+        dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+        canvas.width = Math.round(bw * dpr);
+        canvas.height = Math.round(bh * dpr);
+        draw();
+      }
+
+      // ───────────────────────── 입력 큐 (길이 2 · 같은 방향·반대 방향 무시)
+      function enqueue(d) {
+        if (!DIR[d]) return;
+        const ref = queue.length ? queue[queue.length - 1] : dir;
+        if (d === ref || OPP[d] === ref || queue.length >= 2) return;
+        queue.push(d);
+      }
+
+      const KEYMAP = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
+      function onKey(e) {
+        const t = e.target;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+        if (document.querySelector(".hk-dialog__overlay")) return;
+        const d = KEYMAP[e.code];
+        if (state === "ready") {
+          // 시작 화면에서 방향키 = 시작 (스페이스는 공통 틀이 [시작] 버튼을 누른다)
+          if (d) { e.preventDefault(); if (!e.repeat) { start(); enqueue(d); } }
+          return;
+        }
+        if (state === "paused" || state === "over") { if (d) e.preventDefault(); return; }
+        if (d || e.code === "Space") e.preventDefault();
+        if (d && !e.repeat) enqueue(d);
+      }
+      window.addEventListener("keydown", onKey);
+
+      // 판 위 스와이프 — 손을 떼기 전에 18px 움직이는 순간 판정, 한 터치에 한 번
+      let ptr = null;
+      boardEl.addEventListener("pointerdown", (e) => {
+        if (!live() || e.target !== canvas) return;
+        ptr = { id: e.pointerId, x: e.clientX, y: e.clientY, done: false };
+        try { boardEl.setPointerCapture(e.pointerId); } catch (_) { /* 캡처 못 해도 판 안에서는 동작 */ }
+        e.preventDefault();
+      });
+      boardEl.addEventListener("pointermove", (e) => {
+        if (!ptr || e.pointerId !== ptr.id || ptr.done) return;
+        const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
+        if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+        ptr.done = true;
+        if (!live()) return;
+        enqueue(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
+      });
+      const endPtr = (e) => { if (ptr && e.pointerId === ptr.id) ptr = null; };
+      boardEl.addEventListener("pointerup", endPtr);
+      boardEl.addEventListener("pointercancel", endPtr);
+      // 판 위 스와이프가 페이지 스크롤·당겨서 새로고침으로 새지 않게
+      boardEl.addEventListener("touchstart", (e) => { if (live() && e.target === canvas) e.preventDefault(); }, { passive: false });
+      boardEl.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+      document.documentElement.style.overscrollBehaviorY = "contain";
+      document.body.style.overscrollBehaviorY = "contain";
+
+      // 버튼 줄 ← ↑ ↓ → : pointerdown 즉시
+      stage.querySelectorAll(".gm-sn-btn").forEach((b) => {
+        b.addEventListener("pointerdown", (e) => {
+          e.preventDefault();
+          b.classList.add("is-down");
+          if (state === "ready") { start(); enqueue(b.dataset.dir); return; }
+          if (live()) enqueue(b.dataset.dir);
+        });
+        const up = () => b.classList.remove("is-down");
+        b.addEventListener("pointerup", up);
+        b.addEventListener("pointerleave", up);
+        b.addEventListener("pointercancel", up);
+        b.addEventListener("click", (e) => e.preventDefault());
+      });
+
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && live()) pause();
+      });
+
+      // ───────────────────────── 겹침 화면 · 토스트
+      function showOver(html) {
+        over.innerHTML = html;
+        over.hidden = false;
+        HKUI.refreshIcons(over);
+      }
+      function hideOver() { over.hidden = true; over.innerHTML = ""; }
+      let toastTimer = null;
+      function toast(text) {
+        toastEl.textContent = text;
+        toastEl.classList.add("is-on");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove("is-on"), 1200);
+      }
+
+      function showReady() {
+        state = "ready";
+        showOver(`<div class="gm-sn-card">
+          <span class="gm-sn-badge">${HKUI.icon("utensils", 26, "#fff")}</span>
+          <h2>줄줄이 점심</h2>
+          <p>비타민을 먹을수록 점심 줄이 길어져요</p>
+          <p class="gm-sn-sub">벽·책상에 부딪히면 끝 · 내 줄에 부딪히면 <b style="color:#15803d">새치기!</b> 뒤 동료들이 10초 동안 삐져서 길을 막아요</p>
+          <p class="gm-sn-sub">도시락은 빨리 먹을수록 점수가 커요<br>줄 +3명 · 3초 가속</p>
+          <dl class="gm-sn-keys">
+            <dt>PC</dt><dd>방향키 또는 W·A·S·D</dd>
+            <dt>모바일</dt><dd>판 위 스와이프 · 아래 버튼</dd>
+          </dl>
+          <button type="button" class="hk-btn hk-btn--primary" id="gm-sn-start">${HKUI.icon("play", 16, "#fff")} 점심 줄 시작</button>
+        </div>`);
+        over.querySelector("#gm-sn-start").onclick = start;
+      }
+
+      function start() {
+        reset();
+        hideOver();
+        state = "go"; // 0.6초 "출발!" 비트 뒤 플레이
+        phaseT = 0;
+        last = null;
+        ctx.sfx("go");
+        if (ctx.started) ctx.started();
+      }
+
+      function pause() {
+        if (!live()) return;
+        state = "paused";
+        ctx.sfx("tap");
+        showOver(`<div class="gm-sn-card">
+          <span class="gm-sn-badge">${HKUI.icon("pause", 26, "#fff")}</span>
+          <h2>잠깐 멈춤</h2>
+          <p>점심 줄도 퇴근 시계도 같이 멈춰 있어요.</p>
+          <button type="button" class="hk-btn hk-btn--primary" id="gm-sn-resume">${HKUI.icon("play", 16, "#fff")} 계속하기</button>
+          <p class="gm-sn-sub" style="margin:10px 0 0">Esc·스페이스로도 이어 할 수 있어요</p>
+        </div>`);
+        over.querySelector("#gm-sn-resume").onclick = resume;
+      }
+      function resume() {
+        if (state !== "paused") return;
+        hideOver();
+        state = "count"; // 1초 "준비…" 카운트 뒤 재개
+        phaseT = 0; countStep = 0;
+        last = null;
+        ctx.sfx("countdown");
+      }
+
+      function finalScore() {
+        const sum = log.vit.reduce((a, L) => a + 10 * L, 0) + log.lunch.reduce((a, p) => a + p, 0) + log.floors.reduce((a, f) => a + 50 * f, 0);
+        return Math.min(MAX_SCORE, Math.max(0, Math.round(sum)));
+      }
+
+      function gameOver(reason) {
+        if (state === "over") return;
+        state = "over";
+        overReason = reason; overT = 0; queue = [];
+        ctx.sfx(reason === "time" || reason === "full" ? "go" : "explode");
+        const final = finalScore();
+        const [title, sub] = REASONS[reason] || REASONS.wall;
+        setTimeout(() => {
+          if (state !== "over") return;
+          showOver(`<div class="gm-sn-card">
+            <div class="gm-sn-reason${reason === "time" || reason === "full" ? " is-time" : ""}">${title}</div>
+            <p class="gm-sn-sub">${sub}</p>
+            <div class="gm-sn-big">${fmt(final)}<small>점</small></div>
+            <p>줄 최대 <b style="color:#0b3558">${maxLen}명</b> · <b style="color:#0b3558">${floor}층</b> · 비타민 ${vitCount}개</p>
+            <button type="button" class="hk-btn hk-btn--primary" id="gm-sn-again">${HKUI.icon("rotate-ccw", 16, "#fff")} 다시 하기</button>
+          </div>`);
+          over.querySelector("#gm-sn-again").onclick = start;
+          ctx.submit(final);
+        }, 800);
+      }
+
+      ctx.onRestart(() => start());
+      ctx.onPause(() => state === "play" && pause());
+
+      // ───────────────────────── 틱
+      function cutIn(k) {
+        const hitC = snake[k];
+        const rest = snake.slice(k + 1);
+        snake = snake.slice(0, k);
+        for (const s of rest) {
+          const dup = sulks.find((x) => x.c === s.c && x.r === s.r);
+          if (dup) { dup.born = playMs; dup.solid = false; }
+          else sulks.push({ c: s.c, r: s.r, born: playMs, solid: false });
+        }
+        puffs.push({ c: hitC.c, r: hitC.r, t: 0 });
+        toast(rest.length ? `새치기! 동료 ${rest.length}명이 삐졌어요` : "맨 뒤 동료가 빠졌어요");
+        ctx.sfx("hit");
+      }
+
+      function floorUp(f) {
+        floor = f;
+        score += 50 * f;
+        log.floors.push(f);
+        let added = false;
+        if (desks.length < Math.min(12, floor + 1)) added = spawnDesk(false);
+        if (added) ctx.sfx("tap");
+        toast(added ? `${f}층! 책상이 하나 늘어요` : `${f}층!`);
+        ctx.sfx("combo", Math.min(10, f - 1));
+      }
+
+      function processTimers() {
+        // 책상 예고 1초 → 굳힘 (그 칸에 줄이 있으면 재추첨)
+        for (let i = desks.length - 1; i >= 0; i--) {
+          const d = desks[i];
+          if (d.solid || playMs - d.born < 1000) continue;
+          if (snakeAt(d.c, d.r)) { desks.splice(i, 1); if (spawnDesk(false)) ctx.sfx("tap"); }
+          else { d.solid = true; ctx.sfx("land"); }
+        }
+        // 삐진 동료: 0.4초 뒤 칸이 비어 있을 때 굳음 · 10초 뒤 사라짐
+        for (let i = sulks.length - 1; i >= 0; i--) {
+          const s = sulks[i], age = playMs - s.born;
+          if (age >= 10000) { sulks.splice(i, 1); continue; }
+          if (!s.solid && age >= 400 && age < 9700 && !snakeAt(s.c, s.r)) s.solid = true;
+        }
+        // 도시락 노출 만료
+        if (lunch && playMs >= lunch.born + lunch.expo) { lunch = null; ctx.sfx("whoosh"); }
+        // 1초마다 비타민 재배치 검사 — 정적 장애물(책상·삐진 동료)만 막힌 칸으로, 2초 연속 못 닿으면 옮김
+        while (playMs - lastCheck >= 1000) {
+          lastCheck += 1000;
+          if (!vitamin) continue;
+          const occ = buildOcc();
+          const reach = bfs(snake[0], (j) => occ[j] === 2 || occ[j] === 3);
+          if (reach[idx(vitamin.c, vitamin.r)]) unreach = 0;
+          else if (++unreach >= 2) { vitamin = null; spawnVitamin(); unreach = 0; }
+        }
+      }
+
+      function checkOvertake() {
+        if (!targets || !targets.length) return;
+        let passed = null;
+        while (targets.length && score > targets[0].score) passed = targets.shift();
+        if (passed && playMs - lastOvertake >= 2000) {
+          lastOvertake = playMs;
+          toast(`${passed.name}님 추월!`);
+          ctx.sfx("select");
+        }
+      }
+
+      function tick() {
+        if (state !== "play") return;
+        if (queue.length) { const d = queue.shift(); if (OPP[d] !== dir) dir = d; }
+        const h = snake[0], v = DIR[dir];
+        const nc = h.c + v[0], nr = h.r + v[1];
+        if (!inside(nc, nr)) return gameOver("wall");
+        const dk = desks.find((d) => d.c === nc && d.r === nr);
+        if (dk && dk.solid) return gameOver("desk");
+        const sk = sulks.find((s) => s.c === nc && s.r === nr);
+        if (sk && sulkBlocks(sk)) return gameOver("sulk");
+        const L = snake.length;
+        let grow = 0, ate = false;
+        if (vitamin && vitamin.c === nc && vitamin.r === nr) {
+          score += 10 * L; log.vit.push(L);
+          grow = 1; vitCount++; ate = true; vitamin = null;
+          ctx.sfx("coin");
+        } else if (lunch && lunch.c === nc && lunch.r === nr) {
+          const remain = Math.max(0, lunch.born + lunch.expo - playMs);
+          const pts = Math.floor(15 * L * (1 + remain / lunch.expo));
+          score += pts; log.lunch.push(pts);
+          grow = 3; boostUntil = playMs + 3000; lunch = null;
+          ctx.sfx("powerup");
+          toast(`도시락 +${fmt(pts)}점 · 줄 +3 · 3초 가속!`);
+        }
+        const k = snake.findIndex((s) => s.c === nc && s.r === nr);
+        if (k >= 0 && !(k === snake.length - 1 && pending === 0 && grow === 0)) cutIn(k);
+        snake.unshift({ c: nc, r: nr });
+        pending += grow;
+        if (pending > 0) pending--; else snake.pop();
+        if (snake.length > maxLen) maxLen = snake.length;
+        if (ate) {
+          if (!spawnVitamin()) return gameOver("full");
+          if (vitCount >= 8 && vitCount % 4 === 0 && !lunch) spawnLunch();
+        }
+        const f = 1 + Math.floor(vitCount / 5);
+        if (f > floor) floorUp(f);
+        processTimers();
+        checkOvertake();
+      }
+
+      // ───────────────────────── HUD
+      let hudCache = "";
+      function updateHud() {
+        const sec = Math.max(0, Math.ceil((TOTAL_MS - playMs) / 1000));
+        const key = `${score}|${snake.length}|${floor}|${sec}`;
+        if (key === hudCache) return;
+        hudCache = key;
+        hudScore.textContent = fmt(score);
+        hudLen.textContent = snake.length;
+        hudFloor.textContent = floor;
+        hudTimeText.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+        hudTime.classList.toggle("is-warn", sec <= 10);
+      }
+
+      // ───────────────────────── 그리기
+      function rr(x, y, w, h, r) {
+        g.beginPath();
+        if (g.roundRect) g.roundRect(x, y, w, h, r); else g.rect(x, y, w, h);
+      }
+      function drawDesk(d) {
+        const s = cell * 0.86, o = (cell - s) / 2, x = d.c * cell + o, y = d.r * cell + o;
+        if (!d.solid) g.globalAlpha = 0.425 + 0.175 * Math.sin(((playMs - d.born) / 1000) * Math.PI * 8);
+        g.fillStyle = "#94a3b8"; rr(x, y, s, s, cell * 0.16); g.fill();
+        g.save(); rr(x, y, s, s, cell * 0.16); g.clip();
+        g.fillStyle = "#64748b"; g.fillRect(x, y, s, s * 0.24);
+        g.restore();
+        const cx = d.c * cell + cell / 2, cy = d.r * cell + cell / 2;
+        g.fillStyle = "#1e293b"; rr(cx - cell * 0.15, cy - cell * 0.06, cell * 0.3, cell * 0.22, cell * 0.04); g.fill();
+        g.fillRect(cx - cell * 0.03, cy + cell * 0.16, cell * 0.06, cell * 0.08);
+        g.fillStyle = "#cbd5e1"; g.fillRect(cx - cell * 0.12, cy - cell * 0.03, cell * 0.24, cell * 0.13);
+        g.globalAlpha = 1;
+      }
+      function drawSulk(s) {
+        const age = playMs - s.born;
+        let a = 1, wob = 0;
+        if (!s.solid) { a = 0.5; wob = Math.sin((anim / 1000) * Math.PI * 16); }
+        if (age >= 9700) a *= Math.max(0, (10000 - age) / 300);
+        if (a <= 0) return;
+        const sz = cell * 0.8, x = s.c * cell + cell * 0.1 + wob, y = s.r * cell + cell * 0.1;
+        g.globalAlpha = a;
+        g.fillStyle = "#9ca3af"; rr(x, y, sz, sz, cell * 0.18); g.fill();
+        g.fillStyle = "#e5e7eb"; g.beginPath(); g.arc(x + sz / 2, y + sz / 2, cell * 0.14, 0, Math.PI * 2); g.fill();
+        if (s.solid) { g.fillStyle = "#ef4444"; g.beginPath(); g.arc(x + sz - cell * 0.1, y + cell * 0.1, cell * 0.09, 0, Math.PI * 2); g.fill(); }
+        g.globalAlpha = 1;
+      }
+      function drawVitamin() {
+        const p = 1 + 0.05 * Math.sin((anim / 1000) * Math.PI * 3);
+        const cx = (vitamin.c + 0.5) * cell, cy = (vitamin.r + 0.5) * cell, rad = cell * 0.31 * p;
+        g.fillStyle = "#f59e0b"; g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "rgba(255,255,255,.85)"; g.beginPath(); g.arc(cx - rad * 0.38, cy - rad * 0.38, cell * 0.08, 0, Math.PI * 2); g.fill();
+      }
+      function drawLunch() {
+        const x = lunch.c * cell, y = lunch.r * cell, sz = cell * 0.8, o = cell * 0.1;
+        const remain = Math.max(0, lunch.born + lunch.expo - playMs), frac = remain / lunch.expo;
+        g.fillStyle = "#b45309"; rr(x + o, y + o, sz, sz, cell * 0.14); g.fill();
+        g.save(); rr(x + o, y + o, sz, sz, cell * 0.14); g.clip();
+        g.fillStyle = "#fde68a"; g.fillRect(x + o, y + o, sz, sz / 3);
+        g.restore();
+        g.fillStyle = "#fff7ed"; g.fillRect(x + o + sz * 0.2, y + o + sz * 0.5, sz * 0.25, sz * 0.3);
+        g.fillStyle = "#65a30d"; g.fillRect(x + o + sz * 0.55, y + o + sz * 0.5, sz * 0.25, sz * 0.3);
+        // 둘레 남은 시간 링 (마지막 1초 깜빡)
+        const blink = remain < 1000 && Math.floor(anim / 125) % 2 === 0;
+        if (!blink && frac > 0) {
+          const w = cell - 3, r = cell * 0.2, P = 2 * (w + w) - 8 * r + 2 * Math.PI * r;
+          g.strokeStyle = COL_B; g.lineWidth = 3; g.lineCap = "butt";
+          g.setLineDash([Math.max(0.01, P * frac), P]);
+          rr(x + 1.5, y + 1.5, w, w, r); g.stroke();
+          g.setLineDash([]);
+        }
+      }
+      function drawBody(s, i) {
+        const sz = cell * 0.8, x = s.c * cell + cell * 0.1, y = s.r * cell + cell * 0.1;
+        g.fillStyle = i % 2 ? COL_B : "#a3e635"; rr(x, y, sz, sz, cell * 0.18); g.fill();
+        g.fillStyle = "#f7fee7"; g.beginPath(); g.arc(x + sz / 2, y + sz / 2, cell * 0.14, 0, Math.PI * 2); g.fill();
+      }
+      function drawHead() {
+        const h = snake[0], v = DIR[dir], p = [-v[1], v[0]];
+        const sz = cell * 0.88, o = cell * 0.06, x = h.c * cell + o, y = h.r * cell + o;
+        if (playMs < boostUntil && live()) { g.strokeStyle = "#fde047"; g.lineWidth = 2; rr(x - 1, y - 1, sz + 2, sz + 2, cell * 0.22 + 1); g.stroke(); }
+        g.fillStyle = COL_A; rr(x, y, sz, sz, cell * 0.22); g.fill();
+        const cx = x + sz / 2, cy = y + sz / 2;
+        const dead = state === "over" && overReason !== "time" && overReason !== "full";
+        for (const sgn of [-1, 1]) {
+          const ex = cx + v[0] * cell * 0.2 + p[0] * sgn * cell * 0.17, ey = cy + v[1] * cell * 0.2 + p[1] * sgn * cell * 0.17;
+          if (dead) {
+            g.strokeStyle = "#f0fdf4"; g.lineWidth = Math.max(1.5, cell * 0.05);
+            g.beginPath(); g.moveTo(ex - cell * 0.06, ey - cell * 0.06); g.lineTo(ex + cell * 0.06, ey + cell * 0.06);
+            g.moveTo(ex + cell * 0.06, ey - cell * 0.06); g.lineTo(ex - cell * 0.06, ey + cell * 0.06); g.stroke();
+          } else {
+            g.fillStyle = "#fff"; g.beginPath(); g.arc(ex, ey, cell * 0.07, 0, Math.PI * 2); g.fill();
+            g.fillStyle = "#14532d"; g.beginPath(); g.arc(ex + v[0] * cell * 0.025, ey + v[1] * cell * 0.025, cell * 0.035, 0, Math.PI * 2); g.fill();
+          }
+        }
+      }
+      function draw() {
+        if (!bw || !snake) return;
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        // 바닥 · 타일 선
+        g.fillStyle = "#f3f6f2"; g.fillRect(0, 0, bw, bh);
+        g.strokeStyle = "rgba(21,128,61,.07)"; g.lineWidth = 1;
+        g.beginPath();
+        for (let c = 1; c < COLS; c++) { g.moveTo(c * cell + 0.5, 0); g.lineTo(c * cell + 0.5, bh); }
+        for (let r = 1; r < ROWS; r++) { g.moveTo(0, r * cell + 0.5); g.lineTo(bw, r * cell + 0.5); }
+        g.stroke();
+        for (const d of desks) drawDesk(d);
+        for (const s of sulks) drawSulk(s);
+        if (vitamin) drawVitamin();
+        if (lunch) drawLunch();
+        for (let i = snake.length - 1; i >= 1; i--) drawBody(snake[i], i);
+        drawHead();
+        for (const pf of puffs) {
+          g.globalAlpha = (1 - pf.t) * 0.6;
+          g.fillStyle = "#9ca3af"; g.beginPath(); g.arc((pf.c + 0.5) * cell, (pf.r + 0.5) * cell, cell * (0.2 + 0.4 * pf.t), 0, Math.PI * 2); g.fill();
+          g.globalAlpha = 1;
+        }
+        // 벽
+        g.strokeStyle = "rgba(21,128,61,.28)"; g.lineWidth = 2; g.strokeRect(1, 1, bw - 2, bh - 2);
+        // 출발! · 준비…
+        if (state === "go" || state === "count") {
+          const text = state === "go" ? "출발!" : "준비…";
+          g.font = `800 ${Math.max(22, cell * 1.1)}px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
+          const tw = g.measureText(text).width, ph = Math.max(40, cell * 1.6);
+          g.fillStyle = "rgba(255,255,255,.92)"; rr(bw / 2 - tw / 2 - 20, bh / 2 - ph / 2, tw + 40, ph, ph / 2); g.fill();
+          g.fillStyle = COL_A; g.fillText(text, bw / 2, bh / 2 + 1);
+        }
+        if (state === "over" && overReason !== "time" && overReason !== "full") {
+          const a = Math.max(0, 0.28 - overT * 0.0004);
+          if (a > 0) { g.fillStyle = `rgba(220,38,38,${a})`; g.fillRect(0, 0, bw, bh); }
+        }
+      }
+
+      // ───────────────────────── 루프
+      function frame(now) {
+        if (last == null) last = now;
+        const dt = Math.min(250, now - last);
+        last = now;
+        if (state === "play") {
+          playMs += dt; anim += dt;
+          if (playMs >= TOTAL_MS) { playMs = TOTAL_MS; gameOver("time"); }
+          else {
+            acc += dt;
+            let n = 0;
+            while (state === "play" && acc >= tickMs() && n < 3) { acc -= tickMs(); tick(); n++; }
+            if (n >= 3 && acc >= tickMs()) acc = 0; // 초과분 버림
+            if (state === "play") {
+              const sec = Math.ceil((TOTAL_MS - playMs) / 1000);
+              if (sec <= 3 && sec >= 1 && sec !== lastCountSec) { lastCountSec = sec; ctx.sfx("countdown"); }
+            }
+          }
+        } else if (state === "go") {
+          anim += dt; phaseT += dt;
+          if (phaseT >= 600) { state = "play"; acc = 0; }
+        } else if (state === "count") {
+          anim += dt; phaseT += dt;
+          if (countStep === 0 && phaseT >= 500) { countStep = 1; ctx.sfx("countdown"); }
+          if (phaseT >= 1000) { state = "play"; acc = 0; ctx.sfx("go"); }
+        } else if (state === "over") {
+          overT += dt;
+        }
+        if (state !== "ready" && state !== "paused" && puffs.length) {
+          for (const pf of puffs) pf.t += dt / 320;
+          puffs = puffs.filter((pf) => pf.t < 1);
+        }
+        updateHud();
+        draw();
+        requestAnimationFrame(frame);
+      }
+
+
+      window.addEventListener("resize", resize);
+      reset();
+      resize();
+      showReady();
+      requestAnimationFrame(() => { resize(); requestAnimationFrame(frame); });
+    },
+  });
+  </script>
+</body>
+</html>
