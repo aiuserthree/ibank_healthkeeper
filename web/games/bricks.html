@@ -131,7 +131,7 @@
         life: { label: "목숨+1", color: "#e11d48" },
       };
       // 아이템이 나오는 비율 (합이 1)
-      const ITEM_TABLE = [["wide", 0.15], ["multi", 0.14], ["slow", 0.1], ["pierce", 0.09], ["laser", 0.13], ["boom", 0.12], ["big", 0.1], ["magnet", 0.08], ["guard", 0.06], ["life", 0.03]];
+      const ITEM_TABLE = [["wide", 0.13], ["multi", 0.13], ["slow", 0.1], ["pierce", 0.11], ["laser", 0.12], ["boom", 0.12], ["big", 0.1], ["magnet", 0.09], ["guard", 0.07], ["life", 0.03]];
       // 시간제 효과 — 오른쪽 위 칩에 남은 초 표시
       const TIMED = ["pierce", "slow", "wide", "laser", "boom", "big", "magnet"];
 
@@ -372,7 +372,7 @@
 
         // 아이템
         for (const it of S.items) {
-          it.y += 115 * dt;
+          it.y += 175 * dt; // 떨어지는 속도 (전 115)
           if (!it.got && it.y + 8 >= PADDLE_Y && it.y - 8 <= PADDLE_Y + PH && Math.abs(it.x - S.px) < S.pw / 2 + 16) { it.got = true; takeItem(it); }
         }
         S.items = S.items.filter((it) => !it.got && it.y < H + 20);
@@ -477,10 +477,16 @@
         sfxGap("pop", 0.05);
         burst(k.x + k.w / 2, k.y + k.h / 2, k.hard ? "#94a3b8" : k.color, 10, 120);
         S.texts.push({ x: k.x + k.w / 2, y: k.y + k.h / 2, text: `+${pts}`, life: 0.6, color: k.hard ? "#fde68a" : "#fff" });
+        // 아이템 — 일반 벽돌 20%·단단한 벽돌 35%, 화면에 3개까지. 최근 나온 두 종류는 다시 뽑아 골고루
         const falling = S.items.length;
-        if (falling < 2 && Math.random() < (k.hard ? 0.22 : 0.12)) {
-          let r = Math.random(), kind = "wide";
-          for (const [k2, w2] of ITEM_TABLE) { if ((r -= w2) <= 0) { kind = k2; break; } }
+        if (falling < 3 && Math.random() < (k.hard ? 0.35 : 0.2)) {
+          let kind = "wide";
+          for (let tries = 0; tries < 4; tries++) {
+            let r = Math.random();
+            for (const [k2, w2] of ITEM_TABLE) { if ((r -= w2) <= 0) { kind = k2; break; } }
+            if (!S.recentItems || !S.recentItems.includes(kind)) break;
+          }
+          S.recentItems = [kind, ...(S.recentItems || [])].slice(0, 2);
           S.items.push({ x: k.x + k.w / 2, y: k.y + k.h / 2, kind });
         }
         hud();
