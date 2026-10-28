@@ -60,7 +60,7 @@
     @media (max-width: 420px) { .gm-pop { font-size: 16px; } .gm-pop--bento { font-size: 14px; } }
     .gm-pop--lv { color: #8fe3ff; }
     @keyframes gm-pop { 0% { opacity: 0; transform: translateY(10px) scale(.8); } 15% { opacity: 1; transform: translateY(0) scale(1.08); } 30% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px); } }
-    .gm-pad { display: none; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+    .gm-pad { display: none; grid-template-columns: repeat(6, 1fr); gap: 6px; }
     .gm-pad button[data-act="bento"] { background: #fff4e6; border-color: #ffd8a8; color: #e8590c; gap: 3px; font-weight: 800; }
     .gm-pad button[data-act="bento"].is-empty { opacity: .45; }
     .gm-pad button { height: 56px; border-radius: 14px; border: 1px solid #d6e4ff; background: #eef4ff; color: #2f6bff; display: flex; align-items: center; justify-content: center; touch-action: none; cursor: pointer; }
@@ -121,6 +121,7 @@
           <div class="gm-pad">
             <button type="button" data-act="rot" aria-label="회전">${HKUI.icon("rotate-cw", 24, "currentColor")}</button>
             <button type="button" data-act="left" aria-label="왼쪽">${HKUI.icon("arrow-left", 24, "currentColor")}</button>
+            <button type="button" data-act="soft" aria-label="한 칸 내리기">${HKUI.icon("arrow-down", 24, "currentColor")}</button>
             <button type="button" data-act="right" aria-label="오른쪽">${HKUI.icon("arrow-right", 24, "currentColor")}</button>
             <button type="button" data-act="drop" aria-label="바로 내리기">${HKUI.icon("arrow-down-to-line", 24, "currentColor")}</button>
             <button type="button" data-act="bento" aria-label="도시락 쓰기">${HKUI.icon("package-open", 22, "currentColor")}<small data-v="bentopad">0</small></button>
@@ -507,7 +508,7 @@
               <b>스페이스</b><span>바로 내리기</span>
               <b>Esc</b><span>일시정지</span>
             </div>
-            <p style="font-size:12px">휴대폰은 좌우 밀기 · 톡 돌리기 · 아래로 휙 내리기</p>
+            <p style="font-size:12px">휴대폰은 좌우 밀기 · 톡 돌리기 · 아래로 휙 내리기 · 아래 ↓ 버튼은 한 칸씩</p>
             <button type="button" class="gm-start" data-go>${HKUI.icon("play", 18, "#fff")} 시작</button>`);
           ov.querySelector("[data-go]").onclick = startGame;
         }
@@ -623,7 +624,7 @@
         stage.querySelectorAll(".gm-pad button").forEach((b) => {
           let hold = null;
           const act = b.dataset.act;
-          const fire = () => (act === "left" ? move(-1) : act === "right" ? move(1) : act === "rot" ? rotate() : act === "bento" ? useBento() : hardDrop());
+          const fire = () => (act === "left" ? move(-1) : act === "right" ? move(1) : act === "soft" ? softDrop() : act === "rot" ? rotate() : act === "bento" ? useBento() : hardDrop());
           const stop = () => { clearTimeout(hold); clearInterval(hold); hold = null; b.classList.remove("is-down"); };
           b.addEventListener("pointerdown", (e) => {
             e.preventDefault();
@@ -631,6 +632,8 @@
             b.classList.add("is-down");
             fire();
             if (act === "left" || act === "right") hold = setTimeout(() => (hold = setInterval(fire, 70)), 180);
+            // 한 칸 내리기는 누르고 있으면 계속 내려간다 (키보드 ↓ 와 같이)
+            else if (act === "soft") hold = setTimeout(() => (hold = setInterval(fire, 50)), 150);
           });
           ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => b.addEventListener(ev, stop));
           b.addEventListener("contextmenu", (e) => e.preventDefault());
