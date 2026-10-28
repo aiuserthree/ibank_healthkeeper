@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
+  <title>헬스키퍼 관리자 — 게임 요청</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/admin-shell.js"></script>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 아케이드 「이런 게임 있으면 좋겠어요」로 들어온 요청 — 최신순, 상태는 관리자만 본다
+    const STATUS = [["NEW", "새 요청"], ["PLANNED", "만들기로 함"], ["DONE", "만듦"], ["HOLD", "보류"]];
+    const FILTERS = [["all", "전체"], ...STATUS];
+    const esc = (t) => HKUI.escapeHtml(t);
+    let filter = "all";
+    let data = { items: [], counts: {} };
+
+    function card(r) {
+      const options = STATUS.map(([k, l]) => `<option value="${k}"${r.status === k ? " selected" : ""}>${l}</option>`).join("");
+      return `<div class="hk-card hk-card--pad" style="display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
+          <div style="min-width:0;flex:1">
+            <div style="font-size:15px;line-height:1.6;color:var(--color-midnight-navy);white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere">${esc(r.body)}</div>
+            <div style="font-size:12.5px;color:var(--text-muted);margin-top:6px">
+              <b style="color:var(--text-secondary)">${esc(r.member.name)}</b> · ${esc(r.member.department || "-")} · ${esc(HKUI.formatDateTimeKst(r.createdAt))}
+            </div>
+          </div>
+          <select class="hk-input" data-status="${r.id}" style="width:auto;min-width:130px;height:38px;flex-shrink:0">${options}</select>
+        </div>`;
+    }
+
+    function render() {
+      const total = data.items.length;
+      document.getElementById("filters").innerHTML = FILTERS.map(([k, l]) => {
+        const cnt = k === "all" ? total : data.counts[k] || 0;
+        return HKAdmin.filterPill(cnt ? `${l} (${cnt})` : l, filter === k, `data-f="${k}"`);
+      }).join("");
+      const list = filter === "all" ? data.items : data.items.filter((r) => r.status === filter);
+      document.getElementById("list").innerHTML = list.length
+        ? list.map(card).join("")
+        : HKUI.alertBox("info", total ? "해당 상태의 요청 없음" : "아직 받은 요청 없음", total ? "다른 상태를 골라 보세요." : "아케이드 아래쪽 「이런 게임 있으면 좋겠어요」로 요청이 들어오면 여기에 쌓여요.");
+      document.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { filter = b.dataset.f; render(); }));
+      document.querySelectorAll("[data-status]").forEach((sel) => {
+        sel.onchange = async () => {
+          const id = Number(sel.dataset.status);
+          sel.disabled = true;
+          try {
+            await HKApi.adminSetGameRequestStatus(id, sel.value);
+            const r = data.items.find((x) => x.id === id);
+            data.counts[r.status] -= 1;
+            r.status = sel.value;
+            data.counts[r.status] = (data.counts[r.status] || 0) + 1;
+            HKUI.toast("상태를 바꿨어요");
+            render();
+          } catch (e) {
+            sel.disabled = false;
+            HKUI.toast(e.message, "danger");
+          }
+        };
+      });
+      HKUI.refreshIcons();
+    }
+
+    HKAdmin.mountPage({
+      active: "gameRequests",
+      render() {
+        return `${HKAdmin.pageHead("게임 요청", "아케이드에서 회원이 보낸 「이런 게임 있으면 좋겠어요」 요청이에요.")}
+          <div id="filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
+          <div id="list" style="display:flex;flex-direction:column;gap:10px"><div style="text-align:center;padding:40px 0"><span class="hk-spin"></span></div></div>`;
+      },
+      afterMount: async () => {
+        try {
+          data = await HKApi.adminGameRequests();
+          render();
+        } catch (e) {
+          document.getElementById("list").innerHTML = HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "요청 목록을 불러오지 못했어요."));
+          HKUI.refreshIcons();
+        }
+      },
+    });
+  </script>
+</body>
+</html>

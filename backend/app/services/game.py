@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import raise_app_error
 from app.config import get_settings
 from app.core.time import now_kst, today_kst
-from app.models import ArcadeStamp, Coupon, CouponSource, CouponStatus, GamePlay, Member, MemberStatus
+from app.models import ArcadeStamp, Coupon, CouponSource, CouponStatus, GamePlay, GameRequest, Member, MemberStatus
 from app.services.avatar import member_avatar_url
 from app.services.fun_stats import DEPARTMENT_RANKING_EXCLUDED
 from app.services.korean_holidays import is_public_holiday
@@ -432,3 +432,57 @@ async def submit_score(
         "todayRank": await rank_in(today),
         "weekRank": await rank_in(_period_start("week", today)),
     }
+
+
+# 게임 요청 — 하루에 보낼 수 있는 개수 · 한 건 글자 수
+GAME_REQUEST_PER_DAY = 5
+GAME_REQUEST_MAX_LEN = 300
+GAME_REQUEST_STATUSES = ("NEW", "PLANNED", "DONE", "HOLD")
+
+
+async def add_game_request(db: AsyncSession, member: Member, body: str) -> None:
+    text = " ".join((body or "").split())[:GAME_REQUEST_MAX_LEN]
+    if len(text) < 2:
+        raise_app_error("GAME_REQUEST_EMPTY", 400)
+    day_start = now_kst().replace(hour=0, minute=0, second=0, microsecond=0)
+    sent = await db.scalar(
+        select(func.count()).select_from(GameRequest).where(
+            GameRequest.member_id == member.id, GameRequest.created_at >= day_start
+        )
+    )
+    if (sent or 0) >= GAME_REQUEST_PER_DAY:
+        raise_app_error("GAME_REQUEST_LIMIT")
+    db.add(GameRequest(member_id=member.id, body=text))
+    await db.commit()
+
+
+async def admin_game_requests(db: AsyncSession) -> dict:
+    rows = (
+        await db.execute(
+            select(GameRequest, Member)
+            .join(Member, Member.id == GameRequest.member_id)
+            .order_by(GameRequest.created_at.desc())
+        )
+    ).all()
+    items = [
+        {
+            "id": r.id,
+            "body": r.body,
+            "status": r.status,
+            "createdAt": r.created_at.isoformat(),
+            "member": {"id": m.id, "name": m.name, "department": m.department},
+        }
+        for r, m in rows
+    ]
+    counts = {s: sum(1 for it in items if it["status"] == s) for s in GAME_REQUEST_STATUSES}
+    return {"items": items, "counts": counts}
+
+
+async def admin_set_game_request_status(db: AsyncSession, request_id: int, status: str) -> None:
+    if status not in GAME_REQUEST_STATUSES:
+        raise_app_error("INVALID_CHANGE", 400)
+    row = await db.get(GameRequest, request_id)
+    if not row:
+        raise_app_error("NOT_FOUND", 404)
+    row.status = status
+    await db.commit()

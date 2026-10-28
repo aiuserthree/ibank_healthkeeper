@@ -220,6 +220,56 @@
         </div>`;
     }
 
+    // 만들어 줬으면 하는 게임 — 보내면 관리자 「게임 요청」에 쌓인다
+    function wishHtml() {
+      return `<div class="hk-aa-wrap hk-aa-wishwrap">
+          <form class="hk-aa-wish" id="aa-wish">
+            <div class="hk-aa-wish__copy">
+              <span class="hk-aa-offer__eyebrow">${HKUI.icon("lightbulb", 16, "currentColor")} 게임 요청</span>
+              <h2 class="hk-aa-h2">이런 게임 있으면<br>좋겠어요.</h2>
+              <p>하고 싶은 게임을 편하게 적어 주세요.<br>다음 대표 게임이 될지도 몰라요.</p>
+            </div>
+            <div class="hk-aa-wish__box">
+              <textarea id="aa-wish-text" maxlength="300" rows="4" placeholder="예: 테트리스 같은 블록 게임, 점심 메뉴 룰렛, 끝말잇기"></textarea>
+              <div class="hk-aa-wish__foot">
+                <span class="hk-aa-wish__msg" id="aa-wish-msg" aria-live="polite"></span>
+                <button type="submit" class="hk-aa-pill is-sm" id="aa-wish-send">보내기</button>
+              </div>
+            </div>
+          </form>
+        </div>`;
+    }
+
+    function bindWish() {
+      const form = document.getElementById("aa-wish");
+      if (!form) return;
+      const text = document.getElementById("aa-wish-text");
+      const msg = document.getElementById("aa-wish-msg");
+      const btn = document.getElementById("aa-wish-send");
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const body = text.value.trim();
+        if (body.length < 2) {
+          msg.className = "hk-aa-wish__msg is-err";
+          msg.textContent = "하고 싶은 게임을 적어 주세요.";
+          return text.focus();
+        }
+        btn.disabled = true;
+        try {
+          await HKApi.playRequestGame(body);
+          text.value = "";
+          msg.className = "hk-aa-wish__msg is-ok";
+          msg.textContent = "받았어요, 고마워요!";
+        } catch (err) {
+          msg.className = "hk-aa-wish__msg is-err";
+          msg.textContent = err.message || "보내지 못했어요. 잠시 뒤 다시 해 주세요.";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+      text.addEventListener("input", () => { if (msg.classList.contains("is-err")) msg.textContent = ""; });
+    }
+
     function endHtml() {
       return `<div class="hk-aa-end">
           <div class="hk-aa-wrap">
@@ -248,7 +298,7 @@
         try {
           const [st, games, sp] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null)]);
           status = st;
-          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + collectionHtml(games) + dailyHtml(games) + faqHtml() + endHtml();
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + collectionHtml(games) + dailyHtml(games) + faqHtml() + wishHtml() + endHtml();
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
         }
@@ -267,6 +317,7 @@
           document.getElementById("aa-games")?.scrollIntoView({ behavior: "smooth" });
         });
         startResetClock();
+        bindWish();
         // 모든 게임 보기 — 흐르는 타일 대신 바둑판으로
         document.getElementById("aa-all")?.addEventListener("click", (e) => {
           e.preventDefault();

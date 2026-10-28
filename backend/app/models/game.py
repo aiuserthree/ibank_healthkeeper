@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, func
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -49,3 +49,22 @@ class ArcadeStamp(Base):
     )
 
     __table_args__ = (UniqueConstraint("member_id", "stamp_date", name="uq_arcade_stamp_member_day"),)
+
+
+class GameRequest(Base):
+    """아케이드 — 회원이 만들어 줬으면 하는 게임 요청 (평가·피드백은 받지 않는다)."""
+
+    __tablename__ = "game_request"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    member_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    # NEW(새 요청) · PLANNED(만들기로 함) · DONE(만듦) · HOLD(보류) — 관리자만 보는 표시
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="NEW")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (Index("ix_game_request_created", "created_at"),)

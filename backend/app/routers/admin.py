@@ -429,6 +429,29 @@ async def revoke_coupon(
     return {"data": {"revoked": True}}
 
 
+@router.get("/game-requests")
+async def game_requests(
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.game import admin_game_requests
+
+    return {"data": await admin_game_requests(db)}
+
+
+@router.post("/game-requests/{request_id}/status")
+async def game_request_status(
+    request_id: int,
+    status: str = Body(..., embed=True),
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.game import admin_set_game_request_status
+
+    await admin_set_game_request_status(db, request_id, status)
+    return {"data": {"ok": True}}
+
+
 @router.get("/reapply-mail/targets")
 async def reapply_targets(
     cycle_id: int = Query(..., alias="cycleId"),

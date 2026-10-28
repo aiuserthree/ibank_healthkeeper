@@ -15,6 +15,10 @@ from app.services import game as game_service
 router = APIRouter(prefix="/play", tags=["play"])
 
 
+class GameRequestBody(BaseModel):
+    body: str
+
+
 class ScoreRequest(BaseModel):
     score: int
     token: Optional[str] = None
@@ -42,6 +46,17 @@ async def stamps(
 ):
     """이번 달 아케이드 참여 도장 — 찍힌 날짜 · 개수 · 목표 · 이번 달 쿠폰 받았는지."""
     return {"data": await game_service.stamp_status(db, member)}
+
+
+@router.post("/requests")
+async def request_game(
+    body: GameRequestBody,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """만들어 줬으면 하는 게임 요청 — 업무 시간에도 보낼 수 있다."""
+    await game_service.add_game_request(db, member, body.body)
+    return {"data": {"ok": True}}
 
 
 @router.post("/{game}/run")

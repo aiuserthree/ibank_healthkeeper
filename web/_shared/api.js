@@ -49,6 +49,7 @@ window.HKApi = (function () {
     playStart: (game) => request(`/play/${encodeURIComponent(game)}/start`, { method: "POST" }),
     playRun: (game, fresh) => request(`/play/${encodeURIComponent(game)}/run${fresh ? "?fresh=1" : ""}`, { method: "POST" }),
     playStamps: () => request("/play/stamps"),
+    playRequestGame: (body) => request("/play/requests", { method: "POST", body: JSON.stringify({ body }) }),
     playSubmit: (game, score, token) => request(`/play/${encodeURIComponent(game)}/score`, { method: "POST", body: JSON.stringify({ score, token }) }),
     notices: (category) => request(category ? `/system/notices?category=${encodeURIComponent(category)}` : "/system/notices"),
     notice: (id) => request(`/system/notices/${id}`),
@@ -59,6 +60,9 @@ window.HKApi = (function () {
         body: JSON.stringify(notice),
       }),
     adminDeleteNotice: (id) => request(`/admin/notices/${id}`, { method: "DELETE" }),
+    adminGameRequests: () => request("/admin/game-requests"),
+    adminSetGameRequestStatus: (id, status) =>
+      request(`/admin/game-requests/${id}/status`, { method: "POST", body: JSON.stringify({ status }) }),
     adminCoupons: () => request("/admin/coupons"),
     adminCouponStats: () => request("/admin/coupons/stats"),
     adminMemberCoupons: (memberId) => request(`/admin/coupons/members/${memberId}`),
