@@ -115,9 +115,21 @@
         </a>`;
     }
 
+    // 대표 게임 — 매주 월요일(한국 시간)에 다음 게임으로 바뀐다. 2026-10-26 주가 별까지 계단
+    const LEAD_ROTATION = [
+      "stairs", "match3", "blocks", "crossing", "bubble", "shooter", "stack", "pairs", "snake",
+      "bricks", "coffee", "sudoku", "mines", "promote", "typing", "chosung", "trivia", "korean",
+    ];
+    function weeklyLead(games) {
+      const kstWeek = (ms) => Math.floor((Math.floor((ms + 9 * 3600e3) / 864e5) + 3) / 7); // 월요일 시작 주 번호
+      const n = kstWeek(Date.now()) - kstWeek(Date.UTC(2026, 9, 26) - 9 * 3600e3);
+      const order = LEAD_ROTATION.map((k) => games.find((g) => g.key === k)).filter(Boolean);
+      if (!order.length) return games[0];
+      return order[((n % order.length) + order.length) % order.length];
+    }
+
     function collectionHtml(games) {
-      // 대표 게임 — 그림 왼쪽 아래가 비어 있어 글씨가 잘 읽히는 세균 격파
-      const lead = games.find((g) => g.key === "shooter") || games[0];
+      const lead = weeklyLead(games);
       const rest = games.filter((g) => g !== lead);
       const half = Math.ceil(rest.length / 2);
       const rail = (list, rev) => {
