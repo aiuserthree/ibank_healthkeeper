@@ -141,8 +141,10 @@
         const free = cols.slice(want);
         // 공 하나 더 — 거의 매 턴 하나
         if (free.length) S.items.push({ r: 0, c: free.shift(), kind: "ball", hit: false });
-        // 8단계부터 가끔 줄 번개 — 공이 지나가면 그 가로줄·세로줄 벽돌 모두 1씩
-        if (n >= 8 && free.length && Math.random() < 0.18) S.items.push({ r: 0, c: free.shift(), kind: Math.random() < 0.5 ? "row" : "col", hit: false });
+        // 3단계부터 줄 번개 — 공이 지나가면 그 가로줄·세로줄 벽돌 모두 1씩
+        if (n >= 3 && free.length && Math.random() < 0.3) S.items.push({ r: 0, c: free.shift(), kind: Math.random() < 0.5 ? "row" : "col", hit: false });
+        // 5단계부터 회오리 — 공이 지나가면 엉뚱한 위쪽 방향으로 튄다
+        if (n >= 5 && free.length && Math.random() < 0.2) S.items.push({ r: 0, c: free.shift(), kind: "swirl", hit: false });
       }
 
       function nextTurn(first) {
@@ -152,6 +154,8 @@
           S.items = S.items.filter((it) => !(it.hit && it.kind !== "ball"));
           for (const b of S.bricks) b.r++;
           for (const it of S.items) it.r++;
+          // 못 맞힌 +1 고리도 맨 아래 줄까지 내려오면 저절로 먹는다 — 공이 꾸준히 늘게
+          for (const it of S.items) if (it.r >= ROWS - 1 && it.kind === "ball") { S.gained++; S.texts.push({ x: cellX(it.c) + CELL / 2, y: cellY(ROWS - 2), text: "+1 공", life: 0.8 }); }
           S.items = S.items.filter((it) => it.r < ROWS - 1);
           S.shiftT = 0.18;
         }
@@ -244,9 +248,17 @@
         // 아이템
         for (const it of S.items) {
           const cx = cellX(it.c) + CELL / 2, cy = cellY(it.r) + CELL / 2;
-          if (Math.hypot(s.x - cx, s.y - cy) > R + CELL * 0.24) continue;
+          if (Math.hypot(s.x - cx, s.y - cy) > R + CELL * (it.kind === "ball" ? 0.32 : 0.24)) continue;
           if (it.kind === "ball") {
             if (!it.hit) { it.hit = true; S.gained++; S.texts.push({ x: cx, y: cy, text: "+1 공", life: 0.8 }); ctx.sfx("coin"); }
+          } else if (it.kind === "swirl") {
+            // 같은 공은 한 번 지날 때 한 번만 — 위쪽 아무 방향으로 튄다
+            const k = "swirl" + it.c + "," + it.r;
+            if (s.lastSwirl === k) continue;
+            s.lastSwirl = k; it.hit = true;
+            const a = -Math.PI * (0.15 + Math.random() * 0.7);
+            s.vx = Math.cos(a); s.vy = Math.sin(a);
+            sfxGap("whoosh", 0.1);
           } else if ((s.zapAt || {})[it.kind + it.c + "," + it.r] == null) {
             s.zapAt = s.zapAt || {}; s.zapAt[it.kind + it.c + "," + it.r] = 1;
             it.hit = true;
@@ -257,6 +269,7 @@
           }
         }
         S.items = S.items.filter((it) => !(it.kind === "ball" && it.hit));
+        if (s.lastSwirl && !S.items.some((it) => it.kind === "swirl" && "swirl" + it.c + "," + it.r === s.lastSwirl && Math.hypot(s.x - cellX(it.c) - CELL / 2, s.y - cellY(it.r) - CELL / 2) <= R + CELL * 0.3)) s.lastSwirl = null;
         // 바닥
         if (s.y >= FLOOR - R && s.vy > 0) {
           s.done = true;
@@ -382,6 +395,11 @@
             g.beginPath(); g.arc(cx, cy, pr, 0, Math.PI * 2); g.stroke();
             g.fillStyle = "#86efac"; g.font = `800 11px ${FONT}`;
             g.fillText("+1", cx, cy + 0.5);
+          } else if (it.kind === "swirl") {
+            g.save(); g.translate(cx, cy); g.rotate(S.t * 4);
+            g.strokeStyle = "#7dd3fc"; g.lineWidth = 2.5; g.lineCap = "round";
+            for (let k = 0; k < 3; k++) { g.beginPath(); g.arc(0, 0, CELL * 0.18, k * 2.1, k * 2.1 + 1.3); g.stroke(); }
+            g.restore();
           } else {
             g.fillStyle = it.hit ? "rgba(253, 224, 71, .45)" : "#fde047";
             g.beginPath(); g.arc(cx, cy, CELL * 0.2, 0, Math.PI * 2); g.fill();
@@ -483,9 +501,10 @@
           <h2>벽돌 깨기</h2>
           <p>끌어서 조준하고 놓으면 공이 <b>줄줄이</b> 날아가요.<br>벽돌 숫자만큼 맞히면 깨지고, 턴마다 벽돌이 <b>한 줄씩</b> 내려와요.<br>맨 아래 줄까지 내려오면 끝.</p>
           <div class="gm-items">
-            <div><span class="gm-pill" style="background:#16a34a">+1</span>공을 하나 더 얻어요 (다음 턴부터)</div>
+            <div><span class="gm-pill" style="background:#16a34a">+1</span>공을 하나 더 얻어요 · 못 맞혀도 바닥 줄까지 내려오면 저절로</div>
             <div><span class="gm-pill" style="background:#ca8a04">↔</span>공이 지나가면 그 가로줄 벽돌 모두 1씩</div>
             <div><span class="gm-pill" style="background:#ca8a04">↕</span>공이 지나가면 그 세로줄 벽돌 모두 1씩</div>
+            <div><span class="gm-pill" style="background:#0284c7">↻</span>회오리 — 지나가는 공이 엉뚱한 방향으로 튀어요</div>
           </div>
           <div class="gm-keys">처음 떨어진 공 자리에서 다음 턴을 쏴요 · 오래 걸리면 공이 빨라지고 <b>모두 회수</b>도 할 수 있어요<br>PC 마우스로 겨누고 클릭 · <kbd>←</kbd><kbd>→</kbd> 조준 · <kbd>Space</kbd> 발사 · <kbd>Esc</kbd> 일시정지</div>
           <button type="button" class="gm-go" data-act="start">시작</button>
@@ -569,9 +588,15 @@
       // 마우스는 올려만 둬도 조준선이 보이고 클릭하면 발사 · 터치는 짚고 끄는 동안 조준, 놓으면 발사
       let press = null;
       canvas.addEventListener("pointermove", (e) => {
-        if (state !== "aim") return;
+        if (state !== "aim" || e.pointerType === "mouse") return;
         const [x, y] = toWorld(e);
-        if (e.pointerType === "mouse" || (press && press.id === e.pointerId)) { aimAt(x, y); S.aiming = aimValid(y); }
+        if (press && press.id === e.pointerId) { aimAt(x, y); S.aiming = aimValid(y); }
+      });
+      // 마우스는 게임 화면 밖으로 나가도 계속 따라가며 조준한다 (클릭 발사는 화면 안에서)
+      window.addEventListener("pointermove", (e) => {
+        if (state !== "aim" || e.pointerType !== "mouse" || !S) return;
+        const [x, y] = toWorld(e);
+        aimAt(x, y); S.aiming = aimValid(y);
       });
       canvas.addEventListener("pointerdown", (e) => {
         if (state !== "aim") return;
@@ -590,7 +615,6 @@
         if (aimValid(y)) fire(); else S.aiming = false;
       });
       canvas.addEventListener("pointercancel", () => { press = null; if (S) S.aiming = false; });
-      canvas.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !press && S && state === "aim") S.aiming = false; });
 
       document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
 
