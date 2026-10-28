@@ -334,7 +334,7 @@ async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -
                     status=CouponStatus.AVAILABLE,
                     grant_month=st["month"],
                     issued_at=now,
-                    expires_at=_next_month_start(now),
+                    expires_at=_next_month_start(_next_month_start(now)),  # 받은 다음 달 말일까지
                     note="아케이드 도장 10개",
                 )
             )

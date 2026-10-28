@@ -310,7 +310,7 @@ window.HKPlay = (function () {
   function stampToast(stamp) {
     if (stamp && stamp.coupon) {
       HKSound.play("win");
-      HKUI.toast(`도장 ${stamp.goal}개 달성! 무적 쿠폰 1장을 받았어요 · 이번 달 안에 예약 신청에 써요`);
+      HKUI.toast(`도장 ${stamp.goal}개 달성! 무적 쿠폰 1장을 받았어요 · 다음 달 말일까지 예약 신청에 써요`);
     }
   }
 
