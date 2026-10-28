@@ -22,7 +22,9 @@ window.HKReservationBoard = (function () {
     let allSlots = board.slots || [];
     let dates = board.weekDates || [];
     let selectedDate = dates[0] || null;
-    let filter = "REQUESTED";
+    // 이미 시작한 주(이번 주)는 확정자를 먼저 본다 — 차주는 신청자부터
+    const todayKst = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    let filter = meta.weekStart && meta.weekStart <= todayKst ? "CONFIRMED" : "REQUESTED";
     const offDates = vacationDates;
 
     const label = board.boardLabel || (meta.weekStart && meta.weekEnd
