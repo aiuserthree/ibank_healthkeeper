@@ -102,7 +102,7 @@
         { id: "spore", name: "포자 세균", tip: "부채꼴 탄과 졸개를 피해요", r: 44, hp: 1, c1: "#fbcfe8", c2: "#ec4899", c3: "#9d174d", spike: "#a3e635" },
         { id: "spiral", name: "소용돌이 세균", tip: "빙글빙글 도는 탄 사이로 빠져나가요", r: 40, hp: 0.95, c1: "#bae6fd", c2: "#0ea5e9", c3: "#075985", spike: "#fde047" },
         { id: "charge", name: "돌진 세균", tip: "부르르 떨면 곧 돌진해요 — 옆으로 피해요", r: 46, hp: 1.15, c1: "#fed7aa", c2: "#f97316", c3: "#9a3412", spike: "#fca5a5" },
-        { id: "queen", name: "여왕 세균", tip: "탄 커튼의 빈틈으로 빠져나가요", r: 48, hp: 1.3, c1: "#ddd6fe", c2: "#8b5cf6", c3: "#4c1d95", spike: "#f0abfc" },
+        { id: "queen", name: "여왕 세균", tip: "탄 커튼의 빈틈으로 빠져나가요", r: 54, hp: 1.3, c1: "#ddd6fe", c2: "#8b5cf6", c3: "#4c1d95", spike: "#f0abfc" },
       ];
       let state = "ready"; // ready | play | paused | over
       let S = null; // 판 상태
@@ -195,8 +195,8 @@
           sway: Math.min(2.4, 0.7 + w * 0.09),
           diveEvery: Math.max(0.7, 3.6 - w * 0.24),
           diveCount: Math.min(5, 1 + Math.floor(w / 3)),
-          shotEvery: Math.max(0.2, 1.9 - w * 0.13),
-          volley: Math.min(3, 1 + Math.floor((w - 1) / 6)), // 한 번에 쏘는 세균 수 (7웨이브 2, 13웨이브 3)
+          shotEvery: Math.max(0.2, 1.15 - w * 0.065), // 1웨이브 약 1초 → 15웨이브 0.2초 (예전엔 1웨이브 1.8초라 초반이 너무 조용했다)
+          volley: w >= 13 ? 3 : w >= 3 ? 2 : 1, // 한 번에 쏘는 세균 수 (3웨이브 2, 13웨이브 3)
           ebSpeed: Math.min(380, 150 + w * 14),
           diveSpeed: Math.min(380, 140 + w * 14),
           hpBonus: Math.floor((w - 1) / 8), // 9웨이브부터 세균마다 체력 +1, 17웨이브 +2 …
@@ -212,7 +212,7 @@
         const P = waveParams(S.wave);
         S.P = P;
         S.diveCd = 3;
-        S.shotCd = 1.6;
+        S.shotCd = 0.6;
         if (S.wave % 5 === 0) {
           const n = S.wave / 5;
           const kind = BOSS_KINDS[(n - 1) % BOSS_KINDS.length];
@@ -433,7 +433,7 @@
               if (!e.fired && e.y > H * 0.32) {
                 e.fired = true;
                 aimShot(e.x, e.y, P.ebSpeed * 1.05);
-                if (S.wave >= 4) aimShot(e.x, e.y, P.ebSpeed * 0.9, 0.22);
+                aimShot(e.x, e.y, P.ebSpeed * 0.9, 0.22);
               }
             }
             if (e.y > H + 30) {
@@ -459,9 +459,11 @@
             }
           }
           S.shotCd -= dt;
-          if (S.shotCd <= 0) {
+          // 자리 잡은 세균 + 날아 들어오는 중이라도 반쯤 들어온 세균 (예전엔 편대가 자리 잡을 때까지 아무도 안 쐈다)
+          const shooters = S.shotCd <= 0 ? S.enemies.filter((e) => e.mode === "form" || (e.mode === "enter" && e.delay <= 0 && e.p >= 0.5 && e.y > 20)) : [];
+          // 쏠 세균이 아직 없으면 차례를 버리지 않고 기다린다 (예전엔 빈 차례로 1~2초를 날려 첫 탄이 늦었다)
+          if (shooters.length) {
             S.shotCd = P.shotEvery * (0.7 + Math.random() * 0.6);
-            const shooters = S.enemies.filter((e) => e.mode === "form");
             for (let v = 0; v < P.volley && shooters.length; v++) {
               const e = shooters.splice(Math.floor(Math.random() * shooters.length), 1)[0];
               aimShot(e.x, e.y + 8, P.ebSpeed, 0, 0.35);
@@ -497,7 +499,9 @@
             // 이동
             if (B.mode === "move") {
               const spd = (0.6 + B.n * 0.08) * (B.kind === "spiral" ? 1.4 : 1) * (B.angry ? 1.25 : 1);
-              B.x = W / 2 + Math.sin(B.t * spd) * (W / 2 - 64);
+              // 좌우 위치는 쌓아 가는 각도로 — 화나서 빨라져도 그 자리에서 이어진다 (예전엔 B.t × 속도라 화나는 순간 옆으로 순간이동했다)
+              B.ph = (B.ph || 0) + spd * dt;
+              B.x = W / 2 + Math.sin(B.ph) * (W / 2 - 64);
               B.y = 110 + Math.sin(B.t * 1.3) * 14;
             }
             B.spreadCd -= dt; B.aimCd -= dt; B.minionCd -= dt;
@@ -551,9 +555,11 @@
                 if (d <= v) { B.x = B.tx; B.y = B.ty; B.mode = "back"; for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; S.ebullets.push({ x: B.x, y: B.y, vx: Math.cos(a) * sp * 0.7, vy: Math.sin(a) * sp * 0.7, r: 4 }); } }
                 else { B.x += (dx / d) * v; B.y += (dy / d) * v; }
               } else if (B.mode === "back") {
-                const ty = 110, dy = ty - B.y, v = 200 * dt;
-                if (Math.abs(dy) <= v) { B.y = ty; B.mode = "move"; B.chargeCd = (3.4 - Math.min(1.4, B.n * 0.15)) * rage; B.t = Math.asin(Math.max(-1, Math.min(1, (B.x - W / 2) / (W / 2 - 64)))) / ((0.6 + B.n * 0.08) * (B.angry ? 1.25 : 1)); }
-                else B.y += Math.sign(dy) * v;
+                // 제자리로 돌아갈 때 좌우도 다니는 범위 안으로 함께 옮긴다 — 다 돌아온 뒤 툭 튀지 않게
+                const amp = W / 2 - 64, tx = Math.max(W / 2 - amp, Math.min(W / 2 + amp, B.x)), ty = 110 + Math.sin(B.t * 1.3) * 14;
+                const dx = tx - B.x, dy = ty - B.y, d = Math.hypot(dx, dy), v = 200 * dt;
+                if (d <= v) { B.x = tx; B.y = ty; B.mode = "move"; B.chargeCd = (3.4 - Math.min(1.4, B.n * 0.15)) * rage; B.ph = Math.asin((B.x - W / 2) / amp); }
+                else { B.x += (dx / d) * v; B.y += (dy / d) * v; }
               }
             } else {
               // 여왕 세균 — 틈 하나 남긴 탄 커튼 + 단단한 졸개 호위
@@ -1117,28 +1123,101 @@
 
       function drawBoss(B) {
         const K = BOSS_KINDS.find((k) => k.id === B.kind) || BOSS_KINDS[0];
-        const T = { spikes: 18 };
         g.save();
         g.translate(B.x, B.y);
         const flash = B.flash > 0;
         if (B.mode === "wind") g.translate(Math.sin(B.t * 70) * 2, 0);
-        g.strokeStyle = flash ? "#fff" : K.c3;
-        g.fillStyle = flash ? "#fff" : K.spike;
-        g.lineWidth = 3;
-        for (let i = 0; i < T.spikes; i++) {
-          const a = (i / T.spikes) * Math.PI * 2 + B.t * 0.5;
-          const len = 10 + Math.sin(B.t * 3 + i * 1.7) * 4;
-          g.beginPath(); g.moveTo(Math.cos(a) * (B.r - 2), Math.sin(a) * (B.r - 2)); g.lineTo(Math.cos(a) * (B.r + len), Math.sin(a) * (B.r + len)); g.stroke();
-          g.beginPath(); g.arc(Math.cos(a) * (B.r + len), Math.sin(a) * (B.r + len), 3.2, 0, Math.PI * 2); g.fill();
+        const R = B.r;
+        const ink = flash ? "#fff" : K.c3;
+        const tip = flash ? "#fff" : K.spike;
+        // 바깥 실루엣 — 종류마다 다르게 (예전엔 넷 다 같은 가시 공에 색만 달랐다)
+        g.strokeStyle = ink; g.fillStyle = tip; g.lineWidth = 3;
+        if (B.kind === "spore") {
+          // 몸에 붙은 버섯 모양 포자 혹 + 둘레를 떠다니는 포자
+          for (let i = 0; i < 7; i++) {
+            const a = (i / 7) * Math.PI * 2 + B.t * 0.3;
+            g.save();
+            g.rotate(a); g.translate(R + 3 + Math.sin(B.t * 2.4 + i) * 2, 0); g.rotate(Math.PI / 2);
+            g.fillStyle = flash ? "#fff" : K.c1; g.fillRect(-3.5, -1, 7, 9);
+            g.fillStyle = tip; g.lineWidth = 2;
+            g.beginPath(); g.arc(0, 0, 10, Math.PI, Math.PI * 2); g.closePath(); g.fill(); g.stroke();
+            g.fillStyle = ink;
+            g.beginPath(); g.arc(-4, -4, 1.8, 0, Math.PI * 2); g.arc(3, -6, 1.5, 0, Math.PI * 2); g.fill();
+            g.restore();
+          }
+          g.fillStyle = flash ? "#fff" : "rgba(163, 230, 53, .75)";
+          for (let i = 0; i < 6; i++) {
+            const a = i * 1.05 + B.t * 0.8, d = R + 22 + Math.sin(B.t * 1.7 + i * 2) * 6;
+            g.beginPath(); g.arc(Math.cos(a) * d, Math.sin(a) * d, 2.6, 0, Math.PI * 2); g.fill();
+          }
+        } else if (B.kind === "spiral") {
+          // 짧은 가시가 빠르게 돌고, 몸 둘레에 도는 점선 고리
+          for (let i = 0; i < 12; i++) {
+            const a = (i / 12) * Math.PI * 2 + B.t * 1.6;
+            g.beginPath(); g.moveTo(Math.cos(a) * (R - 2), Math.sin(a) * (R - 2)); g.lineTo(Math.cos(a + 0.25) * (R + 9), Math.sin(a + 0.25) * (R + 9)); g.stroke();
+          }
+          g.save();
+          g.strokeStyle = tip; g.lineWidth = 2.5; g.setLineDash([10, 9]); g.lineDashOffset = -B.t * 60;
+          g.beginPath(); g.arc(0, 0, R + 15, 0, Math.PI * 2); g.stroke();
+          g.restore();
+        } else if (B.kind === "charge") {
+          // 등 쪽 갈기 가시 + 돌진하는 쪽(아래)으로 난 뿔 두 개
+          for (let i = 0; i < 9; i++) {
+            const a = Math.PI * (1.12 + (i / 8) * 0.76);
+            const len = 12 + Math.sin(B.t * 4 + i) * 3;
+            g.beginPath(); g.moveTo(Math.cos(a) * R * 0.86, Math.sin(a) * R * 1.04); g.lineTo(Math.cos(a) * (R * 0.86 + len), Math.sin(a) * (R * 1.04 + len)); g.stroke();
+          }
+          g.fillStyle = flash ? "#fff" : "#fff7ed"; g.lineWidth = 2.5;
+          for (const sx of [-1, 1]) {
+            g.beginPath();
+            g.moveTo(sx * R * 0.52, R * 0.72);
+            g.quadraticCurveTo(sx * R * 0.78, R * 1.15, sx * R * 0.5, R * 1.5);
+            g.quadraticCurveTo(sx * R * 0.34, R * 1.1, sx * R * 0.14, R * 0.94);
+            g.closePath(); g.fill(); g.stroke();
+          }
+        } else {
+          // 여왕 — 둘레 가시 (왕관은 몸 위에 얹는다)
+          for (let i = 0; i < 18; i++) {
+            const a = (i / 18) * Math.PI * 2 + B.t * 0.5;
+            const len = 10 + Math.sin(B.t * 3 + i * 1.7) * 4;
+            g.beginPath(); g.moveTo(Math.cos(a) * (R - 2), Math.sin(a) * (R - 2)); g.lineTo(Math.cos(a) * (R + len), Math.sin(a) * (R + len)); g.stroke();
+            g.beginPath(); g.arc(Math.cos(a) * (R + len), Math.sin(a) * (R + len), 3.2, 0, Math.PI * 2); g.fill();
+          }
         }
-        const grad = g.createRadialGradient(-B.r * 0.35, -B.r * 0.4, B.r * 0.15, 0, 0, B.r);
+        const grad = g.createRadialGradient(-R * 0.35, -R * 0.4, R * 0.15, 0, 0, R);
         grad.addColorStop(0, flash ? "#fff" : K.c1);
         grad.addColorStop(0.6, flash ? "#fff" : B.angry ? "#ef4444" : K.c2);
         grad.addColorStop(1, flash ? "#fde68a" : K.c3);
         g.fillStyle = grad;
-        g.beginPath(); g.arc(0, 0, B.r, 0, Math.PI * 2); g.fill();
-        g.fillStyle = "rgba(255,255,255,.18)";
-        for (const [dx, dy, rr] of [[18, 16, 6], [-22, 18, 4], [8, 28, 3.5], [-12, -26, 3]]) { g.beginPath(); g.arc(dx, dy, rr, 0, Math.PI * 2); g.fill(); }
+        g.beginPath();
+        if (B.kind === "charge") g.ellipse(0, 0, R * 0.86, R * 1.04, 0, 0, Math.PI * 2); // 위아래로 길쭉한 몸
+        else g.arc(0, 0, R, 0, Math.PI * 2);
+        g.fill();
+        if (B.kind === "spiral") {
+          // 몸통에 도는 회오리 무늬
+          g.strokeStyle = "rgba(255,255,255,.32)"; g.lineWidth = 4; g.lineCap = "round";
+          for (let k = 0; k < 3; k++) {
+            g.beginPath();
+            for (let t = 0; t <= 1.001; t += 0.05) {
+              const a = -B.t * 2.2 + (k / 3) * Math.PI * 2 + t * 3.4, rr = 6 + t * (R - 9);
+              if (t === 0) g.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); else g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+            }
+            g.stroke();
+          }
+        } else {
+          g.fillStyle = "rgba(255,255,255,.18)";
+          for (const [dx, dy, rr] of [[18, 16, 6], [-22, 18, 4], [8, 28, 3.5], [-12, -26, 3]]) { g.beginPath(); g.arc(dx, dy, rr, 0, Math.PI * 2); g.fill(); }
+        }
+        if (B.kind === "queen") {
+          // 왕관
+          const cy = -R + 6;
+          g.fillStyle = flash ? "#fff" : "#fde047"; g.strokeStyle = flash ? "#fff" : "#a16207"; g.lineWidth = 2.5; g.lineJoin = "round";
+          g.beginPath();
+          g.moveTo(-24, cy); g.lineTo(-27, cy - 22); g.lineTo(-13, cy - 10); g.lineTo(0, cy - 28); g.lineTo(13, cy - 10); g.lineTo(27, cy - 22); g.lineTo(24, cy);
+          g.closePath(); g.fill(); g.stroke();
+          g.fillStyle = flash ? "#fff" : "#f0abfc";
+          for (const [jx, jy, jr] of [[0, cy - 9, 3.6], [-15, cy - 5, 2.6], [15, cy - 5, 2.6]]) { g.beginPath(); g.arc(jx, jy, jr, 0, Math.PI * 2); g.fill(); }
+        }
         // 화난 눈
         g.fillStyle = "#fff";
         g.beginPath(); g.arc(-14, -6, 9, 0, Math.PI * 2); g.arc(14, -6, 9, 0, Math.PI * 2); g.fill();
