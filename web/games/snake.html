@@ -47,10 +47,6 @@
     .gm-sn-reason.is-time { color: #0b3558; }
     .gm-sn-big { font-size: 40px; font-weight: 800; letter-spacing: -1px; margin: 4px 0 2px; color: var(--gm-a); line-height: 1.1; }
     .gm-sn-big small { font-size: 18px; font-weight: 700; margin-left: 2px; }
-    .gm-sn-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-    .gm-sn-pad.is-hidden { display: none; }
-    .gm-sn-btn { height: 52px; padding: 0; border: 1px solid #dbe3dc; background: #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; color: #0b3558; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-    .gm-sn-btn:active, .gm-sn-btn.is-down { background: #ecfccb; border-color: var(--gm-a); }
     /* 판이 낮을 때(가로 폰·320px 폰): 시작 카드를 줄여 버튼까지 판 안에 보이게 */
     .gm-sn.is-small .gm-sn-over { padding: 8px; }
     .gm-sn.is-small .gm-sn-card { padding: 12px 12px; }
@@ -61,7 +57,6 @@
     .gm-sn.is-small .gm-sn-card .hk-btn { margin-top: 8px; }
     .gm-sn.is-small .gm-sn-big { font-size: 30px; }
     .gm-sn.is-mini .gm-sn-keys { display: none; }
-    @media (min-width: 900px) { .gm-sn-pad { display: none; } }
     @media (max-width: 640px) {
       .gm-sn { gap: 8px; }
       .gm-sn-hud { height: 32px; }
@@ -99,12 +94,6 @@
           <div class="gm-sn-toast" id="gm-sn-toast" role="status"></div>
           <div class="gm-sn-over" id="gm-sn-over" hidden></div>
         </div>
-        <div class="gm-sn-pad" id="gm-sn-pad">
-          <button type="button" class="gm-sn-btn" data-dir="left" aria-label="왼쪽">${HKUI.icon("chevron-left", 26, "currentColor")}</button>
-          <button type="button" class="gm-sn-btn" data-dir="up" aria-label="위">${HKUI.icon("chevron-up", 26, "currentColor")}</button>
-          <button type="button" class="gm-sn-btn" data-dir="down" aria-label="아래">${HKUI.icon("chevron-down", 26, "currentColor")}</button>
-          <button type="button" class="gm-sn-btn" data-dir="right" aria-label="오른쪽">${HKUI.icon("chevron-right", 26, "currentColor")}</button>
-        </div>
       </div>`;
       HKUI.refreshIcons(stage);
 
@@ -115,7 +104,6 @@
       const g = canvas.getContext("2d");
       const over = $("#gm-sn-over");
       const toastEl = $("#gm-sn-toast");
-      const pad = $("#gm-sn-pad");
       const hudScore = $("#gm-sn-score"), hudLen = $("#gm-sn-len"), hudFloor = $("#gm-sn-floor"), hudTime = $("#gm-sn-time"), hudTimeText = $("#gm-sn-timetext");
       const FONT = getComputedStyle(document.body).fontFamily || "sans-serif";
 
@@ -145,13 +133,13 @@
       let state = "ready"; // ready | go | play | paused | count | over
       let snake, dir, queue, pending, vitamin, lunch, desks, sulks, puffs;
       let score, vitCount, floor, maxLen, boostUntil, playMs, acc, phaseT, countStep, overReason, overT;
+      let prevPos = null;
       let log, unreach, lastCheck, lastCountSec;
       let anim = 0, last = null;
       let cell = 24, bw = 0, bh = 0, dpr = 1;
       let boardRows = null, targets = null, lastOvertake = -1e9;
 
       const live = () => state === "play" || state === "go" || state === "count";
-      // 초당 칸 수 — 1층 5칸에서 층마다 0.5칸씩, 7층부터 8칸 (전: 8→10칸)
       // 초당 칸 수 — 1층 4.3칸, 층마다 0.45씩 빨라져 최대 7.2칸 (예전 5칸 → 최대 8칸에서 조금 느리게)
       const speedOf = (f) => Math.min(7.2, 4.3 + 0.45 * (f - 1));
       const tickMs = () => 1000 / speedOf(floor) / (playMs < boostUntil ? 1.2 : 1);
@@ -265,6 +253,7 @@
 
       // ───────────────────────── 초기화
       function reset() {
+        prevPos = null;
         snake = [];
         // 처음엔 세 명으로 짧게 시작 (예전 여섯 명은 처음부터 길어 부담스러웠다)
         for (let r = 13; r <= 15; r++) snake.push({ c: 6, r });
@@ -285,18 +274,9 @@
       // ───────────────────────── 크기
       function resize() {
         root.style.width = "";
-        pad.classList.remove("is-hidden");
         const sw = stage.clientWidth;
-        let avail = HKPlay.roomFor(stage, boardEl);
-        let c = Math.floor(Math.min(sw / COLS, avail / ROWS));
-        const padShown = getComputedStyle(pad).display !== "none";
-        if (c < 18 && padShown) {
-          // 낮은 창(가로 폰 등): 버튼 줄을 숨기고 다시 잰다 — 스와이프는 그대로
-          pad.classList.add("is-hidden");
-          const avail2 = HKPlay.roomFor(stage, boardEl);
-          const c2 = Math.floor(Math.min(sw / COLS, avail2 / ROWS));
-          if (c2 > c) { c = c2; avail = avail2; } else pad.classList.remove("is-hidden");
-        }
+        const avail = HKPlay.roomFor(stage, boardEl);
+        const c = Math.floor(Math.min(sw / COLS, avail / ROWS));
         cell = Math.max(12, Math.min(40, c));
         bw = cell * COLS; bh = cell * ROWS;
         const rootW = Math.max(bw, Math.min(sw, 300));
@@ -364,20 +344,6 @@
       document.documentElement.style.overscrollBehaviorY = "contain";
       document.body.style.overscrollBehaviorY = "contain";
 
-      // 버튼 줄 ← ↑ ↓ → : pointerdown 즉시
-      stage.querySelectorAll(".gm-sn-btn").forEach((b) => {
-        b.addEventListener("pointerdown", (e) => {
-          e.preventDefault();
-          b.classList.add("is-down");
-          if (state === "ready") { start(); enqueue(b.dataset.dir); return; }
-          if (live()) enqueue(b.dataset.dir);
-        });
-        const up = () => b.classList.remove("is-down");
-        b.addEventListener("pointerup", up);
-        b.addEventListener("pointerleave", up);
-        b.addEventListener("pointercancel", up);
-        b.addEventListener("click", (e) => e.preventDefault());
-      });
 
       document.addEventListener("visibilitychange", () => {
         if (document.hidden && live()) pause();
@@ -408,7 +374,7 @@
           <p class="gm-sn-sub">도시락은 빨리 먹을수록 점수가 커요<br>줄 +3명 · 3초 가속</p>
           <dl class="gm-sn-keys">
             <dt>PC</dt><dd>방향키 또는 W·A·S·D</dd>
-            <dt>모바일</dt><dd>판 위 스와이프 · 아래 버튼</dd>
+            <dt>모바일</dt><dd>판 위에서 밀어서 방향 바꾸기</dd>
           </dl>
           <button type="button" class="hk-btn hk-btn--primary" id="gm-sn-start">${HKUI.icon("play", 16, "#fff")} 점심 줄 시작</button>
         </div>`);
@@ -566,6 +532,8 @@
         }
         const k = snake.findIndex((s) => s.c === nc && s.r === nr);
         if (k >= 0 && !(k === snake.length - 1 && pending === 0 && grow === 0)) cutIn(k);
+        // 그리기용 — 움직이기 전 칸 (다음 칸까지 미끄러지듯 그린다)
+        prevPos = snake.map((s) => ({ c: s.c, r: s.r }));
         snake.unshift({ c: nc, r: nr });
         pending += grow;
         if (pending > 0) pending--; else snake.pop();
@@ -655,8 +623,8 @@
         g.fillStyle = i % 2 ? COL_B : "#a3e635"; rr(x, y, sz, sz, cell * 0.18); g.fill();
         g.fillStyle = "#f7fee7"; g.beginPath(); g.arc(x + sz / 2, y + sz / 2, cell * 0.14, 0, Math.PI * 2); g.fill();
       }
-      function drawHead() {
-        const h = snake[0], v = DIR[dir], p = [-v[1], v[0]];
+      function drawHead(h) {
+        const v = DIR[dir], p = [-v[1], v[0]];
         const sz = cell * 0.88, o = cell * 0.06, x = h.c * cell + o, y = h.r * cell + o;
         if (playMs < boostUntil && live()) { g.strokeStyle = "#fde047"; g.lineWidth = 2; rr(x - 1, y - 1, sz + 2, sz + 2, cell * 0.22 + 1); g.stroke(); }
         g.fillStyle = COL_A; rr(x, y, sz, sz, cell * 0.22); g.fill();
@@ -688,8 +656,15 @@
         for (const s of sulks) drawSulk(s);
         if (vitamin) drawVitamin();
         if (lunch) drawLunch();
-        for (let i = snake.length - 1; i >= 1; i--) drawBody(snake[i], i);
-        drawHead();
+        // 한 칸씩 뚝뚝 옮기지 않고, 지난 칸 → 지금 칸 사이를 틱 진행만큼 미끄러지듯 그린다
+        const t = state === "play" && prevPos ? Math.max(0, Math.min(1, acc / tickMs())) : 1;
+        const at = (i) => {
+          const cur = snake[i], pr = prevPos && prevPos[i];
+          if (!pr || t >= 1 || Math.abs(pr.c - cur.c) + Math.abs(pr.r - cur.r) !== 1) return cur;
+          return { c: pr.c + (cur.c - pr.c) * t, r: pr.r + (cur.r - pr.r) * t };
+        };
+        for (let i = snake.length - 1; i >= 1; i--) drawBody(at(i), i);
+        drawHead(at(0));
         for (const pf of puffs) {
           g.globalAlpha = (1 - pf.t) * 0.6;
           g.fillStyle = "#9ca3af"; g.beginPath(); g.arc((pf.c + 0.5) * cell, (pf.r + 0.5) * cell, cell * (0.2 + 0.4 * pf.t), 0, Math.PI * 2); g.fill();
