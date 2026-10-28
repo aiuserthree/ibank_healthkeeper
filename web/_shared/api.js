@@ -60,6 +60,7 @@ window.HKApi = (function () {
       }),
     adminDeleteNotice: (id) => request(`/admin/notices/${id}`, { method: "DELETE" }),
     adminCoupons: () => request("/admin/coupons"),
+    adminCouponStats: () => request("/admin/coupons/stats"),
     adminMemberCoupons: (memberId) => request(`/admin/coupons/members/${memberId}`),
     adminGrantCoupons: (memberId, count, note) =>
       request("/admin/coupons/grant", { method: "POST", body: JSON.stringify({ memberId, count, note }) }),

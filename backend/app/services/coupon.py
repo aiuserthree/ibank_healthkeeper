@@ -30,6 +30,7 @@ from app.models import (
     Reservation,
     ReservationCycle,
     ReservationStatus,
+    Slot,
 )
 
 DROP_WEEKS_PER_COUPON = 5
@@ -371,6 +372,58 @@ async def admin_coupon_overview(db: AsyncSession) -> list[dict]:
     await db.commit()
     rows.sort(key=lambda r: (-(r["available"] + r["reserved"]), -r["dropWeeks"], r["name"]))
     return rows
+
+
+# 이번 주 쿠폰 신청이 쿠폰 가능 시간대의 이 비율을 넘으면 관리자 화면에 경고
+COUPON_WEEK_WARN_RATIO = 0.25
+
+
+async def admin_coupon_stats(db: AsyncSession) -> dict:
+    """쿠폰이 너무 쌓이는지 보는 지표 — 이번 주 쿠폰 신청 수와 이번 달 출처별 지급 장수."""
+    from app.services.cycle import get_admin_view_cycle
+    from app.services.designated_slot import is_designated_confirm_slot
+    from app.services.korean_holidays import is_public_holiday
+
+    week = None
+    cycle = await get_admin_view_cycle(db)
+    if cycle:
+        slots = (await db.execute(select(Slot).where(Slot.cycle_id == cycle.id))).scalars().all()
+        coupon_slots = sum(
+            1 for s in slots if not s.is_vacation and not is_public_holiday(s.slot_date) and not is_designated_confirm_slot(s)
+        )
+        requests = await db.scalar(
+            select(func.count())
+            .select_from(Reservation)
+            .where(Reservation.cycle_id == cycle.id)
+            .where(Reservation.coupon_id.isnot(None))
+            .where(Reservation.status != ReservationStatus.CANCELLED)
+        )
+        week = {
+            "weekStart": cycle.target_week_start.isoformat(),
+            "weekEnd": cycle.target_week_end.isoformat(),
+            "couponRequests": int(requests or 0),
+            "couponSlots": coupon_slots,
+            "warn": bool(coupon_slots) and (requests or 0) / coupon_slots > COUPON_WEEK_WARN_RATIO,
+        }
+
+    now = now_kst()
+    month_start = datetime(now.year, now.month, 1, tzinfo=KST)
+    issued = dict(
+        (
+            await db.execute(
+                select(Coupon.source, func.count())
+                .where(Coupon.issued_at >= month_start)
+                .where(Coupon.issued_at < _next_month_start(now))
+                .group_by(Coupon.source)
+            )
+        ).all()
+    )
+    return {
+        "week": week,
+        "month": _month_key(now),
+        "issued": {str(getattr(k, "value", k)): v for k, v in issued.items()},
+        "available": int(await db.scalar(select(func.count()).select_from(Coupon).where(Coupon.status == CouponStatus.AVAILABLE)) or 0),
+    }
 
 
 async def admin_member_coupons(db: AsyncSession, member_id: int) -> list[dict]:

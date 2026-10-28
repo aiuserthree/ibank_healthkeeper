@@ -384,6 +384,16 @@ async def coupon_overview(
     return {"data": await admin_coupon_overview(db)}
 
 
+@router.get("/coupons/stats")
+async def coupon_stats(
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    from app.services.coupon import admin_coupon_stats
+
+    return {"data": await admin_coupon_stats(db)}
+
+
 @router.get("/coupons/members/{member_id}")
 async def member_coupons(
     member_id: int,

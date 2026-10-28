@@ -50,6 +50,25 @@
         <tbody>${rows.map(row).join("")}</tbody></table></div>`;
     }
 
+    // 쿠폰이 너무 쌓이는지 보는 지표 — 이번 주 쿠폰 신청 · 이번 달 지급 · 지금 보유
+    function statsHtml(st) {
+      const md = (iso) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
+      const w = st.week;
+      const issued = st.issued || {};
+      const total = Object.values(issued).reduce((a, b) => a + b, 0);
+      const parts = ["DROP", "BADGE", "ARCADE", "ADMIN"].filter((k) => issued[k]).map((k) => `${SOURCE_LABEL[k]} ${issued[k]}`);
+      const blue = { bg: "var(--color-signal-blue-soft)", fg: "var(--color-signal-blue)" };
+      const red = { bg: "var(--color-danger-soft)", fg: "var(--color-danger)" };
+      const violet = { bg: "rgba(124, 58, 237, .1)", fg: "var(--color-ultraviolet)" };
+      return `<div class="hk-dash-stats hk-coupon-stats" style="margin-top:0">
+          ${w ? HKUI.statCard("ticket", `${w.couponRequests} / ${w.couponSlots}`, `${md(w.weekStart)} 주 쿠폰 신청${w.warn ? " · 많아요" : ""}`, w.warn ? red : blue) : ""}
+          ${HKUI.statCard("gamepad-2", `${issued.ARCADE || 0}장`, `${Number(st.month.slice(5))}월 아케이드 쿠폰`, violet)}
+          ${HKUI.statCard("gift", `${total}장`, `${Number(st.month.slice(5))}월 지급${parts.length ? ` (${parts.join(" · ")})` : ""}`, blue)}
+          ${HKUI.statCard("wallet", `${st.available}장`, "지금 보유 중", blue)}
+        </div>
+        ${w && w.warn ? `<div style="margin:-12px 0 20px">${HKUI.alertBox("warning", "쿠폰 신청이 많아요", `이번 주 쿠폰 신청이 쿠폰 가능 시간대의 25%를 넘었어요. 쿠폰 없는 신청자가 더 자주 탈락하게 되니, 아케이드 도장 목표를 올리는 등 지급량 조정을 검토해 주세요.`)}</div>` : ""}`;
+    }
+
     async function openDetail(memberId, name, reload) {
       const coupons = await HKApi.adminMemberCoupons(memberId);
       const body = coupons.length
@@ -84,14 +103,20 @@
     HKAdmin.mountPage({
       active: "coupons",
       render() {
-        return `${HKAdmin.pageHead("무적 쿠폰", "탈락 5주마다 1장 · 명예의 전당 매월 1장(매월 초기화)")}
-          <div style="margin-bottom:16px">${HKUI.alertBox("info", "쿠폰 규칙", "쿠폰 신청은 일반 신청보다 먼저 확정되고, 쿠폰끼리는 일반과 같은 우선권(마지막 이용일) 순입니다. 탈락·관리자 지급 쿠폰은 지급일로부터 3개월 안에 써야 합니다. 경합에서 지거나 마감 전 취소하면 반환, 확정되면 소멸합니다. 탈락 주는 재신청 마감(목 17:00) 후 확정되며(재신청할 빈 슬롯이 없는 주는 마감 결과가 나오면 바로 확정), 그 주에 확정 예약이 있으면 제외됩니다.")}</div>
+        return `${HKAdmin.pageHead("무적 쿠폰", "탈락 5주마다 1장 · 명예의 전당 매월 1장(매월 초기화) · 아케이드 도장 10개마다 1장(월 1장)")}
+          <div style="margin-bottom:16px">${HKUI.alertBox("info", "쿠폰 규칙", "쿠폰 신청은 일반 신청보다 먼저 확정되고, 쿠폰끼리는 일반과 같은 우선권(마지막 이용일) 순입니다. 탈락·관리자 지급 쿠폰은 지급일로부터 3개월, 아케이드 도장 쿠폰은 받은 다음 달 말일까지 써야 합니다. 경합에서 지거나 마감 전 취소하면 반환, 확정되면 소멸합니다. 탈락 주는 재신청 마감(목 17:00) 후 확정되며(재신청할 빈 슬롯이 없는 주는 마감 결과가 나오면 바로 확정), 그 주에 확정 예약이 있으면 제외됩니다.")}</div>
+          <div id="stats"></div>
           <div id="content"></div>`;
       },
       afterMount: async () => {
         const content = document.getElementById("content");
         async function load() {
           try {
+            HKApi.adminCouponStats().then((st) => {
+              const el = document.getElementById("stats");
+              el.innerHTML = statsHtml(st);
+              HKUI.refreshIcons(el);
+            }).catch(() => {});
             const rows = await HKApi.adminCoupons();
             content.innerHTML = tableHtml(rows);
             content.querySelectorAll("[data-detail]").forEach((b) => (b.onclick = () => openDetail(Number(b.dataset.detail), b.dataset.name, load)));
