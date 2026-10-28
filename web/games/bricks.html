@@ -592,11 +592,21 @@
         const [x, y] = toWorld(e);
         if (press && press.id === e.pointerId) { aimAt(x, y); S.aiming = aimValid(y); }
       });
-      // 마우스는 게임 화면 밖으로 나가도 계속 따라가며 조준한다 (클릭 발사는 화면 안에서)
+      // 마우스는 게임 화면 밖으로 나가도 계속 따라가며 조준하고, 밖에서 눌렀다 떼도 발사한다 (버튼·링크 같은 곳은 제외)
       window.addEventListener("pointermove", (e) => {
         if (state !== "aim" || e.pointerType !== "mouse" || !S) return;
         const [x, y] = toWorld(e);
         aimAt(x, y); S.aiming = aimValid(y);
+      });
+      let outPress = false;
+      const uiTarget = (t) => !t || !t.closest || t === canvas || !!t.closest("button, a, input, textarea, select, label, [role=button], .gm-overlay, .hk-play-board, .hk-pf__bar, .hk-dialog__overlay");
+      window.addEventListener("pointerdown", (e) => {
+        outPress = e.pointerType === "mouse" && e.button === 0 && state === "aim" && !uiTarget(e.target);
+      });
+      window.addEventListener("pointerup", (e) => {
+        if (!outPress || e.pointerType !== "mouse") return;
+        outPress = false;
+        if (state === "aim" && S && S.aiming) fire();
       });
       canvas.addEventListener("pointerdown", (e) => {
         if (state !== "aim") return;
