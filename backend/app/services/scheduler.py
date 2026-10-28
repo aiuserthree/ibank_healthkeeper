@@ -157,6 +157,10 @@ async def job_reapply_open(db: AsyncSession) -> None:
         cycle.state = CycleState.REAPPLY
     await db.commit()
 
+    # 08:55 안내 뒤(~09:00)에 빈 슬롯이 생겨 재신청을 열게 된 경우에도 탈락자에게 팀즈 안내 — 이미 받은 사람은 중복 없이 건너뛴다
+    if not cycle.reapply_skipped:
+        await job_teams_reapply_notice(db)
+
 
 async def job_reapply_close(db: AsyncSession) -> None:
     cycle = await get_active_cycle(db)
