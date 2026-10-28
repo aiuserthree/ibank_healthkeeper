@@ -24,6 +24,9 @@
       snake: "액션", stack: "액션", coffee: "액션", mines: "퍼즐", promote: "퍼즐",
     };
     const esc = (t) => HKUI.escapeHtml(t);
+    // 게임 그림 — 서버가 그림을 한 달 동안 캐시하므로, 그림을 바꾸면 여기 숫자를 올려 새 그림을 받게 한다
+    const LOUNGE_IMG_V = { bricks: 2, stairs: 2 };
+    const loungeImg = (k) => `/assets/lounge/${k}.jpg${LOUNGE_IMG_V[k] ? `?v=${LOUNGE_IMG_V[k]}` : ""}`;
 
     function tintVars(key) {
       const [c1, c2] = HKPlay.tintStyle(key).match(/#[0-9a-f]{3,8}/gi) || [];
@@ -40,7 +43,7 @@
       const keys = games.map((g) => g.key);
       const row = (shift) => {
         const list = keys.slice(shift).concat(keys.slice(0, shift));
-        const imgs = list.map((k) => `<img src="/assets/lounge/${k}.jpg" alt="">`).join("");
+        const imgs = list.map((k) => `<img src="${loungeImg(k)}" alt="">`).join("");
         return `<div class="hk-aa-wall__row">${imgs}${imgs}</div>`;
       };
       // 업무 시간에도 버튼은 그대로 — 누르면 안내 창 (아래 click 처리)
@@ -110,7 +113,7 @@
 
     function tileHtml(g) {
       return `<a class="hk-aa-tile" href="/games/${g.key}">
-          <img src="/assets/lounge/${g.key}.jpg" alt="" loading="lazy" onerror="this.remove()">
+          <img src="${loungeImg(g.key)}" alt="" loading="lazy" onerror="this.remove()">
           <span class="hk-aa-tile__copy"><span><small>${GENRE[g.key] || ""}</small><b>${esc(g.title)}</b></span><span class="hk-aa-pill is-sm is-white">시작하기</span></span>
         </a>`;
     }
@@ -142,7 +145,7 @@
             <p>줄을 지우는 퍼즐과 세균을 쓸어버리는 슈팅부터 매일 새로 나오는 상식·한국어·건강 퀴즈,<br>영어 타자까지. 판이 끝나면 점수가 바로 사내 순위에 올라가요.</p>
           </div>
           <a class="hk-aa-feature" href="/games/${lead.key}">
-            <img src="/assets/lounge/${lead.key}.jpg" alt="">
+            <img src="${loungeImg(lead.key)}" alt="">
             <div class="hk-aa-feature__in hk-aa-wrap">
               <h3>${esc(lead.title)}</h3>
               <span class="hk-aa-feature__cat">${GENRE[lead.key] || ""} · ${esc(lead.desc)}</span>
@@ -163,7 +166,7 @@
       if (!daily.length) return "";
       const done = daily.filter((g) => g.playedToday).length;
       const card = (g) => `<a class="hk-aa-daily" href="/games/${g.key}">
-          <span class="hk-aa-daily__art"><img src="/assets/lounge/${g.key}.jpg" alt="" loading="lazy" onerror="this.remove()"></span>
+          <span class="hk-aa-daily__art"><img src="${loungeImg(g.key)}" alt="" loading="lazy" onerror="this.remove()"></span>
           <span class="hk-aa-daily__body">
             <small>${GENRE[g.key] || ""}</small>
             <b>${esc(g.title)}</b>
