@@ -331,7 +331,11 @@ async def profile(
     usage_history_total = await count_member_usage_history(db, member)
     from app.services.coupon import coupon_summary
 
+    from app.services.game import stamp_status
+
     coupons = await coupon_summary(db, member, total_uses=total_uses)
+    # 마이페이지 쿠폰 줄에 이번 달 아케이드 도장 진행도도 함께 보여 준다
+    coupons["arcadeStamp"] = await stamp_status(db, member)
     await db.commit()
 
     return {

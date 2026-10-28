@@ -185,16 +185,37 @@ window.HKFun = (function () {
     return soonest ? ` · ${soonest.getMonth() + 1}/${soonest.getDate()}까지 사용` : "";
   }
 
+  // 보유 쿠폰이 어디서 왔는지 — 탈락 보상 1 · 아케이드 1
+  const COUPON_SOURCE = { DROP: "탈락 보상", ARCADE: "아케이드", BADGE: "등급 혜택", ADMIN: "지급" };
+  function couponSources(c) {
+    const n = {};
+    (c.coupons || []).filter((x) => x.status === "AVAILABLE").forEach((x) => { n[x.source] = (n[x.source] || 0) + 1; });
+    const parts = Object.keys(COUPON_SOURCE).filter((k) => n[k]).map((k) => `${COUPON_SOURCE[k]} ${n[k]}`);
+    return parts.length ? `<span style="font-size:12.5px;font-weight:500;color:var(--text-secondary)">${parts.join(" · ")}</span>` : "";
+  }
+
+  // 이번 달 아케이드 도장 — 누르면 아케이드로
+  function stampLine(st) {
+    if (!st) return "";
+    const parts = st.coupon
+      ? ["이번 달 아케이드 쿠폰 받음", "다음 달 1일부터 새 도장판"]
+      : [`아케이드 도장 ${st.count}/${st.goal}`, `쿠폰까지 ${st.goal - st.count}개`, st.today ? "오늘 도장 찍음" : ""].filter(Boolean);
+    // 휴대폰에서 줄이 바뀌어도 낱말이 떨어지지 않게 마디마다 묶는다
+    const text = parts.map((t) => `<span style="white-space:nowrap">${t}</span>`).join(" · ");
+    return `<a href="${HKRoutes.lounge}" style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed #ddd0f7;font-size:12.5px;color:var(--color-ultraviolet);text-decoration:none">${HKUI.icon("stamp", 14, "currentColor", "flex-shrink:0")}<span>${text}</span><span style="margin-left:auto;white-space:nowrap">아케이드 →</span></a>`;
+  }
+
   function couponLine(c) {
     if (!c) return "";
     const pct = Math.round((c.dropProgress / c.dropPerCoupon) * 100);
     return `<div class="hk-coupon-line">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--color-ultraviolet)">${HKUI.icon("ticket", 16, "currentColor")} 무적 쿠폰 ${c.available}장</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--color-ultraviolet)">${HKUI.icon("ticket", 16, "currentColor")} 무적 쿠폰 ${c.available}장 ${couponSources(c)}</span>
         <a href="${HKRoutes.notice}" style="font-size:12.5px;color:var(--color-slate-blue);text-decoration:none">쿠폰 안내 →</a>
       </div>
       <div class="hk-progress hk-progress--coupon" style="margin-top:8px" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span data-width="${pct}%"></span></div>
       <div style="font-size:12.5px;color:var(--text-secondary);margin-top:6px">탈락 ${c.dropProgress}/${c.dropPerCoupon} · 다음 쿠폰까지 ${c.dropPerCoupon - c.dropProgress}회${couponDeadline(c)}${c.badgeMonthlyQuota ? ` · 등급 혜택 매월 ${c.badgeMonthlyQuota}장` : ""}</div>
+      ${stampLine(c.arcadeStamp)}
     </div>`;
   }
 
