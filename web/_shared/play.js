@@ -43,16 +43,20 @@ window.HKSound = (function () {
     if (!ac) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
+      // 아이폰 무음 스위치가 켜져 있어도 게임 소리는 나게 (사파리 16.4+ — 없으면 그냥 넘어감)
+      try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (_) {}
       ac = new AC();
       master = ac.createGain();
       master.gain.value = 0.32;
       master.connect(ac.destination);
     }
-    if (ac.state === "suspended") ac.resume().catch(() => {});
+    // 아이폰은 suspended 뿐 아니라 interrupted(전화·다른 앱 소리 뒤)로도 멈춘다
+    if (ac.state !== "running") ac.resume().catch(() => {});
     return ac;
   }
-  // 첫 입력에서 오디오 잠금 해제
-  ["pointerdown", "keydown", "touchstart"].forEach((t) =>
+  // 입력할 때마다 오디오 잠금 해제 — 아이폰은 touchend·click 같은 '손을 뗄 때' 입력에서만 풀리고,
+  // 게임 판은 길게 누르기를 막느라 click 이 안 생기므로 손을 뗄 때(pointerup·touchend)도 듣는다
+  ["pointerdown", "pointerup", "touchstart", "touchend", "click", "keydown"].forEach((t) =>
     window.addEventListener(t, () => !muted && ensure(), { passive: true, capture: true })
   );
 
@@ -135,7 +139,7 @@ window.HKSound = (function () {
     const now = performance.now();
     if (lastAt[name] && now - lastAt[name] < 25) return;
     lastAt[name] = now;
-    if (!ensure() || ac.state !== "running") return;
+    if (!ensure() || ac.state !== "running") return; // 아직 잠금이 안 풀렸으면 이번 소리는 건너뛴다
     try {
       SFX[name](arg);
     } catch (_) {
