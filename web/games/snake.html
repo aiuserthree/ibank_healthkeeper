@@ -90,7 +90,7 @@
       stage.innerHTML = `<div class="gm-sn">
         <div class="gm-sn-hud">
           <span class="gm-sn-chip gm-sn-chip--score">${HKUI.icon("utensils", 16, "#fff")}<b id="gm-sn-score">0</b>점</span>
-          <span class="gm-sn-chip">줄 <b id="gm-sn-len">6</b>명</span>
+          <span class="gm-sn-chip">줄 <b id="gm-sn-len">3</b>명</span>
           <span class="gm-sn-chip"><b id="gm-sn-floor">1</b>층</span>
           <span class="gm-sn-chip gm-sn-chip--time" id="gm-sn-time">${HKUI.icon("alarm-clock", 16, "currentColor")}<b id="gm-sn-timetext">3:00</b></span>
         </div>
@@ -152,7 +152,8 @@
 
       const live = () => state === "play" || state === "go" || state === "count";
       // 초당 칸 수 — 1층 5칸에서 층마다 0.5칸씩, 7층부터 8칸 (전: 8→10칸)
-      const speedOf = (f) => Math.min(8, 5 + 0.5 * (f - 1));
+      // 초당 칸 수 — 1층 4.3칸, 층마다 0.45씩 빨라져 최대 7.2칸 (예전 5칸 → 최대 8칸에서 조금 느리게)
+      const speedOf = (f) => Math.min(7.2, 4.3 + 0.45 * (f - 1));
       const tickMs = () => 1000 / speedOf(floor) / (playMs < boostUntil ? 1.2 : 1);
       const snakeAt = (c, r) => snake.some((s) => s.c === c && s.r === r);
       const sulkBlocks = (s) => s.solid && playMs - s.born < 9700;
@@ -265,10 +266,11 @@
       // ───────────────────────── 초기화
       function reset() {
         snake = [];
-        for (let r = 10; r <= 15; r++) snake.push({ c: 6, r });
+        // 처음엔 세 명으로 짧게 시작 (예전 여섯 명은 처음부터 길어 부담스러웠다)
+        for (let r = 13; r <= 15; r++) snake.push({ c: 6, r });
         dir = "up"; queue = []; pending = 0;
         vitamin = null; lunch = null; desks = []; sulks = []; puffs = [];
-        score = 0; vitCount = 0; floor = 1; maxLen = 6; boostUntil = -1;
+        score = 0; vitCount = 0; floor = 1; maxLen = 3; boostUntil = -1;
         playMs = 0; acc = 0; phaseT = 0; countStep = 0; overReason = ""; overT = 0;
         log = { vit: [], lunch: [], floors: [] };
         unreach = 0; lastCheck = 0; lastCountSec = 99;
@@ -336,7 +338,7 @@
       }
       window.addEventListener("keydown", onKey);
 
-      // 판 위 스와이프 — 손을 떼기 전에 18px 움직이는 순간 판정, 한 터치에 한 번
+      // 판 위 스와이프 — 손을 떼기 전에 10px 움직이는 순간 판정. 손을 떼지 않고 이어서 다른 방향으로 밀어도 또 꺾인다
       let ptr = null;
       boardEl.addEventListener("pointerdown", (e) => {
         if (!live() || e.target !== canvas) return;
@@ -347,8 +349,9 @@
       boardEl.addEventListener("pointermove", (e) => {
         if (!ptr || e.pointerId !== ptr.id || ptr.done) return;
         const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
-        if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
-        ptr.done = true;
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        // 판정한 자리에서 다시 재기 시작 — 한 번 짚고 ㄱ자·ㄴ자로 그려도 두 번 꺾인다
+        ptr.x = e.clientX; ptr.y = e.clientY;
         if (!live()) return;
         enqueue(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up"));
       });
