@@ -291,6 +291,30 @@ async def get_member_total_uses(db: AsyncSession, member: Member) -> int:
     return confirmed + legacy
 
 
+async def get_member_last_visit_date(db: AsyncSession, member: Member) -> date | None:
+    """실제로 이용을 마친 마지막 날 — 누적 이용과 같은 기준(시간이 끝난 확정 예약 + 과거 스케줄).
+
+    member.last_used_date 는 우선권 계산용이라 아직 안 받은 다음 주 확정 예약 날짜도 들어간다.
+    """
+    now = now_kst()
+    result = await db.execute(
+        select(func.max(Slot.slot_date))
+        .join(Reservation, Reservation.slot_id == Slot.id)
+        .where(Reservation.member_id == member.id)
+        .where(Reservation.status == ReservationStatus.CONFIRMED)
+        .where(
+            or_(
+                Slot.slot_date < now.date(),
+                and_(Slot.slot_date == now.date(), Slot.end_time <= now.time().replace(tzinfo=None)),
+            )
+        )
+    )
+    confirmed_max = result.scalar_one_or_none()
+    legacy_max = await resolve_legacy_last_used_date(db, email=member.email, name=member.name)
+    candidates = [d for d in (confirmed_max, legacy_max) if d is not None]
+    return max(candidates) if candidates else None
+
+
 async def get_member_apply_total(db: AsyncSession, member: Member) -> int:
     """과거 스케줄 이용 + 사이트 신청(취소 제외). 이력만 있으면 누적 이용과 동일."""
     legacy = await count_legacy_usages(db, email=member.email, name=member.name)

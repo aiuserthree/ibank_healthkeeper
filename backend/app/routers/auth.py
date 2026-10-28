@@ -20,6 +20,7 @@ from app.database import get_db
 from app.models import Member
 from app.services.legacy_usage import (
     get_member_apply_total,
+    get_member_last_visit_date,
     get_member_total_uses,
     count_member_usage_history,
     list_member_usage_history,
@@ -327,6 +328,7 @@ async def profile(
     db: AsyncSession = Depends(get_db),
 ):
     total_uses = await get_member_total_uses(db, member)
+    last_visit = await get_member_last_visit_date(db, member)
     apply_total = await get_member_apply_total(db, member)
     usage_history_total = await count_member_usage_history(db, member)
     from app.services.coupon import coupon_summary
@@ -347,6 +349,8 @@ async def profile(
             "avatarUrl": avatar_public_url(member.id),
             "lastLoginAt": format_kst_iso(member.last_login_at),
             "lastUsedDate": member.last_used_date.isoformat() if member.last_used_date else None,
+            # 화면의 「마지막 이용일」 — 실제로 이용을 마친 날 (lastUsedDate 는 우선권용이라 다음 주 확정 예약도 들어간다)
+            "lastVisitDate": last_visit.isoformat() if last_visit else None,
             "totalUses": total_uses,
             "applyTotal": apply_total,
             "usageHistoryTotal": usage_history_total,
