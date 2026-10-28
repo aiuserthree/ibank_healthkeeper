@@ -819,7 +819,7 @@
             <div>${pill("guard")}바닥 한 번 막아 줘요</div>
             <div>${pill("life")}목숨 하나 더 (드물게)</div>
           </div>
-          <div class="gm-keys">PC 마우스·<kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>Space</kbd> 발사 · <kbd>Esc</kbd> 일시정지<br>모바일은 끌어서 이동 · 손을 떼면 발사</div>
+          <div class="gm-keys">PC 마우스·<kbd>←</kbd><kbd>→</kbd> 이동 · <kbd>Space</kbd> 발사 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면 아무 데나 짚고 끌어서 이동 · 손을 떼면 발사</div>
           <button type="button" class="gm-go" data-act="start">시작</button>
         </div>`);
       }
@@ -893,24 +893,35 @@
         const rect = canvas.getBoundingClientRect();
         return ((e.clientX - rect.left) / rect.width) * W;
       }
-      // 마우스는 올려만 둬도 따라오고, 터치는 끄는 동안 따라와요
+      // 마우스는 올려만 둬도 따라오고, 터치는 끄는 동안 끈 만큼 따라와요
       // 휴대폰에서 길게 누르거나 두 번 톡 쳤을 때 돋보기·확대·글자 선택이 뜨지 않게 (버튼은 그대로 눌리게)
       const noZoom = (e) => { if (!(e.target.closest && e.target.closest("button, a"))) e.preventDefault(); };
       shell.addEventListener("touchstart", noZoom, { passive: false });
       shell.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
       shell.addEventListener("dblclick", (e) => e.preventDefault());
       shell.addEventListener("contextmenu", (e) => e.preventDefault());
+      // 터치는 손가락 아래로 패들을 옮기지 않고, 끈 만큼만 따라오게 — 화면 어디를 짚고 끌어도 되니 손에 패들이 가리지 않는다
+      let drag = null;
       canvas.addEventListener("pointermove", (e) => {
         if (state !== "play" || !S) return;
-        if (e.pointerType === "mouse" || e.buttons || e.pressure > 0) S.mouseX = toWorldX(e);
+        if (e.pointerType === "mouse") { S.mouseX = toWorldX(e); return; }
+        if (!drag || e.pointerId !== drag.id) return;
+        const fx = toWorldX(e), lo = S.pw / 2 + 4, hi = W - S.pw / 2 - 4;
+        const want = drag.px + (fx - drag.fx) * 1.2;
+        S.mouseX = Math.max(lo, Math.min(hi, want));
+        // 벽에 닿으면 기준점을 다시 잡아, 반대로 끌 때 바로 따라오게
+        if (want !== S.mouseX) drag = { id: drag.id, fx, px: S.mouseX };
       });
       canvas.addEventListener("pointerdown", (e) => {
         if (state !== "play" || !S) return;
-        S.mouseX = toWorldX(e);
+        if (e.pointerType === "mouse") S.mouseX = toWorldX(e);
+        else drag = { id: e.pointerId, fx: toWorldX(e), px: S.px };
         try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
         e.preventDefault();
       });
+      canvas.addEventListener("pointercancel", () => { drag = null; });
       canvas.addEventListener("pointerup", (e) => {
+        if (drag && e.pointerId === drag.id) drag = null;
         if (state !== "play" || !S) return;
         launch();
       });
