@@ -767,7 +767,8 @@
         S.score += pts;
         for (let i = 0; i < 4; i++) burst(B.x + (Math.random() - 0.5) * 60, B.y + (Math.random() - 0.5) * 50, i % 2 ? "#f472b6" : "#a3e635", 18, 220);
         S.texts.push({ x: B.x, y: B.y, text: `+${pts.toLocaleString("ko-KR")}`, life: 1.2, color: "#fde047" });
-        dropItem(B.x, B.y, ["water", "wing", "bomb"][Math.floor(Math.random() * 3)]);
+        // 보스를 잡으면 화면이 비니 손소독제 대신 마스크 (다음 웨이브까지 들고 갈 수 있다)
+        dropItem(B.x, B.y, ["water", "wing", "mask"][Math.floor(Math.random() * 3)]);
         S.boss = null;
         S.enemies.forEach((e) => { e.dead = true; burst(e.x, e.y, TYPES[e.type].c2, 8); });
         S.enemies = [];
@@ -801,6 +802,12 @@
         return pick(fresh.length ? fresh : WEAPON_ITEMS.filter((k) => k !== S.lastWeapon));
       }
 
+      // 화면이 붐비는지 — 살아 있는 세균 8마리 이상 · 적 탄 8발 이상 · 큰 세균 등장 중
+      function crowded() {
+        const alive = S.enemies.filter((e) => !e.dead && onScreen(e)).length;
+        return alive >= 8 || S.ebullets.length >= 8 || !!(S.boss && !S.boss.dead);
+      }
+
       function dropItem(x, y, kind) {
         if (!kind) {
           if (S.lives <= 1 && !S.shield && Math.random() < 0.45) kind = Math.random() < 0.5 ? "mask" : "water"; // 목숨이 위험하면 지켜 주는 아이템
@@ -808,6 +815,8 @@
             // 아이템 뽑기 — 숫자가 클수록 자주 나온다
             let r = Math.random() * ITEM_TOTAL;
             kind = ITEM_TABLE.find(([, w]) => (r -= w) < 0)[0];
+            // 손소독제는 쓸 데가 있을 때만 — 화면에 세균이 많거나 적 탄이 많거나 큰 세균이 있을 때. 아니면 무기로 바꾼다
+            if (kind === "bomb" && !crowded()) kind = "vitc";
             if (WEAPON_ITEMS.includes(kind)) kind = pickWeapon();
           }
         }
