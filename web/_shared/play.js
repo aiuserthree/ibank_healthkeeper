@@ -498,6 +498,17 @@ window.HKPlay = (function () {
     const editable = (t) => t && t.closest && t.closest("input, textarea, [contenteditable]");
     document.addEventListener("selectstart", (e) => { if (!editable(e.target)) e.preventDefault(); });
     document.addEventListener("contextmenu", (e) => { if (!editable(e.target)) e.preventDefault(); });
+    // 아이폰은 CSS·selectstart 를 막아도 판을 길게 누르고 끌면 돋보기가 뜬다 — 스크롤을 막아 둔 판(touch-action:none) 위에서는
+    // 터치 시작 자체를 막아 길게 누르기 동작이 아예 시작되지 않게 한다. 게임 조작은 포인터 이벤트라 그대로 들어오고,
+    // 버튼·입력창처럼 클릭으로 동작하는 곳은 건드리지 않는다
+    document.addEventListener("touchstart", (e) => {
+      const t = e.target;
+      if (!t || !t.closest || !t.closest("#hk-play-stage")) return;
+      if (t.closest("button, a, input, textarea, select, label, [contenteditable], [data-act], [data-i], [role=button]")) return;
+      for (let el = t; el && el.id !== "hk-play-stage"; el = el.parentElement) {
+        if (getComputedStyle(el).touchAction === "none") { e.preventDefault(); return; }
+      }
+    }, { passive: false });
     document.getElementById("app").innerHTML = `<div class="hk-pf">
         <header class="hk-pf__bar" id="hk-play-head"></header>
         <div class="hk-pf__body">
