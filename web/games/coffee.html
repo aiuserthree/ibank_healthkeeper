@@ -380,6 +380,18 @@
         for (const p of people) if (p.st === "walk") p.p = Math.min(1.02, p.p + 0.12);
       }
 
+      // 빈 잔 — 다른 레인의 빈 잔과 거의 같은 때 카운터에 닿지 않게, 겹치면 이번 잔을 늦춘다
+      // (레인을 옮길 시간: 한 칸 0.55초, 칸이 멀수록 더 · 같은 레인은 서 있으면 다 받으니 상관없다)
+      function pushEmpty(l, pos) {
+        let ta = pos / W.back;
+        for (let tries = 0; tries < 8; tries++) {
+          const clash = empties.find((e) => e.lane !== l && Math.abs(e.p / e.v - ta) < 0.35 + 0.2 * Math.abs(e.lane - l));
+          if (!clash) break;
+          ta = clash.p / clash.v + 0.35 + 0.2 * Math.abs(clash.lane - l);
+        }
+        empties.push({ lane: l, p: pos, v: pos / ta });
+      }
+
       function serve(person, cup) {
         combo++;
         if (combo > maxCombo) maxCombo = combo;
@@ -484,7 +496,7 @@
             if (p.t >= 260) { p.st = "drink"; p.t = 0; }
           } else if (p.st === "drink") {
             if (p.t >= DRINK_MS) {
-              empties.push({ lane: p.lane, p: Math.min(0.98, p.p), v: W.back });
+              pushEmpty(p.lane, Math.min(0.98, p.p));
               p.t = 0;
               p.st = p.need > 0 ? "walk" : "leave";
               p.mood = p.need > 0 ? 0 : 1;
