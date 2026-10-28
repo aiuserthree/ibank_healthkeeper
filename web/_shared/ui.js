@@ -889,6 +889,12 @@ window.HKUI = (function () {
     else if (r.status === "CONFIRMED") sub = "일반 신청 · 예약 확정";
     else if (r.status === "CANCELLED") sub = "취소됨";
     if (r.usedCoupon && r.status === "CONFIRMED") sub = "무적 쿠폰 · 예약 확정 (양도·교환 불가)";
+    // 확정 예약의 시간이 끝났으면 「이용 완료」 — 배지·설명을 바꾸고 교환·양도 버튼은 뺀다
+    const used = r.status === "CONFIRMED" && !!r.endTime && new Date(`${r.slotDate}T${r.endTime}:00+09:00`) <= new Date();
+    if (used) {
+      const how = r.usedCoupon ? "무적 쿠폰" : r.type === "REAPPLY" ? "재신청" : r.type === "TRANSFER" ? "양도 수령" : r.type === "ADMIN_ASSIGN" ? "관리자 지정" : "일반 신청";
+      sub = `${how} · 이용 완료`;
+    }
     else if (r.usedCoupon && r.status === "REQUESTED") sub = "무적 쿠폰 사용 · 확정 대기";
     else if (r.usedCoupon && r.status === "DROPPED") sub += " · 쿠폰 반환됨";
     // 확정됐지만 양도/교환 창(수 17:00 등)이 아직 열리지 않은 경우 — 정책은 그대로, 안내만 미리 노출
@@ -924,6 +930,8 @@ window.HKUI = (function () {
       actions.push(badge("교환 제안 받음", "warning"));
     } else if (r.transferPending) {
       actions.push(badge("양도 처리 중", "warning"));
+    } else if (used) {
+      // 이용이 끝난 예약 — 할 수 있는 일이 없으니 버튼 없음
     } else if (r.status === "DROPPED" && reapplyAvailable) {
       actions.push(`<a href="${(window.HKRoutes || { reapply: "/reapply" }).reapply}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm">재신청</button></a>`);
     } else {
@@ -968,7 +976,7 @@ window.HKUI = (function () {
           </div>
         </div>
         <div class="hk-rsv-card__aside">
-          <div class="hk-rsv-card__status">${statusBadge(r.status)}</div>
+          <div class="hk-rsv-card__status">${used ? badge("이용 완료", "neutral") : statusBadge(r.status)}</div>
           ${action}
         </div>
       </div>
