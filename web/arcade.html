@@ -131,6 +131,16 @@
       return order[((n % order.length) + order.length) % order.length];
     }
 
+    // 모든 게임 보기 — 벽돌 깨기를 점심 블록 앞에 둔다 (나머지는 그대로)
+    function gridOrder(games) {
+      const list = games.filter((g) => g.key !== "bricks");
+      const bricks = games.find((g) => g.key === "bricks");
+      if (!bricks) return games;
+      const at = list.findIndex((g) => g.key === "blocks");
+      list.splice(at < 0 ? 0 : at, 0, bricks);
+      return list;
+    }
+
     function collectionHtml(games) {
       const lead = weeklyLead(games);
       const rest = games.filter((g) => g !== lead);
@@ -154,7 +164,7 @@
           </a>
           <div class="hk-aa-rail" id="aa-rail">${rail(rest.slice(0, half), false)}${rail(rest.slice(half), true)}</div>
           <div class="hk-aa-wrap">
-            <div class="hk-aa-grid" id="aa-grid" hidden>${games.map(tileHtml).join("")}</div>
+            <div class="hk-aa-grid" id="aa-grid" hidden>${gridOrder(games).map(tileHtml).join("")}</div>
             <div class="hk-aa-all"><a href="#" id="aa-all">모든 게임 보기 ›</a></div>
           </div>
         </div>`;

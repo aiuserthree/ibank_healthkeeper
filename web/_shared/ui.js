@@ -496,8 +496,8 @@ window.HKUI = (function () {
           const cols = Math.max(1, Math.min(4, Number(block[2]) || 2));
           const shots = body.map((b) => {
             const [src, cap] = b.split("|").map((x) => x.trim());
-            // 이 사이트 안의 이미지 파일만 ("/경로.jpg", "//" 제외)
-            if (!/^\/(?!\/)[A-Za-z0-9/_.-]+\.(png|jpe?g|webp|svg)$/i.test(src || "")) return "";
+            // 이 사이트 안의 이미지 파일만 ("/경로.jpg", "//" 제외) · 그림을 바꿨을 때 캐시를 넘기는 "?v=숫자"는 허용
+            if (!/^\/(?!\/)[A-Za-z0-9/_.-]+\.(png|jpe?g|webp|svg)(\?v=\d+)?$/i.test(src || "")) return "";
             return `<figure class="hk-nb-shot"><img src="${escapeHtml(src)}" alt="${escapeHtml(cap || "")}" loading="lazy">${cap ? `<figcaption>${inline(cap)}</figcaption>` : ""}</figure>`;
           }).join("");
           out.push(`<div class="hk-nb-shots" style="--cols:${cols}">${shots}</div>`);
