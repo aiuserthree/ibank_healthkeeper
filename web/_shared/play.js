@@ -494,6 +494,10 @@ window.HKPlay = (function () {
     const profile = await HKMember.requireAuth(window.location.pathname);
     if (!profile) return;
     document.body.classList.add("hk-pf-body");
+    // 길게 누르기 — 글자 선택·메뉴가 시작되지 않게 (입력창은 그대로). CSS만으로는 아이폰에서 가끔 돋보기가 떴다
+    const editable = (t) => t && t.closest && t.closest("input, textarea, [contenteditable]");
+    document.addEventListener("selectstart", (e) => { if (!editable(e.target)) e.preventDefault(); });
+    document.addEventListener("contextmenu", (e) => { if (!editable(e.target)) e.preventDefault(); });
     document.getElementById("app").innerHTML = `<div class="hk-pf">
         <header class="hk-pf__bar" id="hk-play-head"></header>
         <div class="hk-pf__body">
