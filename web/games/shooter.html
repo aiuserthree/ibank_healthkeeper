@@ -100,7 +100,7 @@
       // 큰 세균 — 5웨이브마다 이 순서로 돌아가며 나온다 (hp: 체력 배율)
       const BOSS_KINDS = [
         { id: "spore", name: "포자 세균", tip: "부채꼴 탄과 졸개를 피해요", r: 44, hp: 1, c1: "#fbcfe8", c2: "#ec4899", c3: "#9d174d", spike: "#a3e635" },
-        { id: "spiral", name: "소용돌이 세균", tip: "빙글빙글 도는 탄 사이로 빠져나가요", r: 40, hp: 0.95, c1: "#bae6fd", c2: "#0ea5e9", c3: "#075985", spike: "#fde047" },
+        { id: "spiral", name: "소용돌이 세균", tip: "빙글빙글 도는 탄 사이로 빠져나가요", r: 40, hp: 0.8, c1: "#bae6fd", c2: "#0ea5e9", c3: "#075985", spike: "#fde047" },
         { id: "charge", name: "돌진 세균", tip: "부르르 떨면 곧 돌진해요 — 옆으로 피해요", r: 46, hp: 1.15, c1: "#fed7aa", c2: "#f97316", c3: "#9a3412", spike: "#fca5a5" },
         { id: "queen", name: "여왕 세균", tip: "탄 커튼의 빈틈으로 빠져나가요", r: 54, hp: 1.3, c1: "#ddd6fe", c2: "#8b5cf6", c3: "#4c1d95", spike: "#f0abfc" },
       ];
@@ -133,15 +133,17 @@
       // 동그라미 아이템 그림 — [바탕, 글자색, 글자]
       const ITEM_LOOK = { rapid: ["#7c4a1e", "#fff", "커"], laser: ["#facc15", "#713f12", "레"], homing: ["#ef4444", "#fff", "생"], orbit: ["#f5f5f4", "#57534e", "마"], chili: ["#dc2626", "#fff", "고"], ripple: ["#c084fc", "#fff", "양"], zap: ["#3b82f6", "#fff", "블"], slow: ["#f59e0b", "#fff", "꿀"], wing: ["#22c55e", "#fff", "균"], x2: ["#a855f7", "#fff", "D"], bomb: ["#0ea5e9", "#fff", "소"] };
       // 시간제 효과 — [상태 키, 이름, 막대 색, 최대 초]
-      const WEAPON_MAX = 40; // 무기는 겹쳐 먹어도 최대 40초
-      const TIMED = [["triple", "확산탄", "#fb923c", WEAPON_MAX], ["rapid", "연사", "#b45309", WEAPON_MAX], ["laser", "관통 레이저", "#facc15", WEAPON_MAX], ["homing", "유도탄", "#ef4444", WEAPON_MAX], ["orbit", "마늘 방패", "#d6d3d1", WEAPON_MAX], ["chili", "고추 화염", "#dc2626", WEAPON_MAX], ["ripple", "파동탄", "#c084fc", WEAPON_MAX], ["zap", "번개", "#3b82f6", WEAPON_MAX], ["wing", "도우미", "#22c55e", WEAPON_MAX], ["slow", "느리게", "#f59e0b", 9], ["x2", "점수 2배", "#a855f7", 14]];
+      const WEAPON_MAX = 20; // 무기는 겹쳐 먹어도 최대 20초 (예전 40초는 무기가 너무 오래 남아 시시했다)
+      const TIMED = [["triple", "확산탄", "#fb923c", WEAPON_MAX], ["rapid", "연사", "#b45309", WEAPON_MAX], ["laser", "관통 레이저", "#facc15", WEAPON_MAX], ["homing", "유도탄", "#ef4444", WEAPON_MAX], ["orbit", "마늘 방패", "#d6d3d1", WEAPON_MAX], ["chili", "고추 화염", "#dc2626", WEAPON_MAX], ["ripple", "파동탄", "#c084fc", WEAPON_MAX], ["zap", "번개", "#3b82f6", WEAPON_MAX], ["wing", "도우미", "#22c55e", WEAPON_MAX], ["slow", "느리게", "#f59e0b", 6], ["x2", "점수 2배", "#a855f7", 10]];
       // 무기 — 같은 걸 또 먹으면 시간이 늘고 한 단계 세진다 (최대 3단계)
       // 무기 지속 시간(초) — 먹을 때마다 이만큼 늘고 최대 WEAPON_MAX 초까지 쌓인다
-      const WEAPONS = { triple: 20, rapid: 18, laser: 16, homing: 20, orbit: 20, chili: 16, ripple: 20, zap: 20, wing: 24 };
+      const WEAPONS = { triple: 10, rapid: 9, laser: 8, homing: 10, orbit: 10, chili: 8, ripple: 10, zap: 10, wing: 12 };
       const WEAPON_NAME = { triple: "확산탄", rapid: "연사", laser: "관통 레이저", homing: "유도탄", orbit: "마늘 방패", chili: "고추 화염", ripple: "양파 파동탄", zap: "블루베리 번개", wing: "도우미" };
       // 고추 화염이 닿는 거리 (단계마다 길어짐)
       const flameLen = () => 90 + lvOf("chili") * 30;
       function lvOf(k) { return S[k] > 0 ? S.lv[k] || 1 : 0; }
+      // 화면 안에 들어온 세균만 무기가 노린다 — 예전엔 옆에서 날아 들어오는 중인 세균을 유도탄·번개가 화면 밖에서 잡아 등장하기도 전에 사라졌다
+      const onScreen = (e) => e.x > 10 && e.x < W - 10 && e.y > 10;
       // 마늘 방패 — 내 기체 둘레를 도는 알 (단계마다 2·3·4개)
       function orbs() {
         const n = lvOf("orbit") + 1;
@@ -216,7 +218,7 @@
         if (S.wave % 5 === 0) {
           const n = S.wave / 5;
           const kind = BOSS_KINDS[(n - 1) % BOSS_KINDS.length];
-          const hp = Math.round((80 + (n - 1) * 60) * kind.hp);
+          const hp = Math.round((90 + (n - 1) * 40) * kind.hp);
           S.boss = { kind: kind.id, x: W / 2, y: -70, r: kind.r, hp, maxHp: hp, t: 0, spreadCd: 2.2, aimCd: 1.4, minionCd: 4, spinA: 0, spinCd: 0, chargeCd: 3.5, mode: "move", curtainCd: 2, itemCd: 3, flash: 0, n, angry: false };
           S.form = null;
           S.banner = { text: `${kind.name} 등장!`, sub: kind.tip, t: 2.2 };
@@ -299,8 +301,8 @@
         S.px = Math.max(22, Math.min(W - 22, S.px));
         PY = Math.max(PY_MIN, Math.min(PY_MAX, PY));
         if (S.invul > 0) S.invul -= dt;
-        // 웨이브 사이(클리어 뒤 ~ 다음 세균이 다 들어와 자리 잡기 전)에는 아이템 남은 시간을 줄이지 않는다
-        const between = S.clearT > 0 || (S.boss ? S.boss.y < 110 : S.enemies.length > 0 && S.enemies.every((e) => e.mode === "enter"));
+        // 웨이브 클리어 안내 동안만 아이템 남은 시간을 줄이지 않는다 (예전엔 세균이 들어오는 동안에도 멈춰 있어 무기가 더 오래 갔다)
+        const between = S.clearT > 0;
         if (!between) {
           if (S.triple > 0) S.triple -= dt;
           for (const k of ["rapid", "laser", "homing", "orbit", "chili", "ripple", "zap", "slow", "wing", "x2"]) if (S[k] > 0) S[k] -= dt;
@@ -349,7 +351,7 @@
           let tgt = null, best = 1e9;
           // 큰 세균은 몸이 화면에 보이기 시작하면 바로 맞는다 (예전엔 y 40 아래로 내려와야 맞았다)
           const pool = S.boss && S.boss.y + S.boss.r > 0 ? [S.boss] : S.enemies;
-          for (const e of pool) { if (e.dead || (e.mode === "enter" && e.delay > 0)) continue; const d = (e.x - m.x) ** 2 + (e.y - m.y) ** 2; if (d < best) { best = d; tgt = e; } }
+          for (const e of pool) { if (e.dead || (e.mode === "enter" && e.delay > 0) || (e !== S.boss && !onScreen(e))) continue; const d = (e.x - m.x) ** 2 + (e.y - m.y) ** 2; if (d < best) { best = d; tgt = e; } }
           if (tgt) {
             const a = Math.atan2(tgt.y - m.y, tgt.x - m.x);
             m.vx += (Math.cos(a) * 420 - m.vx) * Math.min(1, dt * 5);
@@ -378,7 +380,7 @@
             for (let i = 0; i < 2 + lvOf("zap"); i++) {
               let tgt = null, best = 260 * 260;
               for (const e of S.enemies) {
-                if (e.dead || done.has(e) || (e.mode === "enter" && e.delay > 0)) continue;
+                if (e.dead || done.has(e) || (e.mode === "enter" && e.delay > 0) || !onScreen(e)) continue;
                 const d = (e.x - from.x) ** 2 + (e.y - from.y) ** 2;
                 if (d < best) { best = d; tgt = e; }
               }
@@ -487,18 +489,18 @@
           if (B.entered) {
             B.itemCd -= dt;
             if (B.itemCd <= 0) {
-              B.itemCd = (B.angry ? 4.5 : 6) * (0.85 + Math.random() * 0.3);
+              B.itemCd = (B.angry ? 6 : 8) * (0.85 + Math.random() * 0.3);
               if (S.items.length < 3) dropItem(30 + Math.random() * (W - 60), 40);
             }
           }
           const rage = B.angry ? 0.7 : 1; // 쿨타임 배율
           const sp = Math.min(300, 150 + B.n * 25) * (B.angry ? 1.12 : 1);
           // 등장 — 한 번 자리 잡으면 끝 (예전엔 위아래로 흔들리며 110 위로 올라갈 때마다 '등장 중'으로 돌아가 공격을 반쯤 쉬었다)
-          if (!B.entered) { B.y = Math.min(110, B.y + 90 * dt); if (B.y >= 110) { B.entered = true; B.t = 0; } }
+          if (!B.entered) { B.y = Math.min(110, B.y + 170 * dt); if (B.y >= 110) { B.entered = true; B.t = 0; } }
           else {
             // 이동
             if (B.mode === "move") {
-              const spd = (0.6 + B.n * 0.08) * (B.kind === "spiral" ? 1.4 : 1) * (B.angry ? 1.25 : 1);
+              const spd = (0.8 + B.n * 0.1) * (B.kind === "spiral" ? 1.25 : 1) * (B.angry ? 1.25 : 1);
               // 좌우 위치는 쌓아 가는 각도로 — 화나서 빨라져도 그 자리에서 이어진다 (예전엔 B.t × 속도라 화나는 순간 옆으로 순간이동했다)
               B.ph = (B.ph || 0) + spd * dt;
               B.x = W / 2 + Math.sin(B.ph) * (W / 2 - 64);
@@ -618,7 +620,7 @@
         // 충돌: 파동탄 → 세균 (같은 물결은 한 세균에 한 번)
         for (const wv of S.waves) {
           for (const e of S.enemies) {
-            if (e.dead || wv.hits.has(e) || (e.mode === "enter" && e.delay > 0)) continue;
+            if (e.dead || wv.hits.has(e) || (e.mode === "enter" && e.delay > 0) || !onScreen(e)) continue;
             if (Math.abs(e.y - wv.y) < e.r + 8 && Math.abs(e.x - wv.x) < wv.w / 2 + e.r) {
               wv.hits.add(e); e.hp--; e.flash = 0.08;
               if (e.hp <= 0) killEnemy(e); else sfxGap("hit", 0.12);
@@ -822,8 +824,8 @@
           label = `${WEAPON_NAME[wk]} ${S.lv[wk]}단계!`;
         }
         else if (it.kind === "mask") { S.shield = true; label = "마스크 · 보호막!"; }
-        else if (it.kind === "slow") { S.slow = 9; label = "꿀 · 세균이 느려져요"; }
-        else if (it.kind === "x2") { S.x2 = 14; label = "비타민D · 점수 2배!"; }
+        else if (it.kind === "slow") { S.slow = 6; label = "꿀 · 세균이 느려져요"; }
+        else if (it.kind === "x2") { S.x2 = 10; label = "비타민D · 점수 2배!"; }
         else if (it.kind === "bomb") { label = "손소독제 · 싹 소독!"; sanitize(); }
         else { S.lives = Math.min(6, S.lives + 1); label = "물방울 · 목숨 +1"; }
         S.score += 100;
