@@ -347,7 +347,8 @@
         for (const m of S.missiles) {
           m.t += dt;
           let tgt = null, best = 1e9;
-          const pool = S.boss && S.boss.y > 40 ? [S.boss] : S.enemies;
+          // 큰 세균은 몸이 화면에 보이기 시작하면 바로 맞는다 (예전엔 y 40 아래로 내려와야 맞았다)
+          const pool = S.boss && S.boss.y + S.boss.r > 0 ? [S.boss] : S.enemies;
           for (const e of pool) { if (e.dead || (e.mode === "enter" && e.delay > 0)) continue; const d = (e.x - m.x) ** 2 + (e.y - m.y) ** 2; if (d < best) { best = d; tgt = e; } }
           if (tgt) {
             const a = Math.atan2(tgt.y - m.y, tgt.x - m.x);
@@ -578,7 +579,7 @@
 
         // 충돌: 유도탄 → 적 (한 발에 2 피해)
         for (const m of S.missiles) {
-          if (B && !B.dead && B.y > 40 && Math.hypot(m.x - B.x, m.y - B.y) < B.r) {
+          if (B && !B.dead && B.y + B.r > 0 && Math.hypot(m.x - B.x, m.y - B.y) < B.r) {
             m.hit = true; B.hp -= 2; B.flash = 0.06;
             if (B.hp <= 0) killBoss(); else sfxGap("hit", 0.4);
             continue;
@@ -604,7 +605,7 @@
               if (e.hp <= 0) killEnemy(e);
             }
           }
-          if (B && !B.dead && B.y > 40 && PY - 20 - B.y < len + B.r && Math.abs(B.x - S.px) < B.r + 30 && (B.fireCd || 0) <= S.t) {
+          if (B && !B.dead && B.y + B.r > 0 && PY - 20 - B.y < len + B.r && Math.abs(B.x - S.px) < B.r + 30 && (B.fireCd || 0) <= S.t) {
             B.fireCd = S.t + 0.2; B.hp--; B.flash = 0.05; if (B.hp <= 0) killBoss();
           }
         }
@@ -617,7 +618,7 @@
               if (e.hp <= 0) killEnemy(e); else sfxGap("hit", 0.12);
             }
           }
-          if (B && !B.dead && B.y > 40 && !wv.hits.has(B) && Math.abs(B.y - wv.y) < B.r && Math.abs(B.x - wv.x) < wv.w / 2 + B.r) {
+          if (B && !B.dead && B.y + B.r > 0 && !wv.hits.has(B) && Math.abs(B.y - wv.y) < B.r && Math.abs(B.x - wv.x) < wv.w / 2 + B.r) {
             wv.hits.add(B); B.hp -= 2; B.flash = 0.06; if (B.hp <= 0) killBoss();
           }
         }
@@ -636,7 +637,7 @@
         S.enemies = S.enemies.filter((e) => !e.dead);
         // 충돌: 내 탄 → 적
         for (const b of S.bullets) {
-          if (B && !B.dead && B.y > 40 && Math.hypot(b.x - B.x, b.y - B.y) < B.r) {
+          if (B && !B.dead && B.y + B.r > 0 && Math.hypot(b.x - B.x, b.y - B.y) < B.r) {
             b.hit = true; B.hp--; B.flash = 0.06;
             if (B.hp <= 0) killBoss();
             else sfxGap("hit", 0.4);
@@ -837,7 +838,7 @@
         S.enemies = S.enemies.filter((e) => !e.dead);
         S.ebullets = [];
         const B = S.boss;
-        if (B && !B.dead && B.y > 40) {
+        if (B && !B.dead && B.y + B.r > 0) {
           B.hp -= Math.ceil(B.maxHp * 0.2);
           B.flash = 0.2;
           if (B.hp <= 0) killBoss();
