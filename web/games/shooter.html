@@ -140,8 +140,10 @@
       // 무기 지속 시간(초) — 먹을 때마다 이만큼 늘고 최대 WEAPON_MAX 초까지 쌓인다
       const WEAPONS = { triple: 13, rapid: 12, laser: 11, homing: 13, orbit: 13, chili: 11, ripple: 13, zap: 13, wing: 15 };
       const WEAPON_NAME = { triple: "확산탄", rapid: "연사", laser: "관통 레이저", homing: "유도탄", orbit: "마늘 방패", chili: "고추 화염", ripple: "양파 파동탄", zap: "블루베리 번개", wing: "도우미" };
-      // 고추 화염이 닿는 거리 (단계마다 길어짐)
-      const flameLen = () => 90 + lvOf("chili") * 30;
+      // 고추 화염이 닿는 거리 (단계마다 길어짐) — 예전 120·150·180 은 돌진해 내려온 세균에만 닿아 편대·큰 세균엔 거의 못 썼다
+      const flameLen = () => 200 + lvOf("chili") * 60; // 260 · 320 · 380 — 1단계도 맨 아래에서 편대 아랫줄에 닿는다
+      // 화염 폭 — 멀리 닿는 대신 부채꼴은 좁게 (예전 0.45 그대로면 화면을 거의 다 덮는다)
+      const FLAME_SPREAD = 0.24;
       function lvOf(k) { return S[k] > 0 ? S.lv[k] || 1 : 0; }
       // 화면 안에 들어온 세균만 무기가 노린다 — 예전엔 옆에서 날아 들어오는 중인 세균을 유도탄·번개가 화면 밖에서 잡아 등장하기도 전에 사라졌다
       const onScreen = (e) => e.x > 10 && e.x < W - 10 && e.y > 10;
@@ -607,9 +609,9 @@
         if (S.chili > 0) {
           const len = flameLen();
           for (const e of S.enemies) {
-            if (e.dead || (e.mode === "enter" && e.delay > 0) || (e.fireCd || 0) > S.t) continue;
+            if (e.dead || (e.mode === "enter" && e.delay > 0) || (e.fireCd || 0) > S.t || !onScreen(e)) continue;
             const dy = PY - 20 - e.y, dx = e.x - S.px;
-            if (dy > 0 && dy < len && Math.abs(dx) < 14 + dy * 0.45) {
+            if (dy > 0 && dy < len && Math.abs(dx) < 14 + dy * FLAME_SPREAD) {
               e.fireCd = S.t + 0.15; e.hp--; e.flash = 0.08;
               if (e.hp <= 0) killEnemy(e);
             }
@@ -928,7 +930,7 @@
           fg.addColorStop(0, "rgba(254, 240, 138, .85)"); fg.addColorStop(0.45, "rgba(249, 115, 22, .55)"); fg.addColorStop(1, "rgba(220, 38, 38, 0)");
           g.fillStyle = fg;
           const fl = Math.sin(S.t * 40) * 4;
-          g.beginPath(); g.moveTo(S.px - 6, y0); g.lineTo(S.px - 14 - len * 0.45 + fl, y0 - len); g.lineTo(S.px + 14 + len * 0.45 - fl, y0 - len); g.lineTo(S.px + 6, y0); g.closePath(); g.fill();
+          g.beginPath(); g.moveTo(S.px - 6, y0); g.lineTo(S.px - 14 - len * FLAME_SPREAD + fl, y0 - len); g.lineTo(S.px + 14 + len * FLAME_SPREAD - fl, y0 - len); g.lineTo(S.px + 6, y0); g.closePath(); g.fill();
         }
         // 양파 파동탄
         for (const wv of S.waves) {
