@@ -175,10 +175,15 @@ async def job_reapply_close(db: AsyncSession) -> None:
 
 
 async def job_coupon_sync(db: AsyncSession) -> None:
-    """매일 00:05 · 목 17:01 — 월간 배지 쿠폰 지급·만료, 확정된 탈락 주 쿠폰 지급."""
+    """매일 00:05 · 목 17:01 — 월간 배지 쿠폰 지급·만료, 확정된 탈락 주 쿠폰 지급, 기다리던 아케이드 도장 쿠폰 지급."""
+    from app.services.game import issue_pending_arcade_coupons
+
     issued = await sync_all_member_coupons(db)
     if issued:
         logger.info("Coupon sync issued=%s", issued)
+    arcade = await issue_pending_arcade_coupons(db)
+    if arcade:
+        logger.info("Arcade stamp coupons issued=%s", arcade)
 
 
 async def job_mail_retry(db: AsyncSession) -> None:

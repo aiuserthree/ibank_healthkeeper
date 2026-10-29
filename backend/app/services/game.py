@@ -340,70 +340,99 @@ async def start_run(redis: Redis, member: Member, key: str, fresh: bool = False)
     await redis.set(_run_key(member, key), str(int(time.time() * 1000)), nx=not fresh, ex=3 * 3600)
 
 
-def _month_bounds(day: date) -> tuple[date, date]:
-    start = day.replace(day=1)
-    nxt = (start + timedelta(days=32)).replace(day=1)
-    return start, nxt
-
-
 async def stamp_status(db: AsyncSession, member: Member, day: date | None = None) -> dict:
+    """참여 도장 — 달이 바뀌어도 이어서 모은다. 10개마다 쿠폰 1장(한 달에 1장까지).
+
+    지금 도장판 = 전체 도장에서 쿠폰으로 바꾼 만큼(쿠폰 수 × 10)을 뺀 나머지.
+    이번 달 쿠폰을 이미 받았는데 10개가 또 차면 다음 달 1일에 쿠폰이 들어온다(pending).
+    """
     day = day or today_kst()
-    start, nxt = _month_bounds(day)
-    rows = (
+    dates = (
         await db.execute(
-            select(ArcadeStamp.stamp_date)
-            .where(ArcadeStamp.member_id == member.id, ArcadeStamp.stamp_date >= start, ArcadeStamp.stamp_date < nxt)
-            .order_by(ArcadeStamp.stamp_date)
+            select(ArcadeStamp.stamp_date).where(ArcadeStamp.member_id == member.id).order_by(ArcadeStamp.stamp_date)
         )
     ).scalars().all()
     month = f"{day.year:04d}-{day.month:02d}"
-    coupon = await db.scalar(
+    used = await db.scalar(
+        select(func.count()).select_from(Coupon).where(Coupon.member_id == member.id, Coupon.source == CouponSource.ARCADE)
+    ) or 0
+    this_month = await db.scalar(
         select(func.count()).select_from(Coupon).where(
             Coupon.member_id == member.id, Coupon.source == CouponSource.ARCADE, Coupon.grant_month == month
         )
-    )
+    ) or 0
+    card = list(dates[used * STAMP_GOAL :])
+    count = min(len(card), STAMP_GOAL)
     return {
         "month": month,
-        "days": [d.isoformat() for d in rows],
-        "count": len(rows),
+        "days": [d.isoformat() for d in card[:STAMP_GOAL]],
+        "count": count,
         "goal": STAMP_GOAL,
-        "today": day.isoformat() in {d.isoformat() for d in rows},
-        "coupon": bool(coupon),
+        "today": day in set(dates),
+        "coupon": bool(this_month),  # 이번 달 아케이드 쿠폰을 받았는지
+        "pending": count >= STAMP_GOAL and bool(this_month),  # 10개 다 찼지만 이번 달 몫은 받아서 다음 달 1일에
         "minSeconds": STAMP_MIN_SEC,
     }
 
 
-async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -> dict:
-    """오늘 첫 도장이면 찍고, 이번 달 목표를 채우면 쿠폰을 준다."""
+async def _issue_arcade_coupon_if_due(db: AsyncSession, member: Member, day: date) -> bool:
+    """도장판이 10개 찼고 이번 달 쿠폰을 아직 안 받았으면 1장 준다 (커밋은 부르는 쪽에서)."""
     from app.services.coupon import _next_month_start
 
+    st = await stamp_status(db, member, day)
+    if st["count"] < STAMP_GOAL or st["coupon"]:
+        return False
+    now = now_kst()
+    db.add(
+        Coupon(
+            member_id=member.id,
+            source=CouponSource.ARCADE,
+            status=CouponStatus.AVAILABLE,
+            grant_month=st["month"],
+            issued_at=now,
+            expires_at=_next_month_start(_next_month_start(now)),  # 받은 다음 달 말일까지
+            note="아케이드 도장 10개",
+        )
+    )
+    await db.flush()
+    return True
+
+
+async def issue_pending_arcade_coupons(db: AsyncSession) -> int:
+    """매일 자정 — 지난달에 도장 10개를 또 채워 두고 기다리던 회원에게 이번 달 쿠폰을 준다."""
+    today = today_kst()
+    ids = (await db.execute(select(ArcadeStamp.member_id).distinct())).scalars().all()
+    members = await _members(db, list(ids))
+    issued = 0
+    for m in members.values():
+        if await _issue_arcade_coupon_if_due(db, m, today):
+            issued += 1
+    if issued:
+        await db.commit()
+    return issued
+
+
+async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -> dict:
+    """오늘 첫 도장이면 찍고, 도장판 10개를 채우면 쿠폰을 준다 (한 달에 1장).
+
+    이번 달 쿠폰을 받은 뒤 다시 10개를 채운 판은 다음 달 1일 쿠폰으로 기다린다 — 기다리는 판은 1장까지라,
+    그 판이 꽉 찬 동안 찍는 도장은 쌓지 않는다 (매일 해도 받을 수 있는 쿠폰은 한 달 1장이라 손해 없음).
+    """
+    # 지난달에 채워 두고 기다리던 몫부터 받는다 (달이 바뀐 첫 판)
+    issued = await _issue_arcade_coupon_if_due(db, member, today)
     has = await db.scalar(
         select(func.count()).select_from(ArcadeStamp).where(ArcadeStamp.member_id == member.id, ArcadeStamp.stamp_date == today)
     )
     new = False
-    issued = False
-    if not has:
+    if not has and not (await stamp_status(db, member, today))["pending"]:
         db.add(ArcadeStamp(member_id=member.id, stamp_date=today, game=key))
         await db.flush()
         new = True
-        st = await stamp_status(db, member, today)
-        if st["count"] >= STAMP_GOAL and not st["coupon"]:
-            now = now_kst()
-            db.add(
-                Coupon(
-                    member_id=member.id,
-                    source=CouponSource.ARCADE,
-                    status=CouponStatus.AVAILABLE,
-                    grant_month=st["month"],
-                    issued_at=now,
-                    expires_at=_next_month_start(_next_month_start(now)),  # 받은 다음 달 말일까지
-                    note="아케이드 도장 10개",
-                )
-            )
-            issued = True
+        issued = await _issue_arcade_coupon_if_due(db, member, today) or issued
+    if new or issued:
         await db.commit()
     st = await stamp_status(db, member, today)
-    return {"new": new, "count": st["count"], "goal": st["goal"], "coupon": issued, "today": st["today"]}
+    return {"new": new, "count": st["count"], "goal": st["goal"], "coupon": issued, "today": st["today"], "pending": st["pending"]}
 
 
 def _daily_key(game: Game, member: Member, day: date, variant: str = "") -> str:

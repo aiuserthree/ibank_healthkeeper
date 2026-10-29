@@ -197,8 +197,11 @@ window.HKFun = (function () {
   // 이번 달 아케이드 도장 — 누르면 아케이드로
   function stampLine(st) {
     if (!st) return "";
-    const parts = st.coupon
-      ? ["이번 달 아케이드 쿠폰 받음", "다음 달 1일부터 새 도장판"]
+    // 도장은 달이 바뀌어도 이어서 모인다 — 쿠폰만 한 달에 1장
+    const parts = st.pending
+      ? [`아케이드 도장 ${st.goal}/${st.goal} 완성`, "쿠폰은 다음 달 1일에"]
+      : st.coupon
+      ? ["이번 달 아케이드 쿠폰 받음", `다음 쿠폰까지 ${st.goal - st.count}개`]
       : [`아케이드 도장 ${st.count}/${st.goal}`, `쿠폰까지 ${st.goal - st.count}개`, st.today ? "오늘 도장 찍음" : ""].filter(Boolean);
     // 휴대폰에서 줄이 바뀌어도 낱말이 떨어지지 않게 마디마다 묶는다
     const text = parts.map((t) => `<span style="white-space:nowrap">${t}</span>`).join(" · ");
