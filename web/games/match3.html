@@ -243,6 +243,7 @@
         // 1~3단계는 시간의 절반 이상 남기고 넉넉히, 6단계부터 빠듯하게. 그림 종류가 늘면 득점이 크게 줄어서
         // 단계 배율(×1.1씩)로 보정해 목표가 계속 오르게 했다
         const TARGETS = [6000, 8000, 9000, 9500, 10000, 15000, 16000, 17000, 18000, 19000];
+        const MAX_STAGE = 30; // 30단계를 깨면 다 깬 것으로 끝낸다
         function cfg(n) {
           const last = TARGETS[TARGETS.length - 1];
           return {
@@ -1092,7 +1093,7 @@
           updateHud();
           pauseBtn.disabled = true;
           showOverlay(`<h2>비타민 3매치</h2>
-            <p>시간 안에 <b>목표 점수</b>를 채우면 다음 판으로! 판 모양이 바뀌고<br>단계마다 점수 배율이 올라가요 · 남은 시간은 1초에 20점</p>
+            <p>시간 안에 <b>목표 점수</b>를 채우면 다음 판으로! 판 모양이 바뀌고<br>단계마다 점수 배율이 올라가요 · 남은 시간은 1초에 20점 · <b>${MAX_STAGE}단계</b>까지</p>
             <div class="gm-rules">
               <div>${HKUI.icon("grid-2x2", 15, "#ff7a59")}<span>같은 그림 <b>3개 이상</b> 또는 <b>2×2 네모</b>로 맞춰요</span></div>
               <div>${HKUI.icon("sparkles", 15, "#ff7a59")}<span><b>4개</b> 줄 비타민 · <b>네모·ㄱ자</b> 폭탄 · <b>일자 5개</b> 종합 비타민</span></div>
@@ -1149,6 +1150,7 @@
           const secs = Math.ceil(timeLeft / 1000), bonus = secs * CLEAR_BONUS;
           score += bonus;
           updateHud();
+          if (stageNo >= MAX_STAGE) return allClear(secs, bonus);
           ctx.sfx("line");
           setTimeout(() => my === runId && ctx.sfx("powerup"), 280);
           const next = MAPS[mapFor(stageNo + 1)].name;
@@ -1163,6 +1165,22 @@
           if (my !== runId || state !== "clear") return;
           hideOverlay();
           nextStage();
+        }
+        // 마지막(30) 단계까지 다 깼을 때 — 축하하고 그대로 기록
+        function allClear(secs, bonus) {
+          state = "over"; submitted = true; doubleLeft = 0;
+          runId++;
+          clearSel(); clearHint(); endFever();
+          pauseBtn.disabled = true;
+          updateHud();
+          ctx.sfx("win");
+          showOverlay(`<h2>${MAX_STAGE}단계 모두 클리어!</h2>
+            <p>마지막 판 남은 시간 ${secs}초 × ${CLEAR_BONUS} = <b>+${fmt(bonus)}</b></p>
+            <div class="gm-big">${fmt(score)}점</div>
+            <div class="gm-chips"><span class="gm-chip">클리어 <b>${MAX_STAGE}단계</b></span></div>
+            <button type="button" class="gm-start" data-again>${HKUI.icon("rotate-ccw", 18, "#fff")} 다시 하기</button>`);
+          ov.querySelector("[data-again]").onclick = startGame;
+          ctx.submit(score);
         }
         function finish() {
           if (state === "over" || submitted || state === "clear") return;
@@ -1278,6 +1296,8 @@
         // 공통 틀이 stage 폭을 바꾸면 바로 다시 그린다 (늦게 그리면 틀이 옛 비율로 폭을 다시 재서 출렁인다)
         window.addEventListener("resize", layout);
 
+        // 게임 중 뒤로 가기 → '기록 남기고 나가기'에 쓰는 지금 점수
+        ctx.onScore && ctx.onScore(() => score);
         ctx.onRestart(startGame);
         ctx.onPause(pause);
         showStart();

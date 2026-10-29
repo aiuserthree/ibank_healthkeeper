@@ -278,7 +278,7 @@ window.HKPlay = (function () {
   }
 
   // 판이 끝나면 화면 위쪽에 결과 띠 — 게임 자체의 끝 화면(다시 하기 버튼 포함)과 겹치지 않게
-  // 가운데 창 대신 띠로 보여 주고, 몇 초 뒤 저절로 사라진다
+  // 가운데 창 대신 띠로 보여 주고, 3초 뒤 저절로 사라진다 (위로 쓸어 올리거나 X 로 바로 닫기)
   let resultTimer = null;
   function resultBanner(game, result) {
     HKSound.play(result.counted && result.newBest ? "win" : "success");
@@ -296,18 +296,38 @@ window.HKPlay = (function () {
       <div class="hk-play-result__text">
         <b>${title} · ${formatScore(game, result.score)}</b>
         <span>${ranks.join(" · ") || (result.counted ? "순위를 불러오는 중이에요" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.best != null && !result.newBest ? ` · 내 최고 ${formatScore(game, result.best)}` : ""}</span>
-        ${result.stamp ? `<span class="hk-play-result__stamp${result.stamp.new ? " is-new" : ""}">${HKUI.icon("stamp", 13, "currentColor")} ${result.stamp.new ? "오늘 도장 쾅!" : result.stamp.today ? "오늘 도장은 이미 찍었어요" : "30초 이상 해야 도장이 찍혀요"} · ${result.stamp.count >= result.stamp.goal ? `이번 달 <b>${result.stamp.goal}개 완성</b>` : `이번 달 <b>${result.stamp.count}/${result.stamp.goal}</b>`}</span>` : ""}
+        ${result.stamp ? `<span class="hk-play-result__stamp${result.stamp.new ? " is-new" : ""}">${HKUI.icon("stamp", 13, "currentColor")} ${result.stamp.new ? "오늘 도장 쾅!" : result.stamp.today ? "오늘 도장은 이미 찍었어요" : "게임 화면에서 시작한 판만 도장이 찍혀요"} · ${result.stamp.count >= result.stamp.goal ? `이번 달 <b>${result.stamp.goal}개 완성</b>` : `이번 달 <b>${result.stamp.count}/${result.stamp.goal}</b>`}</span>` : ""}
       </div>
       <button type="button" class="hk-play-result__close" aria-label="닫기">${HKUI.icon("x", 16, "currentColor")}</button>`;
     const close = () => {
+      clearTimeout(resultTimer);
+      el.style.transform = "";
       el.classList.remove("is-in");
       setTimeout(() => el.remove(), 250);
     };
     el.querySelector(".hk-play-result__close").onclick = close;
+    // 위로 쓸어 올리면 닫힌다 — 손가락을 따라 올라가다가 30px 넘게 올리고 떼면 사라짐
+    let sw = null;
+    el.addEventListener("pointerdown", (e) => {
+      if (e.target.closest(".hk-play-result__close")) return;
+      sw = { id: e.pointerId, y: e.clientY };
+      el.style.transition = "none";
+      try { el.setPointerCapture(e.pointerId); } catch (_) {}
+    });
+    el.addEventListener("pointermove", (e) => {
+      if (!sw || e.pointerId !== sw.id) return;
+      const dy = Math.min(0, e.clientY - sw.y);
+      el.style.transform = `translate(-50%, ${dy}px)`;
+      if (dy < -30) { sw = null; el.style.transition = ""; close(); }
+    });
+    const swEnd = () => { if (!sw) return; sw = null; el.style.transition = ""; el.style.transform = ""; };
+    el.addEventListener("pointerup", swEnd);
+    el.addEventListener("pointercancel", swEnd);
     (document.querySelector(".hk-pf") || document.body).appendChild(el);
     HKUI.refreshIcons(el);
     requestAnimationFrame(() => el.classList.add("is-in"));
-    resultTimer = setTimeout(close, 7000);
+    // 예전 7초는 길어서 다음 판을 가렸다 — 3초 뒤 저절로 사라짐
+    resultTimer = setTimeout(close, 3000);
   }
 
   // 도장으로 쿠폰을 받으면 한 번 더 크게 알려 준다
@@ -323,6 +343,8 @@ window.HKPlay = (function () {
     let period = "today";
     const restartFns = [];
     let dailyToken = null;
+    // 갈래 — 상식 퀴즈 분야처럼 한 게임 안에서 고르는 판. 갈래마다 순위·하루 첫 판을 따로 센다 ("" = 기본 판)
+    let variant = "", variantLabel = "", playedVariants = [];
     // 키 약속 (모든 게임 공통)
     //  - 스페이스: 시작 화면·끝 화면에서 시작/다시 하기 (게임 중에는 게임이 자유롭게 씀)
     //  - Esc: 게임 중 일시정지 (게임이 onPause 로 등록한 함수), 일시정지 화면에서 다시 누르면 이어 하기
@@ -336,9 +358,13 @@ window.HKPlay = (function () {
     // 시작 화면·결과 화면에서도 미리 알려 두어, 시작을 못 알아채는 게임도 길이가 잡히게 한다
     let inRun = false;
     const armRun = (fresh) => HKApi.playRun(key, fresh).catch(() => {});
+    let playingNow = false;
+    let scoreFn = null; // 게임이 알려 주는 지금 점수 (뒤로 가기 → 기록 남기고 나가기)
     function setPlaying(on) {
       // 휴대폰 머리의 일시정지 버튼은 판이 도는 동안만
       document.querySelector(".hk-pf")?.classList.toggle("is-playing", on);
+      playingNow = on;
+      if (on && !(history.state && history.state.hkPlay)) history.pushState({ hkPlay: 1 }, "");
       if (!on) return;
       if (!inRun) armRun(true);
       inRun = true;
@@ -420,6 +446,47 @@ window.HKPlay = (function () {
     // ── 판이 끝나면 '다시 하기' 옆에 '그만하기' — 게임의 다시 하기 버튼 옆에 붙이고, 없으면(창 안 게임 등) 창 아래에 둘 다 띄운다
     let endTimer = null;
     function goQuit() { location.href = HKRoutes.lounge; }
+
+    // ── 게임 중 뒤로 가기 — 바로 나가지 않고 묻는다: 지금까지 점수를 기록에 남기고 나갈지, 그냥 나갈지
+    let leaving = null;
+    function askLeave() {
+      if (leaving) return;
+      pauseFns.forEach((fn) => { try { fn(); } catch (_) {} });
+      let now = null;
+      try { now = scoreFn ? Math.max(0, Math.round(Number(scoreFn()) || 0)) : null; } catch (_) { now = null; }
+      const overlay = document.createElement("div");
+      overlay.className = "hk-dialog__overlay";
+      overlay.innerHTML = `<div class="hk-dialog" role="dialog">
+          <div class="hk-dialog__title">게임을 그만할까요?</div>
+          <div class="hk-dialog__body">${now != null ? `지금까지 <b>${formatScore(game, now)}</b>이에요. 이 점수를 기록에 남기고 나갈 수 있어요.` : "이 게임은 끝까지 해야 기록이 남아요. 지금 나가면 이번 판은 기록되지 않아요."}</div>
+          <div class="hk-dialog__actions" style="flex-wrap:wrap">
+            <button type="button" class="hk-btn hk-btn--secondary" data-leave="stay">계속하기</button>
+            <button type="button" class="hk-btn hk-btn--secondary" data-leave="out">그냥 나가기</button>
+            ${now != null ? `<button type="button" class="hk-btn hk-btn--primary" data-leave="save">기록 남기고 나가기</button>` : ""}
+          </div>
+        </div>`;
+      leaving = overlay;
+      const done = () => { overlay.remove(); leaving = null; };
+      overlay.addEventListener("click", async (e) => {
+        if (e.target === overlay) return done();
+        const b = e.target.closest("[data-leave]");
+        if (!b) return;
+        if (b.dataset.leave === "stay") return done();
+        if (b.dataset.leave === "save") {
+          overlay.querySelectorAll("button").forEach((x) => (x.disabled = true));
+          b.textContent = "저장하는 중…";
+          try { await HKApi.playSubmit(key, now, dailyToken, variant); } catch (_) { /* 저장 못 해도 나간다 */ }
+        }
+        playingNow = false;
+        goQuit();
+      });
+      document.body.appendChild(overlay);
+    }
+    // 휴대폰·브라우저 뒤로 가기 — 판이 도는 중이면 한 칸 되돌려 놓고 묻는다
+    window.addEventListener("popstate", () => {
+      if (playingNow) { history.pushState({ hkPlay: 1 }, ""); askLeave(); }
+      else if (!(history.state && history.state.hkPlay)) history.back();
+    });
     function doRestart() {
       if (!canRestart) return;
       canRestart = false;
@@ -483,9 +550,9 @@ window.HKPlay = (function () {
       const body = document.getElementById("hk-play-board-body");
       if (!body) return;
       try {
-        const data = await HKApi.playLeaderboard(key, period === "dept" ? "week" : period);
+        const data = await HKApi.playLeaderboard(key, period === "dept" ? "week" : period, variant);
         game = data.game;
-        document.getElementById("hk-play-count").textContent = period === "dept" ? "" : `${data.players}명`;
+        document.getElementById("hk-play-count").textContent = `${variantLabel ? `${variantLabel} · ` : ""}${period === "dept" ? "" : `${data.players}명`}`;
         body.innerHTML = period === "dept" ? deptRowsHtml(data, game) : boardRowsHtml(data, game);
         HKUI.refreshIcons(body);
       } catch (e) {
@@ -528,6 +595,7 @@ window.HKPlay = (function () {
         const meta = list.find((g) => g.key === key) || game || { key, title: key, unit: "" };
         game = { ...meta, ...(game || {}) };
         const dailyDone = !!(meta.dailyOnce && meta.playedToday);
+        playedVariants = meta.playedVariants || [];
         document.getElementById("hk-play-head").innerHTML = `<a class="hk-pf__back" href="${HKRoutes.lounge}" aria-label="아케이드로">${HKUI.icon("chevron-left", 20, "currentColor")}<span>아케이드</span></a>
           <span class="hk-pf__icon" style="${tintStyle(key)}">${HKUI.icon(meta.icon || "gamepad-2", 18, "#fff")}</span>
           <div class="hk-pf__title"><b>${HKUI.escapeHtml(meta.title)}</b><small>${HKUI.escapeHtml(meta.desc || "")}</small></div>
@@ -538,6 +606,11 @@ window.HKPlay = (function () {
             <button type="button" class="hk-play-sound hk-pf__rank-btn" id="hk-pf-rank" hidden>${HKUI.icon("trophy", 18, "currentColor")}<span>순위</span></button>
           </div>`;
         document.getElementById("hk-pf-pause").onclick = (e) => { e.currentTarget.blur(); togglePause(); };
+        document.querySelector(".hk-pf__back").addEventListener("click", (e) => {
+          if (!playingNow) return;
+          e.preventDefault();
+          askLeave();
+        });
         const soundBtn = document.getElementById("hk-play-sound");
         const paintSound = () => {
           const m = HKSound.isMuted();
@@ -581,10 +654,25 @@ window.HKPlay = (function () {
           },
           // 버튼 없이 시작하는 게임(예: iframe 안의 게임)이 새 판 시작을 알릴 때
           started: () => setPlaying(true),
+          // 갈래 고르기 — 순위표와 하루 첫 판 판정이 그 갈래로 바뀐다 (label 은 순위표 머리에 보임)
+          setVariant: (v, label) => {
+            variant = v || ""; variantLabel = variant ? label || "" : "";
+            ctx.dailyDone = !!(game.dailyOnce && (variant ? playedVariants.includes(variant) : meta.playedToday));
+            const badge = document.querySelector(".hk-pf__daily");
+            if (badge) {
+              badge.className = `hk-badge ${ctx.dailyDone ? "hk-badge--neutral" : "hk-badge--warning"} hk-pf__daily`;
+              badge.textContent = ctx.dailyDone ? "오늘 도전 완료 · 연습" : "오늘의 도전";
+            }
+            loadBoard();
+            return ctx.dailyDone;
+          },
+          playedVariants: () => playedVariants.slice(),
+          // 지금 점수 — 게임 중 뒤로 가기에서 '기록 남기고 나가기'에 쓴다 (없으면 그냥 나가기만)
+          onScore: (fn) => { scoreFn = fn; },
           begin: async () => {
             if (!game.dailyOnce) return true;
             try {
-              const r = await HKApi.playStart(key);
+              const r = await HKApi.playStart(key, variant);
               dailyToken = r.token;
               if (!r.ranked) {
                 if (!ctx.dailyDone) HKUI.toast("오늘 이미 시작했던 도전이라 이번 판은 연습으로 기록돼요");
@@ -601,13 +689,17 @@ window.HKPlay = (function () {
             const value = Math.max(0, Math.round(score));
             let result;
             try {
-              result = await HKApi.playSubmit(key, value, dailyToken);
+              result = await HKApi.playSubmit(key, value, dailyToken, variant);
               dailyToken = null;
             } catch (e) {
               HKUI.toast(e.message || "기록을 저장하지 못했어요", "danger");
               result = { counted: false, score: value, best: null };
             }
-            if (result.counted && game.dailyOnce) ctx.dailyDone = true;
+            if (result.counted && game.dailyOnce) {
+              ctx.dailyDone = true;
+              if (variant && !playedVariants.includes(variant)) playedVariants.push(variant);
+              else if (!variant) meta.playedToday = true;
+            }
             resultBanner(game, result);
             stampToast(result.stamp);
             inRun = false;

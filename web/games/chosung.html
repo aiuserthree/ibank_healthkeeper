@@ -200,7 +200,7 @@
     HKPlay.mountGame({
       key: "chosung",
       setup(stage, ctx) {
-        const COUNT = 5, LIMIT = 40, PER_SEC = 2, MAX_TRIES = 3, HINT_COST = 30, FEEDBACK_MS = 1500;
+        const COUNT = 10, LIMIT = 40, PER_SEC = 2, MAX_TRIES = 3, HINT_COST = 30, FEEDBACK_MS = 1500;
         const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
         const esc = (s) => HKUI.escapeHtml(String(s));
         const norm = (s) => String(s).replace(/\s+/g, "");
@@ -212,8 +212,8 @@
         }
         const toCho = (word) => Array.from(word).map((c) => (c === " " ? " " : choOf(c))).join("");
 
-        // 오늘의 5문제 — 같은 날이면 모든 직원이 같은 문제 (ctx.rng)
-        // 오늘 문제 — 섞어 둔 낱말 줄에서 날마다 다음 5개를 낸다 (한 바퀴 약 17일 동안 같은 낱말이 다시 나오지 않음)
+        // 오늘의 10문제 — 같은 날이면 모든 직원이 같은 문제 (ctx.rng)
+        // 오늘 문제 — 섞어 둔 낱말 줄에서 날마다 다음 10개를 낸다 (낱말 86개 · 약 8일마다 한 바퀴)
         function todaysQuestions() {
           const [y, m, d] = ctx.today.split("-").map(Number);
           const day = Math.round((Date.UTC(y, m - 1, d) - Date.UTC(2026, 0, 1)) / 86400000);
@@ -254,7 +254,7 @@
           phase = "intro";
           stage.innerHTML = `<div class="gm-cs">
             <div class="gm-cs__intro">
-              <span class="gm-cs__date">${formatDate(ctx.today)} · 오늘의 5문제</span>
+              <span class="gm-cs__date">${formatDate(ctx.today)} · 오늘의 ${COUNT}문제</span>
               <div class="gm-cs__demo" aria-hidden="true">
                 <span class="gm-cs__tile">ㄱ</span><span class="gm-cs__tile">ㅂ</span><span class="gm-cs__tile">ㅁ</span>
                 <span class="gm-cs__arrow">${HKUI.icon("arrow-right", 26, "currentColor")}</span>
@@ -472,7 +472,7 @@
           const score = totalScore();
           stage.innerHTML = `<div class="gm-cs">
             <div class="gm-cs__intro">
-              <span class="gm-cs__date">${formatDate(ctx.today)} · 오늘의 5문제</span>
+              <span class="gm-cs__date">${formatDate(ctx.today)} · 오늘의 ${COUNT}문제</span>
               <div class="gm-cs__sum-big">${okCount}<small> / ${COUNT} 정답</small></div>
               <div class="gm-cs__calc">
                 <span>정답 ${okCount}개 × 100</span><b>${base}</b>
@@ -514,6 +514,8 @@
           if (document.hidden) pause();
         });
 
+        // 게임 중 뒤로 가기 → '기록 남기고 나가기'에 쓰는 지금 점수
+        ctx.onScore && ctx.onScore(() => totalScore());
         ctx.onRestart(showIntro);
         ctx.onPause(pause);
         showIntro();
