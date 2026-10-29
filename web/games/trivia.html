@@ -72,6 +72,8 @@
     .gm-tv__opt.is-wrong .gm-tv__num { background: var(--gm-ng); color: #fff; }
     .gm-tv__opt.is-dim { opacity: .5; }
 
+    .gm-tv__fb-skip { align-self: flex-end; margin-top: 2px; font-size: 12px; color: var(--text-muted, #94a3b8); }
+    .gm-tv__fb.is-ok, .gm-tv__fb.is-ng { cursor: pointer; }
     .gm-tv__fb { min-height: 82px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 10px 14px; border-radius: 12px; border: 1px dashed var(--color-mist-border, #e3e8f0); box-sizing: border-box; }
     .gm-tv__hint { font-size: 13.5px; color: var(--text-muted, #8a94a6); text-align: center; }
     .gm-tv__fb.is-ok { border: 0; background: var(--gm-ok-soft); animation: gm-tv-fade .18s ease-out; }
@@ -126,6 +128,13 @@
     .gm-tv__chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; max-width: 460px; }
     .gm-tv__chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px; border-radius: 999px; background: #fff; border: 1px solid var(--gm-line); color: var(--gm-ink); font-size: 12.5px; font-weight: 700; }
     .gm-tv__chip small { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+    /* 분야 고르기 — 전체(오늘의 20문제) + 10개 분야, 분야마다 순위 따로 */
+    .gm-tv__pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; width: 100%; max-width: 500px; }
+    .gm-tv__pk { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 7px; border-radius: 12px; border: 1.5px solid var(--gm-line); background: #fff; color: var(--gm-ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .gm-tv__pk small { font-size: 11px; font-weight: 600; color: var(--text-secondary); }
+    .gm-tv__pk.is-on { border-color: var(--gm-b); background: var(--gm-soft); }
+    .gm-tv__pk.is-all { grid-column: 1 / -1; flex-direction: row; justify-content: center; gap: 6px; }
+    .gm-tv__pk .gm-tv__pk-done { position: absolute; top: 4px; right: 5px; color: #16a34a; }
     .gm-tv__note { width: 100%; max-width: 460px; padding: 10px 14px; border-radius: 12px; background: #fff7e6; color: #9a6400; font-size: 13.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; }
     .gm-tv__start { min-width: 200px; height: 52px; border: 0; border-radius: 14px; color: #fff; font: inherit; font-size: 17px; font-weight: 800; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); box-shadow: 0 6px 18px rgba(8, 145, 178, .3); cursor: pointer; }
     @media (hover: hover) { .gm-tv__start:hover:not([disabled]) { filter: brightness(1.07); } }
@@ -1092,13 +1101,17 @@
     ];
 
     // 하루 구성 — 쉬운 단계부터: 워밍업(쉬움 5) → 예선(보통 5) → 본선(어려움 5) → 결승(아주 어려움 5)
-    const STAGES = [
+    const FULL_STAGES = [
       { lv: 1, n: 5, name: "워밍업", call: "워밍업 시작!" },
       { lv: 2, n: 5, name: "예선", call: "예선 시작!" },
       { lv: 3, n: 5, name: "본선", call: "본선 시작!" },
       { lv: 4, n: 5, name: "결승", call: "결승 시작!" },
     ];
-    const COUNT = STAGES.reduce((s, st) => s + st.n, 0);
+    // 지금 고른 판의 단계 구성 — 전체는 위 20문제, 분야는 그날 뽑힌 10문제의 난이도대로 나눈다
+    let STAGES = FULL_STAGES;
+    let COUNT = 20;
+    const CAT_N = 10; // 분야 하나의 하루 문제 수
+    const STAGE_NAME = { 1: "워밍업", 2: "예선", 3: "본선", 4: "결승" };
     const BASE_DAY = "2026-10-27";
 
     function shuffleWith(r, arr) {
@@ -1132,7 +1145,25 @@
     // 단계 순서대로 이어 붙인 오늘의 문제 번호 (쉬움 5 → 보통 5 → 어려움 5 → 아주 어려움 5)
     function pickDay(iso) {
       const d = dayIndex(iso);
-      return STAGES.flatMap((st) => pickLevel(st.lv, st.n, d));
+      return FULL_STAGES.flatMap((st) => pickLevel(st.lv, st.n, d));
+    }
+    // 분야 하나의 오늘 10문제 — 그 분야 문항을 고정 시드로 섞어 날마다 다음 10개 (약 8일마다 한 바퀴), 쉬운 것부터
+    function pickCat(cat, iso) {
+      const d = dayIndex(iso);
+      const pool = BANK.map((_, i) => i).filter((i) => BANK[i][0] === cat);
+      const days = Math.max(1, Math.floor(pool.length / CAT_N));
+      const round = Math.floor(d / days), k = d - round * days;
+      const key = `cat:${cat}:${round}`;
+      if (!permCache[key]) permCache[key] = shuffleWith(HKPlay.seededRng(`trivia-cat:${cat}:${round}`), pool);
+      return permCache[key].slice(k * CAT_N, k * CAT_N + CAT_N).sort((a, b) => BANK[a][1] - BANK[b][1]);
+    }
+    // 판 고르기 — "" 는 오늘의 20문제, 분야 키면 그 분야 10문제. 단계 구성(STAGES·COUNT)도 함께 바꾼다
+    function planFor(mode, iso) {
+      if (!mode) { STAGES = FULL_STAGES; COUNT = 20; return pickDay(iso); }
+      const list = pickCat(mode, iso);
+      STAGES = [1, 2, 3, 4].map((lv) => ({ lv, n: list.filter((i) => BANK[i][1] === lv).length, name: STAGE_NAME[lv], call: `${STAGE_NAME[lv]} 시작!` })).filter((st) => st.n > 0);
+      COUNT = list.length;
+      return list;
     }
     const stageOf = (i) => {
       let end = 0;
@@ -1144,7 +1175,9 @@
     HKPlay.mountGame({
       key: "trivia",
       setup(stage, ctx) {
-        const LIMIT = 20, FEEDBACK_MS = 1500, JUDGE_MS = 180;
+        const LIMIT = 20, JUDGE_MS = 180;
+        // 정답·해설 보여 주는 시간 — 해설이 길수록 오래 (약 3~6초). 눌러서 바로 넘길 수도 있다 (예전 1.5초 고정)
+        const feedbackMs = (q) => Math.min(6000, 2800 + 35 * String(q.e || "").length);
         const BASE_PTS = { 1: 60, 2: 80, 3: 100, 4: 150 }, PER_SEC = 2, STREAK_N = 5, STREAK_BONUS = 100, CALL_MS = 1100;
         const CATS = {
           sci: { label: "과학", icon: "atom" },
@@ -1163,9 +1196,13 @@
         const coarse = window.matchMedia && matchMedia("(pointer: coarse)").matches;
 
         // 오늘 문제 — 쉬운 것(어려움)부터, 같은 분야가 연달아 나오지 않게 한 번 고르고, 보기는 ctx.rng 로 섞는다
+        let mode = "";
+        try { mode = localStorage.getItem("hk-trivia-mode") || ""; } catch (_) {}
+        if (mode && !CATS[mode]) mode = "";
+        ctx.setVariant && ctx.setVariant(mode, mode ? CATS[mode].label : "");
         function todaysQuestions() {
-          const r = ctx.rng("opts");
-          const list = pickDay(ctx.today); // 이미 쉬운 단계부터 순서대로
+          const r = ctx.rng(mode ? `opts:${mode}` : "opts");
+          const list = planFor(mode, ctx.today); // 이미 쉬운 단계부터 순서대로
           for (let k = 1; k < list.length; k++) {
             if (BANK[list[k]][0] !== BANK[list[k - 1]][0]) continue;
             for (let j = k + 1; j < list.length && BANK[list[j]][1] === BANK[list[k]][1]; j++) {
@@ -1213,21 +1250,28 @@
         function showIntro() {
           stopLoops();
           phase = "intro";
-          const today = pickDay(ctx.today);
+          const today = planFor(mode, ctx.today);
           const counts = {};
           today.forEach((i) => (counts[BANK[i][0]] = (counts[BANK[i][0]] || 0) + 1));
+          const done = ctx.playedVariants ? ctx.playedVariants() : [];
+          const doneMark = `<span class="gm-tv__pk-done">${HKUI.icon("check-circle-2", 13, "currentColor")}</span>`;
+          const picker = `<div class="gm-tv__pick">
+              <button type="button" class="gm-tv__pk is-all${mode ? "" : " is-on"}" data-mode="">${HKUI.icon("sparkles", 15, "currentColor")} 전체 · 오늘의 20문제${!mode && ctx.dailyDone ? doneMark : ""}</button>
+              ${Object.keys(CATS).map((c) => `<button type="button" class="gm-tv__pk${mode === c ? " is-on" : ""}" data-mode="${c}">${HKUI.icon(CATS[c].icon, 16, "currentColor")}${CATS[c].label}<small>${CAT_N}문제</small>${done.includes(c) ? doneMark : ""}</button>`).join("")}
+            </div>`;
           stage.innerHTML = `<div class="gm-tv">
             <div class="gm-tv__intro">
               <span class="gm-tv__badge">${HKUI.icon("lightbulb", 34, "#fff")}</span>
-              <span class="gm-tv__date">${formatDate(ctx.today)} · 오늘의 ${COUNT}문제</span>
+              <span class="gm-tv__date">${formatDate(ctx.today)} · ${mode ? `${CATS[mode].label} ` : "오늘의 "}${COUNT}문제</span>
               <h2 class="gm-tv__h">오늘의 상식 퀴즈</h2>
-              <p class="gm-tv__sub">단계를 올라갈수록 어려워져요.</p>
+              <p class="gm-tv__sub">분야를 고르고, 단계를 올라갈수록 어려워져요.</p>
+              ${picker}
               <div class="gm-tv__ladder">${STAGES.map((st, si) => `<div class="gm-tv__rung s-${si}"><b>${st.name}</b><span>${LV[st.lv]}</span><em>${st.n}문제 · ${BASE_PTS[st.lv]}점</em></div>`).join(`<span class="gm-tv__arrow">${HKUI.icon("chevron-right", 16, "currentColor")}</span>`)}</div>
-              <div class="gm-tv__chips">${Object.keys(CATS).filter((c) => counts[c]).map((c) => catChip(c, counts[c])).join("")}</div>
+              ${mode ? "" : `<div class="gm-tv__chips">${Object.keys(CATS).filter((c) => counts[c]).map((c) => catChip(c, counts[c])).join("")}</div>`}
               <ul class="gm-tv__rules">
                 <li><span>1</span><span>문제마다 <b>${LIMIT}초</b>, 보기 4개 중 하나를 골라요. PC는 숫자 <b>1~4</b> 키나 클릭, 휴대폰은 보기를 눌러요.</span></li>
                 <li><span>2</span><span>정답 기본점 <b>쉬움 ${BASE_PTS[1]} · 보통 ${BASE_PTS[2]} · 어려움 ${BASE_PTS[3]} · 아주 어려움 ${BASE_PTS[4]}</b> + 남은 초×${PER_SEC} · <b>${STREAK_N}연속</b> 정답마다 <b>+${STREAK_BONUS}</b></span></li>
-                <li><span>3</span><span>오늘 문제는 모든 직원이 같고, 날마다 겹치지 않는 새 문제가 나와요.</span></li>
+                <li><span>3</span><span>오늘 문제는 모든 직원이 같아요. <b>분야마다 하루 첫 판</b>만 그 분야 순위에 들어가요.</span></li>
               </ul>
               ${ctx.dailyDone ? `<div class="gm-tv__note">${HKUI.icon("info", 16, "currentColor")} 오늘 기록은 이미 반영됐어요 · 이번 판은 연습</div>` : ""}
               <button type="button" class="gm-tv__start" data-start>시작하기</button>
@@ -1235,6 +1279,14 @@
             </div>
           </div>`;
           stage.querySelector("[data-start]").onclick = (e) => begin(e.currentTarget);
+          stage.querySelectorAll("[data-mode]").forEach((b) => (b.onclick = () => {
+            if (mode === b.dataset.mode) return;
+            mode = b.dataset.mode;
+            try { localStorage.setItem("hk-trivia-mode", mode); } catch (_) {}
+            ctx.setVariant && ctx.setVariant(mode, mode ? CATS[mode].label : "");
+            ctx.sfx("select");
+            showIntro();
+          }));
           HKUI.refreshIcons(stage);
           layout();
         }
@@ -1244,8 +1296,17 @@
           if (phase !== "intro" && phase !== "done") return;
           if (btn) btn.disabled = true;
           phase = "starting";
-          await ctx.begin();
+          const ranked = await ctx.begin();
           qs = todaysQuestions();
+          // 두 번째 판부터(연습)는 같은 문제라도 단계 안에서 순서를 섞는다 — 첫 판(순위용)은 모두 같은 순서
+          if (!ranked) {
+            for (let si = 0; si < STAGES.length; si++) {
+              const from = stageStart(si), part = qs.slice(from, from + STAGES[si].n);
+              shuffleWith(Math.random, part);
+              qs.splice(from, part.length, ...part);
+            }
+            qs.forEach((q) => shuffleWith(Math.random, q.opts));
+          }
           idx = 0;
           results = [];
           streak = 0;
@@ -1390,8 +1451,15 @@
           fb.innerHTML = ok
             ? `<div class="gm-tv__fb-head">${HKUI.icon("check", 18, "currentColor")} 정답이에요! +${pts}점${bonus ? ` <em>${streak}연속 보너스 +${bonus}</em>` : ""}</div><p>${esc(q.e)}</p>`
             : `<div class="gm-tv__fb-head">${HKUI.icon(i < 0 ? "timer-off" : "x", 18, "currentColor")} ${i < 0 ? "시간이 다 됐어요" : "아쉬워요"} · 정답은 ‘${esc(q.a)}’</div><p>${esc(q.e)}</p>`;
+          fb.insertAdjacentHTML("beforeend", `<span class="gm-tv__fb-skip">${coarse ? "눌러서" : "스페이스·클릭으로"} 다음 문제</span>`);
+          fb.onclick = skipFeedback;
           HKUI.refreshIcons(stage);
-          timer = setTimeout(next, FEEDBACK_MS);
+          timer = setTimeout(next, feedbackMs(q));
+        }
+        function skipFeedback() {
+          if (phase !== "feedback") return;
+          clearTimeout(timer);
+          next();
         }
 
         function next() {
@@ -1500,6 +1568,11 @@
           if (e.ctrlKey || e.metaKey || e.altKey) return;
           const tag = (e.target && e.target.tagName) || "";
           if (tag === "INPUT" || tag === "TEXTAREA" || (e.target && e.target.isContentEditable)) return;
+          if ((e.code === "Space" || e.code === "Enter") && phase === "feedback" && !e.repeat) {
+            e.preventDefault();
+            skipFeedback();
+            return;
+          }
           if (e.code === "Space" && ["play", "judge", "feedback", "starting", "call"].includes(phase)) {
             e.preventDefault();
             return;
@@ -1511,6 +1584,8 @@
           choose(+m[1] - 1);
         });
 
+        // 게임 중 뒤로 가기 → '기록 남기고 나가기'에 쓰는 지금 점수
+        ctx.onScore && ctx.onScore(() => totalScore());
         ctx.onRestart(() => {
           if (phase === "done") begin(stage.querySelector("[data-again]"));
         });

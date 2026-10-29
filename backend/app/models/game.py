@@ -18,6 +18,8 @@ class GamePlay(Base):
         BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False
     )
     game: Mapped[str] = mapped_column(String(30), nullable=False)
+    # 같은 게임 안의 갈래 — 상식 퀴즈 분야(sci·khist …). 빈 값이 기본 판(오늘의 20문제). 갈래마다 순위·하루 첫 판을 따로 센다
+    variant: Mapped[str] = mapped_column(String(20), nullable=False, server_default="")
     score: Mapped[int] = mapped_column(Integer, nullable=False)
     # KST 날짜 — 오늘·이번 주 순위 기준
     played_on: Mapped[date] = mapped_column(Date, nullable=False)

@@ -22,6 +22,7 @@ class GameRequestBody(BaseModel):
 class ScoreRequest(BaseModel):
     score: int
     token: Optional[str] = None
+    variant: Optional[str] = None
 
 
 @router.get("/status")
@@ -37,6 +38,15 @@ async def games(
 ):
     """점심 라운지 게임 목록 — 오늘 1위 · 오늘 참가자 수 · 내 최고 기록."""
     return {"data": await game_service.list_games(db, member)}
+
+
+@router.get("/weekly")
+async def weekly(
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """지난주(월~일) 게임별 1~3위 — 아케이드 '지난주 명예의 전당'."""
+    return {"data": await game_service.last_week_board(db)}
 
 
 @router.get("/stamps")
@@ -75,10 +85,11 @@ async def run(
 async def leaderboard(
     game: str,
     period: str = Query("today"),
+    variant: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    return {"data": await game_service.leaderboard(db, member, game, period)}
+    return {"data": await game_service.leaderboard(db, member, game, period, variant)}
 
 
 @router.post("/{game}/score")
@@ -89,15 +100,16 @@ async def submit_score(
     redis: Redis = Depends(get_redis_client),
     member: Member = Depends(get_current_active_member),
 ):
-    return {"data": await game_service.submit_score(db, redis, member, game, body.score, body.token)}
+    return {"data": await game_service.submit_score(db, redis, member, game, body.score, body.token, body.variant)}
 
 
 @router.post("/{game}/start")
 async def start(
     game: str,
+    variant: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis_client),
     member: Member = Depends(get_current_active_member),
 ):
     """오늘의 도전 시작 신고 — 하루 첫 시작만 순위용 토큰을 준다."""
-    return {"data": await game_service.start_daily(db, redis, member, game)}
+    return {"data": await game_service.start_daily(db, redis, member, game, variant)}
