@@ -204,7 +204,9 @@
           volley: w >= 20 ? 3 : w >= 4 ? 2 : 1, // 한 번에 쏘는 세균 수 (4웨이브 2, 20웨이브 3)
           ebSpeed: Math.min(300, 130 + w * 11), // 탄 속도 — 1웨이브 141 → 최대 300
           diveSpeed: Math.min(380, 140 + w * 14),
-          hpBonus: Math.floor((w - 1) / 8), // 9웨이브부터 세균마다 체력 +1, 17웨이브 +2 …
+          // 세균 체력 보너스 — 웨이브마다 조금씩(평균 +0.125) 늘어난다. 예전엔 9웨이브 +1, 17웨이브 +2 처럼 계단으로 뛰어
+          // 17웨이브에서 갑자기 어려워졌다. 소수 부분은 그 확률로 세균마다 +1 (12~13웨이브 평균 +1, 20~21웨이브 평균 +2)
+          hpGrow: Math.max(0, (w - 4.5) / 8),
           armored: w >= 11, // 11웨이브부터 둘째 줄도 단단한 세균
         };
       }
@@ -240,14 +242,14 @@
               const T = TYPES[type];
               const fromLeft = (r + c) % 2 === 0;
               S.enemies.push({
-                type, hp: T.hp + P.hpBonus, r: T.r, col: c, row: r, x: fromLeft ? -30 : W + 30, y: -20,
+                type, hp: T.hp + Math.floor(P.hpGrow) + (Math.random() < P.hpGrow % 1 ? 1 : 0), r: T.r, col: c, row: r, x: fromLeft ? -30 : W + 30, y: -20,
                 mode: "enter", delay: 0.25 + r * 0.32 + c * 0.06, p: 0,
                 sx: fromLeft ? -30 : W + 30, sy: 40 + r * 10, cx: fromLeft ? W * 0.75 : W * 0.25, cy: 240,
                 flash: 0, spin: Math.random() * 6,
               });
             }
           }
-          S.banner = { text: `웨이브 ${S.wave}`, sub: S.wave === 1 ? "세균 편대가 몰려와요" : P.hpBonus && (S.wave - 1) % 8 === 0 ? "세균이 더 단단해졌어요!" : "더 빠르고 촘촘해져요", t: 1.6 };
+          S.banner = { text: `웨이브 ${S.wave}`, sub: S.wave === 1 ? "세균 편대가 몰려와요" : S.wave === 9 ? "세균이 조금씩 단단해져요!" : "더 빠르고 촘촘해져요", t: 1.6 };
           ctx.sfx("go");
         }
         hud();
