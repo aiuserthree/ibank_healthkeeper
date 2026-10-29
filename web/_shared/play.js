@@ -357,6 +357,8 @@ window.HKPlay = (function () {
     // 참여 도장용 판 길이 — 새 판을 시작하면 그때부터 다시 잰다(이어 하기는 그대로).
     // 시작 화면·결과 화면에서도 미리 알려 두어, 시작을 못 알아채는 게임도 길이가 잡히게 한다
     let inRun = false;
+    let runStartAt = 0; // 이번 판을 시작한 시각 — 뒤로 가기 '기록 남기고 나가기'는 30초 넘게 한 판만
+    const SAVE_MIN_SEC = 30;
     const armRun = (fresh) => HKApi.playRun(key, fresh).catch(() => {});
     let playingNow = false;
     let scoreFn = null; // 게임이 알려 주는 지금 점수 (뒤로 가기 → 기록 남기고 나가기)
@@ -366,7 +368,7 @@ window.HKPlay = (function () {
       playingNow = on;
       if (on && !(history.state && history.state.hkPlay)) history.pushState({ hkPlay: 1 }, "");
       if (!on) return;
-      if (!inRun) armRun(true);
+      if (!inRun) { armRun(true); runStartAt = Date.now(); }
       inRun = true;
       endQuit(false);
       runNo++;
@@ -454,11 +456,14 @@ window.HKPlay = (function () {
       pauseFns.forEach((fn) => { try { fn(); } catch (_) {} });
       let now = null;
       try { now = scoreFn ? Math.max(0, Math.round(Number(scoreFn()) || 0)) : null; } catch (_) { now = null; }
+      // 시작하자마자 나가며 기록만 남기는 걸 막는다 — 30초가 안 됐으면 기록 남기기는 없이
+      const tooShort = now != null && (Date.now() - runStartAt) / 1000 < SAVE_MIN_SEC;
+      if (tooShort) now = null;
       const overlay = document.createElement("div");
       overlay.className = "hk-dialog__overlay";
       overlay.innerHTML = `<div class="hk-dialog" role="dialog">
           <div class="hk-dialog__title">게임을 그만할까요?</div>
-          <div class="hk-dialog__body">${now != null ? `지금까지 <b>${formatScore(game, now)}</b>이에요. 이 점수를 기록에 남기고 나갈 수 있어요.` : "이 게임은 끝까지 해야 기록이 남아요. 지금 나가면 이번 판은 기록되지 않아요."}</div>
+          <div class="hk-dialog__body">${now != null ? `지금까지 <b>${formatScore(game, now)}</b>이에요. 이 점수를 기록에 남기고 나갈 수 있어요.` : tooShort ? `시작한 지 ${SAVE_MIN_SEC}초가 안 돼서 기록을 남길 수 없어요. 지금 나가면 이번 판은 기록되지 않아요.` : "이 게임은 끝까지 해야 기록이 남아요. 지금 나가면 이번 판은 기록되지 않아요."}</div>
           <div class="hk-dialog__actions" style="flex-wrap:wrap">
             <button type="button" class="hk-btn hk-btn--secondary" data-leave="stay">계속하기</button>
             <button type="button" class="hk-btn hk-btn--secondary" data-leave="out">그냥 나가기</button>
@@ -522,6 +527,52 @@ window.HKPlay = (function () {
       // 바깥을 눌러도 닫히지 않게 — 이 판은 이미 기록됐으니 나가기만 남는다 (계속하면 같은 판이 두 번 기록될 수 있다)
       overlay.dataset.final = "1";
       load("today");
+    }
+    // 게임 화면에서 바로 오류 신고 · 개선 의견 — 이 게임과 기기 정보가 함께 저장된다 (관리자 「게임 요청」)
+    function openReport() {
+      if (document.querySelector(".hk-report")) return;
+      if (playingNow) pauseFns.forEach((fn) => { try { fn(); } catch (_) {} });
+      const overlay = document.createElement("div");
+      overlay.className = "hk-dialog__overlay hk-report";
+      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:420px;width:calc(100% - 32px)">
+          <div class="hk-dialog__title">${HKUI.escapeHtml(game.title || "")} · 의견 보내기</div>
+          <div class="hk-play-tabs" role="tablist" style="margin:4px 0 10px">
+            <button type="button" class="hk-play-tab is-active" data-rk="BUG">오류 신고</button>
+            <button type="button" class="hk-play-tab" data-rk="IDEA">개선 의견</button>
+          </div>
+          <textarea class="hk-input" data-rtext maxlength="300" rows="4" style="width:100%;box-sizing:border-box;resize:vertical;min-height:110px;padding:12px;font:inherit;font-size:15px" placeholder="어떤 상황에서 무엇이 안 됐는지 적어 주세요"></textarea>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:6px">게임 이름과 기기 정보(${HKUI.escapeHtml(HKUI.deviceInfo())})가 함께 전달돼요.</div>
+          <div class="hk-dialog__actions" style="margin-top:12px">
+            <button type="button" class="hk-btn hk-btn--secondary" data-rclose>닫기</button>
+            <button type="button" class="hk-btn hk-btn--primary" data-rsend>보내기</button>
+          </div>
+        </div>`;
+      let kind = "BUG";
+      const ta = overlay.querySelector("[data-rtext]");
+      overlay.querySelectorAll("[data-rk]").forEach((t) => (t.onclick = () => {
+        kind = t.dataset.rk;
+        overlay.querySelectorAll("[data-rk]").forEach((x) => x.classList.toggle("is-active", x === t));
+        ta.placeholder = kind === "BUG" ? "어떤 상황에서 무엇이 안 됐는지 적어 주세요" : "이렇게 바뀌면 좋겠다는 점을 적어 주세요";
+      }));
+      const close = () => overlay.remove();
+      overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+      overlay.querySelector("[data-rclose]").onclick = close;
+      overlay.querySelector("[data-rsend]").onclick = async (e) => {
+        const body = ta.value.trim();
+        if (body.length < 2) { HKUI.toast("내용을 적어 주세요", "danger"); return ta.focus(); }
+        e.currentTarget.disabled = true;
+        try {
+          await HKApi.playRequestGame(body, { kind, game: key, device: HKUI.deviceInfo() });
+          close();
+          HKUI.toast("보냈어요, 고마워요!");
+        } catch (err) {
+          e.currentTarget.disabled = false;
+          HKUI.toast(err.message || "보내지 못했어요", "danger");
+        }
+      };
+      document.body.appendChild(overlay);
+      HKUI.refreshIcons(overlay);
+      setTimeout(() => ta.focus(), 50);
     }
     // 휴대폰·브라우저 뒤로 가기 — 판이 도는 중이면 한 칸 되돌려 놓고 묻는다
     window.addEventListener("popstate", () => {
@@ -643,10 +694,12 @@ window.HKPlay = (function () {
           <div class="hk-pf__tools">
             ${meta.dailyOnce ? `<span class="hk-badge ${dailyDone ? "hk-badge--neutral" : "hk-badge--warning"} hk-pf__daily">${dailyDone ? "오늘 도전 완료 · 연습" : "오늘의 도전"}</span>` : ""}
             <button type="button" class="hk-play-sound hk-pf__pause" id="hk-pf-pause" hidden aria-label="일시정지">${HKUI.icon("pause", 18, "currentColor")}<span>일시정지</span></button>
+            <button type="button" class="hk-play-sound" id="hk-pf-report" aria-label="오류 신고">${HKUI.icon("bug", 18, "currentColor")}<span>오류 신고</span></button>
             <button type="button" class="hk-play-sound" id="hk-play-sound"></button>
             <button type="button" class="hk-play-sound hk-pf__rank-btn" id="hk-pf-rank" hidden>${HKUI.icon("trophy", 18, "currentColor")}<span>순위</span></button>
           </div>`;
         document.getElementById("hk-pf-pause").onclick = (e) => { e.currentTarget.blur(); togglePause(); };
+        document.getElementById("hk-pf-report").onclick = (e) => { e.currentTarget.blur(); openReport(); };
         document.querySelector(".hk-pf__back").addEventListener("click", (e) => {
           if (!playingNow) return;
           e.preventDefault();
