@@ -1107,10 +1107,10 @@
       { lv: 3, n: 5, name: "본선", call: "본선 시작!" },
       { lv: 4, n: 5, name: "결승", call: "결승 시작!" },
     ];
-    // 지금 고른 판의 단계 구성 — 전체는 위 20문제, 분야는 그날 뽑힌 10문제의 난이도대로 나눈다
+    // 지금 고른 판의 단계 구성 — 전체는 위 20문제, 분야는 그날 뽑힌 20문제의 난이도대로 나눈다
     let STAGES = FULL_STAGES;
     let COUNT = 20;
-    const CAT_N = 10; // 분야 하나의 하루 문제 수
+    const CAT_N = 20; // 분야 하나의 하루 문제 수
     const STAGE_NAME = { 1: "워밍업", 2: "예선", 3: "본선", 4: "결승" };
     const BASE_DAY = "2026-10-27";
 
@@ -1147,7 +1147,7 @@
       const d = dayIndex(iso);
       return FULL_STAGES.flatMap((st) => pickLevel(st.lv, st.n, d));
     }
-    // 분야 하나의 오늘 10문제 — 그 분야 문항을 고정 시드로 섞어 날마다 다음 10개 (약 8일마다 한 바퀴), 쉬운 것부터
+    // 분야 하나의 오늘 20문제 — 그 분야 문항을 고정 시드로 섞어 날마다 다음 20개 (분야당 약 80문항 · 약 4일마다 한 바퀴), 쉬운 것부터
     function pickCat(cat, iso) {
       const d = dayIndex(iso);
       const pool = BANK.map((_, i) => i).filter((i) => BANK[i][0] === cat);
@@ -1157,7 +1157,7 @@
       if (!permCache[key]) permCache[key] = shuffleWith(HKPlay.seededRng(`trivia-cat:${cat}:${round}`), pool);
       return permCache[key].slice(k * CAT_N, k * CAT_N + CAT_N).sort((a, b) => BANK[a][1] - BANK[b][1]);
     }
-    // 판 고르기 — "" 는 오늘의 20문제, 분야 키면 그 분야 10문제. 단계 구성(STAGES·COUNT)도 함께 바꾼다
+    // 판 고르기 — "" 는 오늘의 20문제, 분야 키면 그 분야 20문제. 단계 구성(STAGES·COUNT)도 함께 바꾼다
     function planFor(mode, iso) {
       if (!mode) { STAGES = FULL_STAGES; COUNT = 20; return pickDay(iso); }
       const list = pickCat(mode, iso);
