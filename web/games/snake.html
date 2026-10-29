@@ -133,7 +133,6 @@
       let state = "ready"; // ready | go | play | paused | count | over
       let snake, dir, queue, pending, vitamin, lunch, desks, sulks, puffs;
       let score, vitCount, floor, maxLen, boostUntil, playMs, acc, phaseT, countStep, overReason, overT;
-      let prevPos = null;
       let log, unreach, lastCheck, lastCountSec;
       let anim = 0, last = null;
       let cell = 24, bw = 0, bh = 0, dpr = 1;
@@ -253,7 +252,6 @@
 
       // ───────────────────────── 초기화
       function reset() {
-        prevPos = null;
         snake = [];
         // 처음엔 세 명으로 짧게 시작 (예전 여섯 명은 처음부터 길어 부담스러웠다)
         for (let r = 13; r <= 15; r++) snake.push({ c: 6, r });
@@ -318,7 +316,7 @@
       }
       window.addEventListener("keydown", onKey);
 
-      // 판 위 스와이프 — 손을 떼기 전에 10px 움직이는 순간 판정. 손을 떼지 않고 이어서 다른 방향으로 밀어도 또 꺾인다
+      // 판 위 스와이프 — 손을 떼기 전에 7px 움직이는 순간 판정. 손을 떼지 않고 이어서 다른 방향으로 밀어도 또 꺾인다
       let ptr = null;
       boardEl.addEventListener("pointerdown", (e) => {
         if (!live() || e.target !== canvas) return;
@@ -329,7 +327,7 @@
       boardEl.addEventListener("pointermove", (e) => {
         if (!ptr || e.pointerId !== ptr.id || ptr.done) return;
         const dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
-        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return;
         // 판정한 자리에서 다시 재기 시작 — 한 번 짚고 ㄱ자·ㄴ자로 그려도 두 번 꺾인다
         ptr.x = e.clientX; ptr.y = e.clientY;
         if (!live()) return;
@@ -534,8 +532,6 @@
         }
         const k = snake.findIndex((s) => s.c === nc && s.r === nr);
         if (k >= 0 && !(k === snake.length - 1 && pending === 0 && grow === 0)) cutIn(k);
-        // 그리기용 — 움직이기 전 칸 (다음 칸까지 미끄러지듯 그린다)
-        prevPos = snake.map((s) => ({ c: s.c, r: s.r }));
         snake.unshift({ c: nc, r: nr });
         pending += grow;
         if (pending > 0) pending--; else snake.pop();
@@ -625,8 +621,8 @@
         g.fillStyle = i % 2 ? COL_B : "#a3e635"; rr(x, y, sz, sz, cell * 0.18); g.fill();
         g.fillStyle = "#f7fee7"; g.beginPath(); g.arc(x + sz / 2, y + sz / 2, cell * 0.14, 0, Math.PI * 2); g.fill();
       }
-      function drawHead(h) {
-        const v = DIR[dir], p = [-v[1], v[0]];
+      function drawHead(h, d) {
+        const v = DIR[d || dir], p = [-v[1], v[0]];
         const sz = cell * 0.88, o = cell * 0.06, x = h.c * cell + o, y = h.r * cell + o;
         if (playMs < boostUntil && live()) { g.strokeStyle = "#fde047"; g.lineWidth = 2; rr(x - 1, y - 1, sz + 2, sz + 2, cell * 0.22 + 1); g.stroke(); }
         g.fillStyle = COL_A; rr(x, y, sz, sz, cell * 0.22); g.fill();
@@ -658,15 +654,21 @@
         for (const s of sulks) drawSulk(s);
         if (vitamin) drawVitamin();
         if (lunch) drawLunch();
-        // 한 칸씩 뚝뚝 옮기지 않고, 지난 칸 → 지금 칸 사이를 틱 진행만큼 미끄러지듯 그린다
-        const t = state === "play" && prevPos ? Math.max(0, Math.min(1, acc / tickMs())) : 1;
+        // 지금 칸 → 다음 칸으로 미리 미끄러지듯 그린다 — 밀자마자 머리가 새 방향으로 움직이기 시작해 반응이 바로 보인다
+        // (예전엔 지난 칸 → 지금 칸으로 그려 화면이 한 칸 늦게 따라왔다). 머리의 다음 칸은 다음 틱에 쓸 방향(줄 선 입력)으로
+        const nd = queue.length && OPP[queue[0]] !== dir ? queue[0] : dir;
+        const t = state === "play" ? Math.max(0, Math.min(1, acc / tickMs())) : 0;
         const at = (i) => {
-          const cur = snake[i], pr = prevPos && prevPos[i];
-          if (!pr || t >= 1 || Math.abs(pr.c - cur.c) + Math.abs(pr.r - cur.r) !== 1) return cur;
-          return { c: pr.c + (cur.c - pr.c) * t, r: pr.r + (cur.r - pr.r) * t };
+          const cur = snake[i];
+          if (!t) return cur;
+          let nx;
+          if (i === 0) nx = { c: cur.c + DIR[nd][0], r: cur.r + DIR[nd][1] };
+          else if (i === snake.length - 1 && pending > 0) return cur; // 길어지는 중이면 꼬리는 그 자리
+          else nx = snake[i - 1];
+          return { c: cur.c + (nx.c - cur.c) * t, r: cur.r + (nx.r - cur.r) * t };
         };
         for (let i = snake.length - 1; i >= 1; i--) drawBody(at(i), i);
-        drawHead(at(0));
+        drawHead(at(0), t ? nd : dir);
         for (const pf of puffs) {
           g.globalAlpha = (1 - pf.t) * 0.6;
           g.fillStyle = "#9ca3af"; g.beginPath(); g.arc((pf.c + 0.5) * cell, (pf.r + 0.5) * cell, cell * (0.2 + 0.4 * pf.t), 0, Math.PI * 2); g.fill();
