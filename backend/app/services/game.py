@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
 from app.config import get_settings
-from app.core.time import now_kst, today_kst
+from app.core.time import KST, now_kst, today_kst
 from app.models import ArcadeStamp, Coupon, CouponSource, CouponStatus, GamePlay, GameRequest, Member, MemberStatus
 from app.services.avatar import member_avatar_url
 from app.services.fun_stats import DEPARTMENT_RANKING_EXCLUDED
@@ -328,6 +328,7 @@ async def last_week_board(db: AsyncSession) -> dict:
 STAMP_GOAL = 10
 # 판 길이 제한 없음 — 일찍 죽어 끝난 판도 도장. 다만 게임 화면에서 판을 시작한 기록(run)은 있어야 한다 (점수만 보내는 꼼수 막기)
 STAMP_MIN_SEC = 0
+ARCADE_COUPON_DAYS = 30  # 아케이드 쿠폰 사용 기한 — 받은 날부터 30일
 
 
 def _run_key(member: Member, key: str) -> str:
@@ -377,12 +378,12 @@ async def stamp_status(db: AsyncSession, member: Member, day: date | None = None
 
 async def _issue_arcade_coupon_if_due(db: AsyncSession, member: Member, day: date) -> bool:
     """도장판이 10개 찼고 이번 달 쿠폰을 아직 안 받았으면 1장 준다 (커밋은 부르는 쪽에서)."""
-    from app.services.coupon import _next_month_start
-
     st = await stamp_status(db, member, day)
     if st["count"] < STAMP_GOAL or st["coupon"]:
         return False
     now = now_kst()
+    # 받은 날부터 30일 (예: 10/1 받으면 10/31 23:59까지) — 언제 받든 수요일 신청이 4번 넘게 들어간다
+    until = datetime.combine(now.date() + timedelta(days=ARCADE_COUPON_DAYS + 1), datetime.min.time(), tzinfo=KST)
     db.add(
         Coupon(
             member_id=member.id,
@@ -390,7 +391,7 @@ async def _issue_arcade_coupon_if_due(db: AsyncSession, member: Member, day: dat
             status=CouponStatus.AVAILABLE,
             grant_month=st["month"],
             issued_at=now,
-            expires_at=_next_month_start(_next_month_start(now)),  # 받은 다음 달 말일까지
+            expires_at=until,
             note="아케이드 도장 10개",
         )
     )
