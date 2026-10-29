@@ -468,6 +468,7 @@ window.HKPlay = (function () {
       leaving = overlay;
       const done = () => { overlay.remove(); leaving = null; };
       overlay.addEventListener("click", async (e) => {
+        if (overlay.dataset.final) return; // 기록을 남긴 뒤 결과 창 — 나가기 버튼만
         if (e.target === overlay) return done();
         const b = e.target.closest("[data-leave]");
         if (!b) return;
@@ -475,12 +476,52 @@ window.HKPlay = (function () {
         if (b.dataset.leave === "save") {
           overlay.querySelectorAll("button").forEach((x) => (x.disabled = true));
           b.textContent = "저장하는 중…";
-          try { await HKApi.playSubmit(key, now, dailyToken, variant); } catch (_) { /* 저장 못 해도 나간다 */ }
+          let result = null;
+          try { result = await HKApi.playSubmit(key, now, dailyToken, variant); dailyToken = null; } catch (_) { /* 저장 못 해도 나갈 수는 있게 */ }
+          playingNow = false;
+          if (result) return showLeaveResult(overlay, result);
         }
         playingNow = false;
         goQuit();
       });
       document.body.appendChild(overlay);
+    }
+    // 기록 남기고 나가기 뒤 — 같은 창에서 내 결과와 사내 순위(오늘·이번 주)를 보여 주고, 나가기는 버튼으로
+    function showLeaveResult(overlay, result) {
+      stampToast(result.stamp);
+      const ranks = [];
+      if (result.todayRank) ranks.push(`오늘 <b>${result.todayRank}위</b>`);
+      if (result.weekRank) ranks.push(`이번 주 <b>${result.weekRank}위</b>`);
+      const title = !result.counted ? "연습 기록이에요" : result.newBest ? "새 최고 기록!" : "기록을 남겼어요";
+      overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:420px;width:calc(100% - 32px);max-height:min(640px, 85dvh);display:flex;flex-direction:column">
+          <div class="hk-dialog__title">${title} · ${formatScore(game, result.score)}</div>
+          <div class="hk-dialog__body" style="margin-bottom:10px">${ranks.join(" · ") || (result.counted ? "" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.stamp && result.stamp.new ? `${ranks.length ? " · " : ""}오늘 도장 쾅!` : ""}</div>
+          <div class="hk-play-tabs" role="tablist" style="margin-bottom:8px">
+            <button type="button" class="hk-play-tab is-active" data-lp="today">오늘</button>
+            <button type="button" class="hk-play-tab" data-lp="week">이번 주</button>
+            <button type="button" class="hk-play-tab" data-lp="all">전체</button>
+          </div>
+          <div data-lboard style="flex:1;min-height:0;overflow-y:auto"><div style="text-align:center;padding:24px"><span class="hk-spin"></span></div></div>
+          <div class="hk-dialog__actions" style="margin-top:12px">
+            <button type="button" class="hk-btn hk-btn--primary" data-leave-go>아케이드로 나가기</button>
+          </div>
+        </div>`;
+      const box = overlay.querySelector("[data-lboard]");
+      const load = async (pd) => {
+        overlay.querySelectorAll("[data-lp]").forEach((t) => t.classList.toggle("is-active", t.dataset.lp === pd));
+        try {
+          const data = await HKApi.playLeaderboard(key, pd, variant);
+          box.innerHTML = boardRowsHtml(data, data.game || game);
+        } catch (e) {
+          box.innerHTML = `<div class="hk-play-board__empty">${HKUI.escapeHtml(e.message || "순위를 불러오지 못했어요")}</div>`;
+        }
+        HKUI.refreshIcons(box);
+      };
+      overlay.querySelectorAll("[data-lp]").forEach((t) => (t.onclick = () => load(t.dataset.lp)));
+      overlay.querySelector("[data-leave-go]").onclick = goQuit;
+      // 바깥을 눌러도 닫히지 않게 — 이 판은 이미 기록됐으니 나가기만 남는다 (계속하면 같은 판이 두 번 기록될 수 있다)
+      overlay.dataset.final = "1";
+      load("today");
     }
     // 휴대폰·브라우저 뒤로 가기 — 판이 도는 중이면 한 칸 되돌려 놓고 묻는다
     window.addEventListener("popstate", () => {
