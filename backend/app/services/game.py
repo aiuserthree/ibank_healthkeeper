@@ -532,12 +532,18 @@ async def submit_score(
 GAME_REQUEST_PER_DAY = 5
 GAME_REQUEST_MAX_LEN = 300
 GAME_REQUEST_STATUSES = ("NEW", "PLANNED", "DONE", "HOLD")
+GAME_REQUEST_KINDS = ("GAME", "BUG", "IDEA")  # 하고 싶은 게임 · 오류 신고 · 개선 의견
 
 
-async def add_game_request(db: AsyncSession, member: Member, body: str) -> None:
+async def add_game_request(
+    db: AsyncSession, member: Member, body: str, kind: str | None = None, game: str | None = None, device: str | None = None
+) -> None:
     text = " ".join((body or "").split())[:GAME_REQUEST_MAX_LEN]
     if len(text) < 2:
         raise_app_error("GAME_REQUEST_EMPTY", 400)
+    kind = kind if kind in GAME_REQUEST_KINDS else "GAME"
+    game = game if game in GAMES else None
+    device = " ".join((device or "").split())[:200] or None
     day_start = now_kst().replace(hour=0, minute=0, second=0, microsecond=0)
     sent = await db.scalar(
         select(func.count()).select_from(GameRequest).where(
@@ -546,7 +552,7 @@ async def add_game_request(db: AsyncSession, member: Member, body: str) -> None:
     )
     if (sent or 0) >= GAME_REQUEST_PER_DAY:
         raise_app_error("GAME_REQUEST_LIMIT")
-    db.add(GameRequest(member_id=member.id, body=text))
+    db.add(GameRequest(member_id=member.id, body=text, kind=kind, game=game, device=device))
     await db.commit()
 
 
@@ -563,13 +569,17 @@ async def admin_game_requests(db: AsyncSession) -> dict:
             "id": r.id,
             "body": r.body,
             "status": r.status,
+            "kind": r.kind,
+            "game": {"key": r.game, "title": GAMES[r.game].title} if r.game in GAMES else None,
+            "device": r.device,
             "createdAt": r.created_at.isoformat(),
             "member": {"id": m.id, "name": m.name, "department": m.department},
         }
         for r, m in rows
     ]
     counts = {s: sum(1 for it in items if it["status"] == s) for s in GAME_REQUEST_STATUSES}
-    return {"items": items, "counts": counts}
+    kinds = {k: sum(1 for it in items if it["kind"] == k) for k in GAME_REQUEST_KINDS}
+    return {"items": items, "counts": counts, "kinds": kinds}
 
 
 async def admin_set_game_request_status(db: AsyncSession, request_id: int, status: str) -> None:

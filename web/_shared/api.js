@@ -50,7 +50,8 @@ window.HKApi = (function () {
     playRun: (game, fresh) => request(`/play/${encodeURIComponent(game)}/run${fresh ? "?fresh=1" : ""}`, { method: "POST" }),
     playStamps: () => request("/play/stamps"),
     playWeekly: () => request("/play/weekly"),
-    playRequestGame: (body) => request("/play/requests", { method: "POST", body: JSON.stringify({ body }) }),
+    // 아케이드 의견 — kind: GAME(하고 싶은 게임) · BUG(오류) · IDEA(개선), game: 게임 키, device: 기기 정보
+    playRequestGame: (body, opts = {}) => request("/play/requests", { method: "POST", body: JSON.stringify({ body, kind: opts.kind || null, game: opts.game || null, device: opts.device || null }) }),
     playSubmit: (game, score, token, variant) => request(`/play/${encodeURIComponent(game)}/score`, { method: "POST", body: JSON.stringify({ score, token, variant: variant || null }) }),
     notices: (category) => request(category ? `/system/notices?category=${encodeURIComponent(category)}` : "/system/notices"),
     notice: (id) => request(`/system/notices/${id}`),

@@ -257,17 +257,26 @@
         </div>`;
     }
 
-    // 만들어 줬으면 하는 게임 — 보내면 관리자 「게임 요청」에 쌓인다
-    function wishHtml() {
+    // 의견 보내기 — 하고 싶은 게임 · 오류 신고 · 개선 의견. 보내면 관리자 「게임 요청」에 쌓인다
+    const WISH_KINDS = [
+      ["GAME", "하고 싶은 게임", "예: 오목, 끝말잇기, 점심 메뉴 룰렛"],
+      ["BUG", "오류 신고", "예: 휴대폰에서 시작을 눌러도 안 넘어가요 — 어떤 상황에서 무엇이 안 됐는지 적어 주세요"],
+      ["IDEA", "개선 의견", "예: 순위표에서 우리 부서만 따로 보고 싶어요"],
+    ];
+    let wishGames = [];
+    function wishHtml(games) {
+      wishGames = games || [];
       return `<div class="hk-aa-wrap hk-aa-wishwrap">
           <form class="hk-aa-wish" id="aa-wish">
             <div class="hk-aa-wish__copy">
-              <span class="hk-aa-offer__eyebrow">${HKUI.icon("lightbulb", 16, "currentColor")} 게임 요청</span>
+              <span class="hk-aa-offer__eyebrow">${HKUI.icon("lightbulb", 16, "currentColor")} 의견 보내기</span>
               <h2 class="hk-aa-h2">이런 게임 있으면<br>좋겠어요.</h2>
-              <p>하고 싶은 게임을 편하게 적어 주세요.<br>다음 대표 게임이 될지도 몰라요.</p>
+              <p>하고 싶은 게임, 오류, 바라는 점을<br>편하게 적어 주세요.</p>
             </div>
             <div class="hk-aa-wish__box">
-              <textarea id="aa-wish-text" maxlength="300" rows="4" placeholder="예: 오목, 끝말잇기, 점심 메뉴 룰렛"></textarea>
+              <div class="hk-aa-wish__kinds" role="radiogroup">${WISH_KINDS.map(([k, l], i) => `<button type="button" class="hk-aa-wish__kind${i ? "" : " is-on"}" data-kind="${k}" role="radio" aria-checked="${i ? "false" : "true"}">${l}</button>`).join("")}</div>
+              <select id="aa-wish-game" class="hk-aa-wish__game" hidden><option value="">어느 게임인가요? (아케이드 전체면 비워 두세요)</option>${wishGames.map((g) => `<option value="${g.key}">${esc(g.title)}</option>`).join("")}</select>
+              <textarea id="aa-wish-text" maxlength="300" rows="4" placeholder="${WISH_KINDS[0][2]}"></textarea>
               <div class="hk-aa-wish__foot">
                 <span class="hk-aa-wish__msg" id="aa-wish-msg" aria-live="polite"></span>
                 <button type="submit" class="hk-aa-pill is-sm" id="aa-wish-send">보내기</button>
@@ -283,17 +292,26 @@
       const text = document.getElementById("aa-wish-text");
       const msg = document.getElementById("aa-wish-msg");
       const btn = document.getElementById("aa-wish-send");
+      const gameSel = document.getElementById("aa-wish-game");
+      let kind = "GAME";
+      form.querySelectorAll("[data-kind]").forEach((b) => (b.onclick = () => {
+        kind = b.dataset.kind;
+        form.querySelectorAll("[data-kind]").forEach((x) => { x.classList.toggle("is-on", x === b); x.setAttribute("aria-checked", x === b ? "true" : "false"); });
+        text.placeholder = WISH_KINDS.find(([k]) => k === kind)[2];
+        gameSel.hidden = kind === "GAME";
+        msg.textContent = "";
+      }));
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         const body = text.value.trim();
         if (body.length < 2) {
           msg.className = "hk-aa-wish__msg is-err";
-          msg.textContent = "하고 싶은 게임을 적어 주세요.";
+          msg.textContent = kind === "GAME" ? "하고 싶은 게임을 적어 주세요." : "내용을 적어 주세요.";
           return text.focus();
         }
         btn.disabled = true;
         try {
-          await HKApi.playRequestGame(body);
+          await HKApi.playRequestGame(body, { kind, game: kind === "GAME" ? null : gameSel.value || null, device: HKUI.deviceInfo() });
           text.value = "";
           msg.className = "hk-aa-wish__msg is-ok";
           msg.textContent = "받았어요, 고마워요!";
@@ -335,7 +353,7 @@
         try {
           const [st, games, sp, wk] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null), HKApi.playWeekly().catch(() => null)]);
           status = st;
-          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml() + endHtml();
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
         }

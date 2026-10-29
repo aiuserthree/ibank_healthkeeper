@@ -17,6 +17,9 @@ router = APIRouter(prefix="/play", tags=["play"])
 
 class GameRequestBody(BaseModel):
     body: str
+    kind: Optional[str] = None  # GAME · BUG · IDEA
+    game: Optional[str] = None
+    device: Optional[str] = None
 
 
 class ScoreRequest(BaseModel):
@@ -64,8 +67,8 @@ async def request_game(
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    """만들어 줬으면 하는 게임 요청 — 업무 시간에도 보낼 수 있다."""
-    await game_service.add_game_request(db, member, body.body)
+    """아케이드 의견(하고 싶은 게임 · 오류 신고 · 개선 의견) — 업무 시간에도 보낼 수 있다."""
+    await game_service.add_game_request(db, member, body.body, body.kind, body.game, body.device)
     return {"data": {"ok": True}}
 
 

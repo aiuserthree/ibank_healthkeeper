@@ -19,17 +19,21 @@
     // 아케이드 「이런 게임 있으면 좋겠어요」로 들어온 요청 — 최신순, 상태는 관리자만 본다
     const STATUS = [["NEW", "새 요청"], ["PLANNED", "만들기로 함"], ["DONE", "만듦"], ["HOLD", "보류"]];
     const FILTERS = [["all", "전체"], ...STATUS];
+    // 의견 종류 — 하고 싶은 게임 · 오류 신고 · 개선 의견
+    const KINDS = [["all", "모든 종류"], ["GAME", "하고 싶은 게임"], ["BUG", "오류 신고"], ["IDEA", "개선 의견"]];
+    const KIND_BADGE = { GAME: ["게임 요청", "info"], BUG: ["오류", "danger"], IDEA: ["개선", "warning"] };
     const esc = (t) => HKUI.escapeHtml(t);
-    let filter = "all";
+    let filter = "all", kindFilter = "all";
     let data = { items: [], counts: {} };
 
     function card(r) {
       const options = STATUS.map(([k, l]) => `<option value="${k}"${r.status === k ? " selected" : ""}>${l}</option>`).join("");
       return `<div class="hk-card hk-card--pad" style="display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap">
           <div style="min-width:0;flex:1">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px">${HKUI.badge(...(KIND_BADGE[r.kind] || KIND_BADGE.GAME))}${r.game ? `<span style="font-size:13px;font-weight:700;color:var(--color-midnight-navy)">${esc(r.game.title)}</span>` : ""}</div>
             <div style="font-size:15px;line-height:1.6;color:var(--color-midnight-navy);white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere">${esc(r.body)}</div>
             <div style="font-size:12.5px;color:var(--text-muted);margin-top:6px">
-              <b style="color:var(--text-secondary)">${esc(r.member.name)}</b> · ${esc(r.member.department || "-")} · ${esc(HKUI.formatDateTimeKst(r.createdAt))}
+              <b style="color:var(--text-secondary)">${esc(r.member.name)}</b> · ${esc(r.member.department || "-")} · ${esc(HKUI.formatDateTimeKst(r.createdAt))}${r.device ? ` · ${esc(r.device)}` : ""}
             </div>
           </div>
           <select class="hk-input" data-status="${r.id}" style="width:auto;min-width:130px;height:38px;flex-shrink:0">${options}</select>
@@ -38,15 +42,21 @@
 
     function render() {
       const total = data.items.length;
+      const kinds = data.kinds || {};
+      document.getElementById("kinds").innerHTML = KINDS.map(([k, l]) => {
+        const cnt = k === "all" ? total : kinds[k] || 0;
+        return HKAdmin.filterPill(cnt ? `${l} (${cnt})` : l, kindFilter === k, `data-k="${k}"`);
+      }).join("");
       document.getElementById("filters").innerHTML = FILTERS.map(([k, l]) => {
         const cnt = k === "all" ? total : data.counts[k] || 0;
         return HKAdmin.filterPill(cnt ? `${l} (${cnt})` : l, filter === k, `data-f="${k}"`);
       }).join("");
-      const list = filter === "all" ? data.items : data.items.filter((r) => r.status === filter);
+      const list = data.items.filter((r) => (filter === "all" || r.status === filter) && (kindFilter === "all" || r.kind === kindFilter));
       document.getElementById("list").innerHTML = list.length
         ? list.map(card).join("")
         : HKUI.alertBox("info", total ? "해당 상태의 요청 없음" : "아직 받은 요청 없음", total ? "다른 상태를 골라 보세요." : "아케이드 아래쪽 「이런 게임 있으면 좋겠어요」로 요청이 들어오면 여기에 쌓여요.");
       document.querySelectorAll("[data-f]").forEach((b) => (b.onclick = () => { filter = b.dataset.f; render(); }));
+      document.querySelectorAll("[data-k]").forEach((b) => (b.onclick = () => { kindFilter = b.dataset.k; render(); }));
       document.querySelectorAll("[data-status]").forEach((sel) => {
         sel.onchange = async () => {
           const id = Number(sel.dataset.status);
@@ -71,7 +81,8 @@
     HKAdmin.mountPage({
       active: "gameRequests",
       render() {
-        return `${HKAdmin.pageHead("게임 요청", "아케이드에서 회원이 보낸 「이런 게임 있으면 좋겠어요」 요청이에요.")}
+        return `${HKAdmin.pageHead("게임 요청", "아케이드에서 회원이 보낸 의견이에요 — 하고 싶은 게임 · 오류 신고 · 개선 의견.")}
+          <div id="kinds" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px"></div>
           <div id="filters" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px"></div>
           <div id="list" style="display:flex;flex-direction:column;gap:10px"><div style="text-align:center;padding:40px 0"><span class="hk-spin"></span></div></div>`;
       },

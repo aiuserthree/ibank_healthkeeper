@@ -1224,6 +1224,15 @@ window.HKUI = (function () {
     });
   }
 
+  // 오류 신고용 기기 정보 — "휴대폰 · 아이폰 · Safari · 390×844" 처럼 짧게
+  function deviceInfo() {
+    const ua = navigator.userAgent || "";
+    const os = /iPhone/.test(ua) ? "아이폰" : /iPad/.test(ua) ? "아이패드" : /Android/.test(ua) ? "안드로이드" : /Windows/.test(ua) ? "Windows" : /Mac OS X/.test(ua) ? "Mac" : "기타";
+    const br = /Edg\//.test(ua) ? "Edge" : /Whale/.test(ua) ? "Whale" : /SamsungBrowser/.test(ua) ? "삼성 인터넷" : /CriOS|Chrome\//.test(ua) ? "Chrome" : /Firefox|FxiOS/.test(ua) ? "Firefox" : /Safari/.test(ua) ? "Safari" : "기타";
+    const touch = window.matchMedia && matchMedia("(pointer: coarse)").matches;
+    return `${touch ? "휴대폰" : "PC"} · ${os} · ${br} · ${window.innerWidth}×${window.innerHeight}`;
+  }
+
   return {
     STATE_BANNER,
     STATUS_LABEL,
@@ -1237,6 +1246,7 @@ window.HKUI = (function () {
     formatTimeKst,
     formatDateTimeKst,
     formatDateTimeSecKst,
+    deviceInfo,
     formatDeadlineRelative,
     getStateBanner,
     formatDateDotKst,

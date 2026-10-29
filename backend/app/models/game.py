@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Optional
 
 from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -54,7 +55,7 @@ class ArcadeStamp(Base):
 
 
 class GameRequest(Base):
-    """아케이드 — 회원이 만들어 줬으면 하는 게임 요청 (평가·피드백은 받지 않는다)."""
+    """아케이드 의견 — 하고 싶은 게임 · 오류 신고 · 개선 의견 (점수 매기는 평가는 받지 않는다)."""
 
     __tablename__ = "game_request"
 
@@ -63,6 +64,11 @@ class GameRequest(Base):
         BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
+    # GAME(하고 싶은 게임) · BUG(오류 신고) · IDEA(개선 의견)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, server_default="GAME")
+    # 오류·개선이면 어느 게임인지 (게임 키) · 보낸 기기(휴대폰/PC · 브라우저) — 오류 원인 찾기용
+    game: Mapped[Optional[str]] = mapped_column(String(30), nullable=True)
+    device: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     # NEW(새 요청) · PLANNED(만들기로 함) · DONE(만듦) · HOLD(보류) — 관리자만 보는 표시
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="NEW")
     created_at: Mapped[datetime] = mapped_column(
