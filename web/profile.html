@@ -94,7 +94,9 @@
           const pickedItems = picked ? byDate[picked] || [] : [];
           const pd = picked ? new Date(picked + "T12:00:00") : null;
           const cells = [];
-          for (let k = 0; k < first.getDay(); k++) cells.push(`<span class="hk-ucal__cell is-blank"></span>`);
+          // 빈 칸도 날짜 칸과 같은 높이 — 달력을 늘 6주로 그려 달을 바꿔도 창 높이가 그대로
+          const blank = `<span class="hk-ucal__cell is-blank" aria-hidden="true"><span class="hk-ucal__num"></span></span>`;
+          for (let k = 0; k < first.getDay(); k++) cells.push(blank);
           for (let d = 1; d <= daysIn; d++) {
             const iso = `${ym}-${String(d).padStart(2, "0")}`;
             const used = byDate[iso];
@@ -104,6 +106,7 @@
               ? `<button type="button" class="${cls}" data-date="${iso}" aria-label="${m}월 ${d}일 ${used[0].startTime} 이용"><span class="hk-ucal__num">${d}</span></button>`
               : `<span class="${cls}"><span class="hk-ucal__num">${d}</span></span>`);
           }
+          while (cells.length < 42) cells.push(blank);
           bodyEl.innerHTML = `
             <div class="hk-ucal">
               <div class="hk-ucal__head">
