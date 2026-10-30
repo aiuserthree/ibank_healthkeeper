@@ -1481,23 +1481,25 @@
         return ((e.clientX - rect.left) / rect.width) * W;
       }
       // 휴대폰 — 누른 곳으로 날아가지 않고, 손가락을 끈 만큼만 같은 방향으로 움직인다 (화면 어디를 눌러도 됨)
-      let dragging = false, lastFX = 0, lastFY = 0;
+      // 처음 닿은 손가락만 따라간다 — 다른 손가락이 닿아도 기체가 튀지 않게
+      let dragId = null, lastFX = 0, lastFY = 0;
       canvas.addEventListener("pointerdown", (e) => {
         if (state !== "play") return;
-        dragging = true;
+        e.preventDefault();
+        if (dragId != null) return;
+        dragId = e.pointerId;
         lastFX = toWorldX(e); lastFY = toWorldY(e);
         pointerX = S.px; pointerY = PY;
         try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-        e.preventDefault();
       });
       canvas.addEventListener("pointermove", (e) => {
-        if (!dragging || state !== "play") return;
+        if (e.pointerId !== dragId || state !== "play") return;
         const fx = toWorldX(e), fy = toWorldY(e);
         pointerX = Math.max(22, Math.min(W - 22, (pointerX ?? S.px) + fx - lastFX));
         pointerY = Math.max(PY_MIN, Math.min(PY_MAX, (pointerY ?? PY) + fy - lastFY));
         lastFX = fx; lastFY = fy;
       });
-      const endDrag = () => { dragging = false; pointerX = pointerY = null; };
+      const endDrag = (e) => { if (e.pointerId !== dragId) return; dragId = null; pointerX = pointerY = null; };
       canvas.addEventListener("pointerup", endDrag);
       canvas.addEventListener("pointercancel", endDrag);
 
