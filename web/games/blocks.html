@@ -114,7 +114,7 @@
                 <div class="gm-bento-n" data-v="bento">0<small>개</small></div>
                 <div class="gm-bar"><i data-v="bentobar"></i></div>
                 <div class="gm-tip" style="margin-top:4px" data-v="bentonext">다음 도시락까지 10줄</div>
-                <div class="gm-tip" style="margin-top:6px"><b>B</b> 키로 원할 때 꺼내 써요 · 착지하면 두 열의 아래 3줄을 비워 줘요</div>
+                <div class="gm-tip" style="margin-top:6px"><b>B</b> 키로 원할 때 꺼내 써요 · 착지하면 두 열의 위쪽 3칸을 먹어 치워요</div>
               </div>
             </div>
           </div>
@@ -313,17 +313,18 @@
           }
           updateHud();
         }
-        // 도시락: 착지한 두 열의 아래 3줄을 비우고 그 위를 끌어내림
+        // 도시락: 착지한 두 열에서 맨 위부터 3칸을 먹어 치운다 (도시락도 함께 사라진다)
         function bentoLand(p) {
           const cols = [...new Set(p.cells.map(([x]) => p.x + x))];
           for (const c of cols) {
-            const col = [];
-            for (let r = 0; r < ROWS - 3; r++) col.push(grid[r][c]);
-            for (let r = 0; r < ROWS; r++) grid[r][c] = r < 3 ? null : col[r - 3];
+            let left = 3;
+            for (let r = 0; r < ROWS && left > 0; r++) {
+              if (grid[r][c]) { grid[r][c] = null; left--; }
+            }
           }
           bentoFx = { cols, t: 0 };
           sfx("explode");
-          pop("도시락 냠! 아래 3줄 비움", "bento");
+          pop("도시락 냠! 위 3칸 비움", "bento");
           updateHud();
           checkLines();
         }
@@ -434,7 +435,7 @@
             const k = 1 - bentoFx.t / BENTO_FX_MS;
             for (const c of bentoFx.cols) {
               const gr = g.createLinearGradient(0, 0, 0, H);
-              gr.addColorStop(0, "rgba(255,182,72,0)"); gr.addColorStop(1, `rgba(255,182,72,${0.55 * k})`);
+              gr.addColorStop(0, `rgba(255,182,72,${0.55 * k})`); gr.addColorStop(1, "rgba(255,182,72,0)");
               g.fillStyle = gr; g.fillRect(c * s, 0, s, H);
             }
           }
