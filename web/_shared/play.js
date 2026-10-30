@@ -277,13 +277,15 @@ window.HKPlay = (function () {
       </aside>`;
   }
 
-  // 판이 끝나면 화면 위쪽에 결과 띠 — 게임 자체의 끝 화면(다시 하기 버튼 포함)과 겹치지 않게
+  // 판이 끝나면 넓은 화면은 위쪽에 결과 띠 — 게임 자체의 끝 화면(다시 하기 버튼 포함)과 겹치지 않게
   // 가운데 창 대신 띠로 보여 주고, 3초 뒤 저절로 사라진다 (위로 쓸어 올리거나 X 로 바로 닫기)
   let resultTimer = null;
   function resultBanner(game, result) {
     HKSound.play(result.counted && result.newBest ? "win" : "success");
     document.querySelector(".hk-play-result")?.remove();
     clearTimeout(resultTimer);
+    // 좁은 화면은 순위표가 바로 열리니 결과 띠는 띄우지 않는다
+    if (!window.matchMedia("(min-width: 900px)").matches) return;
     const title = !result.counted ? "연습 기록" : result.newBest ? "새 최고 기록!" : "기록을 남겼어요";
     const iconName = !result.counted ? "dumbbell" : result.newBest ? "party-popper" : "flag";
     const ranks = [];
@@ -802,10 +804,10 @@ window.HKPlay = (function () {
             endQuit(true);
             const run = runNo;
             await loadBoard();
-            // 넓은 화면은 끝나자마자 순위표를 연다 (휴대폰은 '순위' 버튼으로)
+            // 끝나자마자 순위표를 연다 — 휴대폰은 닫으면 게임의 끝 화면이 보이고, '순위' 버튼으로 다시 연다
             if (run === runNo) {
               showRankBtn(true);
-              if (window.matchMedia("(min-width: 900px)").matches) openBoard(true);
+              openBoard(true);
             }
             return result;
           },
