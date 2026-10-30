@@ -43,13 +43,13 @@
     .gm-keys kbd { display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #f8fafc; font: 600 11px/1.6 inherit; }
     .gm-go { width: 100%; border: 0; padding: 12px; border-radius: 12px; font-size: 15.5px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(135deg, #0891b2, #8b5cf6); }
     .gm-go:focus-visible { outline: 3px solid #a5f3fc; outline-offset: 2px; }
-    /* 휴대폰 조작 — 왼쪽 엄지는 이동 칸(왼쪽 절반 ←, 오른쪽 절반 →, 미끄러뜨리면 바로 방향 바뀜), 오른쪽 엄지는 점프·쏘기 */
+    /* 휴대폰 조작 — 왼쪽 엄지는 이동 칸(둥근 손잡이를 좌우로 민다, 가운데를 넘으면 바로 방향 바뀜), 오른쪽 엄지는 점프·쏘기 */
     .gm-pad { display: none; grid-template-columns: 1.15fr 1fr 1fr; gap: 8px; padding: 10px; border-radius: 0 0 16px 16px; background: #102a3c; touch-action: none; }
     .gm-pad.is-on { display: grid; }
-    .gm-move { position: relative; display: grid; grid-template-columns: 1fr 1fr; height: 96px; border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.07); touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; }
-    .gm-move span { display: flex; align-items: center; justify-content: center; color: #a5f3fc; pointer-events: none; transition: background .06s; }
-    .gm-move span + span { border-left: 1px solid rgba(255,255,255,.08); }
-    .gm-move.is-left span:first-child, .gm-move.is-right span:last-child { background: rgba(103,232,249,.35); color: #fff; }
+    .gm-move { position: relative; height: 96px; border-radius: 16px; overflow: hidden; background: rgba(255,255,255,.07); touch-action: none; -webkit-tap-highlight-color: transparent; user-select: none; }
+    .gm-move__track { position: absolute; left: 14px; right: 14px; top: 50%; height: 8px; margin-top: -4px; border-radius: 4px; background: rgba(255,255,255,.14); pointer-events: none; }
+    .gm-move__knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #0e3a4a; background: radial-gradient(circle at 35% 30%, #cffafe, #67e8f9 70%); box-shadow: 0 4px 12px rgba(0,0,0,.35); transform: translate(-50%, -50%); transition: transform .12s ease; pointer-events: none; }
+    .gm-move.is-left .gm-move__knob, .gm-move.is-right .gm-move__knob { transition: none; background: radial-gradient(circle at 35% 30%, #fff, #22d3ee 70%); }
     .gm-pad button { height: 96px; border: 0; border-radius: 14px; background: rgba(255,255,255,.1); color: #e0f7fa; font-size: 14px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 4px; touch-action: none; -webkit-tap-highlight-color: transparent; }
     .gm-pad button.is-down { background: rgba(103,232,249,.35); }
     .gm-pad button[data-k="jump"] { background: rgba(167,139,250,.28); }
@@ -79,8 +79,9 @@
             <div class="gm-overlay" data-overlay></div>
           </div>
           <div class="gm-pad" data-pad>
-            <div class="gm-move" data-move aria-label="이동 — 왼쪽 절반 왼쪽, 오른쪽 절반 오른쪽">
-              <span>${HKUI.icon("chevron-left", 30, "currentColor")}</span><span>${HKUI.icon("chevron-right", 30, "currentColor")}</span>
+            <div class="gm-move" data-move aria-label="이동 — 둥근 손잡이를 좌우로 밀기">
+              <i class="gm-move__track"></i>
+              <i class="gm-move__knob" data-knob>${HKUI.icon("chevrons-left-right", 22, "currentColor")}</i>
             </div>
             <button type="button" data-k="shoot">${HKUI.icon("droplets", 20, "currentColor")} 쏘기</button>
             <button type="button" data-k="jump">${HKUI.icon("arrow-big-up", 20, "currentColor")} 점프</button>
@@ -1230,16 +1231,19 @@
         btn.addEventListener("contextmenu", (e) => e.preventDefault());
       });
 
-      // 이동 칸 — 누른 손가락이 칸 왼쪽 절반이면 ←, 오른쪽 절반이면 →. 손을 떼지 않고 미끄러뜨리면 바로 바뀐다
+      // 이동 칸 — 둥근 손잡이가 손가락을 따라 좌우로 움직인다. 칸 왼쪽 절반이면 ←, 오른쪽 절반이면 →, 손을 떼면 가운데로 돌아온다
       const move = pad.querySelector("[data-move]");
+      const knob = pad.querySelector("[data-knob]");
       let mv = null;
       function moveSet(k, on) { if (!!keys[k] === on) return; on ? press(k) : release(k); }
-      function moveReset() { mv = null; move.classList.remove("is-left", "is-right"); }
+      function moveReset() { mv = null; move.classList.remove("is-left", "is-right"); knob.style.transform = ""; }
       function moveUpdate(x) {
         const rc = move.getBoundingClientRect();
         const left = x < rc.left + rc.width / 2;
         moveSet("left", left); moveSet("right", !left);
         move.classList.toggle("is-left", left); move.classList.toggle("is-right", !left);
+        const room = rc.width / 2 - 34; // 손잡이가 칸 밖으로 나가지 않게
+        knob.style.transform = `translate(-50%, -50%) translateX(${Math.max(-room, Math.min(room, x - rc.left - rc.width / 2))}px)`;
       }
       move.addEventListener("pointerdown", (e) => {
         e.preventDefault();
