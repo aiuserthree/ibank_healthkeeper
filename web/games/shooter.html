@@ -26,6 +26,10 @@
     .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #150a2b; }
     /* 게임 화면 안에서는 마우스 커서만 숨긴다 (조작은 그대로 · 시작·일시정지 안내 창 위에서는 다시 보임) */
     .gm-canvas { display: block; touch-action: none; cursor: none; }
+    .gm-bomb { position: absolute; right: 10px; bottom: 10px; width: 54px; height: 54px; padding: 0; border: 2px solid rgba(255,255,255,.75); border-radius: 50%; background: rgba(14, 165, 233, .78); color: #fff; font: inherit; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    .gm-bomb i { font-style: normal; font-size: 18px; font-weight: 800; }
+    .gm-bomb b { position: absolute; right: -4px; top: -4px; min-width: 20px; height: 20px; line-height: 20px; border-radius: 10px; background: #fff; color: #0369a1; font-size: 12px; font-weight: 800; }
+    .gm-bomb:disabled { opacity: .3; cursor: default; }
     .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(16, 7, 34, .62); backdrop-filter: blur(2px); overflow-y: auto; }
     .gm-overlay[hidden] { display: none; }
     .gm-card { width: 100%; max-width: 320px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 18px 16px 16px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; box-shadow: 0 12px 40px rgba(0,0,0,.35); }
@@ -63,9 +67,10 @@
           </div>
           <div class="gm-screen">
             <canvas class="gm-canvas" aria-label="세균 격파 게임 화면"></canvas>
+            <button type="button" class="gm-bomb" data-bomb tabindex="-1" aria-label="손소독제 쓰기" disabled><i>소</i><b>0</b></button>
             <div class="gm-overlay" data-overlay></div>
           </div>
-          <div class="gm-note">방향키·WASD 이동 · Esc 일시정지 · 모바일은 화면을 끌어서 이동</div>
+          <div class="gm-note">방향키·WASD 이동 · 스페이스 손소독제 · Esc 일시정지 · 모바일은 화면을 끌어서 이동</div>
         </div>`;
       const shell = stage.querySelector(".gm-shell");
       const canvas = stage.querySelector("canvas");
@@ -74,6 +79,7 @@
       const elScore = stage.querySelector("[data-score]");
       const elWave = stage.querySelector("[data-wave]");
       const elLives = stage.querySelector("[data-lives]");
+      const elBomb = stage.querySelector("[data-bomb]");
 
       // ---------- 화면 크기 ----------
       let scale = 1;
@@ -185,7 +191,7 @@
           px: W / 2, fireCd: 0.3, triple: 0, shield: false, invul: 0,
           rapid: 0, laser: 0, homing: 0, orbit: 0, chili: 0, ripple: 0, zap: 0, waves: [], waveCd: 0, zapCd: 0, bolts: [], slow: 0, wing: 0, x2: 0, flashT: 0, lv: {}, homingCd: 0, missiles: [],
           bullets: [], ebullets: [], enemies: [], items: [], parts: [], texts: [],
-          boss: null, form: null, diveCd: 3, shotCd: 1.5,
+          boss: null, form: null, diveCd: 3, shotCd: 1.5, stormT: 0, stormCd: 12, bombs: 0,
           banner: null, clearT: 0, dead: false, overT: 0,
         };
         nextWave();
@@ -202,6 +208,7 @@
           diveCount: Math.min(4, 1 + Math.floor(w / 3)), // 한 번에 최대 4마리 (예전 5마리)
           shotEvery: Math.max(0.5, 1.35 - w * 0.065), // 1웨이브 약 1.3초 → 14웨이브부터 0.5초에서 멈춤 (예전 0.24초까지 내려가 15웨이브 뒤 탄이 너무 많았다)
           volley: w >= 20 ? 3 : w >= 4 ? 2 : 1, // 한 번에 쏘는 세균 수 (4웨이브 2, 20웨이브 3)
+          storm: w >= 14, // 탄이 가장 촘촘해지는 14웨이브부터는 평소엔 덜 쏘고 가끔만 몰아친다 (계속 쏟아지면 피할 수가 없었다)
           ebSpeed: Math.min(300, 130 + w * 11), // 탄 속도 — 1웨이브 141 → 최대 300
           diveSpeed: Math.min(380, 140 + w * 14),
           // 세균 체력 보너스 — 웨이브마다 조금씩(평균 +0.125) 늘어난다. 예전엔 9웨이브 +1, 17웨이브 +2 처럼 계단으로 뛰어
@@ -220,6 +227,7 @@
         S.P = P;
         S.diveCd = 3;
         S.shotCd = 0.6;
+        S.stormT = 0;
         if (S.wave % 5 === 0) {
           const n = S.wave / 5;
           const kind = BOSS_KINDS[(n - 1) % BOSS_KINDS.length];
@@ -405,6 +413,7 @@
         // 편대
         if (S.form) S.form.t += dt;
         const P = S.P;
+        const hot = !P.storm || S.stormT > 0; // 평소 사격인지 몰아치는 중인지
         for (const e of S.enemies) {
           e.spin += dt;
           if (e.flash > 0) e.flash -= dt;
@@ -440,7 +449,7 @@
               if (!e.fired && e.y > H * 0.32) {
                 e.fired = true;
                 aimShot(e.x, e.y, P.ebSpeed * 1.05);
-                if (S.wave >= 3) aimShot(e.x, e.y, P.ebSpeed * 0.9, 0.22);
+                if (S.wave >= 3 && hot) aimShot(e.x, e.y, P.ebSpeed * 0.9, 0.22);
               }
             }
             if (e.y > H + 30) {
@@ -465,13 +474,25 @@
               startDive(e, P.diveSpeed, i * 0.18);
             }
           }
+          // 몰아치기 — 14~20초에 한 번, 4초 동안만 예전처럼 쏟아진다 (시작 전 잠깐 멈춰 알아챌 틈을 준다)
+          if (P.storm) {
+            S.stormT = Math.max(0, S.stormT - dt);
+            S.stormCd -= dt;
+            if (S.stormCd <= 0) {
+              S.stormCd = 14 + Math.random() * 6;
+              S.stormT = 4.8;
+              S.shotCd = 0.8;
+              S.banner = { text: "세균 탄이 몰아쳐요!", sub: "", t: 1.2 };
+              ctx.sfx("whoosh");
+            }
+          }
           S.shotCd -= dt;
           // 자리 잡은 세균 + 날아 들어오는 중이라도 반쯤 들어온 세균 (예전엔 편대가 자리 잡을 때까지 아무도 안 쐈다)
           const shooters = S.shotCd <= 0 ? S.enemies.filter((e) => e.mode === "form" || (e.mode === "enter" && e.delay <= 0 && e.p >= 0.5 && e.y > 20)) : [];
           // 쏠 세균이 아직 없으면 차례를 버리지 않고 기다린다 (예전엔 빈 차례로 1~2초를 날려 첫 탄이 늦었다)
           if (shooters.length) {
-            S.shotCd = P.shotEvery * (0.7 + Math.random() * 0.6);
-            for (let v = 0; v < P.volley && shooters.length; v++) {
+            S.shotCd = (hot ? P.shotEvery : CALM_SHOT_EVERY) * (0.7 + Math.random() * 0.6);
+            for (let v = 0; v < (hot ? P.volley : 2) && shooters.length; v++) {
               const e = shooters.splice(Math.floor(Math.random() * shooters.length), 1)[0];
               aimShot(e.x, e.y + 8, P.ebSpeed, 0, 0.35);
             }
@@ -731,9 +752,10 @@
 
       // 보통 웨이브에서 화면에 동시에 떠 있는 세균 탄은 16발까지 — 후반(15~17웨이브~)에 탄이 겹겹이 깔려 피할 틈이 없던 문제.
       // 큰 세균(보스)의 공격 무늬는 그대로
-      const MAX_FIELD_SHOTS = 16;
+      // 14웨이브부터는 몰아칠 때만 16발, 평소엔 9발까지
+      const MAX_FIELD_SHOTS = 16, CALM_FIELD_SHOTS = 9, CALM_SHOT_EVERY = 0.9;
       function aimShot(x, y, sp, offset = 0, spreadLimit = 1) {
-        if (!S.boss && S.ebullets.length >= MAX_FIELD_SHOTS) return;
+        if (!S.boss && S.ebullets.length >= (S.P.storm && !(S.stormT > 0) ? CALM_FIELD_SHOTS : MAX_FIELD_SHOTS)) return;
         let a = Math.atan2(PY - y, S.px - x) + offset;
         const down = Math.PI / 2;
         // 내 기체가 아래에 있으면 아래쪽 부채꼴로만, 세균보다 위로 올라가 있으면 그대로 겨눈다 (맨 위가 안전지대가 되지 않게)
@@ -844,11 +866,21 @@
         else if (it.kind === "mask") { S.shield = true; label = "마스크 · 보호막!"; }
         else if (it.kind === "slow") { S.slow = 7; label = "꿀 · 세균이 느려져요"; }
         else if (it.kind === "x2") { S.x2 = 12; label = "비타민D · 점수 2배!"; }
-        else if (it.kind === "bomb") { label = "손소독제 · 싹 소독!"; sanitize(); }
+        else if (it.kind === "bomb") { label = S.bombs >= BOMB_MAX ? "손소독제 가득!" : "손소독제 보관!"; S.bombs = Math.min(BOMB_MAX, S.bombs + 1); }
         else { S.lives = Math.min(6, S.lives + 1); label = "물방울 · 목숨 +1"; }
         S.score += 100;
         ctx.sfx("powerup");
         S.texts.push({ x: Math.max(70, Math.min(W - 70, S.px)), y: PY - 36, text: label, life: 1.2, color: "#fde68a", big: true });
+        hud();
+      }
+
+      // 손소독제는 먹으면 3개까지 보관했다가 스페이스·화면 버튼으로 원할 때 쓴다
+      const BOMB_MAX = 3;
+      function useBomb() {
+        if (state !== "play" || !S || S.bombs <= 0 || S.clearT) return;
+        S.bombs--;
+        sanitize();
+        S.texts.push({ x: Math.max(70, Math.min(W - 70, S.px)), y: PY - 36, text: "싹 소독!", life: 1, color: "#a5f3fc", big: true });
         hud();
       }
 
@@ -901,6 +933,8 @@
         elWave.textContent = S.wave;
         const n = Math.max(0, S.lives);
         if (elLives.childElementCount !== n) elLives.innerHTML = Array.from({ length: n }, () => '<i class="gm-life"></i>').join("");
+        elBomb.disabled = !S.bombs;
+        elBomb.querySelector("b").textContent = S.bombs;
       }
 
       // ---------- 그리기 ----------
@@ -1348,10 +1382,10 @@
             <div class="is-new"><span class="gm-dot" style="background:#dc2626">고</span>고추 화염</div>
             <div class="is-new"><span class="gm-dot" style="background:#c084fc">양</span>파동탄</div>
             <div class="is-new"><span class="gm-dot" style="background:#3b82f6">블</span>연쇄 번개</div>
-            <div><span class="gm-dot" style="background:#0ea5e9">소</span>화면 소독</div>
+            <div><span class="gm-dot" style="background:#0ea5e9">소</span>화면 소독 · 보관</div>
           </div>
           <p class="gm-items-note">같은 무기를 또 먹으면 <b>최대 3단계</b> · 빨간 칩은 새 무기 · 가끔 마스크·물방울·비타민D·꿀</p>
-          <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 자동 연사 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면 아무 데나 대고 끌면 끈 만큼 움직여요</div>
+          <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 자동 연사 · <kbd>스페이스</kbd> 손소독제 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면 아무 데나 대고 끌면 끈 만큼 움직이고, 오른쪽 아래 버튼으로 손소독제를 써요</div>
           <button type="button" class="gm-go" data-act="start">시작</button>
         </div>`);
       }
@@ -1410,6 +1444,7 @@
           if (c === "ArrowRight" || c === "KeyD") keys.right = true;
           if (c === "ArrowUp" || c === "KeyW") keys.up = true;
           if (c === "ArrowDown" || c === "KeyS") keys.down = true;
+          if (c === "Space" && !e.repeat) useBomb();
           if (c === "KeyP" || c === "Escape") pause();
         } else if (state === "paused") {
           if (gameKey) e.preventDefault();
@@ -1456,6 +1491,8 @@
       const endDrag = () => { dragging = false; pointerX = pointerY = null; };
       canvas.addEventListener("pointerup", endDrag);
       canvas.addEventListener("pointercancel", endDrag);
+
+      elBomb.addEventListener("pointerdown", (e) => { e.preventDefault(); e.stopPropagation(); useBomb(); });
 
       document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
 
