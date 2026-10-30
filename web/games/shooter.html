@@ -29,7 +29,7 @@
     .gm-bomb { position: absolute; left: 10px; bottom: 10px; width: 54px; height: 54px; padding: 0; border: 2px solid rgba(255,255,255,.75); border-radius: 50%; background: rgba(14, 165, 233, .78); color: #fff; font: inherit; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
     .gm-bomb.is-right { left: auto; right: 10px; }
     .gm-side { width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #334155; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .gm-bomb i { font-style: normal; font-size: 18px; font-weight: 800; }
+    .gm-bomb i { font-style: normal; font-size: 16px; font-weight: 800; }
     .gm-bomb b { position: absolute; right: -4px; top: -4px; box-sizing: border-box; min-width: 20px; height: 20px; padding: 0 4px; line-height: 20px; border-radius: 10px; background: #fff; color: #0369a1; font-size: 12px; font-weight: 800; }
     .gm-bomb.is-full b { background: #f59e0b; color: #fff; font-size: 10px; }
     .gm-bomb:disabled { opacity: .3; cursor: default; }
@@ -42,6 +42,7 @@
     .gm-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 5px; margin: 4px 0 8px; }
     .gm-items div { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 3px; border-radius: 99px; background: #f1f5f9; font-size: 12px; font-weight: 600; color: #334155; white-space: nowrap; }
     .gm-items div.is-new { background: #fee2e2; color: #991b1b; }
+    .gm-dot--two { width: auto; padding: 0 5px; border-radius: 9px; }
     .gm-items-note { margin: 0 0 10px; font-size: 11.5px; color: #64748b; word-break: keep-all; }
     .gm-dot { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #fff; }
     .gm-keys { font-size: 12px; color: var(--text-muted, #64748b); margin: 0 0 14px; line-height: 1.6; }
@@ -70,7 +71,7 @@
           </div>
           <div class="gm-screen">
             <canvas class="gm-canvas" aria-label="세균 격파 게임 화면"></canvas>
-            <button type="button" class="gm-bomb" data-bomb tabindex="-1" aria-label="손소독제 쓰기" disabled><i>소</i><b>0</b></button>
+            <button type="button" class="gm-bomb" data-bomb tabindex="-1" aria-label="손소독제 쓰기" disabled><i>소독</i><b>0</b></button>
             <div class="gm-overlay" data-overlay></div>
           </div>
           <div class="gm-note">방향키·WASD 이동 · 스페이스 손소독제 · Esc 일시정지 · 모바일은 화면을 끌어서 이동</div>
@@ -154,7 +155,7 @@
       const ITEM_TABLE = [["vitc", 12], ["laser", 10], ["rapid", 10], ["homing", 10], ["orbit", 9], ["wing", 9], ["chili", 9], ["ripple", 9], ["zap", 9], ["bomb", 7], ["mask", 6], ["x2", 6], ["slow", 5], ["water", 2]];
       const ITEM_TOTAL = ITEM_TABLE.reduce((a, [, w]) => a + w, 0);
       // 동그라미 아이템 그림 — [바탕, 글자색, 글자]
-      const ITEM_LOOK = { rapid: ["#7c4a1e", "#fff", "커"], laser: ["#facc15", "#713f12", "레"], homing: ["#ef4444", "#fff", "생"], orbit: ["#f5f5f4", "#57534e", "마"], chili: ["#dc2626", "#fff", "고"], ripple: ["#c084fc", "#fff", "양"], zap: ["#3b82f6", "#fff", "블"], slow: ["#f59e0b", "#fff", "꿀"], wing: ["#22c55e", "#fff", "균"], x2: ["#a855f7", "#fff", "D"], bomb: ["#0ea5e9", "#fff", "소"] };
+      const ITEM_LOOK = { rapid: ["#7c4a1e", "#fff", "커"], laser: ["#facc15", "#713f12", "레"], homing: ["#ef4444", "#fff", "생"], orbit: ["#f5f5f4", "#57534e", "마"], chili: ["#dc2626", "#fff", "고"], ripple: ["#c084fc", "#fff", "양"], zap: ["#3b82f6", "#fff", "블"], slow: ["#f59e0b", "#fff", "꿀"], wing: ["#22c55e", "#fff", "균"], x2: ["#a855f7", "#fff", "D"], bomb: ["#0ea5e9", "#fff", "소독"] };
       // 시간제 효과 — [상태 키, 이름, 막대 색, 최대 초]
       const WEAPON_MAX = 26; // 무기는 겹쳐 먹어도 최대 26초 (예전 40초는 무기가 너무 오래 남아 시시했다)
       const TIMED = [["triple", "확산탄", "#fb923c", WEAPON_MAX], ["rapid", "연사", "#b45309", WEAPON_MAX], ["laser", "관통 레이저", "#facc15", WEAPON_MAX], ["homing", "유도탄", "#ef4444", WEAPON_MAX], ["orbit", "마늘 방패", "#d6d3d1", WEAPON_MAX], ["chili", "고추 화염", "#dc2626", WEAPON_MAX], ["ripple", "파동탄", "#c084fc", WEAPON_MAX], ["zap", "번개", "#3b82f6", WEAPON_MAX], ["wing", "도우미", "#22c55e", WEAPON_MAX], ["slow", "느리게", "#f59e0b", 7], ["x2", "점수 2배", "#a855f7", 12]];
@@ -1329,7 +1330,7 @@
           g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 1.5;
           g.beginPath(); g.arc(0, 0, 11, 0, Math.PI * 2); g.stroke();
           g.fillStyle = fg;
-          g.font = "900 11px Pretendard, system-ui, sans-serif";
+          g.font = `900 ${ch.length > 1 ? 9 : 11}px Pretendard, system-ui, sans-serif`; // 두 글자는 원 안에 들어가게 작게
           g.textAlign = "center"; g.textBaseline = "middle";
           g.fillText(ch, 0, 1);
         } else {
@@ -1390,7 +1391,7 @@
             <div class="is-new"><span class="gm-dot" style="background:#dc2626">고</span>고추 화염</div>
             <div class="is-new"><span class="gm-dot" style="background:#c084fc">양</span>파동탄</div>
             <div class="is-new"><span class="gm-dot" style="background:#3b82f6">블</span>연쇄 번개</div>
-            <div><span class="gm-dot" style="background:#0ea5e9">소</span>화면 소독 · 보관</div>
+            <div><span class="gm-dot gm-dot--two" style="background:#0ea5e9">소독</span>화면 소독 · 보관</div>
           </div>
           <p class="gm-items-note">같은 무기를 또 먹으면 <b>최대 3단계</b> · 빨간 칩은 새 무기 · 가끔 마스크·물방울·비타민D·꿀</p>
           <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 자동 연사 · <kbd>스페이스</kbd> 손소독제 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면 아무 데나 대고 끌면 끈 만큼 움직이고, 아래쪽 버튼으로 손소독제를 써요</div>
