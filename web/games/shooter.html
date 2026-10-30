@@ -27,6 +27,8 @@
     /* 게임 화면 안에서는 마우스 커서만 숨긴다 (조작은 그대로 · 시작·일시정지 안내 창 위에서는 다시 보임) */
     .gm-canvas { display: block; touch-action: none; cursor: none; }
     .gm-bomb { position: absolute; left: 10px; bottom: 10px; width: 54px; height: 54px; padding: 0; border: 2px solid rgba(255,255,255,.75); border-radius: 50%; background: rgba(14, 165, 233, .78); color: #fff; font: inherit; cursor: pointer; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    .gm-bomb.is-right { left: auto; right: 10px; }
+    .gm-side { width: 100%; margin-top: 8px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #334155; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
     .gm-bomb i { font-style: normal; font-size: 18px; font-weight: 800; }
     .gm-bomb b { position: absolute; right: -4px; top: -4px; min-width: 20px; height: 20px; line-height: 20px; border-radius: 10px; background: #fff; color: #0369a1; font-size: 12px; font-weight: 800; }
     .gm-bomb:disabled { opacity: .3; cursor: default; }
@@ -80,6 +82,19 @@
       const elWave = stage.querySelector("[data-wave]");
       const elLives = stage.querySelector("[data-lives]");
       const elBomb = stage.querySelector("[data-bomb]");
+      // 손소독제 버튼 위치 — 휴대폰에서 끄는 손의 반대쪽에 두도록 바꿀 수 있다 (기기에 저장)
+      const SIDE_KEY = "hk-shooter-bomb-right";
+      let bombRight = false;
+      try { bombRight = localStorage.getItem(SIDE_KEY) === "1"; } catch (_) {}
+      elBomb.classList.toggle("is-right", bombRight);
+      const sideLabel = () => `손소독제 버튼 ${bombRight ? "오른쪽" : "왼쪽"} · 위치 바꾸기`;
+      const sideBtn = () => (matchMedia("(pointer: coarse)").matches ? `<button type="button" class="gm-side" data-act="side">${sideLabel()}</button>` : "");
+      function switchSide(btn) {
+        bombRight = !bombRight;
+        try { localStorage.setItem(SIDE_KEY, bombRight ? "1" : "0"); } catch (_) {}
+        elBomb.classList.toggle("is-right", bombRight);
+        btn.textContent = sideLabel();
+      }
 
       // ---------- 화면 크기 ----------
       let scale = 1;
@@ -817,6 +832,8 @@
         if (S.items.length >= 2) p = 0; // 화면에 이미 두 개 떨어지는 중이면 그만
         // 무기 없이 8초가 지나면 다음 세균은 반드시 무기
         if (armed.length === 0 && S.unarmedT > 8 && S.items.length === 0) { dropItem(x, y, pickWeapon()); S.unarmedT = 0; return; }
+        // 손소독제는 무기와 따로 뽑는다 — 무기를 들고 있으면 아이템 자체가 드물어 거의 안 나왔다 (보통 2~4웨이브에 하나)
+        if (S.items.length < 2 && S.bombs < BOMB_MAX && Math.random() < BOMB_DROP) { dropItem(x, y, "bomb"); return; }
         if (Math.random() < p) dropItem(x, y);
       }
       // 무기 고르기 — 가끔(25%)은 3단계가 안 된 지금 무기를 올려 주고, 나머지는 안 들고 있는 무기에서. 방금 나온 무기는 연달아 안 나온다
@@ -830,12 +847,6 @@
         return pick(fresh.length ? fresh : WEAPON_ITEMS.filter((k) => k !== S.lastWeapon));
       }
 
-      // 화면이 붐비는지 — 살아 있는 세균 8마리 이상 · 적 탄 8발 이상 · 큰 세균 등장 중
-      function crowded() {
-        const alive = S.enemies.filter((e) => !e.dead && onScreen(e)).length;
-        return alive >= 8 || S.ebullets.length >= 8 || !!(S.boss && !S.boss.dead);
-      }
-
       function dropItem(x, y, kind) {
         if (!kind) {
           if (S.lives <= 1 && !S.shield && Math.random() < 0.45) kind = Math.random() < 0.5 ? "mask" : "water"; // 목숨이 위험하면 지켜 주는 아이템
@@ -843,8 +854,6 @@
             // 아이템 뽑기 — 숫자가 클수록 자주 나온다
             let r = Math.random() * ITEM_TOTAL;
             kind = ITEM_TABLE.find(([, w]) => (r -= w) < 0)[0];
-            // 손소독제는 쓸 데가 있을 때만 — 화면에 세균이 많거나 적 탄이 많거나 큰 세균이 있을 때. 아니면 무기로 바꾼다
-            if (kind === "bomb" && !crowded()) kind = "vitc";
             if (WEAPON_ITEMS.includes(kind)) kind = pickWeapon();
           }
         }
@@ -875,7 +884,7 @@
       }
 
       // 손소독제는 먹으면 3개까지 보관했다가 스페이스·화면 버튼으로 원할 때 쓴다
-      const BOMB_MAX = 3;
+      const BOMB_MAX = 3, BOMB_DROP = 0.012;
       function useBomb() {
         if (state !== "play" || !S || S.bombs <= 0 || S.clearT) return;
         S.bombs--;
@@ -1043,18 +1052,19 @@
 
         // 3갈래 탄 남은 시간
         // 켜져 있는 아이템 효과와 남은 시간
-        // 왼쪽 아래는 손소독제 버튼 자리라 오른쪽 아래에 쌓는다
+        // 손소독제 버튼의 반대쪽 아래에 쌓는다
         let barY = H - 18;
+        const barX = bombRight ? 12 : W - 82;
         g.font = "700 10px Pretendard, system-ui, sans-serif";
-        g.textAlign = "right";
+        g.textAlign = bombRight ? "left" : "right";
         for (const [k, name, color, full] of TIMED) {
           if (!(S[k] > 0)) continue;
           g.fillStyle = "rgba(255,255,255,.15)";
-          roundRect(W - 82, barY, 70, 6, 3); g.fill();
+          roundRect(barX, barY, 70, 6, 3); g.fill();
           g.fillStyle = color;
-          roundRect(W - 82, barY, 70 * Math.min(1, S[k] / full), 6, 3); g.fill();
+          roundRect(barX, barY, 70 * Math.min(1, S[k] / full), 6, 3); g.fill();
           g.fillStyle = "#fff";
-          g.fillText(WEAPONS[k] && S.lv[k] > 1 ? `${name} ${S.lv[k]}단계` : name, W - 88, barY + 3);
+          g.fillText(WEAPONS[k] && S.lv[k] > 1 ? `${name} ${S.lv[k]}단계` : name, bombRight ? 88 : W - 88, barY + 3);
           barY -= 14;
         }
         // 꿀(느리게) 중에는 화면이 살짝 노랗게, 손소독제는 하얗게 번쩍
@@ -1380,8 +1390,8 @@
             <div><span class="gm-dot" style="background:#0ea5e9">소</span>화면 소독 · 보관</div>
           </div>
           <p class="gm-items-note">같은 무기를 또 먹으면 <b>최대 3단계</b> · 빨간 칩은 새 무기 · 가끔 마스크·물방울·비타민D·꿀</p>
-          <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 자동 연사 · <kbd>스페이스</kbd> 손소독제 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면 아무 데나 대고 끌면 끈 만큼 움직이고, 왼쪽 아래 버튼으로 손소독제를 써요</div>
-          <button type="button" class="gm-go" data-act="start">시작</button>
+          <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 자동 연사 · <kbd>스페이스</kbd> 손소독제 · <kbd>Esc</kbd> 일시정지<br>모바일은 화면 아무 데나 대고 끌면 끈 만큼 움직이고, 아래쪽 버튼으로 손소독제를 써요</div>
+          <button type="button" class="gm-go" data-act="start">시작</button>${sideBtn()}
         </div>`);
       }
       function start() {
@@ -1399,7 +1409,7 @@
         state = "paused";
         keys.left = keys.right = keys.up = keys.down = false;
         pointerX = pointerY = null;
-        showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>현재 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점 · 웨이브 ${S.wave}</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>현재 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점 · 웨이브 ${S.wave}</p><button type="button" class="gm-go" data-act="resume">계속하기</button>${sideBtn()}</div>`);
       }
       function resume() {
         if (state !== "paused") return;
@@ -1421,6 +1431,7 @@
         if (!b) return;
         if (b.dataset.act === "start") start();
         else if (b.dataset.act === "resume") resume();
+        else if (b.dataset.act === "side") switchSide(b);
       });
 
       // ---------- 입력 ----------
