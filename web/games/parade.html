@@ -44,6 +44,7 @@
         const W = 180, H = 250, LANES = 3, LANE_W = W / LANES, HIT_Y = 214, TOP_Y = 66;
         const PERFECT = 0.07, GOOD = 0.13, FALL_SEC = 1.25; // 판정 시간(초) · 풍선이 내려오는 시간
         const LOOK = 0.25; // 소리를 미리 예약하는 시간(초)
+        const COUNT_IN = 4; // 구간 앞 예비박 수
         const LANE_C = ["#38bdf8", "#facc15", "#a3e635"];
         // 구간마다 빠르기와 촘촘함이 오른다 [박자 수, 분당 박, 8분음 확률, 동시 치기 확률, 빨간 풍선 확률]
         const SECTIONS = [[32, 100, 0.05, 0, 0], [32, 112, 0.25, 0.04, 0.1], [32, 124, 0.4, 0.1, 0.14], [32, 136, 0.5, 0.16, 0.18]];
@@ -85,6 +86,9 @@
           let prev = 1;
           SECTIONS.forEach(([count, bpm, eighth, dbl, red], si) => {
             const beat = 60 / bpm;
+            // 예비박 — 구간마다 새 빠르기로 네 번 세고 시작한다 (이때는 풍선이 없다)
+            for (let i = 0; i < COUNT_IN; i++) beats.push({ t: t + i * beat, n: 0, count: COUNT_IN - i, first: si === 0, life: beat });
+            t += COUNT_IN * beat;
             for (let b = 0; b < count; b++) {
               for (let sub = 0; sub < 2; sub++) {
                 const at = t + (b + sub / 2) * beat;
@@ -152,12 +156,18 @@
           // 오르골 · 박자 — 조금 앞서 예약해 두면 화면이 잠깐 밀려도 소리는 제 박자에 울린다
           while (S.bi < S.beats.length && S.beats[S.bi].t <= S.t + LOOK) {
             const b = S.beats[S.bi++], delay = Math.max(0, b.t - S.t - S.lat);
+            if (b.count) { ctx.sfx("beat", { delay, strong: true }); continue; }
             const n = TUNE[b.n % TUNE.length];
             if (n >= 0) ctx.sfx("mbox", { n, delay });
             if (b.n % 2 === 0) ctx.sfx("beat", { delay, strong: b.n % 8 === 0 });
             else ctx.sfx("shake", { delay });
           }
-          while (S.vi < S.beats.length && S.beats[S.vi].t <= S.t) { if (S.beats[S.vi].n % 2 === 0) S.pulse = 0.12; S.vi++; }
+          while (S.vi < S.beats.length && S.beats[S.vi].t <= S.t) {
+            const b = S.beats[S.vi++];
+            if (b.n % 2 === 0) S.pulse = 0.12;
+            if (b.count) S.cue = { n: b.count, first: b.first, life: b.life * 0.9 };
+          }
+          if (S.cue) { S.cue.life -= dt; if (S.cue.life <= 0) S.cue = null; }
           if (S.pulse > 0) S.pulse -= dt;
           if (S.angry > 0) S.angry -= dt;
           if (S.shake > 0) S.shake -= dt;
@@ -242,6 +252,12 @@
           if (KEY_HINT) {
             out.font = "900 13px sans-serif"; out.fillStyle = "#fae8ff";
             KEY_HINT.forEach((k, i) => out.fillText(k, (i + 0.5) * LANE_W, HIT_Y + 18));
+          }
+          if (S.cue) {
+            // 예비박 숫자
+            out.fillStyle = "rgba(11, 4, 32, .78)"; out.fillRect(W / 2 - 50, 112, 100, 66);
+            out.fillStyle = "#fde68a"; out.font = "900 32px sans-serif"; out.fillText(S.cue.n, W / 2, 136);
+            out.fillStyle = "#fae8ff"; out.font = "800 11px sans-serif"; out.fillText(S.cue.first ? "준비하세요" : "빨라져요!", W / 2, 164);
           }
           out.font = "800 8px sans-serif";
           for (const t of S.texts) { out.fillStyle = t.c; out.fillText(t.t, t.x, t.y); }
