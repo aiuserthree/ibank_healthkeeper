@@ -66,7 +66,16 @@ window.HKSeriesArt = (function () {
       if (hit.size * 2 > right - left) continue;
       for (let x = left; x <= right + 1; x++) if (!hit.has(x)) gaps.push([x, y], [x + dx, y]);
     }
-    return { dots: dots.filter(([x, y]) => x >= cw || y < top).concat(rieul.map(([x, y]) => [x + dx, y])), gaps };
+    // PC — ㅜ의 아래 획이 짧으면 끌처럼 보이니 윗부분을 두 줄 올리고 그만큼 획을 늘린다
+    const lift = window.innerWidth > 640 ? 2 : 0;
+    const upper = dots.filter(([x, y]) => x < cw && y < top), stem = lift ? upper.filter(([, y]) => y === top - 1) : [];
+    return {
+      dots: dots.filter(([x]) => x >= cw).concat(
+        upper.map(([x, y]) => [x, y - lift]),
+        stem, stem.map(([x, y]) => [x, y - 1]),
+        rieul.map(([x, y]) => [x + dx, y])),
+      gaps,
+    };
   }
   // 하늘에 뜬 제목 — 작게 찍은 글자를 두 배로 키워 네모난 도트만 남긴다
   function makeTitle() {
