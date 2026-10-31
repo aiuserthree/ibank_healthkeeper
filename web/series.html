@@ -11,7 +11,7 @@
   <script src="/_shared/ui.js"></script>
   <script src="/_shared/api.js"></script>
   <script src="/_shared/member-shell.js"></script>
-  <script src="/_shared/play.js"></script>
+  <script src="/_shared/series-art.js"></script>
   <style>
     .hk-sr { --ink: #fef3c7; --night: #120a24; --plum: #2a1b4d; --gold: #fde68a; --red: #ef4444; margin: -36px -32px -72px; padding-bottom: 72px; background: var(--night); color: var(--ink); min-height: 100vh; }
     .hk-sr__scene { display: block; width: 100%; height: auto; image-rendering: pixelated; }
@@ -32,12 +32,6 @@
     .hk-sr__job.is-off { background: #cbbfa4; color: #6b5a42; }
     .hk-sr__job.is-off .hk-sr__go { background: #6b5a42; }
     .hk-sr__back { display: inline-block; margin: 18px 0 0; font-size: 14px; font-weight: 700; color: var(--gold); text-decoration: none; }
-    /* 오프닝 — 도트 애니메이션을 화면 가득 */
-    .hk-op { position: fixed; inset: 0; z-index: 9000; display: flex; align-items: center; justify-content: center; background: #000; transition: opacity .5s; }
-    .hk-op.is-out { opacity: 0; pointer-events: none; }
-    .hk-op canvas { display: block; width: min(100vw, 177.78vh); height: auto; max-height: 100vh; image-rendering: pixelated; cursor: pointer; }
-    .hk-op__skip { position: absolute; right: 16px; top: max(14px, env(safe-area-inset-top)); padding: 7px 14px; border: 2px solid #78716c; background: rgba(0,0,0,.6); color: #e7e5e4; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
-    .hk-sr__replay { float: right; margin: 18px 0 0; padding: 0; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 700; color: var(--gold); cursor: pointer; }
     @media (max-width: 860px) {
       .hk-sr { margin: 0; }
       .hk-sr__board { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; gap: 12px; }
@@ -81,261 +75,6 @@
       g.fillStyle = color;
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 110) g.fillRect(x, y, 1, 1);
     }
-    // 글자를 도트 점 목록으로 — 네온 간판에 쓴다
-    function textDots(text, size) {
-      const t = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-      const font = `800 ${size}px Pretendard, "Apple SD Gothic Neo", sans-serif`;
-      t.font = font;
-      const w = Math.ceil(t.measureText(text).width) + 2, h = size + 4;
-      t.canvas.width = w; t.canvas.height = h;
-      t.font = font; t.textBaseline = "middle"; t.fillStyle = "#000"; t.fillText(text, 1, h / 2);
-      const d = t.getImageData(0, 0, w, h).data, dots = [];
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 120) dots.push([x, y]);
-      return { dots, w, h };
-    }
-    // 밤의 낡은 골목 — 왼쪽 혼자 켜진 편의점, 가운데 네온이 깜빡이는 인력사무소와 구인 벽보, 오른쪽 가로등 아래 광대
-    let SIGN = null, MOTHS = null;
-    function drawScene(c, t) {
-      const g = c.getContext("2d"), W = c.width, H = c.height, GROUND = 138;
-      const px = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(Math.round(x), Math.round(y), w, h); };
-      if (!SIGN) {
-        SIGN = textDots("꿀벌 인력사무소", 13);
-        MOTHS = Array.from({ length: 26 }, (_, i) => ({ c: i % 3, a: i * 2.4, r: 7 + (i * 7) % 26, sp: 0.9 + (i % 5) * 0.28 }));
-      }
-      const beat = Math.floor(t / 90);
-      const neon = !(beat % 37 < 3 || beat % 53 === 7);         // 간판이 가끔 나간다
-      const lamp = !(beat % 29 < 2 || beat % 41 === 11);        // 가로등도 가끔 깜빡인다
-      px(0, 0, W, H, "#0d0716");
-      for (let i = 0; i < 70; i++) if ((i + Math.floor(t / 800)) % 9) px((i * 61) % W, (i * 23) % 62, 1, 1, i % 5 ? "#475569" : "#cbd5e1");
-      // 달 (구름에 살짝 가림)
-      px(410, 12, 22, 22, "#d6d3a8"); px(404, 24, 40, 6, "#1b1230");
-      // 먼 건물
-      for (const [x, w, h] of [[0, 70, 92], [62, 46, 112], [352, 50, 104], [396, 90, 86]]) {
-        px(x, GROUND - h, w, h, "#150c26");
-        for (let wx = x + 5; wx < x + w - 5; wx += 11) for (let wy = GROUND - h + 7; wy < GROUND - 24; wy += 13) if ((wx * 7 + wy * 3) % 11 === 0) px(wx, wy, 4, 6, "#57401f");
-      }
-      // 인력사무소 — 낡은 3층 건물
-      px(128, 22, 196, 116, "#2a2133");
-      px(128, 22, 196, 3, "#463a52");
-      for (let y = 28; y < 136; y += 6) for (let x = 130 + (y % 12 ? 0 : 6); x < 322; x += 12) px(x, y, 11, 1, "#231b2c");
-      for (const [x, y, w] of [[140, 92, 34], [290, 70, 22], [214, 26, 40]]) px(x, y, w, 2, "#17101f");  // 벽 금
-      // 위층 창문 — 한 칸만 불이 켜져 있고 사람 그림자가 있다
-      for (let i = 0; i < 5; i++) {
-        const x = 142 + i * 36, on = i === 3;
-        px(x, 58, 20, 22, "#120c1b"); px(x + 2, 60, 16, 18, on ? "#b45309" : "#1b1426");
-        if (on) { px(x + 7, 66, 6, 12, "#2a1608"); px(x + 8, 62, 4, 4, "#2a1608"); }
-      }
-      // 네온 간판
-      const sx = 226 - SIGN.w / 2, sy = 30;
-      px(sx - 8, sy - 3, SIGN.w + 16, SIGN.h + 6, "#1a0a12");
-      px(sx - 8, sy - 3, SIGN.w + 16, 1, "#7f1d1d"); px(sx - 8, sy + SIGN.h + 2, SIGN.w + 16, 1, "#7f1d1d");
-      if (neon) { g.fillStyle = "rgba(239, 68, 68, .1)"; g.fillRect(sx - 30, sy - 14, SIGN.w + 60, SIGN.h + 40); }
-      for (const [x, y] of SIGN.dots) px(sx + x, sy + y, 1, 1, neon ? "#f87171" : "#4a1d24");
-      // 문과 지하 계단
-      px(198, 96, 52, 42, "#120c1b"); px(202, 100, 44, 38, "#1f2937");
-      px(206, 104, 16, 34, neon ? "#92400e" : "#451a03"); px(226, 104, 16, 34, "#0b0a14");
-      px(209, 107, 10, 10, neon ? "#fbbf24" : "#713f12");
-      px(226, 132, 16, 2, "#334155"); px(226, 126, 16, 2, "#293548"); px(226, 120, 16, 2, "#1e293b");
-      // 구인 벽보 — 바람에 한 장씩 흔들린다
-      const POSTERS = [[138, 98, 14, 18], [156, 102, 12, 16], [172, 96, 14, 20], [258, 98, 14, 18], [276, 104, 12, 15], [294, 97, 16, 20]];
-      POSTERS.forEach(([x, y, w, h], i) => {
-        const flap = Math.floor(t / 400 + i * 3) % 7 === 0 ? 1 : 0;
-        px(x, y + flap, w, h, i % 2 ? "#e7dcc0" : "#f1e7cd");
-        px(x + 2, y + 3 + flap, w - 4, 2, "#b91c1c");
-        for (let l = 7; l < h - 2; l += 3) px(x + 2, y + l + flap, w - 5, 1, "#8b7d63");
-        px(x + w / 2 - 1, y - 1 + flap, 2, 2, "#57534e");
-      });
-      // 혼자 켜진 편의점
-      px(4, 84, 118, 54, "#16202c");
-      px(4, 84, 118, 12, "#0f766e"); px(4, 95, 118, 2, "#fbbf24");
-      for (let i = 0; i < 3; i++) { px(12 + i * 38, 100, 34, 38, lamp ? "#cffafe" : "#67a3a8"); for (let s = 0; s < 3; s++) { px(14 + i * 38, 106 + s * 10, 30, 1, "#64748b"); for (let k = 0; k < 6; k++) px(15 + i * 38 + k * 5, 101 + s * 10, 3, 5, ["#ef4444", "#3b82f6", "#22c55e", "#f59e0b"][(i + s + k) % 4]); } }
-      g.fillStyle = "rgba(165, 243, 252, .1)"; g.fillRect(0, 96, 150, 64);
-      // 땅 — 젖은 아스팔트에 불빛이 비친다
-      px(0, GROUND, W, H - GROUND, "#120c1d");
-      px(0, GROUND, W, 2, "#2a2133");
-      for (let i = 0; i < 40; i++) px((i * 37) % W, GROUND + 4 + (i * 11) % 28, 8 + i % 9, 1, "#1c1429");
-      if (lamp) for (let y = GROUND + 3; y < H; y += 3) px(14 + (y % 5), y, 100, 1, "rgba(165, 243, 252, .1)");
-      if (neon) for (let y = GROUND + 3; y < H; y += 3) px(176 + (y % 7), y, 100, 1, "rgba(239, 68, 68, .12)");
-      // 가로등 빛 · 기둥
-      const lx = 372;
-      px(lx, 52, 3, 86, "#334155"); px(lx - 16, 50, 19, 3, "#334155"); px(lx - 20, 53, 9, 3, lamp ? "#fef08a" : "#4b4620");
-      if (lamp) { g.fillStyle = "rgba(254, 240, 138, .08)"; g.beginPath(); g.moveTo(lx - 20, 56); g.lineTo(lx - 11, 56); g.lineTo(lx + 22, GROUND); g.lineTo(lx - 54, GROUND); g.closePath(); g.fill(); }
-      // 불빛에 모이는 나방 떼
-      for (const m of MOTHS) {
-        const a = m.a + (t / 1000) * m.sp, cx = m.c === 0 ? lx - 16 : m.c === 1 ? 60 : 226;
-        const cy = m.c === 0 ? 62 : m.c === 1 ? 90 : 44;
-        const x = cx + Math.cos(a) * m.r, y = cy + Math.sin(a * 1.7) * m.r * 0.6, f = Math.floor(t / 90 + m.a) % 2;
-        px(x - 1, y, 3, 1, "#d6cfc0"); px(x - (f ? 2 : 1), y - 1, 2, 1, "#a8a29e"); px(x + (f ? 1 : 0), y - 1, 2, 1, "#a8a29e");
-      }
-      // 가로등 아래 광대 — 풍선을 들고 이쪽을 보고 서 있다
-      const cl = 344, hop = Math.floor(t / 2200) % 5 === 0 ? 1 : 0;
-      px(cl - 7, GROUND - 2, 16, 2, "rgba(0,0,0,.5)");
-      px(cl - 3, GROUND - 7, 3, 7, "#111827"); px(cl + 2, GROUND - 7, 3, 7, "#111827");
-      px(cl - 4, GROUND - 19, 5, 13, "#991b1b"); px(cl + 1, GROUND - 19, 5, 13, "#1e3a8a");
-      px(cl, GROUND - 17, 2, 1, "#fde047"); px(cl, GROUND - 13, 2, 1, "#fde047");
-      px(cl - 3, GROUND - 27, 8, 8, "#e5e7eb");
-      px(cl - 2, GROUND - 25, 2, 2, "#111827"); px(cl + 2, GROUND - 25, 2, 2, "#111827");
-      px(cl, GROUND - 23 + hop, 2, 1, "#ef4444"); px(cl - 2, GROUND - 21, 6, 1, "#b91c1c");
-      px(cl - 2, GROUND - 29, 6, 2, "#7c3aed"); px(cl, GROUND - 31, 2, 2, "#fde047");
-      px(cl + 5, GROUND - 16, 3, 2, "#e5e7eb");
-      px(cl + 7, GROUND - 40 + hop, 1, 24, "#94a3b8");
-      px(cl + 3, GROUND - 52 + hop, 9, 11, "#dc2626"); px(cl + 4, GROUND - 54 + hop, 7, 2, "#dc2626"); px(cl + 5, GROUND - 50 + hop, 2, 2, "#fca5a5");
-      // 왼쪽 위 어둠 — 화면 가장자리를 눌러 분위기를 잡는다
-      g.fillStyle = "rgba(5, 3, 12, .45)"; g.fillRect(0, 0, W, 6); g.fillRect(0, H - 6, W, 6);
-    }
-    // ---------- 오프닝 ----------
-    // 구인 문자 → (누르면) 여덟 알바가 한 컷씩 → 간판이 켜지며 제목. 처음 들어올 때만 나오고, 아래 버튼으로 다시 볼 수 있다
-    const OP_SEEN = "hk-series-opening";
-    const CUT = 0.95, TITLE_SEC = 3.6;
-    function playOpening() {
-      const W = 320, H = 180, K = 2; // 그림은 320×180 도트, 글자만 두 배로 또렷하게
-      const box = document.createElement("div");
-      box.className = "hk-op";
-      box.innerHTML = `<canvas width="${W * K}" height="${H * K}" aria-label="꿀알바 시리즈 오프닝"></canvas><button type="button" class="hk-op__skip">건너뛰기</button>`;
-      document.body.appendChild(box);
-      const canvas = box.querySelector("canvas"), g = canvas.getContext("2d");
-      g.scale(K, K);
-      const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
-      const texts = {};
-      const words = (t, x, y, size, c, center = true) => {
-        const T = texts[t + size] || (texts[t + size] = textDots(t, size * K));
-        const ox = Math.round(center ? x - T.w / K / 2 : x);
-        g.fillStyle = c;
-        for (const [dx, dy] of T.dots) g.fillRect(ox + dx / K, y + dy / K, 1 / K, 1 / K);
-      };
-      const sfx = (n, a) => { try { window.HKSound.play(n, a); } catch (_) {} };
-      const noise = (n, c) => { for (let i = 0; i < n; i++) px(Math.random() * W, Math.random() * H, 2, 1, c); };
-      // 여덟 장면 — k 는 컷 안에서 0→1
-      const CUTS = [
-        ["1화", "심야 편의점", (k, t) => {
-          px(0, 0, W, H, "#050810"); px(60, 40, 200, 110, "#0f172a"); px(60, 40, 200, 16, "#0f766e");
-          const on = Math.sin(t * 40) > -0.5;
-          for (let i = 0; i < 3; i++) { px(72 + i * 62, 62, 52, 80, on ? "#a5f3fc" : "#3f6468"); for (let r = 0; r < 3; r++) px(76 + i * 62, 72 + r * 24, 44, 2, "#475569"); }
-          for (let i = 0; i < 46; i++) { const a = i * 2.1 + t * (2 + i % 3), R = 16 + (i * 13) % 110 * (1.1 - k * 0.4), x = 160 + Math.cos(a) * R * 1.3, y = 80 + Math.sin(a * 1.4) * R * 0.6, f = Math.floor(t * 18 + i) % 2; px(x, y, 3, 1, "#e7e5e4"); px(x - (f ? 2 : 0), y - 1, 2, 1, "#a8a29e"); }
-        }],
-        ["2화", "광대를 놓치지 마", (k, t) => {
-          px(0, 0, W, H, "#0b0614");
-          const z = 2 + Math.floor(k * 6), x = 160 - 4 * z, y = 150 - 14 * z;
-          px(x - z, y + 8 * z, 5 * z, 8 * z, "#7f1d1d"); px(x + 4 * z, y + 8 * z, 5 * z, 8 * z, "#1e3a8a");
-          px(x, y, 8 * z, 8 * z, "#e5e7eb");
-          px(x + z, y + 2 * z, 2 * z, z, "#111827"); px(x + 5 * z, y + 2 * z, 2 * z, z, "#111827");
-          px(x + 3 * z, y + 4 * z, 2 * z, z, "#ef4444"); px(x + z, y + 6 * z, 6 * z, z, "#b91c1c");
-          px(x, y - z, 8 * z, z, "#7c3aed");
-        }],
-        ["3화", "새벽 우유 배달", (k) => {
-          px(0, 0, W, H, "#0a1022"); px(80, 30, 160, 120, "#334155"); px(70, 22, 180, 10, "#7c2d12");
-          const open = k > 0.55;
-          px(136, 70, 48, 80, open ? "#020617" : "#dc2626");
-          if (open) { px(148, 96, 6, 6, "#ef4444"); px(166, 96, 6, 6, "#ef4444"); }
-          for (let i = 0; i < 6; i++) px(90 + (i % 3) * 8, 138 - Math.floor(i / 3) * 12, 5, 11, "#f8fafc");
-        }],
-        ["4화", "심야 극장 안내", (k) => {
-          px(0, 0, W, H, "#0a0406");
-          const turn = k > 0.5;
-          px(50, 12, 220, 46, turn ? "#7f1d1d" : "#cbd5e1");
-          for (let r = 0; r < 3; r++) for (let c = 0; c < 9; c++) {
-            const x = 28 + c * 31, y = 76 + r * 34;
-            px(x, y + 12, 20, 12, "#7f1d1d");
-            px(x + 3, y, 14, 13, turn ? "#e5e7eb" : "#27272a");
-            if (turn) { px(x + 5, y + 4, 3, 3, "#b91c1c"); px(x + 12, y + 4, 3, 3, "#b91c1c"); }
-          }
-        }],
-        ["5화", "신약 시험 보조", (k, t) => {
-          px(0, 0, W, H, "#06201d");
-          px(70, 90, 180, 60, "#e2e8f0"); px(70, 110, 180, 40, "#5eead4"); px(136, 72, 48, 40, k > 0.6 ? "#a7f3d0" : "#fde68a");
-          px(146, 86, 8, 7, k > 0.6 ? "#dc2626" : "#111827"); px(166, 86, 8, 7, k > 0.6 ? "#dc2626" : "#111827");
-          for (let i = 0; i < 5; i++) { const y = ((t * 90 + i * 34) % 90), x = 40 + i * 58; px(x, y, 12, 6, ["#ef4444", "#facc15", "#3b82f6"][i % 3]); }
-        }],
-        ["6화", "조용한 공사장", (k) => {
-          px(0, 0, W, H, "#0c0a09");
-          for (let x = 0; x < W; x += 40) px(x, 60 + (x % 3) * 8, 4, 120, "#44403c");
-          px(0, 150, W, 30, "#64748b"); for (let x = 8; x < W; x += 24) px(x, 156, 3, 3, "#cbd5e1");
-          const x = 60 + k * 150;
-          px(x, 70, 44, 80, "#e7e5e4"); px(x + 4, 44, 36, 28, "#e7e5e4"); px(x - 8, 48, 8, 18, "#a8a29e"); px(x + 44, 48, 8, 18, "#a8a29e"); px(x + 14, 60, 16, 3, "#292524");
-        }],
-        ["7화", "야간 퍼레이드", (k, t) => {
-          px(0, 0, W, H, "#0b0420");
-          const hop = Math.abs(Math.sin(t * 9)) * 8, ang = k > 0.55;
-          px(124, 16 - hop, 12, 34, "#f5f5f4"); px(184, 16 - hop, 12, 34, "#f5f5f4");
-          px(116, 46 - hop, 88, 64, "#f5f5f4");
-          px(132, 66 - hop, 16, 16, ang ? "#ef4444" : "#111827"); px(172, 66 - hop, 16, 16, ang ? "#ef4444" : "#111827");
-          px(136, 92 - hop, 48, 8, "#111827");
-          px(124, 110 - hop, 72, 70, "#a21caf");
-          for (let i = 0; i < 10; i++) px(16 + i * 30, ((t * 60 + i * 37) % 200) - 16, 10, 12, ["#38bdf8", "#facc15", "#a3e635", "#ef4444"][i % 4]);
-        }],
-        ["8화", "마지막 축제", (k, t) => {
-          px(0, 0, W, H, "#120606");
-          for (let i = 0; i < 12; i++) px(i * 28, 0, 28, 120 - Math.abs(i - 5.5) * 16, i % 2 ? "#991b1b" : "#e7dcc0");
-          px(0, 150, W, 30, "#2a0a0a");
-          for (let i = 0; i < 14; i++) { const s = Math.sin(t * 8 + i) > 0.2; px(10 + i * 22, 142, 3, 3, s ? "#fde047" : "#713f12"); }
-        }],
-      ];
-      let raf = 0, stage = "msg", t0 = 0, cutNow = -1, done = false, titleHit = false, typed = 0;
-      function close() {
-        if (done) return;
-        done = true;
-        cancelAnimationFrame(raf);
-        try { window.HKSound.ambient(false); } catch (_) {}
-        try { localStorage.setItem(OP_SEEN, "1"); } catch (_) {}
-        box.classList.add("is-out");
-        setTimeout(() => box.remove(), 520);
-      }
-      function accept() {
-        if (stage !== "msg") return;
-        stage = "cuts"; t0 = performance.now();
-        sfx("whoosh");
-        try { window.HKSound.ambient(true); } catch (_) {}
-      }
-      function drawMsg(now) {
-        px(0, 0, W, H, "#050507");
-        const blink = Math.floor(now / 500) % 2;
-        // 휴대폰
-        px(112, 8, 96, 166, "#292524"); px(116, 14, 88, 150, "#0f172a");
-        px(120, 34, 80, 56, "#e7e5e4");
-        const msg = ["꿀벌 인력사무소", "고수익 알바", "오늘 밤 가능?"];
-        msg.forEach((l, i) => words(l, 160, 38 + i * 16, 10, i ? "#1c1917" : "#b91c1c"));
-        px(126, 104, 68, 24, blink ? "#dc2626" : "#991b1b");
-        words("수락", 160, 108, 13, "#fef3c7");
-        words("화면을 누르세요", 160, 136, 9, "#a8a29e");
-      }
-      function frame(now) {
-        raf = requestAnimationFrame(frame);
-        if (stage === "msg") return drawMsg(now);
-        const t = Math.max(0, (now - t0) / 1000); // 첫 프레임은 시각이 살짝 앞설 수 있다
-        const i = Math.floor(t / CUT);
-        if (i < CUTS.length) {
-          if (i !== cutNow) { cutNow = i; sfx("buzz"); sfx("beat", { strong: true }); typed = 0; }
-          const k = (t - i * CUT) / CUT, [ep, name, draw] = CUTS[i];
-          draw(k, t);
-          if (k < 0.12) { px(0, 0, W, H, "#f5f5f4"); }
-          px(0, 0, W, 16, "#000"); px(0, H - 22, W, 22, "#000");
-          words(`${ep} · ${name}`, 160, H - 19, 12, "#fef3c7");
-          if (k > 0.8) noise(60, "#e7e5e4");
-          return;
-        }
-        // 제목 — 어둠 속에서 네온이 깜빡이다 켜진다
-        const tt = t - CUTS.length * CUT;
-        if (tt > TITLE_SEC) return close();
-        if (!titleHit) { titleHit = true; sfx("growl"); }
-        px(0, 0, W, H, "#050208");
-        const on = tt > 1.1 || Math.sin(tt * 34) > 0.35;
-        if (on) { g.fillStyle = "rgba(220, 38, 38, .12)"; g.fillRect(40, 44, 240, 92); }
-        words("꿀알바", 161, 60, 34, "#450a0a");
-        words("꿀알바", 160, 59, 34, on ? "#f87171" : "#3f1d1d");
-        words("시리즈", 160, 104, 14, on ? "#fde68a" : "#3a2f1a");
-        if (tt > 1.8) words("규칙을 지키면, 돈을 드립니다", 160, 134, 10, "#a8a29e");
-        if (tt > TITLE_SEC - 0.5) { g.fillStyle = `rgba(0,0,0,${(tt - (TITLE_SEC - 0.5)) * 2})`; g.fillRect(0, 0, W, H); }
-      }
-      box.querySelector(".hk-op__skip").onclick = (e) => { e.stopPropagation(); close(); };
-      canvas.addEventListener("click", accept);
-      window.addEventListener("keydown", function onKey(e) {
-        if (done) return window.removeEventListener("keydown", onKey);
-        if (e.code === "Escape") close();
-        else if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); accept(); }
-      });
-      raf = requestAnimationFrame(frame);
-    }
-
     HKMember.mountPage({
       active: "lounge",
       auth: true,
@@ -346,20 +85,15 @@
             <p class="hk-sr__lead">밤에만 문을 여는 꿀벌 인력사무소. 시급은 높고, 규칙은 지켜야 해요.<br>공고를 골라 지원하세요.</p>
             <div class="hk-sr__board">${JOBS.map(card).join("")}</div>
             <a class="hk-sr__back" href="/arcade">‹ 아케이드로</a>
-            <button type="button" class="hk-sr__replay" id="sr-replay">오프닝 다시 보기</button>
           </div>
         </div>`,
       afterMount: () => {
         pixelTitle(document.getElementById("sr-title"), "꿀알바 시리즈", 20, 3, "#fde68a");
-        document.getElementById("sr-replay").onclick = playOpening;
-        let seen = false;
-        try { seen = localStorage.getItem(OP_SEEN) === "1"; } catch (_) {}
-        if (!seen && !matchMedia("(prefers-reduced-motion: reduce)").matches) playOpening();
         const c = document.getElementById("sr-scene");
         let raf = 0, lastDraw = 0;
         const loop = (t) => {
           raf = 0;
-          if (t - lastDraw > 80) { lastDraw = t; drawScene(c, t); } // 나방이 움직일 만큼만 — 초당 12번
+          if (t - lastDraw > 80) { lastDraw = t; HKSeriesArt.drawScene(c, t); } // 나방이 움직일 만큼만 — 초당 12번
           if (!document.hidden) raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);

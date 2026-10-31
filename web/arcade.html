@@ -13,6 +13,7 @@
   <script src="/_shared/api.js"></script>
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/play.js"></script>
+  <script src="/_shared/series-art.js"></script>
 </head>
 <body>
   <div id="app"></div>
@@ -252,15 +253,26 @@
       box.setAttribute("aria-modal", "true");
       box.setAttribute("aria-label", "꿀알바 시리즈 소개");
       box.innerHTML = `<div class="hk-srp__card">
+          <canvas class="hk-srp__art" width="${HKSeriesArt.width}" height="${HKSeriesArt.height}" aria-hidden="true"></canvas>
           <button type="button" class="hk-srp__x" data-close aria-label="닫기">✕</button>
-          <small>새 시리즈 · 게임 8편</small>
-          <b>꿀알바 시리즈</b>
-          <p>밤에만 문을 여는 인력사무소. 시급은 높고, 규칙은 지켜야 해요.<br>구인 공고를 골라 알바를 시작해 보세요.</p>
-          <ul>${["심야 편의점", "광대를 놓치지 마", "새벽 우유 배달", "심야 극장 안내"].map((t, i) => `<li><i>${i + 1}화</i>${t}</li>`).join("")}<li class="is-more">그리고 4편 더</li></ul>
-          <a class="hk-srp__go" href="/series">꿀알바 보러 가기 ›</a>
-          <button type="button" class="hk-srp__later" data-today>오늘 그만 보기</button>
+          <div class="hk-srp__body">
+            <small>새 시리즈 · 게임 8편</small>
+            <b>꿀알바 시리즈</b>
+            <p>밤에만 문을 여는 인력사무소. 시급은 높고, 규칙은 지켜야 해요.<br>구인 공고를 골라 알바를 시작해 보세요.</p>
+            <ul>${["심야 편의점", "광대를 놓치지 마", "새벽 우유 배달", "심야 극장 안내", "신약 시험 보조", "조용한 공사장", "야간 퍼레이드", "마지막 축제"].map((t, i) => `<li><i>${i + 1}화</i>${t}</li>`).join("")}</ul>
+            <a class="hk-srp__go" href="/series">꿀알바 보러 가기 ›</a>
+            <button type="button" class="hk-srp__later" data-today>오늘 그만 보기</button>
+          </div>
         </div>`;
-      const close = () => box.remove();
+      // 시리즈 페이지 상단과 같은 밤골목 그림이 움직인다
+      const art = box.querySelector(".hk-srp__art");
+      let raf = 0, lastDraw = 0;
+      const loop = (t) => {
+        if (t - lastDraw > 80) { lastDraw = t; HKSeriesArt.drawScene(art, t); }
+        raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
+      const close = () => { cancelAnimationFrame(raf); box.remove(); };
       box.addEventListener("click", (e) => {
         if (e.target === box || e.target.closest("[data-close]")) close();
         else if (e.target.closest("[data-today]")) {
