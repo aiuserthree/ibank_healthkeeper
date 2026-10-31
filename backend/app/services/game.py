@@ -295,19 +295,35 @@ async def leaderboard(db: AsyncSession, member: Member, key: str, period: str, v
     }
 
 
+async def _week_bests(db: AsyncSession, game: Game, start: date, end: date) -> tuple[list[tuple[int, int]], dict[int, str]]:
+    """명예의 전당용 회원별 최고 기록 — 갈래가 있는 게임은 전체·갈래를 통틀어 가장 좋은 기록과 그 갈래."""
+    if not game.variants:
+        return await _bests(db, game, start, "", end), {}
+    best: dict[int, int] = {}
+    where: dict[int, str] = {}
+    for variant in ("", *game.variants):
+        for member_id, score in await _bests(db, game, start, variant, end):
+            if member_id not in best or (score < best[member_id] if game.lower_better else score > best[member_id]):
+                best[member_id] = score
+                where[member_id] = variant
+    rows = sorted(best.items(), key=lambda r: r[1], reverse=not game.lower_better)
+    return rows, where
+
+
 async def last_week_board(db: AsyncSession) -> dict:
     """지난주(월~일) 게임별 1~3위 — 아케이드 '지난주 명예의 전당'. 월요일마다 저절로 바뀐다."""
     today = today_kst()
     end = today - timedelta(days=today.weekday() + 1)  # 지난주 일요일
     start = end - timedelta(days=6)
-    picked: list[tuple[Game, list[tuple[int, int, int]]]] = []
+    picked: list[tuple[Game, list[tuple[int, int, int]], dict[int, str]]] = []
     for game in GAMES.values():
-        ranked = _ranked(await _bests(db, game, start, "", end))[:3]
+        rows, where = await _week_bests(db, game, start, end)
+        ranked = _ranked(rows)[:3]
         if ranked:
-            picked.append((game, ranked))
-    members = await _members(db, list({mid for _, rows in picked for _, mid, _ in rows}))
+            picked.append((game, ranked, where))
+    members = await _members(db, list({mid for _, rows, _ in picked for _, mid, _ in rows}))
     games = []
-    for game, rows in picked:
+    for game, rows, where in picked:
         top = [
             {
                 "rank": rank,
@@ -315,6 +331,7 @@ async def last_week_board(db: AsyncSession) -> dict:
                 "department": members[mid].department,
                 "avatarUrl": member_avatar_url(mid),
                 "score": best,
+                "variant": where.get(mid, ""),
             }
             for rank, mid, best in rows
             if mid in members
