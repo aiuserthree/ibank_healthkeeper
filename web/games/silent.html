@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 꿀알바 시리즈 6화 · 조용한 공사장 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #1c1917, #57534e); color: #fef3c7; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .gm-hud__item small { font-size: 11px; opacity: .75; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .gm-hud__mid { align-items: center; }
+    .gm-hud__right { align-items: flex-end; }
+    .gm-lives { display: inline-flex; gap: 3px; min-height: 18px; align-items: center; }
+    .gm-lives i { width: 14px; height: 8px; border-radius: 7px 7px 0 0; background: #facc15; }
+    .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #0c0a09; }
+    .gm-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(12, 10, 9, .8); overflow-y: auto; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 16px; border: 3px solid #facc15; background: #1c1917; color: #fef3c7; text-align: center; }
+    .gm-card h2 { margin: 0 0 6px; font-size: 22px; color: #fde68a; }
+    .gm-card p { word-break: keep-all; margin: 0 0 9px; font-size: 13.5px; line-height: 1.5; }
+    .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #fde68a; }
+    .gm-card .gm-warn { padding: 8px; border: 2px dashed #ef4444; font-weight: 700; color: #fecaca; }
+    .gm-go { width: 100%; border: 0; padding: 12px; font-size: 15.5px; font-weight: 800; color: #1c1917; cursor: pointer; background: #facc15; }
+    .gm-note { padding: 7px 4px 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "silent",
+      setup(stage, ctx) {
+        const COLS = 11, ROWS = 14, CELL = 16, W = COLS * CELL, H = ROWS * CELL;
+        const FLOORS = 8, STEP_SEC = 0.17, FLOOR_SEC = 35;
+        const LOUD_R = 6; // 철판을 밟으면 이 칸 안의 그것이 듣는다
+        const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+        stage.innerHTML = `
+          <div class="gm-shell">
+            <div class="gm-hud">
+              <div class="gm-hud__item"><small>점수</small><b data-score>0</b></div>
+              <div class="gm-hud__item gm-hud__mid"><small>층</small><b data-floor>1층</b></div>
+              <div class="gm-hud__item gm-hud__right"><small>안전모</small><span class="gm-lives" data-lives></span></div>
+            </div>
+            <div class="gm-screen">
+              <canvas class="gm-canvas" aria-label="조용한 공사장 게임 화면"></canvas>
+              <div class="gm-overlay" data-overlay></div>
+            </div>
+            <div class="gm-note">방향키·WASD 이동 · 모바일은 화면에 대고 가고 싶은 쪽으로 밀기 · Esc 일시정지</div>
+          </div>`;
+        const shell = stage.querySelector(".gm-shell");
+        const canvas = stage.querySelector("canvas");
+        canvas.width = W * 2; canvas.height = H * 2;
+        const out = canvas.getContext("2d");
+        const buf = document.createElement("canvas");
+        buf.width = W; buf.height = H;
+        const g = buf.getContext("2d", { willReadFrequently: true });
+        const overlay = stage.querySelector("[data-overlay]");
+        const elScore = stage.querySelector("[data-score]");
+        const elFloor = stage.querySelector("[data-floor]");
+        const elLives = stage.querySelector("[data-lives]");
+
+        let state = "ready", S = null, raf = 0, last = 0;
+        const keys = {};
+        let touchDir = null;
+        const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+        const rnd = (a, b) => a + Math.random() * (b - a);
+        const ri = (n) => Math.floor(Math.random() * n);
+        const key = (c, r) => r * COLS + c;
+
+        // 칸마다 목표까지 걸음 수
+        function flow(map, tc, tr) {
+          const d = new Int16Array(COLS * ROWS).fill(-1), q = [key(tc, tr)];
+          d[q[0]] = 0;
+          for (let i = 0; i < q.length; i++) {
+            const n = q[i], c = n % COLS, r = (n - c) / COLS;
+            for (const [dc, dr] of Object.values(DIRS)) {
+              const nc = c + dc, nr = r + dr;
+              if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS || map[key(nc, nr)] === "#") continue;
+              const k = key(nc, nr);
+              if (d[k] < 0) { d[k] = d[n] + 1; q.push(k); }
+            }
+          }
+          return d;
+        }
+        // 한 층 만들기 — 기둥과 철판을 놓고, 출구까지 길이 반드시 있게 한다. 위층일수록 철판이 많다
+        function makeFloor(f) {
+          for (let tries = 0; tries < 50; tries++) {
+            const map = Array(COLS * ROWS).fill(".");
+            for (let i = 0; i < 9 + f; i++) {
+              const c = ri(COLS), r = 1 + ri(ROWS - 2), wide = Math.random() < 0.5;
+              for (let k = 0; k < 2 + ri(2); k++) { const cc = c + (wide ? k : 0), rr = r + (wide ? 0 : k); if (cc < COLS && rr < ROWS) map[key(cc, rr)] = "#"; }
+            }
+            const start = [ri(3), ROWS - 1], exit = [COLS - 1 - ri(3), 0];
+            map[key(start[0], start[1])] = "."; map[key(exit[0], exit[1])] = ".";
+            for (let i = 0; i < 5 + f * 1.5; i++) {
+              const c = ri(COLS), r = 1 + ri(ROWS - 2);
+              for (let dc = 0; dc < 2 + ri(3); dc++) for (let dr = 0; dr < 1 + ri(3); dr++) { const k = key(c + dc, r + dr); if (c + dc < COLS && r + dr < ROWS && map[k] === ".") map[k] = "m"; }
+            }
+            const d = flow(map, exit[0], exit[1]);
+            // 철판을 안 밟고 가는 길은 없어도 된다 — 하지만 출구까지 길은 있어야 한다
+            if (d[key(start[0], start[1])] > 0) return { map, start, exit };
+          }
+          return makeFloor(f);
+        }
+        function newGame() {
+          S = { t: 0, score: 0, lives: 3, floor: 0, stepT: 0, x: 0, y: 0, fx: 0, fy: 0, dir: "up", map: [], exit: [0, 0], start: [0, 0], mons: [], rings: [], floorT: 0, noise: 0, hurt: 0, texts: [], shake: 0 };
+          enterFloor(1);
+        }
+        function enterFloor(f) {
+          S.floor = f;
+          const F = makeFloor(f);
+          S.map = F.map; S.exit = F.exit; S.start = F.start;
+          S.x = S.fx = F.start[0]; S.y = S.fy = F.start[1];
+          S.floorT = 0; S.noise = 0; S.rings = [];
+          S.mons = [];
+          const n = Math.min(5, 1 + Math.floor(f / 1.6));
+          for (let i = 0; i < n; i++) {
+            for (let t = 0; t < 200; t++) {
+              const c = ri(COLS), r = ri(ROWS);
+              if (S.map[key(c, r)] === "#" || Math.abs(c - S.x) + Math.abs(r - S.y) < 7) continue;
+              S.mons.push({ c, r, fc: c, fr: r, cd: rnd(0.2, 0.6), target: null, heard: 0 });
+              break;
+            }
+          }
+          hud();
+        }
+        function hud() {
+          if (!S) return;
+          elScore.textContent = S.score.toLocaleString("ko-KR");
+          elFloor.textContent = `${S.floor}층`;
+          if (elLives.childElementCount !== Math.max(0, S.lives)) elLives.innerHTML = "<i></i>".repeat(Math.max(0, S.lives));
+        }
+        function makeNoise(c, r) {
+          S.noise++;
+          S.rings.push({ c, r, t: 0 });
+          ctx.sfx("hit");
+          for (const m of S.mons) if (Math.abs(m.c - c) + Math.abs(m.r - r) <= LOUD_R) { m.target = [c, r]; m.heard = 0.7; m.field = flow(S.map, c, r); }
+        }
+        function caught() {
+          S.lives--; S.shake = 0.35; S.hurt = 0.7;
+          ctx.sfx("ghost");
+          hud();
+          if (S.lives <= 0) return finish(false);
+          S.x = S.fx = S.start[0]; S.y = S.fy = S.start[1]; S.stepT = 0.5;
+          for (const m of S.mons) { m.target = null; m.field = null; }
+        }
+        function wanted() {
+          if (keys.up) return "up"; if (keys.down) return "down"; if (keys.left) return "left"; if (keys.right) return "right";
+          return touchDir;
+        }
+        function update(dt) {
+          S.t += dt; S.floorT += dt;
+          if (S.shake > 0) S.shake -= dt;
+          if (S.hurt > 0) S.hurt -= dt;
+          // 내 걸음
+          S.stepT -= dt;
+          S.fx += (S.x - S.fx) * Math.min(1, dt * 22); S.fy += (S.y - S.fy) * Math.min(1, dt * 22);
+          const d = wanted();
+          if (d && S.stepT <= 0) {
+            S.dir = d;
+            const [dc, dr] = DIRS[d], nc = S.x + dc, nr = S.y + dr;
+            if (nc >= 0 && nr >= 0 && nc < COLS && nr < ROWS && S.map[key(nc, nr)] !== "#") {
+              S.x = nc; S.y = nr; S.stepT = STEP_SEC;
+              if (S.map[key(nc, nr)] === "m") makeNoise(nc, nr);
+              if (nc === S.exit[0] && nr === S.exit[1]) return floorDone();
+            }
+          }
+          // 그것 — 눈이 없어 소리가 난 곳으로만 간다. 시간이 지나면 더 빨라진다
+          const hurry = S.floorT > FLOOR_SEC ? 0.62 : 1;
+          for (const m of S.mons) {
+            if (m.heard > 0) m.heard -= dt;
+            m.fc += (m.c - m.fc) * Math.min(1, dt * 12); m.fr += (m.r - m.fr) * Math.min(1, dt * 12);
+            m.cd -= dt;
+            if (m.cd <= 0) {
+              m.cd = (m.target ? 0.28 : 0.55) * hurry * (1 - S.floor * 0.025);
+              let best = null;
+              if (m.target && m.field) {
+                let bd = 999;
+                for (const [dc, dr] of Object.values(DIRS)) {
+                  const nc = m.c + dc, nr = m.r + dr;
+                  if (nc < 0 || nr < 0 || nc >= COLS || nr >= ROWS || S.map[key(nc, nr)] === "#") continue;
+                  const v = m.field[key(nc, nr)];
+                  if (v >= 0 && v < bd) { bd = v; best = [nc, nr]; }
+                }
+                if (m.c === m.target[0] && m.r === m.target[1]) { m.target = null; m.field = null; best = null; }
+              }
+              if (!best) {
+                const opts = Object.values(DIRS).map(([dc, dr]) => [m.c + dc, m.r + dr]).filter(([c, r]) => c >= 0 && r >= 0 && c < COLS && r < ROWS && S.map[key(c, r)] !== "#");
+                if (opts.length && Math.random() < 0.75) best = opts[ri(opts.length)];
+              }
+              if (best) { m.c = best[0]; m.r = best[1]; }
+            }
+            if (m.c === S.x && m.r === S.y && S.hurt <= 0) { caught(); if (state !== "play") return; break; }
+          }
+          for (const q of S.rings) q.t += dt * 2.2;
+          S.rings = S.rings.filter((q) => q.t < 1);
+          for (const t of S.texts) { t.y -= 14 * dt; t.life -= dt; }
+          S.texts = S.texts.filter((t) => t.life > 0);
+          hud();
+        }
+        function floorDone() {
+          const quiet = S.noise === 0 ? 300 : 0;
+          const bonus = 200 + S.floor * 100 + Math.max(0, Math.round((FLOOR_SEC - S.floorT) * 8)) + quiet;
+          S.score += bonus;
+          ctx.sfx(quiet ? "coin" : "success");
+          if (S.floor >= FLOORS) return finish(true);
+          enterFloor(S.floor + 1);
+          S.texts.push({ x: W / 2, y: H - 30, t: `${quiet ? "조용히 통과! " : ""}+${bonus}`, c: "#fde68a", life: 1.3 });
+        }
+
+        // ---------- 그리기 ----------
+        function drawTile(c, r) {
+          const x = c * CELL, y = r * CELL, t = S ? S.map[key(c, r)] : ".";
+          px(x, y, CELL, CELL, (c + r) % 2 ? "#44403c" : "#3f3a36");
+          if (t === "m") {
+            px(x + 1, y + 1, CELL - 2, CELL - 2, "#64748b");
+            px(x + 1, y + 1, CELL - 2, 2, "#94a3b8");
+            px(x + 3, y + 5, 2, 2, "#cbd5e1"); px(x + 11, y + 5, 2, 2, "#cbd5e1"); px(x + 3, y + 11, 2, 2, "#cbd5e1"); px(x + 11, y + 11, 2, 2, "#cbd5e1");
+          } else if (t === "#") {
+            px(x, y, CELL, CELL, "#1c1917");
+            px(x + 1, y + 1, CELL - 2, CELL - 3, "#78716c");
+            px(x + 3, y + 3, 3, 2, "#57534e"); px(x + 9, y + 8, 4, 2, "#57534e");
+          }
+        }
+        function paint() {
+          const sh = S && S.shake > 0 ? Math.round(Math.sin(S.t * 70) * 2) : 0;
+          g.setTransform(1, 0, 0, 1, sh, 0);
+          px(-4, 0, W + 8, H, "#0c0a09");
+          for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) drawTile(c, r);
+          if (!S) { g.setTransform(1, 0, 0, 1, 0, 0); return; }
+          // 출구(계단)
+          const ex = S.exit[0] * CELL, ey = S.exit[1] * CELL;
+          px(ex + 1, ey + 1, CELL - 2, CELL - 2, "#14532d");
+          for (let i = 0; i < 4; i++) px(ex + 3 + i * 2, ey + 11 - i * 3, 9 - i * 2, 2, "#86efac");
+          // 소리 고리
+          for (const q of S.rings) {
+            const rr = q.t * LOUD_R * CELL, n = 28, cx = (q.c + 0.5) * CELL, cy = (q.r + 0.5) * CELL;
+            for (let i = 0; i < n; i++) { const a = (i / n) * 6.283; px(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr, 2, 2, "#fbbf24"); }
+          }
+          // 그것 — 얼굴에 눈이 없고 큰 귀만 있다
+          for (const m of S.mons) {
+            const x = m.fc * CELL + 3, y = m.fr * CELL + 1, w = Math.floor(S.t * 5 + m.c) % 2;
+            px(x, y + 5, 10, 9, m.heard > 0 ? "#fecaca" : "#e7e5e4");
+            px(x + 1, y, 8, 6, m.heard > 0 ? "#fecaca" : "#e7e5e4");
+            px(x - 2, y + 1, 2, 4, "#a8a29e"); px(x + 10, y + 1, 2, 4, "#a8a29e");
+            px(x + 3, y + 4, 4, 1, "#292524");
+            px(x + 1, y + 14, 3, w ? 1 : 2, "#57534e"); px(x + 6, y + 14, 3, w ? 2 : 1, "#57534e");
+          }
+          // 나
+          const x = S.fx * CELL + 4, y = S.fy * CELL + 2;
+          if (!(S.hurt > 0 && Math.floor(S.t * 12) % 2)) {
+            px(x + 1, y + 8, 6, 5, "#ea580c"); px(x + 2, y + 9, 4, 1, "#fde047");
+            px(x + 1, y + 3, 6, 5, "#fde68a");
+            px(x, y + 1, 8, 3, "#facc15");
+            px(x + 2, y + 13, 2, 1, "#1c1917"); px(x + 5, y + 13, 2, 1, "#1c1917");
+            const [dx, dy] = DIRS[S.dir];
+            if (dy <= 0) { px(x + 2 + dx, y + 5, 1, 1, "#111827"); px(x + 5 + dx, y + 5, 1, 1, "#111827"); }
+          }
+          // 어둠 · 시간 초과
+          if (S.floorT > FLOOR_SEC) { g.fillStyle = "rgba(127, 29, 29, .22)"; g.fillRect(-4, 0, W + 8, H); }
+          g.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        function draw() {
+          paint();
+          HKPlay.smoothPixels(buf, out);
+          if (!S) return;
+          out.setTransform(2, 0, 0, 2, 0, 0);
+          out.font = "800 8px sans-serif"; out.textAlign = "center"; out.textBaseline = "middle";
+          for (const t of S.texts) { out.fillStyle = t.c; out.fillText(t.t, t.x, t.y); }
+        }
+
+        // ---------- 흐름 ----------
+        function fit() {
+          const rect = stage.getBoundingClientRect();
+          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
+          const cw = Math.floor(W * k);
+          canvas.style.width = `${cw}px`; canvas.style.height = `${Math.floor(H * k)}px`;
+          shell.style.width = `${cw}px`;
+          draw();
+        }
+        function frame(now) {
+          raf = 0;
+          if (state !== "play") return;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          last = now;
+          try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
+          if (state === "play") raf = requestAnimationFrame(frame);
+        }
+        function run() { if (raf) cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); }
+        function showOverlay(html) {
+          overlay.innerHTML = html;
+          overlay.hidden = false;
+          const b = overlay.querySelector("button");
+          if (b) b.focus({ preventScroll: true });
+        }
+        function clearInput() { Object.keys(keys).forEach((k) => { keys[k] = false; }); touchDir = null; }
+        function showReady() {
+          state = "ready";
+          S = null;
+          elLives.innerHTML = "<i></i><i></i><i></i>";
+          draw();
+          showOverlay(`<div class="gm-card">
+            <h2>조용한 공사장</h2>
+            <p>야간 공사장의 ${FLOORS}층까지 올라가요. 초록 계단까지 가면 다음 층이에요.</p>
+            <p class="gm-warn">근무 규칙 · 소리를 내지 말 것</p>
+            <p>그것은 눈이 없고 소리만 들어요. <b>철판</b>을 밟으면 큰 소리가 나서 몰려와요.</p>
+            <button type="button" class="gm-go" data-act="start">시작하기</button>
+          </div>`);
+        }
+        function start() {
+          overlay.hidden = true; overlay.innerHTML = "";
+          clearInput();
+          newGame();
+          state = "play";
+          ctx.sfx("go");
+          window.HKSound.ambient(true);
+          run();
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          clearInput();
+          window.HKSound.ambient(false);
+          showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>${S.floor}층 · 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        }
+        function resume() {
+          if (state !== "paused") return;
+          overlay.hidden = true;
+          state = "play";
+          window.HKSound.ambient(true);
+          run();
+        }
+        function finish(won) {
+          state = "over";
+          clearInput();
+          window.HKSound.ambient(false);
+          if (won) S.score += 2000 + S.lives * 500;
+          hud();
+          draw();
+          ctx.sfx(won ? "win" : "lose");
+          const score = S.score;
+          showOverlay(`<div class="gm-card"><h2>${won ? "옥상에 도착했어요" : "철수했어요"}</h2><p>${won ? `${FLOORS}층까지 무사히 올라갔어요!` : `${S.floor}층까지 올라갔어요`}</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          ctx.submit(score);
+        }
+        overlay.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-act]");
+          if (!b) return;
+          if (b.dataset.act === "start") start();
+          else if (b.dataset.act === "resume") resume();
+        });
+
+        // ---------- 입력 ----------
+        const KEY = { ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down", ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right" };
+        window.addEventListener("keydown", (e) => {
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          const c = e.code;
+          if (state === "play") {
+            if (KEY[c]) { e.preventDefault(); keys[KEY[c]] = true; }
+            if (c === "Space") e.preventDefault();
+            if (c === "KeyP" || c === "Escape") pause();
+          } else if ((state === "paused" || state === "ready") && (c === "Space" || c === "Enter")) {
+            e.preventDefault();
+            if (state === "ready") start(); else resume();
+          }
+        });
+        window.addEventListener("keyup", (e) => { if (KEY[e.code]) keys[KEY[e.code]] = false; });
+        window.addEventListener("blur", clearInput);
+        // 휴대폰 — 대고 민 방향으로 계속 걷는다. 손을 떼면 멈춘다
+        let tp = null;
+        canvas.addEventListener("pointerdown", (e) => {
+          if (state !== "play") return;
+          e.preventDefault();
+          if (tp) return;
+          tp = { id: e.pointerId, x: e.clientX, y: e.clientY };
+          try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+        });
+        canvas.addEventListener("pointermove", (e) => {
+          if (!tp || e.pointerId !== tp.id) return;
+          const dx = e.clientX - tp.x, dy = e.clientY - tp.y;
+          if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+          touchDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+          tp.x = e.clientX - Math.sign(dx) * 12; tp.y = e.clientY - Math.sign(dy) * 12; // 살짝만 되밀어도 방향이 바뀌게
+        });
+        const up = (e) => { if (tp && e.pointerId === tp.id) { tp = null; touchDir = null; } };
+        canvas.addEventListener("pointerup", up);
+        canvas.addEventListener("pointercancel", up);
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+        // ---------- 시작 ----------
+        ctx.onScore && ctx.onScore(() => (S ? S.score : 0));
+        ctx.onRestart(start);
+        ctx.onPause(pause);
+        if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+        window.addEventListener("resize", fit);
+        showReady();
+        fit();
+      },
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 꿀알바 시리즈 5화 · 신약 시험 보조 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #06302c, #0f766e); color: #ccfbf1; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .gm-hud__item small { font-size: 11px; opacity: .75; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .gm-hud__mid { align-items: center; }
+    .gm-hud__right { align-items: flex-end; }
+    .gm-lives { display: inline-flex; gap: 3px; min-height: 18px; align-items: center; }
+    .gm-lives i { width: 12px; height: 12px; background: #f87171; box-shadow: inset 0 0 0 2px #fecaca; }
+    .gm-chart { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 6px 8px; background: #f0fdfa; border-bottom: 3px solid #0f766e; }
+    .gm-chart.is-new { animation: gm-flash .4s steps(2) 4; }
+    @keyframes gm-flash { 50% { background: #fde047; } }
+    .gm-chart span { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 13.5px; font-weight: 800; color: #134e4a; }
+    .gm-dotp { width: 18px; height: 9px; display: inline-block; border: 1.5px solid #134e4a; }
+    .gm-screen { position: relative; overflow: hidden; background: #0c1f1d; }
+    .gm-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
+    .gm-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-radius: 0 0 16px 16px; background: #0c1f1d; }
+    .gm-pills button { display: flex; align-items: center; justify-content: center; gap: 6px; height: 56px; border: 3px solid #334155; background: #1e293b; color: #e2e8f0; font-size: 13px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+    .gm-pills button i { width: 26px; height: 13px; display: block; border: 2px solid #f1f5f9; }
+    .gm-pills button.is-on { border-color: #fde047; background: #334155; transform: translateY(-2px); }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(6, 24, 22, .8); overflow-y: auto; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 16px; border: 3px solid #5eead4; background: #06302c; color: #ccfbf1; text-align: center; }
+    .gm-card h2 { margin: 0 0 6px; font-size: 22px; color: #99f6e4; }
+    .gm-card p { word-break: keep-all; margin: 0 0 9px; font-size: 13.5px; line-height: 1.5; }
+    .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #fde68a; }
+    .gm-card .gm-warn { padding: 8px; border: 2px dashed #ef4444; font-weight: 700; color: #fecaca; }
+    .gm-go { width: 100%; border: 0; padding: 12px; font-size: 15.5px; font-weight: 800; color: #06302c; cursor: pointer; background: #99f6e4; }
+    .gm-note { padding: 7px 4px 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "trial",
+      setup(stage, ctx) {
+        const W = 180, H = 150, COLS = 3, ROWS = 2, CW = W / COLS, CH = H / ROWS;
+        const DAYS = 5, DAY_SEC = 30;   // 5일 · 하루 30초 · 처방표는 날마다 바뀐다
+        const SYMS = ["기침", "열", "떨림"];
+        const PILLS = [{ name: "빨강", c: "#ef4444" }, { name: "노랑", c: "#facc15" }, { name: "파랑", c: "#3b82f6" }];
+
+        stage.innerHTML = `
+          <div class="gm-shell">
+            <div class="gm-hud">
+              <div class="gm-hud__item"><small>점수</small><b data-score>0</b></div>
+              <div class="gm-hud__item gm-hud__mid"><small>시험</small><b data-day>1일차</b></div>
+              <div class="gm-hud__item gm-hud__right"><small>사고 허용</small><span class="gm-lives" data-lives></span></div>
+            </div>
+            <div class="gm-chart" data-chart></div>
+            <div class="gm-screen">
+              <canvas class="gm-canvas" aria-label="신약 시험 보조 게임 화면"></canvas>
+              <div class="gm-overlay" data-overlay></div>
+            </div>
+            <div class="gm-pills" data-pills>${PILLS.map((p, i) => `<button type="button" data-pill="${i}"><i style="background:${p.c}"></i>${i + 1}</button>`).join("")}</div>
+            <div class="gm-note">약을 고른 뒤 환자를 눌러요 · 숫자 1·2·3으로도 고를 수 있어요 · Esc 일시정지</div>
+          </div>`;
+        const shell = stage.querySelector(".gm-shell");
+        const canvas = stage.querySelector("canvas");
+        canvas.width = W * 2; canvas.height = H * 2;
+        const out = canvas.getContext("2d");
+        const buf = document.createElement("canvas");
+        buf.width = W; buf.height = H;
+        const g = buf.getContext("2d", { willReadFrequently: true });
+        const overlay = stage.querySelector("[data-overlay]");
+        const elScore = stage.querySelector("[data-score]");
+        const elDay = stage.querySelector("[data-day]");
+        const elLives = stage.querySelector("[data-lives]");
+        const elChart = stage.querySelector("[data-chart]");
+        const elPills = stage.querySelector("[data-pills]");
+
+        let state = "ready", S = null, raf = 0, last = 0;
+        const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+        const rnd = (a, b) => a + Math.random() * (b - a);
+
+        function newGame() {
+          S = { t: 0, score: 0, lives: 3, day: 0, combo: 0, map: [0, 1, 2], pick: -1, beds: Array.from({ length: COLS * ROWS }, (_, i) => ({ i, sym: -1, life: 0, max: 0, sleep: 0, bad: 0, ok: 0 })), spawnCd: 1, sleepCd: 7, texts: [], shake: 0, given: 0 };
+          newDay();
+          setPick(-1);
+          hud();
+        }
+        // 처방표 — 날마다 증상과 약이 다시 섞인다 (전날과 같은 조합은 피한다)
+        function newDay() {
+          const was = S.map.join();
+          do { S.map = [0, 1, 2].sort(() => Math.random() - 0.5); } while (S.map.join() === was);
+          elChart.innerHTML = SYMS.map((s, i) => `<span>${s} <i class="gm-dotp" style="background:${PILLS[S.map[i]].c}"></i></span>`).join("");
+          elChart.classList.remove("is-new"); void elChart.offsetWidth; elChart.classList.add("is-new");
+        }
+        function setPick(i) {
+          if (S) S.pick = i;
+          elPills.querySelectorAll("button").forEach((b, k) => b.classList.toggle("is-on", k === i));
+        }
+        function hud() {
+          if (!S) return;
+          elScore.textContent = S.score.toLocaleString("ko-KR");
+          elDay.textContent = `${Math.min(DAYS, S.day + 1)}일차`;
+          if (elLives.childElementCount !== Math.max(0, S.lives)) elLives.innerHTML = "<i></i>".repeat(Math.max(0, S.lives));
+        }
+        const level = () => Math.min(1, S.t / (DAYS * DAY_SEC));
+        function text(i, t, c) { const x = (i % COLS) * CW + CW / 2, y = Math.floor(i / COLS) * CH + 20; S.texts.push({ x, y, t, c, life: 0.9 }); }
+        function strike(b, label) {
+          S.lives--; S.combo = 0; S.shake = 0.3; b.bad = 1;
+          text(b.i, label, "#fca5a5");
+          ctx.sfx("hurt");
+          hud();
+          if (S.lives <= 0) finish(false);
+        }
+        function tapBed(i) {
+          if (state !== "play" || i < 0) return;
+          const b = S.beds[i];
+          if (S.pick < 0) { ctx.sfx("invalid"); return; }
+          if (b.sleep > 0) { b.sleep = 0; return strike(b, "깨웠어요!"); } // 자는 환자는 깨우면 안 된다
+          if (b.sym < 0) { ctx.sfx("invalid"); return; }
+          if (S.map[b.sym] !== S.pick) { b.sym = -1; return strike(b, "부작용!"); }
+          S.combo++; S.given++;
+          const gain = 100 + Math.round((b.life / b.max) * 100) + Math.min(10, S.combo) * 10;
+          S.score += gain;
+          text(i, `+${gain}`, "#fde68a");
+          b.sym = -1; b.ok = 0.5;
+          ctx.sfx(S.combo % 5 === 0 ? "coin" : "pop");
+          hud();
+        }
+        function update(dt) {
+          S.t += dt;
+          if (S.t >= DAYS * DAY_SEC) return finish(true);
+          const d = Math.floor(S.t / DAY_SEC);
+          if (d !== S.day) { S.day = d; newDay(); setPick(-1); ctx.sfx("buzz"); hud(); }
+          const k = level();
+          S.spawnCd -= dt;
+          const free = S.beds.filter((b) => b.sym < 0 && b.sleep <= 0 && b.bad <= 0 && b.ok <= 0);
+          if (S.spawnCd <= 0 && free.length) {
+            const b = free[Math.floor(Math.random() * free.length)];
+            b.sym = Math.floor(Math.random() * 3);
+            b.max = b.life = 6.5 - k * 3.2;
+            S.spawnCd = rnd(1.6 - k * 0.9, 2.4 - k * 1.2);
+            ctx.sfx("tick");
+          }
+          // 자는 환자 — 깨우면 안 된다. 2일차부터 나온다
+          S.sleepCd -= dt;
+          if (S.sleepCd <= 0 && S.day >= 1 && free.length) {
+            const b = free[Math.floor(Math.random() * free.length)];
+            if (b.sym < 0) b.sleep = rnd(4, 7);
+            S.sleepCd = rnd(5, 9);
+          }
+          for (const b of S.beds) {
+            if (b.sleep > 0) b.sleep -= dt;
+            if (b.bad > 0) b.bad -= dt;
+            if (b.ok > 0) b.ok -= dt;
+            if (b.sym >= 0) {
+              b.life -= dt;
+              if (b.life <= 0) { b.sym = -1; strike(b, "늦었어요!"); if (state !== "play") return; }
+            }
+          }
+          for (const t of S.texts) { t.y -= 14 * dt; t.life -= dt; }
+          S.texts = S.texts.filter((t) => t.life > 0);
+          if (S.shake > 0) S.shake -= dt;
+        }
+
+        // ---------- 그리기 ----------
+        function drawBed(b, x, y) {
+          px(x + 3, y + 4, CW - 6, CH - 8, "#134e4a");
+          px(x + 8, y + 30, CW - 16, 32, "#e2e8f0");       // 침대
+          px(x + 8, y + 28, CW - 16, 4, "#94a3b8");
+          px(x + 16, y + 32, CW - 32, 8, "#f8fafc");       // 베개
+          px(x + 8, y + 42, CW - 16, 20, "#5eead4");       // 이불
+          px(x + 8, y + 42, CW - 16, 2, "#14b8a6");
+          const shake = b.sym === 2 ? Math.round(Math.sin(S ? S.t * 40 + b.i : 0)) : 0;
+          const hx = x + CW / 2 - 6 + shake, hy = y + 32;
+          const red = b.bad > 0;
+          px(hx, hy, 12, 11, b.sym === 1 ? "#fca5a5" : red ? "#a7f3d0" : "#fde68a");
+          px(hx, hy - 1, 12, 3, "#422006");
+          if (b.sleep > 0) {
+            px(hx + 2, hy + 6, 3, 1, "#111827"); px(hx + 7, hy + 6, 3, 1, "#111827");
+            const z = Math.floor(performance.now() / 400) % 2;
+            px(hx + 13, hy - 6 - z, 4, 1, "#e2e8f0"); px(hx + 15, hy - 5 - z, 1, 1, "#e2e8f0"); px(hx + 14, hy - 4 - z, 1, 1, "#e2e8f0"); px(hx + 13, hy - 3 - z, 4, 1, "#e2e8f0");
+          } else {
+            const eye = red ? "#dc2626" : "#111827";
+            px(hx + 2, hy + 5, 2, 2, eye); px(hx + 8, hy + 5, 2, 2, eye);
+            if (b.ok > 0) { px(hx + 4, hy + 8, 4, 1, "#16a34a"); }
+          }
+          if (b.sym >= 0) {
+            // 남은 시간
+            const r = b.life / b.max;
+            px(x + 6, y + CH - 12, CW - 12, 4, "#0f172a");
+            px(x + 7, y + CH - 11, (CW - 14) * r, 2, r < 0.3 ? "#ef4444" : "#22c55e");
+            px(x + 6, y + 6, CW - 12, 15, r < 0.3 && Math.floor(performance.now() / 180) % 2 ? "#7f1d1d" : "#0f172a");
+          }
+        }
+        function paint() {
+          const sh = S && S.shake > 0 ? Math.round(Math.sin(S.t * 70) * 2) : 0;
+          g.setTransform(1, 0, 0, 1, sh, 0);
+          px(-4, 0, W + 8, H, "#0c1f1d");
+          for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+            const b = S ? S.beds[r * COLS + c] : { i: 0, sym: -1, life: 0, max: 1, sleep: 0, bad: 0, ok: 0 };
+            drawBed(b, c * CW, r * CH);
+          }
+          g.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        function draw() {
+          paint();
+          HKPlay.smoothPixels(buf, out);
+          if (!S) return;
+          out.setTransform(2, 0, 0, 2, 0, 0);
+          out.textAlign = "center"; out.textBaseline = "middle";
+          out.font = "800 9px sans-serif"; out.fillStyle = "#f0fdfa";
+          for (const b of S.beds) if (b.sym >= 0) out.fillText(SYMS[b.sym], (b.i % COLS) * CW + CW / 2, Math.floor(b.i / COLS) * CH + 14);
+          out.font = "800 8px sans-serif";
+          for (const t of S.texts) { out.fillStyle = t.c; out.fillText(t.t, t.x, t.y); }
+        }
+
+        // ---------- 흐름 ----------
+        function fit() {
+          const rect = stage.getBoundingClientRect();
+          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + elChart.offsetHeight + elPills.offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
+          const cw = Math.floor(W * k);
+          canvas.style.width = `${cw}px`; canvas.style.height = `${Math.floor(H * k)}px`;
+          shell.style.width = `${cw}px`;
+          draw();
+        }
+        function frame(now) {
+          raf = 0;
+          if (state !== "play") return;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          last = now;
+          try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
+          if (state === "play") raf = requestAnimationFrame(frame);
+        }
+        function run() { if (raf) cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); }
+        function showOverlay(html) {
+          overlay.innerHTML = html;
+          overlay.hidden = false;
+          const b = overlay.querySelector("button");
+          if (b) b.focus({ preventScroll: true });
+        }
+        function showReady() {
+          state = "ready";
+          S = null;
+          elChart.innerHTML = SYMS.map((s) => `<span>${s} <i class="gm-dotp"></i></span>`).join("");
+          elLives.innerHTML = "<i></i><i></i><i></i>";
+          draw();
+          showOverlay(`<div class="gm-card">
+            <h2>신약 시험 보조</h2>
+            <p>5일 동안 병실 환자에게 제시간에 약을 줘요. 위쪽 <b>처방표</b>대로 약을 고르고 환자를 누르세요.</p>
+            <p class="gm-warn">처방표는 날마다 바뀌어요.<br>자는 환자는 깨우지 마세요.</p>
+            <button type="button" class="gm-go" data-act="start">시작하기</button>
+          </div>`);
+        }
+        function start() {
+          overlay.hidden = true; overlay.innerHTML = "";
+          newGame();
+          state = "play";
+          ctx.sfx("go");
+          window.HKSound.ambient(true);
+          run();
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          window.HKSound.ambient(false);
+          showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>${elDay.textContent} · 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        }
+        function resume() {
+          if (state !== "paused") return;
+          overlay.hidden = true;
+          state = "play";
+          window.HKSound.ambient(true);
+          run();
+        }
+        function finish(won) {
+          state = "over";
+          window.HKSound.ambient(false);
+          if (won) S.score += 2000 + S.lives * 500;
+          hud();
+          draw();
+          ctx.sfx(won ? "win" : "lose");
+          const score = S.score;
+          showOverlay(`<div class="gm-card"><h2>${won ? "시험이 끝났어요" : "시험 중단"}</h2><p>${won ? "5일을 무사히 마쳤어요!" : `${elDay.textContent}에 중단됐어요`} · 투약 ${S.given}번</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          ctx.submit(score);
+        }
+        overlay.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-act]");
+          if (!b) return;
+          if (b.dataset.act === "start") start();
+          else if (b.dataset.act === "resume") resume();
+        });
+
+        // ---------- 입력 ----------
+        elPills.addEventListener("pointerdown", (e) => {
+          const b = e.target.closest("[data-pill]");
+          if (!b || state !== "play") return;
+          e.preventDefault();
+          setPick(Number(b.dataset.pill));
+          ctx.sfx("select");
+        });
+        canvas.addEventListener("pointerdown", (e) => {
+          if (state !== "play") return;
+          e.preventDefault();
+          const r = canvas.getBoundingClientRect();
+          const c = Math.floor(((e.clientX - r.left) / r.width) * COLS), w = Math.floor(((e.clientY - r.top) / r.height) * ROWS);
+          tapBed(Math.max(0, Math.min(ROWS - 1, w)) * COLS + Math.max(0, Math.min(COLS - 1, c)));
+        });
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        window.addEventListener("keydown", (e) => {
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          const c = e.code;
+          if (state === "play") {
+            const i = ["Digit1", "Digit2", "Digit3"].indexOf(c);
+            if (i >= 0) { setPick(i); ctx.sfx("select"); }
+            if (c === "KeyP" || c === "Escape") pause();
+          } else if ((state === "paused" || state === "ready") && (c === "Space" || c === "Enter")) {
+            e.preventDefault();
+            if (state === "ready") start(); else resume();
+          }
+        });
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+        // ---------- 시작 ----------
+        ctx.onScore && ctx.onScore(() => (S ? S.score : 0));
+        ctx.onRestart(start);
+        ctx.onPause(pause);
+        if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+        window.addEventListener("resize", fit);
+        showReady();
+        fit();
+      },
+    });
+  </script>
+</body>
+</html>

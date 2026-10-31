@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 꿀알바 시리즈 8화 · 마지막 축제 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #3b0a0a, #b45309); color: #fef3c7; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .gm-hud__item small { font-size: 11px; opacity: .8; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .gm-hud__mid { align-items: center; }
+    .gm-hud__right { align-items: flex-end; }
+    .gm-lives { display: inline-flex; gap: 3px; min-height: 18px; align-items: center; }
+    .gm-lives i { width: 12px; height: 13px; background: #fde68a; box-shadow: inset 3px 4px 0 -2px #7c2d12, inset -3px 4px 0 -2px #7c2d12; }
+    .gm-rule { padding: 7px 10px; min-height: 20px; background: #7c2d12; color: #fef3c7; font-size: 14px; font-weight: 800; text-align: center; word-break: keep-all; }
+    .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #120606; }
+    .gm-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(18, 6, 6, .82); overflow-y: auto; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 16px; border: 3px solid #fbbf24; background: #3b0a0a; color: #fef3c7; text-align: center; }
+    .gm-card h2 { margin: 0 0 6px; font-size: 22px; color: #fde68a; }
+    .gm-card p { word-break: keep-all; margin: 0 0 9px; font-size: 13.5px; line-height: 1.5; }
+    .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #fde68a; }
+    .gm-card .gm-warn { padding: 8px; border: 2px dashed #ef4444; font-weight: 700; color: #fecaca; }
+    .gm-go { width: 100%; border: 0; padding: 12px; font-size: 15.5px; font-weight: 800; color: #3b0a0a; cursor: pointer; background: #fbbf24; }
+    .gm-note { padding: 7px 4px 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "finale",
+      setup(stage, ctx) {
+        const W = 180, H = 220, CYCLES = 3, GAP = 1.05; // 7가지 일을 3바퀴 · 일 사이 쉬는 시간
+        const SYMS = ["기침", "열", "떨림"], PILLS = ["#ef4444", "#facc15", "#3b82f6"], LANE_C = ["#38bdf8", "#facc15", "#a3e635"];
+
+        stage.innerHTML = `
+          <div class="gm-shell">
+            <div class="gm-hud">
+              <div class="gm-hud__item"><small>점수</small><b data-score>0</b></div>
+              <div class="gm-hud__item gm-hud__mid"><small>남은 일</small><b data-left>21</b></div>
+              <div class="gm-hud__item gm-hud__right"><small>가면</small><span class="gm-lives" data-lives></span></div>
+            </div>
+            <div class="gm-rule" data-rule>모든 규칙을 지켜요</div>
+            <div class="gm-screen">
+              <canvas class="gm-canvas" aria-label="마지막 축제 게임 화면"></canvas>
+              <div class="gm-overlay" data-overlay></div>
+            </div>
+            <div class="gm-note">마우스·터치로 해요 · 칸 고르기는 1·2·3 또는 ← ↓ → · 극장은 스페이스도 돼요 · Esc 일시정지</div>
+          </div>`;
+        const shell = stage.querySelector(".gm-shell");
+        const canvas = stage.querySelector("canvas");
+        canvas.width = W * 2; canvas.height = H * 2;
+        const out = canvas.getContext("2d");
+        const buf = document.createElement("canvas");
+        buf.width = W; buf.height = H;
+        const g = buf.getContext("2d", { willReadFrequently: true });
+        const overlay = stage.querySelector("[data-overlay]");
+        const elScore = stage.querySelector("[data-score]");
+        const elLeft = stage.querySelector("[data-left]");
+        const elLives = stage.querySelector("[data-lives]");
+        const elRule = stage.querySelector("[data-rule]");
+
+        let state = "ready", S = null, raf = 0, last = 0;
+        const ptr = { x: W / 2, y: H / 2, down: false };
+        const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+        const rnd = (a, b) => a + Math.random() * (b - a);
+        const ri = (n) => Math.floor(Math.random() * n);
+        const lanes = (x) => Math.max(0, Math.min(2, Math.floor(x / (W / 3))));
+
+        // 일곱 가지 일 — 각각 준비(make), 진행(tick), 누르기(tap), 그리기(draw)
+        const JOBS = {
+          bugs: {
+            rule: "1화 · 손전등으로 벌레를 모두 태워요", time: 6,
+            make: (m) => { m.bugs = Array.from({ length: 4 + S.cycle }, () => ({ x: rnd(20, W - 20), y: rnd(30, H - 20), a: rnd(0, 6.28), dead: false })); },
+            tick: (m, dt) => {
+              for (const b of m.bugs) {
+                if (b.dead) continue;
+                b.a += rnd(-3, 3) * dt;
+                b.x = Math.max(8, Math.min(W - 8, b.x + Math.cos(b.a) * 34 * dt)); b.y = Math.max(12, Math.min(H - 8, b.y + Math.sin(b.a) * 34 * dt));
+                if (Math.hypot(b.x - ptr.x, b.y - ptr.y) < 20) { b.dead = true; ctx.sfx("sizzle"); }
+              }
+              if (m.bugs.every((b) => b.dead)) win(m);
+            },
+            draw: (m) => {
+              px(0, 0, W, H, "#0a0a12");
+              const r = 20;
+              for (let y = -r; y <= r; y += 2) for (let x = -r; x <= r; x += 2) if (x * x + y * y <= r * r) px(ptr.x + x, ptr.y + y, 2, 2, "#475569");
+              for (const b of m.bugs) if (!b.dead) { px(b.x - 3, b.y - 2, 7, 4, "#7c4a1e"); px(b.x + 3, b.y - 1, 2, 2, "#ef4444"); }
+            },
+          },
+          clown: {
+            rule: "2화 · 코가 빨간 광대를 눌러요", time: 5,
+            make: (m) => {
+              const n = 5 + S.cycle, real = ri(n);
+              m.list = Array.from({ length: n }, (_, i) => ({ x: 20 + (i % 3) * 70 + rnd(-6, 6), y: 40 + Math.floor(i / 3) * 56 + rnd(-6, 6), real: i === real, vx: rnd(-14, 14), vy: rnd(-14, 14) }));
+            },
+            tick: (m, dt) => { for (const c of m.list) { c.x = Math.max(12, Math.min(W - 16, c.x + c.vx * dt)); c.y = Math.max(20, Math.min(H - 20, c.y + c.vy * dt)); } },
+            tap: (m, x, y) => {
+              const c = m.list.slice().sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
+              if (Math.hypot(c.x - x, c.y - y) > 22) return;
+              if (c.real) win(m); else lose(m);
+            },
+            draw: (m) => {
+              px(0, 0, W, H, "#2a1b4d");
+              for (const c of m.list) {
+                const x = c.x - 7, y = c.y - 12;
+                px(x, y + 12, 7, 14, "#dc2626"); px(x + 7, y + 12, 7, 14, "#2563eb");
+                px(x + 1, y, 12, 12, "#f8fafc"); px(x + 3, y + 3, 2, 2, "#111827"); px(x + 9, y + 3, 2, 2, "#111827");
+                px(x + 5, y + 6, 4, 4, c.real ? "#ef4444" : "#f59e0b");
+                px(x + 4, y - 3, 6, 3, "#a855f7");
+              }
+            },
+          },
+          milk: {
+            rule: "3화 · 빨간 문이 아닌 집을 눌러요", time: 5,
+            make: (m) => { m.need = 3; m.red = ri(2); },
+            tap: (m, x) => {
+              if (lanes(x) === 1) return;
+              const side = x < W / 2 ? 0 : 1;
+              if (side === m.red) return lose(m);
+              ctx.sfx("drop");
+              if (--m.need <= 0) win(m); else m.red = ri(2);
+            },
+            draw: (m) => {
+              px(0, 0, W, H, "#1c1917"); px(74, 0, 32, H, "#292524");
+              for (const s of [0, 1]) {
+                const x = s ? 112 : 6;
+                px(x, 60, 62, 90, "#475569"); px(x - 3, 50, 68, 12, "#7c2d12");
+                px(x + 21, 92, 20, 58, s === m.red ? "#dc2626" : "#16a34a");
+              }
+              for (let i = 0; i < m.need; i++) px(84 + i * 5, 190, 3, 10, "#f8fafc");
+            },
+          },
+          theater: {
+            rule: "4화 · 누르면 걷고, 돌아보면 멈춰요", time: 7,
+            make: (m) => { m.p = 0; m.phase = 0; m.t = rnd(0.7, 1.2); m.seen = 0; },
+            tick: (m, dt) => {
+              m.t -= dt;
+              if (m.t <= 0) { m.phase = (m.phase + 1) % 3; m.t = [rnd(0.6, 1.1), 0.34, 0.75][m.phase]; if (m.phase === 1) ctx.sfx("buzz"); }
+              if (ptr.down) {
+                m.p += dt / 2.6;
+                if (m.phase === 2) { m.seen += dt; if (m.seen > 0.08) return lose(m); }
+              }
+              if (m.phase !== 2) m.seen = 0;
+              if (m.p >= 1) win(m);
+            },
+            draw: (m) => {
+              px(0, 0, W, H, "#120508");
+              px(20, 18, 140, 30, m.phase === 2 ? "#7f1d1d" : m.phase === 1 && Math.floor(performance.now() / 70) % 2 ? "#0a0a0a" : "#e2e8f0");
+              for (let r = 0; r < 3; r++) for (let c = 0; c < 8; c++) {
+                const x = 12 + c * 22, y = 62 + r * 28;
+                px(x, y + 8, 12, 8, "#7f1d1d");
+                px(x + 2, y, 8, 8, m.phase === 2 ? "#e5e7eb" : "#27272a");
+                if (m.phase === 2) { px(x + 3, y + 3, 2, 2, "#b91c1c"); px(x + 7, y + 3, 2, 2, "#b91c1c"); }
+              }
+              px(14, 170, W - 28, 8, "#3f1d24"); px(16, 172, (W - 32) * m.p, 4, "#fde047");
+              px(14 + (W - 34) * m.p, 182, 7, 12, "#b91c1c"); px(15 + (W - 34) * m.p, 178, 5, 5, "#fde68a");
+            },
+          },
+          pill: {
+            rule: "5화 · 처방표대로 약을 눌러요", time: 6,
+            make: (m) => { m.map = [0, 1, 2].sort(() => Math.random() - 0.5); m.sym = ri(3); m.need = 3; },
+            tap: (m, x, y) => {
+              if (y < 150) return;
+              if (lanes(x) !== m.map[m.sym]) return lose(m);
+              ctx.sfx("pop");
+              if (--m.need <= 0) win(m); else m.sym = ri(3);
+            },
+            draw: (m) => {
+              px(0, 0, W, H, "#0c1f1d");
+              SYMS.forEach((_, i) => { px(10 + i * 56, 16, 48, 26, "#f0fdfa"); px(26 + i * 56, 32, 18, 7, PILLS[m.map[i]]); });
+              px(58, 62, 64, 56, "#134e4a"); px(78, 74, 24, 22, "#fde68a"); px(83, 83, 3, 3, "#111827"); px(94, 83, 3, 3, "#111827");
+              for (let i = 0; i < 3; i++) { px(6 + i * 60, 158, 48, 48, "#1e293b"); px(16 + i * 60, 176, 28, 12, PILLS[i]); }
+            },
+            label: (m) => { SYMS.forEach((s, i) => label(s, 34 + i * 56, 23, "#134e4a")); label(SYMS[m.sym], 90, 128, "#fde68a"); },
+          },
+          silent: {
+            rule: "6화 · 철판을 피해 위로 올라가요", time: 6,
+            make: (m) => {
+              m.rows = Array.from({ length: 5 }, () => { const safe = ri(3), r = [true, true, true]; r[safe] = false; if (Math.random() < 0.5) r[(safe + 1) % 3] = false; return r; });
+              m.row = 0; m.lane = 1;
+            },
+            tap: (m, x) => {
+              const l = lanes(x);
+              if (m.rows[m.row][l]) return lose(m);
+              m.lane = l; m.row++;
+              if (m.row >= m.rows.length) win(m); else ctx.sfx("tap");
+            },
+            draw: (m) => {
+              px(0, 0, W, H, "#292524");
+              m.rows.forEach((r, i) => r.forEach((metal, l) => {
+                const x = 6 + l * 58, y = H - 62 - i * 36;
+                px(x, y, 52, 32, metal ? "#64748b" : "#44403c");
+                if (metal) { px(x + 4, y + 4, 3, 3, "#cbd5e1"); px(x + 45, y + 4, 3, 3, "#cbd5e1"); px(x + 4, y + 25, 3, 3, "#cbd5e1"); px(x + 45, y + 25, 3, 3, "#cbd5e1"); }
+              }));
+              const px0 = 26 + m.lane * 58, py0 = H - 26 - m.row * 36;
+              px(px0, py0 - 4, 12, 3, "#facc15"); px(px0 + 1, py0 - 1, 10, 7, "#fde68a"); px(px0 + 1, py0 + 6, 10, 8, "#ea580c");
+            },
+          },
+          parade: {
+            rule: "7화 · 풍선이 선에 닿을 때 눌러요", time: 6,
+            make: (m) => { const gap = 0.62; m.notes = Array.from({ length: 5 }, (_, i) => ({ t: 0.8 + i * gap, lane: ri(3), done: false })); m.t = 0; },
+            tick: (m, dt) => {
+              m.t += dt;
+              for (const n of m.notes) if (!n.done && m.t - n.t > 0.2) return lose(m);
+              if (m.notes.every((n) => n.done)) win(m);
+            },
+            tap: (m, x) => {
+              const l = lanes(x), n = m.notes.find((o) => !o.done && o.lane === l && Math.abs(o.t - m.t) < 0.2);
+              if (n) { n.done = true; ctx.sfx("mbox", ri(8)); }
+            },
+            draw: (m) => {
+              px(0, 0, W, H, "#150a33");
+              for (let i = 1; i < 3; i++) px(i * 60, 0, 1, H, "#2e1065");
+              for (let i = 0; i < 3; i++) px(i * 60 + 8, 190, 44, 3, LANE_C[i]);
+              for (const n of m.notes) {
+                if (n.done) continue;
+                const y = 190 - (n.t - m.t) * 110;
+                if (y > -10) { const x = n.lane * 60 + 30; px(x - 7, y - 8, 14, 14, LANE_C[n.lane]); px(x - 5, y - 6, 3, 3, "#fff"); }
+              }
+            },
+          },
+        };
+        const ORDER = Object.keys(JOBS);
+        const label = (t, x, y, c) => S && S.labels.push({ t, x, y, c });
+
+        function newGame() {
+          S = { t: 0, score: 0, lives: 3, cycle: 0, queue: [], done: 0, total: CYCLES * ORDER.length, m: null, wait: 1.4, labels: [], shake: 0, red: 0, flash: 0 };
+          refill();
+          hud();
+          setRule("곧 시작해요");
+        }
+        function refill() { S.queue = ORDER.slice().sort(() => Math.random() - 0.5); }
+        function setRule(t) { elRule.textContent = t; }
+        function hud() {
+          if (!S) return;
+          elScore.textContent = S.score.toLocaleString("ko-KR");
+          elLeft.textContent = S.total - S.done;
+          if (elLives.childElementCount !== Math.max(0, S.lives)) elLives.innerHTML = "<i></i>".repeat(Math.max(0, S.lives));
+        }
+        const speed = () => 1 + S.cycle * 0.22;
+        function nextJob() {
+          if (!S.queue.length) { S.cycle++; refill(); }
+          const key = S.queue.shift(), J = JOBS[key];
+          S.m = { key, J, left: J.time / speed(), max: J.time / speed(), over: false };
+          J.make(S.m);
+          setRule(J.rule);
+          ctx.sfx("tick");
+        }
+        function clearJob() { S.m = null; S.wait = Math.max(0.6, GAP / speed()); S.done++; hud(); if (S.done >= S.total) finish(true); }
+        function win(m) {
+          if (m.over) return;
+          m.over = true;
+          const bonus = 100 * (S.cycle + 1) + Math.round((m.left / m.max) * 100);
+          S.score += bonus;
+          S.flash = 0.2;
+          setRule(`잘했어요! +${bonus}`);
+          ctx.sfx("success");
+          clearJob();
+        }
+        function lose(m) {
+          if (m.over) return;
+          m.over = true;
+          S.lives--; S.shake = 0.3; S.red = 0.4;
+          setRule("규칙을 어겼어요!");
+          ctx.sfx("hurt");
+          hud();
+          if (S.lives <= 0) return finish(false);
+          clearJob();
+        }
+        function update(dt) {
+          S.t += dt;
+          if (S.shake > 0) S.shake -= dt;
+          if (S.red > 0) S.red -= dt;
+          if (S.flash > 0) S.flash -= dt;
+          if (!S.m) {
+            S.wait -= dt;
+            if (S.wait <= 0) nextJob();
+            return;
+          }
+          const m = S.m;
+          m.left -= dt;
+          if (m.J.tick) m.J.tick(m, dt * speed());
+          if (state === "play" && !m.over && m.left <= 0) lose(m);
+        }
+        function tap(x, y) {
+          if (state !== "play" || !S.m) return;
+          const m = S.m;
+          if (m.J.tap) m.J.tap(m, x, y);
+        }
+
+        // ---------- 그리기 ----------
+        function paint() {
+          const sh = S && S.shake > 0 ? Math.round(Math.sin(S.t * 70) * 2) : 0;
+          g.setTransform(1, 0, 0, 1, sh, 0);
+          px(-4, 0, W + 8, H, "#120606");
+          if (S && S.labels) S.labels.length = 0;
+          if (S && S.m) {
+            S.m.J.draw(S.m);
+            const r = Math.max(0, S.m.left / S.m.max);
+            px(0, 0, W, 4, "#000"); px(0, 0, W * r, 4, r < 0.3 ? "#ef4444" : "#fbbf24");
+            if (S.m.J.label) S.m.J.label(S.m);
+          } else {
+            // 천막 — 일 사이에 잠깐 보인다
+            for (let i = 0; i < 9; i++) { px(i * 20, 0, 20, 70 - Math.abs(i - 4) * 8, i % 2 ? "#b91c1c" : "#fef3c7"); }
+            px(84, 60, 12, 110, "#78350f");
+            px(60, 170, 60, 8, "#fbbf24");
+            for (let x = 8; x < W; x += 14) px(x, 190 + (x % 3), 3, 3, "#fde047");
+          }
+          if (S && S.red > 0) { g.fillStyle = "rgba(220, 38, 38, .35)"; g.fillRect(-4, 0, W + 8, H); }
+          if (S && S.flash > 0) { g.fillStyle = "rgba(250, 250, 250, .2)"; g.fillRect(-4, 0, W + 8, H); }
+          g.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        function draw() {
+          paint();
+          HKPlay.smoothPixels(buf, out);
+          if (!S || !S.labels) return;
+          out.setTransform(2, 0, 0, 2, 0, 0);
+          out.font = "800 11px sans-serif"; out.textAlign = "center"; out.textBaseline = "middle";
+          for (const l of S.labels) { out.fillStyle = l.c; out.fillText(l.t, l.x, l.y); }
+        }
+
+        // ---------- 흐름 ----------
+        function fit() {
+          const rect = stage.getBoundingClientRect();
+          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + elRule.offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
+          const cw = Math.floor(W * k);
+          canvas.style.width = `${cw}px`; canvas.style.height = `${Math.floor(H * k)}px`;
+          shell.style.width = `${cw}px`;
+          draw();
+        }
+        function frame(now) {
+          raf = 0;
+          if (state !== "play") return;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          last = now;
+          try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
+          if (state === "play") raf = requestAnimationFrame(frame);
+        }
+        function run() { if (raf) cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); }
+        function showOverlay(html) {
+          overlay.innerHTML = html;
+          overlay.hidden = false;
+          const b = overlay.querySelector("button");
+          if (b) b.focus({ preventScroll: true });
+        }
+        function showReady() {
+          state = "ready";
+          S = null;
+          elLives.innerHTML = "<i></i><i></i><i></i>";
+          elLeft.textContent = CYCLES * ORDER.length;
+          draw();
+          showOverlay(`<div class="gm-card">
+            <h2>마지막 축제</h2>
+            <p>마지막 알바예요. 지금까지 한 일 7가지가 <b>짧은 미션</b>으로 쏟아져요. 위쪽 안내를 보고 바로 해요.</p>
+            <p class="gm-warn">근무 규칙 · 지금까지의 규칙을 모두 지킬 것</p>
+            <p>${CYCLES}바퀴를 돌면 끝이에요. 돌수록 빨라져요. 실패는 3번까지예요.</p>
+            <button type="button" class="gm-go" data-act="start">시작하기</button>
+          </div>`);
+        }
+        function start() {
+          overlay.hidden = true; overlay.innerHTML = "";
+          ptr.down = false;
+          newGame();
+          state = "play";
+          ctx.sfx("go");
+          window.HKSound.ambient(true);
+          run();
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          ptr.down = false;
+          window.HKSound.ambient(false);
+          showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>남은 일 ${S.total - S.done}개 · 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        }
+        function resume() {
+          if (state !== "paused") return;
+          overlay.hidden = true;
+          state = "play";
+          window.HKSound.ambient(true);
+          run();
+        }
+        function finish(won) {
+          state = "over";
+          ptr.down = false;
+          window.HKSound.ambient(false);
+          if (won) S.score += 3000 + S.lives * 1000;
+          hud();
+          draw();
+          ctx.sfx(won ? "win" : "lose");
+          const score = S.score;
+          showOverlay(`<div class="gm-card"><h2>${won ? "축제가 끝났어요" : "근무 종료"}</h2><p>${won ? "마지막 알바까지 해냈어요!" : `${S.done}개까지 해냈어요`}</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          ctx.submit(score);
+        }
+        overlay.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-act]");
+          if (!b) return;
+          if (b.dataset.act === "start") start();
+          else if (b.dataset.act === "resume") resume();
+        });
+
+        // ---------- 입력 ----------
+        const toWorld = (e) => { const r = canvas.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }; };
+        window.addEventListener("pointermove", (e) => {
+          if (e.pointerType !== "mouse") return;
+          const p = toWorld(e); ptr.x = p.x; ptr.y = p.y;
+        });
+        canvas.addEventListener("pointerdown", (e) => {
+          if (state !== "play") return;
+          e.preventDefault();
+          const p = toWorld(e);
+          ptr.x = p.x; ptr.y = p.y; ptr.down = true;
+          try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+          tap(p.x, p.y);
+        });
+        canvas.addEventListener("pointermove", (e) => {
+          if (e.pointerType === "mouse" || !ptr.down) return;
+          const p = toWorld(e); ptr.x = p.x; ptr.y = p.y;
+        });
+        const up = () => { ptr.down = false; };
+        canvas.addEventListener("pointerup", up);
+        canvas.addEventListener("pointercancel", up);
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        const KEYL = { Digit1: 0, ArrowLeft: 0, KeyA: 0, Digit2: 1, ArrowDown: 1, KeyS: 1, Digit3: 2, ArrowRight: 2, KeyD: 2 };
+        window.addEventListener("keydown", (e) => {
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          const c = e.code;
+          if (state === "play") {
+            if (c === "Space") { e.preventDefault(); ptr.down = true; }
+            if (c in KEYL) { e.preventDefault(); if (!e.repeat) tap((KEYL[c] + 0.5) * (W / 3), 185); }
+            if (c === "KeyP" || c === "Escape") pause();
+          } else if ((state === "paused" || state === "ready") && (c === "Space" || c === "Enter")) {
+            e.preventDefault();
+            if (state === "ready") start(); else resume();
+          }
+        });
+        window.addEventListener("keyup", (e) => { if (e.code === "Space") ptr.down = false; });
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+        // ---------- 시작 ----------
+        ctx.onScore && ctx.onScore(() => (S ? S.score : 0));
+        ctx.onRestart(start);
+        ctx.onPause(pause);
+        if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+        window.addEventListener("resize", fit);
+        showReady();
+        fit();
+      },
+    });
+  </script>
+</body>
+</html>

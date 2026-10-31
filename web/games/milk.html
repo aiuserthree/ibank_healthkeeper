@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 꿀알바 시리즈 3화 · 새벽 우유 배달 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #0c1a3a, #1e4e79); color: #dbeafe; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .gm-hud__item small { font-size: 11px; opacity: .75; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .gm-hud__mid { align-items: center; }
+    .gm-hud__right { align-items: flex-end; }
+    .gm-lives { display: inline-flex; gap: 3px; min-height: 18px; align-items: center; }
+    .gm-lives i { width: 8px; height: 15px; background: #f8fafc; box-shadow: inset 0 5px 0 #60a5fa; }
+    .gm-rule { padding: 6px 10px; background: #7f1d1d; color: #fee2e2; font-size: 13.5px; font-weight: 800; text-align: center; word-break: keep-all; }
+    .gm-rule.is-new { animation: gm-flash .5s steps(2) 3; }
+    @keyframes gm-flash { 50% { background: #fde047; color: #7f1d1d; } }
+    .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #0b1020; }
+    .gm-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 12, 28, .76); overflow-y: auto; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 18px 16px 16px; border: 3px solid #93c5fd; background: #0c1a3a; color: #dbeafe; text-align: center; }
+    .gm-card h2 { margin: 0 0 6px; font-size: 22px; color: #bfdbfe; }
+    .gm-card p { word-break: keep-all; margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; }
+    .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #fde68a; }
+    .gm-card .gm-warn { padding: 8px; border: 2px dashed #ef4444; font-weight: 700; color: #fecaca; }
+    .gm-go { width: 100%; border: 0; padding: 12px; font-size: 15.5px; font-weight: 800; color: #0c1a3a; cursor: pointer; background: #bfdbfe; }
+    .gm-note { padding: 7px 4px 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "milk",
+      setup(stage, ctx) {
+        const W = 180, H = 240;                      // 도트 그림 해상도
+        const ROAD_L = 58, ROAD_R = 122, BIKE_Y = 196;
+        const ZONE_TOP = 158, ZONE_BOTTOM = 218;     // 이 안의 집에만 우유를 던질 수 있다
+        const SHIFT_SEC = 180, RULE_SEC = 22;        // 새벽 4시 ~ 아침 7시 · 규칙은 22초마다 바뀐다
+        const DOORS = { red: "#dc2626", blue: "#2563eb", green: "#16a34a", gray: "#64748b" };
+        const RULES = [
+          { text: "빨간 문에는 넣지 말 것", bad: (h) => h.door === "red", make: (h) => { h.door = "red"; } },
+          { text: "불 켜진 집에는 넣지 말 것", bad: (h) => h.lit, make: (h) => { h.lit = true; } },
+          { text: "우유가 쌓인 집에는 넣지 말 것", bad: (h) => h.pile, make: (h) => { h.pile = true; } },
+          { text: "문 앞에 누가 서 있으면 넣지 말 것", bad: (h) => h.man, make: (h) => { h.man = true; } },
+          { text: "파란 문에는 넣지 말 것", bad: (h) => h.door === "blue", make: (h) => { h.door = "blue"; } },
+        ];
+
+        stage.innerHTML = `
+          <div class="gm-shell">
+            <div class="gm-hud">
+              <div class="gm-hud__item"><small>구독자</small><b data-score>0</b></div>
+              <div class="gm-hud__item gm-hud__mid"><small>시각</small><b data-clock>4:00</b></div>
+              <div class="gm-hud__item gm-hud__right"><small>실수 허용</small><span class="gm-lives" data-lives></span></div>
+            </div>
+            <div class="gm-rule" data-rule>오늘의 규칙은 출근하면 알려 드려요</div>
+            <div class="gm-screen">
+              <canvas class="gm-canvas" aria-label="새벽 우유 배달 게임 화면"></canvas>
+              <div class="gm-overlay" data-overlay></div>
+            </div>
+            <div class="gm-note">← → 또는 A·D 우유 넣기 · Esc 일시정지 · 모바일은 왼쪽·오른쪽 화면을 터치</div>
+          </div>`;
+        const shell = stage.querySelector(".gm-shell");
+        const canvas = stage.querySelector("canvas");
+        // 그림은 작은 판(buf)에 도트로 그리고, 화면에는 모서리를 다듬어 2배로 옮긴다
+        canvas.width = W * 2; canvas.height = H * 2;
+        const out = canvas.getContext("2d");
+        const buf = document.createElement("canvas");
+        buf.width = W; buf.height = H;
+        const g = buf.getContext("2d", { willReadFrequently: true });
+        const overlay = stage.querySelector("[data-overlay]");
+        const elScore = stage.querySelector("[data-score]");
+        const elClock = stage.querySelector("[data-clock]");
+        const elLives = stage.querySelector("[data-lives]");
+        const elRule = stage.querySelector("[data-rule]");
+
+        let state = "ready", S = null, raf = 0, last = 0;
+        const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+        const pickOf = (a) => a[Math.floor(Math.random() * a.length)];
+
+        function newGame() {
+          S = { t: 0, score: 0, lives: 3, combo: 0, misses: 0, scroll: 0, houses: [], nextY: 40, side: 0, rule: RULES[0], ruleT: 0, ruleIdx: 0, bottles: [], texts: [], shake: 0, redT: 0, done: 0, wrongs: 0 };
+          for (let i = 0; i < 4; i++) addHouse();
+          setRule(Math.floor(Math.random() * RULES.length));
+          hud();
+        }
+        function setRule(i) {
+          S.ruleIdx = i;
+          S.rule = RULES[i];
+          S.ruleT = RULE_SEC;
+          elRule.textContent = `근무 규칙 · ${S.rule.text}`;
+          elRule.classList.remove("is-new");
+          void elRule.offsetWidth;
+          elRule.classList.add("is-new");
+        }
+        // 집 하나 — 금지된 집은 약 3분의 1. 다른 특징은 규칙과 헷갈리게 섞어 둔다
+        function addHouse() {
+          S.side = Math.random() < 0.72 ? 1 - S.side : S.side;
+          const h = { side: S.side, y: S.nextY, door: pickOf(["green", "gray", "green", "gray", "blue", "red"]), lit: Math.random() < 0.28, pile: Math.random() < 0.22, man: Math.random() < 0.14, wall: pickOf(["#475569", "#57534e", "#52525b"]), done: false, open: 0 };
+          // 지금 규칙으로는 금지가 아닌 집을 기본으로 깔고, 일부만 금지로 만든다
+          S.houses.unshift(h);
+          S.nextY -= 44 + Math.random() * 16;
+          fixHouse(h);
+        }
+        function fixHouse(h) {
+          const r = S.rule;
+          if (!r) return;
+          const makeBad = Math.random() < 0.34;
+          if (makeBad) r.make(h);
+          else if (r.bad(h)) { if (h.door === "red" || h.door === "blue") h.door = "green"; h.lit = h.pile = h.man = false; }
+        }
+        function hud() {
+          if (!S) return;
+          elScore.textContent = S.score.toLocaleString("ko-KR");
+          const m = Math.floor((S.t / SHIFT_SEC) * 180);
+          elClock.textContent = `${4 + Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
+          if (elLives.childElementCount !== Math.max(0, S.lives)) elLives.innerHTML = "<i></i>".repeat(Math.max(0, S.lives));
+        }
+        const speed = () => 30 + (S.t / SHIFT_SEC) * 34;
+        function text(x, y, t, c) { S.texts.push({ x, y, t, c, life: 0.9 }); }
+
+        function deliver(side) {
+          if (state !== "play") return;
+          // 자전거 바로 옆에 있는 집 — 방금 지나친 금지된 집에 잘못 들어가지 않게 가장 가까운 집을 고른다
+          const h = S.houses.filter((o) => o.side === side && !o.done && o.y > ZONE_TOP - 22 && o.y < ZONE_BOTTOM).sort((a, b) => Math.abs(a.y + 18 - BIKE_Y) - Math.abs(b.y + 18 - BIKE_Y))[0];
+          ctx.sfx("tap");
+          S.bottles.push({ x: W / 2, y: BIKE_Y - 6, tx: side ? ROAD_R + 16 : ROAD_L - 16, ty: h ? h.y + 18 : BIKE_Y - 20, t: 0 });
+          if (!h) return;
+          h.done = true;
+          if (S.rule.bad(h)) {
+            // 규칙을 어겼다 — 문이 열리고 안에서 뭔가 내다본다
+            h.open = 1.2; S.shake = 0.3; S.redT = 0.5; S.lives--; S.combo = 0; S.wrongs++;
+            ctx.sfx("ghost");
+            hud();
+            if (S.lives <= 0) finish(false);
+            return;
+          }
+          S.combo++; S.done++;
+          const gain = 100 + Math.min(10, S.combo) * 20;
+          S.score += gain;
+          text(side ? ROAD_R + 4 : 8, h.y + 6, `+${gain}`, "#fde68a");
+          ctx.sfx(S.combo % 5 === 0 ? "coin" : "drop");
+          hud();
+        }
+        function update(dt) {
+          S.t += dt;
+          if (S.t >= SHIFT_SEC) return finish(true);
+          S.ruleT -= dt;
+          if (S.ruleT <= 0) {
+            setRule((S.ruleIdx + 1 + Math.floor(Math.random() * (RULES.length - 1))) % RULES.length);
+            // 화면에 없는 집은 새 규칙에 맞춰 다시 꾸민다
+            for (const h of S.houses) if (h.y < -30 && !h.done) fixHouse(h);
+            ctx.sfx("buzz");
+          }
+          const v = speed() * dt;
+          S.scroll = (S.scroll + v) % 16;
+          for (const h of S.houses) { h.y += v; if (h.open > 0) h.open -= dt; }
+          S.nextY += v;
+          while (S.nextY > -80) addHouse();
+          for (const h of S.houses) {
+            if (!h.done && h.y > ZONE_BOTTOM) {
+              h.done = true;
+              if (S.rule.bad(h)) { S.score += 50; text(h.side ? ROAD_R + 4 : 8, 200, "+50", "#86efac"); } // 잘 지나쳤다
+              else {
+                S.combo = 0; S.misses++;
+                text(h.side ? ROAD_R + 4 : 8, 200, "놓침", "#fca5a5");
+                if (S.misses % 3 === 0) { S.lives--; S.redT = 0.3; ctx.sfx("hurt"); hud(); if (S.lives <= 0) return finish(false); }
+              }
+            }
+          }
+          S.houses = S.houses.filter((h) => h.y < H + 40);
+          for (const b of S.bottles) b.t += dt * 5;
+          S.bottles = S.bottles.filter((b) => b.t < 1);
+          for (const t of S.texts) { t.y -= 18 * dt; t.life -= dt; }
+          S.texts = S.texts.filter((t) => t.life > 0);
+          if (S.shake > 0) S.shake -= dt;
+          if (S.redT > 0) S.redT -= dt;
+          hud();
+        }
+
+        // ---------- 그리기 ----------
+        function drawHouse(h) {
+          const x = h.side ? ROAD_R + 4 : 2, y = Math.round(h.y), w = 52;
+          px(x, y + 6, w, 30, h.wall);
+          px(x - 2, y, w + 4, 8, "#7c2d12"); px(x - 2, y + 7, w + 4, 1, "#431407");
+          const dx = h.side ? x + 2 : x + w - 14, wx = h.side ? x + 22 : x + 6;
+          // 창문
+          px(wx, y + 12, 16, 10, h.lit ? "#fde047" : "#0f172a");
+          px(wx + 7, y + 12, 1, 10, "#334155"); px(wx, y + 16, 16, 1, "#334155");
+          // 문
+          px(dx, y + 16, 12, 20, h.open > 0 ? "#020617" : DOORS[h.door]);
+          if (h.open > 0) { px(dx + 3, y + 22, 2, 2, "#ef4444"); px(dx + 7, y + 22, 2, 2, "#ef4444"); }
+          else px(h.side ? dx + 9 : dx + 2, y + 25, 1, 2, "#fde68a");
+          // 쌓인 우유
+          if (h.pile) for (let i = 0; i < 4; i++) { const mx = (h.side ? dx + 14 : dx - 5) + (i % 2) * 3, my = y + 32 - Math.floor(i / 2) * 6; px(mx, my, 2, 5, "#f8fafc"); }
+          // 문 앞의 사람
+          if (h.man && h.open <= 0) { const mx = dx + 3; px(mx, y + 24, 6, 12, "#020617"); px(mx + 1, y + 19, 4, 5, "#020617"); px(mx + 2, y + 21, 1, 1, "#f1f5f9"); }
+          if (h.done && h.open <= 0 && !h.pile) px(h.side ? dx + 14 : dx - 4, y + 31, 2, 5, "#bfdbfe");
+        }
+        function draw() {
+          paint();
+          HKPlay.smoothPixels(buf, out);
+          drawTexts();
+        }
+        function paint() {
+          const shake = S && S.shake > 0 ? Math.round(Math.sin(S.t * 60) * 2) : 0;
+          g.setTransform(1, 0, 0, 1, shake, 0);
+          px(-4, 0, W + 8, H, "#1c1917");
+          for (let y = -16 + (S ? S.scroll : 0); y < H; y += 16) { px(ROAD_L - 2, y, 2, 8, "#57534e"); px(ROAD_R, y, 2, 8, "#57534e"); }
+          px(ROAD_L, 0, ROAD_R - ROAD_L, H, "#292524");
+          for (let y = -16 + (S ? S.scroll : 0); y < H; y += 16) px(W / 2 - 1, y, 2, 8, "#a8a29e");
+          if (!S) return;
+          for (const h of S.houses) if (h.y > -40) drawHouse(h);
+          // 우유를 넣을 수 있는 구간
+          px(0, ZONE_TOP, 3, ZONE_BOTTOM - ZONE_TOP, "#60a5fa"); px(W - 3, ZONE_TOP, 3, ZONE_BOTTOM - ZONE_TOP, "#60a5fa");
+          // 자전거
+          const bx = W / 2, wob = Math.floor(S.t * 8) % 2;
+          px(bx - 1, BIKE_Y + 4, 3, 9, "#111827"); px(bx - 1, BIKE_Y - 10, 3, 6, "#111827");
+          px(bx - 5, BIKE_Y - 3, 11, 2, "#94a3b8"); px(bx - 4, BIKE_Y, 9, 6, "#1d4ed8");
+          px(bx - 3, BIKE_Y - 6, 7, 6, "#fde68a"); px(bx - 3, BIKE_Y - 7, 7, 2, "#422006");
+          px(bx - 7 + wob, BIKE_Y + 3, 3, 5, "#f8fafc"); px(bx + 5 - wob, BIKE_Y + 3, 3, 5, "#f8fafc");
+          for (const b of S.bottles) {
+            const x = b.x + (b.tx - b.x) * b.t, y = b.y + (b.ty - b.y) * b.t - Math.sin(b.t * 3.14) * 14;
+            px(x, y, 2, 5, "#f8fafc"); px(x, y, 2, 1, "#60a5fa");
+          }
+          // 어둠 → 아침
+          const dawn = S.t / SHIFT_SEC;
+          g.fillStyle = `rgba(6, 10, 34, ${0.5 * (1 - dawn)})`; g.fillRect(-4, 0, W + 8, H);
+          if (dawn > 0.6) { g.fillStyle = `rgba(251, 146, 60, ${(dawn - 0.6) * 0.3})`; g.fillRect(-4, 0, W + 8, H); }
+          if (S.redT > 0) { g.fillStyle = "rgba(220, 38, 38, .32)"; g.fillRect(-4, 0, W + 8, H); }
+          // 녹화 표시
+          g.setTransform(1, 0, 0, 1, 0, 0);
+          if (Math.floor(S.t * 2) % 2) px(5, 5, 4, 4, "#ef4444");
+          px(11, 5, 1, 4, "#f8fafc"); px(13, 5, 1, 4, "#f8fafc"); px(15, 5, 1, 4, "#f8fafc");
+        }
+        function drawTexts() {
+          if (!S) return;
+          out.setTransform(2, 0, 0, 2, 0, 0);
+          out.font = "800 8px sans-serif"; out.textAlign = "left"; out.textBaseline = "top";
+          for (const t of S.texts) { out.fillStyle = t.c; out.fillText(t.t, t.x, t.y); }
+        }
+
+        // ---------- 흐름 ----------
+        function fit() {
+          const rect = stage.getBoundingClientRect();
+          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + stage.querySelector(".gm-rule").offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
+          canvas.style.width = `${Math.floor(W * k)}px`; canvas.style.height = `${Math.floor(H * k)}px`;
+          shell.style.width = `${Math.floor(W * k)}px`;
+          draw();
+        }
+        function frame(now) {
+          raf = 0;
+          if (state !== "play") return;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          last = now;
+          try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
+          if (state === "play") raf = requestAnimationFrame(frame);
+        }
+        function run() { if (raf) cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); }
+        function showOverlay(html) {
+          overlay.innerHTML = html;
+          overlay.hidden = false;
+          const b = overlay.querySelector("button");
+          if (b) b.focus({ preventScroll: true });
+        }
+        function showReady() {
+          state = "ready";
+          S = null;
+          elLives.innerHTML = "<i></i><i></i><i></i>";
+          draw();
+          showOverlay(`<div class="gm-card">
+            <h2>새벽 우유 배달</h2>
+            <p>새벽 4시부터 아침 7시까지 골목에 우유를 넣어요. 지나가는 집마다 왼쪽·오른쪽을 눌러요.</p>
+            <p class="gm-warn">근무 규칙은 <b>22초마다 바뀌어요</b>.<br>넣으면 안 되는 집에 넣지 마세요.</p>
+            <p>금지된 집은 그냥 지나가면 돼요. 넣어야 할 집을 3번 놓쳐도 실수 하나예요.</p>
+            <button type="button" class="gm-go" data-act="start">출근하기</button>
+          </div>`);
+        }
+        function start() {
+          overlay.hidden = true; overlay.innerHTML = "";
+          newGame();
+          state = "play";
+          ctx.sfx("go");
+          window.HKSound.ambient(true);
+          run();
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          window.HKSound.ambient(false);
+          showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>${elClock.textContent} · 구독자 <b>${S.score.toLocaleString("ko-KR")}</b>명</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        }
+        function resume() {
+          if (state !== "paused") return;
+          overlay.hidden = true;
+          state = "play";
+          window.HKSound.ambient(true);
+          run();
+        }
+        function finish(won) {
+          state = "over";
+          window.HKSound.ambient(false);
+          if (won) S.score += 2000 + S.lives * 500;
+          hud();
+          draw();
+          ctx.sfx(won ? "win" : "lose");
+          const score = S.score;
+          showOverlay(`<div class="gm-card"><h2>${won ? "아침이 밝았어요" : "오늘 배달 끝"}</h2><p>${won ? "무사히 퇴근했어요!" : `${elClock.textContent}에 그만뒀어요`} · 우유 ${S.done}병</p><div class="gm-big">${score.toLocaleString("ko-KR")}명</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          ctx.submit(score);
+        }
+        overlay.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-act]");
+          if (!b) return;
+          if (b.dataset.act === "start") start();
+          else if (b.dataset.act === "resume") resume();
+        });
+
+        // ---------- 입력 ----------
+        window.addEventListener("keydown", (e) => {
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          const c = e.code;
+          if (state === "play") {
+            if (c === "ArrowLeft" || c === "KeyA") { e.preventDefault(); if (!e.repeat) deliver(0); }
+            if (c === "ArrowRight" || c === "KeyD") { e.preventDefault(); if (!e.repeat) deliver(1); }
+            if (c === "KeyP" || c === "Escape") pause();
+          } else if ((state === "paused" || state === "ready") && (c === "Space" || c === "Enter")) {
+            e.preventDefault();
+            if (state === "ready") start(); else resume();
+          }
+        });
+        canvas.addEventListener("pointerdown", (e) => {
+          if (state !== "play") return;
+          e.preventDefault();
+          const r = canvas.getBoundingClientRect();
+          deliver(e.clientX - r.left < r.width / 2 ? 0 : 1);
+        });
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+        // ---------- 시작 ----------
+        ctx.onScore && ctx.onScore(() => (S ? S.score : 0));
+        ctx.onRestart(start);
+        ctx.onPause(pause);
+        if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+        window.addEventListener("resize", fit);
+        showReady();
+        fit();
+      },
+    });
+  </script>
+</body>
+</html>

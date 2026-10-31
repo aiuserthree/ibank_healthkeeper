@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 꿀알바 시리즈</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <style>
+    .hk-sr { --ink: #fef3c7; --night: #120a24; --plum: #2a1b4d; --gold: #fde68a; --red: #ef4444; margin: -36px -32px -72px; padding-bottom: 72px; background: var(--night); color: var(--ink); min-height: 100vh; }
+    .hk-sr__scene { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+    .hk-sr__in { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+    .hk-sr__title { display: block; margin: 26px auto 6px; image-rendering: pixelated; max-width: 100%; }
+    .hk-sr__lead { margin: 0 0 26px; text-align: center; font-size: 15.5px; line-height: 1.6; color: #e9d5ff; word-break: keep-all; }
+    .hk-sr__board { padding: 18px; background: #5b3a1e; border: 4px solid #2d1a0a; box-shadow: 0 0 0 4px #7c5230; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .hk-sr__job { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 182px; padding: 14px 12px 12px; background: #fef3c7; color: #3f2a14; text-decoration: none; box-shadow: 4px 4px 0 rgba(0,0,0,.35); }
+    .hk-sr__job::before { content: ""; position: absolute; top: -5px; left: 50%; width: 10px; height: 10px; margin-left: -5px; background: var(--red); box-shadow: inset -2px -2px 0 #991b1b; }
+    .hk-sr__job:nth-child(odd) { transform: rotate(-1deg); }
+    .hk-sr__job:nth-child(even) { transform: rotate(.8deg); }
+    a.hk-sr__job:hover { transform: translateY(-3px); }
+    .hk-sr__ep { font-size: 12px; font-weight: 800; color: #b45309; }
+    .hk-sr__job b { font-size: 16.5px; line-height: 1.25; word-break: keep-all; }
+    .hk-sr__pay { font-size: 12px; font-weight: 700; color: #7c2d12; }
+    .hk-sr__rule { margin-top: auto; padding-top: 6px; border-top: 2px dashed #d6b98a; font-size: 12px; line-height: 1.45; word-break: keep-all; }
+    .hk-sr__go { align-self: flex-start; padding: 3px 8px; font-size: 12px; font-weight: 800; color: #fef3c7; background: #7c2d12; }
+    .hk-sr__job.is-off { background: #cbbfa4; color: #6b5a42; }
+    .hk-sr__job.is-off .hk-sr__go { background: #6b5a42; }
+    .hk-sr__back { display: inline-block; margin: 18px 0 0; font-size: 14px; font-weight: 700; color: var(--gold); text-decoration: none; }
+    @media (max-width: 860px) {
+      .hk-sr { margin: 0; }
+      .hk-sr__board { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; gap: 12px; }
+      .hk-sr__job { min-height: 170px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 꿀알바 시리즈 — 밤거리 인력사무소 벽에 붙은 구인 공고. 회차마다 게임 하나
+    const JOBS = [
+      { ep: 1, title: "심야 편의점", pay: "시급 수상할 만큼 높음", rule: "아침 6시까지 두꺼비집을 지킬 것", key: "nightshift" },
+      { ep: 2, title: "광대를 놓치지 마", pay: "시급 더 높음", rule: "광대에게서 눈을 떼지 말 것", key: "clown" },
+      { ep: 3, title: "새벽 우유 배달", pay: "시급 더더욱 높음", rule: "규칙이 금지한 집에 넣지 말 것", key: "milk" },
+      { ep: 4, title: "심야 극장 안내", pay: "시급 점점 수상함", rule: "관객이 돌아보면 움직이지 말 것", key: "theater" },
+      { ep: 5, title: "신약 시험 보조", pay: "위험 수당 포함", rule: "처방표대로, 제시간에 약을 줄 것", key: "trial" },
+      { ep: 6, title: "조용한 공사장", pay: "야간 수당 포함", rule: "소리를 내지 말 것", key: "silent" },
+      { ep: 7, title: "야간 퍼레이드", pay: "행사 수당 포함", rule: "빨간 풍선은 건드리지 말 것", key: "parade" },
+      { ep: 8, title: "마지막 축제", pay: "???", rule: "지금까지의 규칙을 모두 지킬 것", key: "finale" },
+    ];
+    function card(j) {
+      const body = `<span class="hk-sr__ep">${j.ep}화 공고</span><b>${HKUI.escapeHtml(j.title)}</b><span class="hk-sr__pay">${j.pay || "시급 미정"}</span>
+        <span class="hk-sr__rule">규칙 · ${HKUI.escapeHtml(j.rule)}</span><span class="hk-sr__go">${j.key ? "지원하기" : "공고 준비 중"}</span>`;
+      return j.key ? `<a class="hk-sr__job" href="/games/${j.key}">${body}</a>` : `<div class="hk-sr__job is-off">${body}</div>`;
+    }
+    // 도트 글자 — 글꼴 파일 없이 작게 찍어 또렷한 점만 남긴 뒤 크게 키운다
+    function pixelTitle(canvas, text, size, zoom, color) {
+      const t = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+      const font = `800 ${size}px Pretendard, "Apple SD Gothic Neo", sans-serif`;
+      t.font = font;
+      const w = Math.ceil(t.measureText(text).width) + 4, h = size + 6;
+      t.canvas.width = w; t.canvas.height = h;
+      t.font = font; t.textBaseline = "middle"; t.fillStyle = "#000"; t.fillText(text, 2, h / 2);
+      const d = t.getImageData(0, 0, w, h).data;
+      canvas.width = w; canvas.height = h;
+      canvas.style.width = `${w * zoom}px`;
+      const g = canvas.getContext("2d");
+      g.fillStyle = "#7c2d12";
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 110) g.fillRect(x + 1, y + 1, 1, 1);
+      g.fillStyle = color;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 110) g.fillRect(x, y, 1, 1);
+    }
+    // 밤거리 그림 — 모두 네모 도트로 그린다
+    function drawScene(c, t) {
+      const g = c.getContext("2d"), W = c.width, H = c.height;
+      const px = (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+      px(0, 0, W, H, "#120a24");
+      for (let i = 0; i < 60; i++) { if ((i + Math.floor(t / 700)) % 7) px((i * 53) % W, (i * 29) % 60, 1, 1, "#e2e8f0"); }
+      px(330, 10, 14, 14, "#fde68a"); px(334, 10, 10, 11, "#120a24");
+      for (const [x, w, h, col] of [[0, 60, 60, "#1e1336"], [56, 44, 78, "#241843"], [240, 70, 72, "#241843"], [304, 96, 56, "#1e1336"]]) {
+        px(x, 100 - h, w, h, col);
+        for (let wx = x + 5; wx < x + w - 5; wx += 10) for (let wy = 106 - h; wy < 92; wy += 11) if ((wx * 3 + wy) % 4 === 0) px(wx, wy, 4, 5, "#fbbf24");
+      }
+      // 인력사무소
+      px(100, 34, 140, 66, "#3b2a55");
+      px(100, 34, 140, 4, "#5b4378");
+      const on = Math.floor(t / 900) % 5 !== 0;
+      px(112, 42, 116, 16, on ? "#7f1d1d" : "#3f1d2b");
+      px(114, 44, 112, 12, on ? "#dc2626" : "#4c1d2b");
+      for (let i = 0; i < 9; i++) if (on) px(120 + i * 12, 48, 7, 4, "#fde68a");
+      px(116, 66, 26, 34, "#1e293b"); px(120, 70, 18, 14, on ? "#fbbf24" : "#78350f");
+      px(156, 66, 72, 24, "#7c5230"); for (let i = 0; i < 4; i++) px(160 + i * 17, 69 + (i % 2), 13, 18, "#fef3c7");
+      px(0, 100, W, 14, "#2a1b4d");
+      for (let x = 0; x < W; x += 16) px(x, 106, 8, 1, "#4b3a6e");
+      px(20, 60, 3, 40, "#475569"); px(16, 58, 11, 3, "#475569"); px(14, 61, 6, 3, on ? "#fef08a" : "#713f12");
+      // 지나가는 그림자
+      const sx = Math.floor(t / 90) % (W + 30) - 15;
+      px(sx, 88, 7, 12, "#020617"); px(sx + 1, 83, 5, 5, "#020617"); px(sx + 3, 85, 1, 1, "#f1f5f9");
+    }
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div class="hk-sr">
+          <canvas class="hk-sr__scene" id="sr-scene" width="400" height="114" aria-hidden="true"></canvas>
+          <div class="hk-sr__in">
+            <canvas class="hk-sr__title" id="sr-title" role="img" aria-label="꿀알바 시리즈"></canvas>
+            <p class="hk-sr__lead">밤에만 문을 여는 꿀벌 인력사무소. 시급은 높고, 규칙은 지켜야 해요.<br>공고를 골라 지원하세요.</p>
+            <div class="hk-sr__board">${JOBS.map(card).join("")}</div>
+            <a class="hk-sr__back" href="/arcade">‹ 아케이드로</a>
+          </div>
+        </div>`,
+      afterMount: () => {
+        pixelTitle(document.getElementById("sr-title"), "꿀알바 시리즈", 20, 3, "#fde68a");
+        const c = document.getElementById("sr-scene");
+        let raf = 0, lastDraw = 0;
+        const loop = (t) => {
+          raf = 0;
+          if (t - lastDraw > 120) { lastDraw = t; drawScene(c, t); } // 느린 움직임이라 초당 8번이면 충분
+          if (!document.hidden) raf = requestAnimationFrame(loop);
+        };
+        raf = requestAnimationFrame(loop);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && !raf) raf = requestAnimationFrame(loop); });
+      },
+    });
+  </script>
+</body>
+</html>

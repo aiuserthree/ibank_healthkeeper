@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 꿀알바 시리즈 7화 · 야간 퍼레이드 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-hud { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 9px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #1e0a3c, #a21caf); color: #fae8ff; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .gm-hud__item small { font-size: 11px; opacity: .8; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .gm-meter { height: 12px; border: 2px solid #fae8ff; background: #1e0a3c; }
+    .gm-meter i { display: block; height: 100%; width: 100%; background: #e879f9; }
+    .gm-meter.is-low i { background: #ef4444; }
+    .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #0b0420; }
+    .gm-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(11, 4, 32, .8); overflow-y: auto; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 16px; border: 3px solid #e879f9; background: #1e0a3c; color: #fae8ff; text-align: center; }
+    .gm-card h2 { margin: 0 0 6px; font-size: 22px; color: #f0abfc; }
+    .gm-card p { word-break: keep-all; margin: 0 0 9px; font-size: 13.5px; line-height: 1.5; }
+    .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #fde68a; }
+    .gm-card .gm-warn { padding: 8px; border: 2px dashed #ef4444; font-weight: 700; color: #fecaca; }
+    .gm-go { width: 100%; border: 0; padding: 12px; font-size: 15.5px; font-weight: 800; color: #1e0a3c; cursor: pointer; background: #f0abfc; }
+    .gm-note { padding: 7px 4px 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "parade",
+      setup(stage, ctx) {
+        const W = 180, H = 250, LANES = 3, LANE_W = W / LANES, HIT_Y = 214, TOP_Y = 66;
+        const PERFECT = 0.07, GOOD = 0.13, FALL_SEC = 1.25; // 판정 시간(초) · 풍선이 내려오는 시간
+        const LANE_C = ["#38bdf8", "#facc15", "#a3e635"];
+        // 구간마다 빠르기와 촘촘함이 오른다 [박자 수, 분당 박, 8분음 확률, 동시 치기 확률, 빨간 풍선 확률]
+        const SECTIONS = [[32, 100, 0.05, 0, 0], [32, 112, 0.25, 0.04, 0.1], [32, 124, 0.4, 0.1, 0.14], [32, 136, 0.5, 0.16, 0.18]];
+        // 오르골 멜로디 — 8분음 16개를 되풀이 (음 번호, -1은 쉼)
+        const TUNE = [0, 2, 4, 7, 6, 4, 2, -1, 0, 3, 5, 7, 6, 5, 4, -1];
+
+        stage.innerHTML = `
+          <div class="gm-shell">
+            <div class="gm-hud">
+              <div class="gm-hud__item"><small>점수</small><b data-score>0</b></div>
+              <div class="gm-hud__item"><small>박수 소리</small><div class="gm-meter" data-meter><i></i></div></div>
+              <div class="gm-hud__item"><small>연속</small><b data-combo>0</b></div>
+            </div>
+            <div class="gm-screen">
+              <canvas class="gm-canvas" aria-label="야간 퍼레이드 게임 화면"></canvas>
+              <div class="gm-overlay" data-overlay></div>
+            </div>
+            <div class="gm-note">← ↓ → 또는 A·S·D · 모바일은 칸을 터치 · 빨간 풍선은 그냥 보내요 · Esc 일시정지</div>
+          </div>`;
+        const shell = stage.querySelector(".gm-shell");
+        const canvas = stage.querySelector("canvas");
+        canvas.width = W * 2; canvas.height = H * 2;
+        const out = canvas.getContext("2d");
+        const buf = document.createElement("canvas");
+        buf.width = W; buf.height = H;
+        const g = buf.getContext("2d", { willReadFrequently: true });
+        const overlay = stage.querySelector("[data-overlay]");
+        const elScore = stage.querySelector("[data-score]");
+        const elCombo = stage.querySelector("[data-combo]");
+        const elMeter = stage.querySelector("[data-meter]");
+
+        let state = "ready", S = null, raf = 0, last = 0;
+        const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+
+        // 악보 — 박자 시각에 맞춰 풍선을 놓는다. 곡 시작 전 2초는 준비
+        function makeChart() {
+          const notes = [], beats = [];
+          let t = 2;
+          let prev = 1;
+          SECTIONS.forEach(([count, bpm, eighth, dbl, red], si) => {
+            const beat = 60 / bpm;
+            for (let b = 0; b < count; b++) {
+              for (let sub = 0; sub < 2; sub++) {
+                const at = t + (b + sub / 2) * beat;
+                beats.push({ t: at, n: (si * 32 * 2 + b * 2 + sub) });
+                const on = sub === 0 ? (b % 4 !== 3 || si > 0) : Math.random() < eighth;
+                if (!on) continue;
+                let lane = Math.floor(Math.random() * LANES);
+                if (lane === prev && Math.random() < 0.6) lane = (lane + 1 + Math.floor(Math.random() * 2)) % LANES;
+                prev = lane;
+                notes.push({ t: at, lane, red: Math.random() < red, done: false });
+                if (Math.random() < dbl) notes.push({ t: at, lane: (lane + 1 + Math.floor(Math.random() * 2)) % LANES, red: false, done: false });
+              }
+            }
+            t += count * beat;
+          });
+          return { notes, beats, end: t + 1 };
+        }
+        function newGame() {
+          const c = makeChart();
+          S = { t: 0, score: 0, gauge: 100, combo: 0, best: 0, perfect: 0, good: 0, miss: 0, notes: c.notes, beats: c.beats, end: c.end, flash: [0, 0, 0], texts: [], pulse: 0, angry: 0, shake: 0 };
+          hud();
+        }
+        function hud() {
+          if (!S) return;
+          elScore.textContent = Math.floor(S.score).toLocaleString("ko-KR");
+          elCombo.textContent = S.combo;
+          elMeter.firstElementChild.style.width = `${Math.max(0, S.gauge)}%`;
+          elMeter.classList.toggle("is-low", S.gauge < 30);
+        }
+        const text = (lane, t, c) => S.texts.push({ x: (lane + 0.5) * LANE_W, y: HIT_Y - 14, t, c, life: 0.5 });
+        function hit(lane) {
+          if (state !== "play") return;
+          S.flash[lane] = 0.12;
+          let best = null, bd = 9;
+          for (const n of S.notes) {
+            if (n.done || n.lane !== lane) continue;
+            const d = Math.abs(n.t - S.t);
+            if (d < bd) { bd = d; best = n; }
+            if (n.t - S.t > 0.5) break;
+          }
+          if (!best || bd > GOOD) { ctx.sfx("tap"); return; } // 아무것도 없는 칸은 벌점 없이 지나간다
+          best.done = true;
+          if (best.red) {
+            S.gauge -= 18; S.combo = 0; S.angry = 0.6; S.shake = 0.25; S.miss++;
+            text(lane, "건드렸어요!", "#fca5a5");
+            ctx.sfx("hurt");
+          } else if (bd <= PERFECT) {
+            S.perfect++; S.combo++;
+            S.score += 100 * (1 + Math.min(2, S.combo / 25));
+            S.gauge = Math.min(100, S.gauge + 2);
+            text(lane, "정확!", "#fde68a");
+            ctx.sfx("pop");
+          } else {
+            S.good++; S.combo++;
+            S.score += 50 * (1 + Math.min(2, S.combo / 25));
+            S.gauge = Math.min(100, S.gauge + 1);
+            text(lane, "좋아요", "#a7f3d0");
+            ctx.sfx("tap");
+          }
+          S.best = Math.max(S.best, S.combo);
+          hud();
+          if (S.gauge <= 0) finish(false);
+        }
+        function update(dt) {
+          S.t += dt;
+          // 오르골 · 박자
+          while (S.beats.length && S.beats[0].t <= S.t) {
+            const b = S.beats.shift();
+            const n = TUNE[b.n % TUNE.length];
+            if (n >= 0) ctx.sfx("mbox", n);
+            if (b.n % 2 === 0) { S.pulse = 0.14; ctx.sfx("thump"); }
+          }
+          if (S.pulse > 0) S.pulse -= dt;
+          if (S.angry > 0) S.angry -= dt;
+          if (S.shake > 0) S.shake -= dt;
+          for (let i = 0; i < LANES; i++) if (S.flash[i] > 0) S.flash[i] -= dt;
+          // 놓친 풍선 — 빨간 풍선은 그냥 보내는 게 맞다
+          for (const n of S.notes) {
+            if (n.done) continue;
+            if (n.t > S.t) break;
+            if (S.t - n.t > GOOD) {
+              n.done = true;
+              if (n.red) { S.score += 30; continue; }
+              S.miss++; S.combo = 0; S.gauge -= 9; S.angry = 0.4;
+              text(n.lane, "놓침", "#fca5a5");
+              hud();
+              if (S.gauge <= 0) return finish(false);
+            }
+          }
+          for (const t of S.texts) { t.y -= 22 * dt; t.life -= dt; }
+          S.texts = S.texts.filter((t) => t.life > 0);
+          hud();
+          if (S.t >= S.end) finish(true);
+        }
+
+        // ---------- 그리기 ----------
+        function drawPark() {
+          px(0, 0, W, TOP_Y, "#0b0420");
+          for (let i = 0; i < 30; i++) px((i * 41) % W, (i * 17) % 34, 1, 1, "#e9d5ff");
+          // 관람차
+          const t = S ? S.t : 0, cx = 142, cy = 36;
+          for (let i = 0; i < 8; i++) { const a = t * 0.5 + (i / 8) * 6.283, x = cx + Math.cos(a) * 22, y = cy + Math.sin(a) * 22; px(x - 2, y - 2, 4, 4, ["#f472b6", "#facc15", "#38bdf8"][i % 3]); }
+          px(cx - 1, cy, 2, 28, "#475569");
+          // 줄 전구
+          for (let x = 2; x < W; x += 8) { const y = 10 + Math.abs(((x % 56) - 28)) / 3, on = (Math.floor(t * 5) + x / 8) % 3 < 2; px(x, y, 2, 2, on ? "#fde047" : "#854d0e"); }
+          px(0, TOP_Y - 8, W, 8, "#2e1065");
+          // 마스코트 — 박자에 맞춰 튄다. 틀리면 눈이 빨개진다
+          const hop = S && S.pulse > 0 ? 3 : 0, mx = 58, my = 24 - hop, angry = S && S.angry > 0;
+          px(mx + 2, my - 8, 4, 10, "#f5f5f4"); px(mx + 14, my - 8, 4, 10, "#f5f5f4");
+          px(mx + 3, my - 6, 2, 7, "#fda4af"); px(mx + 15, my - 6, 2, 7, "#fda4af");
+          px(mx, my, 20, 16, "#f5f5f4");
+          px(mx + 4, my + 5, 4, 4, angry ? "#ef4444" : "#111827"); px(mx + 12, my + 5, 4, 4, angry ? "#ef4444" : "#111827");
+          px(mx + 5, my + 11, 10, 2, "#111827"); if (angry) { px(mx + 6, my + 12, 2, 2, "#f5f5f4"); px(mx + 12, my + 12, 2, 2, "#f5f5f4"); }
+          px(mx + 2, my + 16, 16, 14, "#a21caf");
+          px(mx - 3, my + 18 - hop, 5, 3, "#f5f5f4"); px(mx + 18, my + 18 - hop, 5, 3, "#f5f5f4");
+        }
+        function drawBalloon(x, y, c, red) {
+          px(x - 6, y - 7, 12, 12, c);
+          px(x - 4, y - 9, 8, 2, c); px(x - 4, y + 5, 8, 2, c);
+          px(x - 4, y - 5, 2, 3, "#ffffff");
+          if (red) { px(x - 3, y - 2, 2, 2, "#111827"); px(x + 1, y - 2, 2, 2, "#111827"); px(x - 2, y + 2, 4, 1, "#111827"); }
+          px(x, y + 7, 1, 5, "#e2e8f0");
+        }
+        function paint() {
+          const sh = S && S.shake > 0 ? Math.round(Math.sin(S.t * 70) * 2) : 0;
+          g.setTransform(1, 0, 0, 1, sh, 0);
+          px(-4, TOP_Y, W + 8, H - TOP_Y, "#150a33");
+          drawPark();
+          for (let i = 0; i < LANES; i++) {
+            const x = i * LANE_W;
+            if (i) px(x, TOP_Y, 1, H - TOP_Y, "#2e1065");
+            if (S && S.flash[i] > 0) px(x + 1, HIT_Y - 18, LANE_W - 1, H - HIT_Y + 18, "rgba(240, 171, 252, .25)");
+            px(x + 8, HIT_Y - 1, LANE_W - 16, 3, S && S.pulse > 0 ? "#fde047" : LANE_C[i]);
+          }
+          if (S) {
+            for (const n of S.notes) {
+              if (n.done) continue;
+              const left = n.t - S.t;
+              if (left > FALL_SEC) break;
+              const y = HIT_Y - (left / FALL_SEC) * (HIT_Y - TOP_Y);
+              if (y < TOP_Y - 8) continue;
+              drawBalloon((n.lane + 0.5) * LANE_W, y, n.red ? "#ef4444" : LANE_C[n.lane], n.red);
+            }
+          }
+          g.setTransform(1, 0, 0, 1, 0, 0);
+        }
+        function draw() {
+          paint();
+          HKPlay.smoothPixels(buf, out);
+          if (!S) return;
+          out.setTransform(2, 0, 0, 2, 0, 0);
+          out.font = "800 8px sans-serif"; out.textAlign = "center"; out.textBaseline = "middle";
+          for (const t of S.texts) { out.fillStyle = t.c; out.fillText(t.t, t.x, t.y); }
+        }
+
+        // ---------- 흐름 ----------
+        function fit() {
+          const rect = stage.getBoundingClientRect();
+          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
+          const cw = Math.floor(W * k);
+          canvas.style.width = `${cw}px`; canvas.style.height = `${Math.floor(H * k)}px`;
+          shell.style.width = `${cw}px`;
+          draw();
+        }
+        function frame(now) {
+          raf = 0;
+          if (state !== "play") return;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          last = now;
+          try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
+          if (state === "play") raf = requestAnimationFrame(frame);
+        }
+        function run() { if (raf) cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); }
+        function showOverlay(html) {
+          overlay.innerHTML = html;
+          overlay.hidden = false;
+          const b = overlay.querySelector("button");
+          if (b) b.focus({ preventScroll: true });
+        }
+        function showReady() {
+          state = "ready";
+          S = null;
+          draw();
+          showOverlay(`<div class="gm-card">
+            <h2>야간 퍼레이드</h2>
+            <p>밤의 놀이공원 퍼레이드에서 풍선 담당이에요. 풍선이 선에 닿을 때 그 칸을 눌러요.</p>
+            <p class="gm-warn">근무 규칙 · 얼굴이 있는 <b>빨간 풍선</b>은 건드리지 말 것</p>
+            <p>놓치면 박수 소리가 줄어요. 박수가 끊기면 퍼레이드에서 쫓겨나요.</p>
+            <button type="button" class="gm-go" data-act="start">시작하기</button>
+          </div>`);
+        }
+        function start() {
+          overlay.hidden = true; overlay.innerHTML = "";
+          newGame();
+          state = "play";
+          ctx.sfx("go");
+          run();
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>점수 <b>${Math.floor(S.score).toLocaleString("ko-KR")}</b>점</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        }
+        function resume() {
+          if (state !== "paused") return;
+          overlay.hidden = true;
+          state = "play";
+          run();
+        }
+        function finish(won) {
+          state = "over";
+          if (won) S.score += 1000 + Math.max(0, S.gauge) * 10 + S.best * 10;
+          hud();
+          draw();
+          ctx.sfx(won ? "win" : "lose");
+          const score = Math.floor(S.score);
+          showOverlay(`<div class="gm-card"><h2>${won ? "퍼레이드가 끝났어요" : "쫓겨났어요"}</h2><p>정확 ${S.perfect} · 좋아요 ${S.good} · 놓침 ${S.miss} · 최고 연속 ${S.best}</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          ctx.submit(score);
+        }
+        overlay.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-act]");
+          if (!b) return;
+          if (b.dataset.act === "start") start();
+          else if (b.dataset.act === "resume") resume();
+        });
+
+        // ---------- 입력 ----------
+        const LANE_KEY = { ArrowLeft: 0, KeyA: 0, Digit1: 0, ArrowDown: 1, KeyS: 1, Digit2: 1, ArrowRight: 2, KeyD: 2, Digit3: 2 };
+        window.addEventListener("keydown", (e) => {
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          const c = e.code;
+          if (state === "play") {
+            if (c in LANE_KEY) { e.preventDefault(); if (!e.repeat) hit(LANE_KEY[c]); }
+            if (c === "Space") e.preventDefault();
+            if (c === "KeyP" || c === "Escape") pause();
+          } else if ((state === "paused" || state === "ready") && (c === "Space" || c === "Enter")) {
+            e.preventDefault();
+            if (state === "ready") start(); else resume();
+          }
+        });
+        canvas.addEventListener("pointerdown", (e) => {
+          if (state !== "play") return;
+          e.preventDefault();
+          const r = canvas.getBoundingClientRect();
+          hit(Math.max(0, Math.min(LANES - 1, Math.floor(((e.clientX - r.left) / r.width) * LANES))));
+        });
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+        // ---------- 시작 ----------
+        ctx.onScore && ctx.onScore(() => (S ? Math.floor(S.score) : 0));
+        ctx.onRestart(start);
+        ctx.onPause(pause);
+        if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+        window.addEventListener("resize", fit);
+        showReady();
+        fit();
+      },
+    });
+  </script>
+</body>
+</html>

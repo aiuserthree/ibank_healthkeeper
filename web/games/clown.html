@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 꿀알바 시리즈 2화 · 광대를 놓치지 마 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-hud { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; padding: 9px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #1a0b2e, #6b1d3a); color: #fde68a; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; }
+    .gm-hud__item small { font-size: 11px; opacity: .75; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .gm-meter { height: 12px; border: 2px solid #fde68a; background: #1a0b2e; }
+    .gm-meter i { display: block; height: 100%; width: 100%; background: #22c55e; }
+    .gm-meter.is-low i { background: #ef4444; }
+    .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #0b0614; }
+    .gm-canvas { display: block; touch-action: none; cursor: none; image-rendering: pixelated; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(11, 6, 20, .74); overflow-y: auto; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 18px 16px 16px; border: 3px solid #fde68a; background: #1a0b2e; color: #fef3c7; text-align: center; }
+    .gm-card h2 { margin: 0 0 6px; font-size: 22px; color: #fde68a; }
+    .gm-card p { word-break: keep-all; margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; color: #e9d5ff; }
+    .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #fde68a; }
+    .gm-rule { margin: 0 0 12px; padding: 8px; border: 2px dashed #ef4444; font-size: 13.5px; font-weight: 700; color: #fecaca; word-break: keep-all; }
+    .gm-go { width: 100%; border: 0; padding: 12px; font-size: 15.5px; font-weight: 800; color: #1a0b2e; cursor: pointer; background: #fde68a; }
+    .gm-note { padding: 7px 4px 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "clown",
+      setup(stage, ctx) {
+        // 도트 그림 해상도 — 이 크기로 그리고 화면에 맞게 크게 키운다
+        const W = 180, H = 250;
+        const LEVEL_SEC = 14, MAX_LEVEL = 8;
+        const STALLS = [{ x: 28, y: 86, w: 44, h: 22, c: "#b91c1c" }, { x: 112, y: 150, w: 46, h: 22, c: "#1d4ed8" }, { x: 20, y: 196, w: 40, h: 20, c: "#047857" }];
+        const SKIN = ["#fcd34d", "#e7b98b", "#c68642"], WEAR = ["#475569", "#7c3aed", "#0f766e", "#b45309", "#334155", "#be185d"];
+
+        stage.innerHTML = `
+          <div class="gm-shell">
+            <div class="gm-hud">
+              <div class="gm-hud__item"><small>점수</small><b data-score>0</b></div>
+              <div class="gm-hud__item"><small>놓치면 끝</small><div class="gm-meter" data-meter><i></i></div></div>
+              <div class="gm-hud__item"><small>단계</small><b data-level>1</b></div>
+            </div>
+            <div class="gm-screen">
+              <canvas class="gm-canvas" aria-label="광대를 놓치지 마 게임 화면"></canvas>
+              <div class="gm-overlay" data-overlay></div>
+            </div>
+            <div class="gm-note">마우스로 동그라미를 움직여요 · 모바일은 화면을 끌어서 · Esc 일시정지</div>
+          </div>`;
+        const shell = stage.querySelector(".gm-shell");
+        const canvas = stage.querySelector("canvas");
+        // 그림은 작은 판(buf)에 도트로 그리고, 화면에는 모서리를 다듬어 2배로 옮긴다
+        canvas.width = W * 2; canvas.height = H * 2;
+        const out = canvas.getContext("2d");
+        const buf = document.createElement("canvas");
+        buf.width = W; buf.height = H;
+        const g = buf.getContext("2d", { willReadFrequently: true });
+        const overlay = stage.querySelector("[data-overlay]");
+        const elScore = stage.querySelector("[data-score]");
+        const elLevel = stage.querySelector("[data-level]");
+        const elMeter = stage.querySelector("[data-meter]");
+
+        let state = "ready", S = null, raf = 0, last = 0;
+        const rnd = (a, b) => a + Math.random() * (b - a);
+        const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+
+        function newWalker(kind) {
+          const p = { kind, x: rnd(10, W - 10), y: rnd(60, H - 12), tx: 0, ty: 0, wait: rnd(0, 1), sp: rnd(9, 15), step: Math.random() * 6, skin: SKIN[Math.floor(Math.random() * 3)], wear: WEAR[Math.floor(Math.random() * WEAR.length)] };
+          pick(p);
+          return p;
+        }
+        function pick(p) { p.tx = rnd(10, W - 10); p.ty = rnd(60, H - 12); }
+        function newGame() {
+          const clown = newWalker("clown");
+          clown.x = W / 2; clown.y = 150; clown.sp = 15;
+          S = { t: 0, score: 0, level: 1, meter: 100, cx: W / 2, cy: 150, clown, fakes: [], crowd: Array.from({ length: 14 }, () => newWalker("crowd")), dark: 0, darkCd: 11, lostT: 0, shake: 0 };
+          hud();
+        }
+        function hud() {
+          if (!S) return;
+          elScore.textContent = Math.floor(S.score).toLocaleString("ko-KR");
+          elLevel.textContent = S.level;
+          elMeter.firstElementChild.style.width = `${Math.max(0, S.meter)}%`;
+          elMeter.classList.toggle("is-low", S.meter < 35);
+        }
+        const radius = () => Math.max(11, 19 - S.level);
+        function walk(p, dt) {
+          if (p.wait > 0) { p.wait -= dt; return; }
+          const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy);
+          if (d < 2) { pick(p); p.wait = rnd(0.1, p.kind === "crowd" ? 1.6 : 0.8); return; }
+          p.x += (dx / d) * p.sp * dt; p.y += (dy / d) * p.sp * dt;
+          p.step += dt * 9;
+          p.left = dx < 0;
+        }
+        function update(dt) {
+          S.t += dt;
+          const lv = Math.min(MAX_LEVEL, 1 + Math.floor(S.t / LEVEL_SEC));
+          if (lv !== S.level) {
+            S.level = lv;
+            S.clown.sp = 15 + lv * 3.4;
+            if (lv >= 2 && S.fakes.length < Math.min(4, lv - 1)) { const f = newWalker("fake"); f.x = S.clown.x + rnd(-30, 30); f.y = S.clown.y + rnd(-20, 20); S.fakes.push(f); }
+            while (S.crowd.length < 14 + lv * 2) S.crowd.push(newWalker("crowd"));
+            ctx.sfx("go");
+          }
+          for (const f of S.fakes) f.sp = S.clown.sp * 0.9;
+          [S.clown, ...S.fakes, ...S.crowd].forEach((p) => walk(p, dt));
+          // 불이 잠깐 꺼진다 — 그 사이 광대는 움직이고, 눈금은 덜 줄어든다
+          S.darkCd -= dt;
+          if (S.darkCd <= 0) { S.dark = 0.8; S.darkCd = rnd(9, 13); ctx.sfx("buzz"); }
+          const inDark = S.dark > 0;
+          if (inDark) S.dark -= dt;
+          const on = Math.hypot(S.cx - S.clown.x, S.cy - (S.clown.y - 6)) < radius();
+          if (on) {
+            S.meter = Math.min(100, S.meter + 28 * dt);
+            S.score += 10 * S.level * dt;
+          } else if (S.t > 2) { // 시작 2초는 광대를 찾을 시간
+            S.meter -= (inDark ? 9 : 26 + S.level * 3) * dt;
+            if (S.meter < 30 && Math.floor(S.t * 4) !== Math.floor((S.t - dt) * 4)) ctx.sfx("tick");
+          }
+          hud();
+          if (S.meter <= 0) finish();
+        }
+
+        // ---------- 그리기 (전부 네모 도트) ----------
+        function drawStreet() {
+          px(0, 0, W, 34, "#0f0a1e");
+          for (let i = 0; i < 26; i++) px((i * 37) % W, (i * 13) % 30, 1, 1, "#e2e8f0");
+          for (const [x, w, h, c] of [[0, 34, 26, "#1e1336"], [30, 46, 32, "#241843"], [72, 30, 22, "#1e1336"], [100, 50, 30, "#2a1b4d"], [146, 34, 24, "#1e1336"]]) {
+            px(x, 54 - h, w, h, c);
+            for (let wx = x + 4; wx < x + w - 4; wx += 8) for (let wy = 58 - h; wy < 48; wy += 8) if ((wx + wy) % 3 === 0) px(wx, wy, 3, 3, "#fbbf24");
+          }
+          for (let y = 54; y < H; y += 8) for (let x = 0; x < W; x += 8) px(x, y, 8, 8, (x + y) % 16 ? "#3b2a55" : "#35264e");
+        }
+        function drawPerson(p) {
+          const x = Math.round(p.x) - 3, y = Math.round(p.y) - 11, leg = Math.sin(p.step) > 0;
+          px(x, y + 12, 7, 1, "rgba(0,0,0,.35)");
+          px(x + 1, y + 9, 2, leg ? 3 : 2, "#1e293b"); px(x + 4, y + 9, 2, leg ? 2 : 3, "#1e293b");
+          if (p.kind === "crowd") {
+            px(x, y + 4, 7, 6, p.wear);
+            px(x + 1, y, 5, 4, p.skin);
+            px(x + 1, y - 1, 5, 2, "#1f2937");
+          } else {
+            // 광대 — 알록달록한 옷, 흰 얼굴. 진짜 광대만 코가 빨갛다
+            px(x, y + 4, 4, 6, "#dc2626"); px(x + 3, y + 4, 4, 6, "#2563eb");
+            px(x + 3, y + 5, 1, 1, "#fde047"); px(x + 3, y + 7, 1, 1, "#fde047");
+            px(x + 1, y, 5, 4, "#f8fafc");
+            px(x + 3, y + 2, 1, 1, p.kind === "clown" ? "#ef4444" : "#f59e0b");
+            px(x + 1, y + 1, 1, 1, "#111827"); px(x + 5, y + 1, 1, 1, "#111827");
+            px(x + 2, y - 1, 3, 1, "#a855f7"); px(x + 3, y - 2, 1, 1, "#fde047");
+          }
+        }
+        function drawStall(s) {
+          px(s.x, s.y, s.w, s.h, "#78350f");
+          px(s.x - 2, s.y - 8, s.w + 4, 9, s.c);
+          for (let i = 0; i < s.w + 4; i += 8) px(s.x - 2 + i, s.y - 8, 4, 9, "#f1f5f9");
+          px(s.x + 2, s.y + 2, s.w - 4, 3, "#a16207");
+        }
+        function draw() {
+          paint();
+          HKPlay.smoothPixels(buf, out);
+        }
+        function paint() {
+          drawStreet();
+          if (!S) { for (const s of STALLS) drawStall(s); return; }
+          const all = [S.clown, ...S.fakes, ...S.crowd].sort((a, b) => a.y - b.y);
+          let si = 0;
+          const stalls = [...STALLS].sort((a, b) => a.y + a.h - (b.y + b.h));
+          for (const p of all) {
+            while (si < stalls.length && stalls[si].y + stalls[si].h < p.y) drawStall(stalls[si++]);
+            drawPerson(p);
+          }
+          while (si < stalls.length) drawStall(stalls[si++]);
+          if (S.dark > 0) {
+            g.fillStyle = "rgba(2, 2, 8, .97)"; g.fillRect(0, 0, W, H);
+          } else {
+            // 시야가 좁아진다 — 눈금이 낮을수록 가장자리가 어두워진다
+            const v = Math.floor((1 - S.meter / 100) * 16);
+            if (v > 0) { g.fillStyle = "rgba(127, 29, 29, .35)"; g.fillRect(0, 0, W, v); g.fillRect(0, H - v, W, v); g.fillRect(0, 0, v, H); g.fillRect(W - v, 0, v, H); }
+          }
+          // 눈 동그라미
+          const r = radius(), n = 28, on = Math.hypot(S.cx - S.clown.x, S.cy - (S.clown.y - 6)) < r;
+          for (let i = 0; i < n; i++) { const a = (i / n) * 6.283; px(S.cx + Math.cos(a) * r, S.cy + Math.sin(a) * r, 1, 1, on ? "#86efac" : "#fca5a5"); }
+        }
+
+        // ---------- 흐름 ----------
+        function fit() {
+          const rect = stage.getBoundingClientRect();
+          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
+          const cw = Math.floor(W * k), ch = Math.floor(H * k);
+          canvas.style.width = `${cw}px`; canvas.style.height = `${ch}px`;
+          shell.style.width = `${cw}px`;
+          draw();
+        }
+        function frame(now) {
+          raf = 0;
+          if (state !== "play") return;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          last = now;
+          try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
+          if (state === "play") raf = requestAnimationFrame(frame);
+        }
+        function run() {
+          if (raf) cancelAnimationFrame(raf);
+          last = performance.now();
+          raf = requestAnimationFrame(frame);
+        }
+        function showOverlay(html) {
+          overlay.innerHTML = html;
+          overlay.hidden = false;
+          const b = overlay.querySelector("button");
+          if (b) b.focus({ preventScroll: true });
+        }
+        function showReady() {
+          state = "ready";
+          S = null;
+          draw();
+          showOverlay(`<div class="gm-card">
+            <h2>광대를 놓치지 마</h2>
+            <p>이번 알바는 간단해요. 축제 거리에서 광대를 따라다니기만 하면 돼요.</p>
+            <div class="gm-rule">근무 규칙 · 코가 <b>빨간</b> 광대에게서 눈을 떼지 말 것</div>
+            <p>동그라미 안에 광대를 두세요. 비슷한 광대가 섞여 들고, 불이 잠깐 꺼지기도 해요.</p>
+            <button type="button" class="gm-go" data-act="start">시작</button>
+          </div>`);
+        }
+        function start() {
+          overlay.hidden = true;
+          overlay.innerHTML = "";
+          newGame();
+          state = "play";
+          window.HKSound.ambient(true);
+          run();
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          window.HKSound.ambient(false);
+          showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>점수 <b>${Math.floor(S.score).toLocaleString("ko-KR")}</b>점 · ${S.level}단계</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        }
+        function resume() {
+          if (state !== "paused") return;
+          overlay.hidden = true;
+          state = "play";
+          window.HKSound.ambient(true);
+          run();
+        }
+        function finish() {
+          state = "over";
+          window.HKSound.ambient(false);
+          draw();
+          ctx.sfx("ghost");
+          const score = Math.floor(S.score);
+          showOverlay(`<div class="gm-card"><h2>광대가 사라졌어요</h2><p>규칙을 어겼어요 · ${S.level}단계까지 따라갔어요</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          ctx.submit(score);
+        }
+        overlay.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-act]");
+          if (!b) return;
+          if (b.dataset.act === "start") start();
+          else if (b.dataset.act === "resume") resume();
+        });
+
+        // ---------- 입력 ----------
+        const toWorld = (e) => { const r = canvas.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }; };
+        const clampCursor = () => { S.cx = Math.max(0, Math.min(W, S.cx)); S.cy = Math.max(0, Math.min(H, S.cy)); };
+        // 마우스 — 판 밖으로 나가도 따라온다
+        window.addEventListener("pointermove", (e) => {
+          if (e.pointerType !== "mouse" || state !== "play") return;
+          const p = toWorld(e); S.cx = p.x; S.cy = p.y; clampCursor();
+        });
+        // 휴대폰 — 손가락에 가리지 않게 끈 만큼만 움직인다 (처음 닿은 손가락만)
+        let drag = null;
+        canvas.addEventListener("pointerdown", (e) => {
+          if (state !== "play" || e.pointerType === "mouse") return;
+          e.preventDefault();
+          if (drag) return;
+          drag = { id: e.pointerId, ...toWorld(e) };
+          try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+        });
+        canvas.addEventListener("pointermove", (e) => {
+          if (!drag || e.pointerId !== drag.id || state !== "play") return;
+          const p = toWorld(e);
+          S.cx += (p.x - drag.x) * 1.3; S.cy += (p.y - drag.y) * 1.3;
+          drag.x = p.x; drag.y = p.y;
+          clampCursor();
+        });
+        const endDrag = (e) => { if (drag && e.pointerId === drag.id) drag = null; };
+        canvas.addEventListener("pointerup", endDrag);
+        canvas.addEventListener("pointercancel", endDrag);
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        window.addEventListener("keydown", (e) => {
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          if (state === "play" && (e.code === "Escape" || e.code === "KeyP")) pause();
+          else if (state === "paused" && (e.code === "Space" || e.code === "Enter")) { e.preventDefault(); resume(); }
+          else if (state === "ready" && (e.code === "Space" || e.code === "Enter")) { e.preventDefault(); start(); }
+        });
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+        // ---------- 시작 ----------
+        ctx.onScore && ctx.onScore(() => (S ? Math.floor(S.score) : 0));
+        ctx.onRestart(start);
+        ctx.onPause(pause);
+        if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+        window.addEventListener("resize", fit);
+        showReady();
+        fit();
+      },
+    });
+  </script>
+</body>
+</html>

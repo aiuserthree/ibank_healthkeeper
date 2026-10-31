@@ -163,6 +163,9 @@ window.HKSound = (function () {
     ghost: () => { tone({ type: "sine", f: 520, f2: 180, t: 0.7, v: 0.13, attack: 0.1 }); tone({ type: "sine", f: 548, f2: 190, t: 0.7, v: 0.09, attack: 0.1 }); },
     growl: () => { tone({ type: "sawtooth", f: 70, f2: 42, t: 1.1, v: 0.3, attack: 0.1 }); noise({ t: 0.9, v: 0.18, f: 260, f2: 90, type: "lowpass" }); },
     buzz: () => { [0, 0.05, 0.13].forEach((delay) => tone({ type: "sawtooth", f: 120, t: 0.04, v: 0.09, delay })); },
+    // 야간 퍼레이드 — 오르골 음(단조 음계 번호) · 작은 북
+    mbox: (n = 0) => tone({ type: "triangle", f: [440, 494, 523, 587, 659, 698, 784, 880][n % 8], t: 0.32, v: 0.17 }),
+    thump: () => tone({ type: "sine", f: 120, f2: 60, t: 0.09, v: 0.22 }),
   };
 
   function play(name, arg) {
@@ -255,6 +258,13 @@ window.HKPlay = (function () {
     sudoku: ["#334155", "#64748b"],
     chosung: ["#e0508a", "#ff9a8b"],
     nightshift: ["#0b0f1a", "#3b4a6b"],
+    clown: ["#1a0b2e", "#6b1d3a"],
+    milk: ["#0c1a3a", "#1e4e79"],
+    theater: ["#2a0a12", "#6b1426"],
+    trial: ["#06302c", "#0f766e"],
+    silent: ["#1c1917", "#57534e"],
+    parade: ["#1e0a3c", "#a21caf"],
+    finale: ["#3b0a0a", "#b45309"],
     typing: ["#4f46e5", "#a78bfa"],
     trivia: ["#0891b2", "#22d3ee"],
     korean: ["#b45309", "#facc15"],
@@ -271,6 +281,31 @@ window.HKPlay = (function () {
   }
 
   // 문자열 → 32비트 시드 → mulberry32
+  // 도트 그림을 2배로 옮기며 계단진 모서리만 다듬는다 (Scale2x) — 도트 느낌은 남고 윤곽이 매끄러워진다
+  let px2Out = null;
+  function smoothPixels(src, out) {
+    const W = src.width, H = src.height;
+    const from = new Uint32Array(src.getContext("2d").getImageData(0, 0, W, H).data.buffer);
+    if (!px2Out || px2Out.width !== W * 2 || px2Out.height !== H * 2) px2Out = out.createImageData(W * 2, H * 2);
+    const to = new Uint32Array(px2Out.data.buffer);
+    for (let y = 0; y < H; y++) {
+      const up = y > 0 ? y - 1 : y, dn = y < H - 1 ? y + 1 : y;
+      for (let x = 0; x < W; x++) {
+        const lf = x > 0 ? x - 1 : x, rt = x < W - 1 ? x + 1 : x;
+        const e = from[y * W + x], b = from[up * W + x], h = from[dn * W + x], d = from[y * W + lf], f = from[y * W + rt];
+        const i = y * 2 * W * 2 + x * 2, j = i + W * 2;
+        if (b !== h && d !== f) {
+          to[i] = d === b ? d : e; to[i + 1] = b === f ? f : e;
+          to[j] = d === h ? d : e; to[j + 1] = h === f ? f : e;
+        } else {
+          to[i] = to[i + 1] = to[j] = to[j + 1] = e;
+        }
+      }
+    }
+    out.setTransform(1, 0, 0, 1, 0, 0);
+    out.putImageData(px2Out, 0, 0);
+  }
+
   function seededRng(seedText) {
     let h = 1779033703 ^ seedText.length;
     for (let i = 0; i < seedText.length; i++) {
@@ -982,5 +1017,5 @@ window.HKPlay = (function () {
     });
   }
 
-  return { closedHtml, mountGame, roomFor, tintStyle, formatScore, seededRng, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
+  return { closedHtml, mountGame, roomFor, tintStyle, formatScore, seededRng, smoothPixels, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
 })();

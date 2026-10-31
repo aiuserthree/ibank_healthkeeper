@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 꿀알바 시리즈 4화 · 심야 극장 안내 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #2a0a12, #6b1426); color: #fecdd3; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .gm-hud__item small { font-size: 11px; opacity: .75; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .gm-hud__mid { align-items: center; }
+    .gm-hud__right { align-items: flex-end; }
+    .gm-lives { display: inline-flex; gap: 3px; min-height: 18px; align-items: center; }
+    .gm-lives i { width: 14px; height: 9px; background: #fde68a; box-shadow: inset -3px 0 0 #b45309; }
+    .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #0a0406; }
+    .gm-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(10, 4, 6, .78); overflow-y: auto; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 18px 16px 16px; border: 3px solid #fda4af; background: #2a0a12; color: #ffe4e6; text-align: center; }
+    .gm-card h2 { margin: 0 0 6px; font-size: 22px; color: #fecdd3; }
+    .gm-card p { word-break: keep-all; margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; }
+    .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #fde68a; }
+    .gm-card .gm-warn { padding: 8px; border: 2px dashed #ef4444; font-weight: 700; color: #fecaca; }
+    .gm-go { width: 100%; border: 0; padding: 12px; font-size: 15.5px; font-weight: 800; color: #2a0a12; cursor: pointer; background: #fecdd3; }
+    .gm-note { padding: 7px 4px 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "theater",
+      setup(stage, ctx) {
+        const W = 180, H = 240;
+        const ROWS = [64, 88, 112, 136, 160, 184], SEAT_X = [], DOOR = { x: 90, y: 226 };
+        for (let x = 12; x <= 168; x += 13) if (Math.abs(x - 90) > 9) SEAT_X.push(x);
+        const SHOWS = 12;              // 손님 12명을 안내하면 상영 끝
+        const WALK = 42, GRACE = 0.08;  // 걷는 속도 · 돌아본 순간 멈출 여유
+
+        stage.innerHTML = `
+          <div class="gm-shell">
+            <div class="gm-hud">
+              <div class="gm-hud__item"><small>점수</small><b data-score>0</b></div>
+              <div class="gm-hud__item gm-hud__mid"><small>안내</small><b data-round>0 / ${SHOWS}</b></div>
+              <div class="gm-hud__item gm-hud__right"><small>남은 표</small><span class="gm-lives" data-lives></span></div>
+            </div>
+            <div class="gm-screen">
+              <canvas class="gm-canvas" aria-label="심야 극장 안내 게임 화면"></canvas>
+              <div class="gm-overlay" data-overlay></div>
+            </div>
+            <div class="gm-note">화면이나 스페이스를 누르고 있으면 걸어요 · 떼면 멈춰요 · Esc 일시정지</div>
+          </div>`;
+        const shell = stage.querySelector(".gm-shell");
+        const canvas = stage.querySelector("canvas");
+        // 그림은 작은 판(buf)에 도트로 그리고, 화면에는 모서리를 다듬어 2배로 옮긴다
+        canvas.width = W * 2; canvas.height = H * 2;
+        const out = canvas.getContext("2d");
+        const buf = document.createElement("canvas");
+        buf.width = W; buf.height = H;
+        const g = buf.getContext("2d", { willReadFrequently: true });
+        const overlay = stage.querySelector("[data-overlay]");
+        const elScore = stage.querySelector("[data-score]");
+        const elRound = stage.querySelector("[data-round]");
+        const elLives = stage.querySelector("[data-lives]");
+
+        let state = "ready", S = null, raf = 0, last = 0, holding = false;
+        const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
+        const rnd = (a, b) => a + Math.random() * (b - a);
+
+        function audience() {
+          const list = [];
+          for (const y of ROWS) for (const x of SEAT_X) if (Math.random() < 0.62) list.push({ x, y, tone: ["#1f2937", "#292524", "#27272a"][Math.floor(Math.random() * 3)] });
+          return list;
+        }
+        function newGame() {
+          S = { t: 0, score: 0, lives: 3, round: 0, x: DOOR.x, y: DOOR.y, path: [], phase: "quiet", phaseT: 2.4, fake: false, seen: 0, stun: 0, shake: 0, crowd: audience(), target: null, roundT: 0, walking: false, texts: [] };
+          nextGuest();
+          hud();
+        }
+        // 다음 손님 — 앞줄 빈자리까지 복도로 갔다가 문으로 돌아온다
+        function nextGuest() {
+          const row = S.round < 3 ? ROWS[4 - S.round] : ROWS[Math.floor(Math.random() * 4)];
+          const x = SEAT_X[Math.floor(Math.random() * SEAT_X.length)];
+          S.crowd = S.crowd.filter((p) => !(p.y === row && p.x === x));
+          S.target = { x, y: row };
+          const front = row + 12; // 좌석 줄 앞 통로
+          S.path = [{ x: 90, y: front }, { x, y: front }, { x, y: row + 2, drop: true }, { x, y: front }, { x: 90, y: front }, { x: DOOR.x, y: DOOR.y, done: true }];
+          S.roundT = 0;
+        }
+        function hud() {
+          if (!S) return;
+          elScore.textContent = S.score.toLocaleString("ko-KR");
+          elRound.textContent = `${S.round} / ${SHOWS}`;
+          if (elLives.childElementCount !== Math.max(0, S.lives)) elLives.innerHTML = "<i></i>".repeat(Math.max(0, S.lives));
+        }
+        // 돌아보기 주기 — 뒤로 갈수록 조용한 시간과 예고가 짧아지고, 가짜 예고가 섞인다
+        function setQuiet() {
+          const k = Math.min(1, S.round / SHOWS);
+          S.phase = "quiet";
+          S.phaseT = rnd(1.5 - k * 0.7, 3.6 - k * 1.5);
+        }
+        function setWarn() {
+          const k = Math.min(1, S.round / SHOWS);
+          S.phase = "warn";
+          S.phaseT = 0.7 - k * 0.42;
+          S.fake = S.round >= 3 && Math.random() < 0.25;
+          ctx.sfx("buzz");
+        }
+        function setWatch() {
+          if (S.fake) return setQuiet();
+          S.phase = "watch";
+          S.phaseT = rnd(1, 1.9);
+          S.seen = 0;
+          ctx.sfx("tick");
+        }
+        function text(t, c) { S.texts.push({ x: S.x, y: S.y - 12, t, c, life: 1 }); }
+        function update(dt) {
+          S.t += dt; S.roundT += dt;
+          S.phaseT -= dt;
+          if (S.phaseT <= 0) {
+            if (S.phase === "quiet") setWarn();
+            else if (S.phase === "warn") setWatch();
+            else setQuiet();
+          }
+          if (S.shake > 0) S.shake -= dt;
+          if (S.stun > 0) S.stun -= dt;
+          S.walking = holding && S.stun <= 0;
+          // 걷기
+          if (S.walking) {
+            let left = WALK * dt;
+            while (left > 0 && S.path.length) {
+              const p = S.path[0], dx = p.x - S.x, dy = p.y - S.y, d = Math.hypot(dx, dy);
+              if (d <= left) {
+                S.x = p.x; S.y = p.y; left -= d; S.path.shift();
+                if (p.drop) { S.score += 100; text("+100", "#fde68a"); ctx.sfx("coin"); hud(); }
+                if (p.done) return guestDone();
+              } else { S.x += (dx / d) * left; S.y += (dy / d) * left; left = 0; }
+            }
+          }
+          // 관객이 보고 있을 때 움직이면 표를 잃는다
+          if (S.phase === "watch" && S.walking) {
+            S.seen += dt;
+            if (S.seen > GRACE) {
+              S.lives--; S.stun = 1.2; S.shake = 0.35; S.seen = 0; S.phaseT = Math.max(S.phaseT, 1.2);
+              text("들켰어요!", "#fca5a5");
+              ctx.sfx("ghost");
+              hud();
+              if (S.lives <= 0) return finish(false);
+            }
+          }
+          for (const t of S.texts) { t.y -= 16 * dt; t.life -= dt; }
+          S.texts = S.texts.filter((t) => t.life > 0);
+        }
+        function guestDone() {
+          S.round++;
+          const bonus = Math.max(0, Math.round(300 - S.roundT * 12)) + 100 * S.round;
+          S.score += bonus;
+          text(`+${bonus}`, "#86efac");
+          ctx.sfx("success");
+          hud();
+          if (S.round >= SHOWS) return finish(true);
+          nextGuest();
+        }
+
+        // ---------- 그리기 ----------
+        function drawHead(p) {
+          const x = p.x - 3, y = p.y - 7;
+          const looking = S && S.phase === "watch";
+          px(x - 1, y + 7, 9, 6, "#7f1d1d"); px(x - 1, y + 12, 9, 2, "#450a0a"); // 의자
+          if (looking) {
+            px(x, y, 7, 7, "#e5e7eb");
+            px(x + 1, y + 2, 2, 2, "#b91c1c"); px(x + 4, y + 2, 2, 2, "#b91c1c");
+            px(x + 2, y + 5, 3, 1, "#111827");
+          } else {
+            px(x, y, 7, 7, p.tone);
+            px(x, y, 7, 2, "#0f0f12");
+          }
+        }
+        function draw() {
+          paint();
+          HKPlay.smoothPixels(buf, out);
+          if (!S) return;
+          out.setTransform(2, 0, 0, 2, 0, 0);
+          out.font = "800 8px sans-serif"; out.textAlign = "center"; out.textBaseline = "top";
+          for (const t of S.texts) { out.fillStyle = t.c; out.fillText(t.t, t.x, t.y); }
+        }
+        function paint() {
+          const sh = S && S.shake > 0 ? Math.round(Math.sin(S.t * 70) * 2) : 0;
+          g.setTransform(1, 0, 0, 1, sh, 0);
+          px(-4, 0, W + 8, H, "#120508");
+          // 스크린 — 예고 때 깜빡이고, 돌아볼 때 붉어진다
+          const ph = S ? S.phase : "quiet";
+          const blink = ph === "warn" && Math.floor(performance.now() / 70) % 2;
+          px(16, 6, 148, 34, "#1f2937");
+          px(18, 8, 144, 30, ph === "watch" ? "#7f1d1d" : blink ? "#0a0a0a" : "#e2e8f0");
+          if (ph !== "watch" && !blink) { const f = Math.floor(performance.now() / 500) % 3; px(40 + f * 30, 18, 22, 10, "#94a3b8"); px(100 - f * 12, 14, 14, 6, "#64748b"); }
+          // 빛 줄기
+          g.fillStyle = "rgba(226, 232, 240, .05)"; g.beginPath(); g.moveTo(18, 38); g.lineTo(162, 38); g.lineTo(120, 230); g.lineTo(60, 230); g.closePath(); g.fill();
+          // 좌석 앞 통로 · 가운데 복도
+          for (const y of ROWS) px(0, y + 8, W, 2, "#1c0a0f");
+          px(82, 44, 16, H - 44, "#1f0c12");
+          // 안내할 자리
+          if (S && S.target && S.path.some((p) => p.drop)) {
+            const b = Math.floor(performance.now() / 300) % 2 ? "#fde047" : "#f59e0b";
+            px(S.target.x - 4, S.target.y - 7, 9, 1, b); px(S.target.x - 4, S.target.y + 6, 9, 1, b); px(S.target.x - 4, S.target.y - 7, 1, 14, b); px(S.target.x + 4, S.target.y - 7, 1, 14, b);
+          }
+          if (S) for (const p of S.crowd) drawHead(p);
+          else for (const y of ROWS) for (const x of SEAT_X) { px(x - 4, y, 9, 6, "#7f1d1d"); }
+          // 문
+          px(78, 228, 24, 12, "#3f1d24"); px(80, 230, 20, 10, "#14532d");
+          if (S) {
+            const x = S.x - 3, y = S.y - 9, step = S.walking && Math.floor(S.t * 8) % 2;
+            px(x + 1, y + 11, 2, step ? 3 : 2, "#111827"); px(x + 4, y + 11, 2, step ? 2 : 3, "#111827");
+            px(x, y + 4, 7, 7, "#b91c1c"); px(x + 2, y + 4, 3, 3, "#fef3c7");
+            px(x + 1, y, 5, 4, "#fde68a"); px(x + 1, y - 1, 5, 2, "#1f2937");
+            if (S.stun > 0) { g.fillStyle = "rgba(127, 29, 29, .3)"; g.fillRect(-4, 0, W + 8, H); }
+            if (S.phase === "watch") { px(-4, 0, W + 8, 3, "#dc2626"); px(-4, H - 3, W + 8, 3, "#dc2626"); }
+          }
+        }
+
+        // ---------- 흐름 ----------
+        function fit() {
+          const rect = stage.getBoundingClientRect();
+          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
+          canvas.style.width = `${Math.floor(W * k)}px`; canvas.style.height = `${Math.floor(H * k)}px`;
+          shell.style.width = `${Math.floor(W * k)}px`;
+          draw();
+        }
+        function frame(now) {
+          raf = 0;
+          if (state !== "play") return;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          last = now;
+          try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
+          if (state === "play") raf = requestAnimationFrame(frame);
+        }
+        function run() { if (raf) cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); }
+        function showOverlay(html) {
+          overlay.innerHTML = html;
+          overlay.hidden = false;
+          const b = overlay.querySelector("button");
+          if (b) b.focus({ preventScroll: true });
+        }
+        function showReady() {
+          state = "ready";
+          S = null;
+          elLives.innerHTML = "<i></i><i></i><i></i>";
+          draw();
+          showOverlay(`<div class="gm-card">
+            <h2>심야 극장 안내</h2>
+            <p>심야 상영 중인 극장이에요. 손님 <b>${SHOWS}명</b>을 자리까지 안내하고 문으로 돌아와요.</p>
+            <p class="gm-warn">근무 규칙 · 관객이 돌아보면 움직이지 말 것</p>
+            <p>누르고 있으면 걷고, 떼면 멈춰요. 스크린이 깜빡이면 곧 돌아봐요.</p>
+            <button type="button" class="gm-go" data-act="start">시작하기</button>
+          </div>`);
+        }
+        function start() {
+          overlay.hidden = true; overlay.innerHTML = "";
+          holding = false;
+          newGame();
+          state = "play";
+          ctx.sfx("go");
+          window.HKSound.ambient(true);
+          run();
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          holding = false;
+          window.HKSound.ambient(false);
+          showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>${S.round}명 안내 · 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        }
+        function resume() {
+          if (state !== "paused") return;
+          overlay.hidden = true;
+          state = "play";
+          window.HKSound.ambient(true);
+          run();
+        }
+        function finish(won) {
+          state = "over";
+          holding = false;
+          window.HKSound.ambient(false);
+          if (won) S.score += 2000 + S.lives * 500;
+          hud();
+          draw();
+          ctx.sfx(won ? "win" : "lose");
+          const score = S.score;
+          showOverlay(`<div class="gm-card"><h2>${won ? "상영이 끝났어요" : "쫓겨났어요"}</h2><p>${won ? "손님을 모두 안내했어요!" : `${S.round}명까지 안내했어요`}</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          ctx.submit(score);
+        }
+        overlay.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-act]");
+          if (!b) return;
+          if (b.dataset.act === "start") start();
+          else if (b.dataset.act === "resume") resume();
+        });
+
+        // ---------- 입력 — 누르고 있는 동안 걷는다 ----------
+        let holdId = null;
+        canvas.addEventListener("pointerdown", (e) => {
+          if (state !== "play") return;
+          e.preventDefault();
+          holdId = e.pointerId; holding = true;
+          try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+        });
+        const up = (e) => { if (e.pointerId === holdId) { holdId = null; holding = false; } };
+        canvas.addEventListener("pointerup", up);
+        canvas.addEventListener("pointercancel", up);
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        const HOLD = ["Space", "ArrowUp", "KeyW"];
+        window.addEventListener("keydown", (e) => {
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          const c = e.code;
+          if (state === "play") {
+            if (HOLD.includes(c)) { e.preventDefault(); holding = true; }
+            if (c === "KeyP" || c === "Escape") pause();
+          } else if ((state === "paused" || state === "ready") && (c === "Space" || c === "Enter")) {
+            e.preventDefault();
+            if (e.repeat) return;
+            if (state === "ready") start(); else resume();
+          }
+        });
+        window.addEventListener("keyup", (e) => { if (HOLD.includes(e.code) && holdId == null) holding = false; });
+        window.addEventListener("blur", () => { holding = false; });
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+        // ---------- 시작 ----------
+        ctx.onScore && ctx.onScore(() => (S ? S.score : 0));
+        ctx.onRestart(start);
+        ctx.onPause(pause);
+        if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+        window.addEventListener("resize", fit);
+        showReady();
+        fit();
+      },
+    });
+  </script>
+</body>
+</html>

@@ -24,7 +24,9 @@
     .gm-lives { display: inline-flex; gap: 3px; min-height: 18px; align-items: center; }
     .gm-lives i { width: 12px; height: 12px; border-radius: 50%; background: #facc15; box-shadow: 0 0 6px rgba(250, 204, 21, .6); }
     .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #05060c; }
-    .gm-canvas { display: block; touch-action: none; cursor: crosshair; }
+    /* 꿀알바 시리즈 — 그림은 저해상도로 그려 크게 키운 픽셀풍, 글자만 위의 선명한 층에 */
+    .gm-canvas { display: block; touch-action: none; cursor: crosshair; image-rendering: pixelated; }
+    .gm-ui { position: absolute; inset: 0; pointer-events: none; }
     .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(5, 6, 12, .72); overflow-y: auto; }
     .gm-overlay[hidden] { display: none; }
     .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 18px 16px 16px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; }
@@ -77,18 +79,21 @@
             </div>
             <div class="gm-screen">
               <canvas class="gm-canvas" aria-label="심야 편의점 게임 화면"></canvas>
+              <canvas class="gm-ui" aria-hidden="true"></canvas>
               <div class="gm-overlay" data-overlay></div>
             </div>
             <div class="gm-note">방향키·WASD 이동 · 마우스로 손전등 · Esc 일시정지 · 모바일은 왼쪽 이동, 오른쪽 손전등</div>
           </div>`;
         const shell = stage.querySelector(".gm-shell");
-        const canvas = stage.querySelector("canvas");
+        const canvas = stage.querySelector(".gm-canvas");
         const g = canvas.getContext("2d");
+        const uiCanvas = stage.querySelector(".gm-ui");
+        const u = uiCanvas.getContext("2d");
         const overlay = stage.querySelector("[data-overlay]");
         const elScore = stage.querySelector("[data-score]");
         const elClock = stage.querySelector("[data-clock]");
         const elLives = stage.querySelector("[data-lives]");
-        // 어둠은 절반 해상도로 따로 그려 얹는다 — 화면 전체를 매번 계산하지 않게
+        // 어둠은 더 낮은 해상도로 따로 그려 얹는다 — 빛 가장자리가 계단처럼 보이고, 계산도 적다
         const dark = document.createElement("canvas");
         dark.width = W / 2; dark.height = H / 2;
         const dg = dark.getContext("2d");
@@ -260,6 +265,16 @@
             if (S.lives <= 0) finish(false);
           }
         }
+        // 아이템은 내 바로 옆 칸에 — 두꺼비집을 지키다 멀리 주우러 가면 위험하다
+        function nearCell() {
+          const list = [];
+          for (let r = 1; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+            if (wall(c, r)) continue;
+            const x = (c + 0.5) * CELL, y = (r + 0.5) * CELL, d = Math.hypot(x - S.x, y - S.y);
+            if (d >= 28 && d <= 62 && !S.items.some((it) => Math.hypot(it.x - x, it.y - y) < CELL)) list.push({ x, y });
+          }
+          return list.length ? list[Math.floor(Math.random() * list.length)] : farCell(30);
+        }
         function pickKind() {
           const list = ["bat", "bat", "coffee", "coffee", "bomb"];
           if (S.lives < 3) list.push("lunch", "lunch");
@@ -270,7 +285,7 @@
           S.itemCd -= dt;
           if (S.itemCd <= 0) {
             S.itemCd = 11 + Math.random() * 6;
-            if (S.items.length < 3) S.items.push({ ...farCell(70), kind: pickKind(), life: 16 });
+            if (S.items.length < 3) S.items.push({ ...nearCell(), kind: pickKind(), life: 16 });
           }
           for (const it of S.items) {
             it.life -= dt;
@@ -480,7 +495,8 @@
         }
 
         // ---------- 그리기 ----------
-        let scale = 1;
+        const scale = 1; // 게임 그림의 해상도 — 도트가 살짝 보일 만큼만 키운다
+        let uiScale = 1;
         function fit() {
           const rect = stage.getBoundingClientRect();
           const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
@@ -488,9 +504,11 @@
           const k = Math.max(0.4, Math.min(rect.width / W, (box - extra) / H));
           const cw = Math.floor(W * k), ch = Math.floor(H * k);
           const dpr = Math.min(window.devicePixelRatio || 1, 2);
-          scale = (cw * dpr) / W;
-          canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+          canvas.width = Math.round(W * scale); canvas.height = Math.round(H * scale);
           canvas.style.width = `${cw}px`; canvas.style.height = `${ch}px`;
+          uiScale = (cw * dpr) / W;
+          uiCanvas.width = Math.round(cw * dpr); uiCanvas.height = Math.round(ch * dpr);
+          uiCanvas.style.width = `${cw}px`; uiCanvas.style.height = `${ch}px`;
           shell.style.width = `${cw}px`;
           draw();
         }
@@ -519,8 +537,8 @@
           // 두꺼비집
           g.fillStyle = S && S.blackout > 0 ? "#7f1d1d" : "#1e293b";
           g.fillRect(PANEL.x - 11, PANEL.y - 9, 22, 18);
-          g.fillStyle = "#facc15"; g.font = "800 13px Pretendard, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-          g.fillText("⚡", PANEL.x, PANEL.y + 1);
+          g.fillStyle = "#facc15";
+          g.beginPath(); g.moveTo(PANEL.x + 2, PANEL.y - 7); g.lineTo(PANEL.x - 4, PANEL.y + 1); g.lineTo(PANEL.x, PANEL.y + 1); g.lineTo(PANEL.x - 2, PANEL.y + 7); g.lineTo(PANEL.x + 4, PANEL.y - 1); g.lineTo(PANEL.x, PANEL.y - 1); g.closePath(); g.fill();
         }
         function drawRoach(e) {
           g.save(); g.translate(e.x, e.y); g.rotate(e.a);
@@ -590,8 +608,8 @@
             g.fillStyle = "rgba(255,255,255,.18)"; g.beginPath(); g.arc(it.x, it.y + bob, 14, 0, 6.3); g.fill();
             g.fillStyle = I.color; g.beginPath(); g.arc(it.x, it.y + bob, 10, 0, 6.3); g.fill();
             g.strokeStyle = "rgba(255,255,255,.8)"; g.lineWidth = 1.4; g.stroke();
-            g.fillStyle = I.fg; g.font = "900 11px Pretendard, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-            g.fillText(I.ch, it.x, it.y + bob + 0.5);
+            u.fillStyle = I.fg; u.font = "900 11px Pretendard, system-ui, sans-serif"; u.textAlign = "center"; u.textBaseline = "middle";
+            u.fillText(I.ch, it.x, it.y + bob + 0.5);
           }
         }
         function drawPlayer() {
@@ -616,7 +634,7 @@
           dg.fillRect(0, 0, dark.width, dark.height);
           if (S) {
             dg.save();
-            dg.scale(0.5, 0.5);
+            dg.scale(1 / 2, 1 / 2);
             dg.globalCompositeOperation = "destination-out";
             const near = dg.createRadialGradient(S.x, S.y, 8, S.x, S.y, NEAR_LIGHT + 22);
             near.addColorStop(0, "rgba(0,0,0,.95)"); near.addColorStop(1, "rgba(0,0,0,0)");
@@ -637,6 +655,9 @@
         }
         function draw() {
           g.setTransform(scale, 0, 0, scale, 0, 0);
+          g.imageSmoothingEnabled = false;
+          u.setTransform(uiScale, 0, 0, uiScale, 0, 0);
+          u.clearRect(0, 0, W, H);
           drawStore();
           if (S) {
             for (const e of S.en) ({ rat: drawRat, roach: drawRoach, spider: drawSpider, shadow: drawShadow })[e.type](e);
@@ -656,8 +677,8 @@
             if (!(v > 0)) continue;
             g.fillStyle = "rgba(255,255,255,.2)"; g.fillRect(10, barY, 56, 5);
             g.fillStyle = color; g.fillRect(10, barY, 56 * Math.min(1, v / full), 5);
-            g.font = "700 10px Pretendard, system-ui, sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillStyle = "#f1f5f9";
-            g.fillText(name, 72, barY + 3);
+            u.font = "700 10px Pretendard, system-ui, sans-serif"; u.textAlign = "left"; u.textBaseline = "middle"; u.fillStyle = "#f1f5f9";
+            u.fillText(name, 72, barY + 3);
             barY -= 13;
           }
           // 찬 기운 고리는 어둠 위로 보인다
@@ -672,8 +693,8 @@
             g.fillStyle = "#dc2626"; g.beginPath(); g.arc(B.x + Math.cos(B.a) * 11, B.y + Math.sin(B.a) * 11, 3.2, 0, 6.3); g.fill();
             g.fillStyle = "rgba(2, 6, 23, .85)"; g.fillRect(40, 6, W - 80, 24);
             g.fillStyle = "#38bdf8"; g.fillRect(44, 21, (W - 88) * Math.max(0, B.hp / BOSS_HP), 6);
-            g.font = "800 11px Pretendard, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#e0f2fe";
-            g.fillText("냉동고의 그것", W / 2, 13);
+            u.font = "800 11px Pretendard, system-ui, sans-serif"; u.textAlign = "center"; u.textBaseline = "middle"; u.fillStyle = "#e0f2fe";
+            u.fillText("냉동고의 그것", W / 2, 13);
           }
           // 어둠 속의 눈 — 빛 밖에 있는 쥐와 벌레가 빨갛게 보인다
           for (const e of S.en) {
@@ -691,19 +712,19 @@
             const s = e.type === "roach" ? 0.9 : 1.5, ox = Math.cos(e.a) * e.r, oy = Math.sin(e.a) * e.r, px = -Math.sin(e.a) * 2, py = Math.cos(e.a) * 2;
             g.beginPath(); g.arc(e.x + ox + px, e.y + oy + py, s, 0, 6.3); g.arc(e.x + ox - px, e.y + oy - py, s, 0, 6.3); g.fill();
           }
-          g.font = "800 12px Pretendard, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
-          for (const t of S.texts) { g.globalAlpha = Math.min(1, t.life * 3); g.fillStyle = "#fde68a"; g.fillText(t.text, t.x, t.y); }
-          g.globalAlpha = 1;
+          u.font = "800 12px Pretendard, system-ui, sans-serif"; u.textAlign = "center"; u.textBaseline = "middle";
+          for (const t of S.texts) { u.globalAlpha = Math.min(1, t.life * 3); u.fillStyle = "#fde68a"; u.fillText(t.text, t.x, t.y); }
+          u.globalAlpha = 1;
           // 두꺼비집 체력
           g.fillStyle = "rgba(15, 23, 42, .8)"; g.fillRect(W / 2 - 62, H - 17, 124, 11);
           g.fillStyle = S.panel > 35 ? "#facc15" : "#ef4444"; g.fillRect(W / 2 - 60, H - 15, 120 * (S.panel / 100), 7);
           if (S.line) {
-            g.globalAlpha = Math.min(1, S.line.t * 2);
-            g.font = "800 14px Pretendard, system-ui, sans-serif";
-            const tw = g.measureText(S.line.text).width + 26;
-            g.fillStyle = "rgba(2, 6, 23, .82)"; g.fillRect(W / 2 - tw / 2, 42, tw, 28);
-            g.fillStyle = "#f1f5f9"; g.fillText(S.line.text, W / 2, 57);
-            g.globalAlpha = 1;
+            u.globalAlpha = Math.min(1, S.line.t * 2);
+            u.font = "800 14px Pretendard, system-ui, sans-serif";
+            const tw = u.measureText(S.line.text).width + 26;
+            u.fillStyle = "rgba(2, 6, 23, .82)"; u.fillRect(W / 2 - tw / 2, 42, tw, 28);
+            u.fillStyle = "#f1f5f9"; u.fillText(S.line.text, W / 2, 57);
+            u.globalAlpha = 1;
           }
           if (stick.move) drawStick(stick.move);
           if (stick.aim) drawStick(stick.aim);

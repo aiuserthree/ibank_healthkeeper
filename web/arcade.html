@@ -21,7 +21,7 @@
     const GENRE = {
       blocks: "퍼즐", shooter: "슈팅", match3: "퍼즐", stairs: "액션", crossing: "액션", pairs: "퍼즐", bricks: "액션",
       bubble: "캐주얼", sudoku: "퍼즐", chosung: "퀴즈", trivia: "퀴즈", korean: "퀴즈", typing: "어학",
-      snake: "액션", stack: "액션", coffee: "액션", mines: "퍼즐", promote: "퍼즐", nightshift: "액션",
+      snake: "액션", stack: "액션", coffee: "액션", mines: "퍼즐", promote: "퍼즐", nightshift: "액션", clown: "액션", milk: "액션", theater: "액션", trial: "액션", silent: "액션", parade: "액션", finale: "액션",
     };
     const esc = (t) => HKUI.escapeHtml(t);
     // 게임 그림 — 서버가 그림을 한 달 동안 캐시하므로, 그림을 바꾸면 여기 숫자를 올려 새 그림을 받게 한다
@@ -235,6 +235,12 @@
       root.querySelectorAll(".hk-aa-wall, .hk-aa-rail").forEach((el) => io.observe(el));
     }
 
+    // 꿀알바 시리즈 입구 — 시리즈 게임은 시리즈 페이지에서만 고른다 (1화 심야 편의점은 아케이드에도 있다)
+    const SERIES_ONLY = ["clown", "milk", "theater", "trial", "silent", "parade", "finale"];
+    function seriesHtml() {
+      return `<div class="hk-aa-wrap"><a class="hk-aa-series" href="/series"><small>새 시리즈 · 게임 8편</small><b>꿀알바 시리즈</b><span>밤에만 여는 인력사무소의 구인 공고 보러 가기 ›</span></a></div>`;
+    }
+
     // 한국 시간 자정까지 남은 시간 — 1초마다
     function startResetClock() {
       const el = document.getElementById("aa-reset");
@@ -359,9 +365,10 @@
       afterMount: async () => {
         const body = document.getElementById("arcade-body");
         try {
-          const [st, games, sp, wk] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null), HKApi.playWeekly().catch(() => null)]);
+          const [st, allGames, sp, wk] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null), HKApi.playWeekly().catch(() => null)]);
           status = st;
-          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
+          const games = allGames.filter((g) => !SERIES_ONLY.includes(g.key));
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + seriesHtml() + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
