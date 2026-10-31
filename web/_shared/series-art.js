@@ -1,6 +1,6 @@
 // 꿀알바 시리즈 밤골목 그림 — 시리즈 페이지 상단과 아케이드 소개 창이 함께 쓴다
 window.HKSeriesArt = (function () {
-  const W = 640, SKY_H = 76, H = 226 + SKY_H, GROUND = 188; // 하늘을 위로 늘려 제목 자리를 둔다 (건물은 SKY_H 만큼 아래로)
+  const W = 640, SKY_H = 90, H = 226 + SKY_H, GROUND = 188; // 하늘을 위로 늘려 제목 자리를 둔다 (건물은 SKY_H 만큼 아래로)
   // 글자를 도트 점 목록으로 — 낡은 간판에 쓴다
   function textDots(text, size) {
     const t = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
@@ -279,11 +279,11 @@ window.HKSeriesArt = (function () {
     const lamp = !(beat % 29 < 2 || beat % 41 === 11);        // 가로등도 가끔 깜빡인다
     g.drawImage(SKY, 0, 0);
     STARS.forEach(([x, y], i) => { if ((i + Math.floor(t / 700)) % 4 === 0) px(x - 1, y, 3, 1, "#eef1fb"), px(x, y - 1, 1, 3, "#eef1fb"); });
-    [[150, 84, 0, 3], [400, 76, 1, 2], [640, 88, 2, 4], [120, 22, 3, 1.5], [760, 18, 1, 2.5]].forEach(([x0, y, k, sp]) => {
+    [[150, 98, 0, 3], [400, 90, 1, 2], [640, 102, 2, 4], [120, 26, 3, 1.5], [760, 20, 1, 2.5]].forEach(([x0, y, k, sp]) => {
       const cl = CLOUDS[k];
       g.drawImage(cl, Math.round((x0 + (t / 1000) * sp) % (W + 240)) - 240, y, cl.width * 2, cl.height * 2);
     });
-    if (!opts || opts.title !== false) g.drawImage(TITLE, Math.round((W - TITLE.width) / 2), 8); // 제목을 따로 쓰는 곳은 빼고 그린다
+    if (!opts || opts.title !== false) g.drawImage(TITLE, Math.round((W - TITLE.width) / 2), 22); // 제목을 따로 쓰는 곳은 빼고 그린다
     g.drawImage(TOWN, 0, 0);
     g.save(); g.translate(0, SKY_H);
     // 전선 위의 새
