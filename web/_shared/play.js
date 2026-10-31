@@ -558,8 +558,35 @@ window.HKPlay = (function () {
     // ── 판이 끝나면 '다시 하기' 옆에 '그만하기' — 게임의 다시 하기 버튼 옆에 붙이고, 없으면(창 안 게임 등) 창 아래에 둘 다 띄운다
     let endTimer = null;
     // 꿀알바 시리즈 게임 — 게임을 나가면 아케이드 대신 시리즈 공고판으로 돌아간다
-    const SERIES = ["nightshift", "clown", "milk", "theater", "trial", "silent", "parade", "finale"].includes(key);
-    function goQuit() { location.href = SERIES ? "/series" : HKRoutes.lounge; }
+    const SERIES_JOBS = [["nightshift", "심야 편의점"], ["clown", "광대를 놓치지 마"], ["milk", "새벽 우유 배달"], ["theater", "심야 극장 안내"], ["trial", "신약 시험 보조"], ["silent", "조용한 공사장"], ["parade", "야간 퍼레이드"], ["finale", "마지막 축제"]];
+    const SERIES = SERIES_JOBS.some(([k]) => k === key);
+    let leaveTo = null; // 게임 중 왼쪽 목록에서 다른 회차를 고르면 나간 뒤 그 게임으로 간다
+    function goQuit() { location.href = leaveTo || (SERIES ? "/series" : HKRoutes.lounge); }
+    // 상단 「꿀알바 시리즈」 — 시리즈 그림의 제목처럼 작게 찍은 글자를 두 배로 키운다
+    function paintSeriesWord(c) {
+      const t = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+      const font = `800 12px Pretendard, "Apple SD Gothic Neo", sans-serif`, text = "꿀알바 시리즈";
+      t.font = font;
+      const w = Math.ceil(t.measureText(text).width) + 2, h = 15, z = 2;
+      t.canvas.width = w; t.canvas.height = h;
+      t.font = font; t.textBaseline = "middle"; t.fillStyle = "#000"; t.fillText(text, 1, h / 2 + 1);
+      const d = t.getImageData(0, 0, w, h).data, g = c.getContext("2d");
+      c.width = w * z; c.height = h * z;
+      c.style.width = `${w * z}px`; c.style.height = `${h * z}px`;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 110) {
+        g.fillStyle = "#f7cb16"; g.fillRect(x * z, y * z, z, z);
+        g.fillStyle = "#dfae12"; g.fillRect(x * z, y * z + z - 1, z, 1);
+      }
+    }
+    // PC 왼쪽 회차 목록
+    function seriesSideHtml() {
+      return `<nav class="hk-pf__side" aria-label="꿀알바 시리즈 회차">
+          <span class="hk-pf__side-head">회차 목록</span>
+          ${SERIES_JOBS.map(([k, title], i) => (k === key
+            ? `<span class="hk-pf__side-item is-current" aria-current="page"><i>${i + 1}화</i>${title}</span>`
+            : `<a class="hk-pf__side-item" href="/games/${k}"><i>${i + 1}화</i>${title}</a>`)).join("")}
+        </nav>`;
+    }
 
     // ── 게임 중 뒤로 가기 — 바로 나가지 않고 묻는다: 지금까지 점수를 기록에 남기고 나갈지, 그냥 나갈지
     let leaving = null;
@@ -583,7 +610,7 @@ window.HKPlay = (function () {
           </div>
         </div>`;
       leaving = overlay;
-      const done = () => { overlay.remove(); leaving = null; };
+      const done = () => { overlay.remove(); leaving = null; leaveTo = null; };
       overlay.addEventListener("click", async (e) => {
         if (overlay.dataset.final) return; // 기록을 남긴 뒤 결과 창 — 나가기 버튼만
         if (e.target === overlay) return done();
@@ -620,7 +647,7 @@ window.HKPlay = (function () {
           </div>
           <div data-lboard style="flex:1;min-height:0;overflow-y:auto"><div style="text-align:center;padding:24px"><span class="hk-spin"></span></div></div>
           <div class="hk-dialog__actions" style="margin-top:12px">
-            <button type="button" class="hk-btn hk-btn--primary" data-leave-go>${SERIES ? "꿀알바 목록으로 나가기" : "아케이드로 나가기"}</button>
+            <button type="button" class="hk-btn hk-btn--primary" data-leave-go>${leaveTo ? "고른 회차로 가기" : SERIES ? "꿀알바 목록으로 나가기" : "아케이드로 나가기"}</button>
           </div>
         </div>`;
       const box = overlay.querySelector("[data-lboard]");
@@ -787,6 +814,7 @@ window.HKPlay = (function () {
     document.getElementById("app").innerHTML = `<div class="hk-pf">
         <header class="hk-pf__bar" id="hk-play-head"></header>
         <div class="hk-pf__body">
+          ${SERIES ? seriesSideHtml() : ""}
           <main class="hk-pf__main" id="hk-pf-main"><div class="hk-play-frame"><div class="hk-play-stage" id="hk-play-stage"></div></div></main>
           ${boardHtml()}
         </div>
@@ -806,17 +834,24 @@ window.HKPlay = (function () {
           <div class="hk-pf__tools">
             ${meta.dailyOnce ? `<span class="hk-badge ${dailyDone ? "hk-badge--neutral" : "hk-badge--warning"} hk-pf__daily">${dailyDone ? "오늘 도전 완료 · 연습" : "오늘의 도전"}</span>` : ""}
             <button type="button" class="hk-play-sound hk-pf__pause" id="hk-pf-pause" hidden aria-label="일시정지">${HKUI.icon("pause", 18, "currentColor")}<span>일시정지</span></button>
-            ${SERIES ? `<a class="hk-play-sound" id="hk-pf-series" href="/series" aria-label="꿀알바 공고 목록">${HKUI.icon("list", 18, "currentColor")}<span>꿀알바 목록</span></a>` : ""}
+            ${SERIES ? `<a class="hk-play-sound hk-pf__series" id="hk-pf-series" href="/series" aria-label="꿀알바 시리즈">${HKUI.icon("list", 18, "currentColor")}<span><canvas id="hk-pf-series-word" aria-hidden="true"></canvas></span></a>` : ""}
             <button type="button" class="hk-play-sound" id="hk-pf-report" aria-label="오류 신고">${HKUI.icon("bug", 18, "currentColor")}<span>오류 신고</span></button>
             <button type="button" class="hk-play-sound" id="hk-play-sound"></button>
             <button type="button" class="hk-play-sound hk-pf__rank-btn" id="hk-pf-rank" hidden>${HKUI.icon("trophy", 18, "currentColor")}<span>순위</span></button>
           </div>`;
+        if (SERIES) paintSeriesWord(document.getElementById("hk-pf-series-word"));
         document.getElementById("hk-pf-pause").onclick = (e) => { e.currentTarget.blur(); togglePause(); };
         document.getElementById("hk-pf-report").onclick = (e) => { e.currentTarget.blur(); openReport(); };
         // 게임 중에 나가면 먼저 묻는다
         document.querySelectorAll(".hk-pf__back, #hk-pf-series").forEach((a) => a.addEventListener("click", (e) => {
           if (!playingNow) return;
           e.preventDefault();
+          askLeave();
+        }));
+        document.querySelectorAll(".hk-pf__side a").forEach((a) => a.addEventListener("click", (e) => {
+          if (!playingNow) return;
+          e.preventDefault();
+          leaveTo = a.getAttribute("href");
           askLeave();
         }));
         const soundBtn = document.getElementById("hk-play-sound");
