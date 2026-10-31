@@ -241,6 +241,36 @@
       return `<div class="hk-aa-wrap"><a class="hk-aa-series" href="/series"><small>새 시리즈 · 게임 8편</small><b>꿀알바 시리즈</b><span>밤에만 여는 인력사무소의 구인 공고 보러 가기 ›</span></a></div>`;
     }
 
+    // 꿀알바 시리즈 소개 창 — 들어올 때 한 번. '오늘 그만 보기'를 누르면 그날은 안 뜬다
+    const POP_KEY = "hk-series-popup";
+    function seriesPopup() {
+      const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+      try { if (localStorage.getItem(POP_KEY) === today) return; } catch (_) {}
+      const box = document.createElement("div");
+      box.className = "hk-srp";
+      box.setAttribute("role", "dialog");
+      box.setAttribute("aria-modal", "true");
+      box.setAttribute("aria-label", "꿀알바 시리즈 소개");
+      box.innerHTML = `<div class="hk-srp__card">
+          <button type="button" class="hk-srp__x" data-close aria-label="닫기">✕</button>
+          <small>새 시리즈 · 게임 8편</small>
+          <b>꿀알바 시리즈</b>
+          <p>밤에만 문을 여는 인력사무소. 시급은 높고, 규칙은 지켜야 해요.<br>구인 공고를 골라 알바를 시작해 보세요.</p>
+          <ul>${["심야 편의점", "광대를 놓치지 마", "새벽 우유 배달", "심야 극장 안내"].map((t, i) => `<li><i>${i + 1}화</i>${t}</li>`).join("")}<li class="is-more">그리고 4편 더</li></ul>
+          <a class="hk-srp__go" href="/series">꿀알바 보러 가기 ›</a>
+          <button type="button" class="hk-srp__later" data-today>오늘 그만 보기</button>
+        </div>`;
+      const close = () => box.remove();
+      box.addEventListener("click", (e) => {
+        if (e.target === box || e.target.closest("[data-close]")) close();
+        else if (e.target.closest("[data-today]")) {
+          try { localStorage.setItem(POP_KEY, today); } catch (_) {}
+          close();
+        }
+      });
+      document.body.appendChild(box);
+    }
+
     // 한국 시간 자정까지 남은 시간 — 1초마다
     function startResetClock() {
       const el = document.getElementById("aa-reset");
@@ -370,6 +400,7 @@
           const games = allGames.filter((g) => !SERIES_ONLY.includes(g.key));
           body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + seriesHtml() + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
+          seriesPopup();
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
         }
