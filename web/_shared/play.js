@@ -156,6 +156,13 @@ window.HKSound = (function () {
     go: () => tone({ type: "square", f: 1320, t: 0.28, v: 0.18 }),
     tick: () => tone({ type: "square", f: 1800, t: 0.025, v: 0.08 }),
     whoosh: () => noise({ t: 0.25, v: 0.2, f: 400, f2: 2600, q: 1.5 }),
+    // 심야 편의점
+    sizzle: () => noise({ t: 0.12, v: 0.2, f: 5200, f2: 2200, q: 1 }),
+    squeak: () => { tone({ type: "sine", f: 1900, f2: 2700, t: 0.07, v: 0.14 }); tone({ type: "sine", f: 2500, f2: 1500, t: 0.09, v: 0.12, delay: 0.07 }); },
+    webshot: () => { tone({ type: "triangle", f: 900, f2: 260, t: 0.13, v: 0.12 }); noise({ t: 0.1, v: 0.08, f: 2600 }); },
+    ghost: () => { tone({ type: "sine", f: 520, f2: 180, t: 0.7, v: 0.13, attack: 0.1 }); tone({ type: "sine", f: 548, f2: 190, t: 0.7, v: 0.09, attack: 0.1 }); },
+    growl: () => { tone({ type: "sawtooth", f: 70, f2: 42, t: 1.1, v: 0.3, attack: 0.1 }); noise({ t: 0.9, v: 0.18, f: 260, f2: 90, type: "lowpass" }); },
+    buzz: () => { [0, 0.05, 0.13].forEach((delay) => tone({ type: "sawtooth", f: 120, t: 0.04, v: 0.09, delay })); },
   };
 
   function play(name, arg) {
@@ -171,8 +178,43 @@ window.HKSound = (function () {
       /* 소리는 부가 기능 — 실패해도 게임은 계속 */
     }
   }
+  // 낮게 깔리는 소리(심야 편의점 냉장고 웅웅거림) — 켜 두는 동안 계속 난다. 소리를 끄면 함께 멈춘다
+  let hum = null, humWanted = false;
+  function stopHum() {
+    if (!hum) return;
+    const h = hum; hum = null;
+    try {
+      h.g.gain.setTargetAtTime(0.0001, ac.currentTime, 0.1);
+      h.oscs.forEach((o) => o.stop(ac.currentTime + 0.5));
+    } catch (_) { /* 이미 멈춤 */ }
+  }
+  function startHum() {
+    if (hum || muted || !ensure() || ac.state !== "running") return;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, ac.currentTime);
+    g.gain.setTargetAtTime(0.1, ac.currentTime, 0.6);
+    g.connect(master);
+    const oscs = [58, 117].map((f, i) => {
+      const o = ac.createOscillator();
+      o.type = i ? "triangle" : "sine";
+      o.frequency.value = f;
+      o.connect(g);
+      o.start();
+      return o;
+    });
+    hum = { g, oscs };
+  }
+  function ambient(on) {
+    humWanted = !!on;
+    try { if (on) startHum(); else stopHum(); } catch (_) { /* 소리는 부가 기능 */ }
+  }
+  // 첫 입력 전이라 못 켰으면 소리 잠금이 풀릴 때 켠다
+  ["pointerdown", "touchend", "click", "keydown"].forEach((t) =>
+    window.addEventListener(t, () => { if (humWanted && !hum) setTimeout(() => { try { startHum(); } catch (_) {} }, 50); }, { passive: true })
+  );
   function setMuted(m) {
     muted = !!m;
+    if (muted) stopHum(); else if (humWanted) setTimeout(() => { try { startHum(); } catch (_) {} }, 50);
     try {
       localStorage.setItem(KEY, muted ? "1" : "0");
     } catch (_) {
@@ -187,6 +229,7 @@ window.HKSound = (function () {
     setMuted,
     toggle: () => setMuted(!muted),
     onChange: (fn) => listeners.push(fn),
+    ambient,
     names: Object.keys(SFX),
   };
 })();
@@ -211,6 +254,7 @@ window.HKPlay = (function () {
     bubble: ["#06b6d4", "#a78bfa"],
     sudoku: ["#334155", "#64748b"],
     chosung: ["#e0508a", "#ff9a8b"],
+    nightshift: ["#0b0f1a", "#3b4a6b"],
     typing: ["#4f46e5", "#a78bfa"],
     trivia: ["#0891b2", "#22d3ee"],
     korean: ["#b45309", "#facc15"],

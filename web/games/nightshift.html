@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 심야 편의점 전용 */
+    .gm-shell { margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-hud { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 16px 16px 0 0; background: linear-gradient(135deg, #0b0f1a, #243049); color: #e2e8f0; }
+    .gm-hud__item { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+    .gm-hud__item small { font-size: 11px; opacity: .7; font-weight: 600; }
+    .gm-hud__item b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .gm-hud__mid { align-items: center; }
+    .gm-hud__right { align-items: flex-end; }
+    .gm-lives { display: inline-flex; gap: 3px; min-height: 18px; align-items: center; }
+    .gm-lives i { width: 12px; height: 12px; border-radius: 50%; background: #facc15; box-shadow: 0 0 6px rgba(250, 204, 21, .6); }
+    .gm-screen { position: relative; border-radius: 0 0 16px 16px; overflow: hidden; background: #05060c; }
+    .gm-canvas { display: block; touch-action: none; cursor: crosshair; }
+    .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(5, 6, 12, .72); overflow-y: auto; }
+    .gm-overlay[hidden] { display: none; }
+    .gm-card { width: 100%; max-width: 320px; box-sizing: border-box; padding: 18px 16px 16px; border-radius: 16px; background: rgba(255,255,255,.97); color: var(--color-midnight-navy, #0f172a); text-align: center; }
+    .gm-card h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.02em; }
+    .gm-card p { word-break: keep-all; margin: 0 0 10px; font-size: 13.5px; line-height: 1.55; color: var(--text-secondary, #475569); }
+    .gm-card .gm-big { font-size: 34px; font-weight: 800; margin: 2px 0 8px; color: #243049; }
+    .gm-keys { font-size: 12px; color: var(--text-muted, #64748b); margin: 0 0 14px; line-height: 1.6; word-break: keep-all; }
+    .gm-keys kbd { display: inline-block; min-width: 20px; padding: 1px 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #f8fafc; font: 600 11px/1.5 inherit; }
+    .gm-go { width: 100%; border: 0; padding: 12px; border-radius: 12px; font-size: 15.5px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(135deg, #0b0f1a, #3b4a6b); }
+    .gm-note { padding: 7px 4px 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "nightshift",
+      setup(stage, ctx) {
+        const COLS = 15, ROWS = 23, CELL = 24;
+        const W = COLS * CELL, H = ROWS * CELL;
+        const HOUR_SEC = 40, HOURS = 6; // 게임 안의 1시간 = 40초 · 밤 12시부터 아침 6시까지 4분
+        const LIGHT_RANGE = 170, LIGHT_HALF = 0.52, NEAR_LIGHT = 44;
+        const BURN = { roach: 0.08, rat: 0.2, spider: 0.3 }; // 빛에 닿고 쓰러지기까지 걸리는 시간
+        const SHADOW_HITS = 3; // 그림자 손님은 빛을 세 번 비춰야 사라진다
+        const BOSS_HP = 100, BOSS_BURN = 12, BOSS_PTS = 3000, BOSS_R = 24; // 냉동고의 그것 — 8초 남짓 비추면 쓰러진다
+        const MAX_ENEMIES = 42;
+        // 바닥에 나타나는 아이템 — 16초 안에 주워야 한다
+        const ITEMS = {
+          bat: { ch: "전", color: "#facc15", fg: "#422006", label: "건전지 · 빛이 강해져요!" },
+          coffee: { ch: "커", color: "#92400e", fg: "#fff", label: "캔커피 · 빨라져요!" },
+          lunch: { ch: "밥", color: "#22c55e", fg: "#fff", label: "도시락 · 체력 +1" },
+          fuse: { ch: "퓨", color: "#38bdf8", fg: "#082f49", label: "퓨즈 · 두꺼비집 수리" },
+          bomb: { ch: "폭", color: "#ef4444", fg: "#fff", label: "살충 폭탄 · 주변 소독!" },
+        };
+        const BAT_SEC = 9, FAST_SEC = 7, BOMB_R = 130, MAX_LIVES = 4;
+        const LINES = [
+          "새벽 1시 · 천장에서 뭔가 내려와요",
+          "새벽 2시 · 문은 잠겼는데… 손님이 있어요",
+          "새벽 3시 · 쥐들이 몰려와요",
+          "새벽 4시 · 냉장고 문이 혼자 열렸어요",
+          "새벽 5시 · 냉동고에서 뭔가 나와요!",
+        ];
+
+        stage.innerHTML = `
+          <div class="gm-shell">
+            <div class="gm-hud">
+              <div class="gm-hud__item"><small>점수</small><b data-score>0</b></div>
+              <div class="gm-hud__item gm-hud__mid"><small>시각</small><b data-clock>12:00</b></div>
+              <div class="gm-hud__item gm-hud__right"><small>체력</small><span class="gm-lives" data-lives></span></div>
+            </div>
+            <div class="gm-screen">
+              <canvas class="gm-canvas" aria-label="심야 편의점 게임 화면"></canvas>
+              <div class="gm-overlay" data-overlay></div>
+            </div>
+            <div class="gm-note">방향키·WASD 이동 · 마우스로 손전등 · Esc 일시정지 · 모바일은 왼쪽 이동, 오른쪽 손전등</div>
+          </div>`;
+        const shell = stage.querySelector(".gm-shell");
+        const canvas = stage.querySelector("canvas");
+        const g = canvas.getContext("2d");
+        const overlay = stage.querySelector("[data-overlay]");
+        const elScore = stage.querySelector("[data-score]");
+        const elClock = stage.querySelector("[data-clock]");
+        const elLives = stage.querySelector("[data-lives]");
+        // 어둠은 절반 해상도로 따로 그려 얹는다 — 화면 전체를 매번 계산하지 않게
+        const dark = document.createElement("canvas");
+        dark.width = W / 2; dark.height = H / 2;
+        const dg = dark.getContext("2d");
+
+        // ---------- 가게 지도 (. 바닥 · # 진열대 · F 냉장고 · C 계산대) ----------
+        const MAP = [
+          "FFFFFFFFFFFFFFF",
+          "...............",
+          "...............",
+          ".##..###..##...",
+          ".##..###..##...",
+          ".##..###..##...",
+          ".##..###..##...",
+          ".##..###..##...",
+          "...............",
+          "...............",
+          "...............",
+          ".##..###..##...",
+          ".##..###..##...",
+          ".##..###..##...",
+          ".##..###..##...",
+          ".##..###..##...",
+          "...............",
+          "...............",
+          "...............",
+          "....CCCCCCC....",
+          "....CCCCCCC....",
+          "...............",
+          "...............",
+        ];
+        const wall = (c, r) => c < 0 || r < 0 || c >= COLS || r >= ROWS || MAP[r][c] !== ".";
+        const PANEL_C = 7, PANEL_R = 18; // 두꺼비집은 계산대 앞 칸에 있다
+        const PANEL = { x: (PANEL_C + 0.5) * CELL, y: (PANEL_R + 0.9) * CELL };
+        const HOLES = [[0, 1], [14, 1], [0, 9], [14, 9], [0, 21], [14, 21], [14, 17], [0, 17]]; // 벌레가 기어 나오는 틈
+
+        // 칸마다 목표까지 걸음 수 — 쥐·바퀴가 진열대를 돌아서 온다
+        function flow(tc, tr) {
+          const dist = new Int16Array(COLS * ROWS).fill(-1);
+          const q = [tr * COLS + tc];
+          dist[q[0]] = 0;
+          for (let i = 0; i < q.length; i++) {
+            const n = q[i], c = n % COLS, r = (n - c) / COLS;
+            for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+              const nc = c + dc, nr = r + dr;
+              if (wall(nc, nr)) continue;
+              const k = nr * COLS + nc;
+              if (dist[k] < 0) { dist[k] = dist[n] + 1; q.push(k); }
+            }
+          }
+          return dist;
+        }
+        const panelFlow = flow(PANEL_C, PANEL_R);
+        function stepDir(field, x, y) {
+          const c = Math.floor(x / CELL), r = Math.floor(y / CELL);
+          let best = null, bd = 1e9;
+          for (const [dc, dr] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const nc = c + dc, nr = r + dr;
+            if (wall(nc, nr)) continue;
+            const d = field[nr * COLS + nc];
+            if (d >= 0 && d < bd) { bd = d; best = [nc, nr]; }
+          }
+          if (!best) return null;
+          return [(best[0] + 0.5) * CELL - x, (best[1] + 0.5) * CELL - y];
+        }
+
+        // ---------- 판 ----------
+        let state = "ready", S = null, raf = 0, last = 0;
+        const keys = { left: false, right: false, up: false, down: false };
+        const aimAt = { x: W / 2, y: 0 };
+        const stick = { move: null, aim: null };
+        function newGame() {
+          S = {
+            t: 0, score: 0, lives: 3, kills: 0, x: (PANEL_C + 0.5) * CELL, y: 17.5 * CELL, a: -Math.PI / 2, inv: 0, step: 0,
+            panel: 100, blackout: 0, flicker: 0, flickCd: 3, roachCd: 1.5, ratCd: 26, spiderCd: HOUR_SEC, shadowCd: HOUR_SEC * 2, slow: 0, dim: 0, bat: 0, fast: 0, itemCd: 12, items: [], boss: null, bossDown: false, rings: [], hour: 0, line: null, field: null, fieldCd: 0,
+            en: [], webs: [], puffs: [], texts: [],
+          };
+          keys.left = keys.right = keys.up = keys.down = false;
+          stick.move = stick.aim = null;
+          hud();
+        }
+        function hud() {
+          if (!S) return;
+          elScore.textContent = S.score.toLocaleString("ko-KR");
+          const m = S.t / HOUR_SEC, h = Math.min(HOURS, Math.floor(m)), mm = Math.floor((m - h) * 6) * 10;
+          elClock.textContent = `${h === 0 ? 12 : h}:${String(h >= HOURS ? 0 : mm).padStart(2, "0")}`;
+          if (elLives.childElementCount !== Math.max(0, S.lives)) elLives.innerHTML = "<i></i>".repeat(Math.max(0, S.lives));
+        }
+        function say(text, t = 2.6) { S.line = { text, t }; }
+
+        function spawn(type, hole) {
+          if (S.en.length >= MAX_ENEMIES) return;
+          const [c, r] = hole || HOLES[Math.floor(Math.random() * HOLES.length)];
+          const T = { rat: { sp: 88, r: 9, pts: 40 }, roach: { sp: 56 + Math.random() * 16, r: 6, pts: 10 } }[type];
+          S.en.push({ type, ...T, x: (c + 0.5) * CELL, y: (r + 0.5) * CELL, ...fresh(), toPanel: Math.random() < (type === "rat" ? 0.3 : 0.55) });
+        }
+        const fresh = () => ({ a: 0, walk: Math.random() * 6, lit: false, flee: 0, burn: 0, hurt: 0, wob: Math.random() * 6, toPanel: false });
+        // 내 눈앞이 아닌 빈 바닥 칸 하나
+        function farCell(min) {
+          for (let i = 0; i < 60; i++) {
+            const c = Math.floor(Math.random() * COLS), r = 1 + Math.floor(Math.random() * (ROWS - 1));
+            if (wall(c, r)) continue;
+            const x = (c + 0.5) * CELL, y = (r + 0.5) * CELL;
+            if (Math.hypot(x - S.x, y - S.y) >= min) return { x, y };
+          }
+          return { x: CELL / 2, y: 1.5 * CELL };
+        }
+        // 거미 — 그림자로 먼저 알리고 천장에서 내려와, 거미줄을 쏴 발을 묶는다
+        function spawnSpider() {
+          if (S.en.filter((e) => e.type === "spider").length >= 4) return;
+          S.en.push({ type: "spider", sp: 40, r: 9, pts: 80, ...farCell(110), ...fresh(), drop: 1.1, webCd: 1.6 });
+        }
+        // 그림자 손님 — 벽을 지나 천천히 다가온다. 빛을 비추면 사라져 다른 곳에 나타난다
+        function spawnShadow() {
+          if (S.en.filter((e) => e.type === "shadow").length >= 2) return;
+          S.en.push({ type: "shadow", sp: 50, r: 9, pts: 150, ...farCell(170), ...fresh(), hits: 0, safe: 0 });
+          ctx.sfx("ghost");
+        }
+        // 냉동고의 그것 — 새벽 5시에 냉동고 문을 열고 나와, 벽을 지나 천천히 쫓아온다
+        function spawnBoss() {
+          S.boss = { x: W / 2, y: 1.5 * CELL, hp: BOSS_HP, a: 0, t: 0, ringCd: 3, dimCd: 9, callCd: 6, charge: 0, hurt: 0 };
+          ctx.sfx("growl");
+        }
+        function updateBoss(dt) {
+          const B = S.boss;
+          B.t += dt;
+          if (B.hurt > 0) B.hurt -= dt;
+          const d = Math.hypot(S.x - B.x, S.y - B.y);
+          B.a = Math.atan2(S.y - B.y, S.x - B.x);
+          let da = B.a + Math.PI - S.a;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          const hit = d - BOSS_R < range() && Math.abs(da) < beamHalf() + Math.atan2(BOSS_R, d || 1);
+          B.stun = Math.max(0, (B.stun || 0) - dt); // 내게 닿은 뒤에는 잠깐 멈춰 도망칠 틈을 준다
+          const sp = B.stun > 0 ? 0 : hit ? 10 : 24;
+          B.x += Math.cos(B.a) * sp * dt; B.y += Math.sin(B.a) * sp * dt;
+          if (hit) {
+            B.hp -= BOSS_BURN * dt; B.hurt = 0.05;
+            if (B.hp <= 0) {
+              S.score += BOSS_PTS; S.kills++; S.bossDown = true;
+              for (let i = 0; i < 4; i++) burst(B.x + (Math.random() - 0.5) * 40, B.y + (Math.random() - 0.5) * 40, "#bae6fd", 14);
+              S.en.forEach((e) => { e.dead = true; burst(e.x, e.y, "#94a3b8", 4); });
+              S.boss = null; S.rings = []; S.webs = [];
+              say(`냉동고의 그것을 물리쳤어요! +${BOSS_PTS}`, 3);
+              ctx.sfx("win");
+              return;
+            }
+          }
+          // 찬 기운 고리 — 잠깐 움츠렸다 터지고, 닿으면 발이 묶인다
+          B.ringCd -= dt;
+          if (B.ringCd <= 0.7 && !B.charge) B.charge = 0.7;
+          if (B.charge > 0) {
+            B.charge -= dt;
+            if (B.charge <= 0) { B.charge = 0; B.ringCd = 5; S.rings.push({ x: B.x, y: B.y, r: BOSS_R, hit: false }); ctx.sfx("whoosh"); }
+          }
+          // 손전등이 잠깐 약해진다
+          B.dimCd -= dt;
+          if (B.dimCd <= 0) { B.dimCd = 10; S.dim = 1.8; say("손전등이 흐려져요…", 1.2); ctx.sfx("buzz"); }
+          // 바퀴벌레를 부른다
+          B.callCd -= dt;
+          if (B.callCd <= 0) {
+            B.callCd = 7;
+            const c = Math.min(COLS - 1, Math.max(0, Math.floor(B.x / CELL))), r = Math.max(1, Math.floor(B.y / CELL));
+            if (!wall(c, r)) for (let i = 0; i < 3; i++) spawn("roach", [c, r]);
+          }
+          if (d < BOSS_R + 8 && S.inv <= 0) {
+            S.lives--; S.inv = 1.8; B.stun = 2;
+            ctx.sfx("hurt");
+            burst(S.x, S.y, "#bae6fd", 12);
+            hud();
+            if (S.lives <= 0) finish(false);
+          }
+        }
+        function pickKind() {
+          const list = ["bat", "bat", "coffee", "coffee", "bomb"];
+          if (S.lives < 3) list.push("lunch", "lunch");
+          if (S.panel < 70) list.push("fuse", "fuse", "fuse");
+          return list[Math.floor(Math.random() * list.length)];
+        }
+        function updateItems(dt) {
+          S.itemCd -= dt;
+          if (S.itemCd <= 0) {
+            S.itemCd = 11 + Math.random() * 6;
+            if (S.items.length < 3) S.items.push({ ...farCell(70), kind: pickKind(), life: 16 });
+          }
+          for (const it of S.items) {
+            it.life -= dt;
+            if (Math.hypot(it.x - S.x, it.y - S.y) < 19) { it.life = 0; takeItem(it); }
+          }
+          S.items = S.items.filter((it) => it.life > 0);
+        }
+        function takeItem(it) {
+          ctx.sfx("powerup");
+          S.score += 50;
+          S.texts.push({ x: S.x, y: S.y - 20, text: ITEMS[it.kind].label, life: 1.2 });
+          if (it.kind === "bat") S.bat = BAT_SEC;
+          else if (it.kind === "coffee") S.fast = FAST_SEC;
+          else if (it.kind === "lunch") S.lives = Math.min(MAX_LIVES, S.lives + 1);
+          else if (it.kind === "fuse") { S.panel = Math.min(100, S.panel + 45); S.blackout = 0; }
+          else {
+            for (const e of S.en) if (e.type !== "shadow" && !(e.drop > 0) && Math.hypot(e.x - S.x, e.y - S.y) < BOMB_R) kill(e);
+            for (let i = 0; i < 24; i++) { const a = (i / 24) * 6.28; S.puffs.push({ x: S.x, y: S.y, vx: Math.cos(a) * 260, vy: Math.sin(a) * 260, life: 0.45, color: "#a5f3fc" }); }
+            if (S.boss) { S.boss.hp -= 15; S.boss.hurt = 0.15; }
+            ctx.sfx("explode");
+          }
+          hud();
+        }
+        function moveBody(o, dx, dy, r) {
+          const nx = o.x + dx, ny = o.y + dy;
+          const hit = (x, y) => wall(Math.floor((x - r) / CELL), Math.floor((y - r) / CELL)) || wall(Math.floor((x + r) / CELL), Math.floor((y - r) / CELL)) || wall(Math.floor((x - r) / CELL), Math.floor((y + r) / CELL)) || wall(Math.floor((x + r) / CELL), Math.floor((y + r) / CELL));
+          if (!hit(nx, o.y)) o.x = nx;
+          if (!hit(o.x, ny)) o.y = ny;
+        }
+        function clear(x0, y0, x1, y1) {
+          const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 8);
+          for (let i = 1; i < n; i++) {
+            const x = x0 + ((x1 - x0) * i) / n, y = y0 + ((y1 - y0) * i) / n;
+            if (wall(Math.floor(x / CELL), Math.floor(y / CELL))) return false;
+          }
+          return true;
+        }
+        function range() { return (S.blackout > 0 ? 95 : S.dim > 0 ? 105 : LIGHT_RANGE) * (S.bat > 0 ? 1.3 : 1); }
+        function beamHalf() { return LIGHT_HALF + (S.bat > 0 ? 0.16 : 0); }
+        // 손전등 빛 안인지 — 몸 주변은 보이기만 할 뿐, 빛줄기에 닿은 벌레만 타 버린다
+        function inBeam(e) {
+          const d = Math.hypot(e.x - S.x, e.y - S.y);
+          if (d > range()) return false;
+          let da = Math.atan2(e.y - S.y, e.x - S.x) - S.a;
+          da = Math.atan2(Math.sin(da), Math.cos(da));
+          return Math.abs(da) < beamHalf(); // 빛은 화면에서 진열대를 통과해 보이니 판정도 똑같이
+        }
+        function burst(x, y, color, n) {
+          for (let i = 0; i < n; i++) {
+            const a = Math.random() * 6.28, sp = 30 + Math.random() * 80;
+            S.puffs.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 0.35 + Math.random() * 0.25, color });
+          }
+        }
+        function kill(e) {
+          e.dead = true;
+          S.kills++;
+          S.score += e.pts;
+          S.texts.push({ x: e.x, y: e.y - 8, text: `+${e.pts}`, life: 0.6 });
+          burst(e.x, e.y, { rat: "#94a3b8", roach: "#a16207", spider: "#7c3aed", shadow: "#0f172a" }[e.type], e.type === "roach" ? 6 : 12);
+          ctx.sfx({ roach: "sizzle", rat: "squeak", spider: "hit", shadow: "ghost" }[e.type]);
+          hud();
+        }
+
+        function update(dt) {
+          S.t += dt;
+          const hour = Math.floor(S.t / HOUR_SEC);
+          if (hour > S.hour && hour < HOURS) {
+            S.hour = hour;
+            say(LINES[hour - 1] || "");
+            ctx.sfx("whoosh");
+            // 정각의 벌레 떼 — 서로 다른 틈 두 곳에서 동시에 나와 손전등 하나로는 다 못 막는다
+            const pick = () => HOLES[Math.floor(Math.random() * HOLES.length)];
+            const a = pick(); let b = pick();
+            while (b === a) b = pick();
+            if (hour === HOURS - 1) spawnBoss(); // 새벽 5시는 벌레 떼 대신 보스
+            else for (let i = 0; i < 3 + hour * 2; i++) { spawn("roach", a); spawn("roach", b); }
+          }
+          if (S.t >= HOUR_SEC * HOURS) return finish(true);
+          // 이동
+          let dx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), dy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+          if (stick.move) { dx = stick.move.dx; dy = stick.move.dy; }
+          const len = Math.hypot(dx, dy);
+          if (len > 0.05) {
+            const k = ((S.slow > 0 ? 52 : S.fast > 0 ? 165 : 118) * Math.min(1, len)) / len; // 거미줄에 걸리면 느려진다
+            moveBody(S, dx * k * dt, dy * k * dt, 8);
+            S.step += dt * 9;
+          }
+          // 손전등 방향
+          if (stick.aim) S.a = stick.aim.a;
+          else if (!matchMedia("(pointer: coarse)").matches) S.a = Math.atan2(aimAt.y - S.y, aimAt.x - S.x);
+          else if (len > 0.2) S.a = Math.atan2(dy, dx);
+          if (S.inv > 0) S.inv -= dt;
+          if (S.slow > 0) S.slow -= dt;
+          if (S.dim > 0) S.dim -= dt;
+          if (S.bat > 0) S.bat -= dt;
+          if (S.fast > 0) S.fast -= dt;
+          updateItems(dt);
+          if (S.boss) { updateBoss(dt); if (state !== "play") return; }
+          for (const q of S.rings) {
+            q.r += 120 * dt;
+            if (!q.hit && S.inv <= 0 && Math.abs(Math.hypot(S.x - q.x, S.y - q.y) - q.r) < 10) { q.hit = true; S.slow = 1.6; ctx.sfx("invalid"); }
+          }
+          S.rings = S.rings.filter((q) => q.r < 230);
+          // 내가 있는 칸을 향한 길 — 0.25초마다 다시 잰다
+          S.fieldCd -= dt;
+          if (S.fieldCd <= 0 || !S.field) { S.field = flow(Math.floor(S.x / CELL), Math.floor(S.y / CELL)); S.fieldCd = 0.25; }
+          // 나타나기
+          const h = S.t / HOUR_SEC;
+          S.roachCd -= dt;
+          if (S.roachCd <= 0) { spawn("roach"); S.roachCd = Math.max(0.17, 1.15 - 0.22 * h) * (0.7 + Math.random() * 0.6) * (S.boss ? 1.8 : 1); }
+          S.ratCd -= dt;
+          if (S.ratCd <= 0) { spawn("rat"); S.ratCd = Math.max(0.95, 5 - 0.9 * h) * (0.7 + Math.random() * 0.6); }
+          if (S.t >= HOUR_SEC) { S.spiderCd -= dt; if (S.spiderCd <= 0) { spawnSpider(); S.spiderCd = Math.max(4.5, 12 - 1.5 * h); } }
+          if (S.t >= HOUR_SEC * 2) { S.shadowCd -= dt; if (S.shadowCd <= 0) { spawnShadow(); S.shadowCd = Math.max(11, 20 - 1.8 * h); } }
+          // 벌레 움직임
+          for (const e of S.en) {
+            e.walk += dt * 14;
+            if (e.hurt > 0) e.hurt -= dt;
+            if (e.drop > 0) { e.drop -= dt; continue; } // 아직 내려오는 중
+            const beam = inBeam(e);
+            const d = Math.hypot(e.x - S.x, e.y - S.y);
+            e.lit = beam || d < NEAR_LIGHT;
+            if (e.type === "shadow") {
+              if (beam && S.t >= e.safe) {
+                e.hits++;
+                burst(e.x, e.y, "#0f172a", 10);
+                if (e.hits >= SHADOW_HITS) { kill(e); continue; }
+                Object.assign(e, farCell(170));
+                e.safe = S.t + 0.7;
+                ctx.sfx("ghost");
+                continue;
+              }
+              const n = d || 1;
+              e.a = Math.atan2(S.y - e.y, S.x - e.x);
+              e.x += ((S.x - e.x) / n) * e.sp * dt; e.y += ((S.y - e.y) / n) * e.sp * dt;
+            } else {
+              e.burn = beam ? e.burn + dt : Math.max(0, e.burn - dt);
+              if (e.burn >= BURN[e.type]) { kill(e); continue; }
+              if (beam) e.hurt = 0.05;
+            }
+            if (e.type === "spider") {
+              e.webCd -= dt;
+              if (e.webCd <= 0 && d < 190 && clear(e.x, e.y, S.x, S.y)) {
+                e.webCd = 3.4;
+                const a = Math.atan2(S.y - e.y, S.x - e.x);
+                S.webs.push({ x: e.x, y: e.y, vx: Math.cos(a) * 150, vy: Math.sin(a) * 150, life: 1.6 });
+                ctx.sfx("webshot");
+              }
+            }
+            let sp = e.sp * (beam ? 0.4 : 1);
+            let v;
+            if (e.type === "shadow") v = null;
+            else if (e.flee > 0) {
+              e.flee -= dt;
+              v = [e.x - S.x, e.y - S.y];
+              sp *= 1.25;
+            } else {
+              v = stepDir(e.toPanel ? panelFlow : S.field, e.x, e.y);
+            }
+            if (v) {
+              const n = Math.hypot(v[0], v[1]) || 1;
+              const wob = e.type === "roach" ? Math.sin(e.walk * 0.4 + e.wob) * 0.45 : 0;
+              const ax = v[0] / n - (v[1] / n) * wob, ay = v[1] / n + (v[0] / n) * wob;
+              e.a = Math.atan2(ay, ax);
+              moveBody(e, ax * sp * dt, ay * sp * dt, e.r - 2);
+            }
+            // 물기 · 두꺼비집 갉기
+            if (d < e.r + 9 && S.inv <= 0) {
+              S.lives--; S.inv = 1.8;
+              ctx.sfx("hurt");
+              burst(S.x, S.y, "#fca5a5", 10);
+              e.flee = 1; hud();
+              if (e.type === "shadow") Object.assign(e, farCell(170));
+              if (S.lives <= 0) return finish(false);
+            }
+            if (Math.hypot(e.x - PANEL.x, e.y - PANEL.y) < 20 && S.blackout <= 0) {
+              S.panel -= (e.type === "rat" ? 14 : 7) * dt;
+              if (S.panel <= 0) {
+                S.panel = 0; S.blackout = 6;
+                say("두꺼비집이 나갔어요!", 2);
+                ctx.sfx("explode");
+                S.en.forEach((o) => { o.toPanel = false; });
+              }
+            }
+          }
+          S.en = S.en.filter((e) => !e.dead);
+          for (const w of S.webs) {
+            w.x += w.vx * dt; w.y += w.vy * dt; w.life -= dt;
+            if (wall(Math.floor(w.x / CELL), Math.floor(w.y / CELL))) w.life = 0;
+            if (w.life > 0 && S.inv <= 0 && Math.hypot(w.x - S.x, w.y - S.y) < 11) { w.life = 0; S.slow = 2; ctx.sfx("invalid"); say("거미줄에 걸렸어요!", 1); }
+          }
+          S.webs = S.webs.filter((w) => w.life > 0);
+          // 정전 · 깜빡임
+          if (S.blackout > 0) {
+            S.blackout -= dt;
+            if (S.blackout <= 0) { S.panel = 60; say("불이 다시 들어왔어요", 1.6); ctx.sfx("powerup"); }
+          }
+          S.flickCd -= dt;
+          if (S.flickCd <= 0) { S.flicker = 0.12; S.flickCd = 3 + Math.random() * 6; ctx.sfx("buzz"); }
+          if (S.flicker > 0) S.flicker -= dt;
+          for (const p of S.puffs) { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+          S.puffs = S.puffs.filter((p) => p.life > 0);
+          for (const t of S.texts) { t.y -= 22 * dt; t.life -= dt; }
+          S.texts = S.texts.filter((t) => t.life > 0);
+          if (S.line) { S.line.t -= dt; if (S.line.t <= 0) S.line = null; }
+          hud();
+        }
+
+        // ---------- 그리기 ----------
+        let scale = 1;
+        function fit() {
+          const rect = stage.getBoundingClientRect();
+          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const k = Math.max(0.4, Math.min(rect.width / W, (box - extra) / H));
+          const cw = Math.floor(W * k), ch = Math.floor(H * k);
+          const dpr = Math.min(window.devicePixelRatio || 1, 2);
+          scale = (cw * dpr) / W;
+          canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+          canvas.style.width = `${cw}px`; canvas.style.height = `${ch}px`;
+          shell.style.width = `${cw}px`;
+          draw();
+        }
+        const GOODS = ["#ef4444", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7", "#ec4899"];
+        function drawStore() {
+          for (let r = 0; r < ROWS; r++) {
+            for (let c = 0; c < COLS; c++) {
+              const x = c * CELL, y = r * CELL, m = MAP[r][c], open = m === "F" && S && (S.boss || S.bossDown) && Math.abs(c - 7) <= 1;
+              if (m === ".") {
+                g.fillStyle = (c + r) % 2 ? "#cbd5e1" : "#e2e8f0";
+                g.fillRect(x, y, CELL, CELL);
+              } else if (m === "#") {
+                g.fillStyle = "#475569"; g.fillRect(x, y, CELL, CELL);
+                g.fillStyle = "#64748b"; g.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+                for (let i = 0; i < 3; i++) { g.fillStyle = GOODS[(c * 3 + r * 5 + i) % GOODS.length]; g.fillRect(x + 3 + i * 6.5, y + 6, 5, 12); }
+              } else if (m === "F") {
+                g.fillStyle = "#0f766e"; g.fillRect(x, y, CELL, CELL);
+                g.fillStyle = open ? "#0c4a6e" : "#99f6e4"; g.fillRect(x + 2, y + 3, CELL - 4, CELL - 8); // 냉동고 문이 열리면 안이 시커멓다
+              } else {
+                g.fillStyle = "#92400e"; g.fillRect(x, y, CELL, CELL);
+                g.fillStyle = "#b45309"; g.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+              }
+            }
+          }
+          for (const [c, r] of HOLES) { g.fillStyle = "#334155"; g.beginPath(); g.ellipse((c + 0.5) * CELL, (r + 0.5) * CELL, 7, 4, 0, 0, 6.3); g.fill(); }
+          // 두꺼비집
+          g.fillStyle = S && S.blackout > 0 ? "#7f1d1d" : "#1e293b";
+          g.fillRect(PANEL.x - 11, PANEL.y - 9, 22, 18);
+          g.fillStyle = "#facc15"; g.font = "800 13px Pretendard, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+          g.fillText("⚡", PANEL.x, PANEL.y + 1);
+        }
+        function drawRoach(e) {
+          g.save(); g.translate(e.x, e.y); g.rotate(e.a);
+          g.strokeStyle = "#3f2a14"; g.lineWidth = 1;
+          for (const s of [-1, 1]) for (let i = -1; i <= 1; i++) { const w = Math.sin(e.walk + i * 2) * 1.6; g.beginPath(); g.moveTo(i * 2.5, 0); g.lineTo(i * 3.2 + w, s * 6); g.stroke(); }
+          g.fillStyle = e.hurt > 0 ? "#fff" : "#7c4a1e"; g.beginPath(); g.ellipse(0, 0, 6.5, 3.8, 0, 0, 6.3); g.fill();
+          g.fillStyle = "#2d1a0a"; g.beginPath(); g.ellipse(4.6, 0, 2.2, 2.6, 0, 0, 6.3); g.fill();
+          g.strokeStyle = "#3f2a14"; g.beginPath(); g.moveTo(6, -1); g.lineTo(11, -4); g.moveTo(6, 1); g.lineTo(11, 4); g.stroke();
+          g.restore();
+        }
+        function drawRat(e) {
+          g.save(); g.translate(e.x, e.y); g.rotate(e.a);
+          g.strokeStyle = "#f9a8d4"; g.lineWidth = 1.6; g.beginPath(); g.moveTo(-9, 0); g.quadraticCurveTo(-15, Math.sin(e.walk * 0.6) * 5, -20, 0); g.stroke();
+          g.fillStyle = e.hurt > 0 ? "#fff" : "#64748b"; g.beginPath(); g.ellipse(0, 0, 10, 6, 0, 0, 6.3); g.fill();
+          g.beginPath(); g.ellipse(8, 0, 5, 4, 0, 0, 6.3); g.fill();
+          g.fillStyle = "#94a3b8"; g.beginPath(); g.arc(6, -4, 2.4, 0, 6.3); g.arc(6, 4, 2.4, 0, 6.3); g.fill();
+          g.fillStyle = "#ef4444"; g.beginPath(); g.arc(10, -1.6, 1, 0, 6.3); g.arc(10, 1.6, 1, 0, 6.3); g.fill();
+          g.restore();
+        }
+        function drawSpider(e) {
+          if (e.drop > 0) {
+            // 내려오는 중 — 바닥의 그림자가 커지고 실이 보인다
+            const k = 1 - e.drop / 1.1;
+            g.fillStyle = "rgba(15, 23, 42, .5)"; g.beginPath(); g.ellipse(e.x, e.y, 4 + 7 * k, 3 + 5 * k, 0, 0, 6.3); g.fill();
+            g.strokeStyle = "rgba(226, 232, 240, .6)"; g.lineWidth = 1; g.beginPath(); g.moveTo(e.x, e.y - 70); g.lineTo(e.x, e.y - 70 * (1 - k)); g.stroke();
+            return;
+          }
+          g.save(); g.translate(e.x, e.y); g.rotate(e.a);
+          g.strokeStyle = "#1e1b4b"; g.lineWidth = 1.5;
+          for (const s of [-1, 1]) for (let i = 0; i < 4; i++) {
+            const w = Math.sin(e.walk * 0.7 + i * 1.6) * 2, x = -5 + i * 3.4;
+            g.beginPath(); g.moveTo(x * 0.4, s * 2); g.quadraticCurveTo(x, s * 9, x * 1.7 + w, s * 13); g.stroke();
+          }
+          g.fillStyle = e.hurt > 0 ? "#fff" : "#4c1d95"; g.beginPath(); g.ellipse(-3, 0, 8, 6.5, 0, 0, 6.3); g.fill();
+          g.fillStyle = e.hurt > 0 ? "#fff" : "#2e1065"; g.beginPath(); g.arc(5, 0, 4, 0, 6.3); g.fill();
+          g.fillStyle = "#fb7185"; for (const y of [-1.8, -0.6, 0.6, 1.8]) { g.beginPath(); g.arc(7.4, y, 0.7, 0, 6.3); g.fill(); }
+          g.restore();
+        }
+        function drawShadow(e) {
+          g.save(); g.translate(e.x, e.y);
+          g.globalAlpha = S.t < e.safe ? 0.35 : 0.9;
+          g.fillStyle = "#020617";
+          g.beginPath(); g.ellipse(0, 1, 9, 12, 0, 0, 6.3); g.fill();
+          g.beginPath(); g.arc(0, -11, 6, 0, 6.3); g.fill();
+          g.restore();
+        }
+        function drawBoss() {
+          const B = S.boss, w = Math.sin(B.t * 3) * 3, k = B.charge > 0 ? 1 - B.charge / 0.7 : 0;
+          g.save(); g.translate(B.x, B.y);
+          // 얼어붙은 팔
+          g.strokeStyle = B.hurt > 0 ? "#fff" : "#7dd3fc"; g.lineWidth = 6; g.lineCap = "round";
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * 6.28 + B.t * 0.5, r = BOSS_R + 9 + Math.sin(B.t * 2.4 + i) * 5;
+            g.beginPath(); g.moveTo(Math.cos(a) * 14, Math.sin(a) * 14); g.quadraticCurveTo(Math.cos(a + 0.4) * r * 0.8, Math.sin(a + 0.4) * r * 0.8, Math.cos(a) * r, Math.sin(a) * r); g.stroke();
+          }
+          const body = g.createRadialGradient(-6, -8, 4, 0, 0, BOSS_R + 4);
+          body.addColorStop(0, B.hurt > 0 ? "#fff" : "#e0f2fe"); body.addColorStop(1, B.charge > 0 ? "#38bdf8" : "#0369a1");
+          g.fillStyle = body;
+          g.beginPath(); g.ellipse(0, 0, BOSS_R + k * 4 + w * 0.3, BOSS_R - k * 3 - w * 0.3, 0, 0, 6.3); g.fill();
+          g.restore();
+        }
+        function drawItems() {
+          for (const it of S.items) {
+            const I = ITEMS[it.kind], blink = it.life < 4 && Math.floor(it.life * 5) % 2;
+            if (blink) continue;
+            const bob = Math.sin(S.t * 5 + it.x) * 1.5;
+            g.fillStyle = "rgba(255,255,255,.18)"; g.beginPath(); g.arc(it.x, it.y + bob, 14, 0, 6.3); g.fill();
+            g.fillStyle = I.color; g.beginPath(); g.arc(it.x, it.y + bob, 10, 0, 6.3); g.fill();
+            g.strokeStyle = "rgba(255,255,255,.8)"; g.lineWidth = 1.4; g.stroke();
+            g.fillStyle = I.fg; g.font = "900 11px Pretendard, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+            g.fillText(I.ch, it.x, it.y + bob + 0.5);
+          }
+        }
+        function drawPlayer() {
+          g.save(); g.translate(S.x, S.y);
+          if (S.inv > 0 && Math.floor(S.inv * 10) % 2) g.globalAlpha = 0.45;
+          if (S.slow > 0) { g.strokeStyle = "rgba(226, 232, 240, .85)"; g.lineWidth = 1; for (let i = 0; i < 4; i++) { const a = i * 0.8; g.beginPath(); g.moveTo(Math.cos(a) * 13, Math.sin(a) * 13); g.lineTo(-Math.cos(a) * 13, -Math.sin(a) * 13); g.stroke(); } }
+          const w = Math.sin(S.step) * 2;
+          g.fillStyle = "#1e293b"; g.beginPath(); g.ellipse(-3 + w, -6, 3, 3.6, 0, 0, 6.3); g.ellipse(-3 - w, 6, 3, 3.6, 0, 0, 6.3); g.fill();
+          g.rotate(S.a);
+          g.fillStyle = "#16a34a"; g.beginPath(); g.ellipse(0, 0, 8, 10, 0, 0, 6.3); g.fill(); // 조끼
+          g.fillStyle = "#fde68a"; g.beginPath(); g.arc(1, 0, 6, 0, 6.3); g.fill();
+          g.fillStyle = "#422006"; g.beginPath(); g.arc(-1, 0, 5.4, 1.2, 5.1); g.fill();
+          g.fillStyle = "#f1f5f9"; g.fillRect(6, 4, 8, 3.4); // 손전등
+          g.restore();
+        }
+        function drawDark() {
+          const r = S ? range() : 0;
+          const base = !S ? 0.5 : S.blackout > 0 || S.dim > 0 ? 0.97 : S.flicker > 0 ? 0.74 : 0.92;
+          dg.globalCompositeOperation = "source-over";
+          dg.clearRect(0, 0, dark.width, dark.height);
+          dg.fillStyle = `rgba(5, 6, 14, ${base})`;
+          dg.fillRect(0, 0, dark.width, dark.height);
+          if (S) {
+            dg.save();
+            dg.scale(0.5, 0.5);
+            dg.globalCompositeOperation = "destination-out";
+            const near = dg.createRadialGradient(S.x, S.y, 8, S.x, S.y, NEAR_LIGHT + 22);
+            near.addColorStop(0, "rgba(0,0,0,.95)"); near.addColorStop(1, "rgba(0,0,0,0)");
+            dg.fillStyle = near; dg.fillRect(0, 0, W, H);
+            const beam = dg.createRadialGradient(S.x, S.y, 10, S.x, S.y, r);
+            beam.addColorStop(0, "rgba(0,0,0,1)"); beam.addColorStop(0.75, "rgba(0,0,0,.92)"); beam.addColorStop(1, "rgba(0,0,0,0)");
+            dg.fillStyle = beam;
+            dg.beginPath(); dg.moveTo(S.x, S.y); dg.arc(S.x, S.y, r, S.a - beamHalf(), S.a + beamHalf()); dg.closePath(); dg.fill();
+            // 두꺼비집 위치는 어둠 속에서도 어렴풋이
+            if (S.blackout <= 0) {
+              const p = dg.createRadialGradient(PANEL.x, PANEL.y, 2, PANEL.x, PANEL.y, 34);
+              p.addColorStop(0, "rgba(0,0,0,.6)"); p.addColorStop(1, "rgba(0,0,0,0)");
+              dg.fillStyle = p; dg.fillRect(PANEL.x - 34, PANEL.y - 34, 68, 68);
+            }
+            dg.restore();
+          }
+          g.drawImage(dark, 0, 0, W, H);
+        }
+        function draw() {
+          g.setTransform(scale, 0, 0, scale, 0, 0);
+          drawStore();
+          if (S) {
+            for (const e of S.en) ({ rat: drawRat, roach: drawRoach, spider: drawSpider, shadow: drawShadow })[e.type](e);
+            if (S.boss) drawBoss();
+            g.fillStyle = "#e2e8f0";
+            for (const w of S.webs) { g.beginPath(); g.arc(w.x, w.y, 3, 0, 6.3); g.fill(); }
+            for (const p of S.puffs) { g.globalAlpha = Math.min(1, p.life * 3); g.fillStyle = p.color; g.fillRect(p.x - 1.5, p.y - 1.5, 3, 3); }
+            g.globalAlpha = 1;
+            drawPlayer();
+          }
+          drawDark();
+          if (!S) return;
+          drawItems(); // 아이템은 어둠 속에서도 보인다
+          // 켜져 있는 아이템의 남은 시간
+          let barY = H - 30;
+          for (const [v, full, color, name] of [[S.bat, BAT_SEC, "#facc15", "건전지"], [S.fast, FAST_SEC, "#d97706", "캔커피"]]) {
+            if (!(v > 0)) continue;
+            g.fillStyle = "rgba(255,255,255,.2)"; g.fillRect(10, barY, 56, 5);
+            g.fillStyle = color; g.fillRect(10, barY, 56 * Math.min(1, v / full), 5);
+            g.font = "700 10px Pretendard, system-ui, sans-serif"; g.textAlign = "left"; g.textBaseline = "middle"; g.fillStyle = "#f1f5f9";
+            g.fillText(name, 72, barY + 3);
+            barY -= 13;
+          }
+          // 찬 기운 고리는 어둠 위로 보인다
+          for (const q of S.rings) {
+            g.strokeStyle = `rgba(186, 230, 253, ${Math.max(0.1, 0.85 - q.r / 280)})`; g.lineWidth = 4;
+            g.beginPath(); g.arc(q.x, q.y, q.r, 0, 6.3); g.stroke();
+          }
+          if (S.boss) {
+            const B = S.boss;
+            // 어둠 속에서도 보이는 하나뿐인 눈
+            g.fillStyle = "#f8fafc"; g.beginPath(); g.ellipse(B.x + Math.cos(B.a) * 8, B.y + Math.sin(B.a) * 8, 7, 7, 0, 0, 6.3); g.fill();
+            g.fillStyle = "#dc2626"; g.beginPath(); g.arc(B.x + Math.cos(B.a) * 11, B.y + Math.sin(B.a) * 11, 3.2, 0, 6.3); g.fill();
+            g.fillStyle = "rgba(2, 6, 23, .85)"; g.fillRect(40, 6, W - 80, 24);
+            g.fillStyle = "#38bdf8"; g.fillRect(44, 21, (W - 88) * Math.max(0, B.hp / BOSS_HP), 6);
+            g.font = "800 11px Pretendard, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#e0f2fe";
+            g.fillText("냉동고의 그것", W / 2, 13);
+          }
+          // 어둠 속의 눈 — 빛 밖에 있는 쥐와 벌레가 빨갛게 보인다
+          for (const e of S.en) {
+            if (e.drop > 0) continue;
+            if (e.type === "shadow") {
+              // 그림자 손님은 어둠 속에서 하얀 눈만 보인다
+              g.fillStyle = S.t < e.safe ? "rgba(241, 245, 249, .3)" : "rgba(241, 245, 249, .95)";
+              g.beginPath(); g.arc(e.x - 2.2, e.y - 12, 1.2, 0, 6.3); g.arc(e.x + 2.2, e.y - 12, 1.2, 0, 6.3); g.fill();
+              continue;
+            }
+            if (e.lit) continue;
+            const blink = Math.sin(e.walk * 0.15 + e.wob) > -0.6;
+            if (!blink) continue;
+            g.fillStyle = e.type === "roach" ? "rgba(248, 113, 113, .4)" : "rgba(248, 113, 113, .9)";
+            const s = e.type === "roach" ? 0.9 : 1.5, ox = Math.cos(e.a) * e.r, oy = Math.sin(e.a) * e.r, px = -Math.sin(e.a) * 2, py = Math.cos(e.a) * 2;
+            g.beginPath(); g.arc(e.x + ox + px, e.y + oy + py, s, 0, 6.3); g.arc(e.x + ox - px, e.y + oy - py, s, 0, 6.3); g.fill();
+          }
+          g.font = "800 12px Pretendard, system-ui, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle";
+          for (const t of S.texts) { g.globalAlpha = Math.min(1, t.life * 3); g.fillStyle = "#fde68a"; g.fillText(t.text, t.x, t.y); }
+          g.globalAlpha = 1;
+          // 두꺼비집 체력
+          g.fillStyle = "rgba(15, 23, 42, .8)"; g.fillRect(W / 2 - 62, H - 17, 124, 11);
+          g.fillStyle = S.panel > 35 ? "#facc15" : "#ef4444"; g.fillRect(W / 2 - 60, H - 15, 120 * (S.panel / 100), 7);
+          if (S.line) {
+            g.globalAlpha = Math.min(1, S.line.t * 2);
+            g.font = "800 14px Pretendard, system-ui, sans-serif";
+            const tw = g.measureText(S.line.text).width + 26;
+            g.fillStyle = "rgba(2, 6, 23, .82)"; g.fillRect(W / 2 - tw / 2, 42, tw, 28);
+            g.fillStyle = "#f1f5f9"; g.fillText(S.line.text, W / 2, 57);
+            g.globalAlpha = 1;
+          }
+          if (stick.move) drawStick(stick.move);
+          if (stick.aim) drawStick(stick.aim);
+        }
+        function drawStick(s) {
+          g.strokeStyle = "rgba(255,255,255,.35)"; g.lineWidth = 2;
+          g.beginPath(); g.arc(s.x0, s.y0, 30, 0, 6.3); g.stroke();
+          g.fillStyle = "rgba(255,255,255,.35)";
+          g.beginPath(); g.arc(s.x, s.y, 13, 0, 6.3); g.fill();
+        }
+
+        // ---------- 흐름 ----------
+        function frame(now) {
+          raf = 0;
+          if (state !== "play") return;
+          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          last = now;
+          try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
+          if (state === "play") raf = requestAnimationFrame(frame);
+        }
+        function run() {
+          if (raf) cancelAnimationFrame(raf);
+          last = performance.now();
+          raf = requestAnimationFrame(frame);
+        }
+        function showOverlay(html) {
+          overlay.innerHTML = html;
+          overlay.hidden = false;
+          const b = overlay.querySelector("button");
+          if (b) b.focus({ preventScroll: true });
+        }
+        function showReady() {
+          state = "ready";
+          S = null;
+          elScore.textContent = "0"; elClock.textContent = "12:00";
+          elLives.innerHTML = "<i></i><i></i><i></i>";
+          draw();
+          showOverlay(`<div class="gm-card">
+            <h2>심야 편의점</h2>
+            <p>혼자 남은 새벽 근무. 손전등 빛에 닿은 벌레는 타 버려요.<br>거미줄을 피하고, 그림자 손님은 <b>세 번</b> 비춰야 사라져요.<br>바닥의 아이템은 밟으면 바로 써요.<br><b>아침 6시</b>까지 체력과 <b>두꺼비집</b>을 지켜요.</p>
+            <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> · 마우스로 손전등 · <kbd>Esc</kbd> 일시정지<br>모바일은 왼쪽을 끌어 이동, 오른쪽을 끌어 손전등</div>
+            <button type="button" class="gm-go" data-act="start">시작</button>
+          </div>`);
+        }
+        function start() {
+          overlay.hidden = true;
+          overlay.innerHTML = "";
+          newGame();
+          state = "play";
+          say("밤 12시 · 근무 시작", 2);
+          window.HKSound.ambient(true);
+          run();
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "paused";
+          window.HKSound.ambient(false);
+          keys.left = keys.right = keys.up = keys.down = false;
+          stick.move = stick.aim = null;
+          showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>지금 시각 <b>${elClock.textContent}</b> · 점수 <b>${S.score.toLocaleString("ko-KR")}</b>점</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
+        }
+        function resume() {
+          if (state !== "paused") return;
+          overlay.hidden = true;
+          state = "play";
+          window.HKSound.ambient(true);
+          run();
+        }
+        function finish(won) {
+          state = "over";
+          window.HKSound.ambient(false);
+          if (won) S.score += 2000 + S.lives * 500 + Math.round(S.panel) * 5; // 보스 점수는 쓰러뜨릴 때 이미 더했다
+          hud();
+          draw();
+          ctx.sfx(won ? "win" : "lose");
+          const score = S.score;
+          showOverlay(`<div class="gm-card"><h2>${won ? "아침이 밝았어요" : "근무 종료"}</h2><p>${won ? S.bossDown ? "냉동고의 그것까지 물리치고 교대했어요!" : "무사히 교대했어요!" : `${elClock.textContent}까지 버텼어요`} · 벌레 ${S.kills}마리</p><div class="gm-big">${score.toLocaleString("ko-KR")}점</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          ctx.submit(score);
+        }
+        overlay.addEventListener("click", (e) => {
+          const b = e.target.closest("[data-act]");
+          if (!b) return;
+          if (b.dataset.act === "start") start();
+          else if (b.dataset.act === "resume") resume();
+        });
+
+        // ---------- 입력 ----------
+        const dialogOpen = () => !!document.querySelector(".hk-dialog__overlay");
+        window.addEventListener("keydown", (e) => {
+          if (dialogOpen()) return;
+          const c = e.code, game = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Space"].includes(c);
+          if (state === "play") {
+            if (game) e.preventDefault();
+            if (c === "ArrowLeft" || c === "KeyA") keys.left = true;
+            if (c === "ArrowRight" || c === "KeyD") keys.right = true;
+            if (c === "ArrowUp" || c === "KeyW") keys.up = true;
+            if (c === "ArrowDown" || c === "KeyS") keys.down = true;
+            if (c === "KeyP" || c === "Escape") pause();
+          } else if (state === "paused") {
+            if (c === "Space" || c === "Enter" || c === "KeyP") { e.preventDefault(); resume(); }
+          } else if (state === "ready") {
+            if (c === "Space" || c === "Enter") { e.preventDefault(); start(); }
+          }
+        });
+        window.addEventListener("keyup", (e) => {
+          if (e.code === "ArrowLeft" || e.code === "KeyA") keys.left = false;
+          if (e.code === "ArrowRight" || e.code === "KeyD") keys.right = false;
+          if (e.code === "ArrowUp" || e.code === "KeyW") keys.up = false;
+          if (e.code === "ArrowDown" || e.code === "KeyS") keys.down = false;
+        });
+        window.addEventListener("blur", () => { keys.left = keys.right = keys.up = keys.down = false; });
+        const toWorld = (e) => { const r = canvas.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }; };
+        // 휴대폰 — 왼쪽 절반은 이동, 오른쪽 절반은 손전등. 손가락마다 따로 따라간다
+        // 마우스는 게임 판 밖으로 나가도 손전등 방향을 계속 따라간다
+        window.addEventListener("pointermove", (e) => {
+          if (e.pointerType !== "mouse") return;
+          const p = toWorld(e);
+          aimAt.x = p.x; aimAt.y = p.y;
+        });
+        canvas.addEventListener("pointermove", (e) => {
+          if (e.pointerType === "mouse") return;
+          const p = toWorld(e);
+          for (const s of [stick.move, stick.aim]) {
+            if (!s || s.id !== e.pointerId) continue;
+            const dx = p.x - s.x0, dy = p.y - s.y0, d = Math.hypot(dx, dy);
+            const k = Math.min(1, 30 / (d || 1));
+            s.x = s.x0 + dx * k; s.y = s.y0 + dy * k;
+            s.dx = dx / 30; s.dy = dy / 30;
+            if (d > 4) s.a = Math.atan2(dy, dx);
+          }
+        });
+        canvas.addEventListener("pointerdown", (e) => {
+          if (state !== "play" || e.pointerType === "mouse") return;
+          e.preventDefault();
+          const p = toWorld(e), side = p.x < W / 2 ? "move" : "aim";
+          if (stick[side]) return;
+          stick[side] = { id: e.pointerId, x0: p.x, y0: p.y, x: p.x, y: p.y, dx: 0, dy: 0, a: S.a };
+          try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+        });
+        const endStick = (e) => { for (const k of ["move", "aim"]) if (stick[k] && stick[k].id === e.pointerId) stick[k] = null; };
+        canvas.addEventListener("pointerup", endStick);
+        canvas.addEventListener("pointercancel", endStick);
+        canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+        document.addEventListener("visibilitychange", () => { if (document.hidden) pause(); });
+
+        // ---------- 시작 ----------
+        ctx.onScore && ctx.onScore(() => (S ? S.score : 0));
+        ctx.onRestart(start);
+        ctx.onPause(pause);
+        if (window.ResizeObserver) new ResizeObserver(() => fit()).observe(stage);
+        window.addEventListener("resize", fit);
+        showReady();
+        fit();
+      },
+    });
+  </script>
+</body>
+</html>

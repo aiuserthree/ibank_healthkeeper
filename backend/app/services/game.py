@@ -45,6 +45,7 @@ GAMES: dict[str, Game] = {
     for g in (
         Game("blocks", "점심 블록", "MINI", "줄을 채워 지우기 · 10줄마다 도시락 블록", "blocks", "점", 10_000_000),
         Game("shooter", "세균 격파", "MINI", "9가지 무기로 세균 편대 격파 · 같은 무기 3단계", "rocket", "점", 10_000_000),
+        Game("nightshift", "심야 편의점", "MINI", "손전등으로 비추며 아침 6시까지 벌레를 막아요", "flashlight", "점", 200000),
         Game("match3", "비타민 3매치", "MINI", "3개·네모로 맞춰 펑! · 단계마다 새 맵과 목표", "cherry", "점", 10_000_000),
         Game("stairs", "별까지 계단", "MINI", "좌우 계단을 골라 별까지 · 동료 기록 깃발 넘기", "sparkles", "층", 100000),
         Game("crossing", "출근길 대작전", "MINI", "차·자전거·지각선을 피해 회사까지 한 칸씩", "footprints", "칸", 100000),
