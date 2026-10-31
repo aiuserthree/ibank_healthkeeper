@@ -229,6 +229,21 @@ def _open_close_labels(open_at: datetime, close_at: datetime) -> tuple[str, str]
     )
 
 
+# 아케이드 참여 도장 안내 — 이 날짜의 예약 오픈 안내에 한 번만 덧붙인다
+OPEN_NOTICE_ARCADE_DATE = date(2026, 11, 4)
+
+
+def _open_notice_arcade_html() -> str:
+    arcade_url = f"{get_settings().app_base_url.rstrip('/')}/arcade"
+    return (
+        f"<p>&nbsp;</p>"
+        f"<p><strong>🎮 아케이드 참여 도장</strong><br>"
+        f"어떤 게임이든 한 판을 마치면 그날 <b>도장 1개</b>가 찍혀요. (여러 판 해도 <b>하루 1개</b>)<br>"
+        f"<b>10개</b>를 모을 때마다 <b>무적 쿠폰 1장</b>을 드려요. (한 달 1장 · 받은 날부터 30일 동안 사용)<br>"
+        f'<a href="{arcade_url}">{arcade_url}</a></p>'
+    )
+
+
 def render_open_notice_body(
     *,
     name: str,
@@ -247,6 +262,7 @@ def render_open_notice_body(
     open_label, close_label = _open_close_labels(open_at, close_at)
     url = (site_url or open_notice_site_url()).strip()
     tip_title, tip_body = stretch_tip_for(notice_date or now_kst().date())
+    arcade_html = _open_notice_arcade_html() if notice_date == OPEN_NOTICE_ARCADE_DATE else ""
     notice_html = ""
     if notice is not None:
         notice_url = notice_page_url(notice.id)
@@ -269,6 +285,7 @@ def render_open_notice_body(
         f"<p>{name}님, {week_label} 주간 예약 신청이 {open_label}에 시작됩니다.</p>"
         f"<p>마감: {close_label}</p>"
         f'<p><a href="{url}">{url}</a></p>'
+        f"{arcade_html}"
         f"{notice_html}"
         f"{health_html}"
         f"<p>&nbsp;</p>"
