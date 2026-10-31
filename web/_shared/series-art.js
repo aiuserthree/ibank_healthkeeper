@@ -1,4 +1,4 @@
-// 꿀알바 시리즈 낮 골목 그림 — 시리즈 페이지 상단과 아케이드 소개 창이 함께 쓴다
+// 꿀알바 시리즈 밤골목 그림 — 시리즈 페이지 상단과 아케이드 소개 창이 함께 쓴다
 window.HKSeriesArt = (function () {
   const W = 640, SKY_H = 76, H = 226 + SKY_H, GROUND = 188; // 하늘을 위로 늘려 제목 자리를 둔다 (건물은 SKY_H 만큼 아래로)
   // 글자를 도트 점 목록으로 — 낡은 간판에 쓴다
@@ -13,6 +13,9 @@ window.HKSeriesArt = (function () {
     for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 120) dots.push([x, y]);
     return { dots, w, h };
   }
+  const LATE = "#d9b45c";
+  const BX_SIGN = 228, LAMP = 406;                 // 꿀벌 간판 왼쪽 · 가로등 머리의 가운데
+  const STARS = [[46, 18], [96, 52], [178, 12], [236, 66], [452, 14], [508, 58], [628, 74], [16, 86]]; // 반짝이는 별
   const brush = (g) => (x, y, w, h, col) => { g.fillStyle = col; g.fillRect(Math.round(x), Math.round(y), w, h); };
   // 그림은 늘 같아야 하니 정해진 순서로 나오는 난수를 쓴다
   function dice(n) { let s = n; return (m) => { s = (s * 16807) % 2147483647; return s % m; }; }
@@ -20,22 +23,28 @@ window.HKSeriesArt = (function () {
   function makeSky() {
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const px = brush(c.getContext("2d"));
-    const BANDS = ["#9dbccb", "#a7c3d0", "#b2cbd5", "#bed2da", "#cbdadd", "#d9e2df"];
+    const BANDS = ["#0b1030", "#10163c", "#161c48", "#1e2455", "#292d62", "#383a70"];
     const band = Math.ceil(H / BANDS.length);
     BANDS.forEach((col, i) => {
       const y = i * band;
       px(0, y, W, band + 1, col);
       if (BANDS[i + 1]) for (let x = 0; x < W; x += 2) for (let k = 0; k < 6; k += 2) px(x + (k % 4 ? 1 : 0), y + band - 6 + k, 1, 1, BANDS[i + 1]); // 띠 사이는 점으로 섞는다
     });
+    // 별과 달
+    const r = dice(97);
+    for (const [x, y] of STARS) px(x, y, 1, 1, "#aeb6d8");
+    for (let i = 0; i < 90; i++) px(r(W), r(120), 1, 1, r(4) ? "#6f78a6" : "#d6dbef");
+    for (let dy = -15; dy <= 15; dy++) { const dx = Math.round(Math.sqrt(225 - dy * dy)); px(578 - dx, 34 + dy, dx * 2, 1, "#ece6c6"); }
+    px(570, 28, 6, 5, "#d3cca8"); px(584, 38, 5, 4, "#d3cca8"); px(574, 42, 3, 3, "#d3cca8");
     return c;
   }
   // 도트 구름 — 계단처럼 쌓고 아랫단은 점으로 흩어진다
   function makeCloud(rows) {
     const w = Math.max(...rows), c = document.createElement("canvas"); c.width = w; c.height = rows.length + 2;
     const px = brush(c.getContext("2d"));
-    rows.forEach((n, y) => { px((w - n) >> 1, y, n, 1, y < 2 ? "#eef3ec" : "#dde8e1"); });
+    rows.forEach((n, y) => { px((w - n) >> 1, y, n, 1, y < 2 ? "#54588c" : "#393d73"); });
     const last = rows[rows.length - 1];
-    for (let y = 0; y < 2; y++) for (let x = (w - last) >> 1; x < (w + last) >> 1; x += 2) if ((x * 7 + y * 3) % 5) px(x + y, rows.length + y, 1, 1, "#cfdfdc");
+    for (let y = 0; y < 2; y++) for (let x = (w - last) >> 1; x < (w + last) >> 1; x += 2) if ((x * 7 + y * 3) % 5) px(x + y, rows.length + y, 1, 1, "#2c2f62");
     return c;
   }
   // 하늘에 뜬 제목 — 작게 찍은 글자를 두 배로 키워 네모난 도트만 남긴다
@@ -75,7 +84,7 @@ window.HKSeriesArt = (function () {
     for (const [x, y, w, col] of [[0, 62, 64, "#a3aeb7"], [52, 40, 56, "#94a0ab"], [486, 52, 62, "#a3aeb7"], [576, 34, 70, "#8f9ba6"]]) {
       px(x, y, w, GROUND - y, col);
       px(x + w - 7, y, 7, GROUND - y, "#808c98");
-      for (let wy = y + 6; wy < GROUND - 6; wy += 9) for (let wx = x + 5; wx < x + w - 11; wx += 8) px(wx, wy, 5, 5, (wx + wy) % 7 ? "#76838f" : "#c6d2d9");
+      for (let wy = y + 6; wy < GROUND - 6; wy += 9) for (let wx = x + 5; wx < x + w - 11; wx += 8) px(wx, wy, 5, 5, (wx * 3 + wy * 5) % 13 ? "#76838f" : LATE);
     }
     // 왼쪽 혼자 켜진 편의점 (1화)
     px(0, 108, 112, GROUND - 108, "#cfc6b4");
@@ -187,10 +196,33 @@ window.HKSeriesArt = (function () {
     };
     wire(PX - 18, 24, 0, 16, 22); wire(PX - 12, 41, 0, 44, 18); wire(PX + 24, 24, W, 10, 18); wire(PX + 18, 41, W, 30, 22);
     wire(PX - 12, 42, BX + 10, 57, 10); wire(PX + 22, 42, 514, 96, 16);
+    // 날이 저문다 — 불 켜진 곳만 남기고 푸르게 가라앉힌다
+    const LIT = [[0, 144, 112, GROUND - 144], [BX + 112, 68, 90, 42]];
+    const img = g.getImageData(0, 0, W, H), d = img.data;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      if (d[i] === 217 && d[i + 1] === 180 && d[i + 2] === 92) continue;             // 늦게까지 켜진 창 (LATE)
+      if (!d[i + 3] || LIT.some(([lx, ly, lw, lh]) => x >= lx && x < lx + lw && y - SKY_H >= ly && y - SKY_H < ly + lh)) continue;
+      d[i] = d[i] * .3 + 6; d[i + 1] = d[i + 1] * .33 + 8; d[i + 2] = d[i + 2] * .48 + 26;
+    }
+    g.putImageData(img, 0, 0);
+    // 편의점 간판
+    worn(px, r, textDots("24시 편의점", 10), 30, 143, "#f4eedd");
+    // 2층에 혼자 불 켜진 창 — 사람 그림자가 서 있다
+    px(BX + 72, 76, 26, 26, "#e8b452"); px(BX + 84, 75, 2, 28, "#6a5238");
+    px(BX + 90, 88, 7, 14, "#5a3a1c"); px(BX + 91, 83, 5, 5, "#5a3a1c");
+    // 옆 건물 — 텔레비전 불빛
+    px(588, 110, 24, 22, "#6f93bd"); px(599, 110, 2, 22, "#39456e");
+    // 지하로 내려가는 문 — 안쪽에서 새어 나오는 불빛
+    px(DX + 2, 144, 40, GROUND - 144, "#a86a2a");
+    for (let i = 0; i < 6; i++) px(DX + 6 + i * 2, 180 - i * 5, 32 - i * 4, 2, "#6e431c");
+    px(DX + 2, 144, 40, 4, "#d29a45");
+    // 가로등 팔
+    px(PX + 8, 98, 26, 3, "#2b2d4a"); px(PX + 28, 101, 12, 3, "#3a3c5a");
     return c;
   }
 
-  let SKY = null, TOWN = null, TITLE = null, CLOUDS = null;
+  let SKY = null, TOWN = null, TITLE = null, CLOUDS = null, FIGURE = null, MOTHS = null;
   function worker(px, x, foot, t) {                // 공고를 든 구직자 — 노란 모자, 왼손에 종이
     const blink = Math.floor(t / 180) % 23 === 0, bob = Math.floor(t / 900) % 2;
     px(x - 12, foot - 1, 28, 3, "rgba(40, 38, 46, .3)");
@@ -217,15 +249,21 @@ window.HKSeriesArt = (function () {
     px(x, y + 10, 4, 4, "#4b4a55"); px(x + 1, y + 10, 2, 2, "#fbf8ef");
     px(x - 7, y - 5, 16, 11, "#d99a33"); px(x - 6, y - 8, 14, 3, "#8d6239"); px(x - 7, y - 3, 16, 3, "#f2c766"); px(x - 4, y - 1, 4, 3, "#f8e0a0");
   }
-  // 낡은 낮 골목 — 꿀벌 인력사무소 앞에 공고를 든 사람이 서 있다. 구름이 흐르고, 전선의 새와 풍선이 조금씩 움직인다
+  // 낡은 밤골목 — 꿀벌 인력사무소 앞에 공고를 든 사람이 서 있다. 간판과 가로등이 가끔 깜빡이고, 구름이 흐르고, 나방이 불빛에 모인다
   function drawScene(c, t) {
     if (!SKY) {
       SKY = makeSky(); TOWN = makeTown(); TITLE = makeTitle();
+      FIGURE = document.createElement("canvas"); FIGURE.width = 70; FIGURE.height = 100;
+      MOTHS = Array.from({ length: 12 }, (_, i) => ({ a: i * 2.4, r: 6 + (i * 7) % 22, sp: 0.9 + (i % 5) * 0.28 }));
       CLOUDS = [[10, 12, 16, 26, 44, 70, 92], [6, 18, 30, 52, 66], [14, 22, 40, 58, 84, 110], [8, 20, 34, 48]].map(makeCloud);
     }
     const g = c.getContext("2d"), px = brush(g);
     g.imageSmoothingEnabled = false;
+    const beat = Math.floor(t / 90);
+    const neon = !(beat % 37 < 3 || beat % 53 === 7);         // 간판이 가끔 나간다
+    const lamp = !(beat % 29 < 2 || beat % 41 === 11);        // 가로등도 가끔 깜빡인다
     g.drawImage(SKY, 0, 0);
+    STARS.forEach(([x, y], i) => { if ((i + Math.floor(t / 700)) % 4 === 0) px(x - 1, y, 3, 1, "#eef1fb"), px(x, y - 1, 1, 3, "#eef1fb"); });
     [[150, 84, 0, 3], [400, 76, 1, 2], [640, 88, 2, 4], [120, 22, 3, 1.5], [760, 18, 1, 2.5]].forEach(([x0, y, k, sp]) => {
       const cl = CLOUDS[k];
       g.drawImage(cl, Math.round((x0 + (t / 1000) * sp) % (W + 240)) - 240, y, cl.width * 2, cl.height * 2);
@@ -235,15 +273,39 @@ window.HKSeriesArt = (function () {
     g.save(); g.translate(0, SKY_H);
     // 전선 위의 새
     const hop = Math.floor(t / 1700) % 6 === 0 ? 1 : 0;
-    for (const x of [214, 226]) { px(x, 20 - hop, 7, 4, "#3b3942"); px(x + 6, 19 - hop, 3, 3, "#3b3942"); px(x - 3, 22 - hop, 4, 1, "#3b3942"); }
+    for (const x of [214, 226]) { px(x, 20 - hop, 7, 4, "#0d0f26"); px(x + 6, 19 - hop, 3, 3, "#0d0f26"); px(x - 3, 22 - hop, 4, 1, "#0d0f26"); }
     // 전봇대에 묶인 빨간 풍선
     const sway = Math.round(Math.sin(t / 900) * 2);
-    for (let i = 0; i < 26; i++) px(388 + Math.round(sway * i / 26), 92 - i, 1, 1, "#55525c");
-    px(382 + sway, 54, 13, 14, "#c9443c"); px(384 + sway, 52, 9, 18, "#c9443c"); px(386 + sway, 56, 3, 4, "#ec9b92"); px(387 + sway, 70, 3, 2, "#a5332c");
-    px(380, 92, 8, 2, "#55525c");
-    const bob = Math.round(Math.sin(t / 700) * 1.4);
-    worker(px, 250, GROUND + 6, t);
-    bubble(px, 252, 124 + bob);
+    for (let i = 0; i < 26; i++) px(388 + Math.round(sway * i / 26), 92 - i, 1, 1, "#23253f");
+    px(382 + sway, 54, 13, 14, "#a8322c"); px(384 + sway, 52, 9, 18, "#a8322c"); px(386 + sway, 56, 3, 4, "#d9786e"); px(387 + sway, 70, 3, 2, "#7d2420");
+    // 불빛 — 편의점 앞, 간판 둘레, 가로등 아래. 찻길에도 비친다
+    g.globalCompositeOperation = "lighter";
+    px(0, GROUND, 124, 12, "rgb(20, 38, 42)");
+    if (neon) for (let k = 0; k < 3; k++) px(BX_SIGN - 3 - k * 3, 65 - k * 3, 96 + k * 6, 48 + k * 6, "rgb(11, 5, 4)");
+    if (lamp) for (let y = 106; y < GROUND + 12; y += 2) {
+      const hw = 6 + (y - 106) * .5;
+      px(LAMP - hw, y, hw * 2, 2, "rgb(24, 20, 9)"); px(LAMP - hw * .6, y, hw * 1.2, 2, "rgb(18, 15, 7)");
+    }
+    for (let y = GROUND + 16; y < H - SKY_H; y += 3) {
+      px(8 + (y % 5), y, 100, 1, "rgb(20, 44, 48)");
+      if (neon) px(236 + (y % 7), y, 74, 1, "rgb(48, 18, 14)");
+      if (lamp) px(LAMP - 36 + (y % 5), y, 72, 1, "rgb(26, 22, 9)");
+    }
+    g.globalCompositeOperation = "source-over";
+    if (!neon) { g.fillStyle = "rgba(10, 12, 36, .78)"; g.fillRect(BX_SIGN + 2, 70, 86, 38); }
+    px(LAMP - 4, 104, 8, 2, lamp ? "#fff1b0" : "#4b4620");
+    // 불빛에 모이는 나방
+    for (const m of MOTHS) {
+      const a = m.a + (t / 1000) * m.sp, x = LAMP + Math.cos(a) * m.r, y = 116 + Math.sin(a * 1.7) * m.r * .6, f = Math.floor(t / 90 + m.a) % 2;
+      px(x - 1, y, 3, 1, "#d6cfc0"); px(x - (f ? 2 : 1), y - 1, 2, 1, "#a8a29e"); px(x + (f ? 1 : 0), y - 1, 2, 1, "#a8a29e");
+    }
+    // 사람과 말풍선은 따로 그려 밤빛을 입힌다
+    const fg = FIGURE.getContext("2d"), fp = brush(fg), bob = Math.round(Math.sin(t / 700) * 1.4);
+    fg.clearRect(0, 0, 70, 100);
+    worker(fp, 35, 96, t);
+    bubble(fp, 37, 26 + bob);
+    fg.globalCompositeOperation = "source-atop"; fg.fillStyle = "rgba(20, 24, 66, .22)"; fg.fillRect(0, 0, 70, 100); fg.globalCompositeOperation = "source-over";
+    g.drawImage(FIGURE, 215, 98);
     g.restore();
   }
 
