@@ -43,7 +43,7 @@
       key: "silent",
       setup(stage, ctx) {
         const COLS = 11, ROWS = 14, CELL = 16, W = COLS * CELL, H = ROWS * CELL;
-        const FLOORS = 8, STEP_SEC = 0.17, FLOOR_SEC = 35;
+        const FLOORS = 8, STEP_SEC = 0.17, HOLD_SEC = 0.24, FLOOR_SEC = 35; // HOLD_SEC: 터치 첫 걸음 뒤 계속 걷기까지 — 철판 앞에서 한 칸만 갈 수 있게
         const LOUD_R = 6; // 철판을 밟으면 이 칸 안의 그것이 듣는다
         const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 
@@ -58,7 +58,7 @@
               <canvas class="gm-canvas" aria-label="조용한 공사장 게임 화면"></canvas>
               <div class="gm-overlay" data-overlay></div>
             </div>
-            <div class="gm-note">방향키·WASD 이동 · 모바일은 화면에 대고 가고 싶은 쪽으로 밀기 · Esc 일시정지</div>
+            <div class="gm-note">방향키·WASD 이동 · 모바일은 짧게 밀면 한 칸, 밀고 있으면 계속 · Esc 일시정지</div>
           </div>`;
         const shell = stage.querySelector(".gm-shell");
         const canvas = stage.querySelector("canvas");
@@ -74,7 +74,7 @@
 
         let state = "ready", S = null, raf = 0, last = 0;
         const keys = {};
-        let touchDir = null;
+        let touchDir = null, pending = null, fresh = false; // pending: 짧게 민 한 칸은 걸음 사이에 들어와도 놓치지 않는다
         const px = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x), Math.round(y), w, h); };
         const rnd = (a, b) => a + Math.random() * (b - a);
         const ri = (n) => Math.floor(Math.random() * n);
@@ -125,6 +125,7 @@
           S.map = F.map; S.exit = F.exit; S.start = F.start;
           S.x = S.fx = F.start[0]; S.y = S.fy = F.start[1];
           S.floorT = 0; S.noise = 0; S.rings = [];
+          pending = null;
           S.mons = [];
           const n = Math.min(5, 1 + Math.floor(f / 1.6));
           for (let i = 0; i < n; i++) {
@@ -154,7 +155,7 @@
           ctx.sfx("ghost");
           hud();
           if (S.lives <= 0) return finish(false);
-          S.x = S.fx = S.start[0]; S.y = S.fy = S.start[1]; S.stepT = 0.5;
+          S.x = S.fx = S.start[0]; S.y = S.fy = S.start[1]; S.stepT = 0.5; pending = null;
           for (const m of S.mons) { m.target = null; m.field = null; }
         }
         function wanted() {
@@ -168,12 +169,13 @@
           // 내 걸음
           S.stepT -= dt;
           S.fx += (S.x - S.fx) * Math.min(1, dt * 22); S.fy += (S.y - S.fy) * Math.min(1, dt * 22);
-          const d = wanted();
+          const d = wanted() || pending;
           if (d && S.stepT <= 0) {
-            S.dir = d;
+            const hold = fresh ? HOLD_SEC : STEP_SEC;
+            S.dir = d; pending = null; fresh = false;
             const [dc, dr] = DIRS[d], nc = S.x + dc, nr = S.y + dr;
             if (nc >= 0 && nr >= 0 && nc < COLS && nr < ROWS && S.map[key(nc, nr)] !== "#") {
-              S.x = nc; S.y = nr; S.stepT = STEP_SEC;
+              S.x = nc; S.y = nr; S.stepT = hold;
               if (S.map[key(nc, nr)] === "m") makeNoise(nc, nr);
               if (nc === S.exit[0] && nr === S.exit[1]) return floorDone();
             }
@@ -308,7 +310,7 @@
           const b = overlay.querySelector("button");
           if (b) b.focus({ preventScroll: true });
         }
-        function clearInput() { Object.keys(keys).forEach((k) => { keys[k] = false; }); touchDir = null; }
+        function clearInput() { Object.keys(keys).forEach((k) => { keys[k] = false; }); touchDir = null; pending = null; fresh = false; }
         function showReady() {
           state = "ready";
           S = null;
@@ -380,8 +382,16 @@
         });
         window.addEventListener("keyup", (e) => { if (KEY[e.code]) keys[KEY[e.code]] = false; });
         window.addEventListener("blur", clearInput);
-        // 휴대폰 — 대고 민 방향으로 계속 걷는다. 손을 떼면 멈춘다
+        // 휴대폰 — 손가락을 댄 자리가 기준점이고, 기준점에서 민 쪽으로 걷는다. 기준점은 손가락을 따라와 작게 되밀어도 방향이 바뀐다
+        const DEAD = 10, REACH = 14;
         let tp = null;
+        function steer(dx, dy) {
+          const ax = Math.abs(dx), ay = Math.abs(dy);
+          if (Math.max(ax, ay) < DEAD) return null;
+          // 가던 방향은 조금 더 지켜 준다 — 손이 떨려도 옆으로 새지 않게
+          const across = touchDir === "left" || touchDir === "right" ? ax * 1.35 >= ay : touchDir ? ax > ay * 1.35 : ax > ay;
+          return across ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+        }
         canvas.addEventListener("pointerdown", (e) => {
           if (state !== "play") return;
           e.preventDefault();
@@ -391,10 +401,13 @@
         });
         canvas.addEventListener("pointermove", (e) => {
           if (!tp || e.pointerId !== tp.id) return;
-          const dx = e.clientX - tp.x, dy = e.clientY - tp.y;
-          if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
-          touchDir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
-          tp.x = e.clientX - Math.sign(dx) * 12; tp.y = e.clientY - Math.sign(dy) * 12; // 살짝만 되밀어도 방향이 바뀌게
+          let dx = e.clientX - tp.x, dy = e.clientY - tp.y;
+          const len = Math.hypot(dx, dy);
+          if (len > REACH) { dx *= REACH / len; dy *= REACH / len; tp.x = e.clientX - dx; tp.y = e.clientY - dy; }
+          const d = steer(dx, dy);
+          if (d === touchDir) return;
+          if (d) { pending = d; if (!touchDir) fresh = true; }
+          touchDir = d;
         });
         const up = (e) => { if (tp && e.pointerId === tp.id) { tp = null; touchDir = null; } };
         canvas.addEventListener("pointerup", up);
