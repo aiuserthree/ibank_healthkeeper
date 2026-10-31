@@ -838,6 +838,8 @@
         window.addEventListener("blur", () => { keys.left = keys.right = keys.up = keys.down = false; });
         const toWorld = (e) => { const r = canvas.getBoundingClientRect(); return { x: ((e.clientX - r.left) / r.width) * W, y: ((e.clientY - r.top) / r.height) * H }; };
         // 휴대폰 — 왼쪽 절반은 이동, 오른쪽 절반은 손전등. 손가락마다 따로 따라간다
+        const REGRIP_MS = 700;
+        let lastUp = { side: "", t: -1e9 };
         // 마우스는 게임 판 밖으로 나가도 손전등 방향을 계속 따라간다
         window.addEventListener("pointermove", (e) => {
           if (e.pointerType !== "mouse") return;
@@ -859,12 +861,20 @@
         canvas.addEventListener("pointerdown", (e) => {
           if (state !== "play" || e.pointerType === "mouse") return;
           e.preventDefault();
-          const p = toWorld(e), side = p.x < W / 2 ? "move" : "aim";
-          if (stick[side]) return;
+          const p = toWorld(e);
+          // 손가락 하나가 이미 대고 있으면 남은 역할을 맡고, 방금 뗀 손가락이 다시 대면 하던 일을 잇는다
+          // (손전등을 돌리다 잠깐 떼고 가운데 쪽을 다시 눌러도 이동으로 바뀌지 않게). 그 밖에는 화면 왼쪽 이동, 오른쪽 손전등
+          let side = p.x < W / 2 ? "move" : "aim";
+          if (stick.move && stick.aim) return;
+          if (stick.move) side = "aim";
+          else if (stick.aim) side = "move";
+          else if (performance.now() - lastUp.t < REGRIP_MS) side = lastUp.side;
           stick[side] = { id: e.pointerId, x0: p.x, y0: p.y, x: p.x, y: p.y, dx: 0, dy: 0, a: S.a };
           try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
         });
-        const endStick = (e) => { for (const k of ["move", "aim"]) if (stick[k] && stick[k].id === e.pointerId) stick[k] = null; };
+        const endStick = (e) => {
+          for (const k of ["move", "aim"]) if (stick[k] && stick[k].id === e.pointerId) { stick[k] = null; lastUp = { side: k, t: performance.now() }; }
+        };
         canvas.addEventListener("pointerup", endStick);
         canvas.addEventListener("pointercancel", endStick);
         canvas.addEventListener("contextmenu", (e) => e.preventDefault());

@@ -13,11 +13,10 @@
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/series-art.js"></script>
   <style>
-    .hk-sr { --ink: #fef3c7; --night: #120a24; --plum: #2a1b4d; --gold: #fde68a; --red: #ef4444; margin: -36px -32px -72px; padding-bottom: 72px; background: var(--night); color: var(--ink); min-height: 100vh; }
+    .hk-sr { --ink: #fef3c7; --night: #120a24; --plum: #2a1b4d; --gold: #fde68a; --red: #ef4444; padding-bottom: 72px; background: var(--night); color: var(--ink); min-height: 100vh; }
     .hk-sr__scene { display: block; width: 100%; height: auto; image-rendering: pixelated; }
     .hk-sr__in { max-width: 980px; margin: 0 auto; padding: 0 20px; }
-    .hk-sr__title { display: block; margin: 26px auto 6px; image-rendering: pixelated; max-width: 100%; }
-    .hk-sr__lead { margin: 0 0 26px; text-align: center; font-size: 15.5px; line-height: 1.6; color: #e9d5ff; word-break: keep-all; }
+    .hk-sr__lead { margin: 26px 0 26px; text-align: center; font-size: 15.5px; line-height: 1.6; color: #e9d5ff; word-break: keep-all; }
     .hk-sr__board { padding: 18px; background: #5b3a1e; border: 4px solid #2d1a0a; box-shadow: 0 0 0 4px #7c5230; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
     .hk-sr__job { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 182px; padding: 14px 12px 12px; background: #fef3c7; color: #3f2a14; text-decoration: none; box-shadow: 4px 4px 0 rgba(0,0,0,.35); }
     .hk-sr__job::before { content: ""; position: absolute; top: -5px; left: 50%; width: 10px; height: 10px; margin-left: -5px; background: var(--red); box-shadow: inset -2px -2px 0 #991b1b; }
@@ -33,7 +32,6 @@
     .hk-sr__job.is-off .hk-sr__go { background: #6b5a42; }
     .hk-sr__back { display: inline-block; margin: 18px 0 0; font-size: 14px; font-weight: 700; color: var(--gold); text-decoration: none; }
     @media (max-width: 860px) {
-      .hk-sr { margin: 0; }
       .hk-sr__board { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; gap: 12px; }
       .hk-sr__job { min-height: 170px; }
     }
@@ -42,7 +40,7 @@
 <body>
   <div id="app"></div>
   <script>
-    // 꿀알바 시리즈 — 밤거리 인력사무소 벽에 붙은 구인 공고. 회차마다 게임 하나
+    // 꿀알바 시리즈 — 골목 인력사무소 벽에 붙은 구인 공고. 회차마다 게임 하나
     const JOBS = [
       { ep: 1, title: "심야 편의점", pay: "시급 수상할 만큼 높음", rule: "아침 6시까지 두꺼비집을 지킬 것", key: "nightshift" },
       { ep: 2, title: "광대를 놓치지 마", pay: "시급 더 높음", rule: "광대에게서 눈을 떼지 말 것", key: "clown" },
@@ -58,42 +56,23 @@
         <span class="hk-sr__rule">규칙 · ${HKUI.escapeHtml(j.rule)}</span><span class="hk-sr__go">${j.key ? "지원하기" : "공고 준비 중"}</span>`;
       return j.key ? `<a class="hk-sr__job" href="/games/${j.key}">${body}</a>` : `<div class="hk-sr__job is-off">${body}</div>`;
     }
-    // 도트 글자 — 글꼴 파일 없이 작게 찍어 또렷한 점만 남긴 뒤 크게 키운다
-    function pixelTitle(canvas, text, size, zoom, color) {
-      const t = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-      const font = `800 ${size}px Pretendard, "Apple SD Gothic Neo", sans-serif`;
-      t.font = font;
-      const w = Math.ceil(t.measureText(text).width) + 4, h = size + 6;
-      t.canvas.width = w; t.canvas.height = h;
-      t.font = font; t.textBaseline = "middle"; t.fillStyle = "#000"; t.fillText(text, 2, h / 2);
-      const d = t.getImageData(0, 0, w, h).data;
-      canvas.width = w; canvas.height = h;
-      canvas.style.width = `${w * zoom}px`;
-      const g = canvas.getContext("2d");
-      g.fillStyle = "#7c2d12";
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 110) g.fillRect(x + 1, y + 1, 1, 1);
-      g.fillStyle = color;
-      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 110) g.fillRect(x, y, 1, 1);
-    }
     HKMember.mountPage({
       active: "lounge",
       auth: true,
       render: () => `<div class="hk-sr">
-          <canvas class="hk-sr__scene" id="sr-scene" width="480" height="170" aria-hidden="true"></canvas>
+          <canvas class="hk-sr__scene" id="sr-scene" width="${HKSeriesArt.width}" height="${HKSeriesArt.height}" role="img" aria-label="꿀알바 시리즈"></canvas>
           <div class="hk-sr__in">
-            <canvas class="hk-sr__title" id="sr-title" role="img" aria-label="꿀알바 시리즈"></canvas>
-            <p class="hk-sr__lead">밤에만 문을 여는 꿀벌 인력사무소. 시급은 높고, 규칙은 지켜야 해요.<br>공고를 골라 지원하세요.</p>
+            <p class="hk-sr__lead">낡은 골목의 꿀벌 인력사무소. 시급은 높고, 규칙은 지켜야 해요.<br>공고를 골라 지원하세요.</p>
             <div class="hk-sr__board">${JOBS.map(card).join("")}</div>
             <a class="hk-sr__back" href="/arcade">‹ 아케이드로</a>
           </div>
         </div>`,
       afterMount: () => {
-        pixelTitle(document.getElementById("sr-title"), "꿀알바 시리즈", 20, 3, "#fde68a");
         const c = document.getElementById("sr-scene");
         let raf = 0, lastDraw = 0;
         const loop = (t) => {
           raf = 0;
-          if (t - lastDraw > 80) { lastDraw = t; HKSeriesArt.drawScene(c, t); } // 나방이 움직일 만큼만 — 초당 12번
+          if (t - lastDraw > 80) { lastDraw = t; HKSeriesArt.drawScene(c, t); } // 구름이 흐를 만큼만 — 초당 12번
           if (!document.hidden) raf = requestAnimationFrame(loop);
         };
         raf = requestAnimationFrame(loop);
