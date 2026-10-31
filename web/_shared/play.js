@@ -557,7 +557,9 @@ window.HKPlay = (function () {
 
     // ── 판이 끝나면 '다시 하기' 옆에 '그만하기' — 게임의 다시 하기 버튼 옆에 붙이고, 없으면(창 안 게임 등) 창 아래에 둘 다 띄운다
     let endTimer = null;
-    function goQuit() { location.href = HKRoutes.lounge; }
+    // 꿀알바 시리즈 게임 — 게임을 나가면 아케이드 대신 시리즈 공고판으로 돌아간다
+    const SERIES = ["nightshift", "clown", "milk", "theater", "trial", "silent", "parade", "finale"].includes(key);
+    function goQuit() { location.href = SERIES ? "/series" : HKRoutes.lounge; }
 
     // ── 게임 중 뒤로 가기 — 바로 나가지 않고 묻는다: 지금까지 점수를 기록에 남기고 나갈지, 그냥 나갈지
     let leaving = null;
@@ -618,7 +620,7 @@ window.HKPlay = (function () {
           </div>
           <div data-lboard style="flex:1;min-height:0;overflow-y:auto"><div style="text-align:center;padding:24px"><span class="hk-spin"></span></div></div>
           <div class="hk-dialog__actions" style="margin-top:12px">
-            <button type="button" class="hk-btn hk-btn--primary" data-leave-go>아케이드로 나가기</button>
+            <button type="button" class="hk-btn hk-btn--primary" data-leave-go>${SERIES ? "꿀알바 목록으로 나가기" : "아케이드로 나가기"}</button>
           </div>
         </div>`;
       const box = overlay.querySelector("[data-lboard]");
@@ -804,17 +806,19 @@ window.HKPlay = (function () {
           <div class="hk-pf__tools">
             ${meta.dailyOnce ? `<span class="hk-badge ${dailyDone ? "hk-badge--neutral" : "hk-badge--warning"} hk-pf__daily">${dailyDone ? "오늘 도전 완료 · 연습" : "오늘의 도전"}</span>` : ""}
             <button type="button" class="hk-play-sound hk-pf__pause" id="hk-pf-pause" hidden aria-label="일시정지">${HKUI.icon("pause", 18, "currentColor")}<span>일시정지</span></button>
+            ${SERIES ? `<a class="hk-play-sound" id="hk-pf-series" href="/series" aria-label="꿀알바 공고 목록">${HKUI.icon("list", 18, "currentColor")}<span>꿀알바 목록</span></a>` : ""}
             <button type="button" class="hk-play-sound" id="hk-pf-report" aria-label="오류 신고">${HKUI.icon("bug", 18, "currentColor")}<span>오류 신고</span></button>
             <button type="button" class="hk-play-sound" id="hk-play-sound"></button>
             <button type="button" class="hk-play-sound hk-pf__rank-btn" id="hk-pf-rank" hidden>${HKUI.icon("trophy", 18, "currentColor")}<span>순위</span></button>
           </div>`;
         document.getElementById("hk-pf-pause").onclick = (e) => { e.currentTarget.blur(); togglePause(); };
         document.getElementById("hk-pf-report").onclick = (e) => { e.currentTarget.blur(); openReport(); };
-        document.querySelector(".hk-pf__back").addEventListener("click", (e) => {
+        // 게임 중에 나가면 먼저 묻는다
+        document.querySelectorAll(".hk-pf__back, #hk-pf-series").forEach((a) => a.addEventListener("click", (e) => {
           if (!playingNow) return;
           e.preventDefault();
           askLeave();
-        });
+        }));
         const soundBtn = document.getElementById("hk-play-sound");
         const paintSound = () => {
           const m = HKSound.isMuted();
