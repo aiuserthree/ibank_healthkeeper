@@ -163,9 +163,10 @@ window.HKSound = (function () {
     ghost: () => { tone({ type: "sine", f: 520, f2: 180, t: 0.7, v: 0.13, attack: 0.1 }); tone({ type: "sine", f: 548, f2: 190, t: 0.7, v: 0.09, attack: 0.1 }); },
     growl: () => { tone({ type: "sawtooth", f: 70, f2: 42, t: 1.1, v: 0.3, attack: 0.1 }); noise({ t: 0.9, v: 0.18, f: 260, f2: 90, type: "lowpass" }); },
     buzz: () => { [0, 0.05, 0.13].forEach((delay) => tone({ type: "sawtooth", f: 120, t: 0.04, v: 0.09, delay })); },
-    // 야간 퍼레이드 — 오르골 음(단조 음계 번호) · 작은 북
-    mbox: (n = 0) => tone({ type: "triangle", f: [440, 494, 523, 587, 659, 698, 784, 880][n % 8], t: 0.32, v: 0.17 }),
-    thump: () => tone({ type: "sine", f: 120, f2: 60, t: 0.09, v: 0.22 }),
+    // 야간 퍼레이드 — 오르골 음(단조 음계 번호) · 박자 나무 소리 · 작은 찰랑 소리. delay 초 뒤에 울린다
+    mbox: ({ n = 0, delay = 0 } = {}) => tone({ type: "triangle", f: [440, 494, 523, 587, 659, 698, 784, 880][n % 8], t: 0.3, v: 0.16, delay }),
+    beat: ({ delay = 0, strong = false } = {}) => { tone({ type: "triangle", f: strong ? 1100 : 900, f2: 420, t: 0.06, v: strong ? 0.3 : 0.22, delay }); noise({ t: 0.03, v: 0.1, f: 3200, delay }); },
+    shake: ({ delay = 0 } = {}) => noise({ t: 0.03, v: 0.05, f: 7000, delay }),
   };
 
   function play(name, arg) {
@@ -233,6 +234,9 @@ window.HKSound = (function () {
     toggle: () => setMuted(!muted),
     onChange: (fn) => listeners.push(fn),
     ambient,
+    // 소리 시계 — 음악에 맞추는 게임은 화면 대신 이 시계로 시간을 잰다 (소리가 안 켜졌으면 null)
+    now: () => (ac && ac.state === "running" ? ac.currentTime : null),
+    latency: () => (ac ? ac.outputLatency || ac.baseLatency || 0 : 0),
     names: Object.keys(SFX),
   };
 })();

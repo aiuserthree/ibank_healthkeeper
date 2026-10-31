@@ -43,6 +43,7 @@
       setup(stage, ctx) {
         const W = 180, H = 250, LANES = 3, LANE_W = W / LANES, HIT_Y = 214, TOP_Y = 66;
         const PERFECT = 0.07, GOOD = 0.13, FALL_SEC = 1.25; // 판정 시간(초) · 풍선이 내려오는 시간
+        const LOOK = 0.25; // 소리를 미리 예약하는 시간(초)
         const LANE_C = ["#38bdf8", "#facc15", "#a3e635"];
         // 구간마다 빠르기와 촘촘함이 오른다 [박자 수, 분당 박, 8분음 확률, 동시 치기 확률, 빨간 풍선 확률]
         const SECTIONS = [[32, 100, 0.05, 0, 0], [32, 112, 0.25, 0.04, 0.1], [32, 124, 0.4, 0.1, 0.14], [32, 136, 0.5, 0.16, 0.18]];
@@ -60,7 +61,7 @@
               <canvas class="gm-canvas" aria-label="야간 퍼레이드 게임 화면"></canvas>
               <div class="gm-overlay" data-overlay></div>
             </div>
-            <div class="gm-note">← ↓ → 또는 A·S·D · 모바일은 칸을 터치 · 빨간 풍선은 그냥 보내요 · Esc 일시정지</div>
+            <div class="gm-note">PC는 키보드 ← ↓ → 또는 A·S·D · 모바일은 칸을 터치 · 빨간 풍선은 그냥 보내요 · Esc 일시정지</div>
           </div>`;
         const shell = stage.querySelector(".gm-shell");
         const canvas = stage.querySelector("canvas");
@@ -88,7 +89,8 @@
               for (let sub = 0; sub < 2; sub++) {
                 const at = t + (b + sub / 2) * beat;
                 beats.push({ t: at, n: (si * 32 * 2 + b * 2 + sub) });
-                const on = sub === 0 ? (b % 4 !== 3 || si > 0) : Math.random() < eighth;
+                // 풍선은 멜로디 음이 있는 자리에만 놓는다
+                const on = TUNE[beats[beats.length - 1].n % TUNE.length] >= 0 && (sub === 0 ? (b % 4 !== 3 || si > 0) : Math.random() < eighth);
                 if (!on) continue;
                 let lane = Math.floor(Math.random() * LANES);
                 if (lane === prev && Math.random() < 0.6) lane = (lane + 1 + Math.floor(Math.random() * 2)) % LANES;
@@ -103,7 +105,7 @@
         }
         function newGame() {
           const c = makeChart();
-          S = { t: 0, score: 0, gauge: 100, combo: 0, best: 0, perfect: 0, good: 0, miss: 0, notes: c.notes, beats: c.beats, end: c.end, flash: [0, 0, 0], texts: [], pulse: 0, angry: 0, shake: 0 };
+          S = { t: 0, clock: null, lat: window.HKSound.latency(), bi: 0, vi: 0, score: 0, gauge: 100, combo: 0, best: 0, perfect: 0, good: 0, miss: 0, notes: c.notes, beats: c.beats, end: c.end, flash: [0, 0, 0], texts: [], pulse: 0, angry: 0, shake: 0 };
           hud();
         }
         function hud() {
@@ -124,7 +126,7 @@
             if (d < bd) { bd = d; best = n; }
             if (n.t - S.t > 0.5) break;
           }
-          if (!best || bd > GOOD) { ctx.sfx("tap"); return; } // 아무것도 없는 칸은 벌점 없이 지나간다
+          if (!best || bd > GOOD) return; // 아무것도 없는 칸은 벌점 없이 지나간다
           best.done = true;
           if (best.red) {
             S.gauge -= 18; S.combo = 0; S.angry = 0.6; S.shake = 0.25; S.miss++;
@@ -135,13 +137,11 @@
             S.score += 100 * (1 + Math.min(2, S.combo / 25));
             S.gauge = Math.min(100, S.gauge + 2);
             text(lane, "정확!", "#fde68a");
-            ctx.sfx("pop");
           } else {
             S.good++; S.combo++;
             S.score += 50 * (1 + Math.min(2, S.combo / 25));
             S.gauge = Math.min(100, S.gauge + 1);
             text(lane, "좋아요", "#a7f3d0");
-            ctx.sfx("tap");
           }
           S.best = Math.max(S.best, S.combo);
           hud();
@@ -149,13 +149,15 @@
         }
         function update(dt) {
           S.t += dt;
-          // 오르골 · 박자
-          while (S.beats.length && S.beats[0].t <= S.t) {
-            const b = S.beats.shift();
+          // 오르골 · 박자 — 조금 앞서 예약해 두면 화면이 잠깐 밀려도 소리는 제 박자에 울린다
+          while (S.bi < S.beats.length && S.beats[S.bi].t <= S.t + LOOK) {
+            const b = S.beats[S.bi++], delay = Math.max(0, b.t - S.t - S.lat);
             const n = TUNE[b.n % TUNE.length];
-            if (n >= 0) ctx.sfx("mbox", n);
-            if (b.n % 2 === 0) { S.pulse = 0.14; ctx.sfx("thump"); }
+            if (n >= 0) ctx.sfx("mbox", { n, delay });
+            if (b.n % 2 === 0) ctx.sfx("beat", { delay, strong: b.n % 8 === 0 });
+            else ctx.sfx("shake", { delay });
           }
+          while (S.vi < S.beats.length && S.beats[S.vi].t <= S.t) { if (S.beats[S.vi].n % 2 === 0) S.pulse = 0.12; S.vi++; }
           if (S.pulse > 0) S.pulse -= dt;
           if (S.angry > 0) S.angry -= dt;
           if (S.shake > 0) S.shake -= dt;
@@ -230,12 +232,18 @@
           }
           g.setTransform(1, 0, 0, 1, 0, 0);
         }
+        const KEY_HINT = matchMedia("(pointer: fine)").matches ? ["←", "↓", "→"] : null; // PC는 칸마다 누를 키를 적어 둔다
         function draw() {
           paint();
           HKPlay.smoothPixels(buf, out);
           if (!S) return;
           out.setTransform(2, 0, 0, 2, 0, 0);
-          out.font = "800 8px sans-serif"; out.textAlign = "center"; out.textBaseline = "middle";
+          out.textAlign = "center"; out.textBaseline = "middle";
+          if (KEY_HINT) {
+            out.font = "900 13px sans-serif"; out.fillStyle = "#fae8ff";
+            KEY_HINT.forEach((k, i) => out.fillText(k, (i + 0.5) * LANE_W, HIT_Y + 18));
+          }
+          out.font = "800 8px sans-serif";
           for (const t of S.texts) { out.fillStyle = t.c; out.fillText(t.t, t.x, t.y); }
         }
 
@@ -253,7 +261,11 @@
         function frame(now) {
           raf = 0;
           if (state !== "play") return;
-          const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          // 시간은 소리 시계로 잰다 — 화면이 끊겨도 풍선이 음악에서 밀리지 않는다
+          const au = window.HKSound.now();
+          let dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
+          if (au != null && S.clock != null) dt = Math.max(0, Math.min(0.5, au - S.clock));
+          S.clock = au;
           last = now;
           try { update(dt); if (state === "play") draw(); } catch (err) { console.error(err); }
           if (state === "play") raf = requestAnimationFrame(frame);
@@ -273,6 +285,7 @@
             <h2>야간 퍼레이드</h2>
             <p>밤의 놀이공원 퍼레이드에서 풍선 담당이에요. 풍선이 선에 닿을 때 그 칸을 눌러요.</p>
             <p class="gm-warn">근무 규칙 · 얼굴이 있는 <b>빨간 풍선</b>은 건드리지 말 것</p>
+            ${KEY_HINT ? `<p>PC는 키보드 <b>← ↓ →</b> 또는 <b>A S D</b>로 해요.</p>` : ""}
             <p>놓치면 박수 소리가 줄어요. 박수가 끊기면 퍼레이드에서 쫓겨나요.</p>
             <button type="button" class="gm-go" data-act="start">시작하기</button>
           </div>`);
@@ -293,6 +306,7 @@
           if (state !== "paused") return;
           overlay.hidden = true;
           state = "play";
+          S.clock = null;
           run();
         }
         function finish(won) {
