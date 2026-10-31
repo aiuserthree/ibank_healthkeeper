@@ -562,12 +562,12 @@ window.HKPlay = (function () {
     const SERIES = SERIES_JOBS.some(([k]) => k === key);
     let leaveTo = null; // 게임 중 왼쪽 목록에서 다른 회차를 고르면 나간 뒤 그 게임으로 간다
     function goQuit() { location.href = leaveTo || (SERIES ? "/series" : HKRoutes.lounge); }
-    // 상단 「꿀알바 시리즈」 — 시리즈 그림의 제목처럼 작게 찍은 글자를 두 배로 키운다
+    // 상단 「꿀알바 시리즈」 — 옆 버튼과 같은 높이로, 번진 곳 없이 또렷한 점만 찍는다
     function paintSeriesWord(c) {
       const t = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
-      const font = `800 12px Pretendard, "Apple SD Gothic Neo", sans-serif`, text = "꿀알바 시리즈";
+      const font = `800 14px Pretendard, "Apple SD Gothic Neo", sans-serif`, text = "꿀알바 시리즈";
       t.font = font;
-      const w = Math.ceil(t.measureText(text).width) + 2, h = 15, z = 2;
+      const w = Math.ceil(t.measureText(text).width) + 2, h = 18, z = 1;
       t.canvas.width = w; t.canvas.height = h;
       t.font = font; t.textBaseline = "middle"; t.fillStyle = "#000"; t.fillText(text, 1, h / 2 + 1);
       const d = t.getImageData(0, 0, w, h).data, g = c.getContext("2d");
@@ -575,7 +575,6 @@ window.HKPlay = (function () {
       c.style.width = `${w * z}px`; c.style.height = `${h * z}px`;
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 110) {
         g.fillStyle = "#f7cb16"; g.fillRect(x * z, y * z, z, z);
-        g.fillStyle = "#dfae12"; g.fillRect(x * z, y * z + z - 1, z, 1);
       }
     }
     // PC 왼쪽 회차 목록

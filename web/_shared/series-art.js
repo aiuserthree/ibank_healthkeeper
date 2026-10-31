@@ -47,9 +47,24 @@ window.HKSeriesArt = (function () {
     for (let y = 0; y < 2; y++) for (let x = (w - last) >> 1; x < (w + last) >> 1; x += 2) if ((x * 7 + y * 3) % 5) px(x + y, rows.length + y, 1, 1, "#2c2f62");
     return c;
   }
+  // 꿀의 받침 ㄹ은 획이 붙어 뭉개지므로, 또렷하게 찍히는 알의 받침 ㄹ을 옮겨 쓴다 (cw: 한 글자 폭)
+  function borrowRieul(dots, cw) {
+    const al = dots.filter(([x]) => x >= cw && x < cw * 2);
+    const rows = new Set(al.filter(([x]) => x < cw * 1.5).map(([, y]) => y));   // 왼쪽 절반 — ㅇ과 받침만 지나간다
+    let top = Math.min(...rows);
+    while (rows.has(top)) top++;                                                 // ㅇ 아래의 빈 줄을 지나면 받침이다
+    while (!rows.has(top) && top < 99) top++;
+    const old = dots.filter(([x, y]) => x < cw && y >= top), body = al.filter(([, y]) => y >= top);
+    if (!old.length || !body.length) return dots;
+    const oldX = old.map(([x]) => x), left = Math.min(...body.map(([x]) => x)), span = Math.max(...oldX) - Math.min(...oldX);
+    const rieul = body.filter(([x]) => x <= left + span);                        // 바의 첫 획은 빼고 ㄹ만
+    const dx = Math.min(...oldX) - left;
+    return dots.filter(([x, y]) => x >= cw || y < top).concat(rieul.map(([x, y]) => [x + dx, y]));
+  }
   // 하늘에 뜬 제목 — 작게 찍은 글자를 두 배로 키워 네모난 도트만 남긴다
   function makeTitle() {
     const d = textDots("꿀알바 시리즈", 26), z = 2;
+    d.dots = borrowRieul(d.dots, textDots("꿀", 26).w - 1);
     const c = document.createElement("canvas"); c.width = d.w * z + 2; c.height = d.h * z + 2;
     const px = brush(c.getContext("2d"));
     for (const [x, y] of d.dots) px(x * z, y * z, z + 1, z + 1, "#f7cb16");     // 점을 조금 겹쳐 찍어 획을 두껍게
