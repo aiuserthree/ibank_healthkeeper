@@ -265,7 +265,7 @@ window.HKSeriesArt = (function () {
     px(x - 7, y - 5, 16, 11, "#d99a33"); px(x - 6, y - 8, 14, 3, "#8d6239"); px(x - 7, y - 3, 16, 3, "#f2c766"); px(x - 4, y - 1, 4, 3, "#f8e0a0");
   }
   // 낡은 밤골목 — 꿀벌 인력사무소 앞에 공고를 든 사람이 서 있다. 간판과 가로등이 가끔 깜빡이고, 구름이 흐르고, 나방이 불빛에 모인다
-  function drawScene(c, t) {
+  function drawScene(c, t, opts) {
     if (!SKY) {
       SKY = makeSky(); TOWN = makeTown(); TITLE = makeTitle();
       FIGURE = document.createElement("canvas"); FIGURE.width = 70; FIGURE.height = 100;
@@ -283,7 +283,7 @@ window.HKSeriesArt = (function () {
       const cl = CLOUDS[k];
       g.drawImage(cl, Math.round((x0 + (t / 1000) * sp) % (W + 240)) - 240, y, cl.width * 2, cl.height * 2);
     });
-    g.drawImage(TITLE, Math.round((W - TITLE.width) / 2), 8);
+    if (!opts || opts.title !== false) g.drawImage(TITLE, Math.round((W - TITLE.width) / 2), 8); // 제목을 따로 쓰는 곳은 빼고 그린다
     g.drawImage(TOWN, 0, 0);
     g.save(); g.translate(0, SKY_H);
     // 전선 위의 새

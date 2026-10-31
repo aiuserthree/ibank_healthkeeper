@@ -239,7 +239,23 @@
     // 꿀알바 시리즈 입구 — 시리즈 게임은 시리즈 페이지에서만 고른다 (1화 심야 편의점은 아케이드에도 있다)
     const SERIES_ONLY = ["clown", "milk", "theater", "trial", "silent", "parade", "finale"];
     function seriesHtml() {
-      return `<div class="hk-aa-wrap"><a class="hk-aa-series" href="/series"><small>새 시리즈 · 게임 8편</small><b>꿀알바 시리즈</b><span>밤에만 여는 인력사무소의 구인 공고 보러 가기 ›</span></a></div>`;
+      return `<div class="hk-aa-wrap"><a class="hk-aa-series" href="/series"><canvas class="hk-aa-series__art" width="${HKSeriesArt.width}" height="${HKSeriesArt.height}" aria-hidden="true"></canvas><small>새 시리즈 · 게임 8편</small><b>꿀알바 시리즈</b><span>밤에만 여는 인력사무소의 구인 공고 보러 가기 ›</span></a></div>`;
+    }
+
+    // 입구 배경 — 시리즈 페이지와 같은 밤골목 그림. 화면에 보일 때만 움직인다
+    function animateSeriesEntrance(root) {
+      const art = root.querySelector(".hk-aa-series__art");
+      if (!art) return;
+      HKSeriesArt.drawScene(art, 0, { title: false });
+      let raf = 0, lastDraw = 0, seen = false;
+      const loop = (t) => {
+        raf = 0;
+        if (t - lastDraw > 80) { lastDraw = t; HKSeriesArt.drawScene(art, t, { title: false }); }
+        if (seen && !document.hidden) raf = requestAnimationFrame(loop);
+      };
+      const wake = () => { if (seen && !document.hidden && !raf) raf = requestAnimationFrame(loop); };
+      if (window.IntersectionObserver) new IntersectionObserver(([en]) => { seen = en.isIntersecting; wake(); }).observe(art);
+      document.addEventListener("visibilitychange", wake);
     }
 
     // 꿀알바 시리즈 소개 창 — 들어올 때 한 번. '오늘 그만 보기'를 누르면 그날은 안 뜬다
@@ -411,6 +427,7 @@
           const games = allGames.filter((g) => !SERIES_ONLY.includes(g.key));
           body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + seriesHtml() + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
+          animateSeriesEntrance(body);
           seriesPopup();
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
