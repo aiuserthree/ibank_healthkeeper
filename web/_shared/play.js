@@ -17,6 +17,31 @@
  *     sfx(name, arg) — 효과음 (HKSound 이름 목록 참고). 소리 켜고 끄기는 공통 버튼이 맡는다
  *   }
  */
+// 휴대폰은 화면을 초당 60번까지만 그린다 — 90~120Hz 화면에서 배터리를 아끼려고, 화면 주사율이 높아도 게임 속도는 그대로
+(function limitFps() {
+  if (!window.matchMedia("(pointer: coarse)").matches) return;
+  const MIN_GAP = 10.5; // 120Hz는 한 번 걸러 60번, 90Hz 이하는 그대로
+  const nativeRaf = window.requestAnimationFrame.bind(window);
+  const nativeCancel = window.cancelAnimationFrame.bind(window);
+  const live = new Map();
+  let nextId = 1, lastT = -1000;
+  window.requestAnimationFrame = (cb) => {
+    const id = nextId++;
+    const tick = (t) => {
+      if (t !== lastT && t - lastT < MIN_GAP) { live.set(id, nativeRaf(tick)); return; }
+      lastT = t;
+      live.delete(id);
+      cb(t);
+    };
+    live.set(id, nativeRaf(tick));
+    return id;
+  };
+  window.cancelAnimationFrame = (id) => {
+    if (live.has(id)) nativeCancel(live.get(id));
+    live.delete(id);
+  };
+})();
+
 /**
  * 라운지 효과음 — 소리 파일 없이 Web Audio 로 바로 만든다.
  * HKPlay.sfx(name, arg) 로 부르고, 켜고 끄기는 게임 머리의 🔊 버튼(모든 게임 공통, 기억됨).

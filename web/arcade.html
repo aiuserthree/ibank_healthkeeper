@@ -228,6 +228,13 @@
         </div>`;
     }
 
+    // 흘러가는 썸네일 줄은 화면에 보일 때만 움직인다 — 배터리 절약
+    function pauseOffscreen(root) {
+      if (!window.IntersectionObserver) return;
+      const io = new IntersectionObserver((list) => list.forEach((en) => en.target.classList.toggle("is-offscreen", !en.isIntersecting)));
+      root.querySelectorAll(".hk-aa-wall, .hk-aa-rail").forEach((el) => io.observe(el));
+    }
+
     // 한국 시간 자정까지 남은 시간 — 1초마다
     function startResetClock() {
       const el = document.getElementById("aa-reset");
@@ -355,6 +362,7 @@
           const [st, games, sp, wk] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null), HKApi.playWeekly().catch(() => null)]);
           status = st;
           body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
+          pauseOffscreen(body);
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;
         }
