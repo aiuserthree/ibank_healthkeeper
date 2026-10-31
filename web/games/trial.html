@@ -23,15 +23,12 @@
     .gm-hud__right { align-items: flex-end; }
     .gm-lives { display: inline-flex; gap: 3px; min-height: 18px; align-items: center; }
     .gm-lives i { width: 12px; height: 12px; background: #f87171; box-shadow: inset 0 0 0 2px #fecaca; }
-    .gm-chart { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 6px 8px; background: #f0fdfa; border-bottom: 3px solid #0f766e; }
-    .gm-chart.is-new { animation: gm-flash .4s steps(2) 4; }
-    @keyframes gm-flash { 50% { background: #fde047; } }
-    .gm-chart span { display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 13.5px; font-weight: 800; color: #134e4a; }
-    .gm-dotp { width: 18px; height: 9px; display: inline-block; border: 1.5px solid #134e4a; }
     .gm-screen { position: relative; overflow: hidden; background: #0c1f1d; }
     .gm-canvas { display: block; touch-action: none; cursor: pointer; image-rendering: pixelated; }
     .gm-pills { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; padding: 8px; border-radius: 0 0 16px 16px; background: #0c1f1d; }
-    .gm-pills button { display: flex; align-items: center; justify-content: center; gap: 6px; height: 56px; border: 3px solid #334155; background: #1e293b; color: #e2e8f0; font-size: 13px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+    .gm-pills button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; height: 60px; border: 3px solid #334155; background: #1e293b; color: #f1f5f9; font-size: 15px; font-weight: 800; cursor: pointer; touch-action: manipulation; }
+    .gm-pills.is-new button { animation: gm-flash .4s steps(2) 4; }
+    @keyframes gm-flash { 50% { background: #a16207; } }
     .gm-pills button i { width: 26px; height: 13px; display: block; border: 2px solid #f1f5f9; }
     .gm-pills button.is-on { border-color: #fde047; background: #334155; transform: translateY(-2px); }
     .gm-overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 14px; background: rgba(6, 24, 22, .8); overflow-y: auto; }
@@ -52,7 +49,7 @@
       key: "trial",
       setup(stage, ctx) {
         const W = 180, H = 150, COLS = 3, ROWS = 2, CW = W / COLS, CH = H / ROWS;
-        const DAYS = 5, DAY_SEC = 30;   // 5일 · 하루 30초 · 처방표는 날마다 바뀐다
+        const DAYS = 5, DAY_SEC = 30;   // 5일 · 하루 30초 · 약 칸의 병 이름은 날마다 바뀐다
         const SYMS = ["기침", "열", "떨림"];
         const PILLS = [{ name: "빨강", c: "#ef4444" }, { name: "노랑", c: "#facc15" }, { name: "파랑", c: "#3b82f6" }];
 
@@ -63,13 +60,12 @@
               <div class="gm-hud__item gm-hud__mid"><small>시험</small><b data-day>1일차</b></div>
               <div class="gm-hud__item gm-hud__right"><small>사고 허용</small><span class="gm-lives" data-lives></span></div>
             </div>
-            <div class="gm-chart" data-chart></div>
             <div class="gm-screen">
               <canvas class="gm-canvas" aria-label="신약 시험 보조 게임 화면"></canvas>
               <div class="gm-overlay" data-overlay></div>
             </div>
-            <div class="gm-pills" data-pills>${PILLS.map((p, i) => `<button type="button" data-pill="${i}"><i style="background:${p.c}"></i>${i + 1}</button>`).join("")}</div>
-            <div class="gm-note">약을 고른 뒤 환자를 눌러요 · 숫자 1·2·3으로도 고를 수 있어요 · Esc 일시정지</div>
+            <div class="gm-pills" data-pills>${PILLS.map((p, i) => `<button type="button" data-pill="${i}"><i style="background:${p.c}"></i><span data-label></span></button>`).join("")}</div>
+            <div class="gm-note">환자의 병과 같은 약을 고른 뒤 환자를 눌러요 · 숫자 1·2·3으로도 고를 수 있어요 · Esc 일시정지</div>
           </div>`;
         const shell = stage.querySelector(".gm-shell");
         const canvas = stage.querySelector("canvas");
@@ -82,7 +78,6 @@
         const elScore = stage.querySelector("[data-score]");
         const elDay = stage.querySelector("[data-day]");
         const elLives = stage.querySelector("[data-lives]");
-        const elChart = stage.querySelector("[data-chart]");
         const elPills = stage.querySelector("[data-pills]");
 
         let state = "ready", S = null, raf = 0, last = 0;
@@ -95,12 +90,15 @@
           setPick(-1);
           hud();
         }
-        // 처방표 — 날마다 증상과 약이 다시 섞인다 (전날과 같은 조합은 피한다)
+        // 약 — 날마다 약 칸의 병 이름이 뒤바뀐다 (전날과 같은 조합은 피한다)
         function newDay() {
           const was = S.map.join();
           do { S.map = [0, 1, 2].sort(() => Math.random() - 0.5); } while (S.map.join() === was);
-          elChart.innerHTML = SYMS.map((s, i) => `<span>${s} <i class="gm-dotp" style="background:${PILLS[S.map[i]].c}"></i></span>`).join("");
-          elChart.classList.remove("is-new"); void elChart.offsetWidth; elChart.classList.add("is-new");
+          setLabels();
+          elPills.classList.remove("is-new"); void elPills.offsetWidth; elPills.classList.add("is-new");
+        }
+        function setLabels() {
+          elPills.querySelectorAll("[data-label]").forEach((el, i) => { el.textContent = S ? SYMS[S.map.indexOf(i)] : SYMS[i]; });
         }
         function setPick(i) {
           if (S) S.pick = i;
@@ -228,7 +226,7 @@
         function fit() {
           const rect = stage.getBoundingClientRect();
           const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
-          const extra = stage.querySelector(".gm-hud").offsetHeight + elChart.offsetHeight + elPills.offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
+          const extra = stage.querySelector(".gm-hud").offsetHeight + elPills.offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
           const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
           const cw = Math.floor(W * k);
           canvas.style.width = `${cw}px`; canvas.style.height = `${Math.floor(H * k)}px`;
@@ -253,13 +251,13 @@
         function showReady() {
           state = "ready";
           S = null;
-          elChart.innerHTML = SYMS.map((s) => `<span>${s} <i class="gm-dotp"></i></span>`).join("");
+          setLabels();
           elLives.innerHTML = "<i></i><i></i><i></i>";
           draw();
           showOverlay(`<div class="gm-card">
             <h2>신약 시험 보조</h2>
-            <p>5일 동안 병실 환자에게 제시간에 약을 줘요. 위쪽 <b>처방표</b>대로 약을 고르고 환자를 누르세요.</p>
-            <p class="gm-warn">처방표는 날마다 바뀌어요.<br>자는 환자는 깨우지 마세요.</p>
+            <p>5일 동안 병실 환자에게 제시간에 약을 줘요. 환자의 병과 <b>이름이 같은 약</b>을 고르고 환자를 누르세요.</p>
+            <p class="gm-warn">약 칸의 자리는 날마다 바뀌어요.<br>자는 환자는 깨우지 마세요.</p>
             <button type="button" class="gm-go" data-act="start">시작하기</button>
           </div>`);
         }
