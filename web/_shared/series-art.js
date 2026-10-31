@@ -47,28 +47,36 @@ window.HKSeriesArt = (function () {
     for (let y = 0; y < 2; y++) for (let x = (w - last) >> 1; x < (w + last) >> 1; x += 2) if ((x * 7 + y * 3) % 5) px(x + y, rows.length + y, 1, 1, "#2c2f62");
     return c;
   }
-  // 꿀의 받침 ㄹ은 획이 붙어 뭉개지므로, 또렷하게 찍히는 알의 받침 ㄹ을 옮겨 쓴다 (cw: 한 글자 폭)
-  function borrowRieul(dots, cw) {
+  // 받침 ㄹ — 꿀의 ㄹ은 획이 붙어 뭉개지므로 알의 ㄹ을 옮겨 쓰고, 두 ㄹ의 빈 줄을 표시해 둔다 (cw: 한 글자 폭)
+  function fixRieul(dots, cw) {
     const al = dots.filter(([x]) => x >= cw && x < cw * 2);
     const rows = new Set(al.filter(([x]) => x < cw * 1.5).map(([, y]) => y));   // 왼쪽 절반 — ㅇ과 받침만 지나간다
     let top = Math.min(...rows);
     while (rows.has(top)) top++;                                                 // ㅇ 아래의 빈 줄을 지나면 받침이다
     while (!rows.has(top) && top < 99) top++;
     const old = dots.filter(([x, y]) => x < cw && y >= top), body = al.filter(([, y]) => y >= top);
-    if (!old.length || !body.length) return dots;
+    if (!old.length || !body.length) return { dots, gaps: [] };
     const oldX = old.map(([x]) => x), left = Math.min(...body.map(([x]) => x)), span = Math.max(...oldX) - Math.min(...oldX);
     const rieul = body.filter(([x]) => x <= left + span);                        // 바의 첫 획은 빼고 ㄹ만
-    const dx = Math.min(...oldX) - left;
-    return dots.filter(([x, y]) => x >= cw || y < top).concat(rieul.map(([x, y]) => [x + dx, y]));
+    const dx = Math.min(...oldX) - left, right = Math.max(...rieul.map(([x]) => x));
+    // 획이 일부만 지나는 줄이 ㄹ의 빈 줄이다 — 연결 획만 남기고 넓힌다
+    const gaps = [];
+    for (let y = top; y <= Math.max(...rieul.map((d) => d[1])); y++) {
+      const hit = new Set(rieul.filter((d) => d[1] === y).map((d) => d[0]));
+      if (hit.size * 2 > right - left) continue;
+      for (let x = left; x <= right + 1; x++) if (!hit.has(x)) gaps.push([x, y], [x + dx, y]);
+    }
+    return { dots: dots.filter(([x, y]) => x >= cw || y < top).concat(rieul.map(([x, y]) => [x + dx, y])), gaps };
   }
   // 하늘에 뜬 제목 — 작게 찍은 글자를 두 배로 키워 네모난 도트만 남긴다
   function makeTitle() {
-    const d = textDots("꿀알바 시리즈", 26), z = 2;
-    d.dots = borrowRieul(d.dots, textDots("꿀", 26).w - 1);
+    const d = textDots("꿀알바 시리즈", 26), z = 2, r = fixRieul(d.dots, textDots("꿀", 26).w - 1);
     const c = document.createElement("canvas"); c.width = d.w * z + 2; c.height = d.h * z + 2;
-    const px = brush(c.getContext("2d"));
-    for (const [x, y] of d.dots) px(x * z, y * z, z + 1, z + 1, "#f7cb16");     // 점을 조금 겹쳐 찍어 획을 두껍게
-    for (let y = 2; y < c.height; y += 3) { const g = c.getContext("2d"); g.globalCompositeOperation = "source-atop"; px(0, y, c.width, 1, "#eab90f"); g.globalCompositeOperation = "source-over"; }
+    const g = c.getContext("2d"), px = brush(g);
+    for (const [x, y] of r.dots) px(x * z, y * z, z + 1, z + 1, "#f7cb16");     // 점을 조금 겹쳐 찍어 획을 두껍게
+    for (const [x, y] of r.gaps) g.clearRect(x * z, y * z, z, z);        // ㄹ 줄 사이는 작은 화면에서도 벌어져 보이게
+    g.globalCompositeOperation = "source-atop";
+    for (let y = 2; y < c.height; y += 3) px(0, y, c.width, 1, "#eab90f");
     return c;
   }
 
@@ -267,7 +275,11 @@ window.HKSeriesArt = (function () {
   // 낡은 밤골목 — 꿀벌 인력사무소 앞에 공고를 든 사람이 서 있다. 간판과 가로등이 가끔 깜빡이고, 구름이 흐르고, 나방이 불빛에 모인다
   function drawScene(c, t, opts) {
     if (!SKY) {
-      SKY = makeSky(); TOWN = makeTown(); TITLE = makeTitle();
+      SKY = makeSky(); TOWN = makeTown();
+      // 글자는 점으로 찍어 두고 다시 쓰니 글꼴이 도착한 뒤에 찍는다 — 먼저 찍으면 대체 글꼴 모양으로 굳는다
+      const ready = () => { TITLE = makeTitle(); TOWN = makeTown(); };
+      if (document.fonts && document.fonts.load) document.fonts.load("800 26px Pretendard", "꿀알바 시리즈 인력사무소").then(ready, ready);
+      else ready();
       FIGURE = document.createElement("canvas"); FIGURE.width = 70; FIGURE.height = 100;
       MOTHS = Array.from({ length: 12 }, (_, i) => ({ a: i * 2.4, r: 6 + (i * 7) % 22, sp: 0.9 + (i % 5) * 0.28 }));
       CLOUDS = [[10, 12, 16, 26, 44, 70, 92], [6, 18, 30, 52, 66], [14, 22, 40, 58, 84, 110], [8, 20, 34, 48]].map(makeCloud);
@@ -283,7 +295,7 @@ window.HKSeriesArt = (function () {
       const cl = CLOUDS[k];
       g.drawImage(cl, Math.round((x0 + (t / 1000) * sp) % (W + 240)) - 240, y, cl.width * 2, cl.height * 2);
     });
-    if (!opts || opts.title !== false) g.drawImage(TITLE, Math.round((W - TITLE.width) / 2), 22); // 제목을 따로 쓰는 곳은 빼고 그린다
+    if (TITLE && (!opts || opts.title !== false)) g.drawImage(TITLE, Math.round((W - TITLE.width) / 2), 22); // 제목을 따로 쓰는 곳은 빼고 그린다
     g.drawImage(TOWN, 0, 0);
     g.save(); g.translate(0, SKY_H);
     // 전선 위의 새
