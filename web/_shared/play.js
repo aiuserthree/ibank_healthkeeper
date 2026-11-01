@@ -255,6 +255,7 @@ window.HKPlay = (function () {
     match3: ["#ff7a59", "#ffb648"],
     crossing: ["#16a06a", "#7bd389"],
     blocks: ["#2f6bff", "#45c3ff"],
+    gomoku: ["#92400e", "#d97706"],
     pairs: ["#0f8b8d", "#57cc99"],
     shooter: ["#2b1055", "#d53369"],
     bricks: ["#c2410c", "#fb923c"],

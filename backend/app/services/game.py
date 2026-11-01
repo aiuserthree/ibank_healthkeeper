@@ -68,6 +68,7 @@ GAMES: dict[str, Game] = {
         Game("chosung", "건강 초성 퀴즈", "QUIZ", "ㄱㅂㅁ → 거북목 · 오늘의 건강 낱말 20문제", "spell-check", "점", 100000, daily_once=True),
         Game("trivia", "오늘의 상식 퀴즈", "QUIZ", "전체 또는 분야별 하루 20문제 · 분야마다 순위", "lightbulb", "점", 100000, daily_once=True, variants=TRIVIA_VARIANTS),
         Game("korean", "한국어 능력시험", "STUDY", "맞춤법·띄어쓰기·표준어 · 매일 새 20문제", "book-open-check", "점", 100000, daily_once=True),
+        Game("gomoku", "사내 오목", "MINI", "동료에게 도전장 · 번갈아 두는 턴제 대전", "swords", "승", 1_000_000),
         Game("typing", "영어 타자 레이스", "STUDY", "뜻을 보고 영어 단어 치기 · 첫 글자 힌트", "keyboard", "점", 1_000_000),
     )
 }

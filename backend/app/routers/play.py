@@ -11,6 +11,7 @@ from app.core.deps import get_current_active_member, get_redis_client
 from app.database import get_db
 from app.models import Member
 from app.services import game as game_service
+from app.services import match as match_service
 
 router = APIRouter(prefix="/play", tags=["play"])
 
@@ -20,6 +21,20 @@ class GameRequestBody(BaseModel):
     kind: Optional[str] = None  # GAME · BUG · IDEA
     game: Optional[str] = None
     device: Optional[str] = None
+
+
+class MatchCreate(BaseModel):
+    opponentId: int
+
+
+class MatchBot(BaseModel):
+    level: str  # easy · normal · hard
+
+
+class MatchMove(BaseModel):
+    x: int
+    y: int
+    seq: int  # 내가 본 판의 수 — 그새 판이 바뀌었으면 두지 않는다
 
 
 class ScoreRequest(BaseModel):
@@ -70,6 +85,100 @@ async def request_game(
     """아케이드 의견(하고 싶은 게임 · 오류 신고 · 개선 의견) — 업무 시간에도 보낼 수 있다."""
     await game_service.add_game_request(db, member, body.body, body.kind, body.game, body.device)
     return {"data": {"ok": True}}
+
+
+@router.get("/match")
+async def matches(
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """내 오목 대국 — 받은 도전 · 진행 중 · 최근 결과 · 순위."""
+    return {"data": await match_service.overview(db, member)}
+
+
+@router.get("/match/inbox")
+async def match_inbox(
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """내 차례인 판과 받은 도전 수 — 아케이드 알림."""
+    return {"data": await match_service.inbox(db, member)}
+
+
+@router.get("/match/members")
+async def match_members(
+    q: str = Query(""),
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """도전할 직원 찾기."""
+    return {"data": await match_service.search_members(db, member, q)}
+
+
+@router.post("/match")
+async def match_create(
+    body: MatchCreate,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    return {"data": await match_service.create(db, member, body.opponentId)}
+
+
+@router.post("/match/bot")
+async def match_bot(
+    body: MatchBot,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """컴퓨터와 대국 시작 — 두던 판이 있으면 그 판을 돌려준다."""
+    return {"data": await match_service.start_bot(db, member, body.level)}
+
+
+@router.get("/match/{match_id}")
+async def match_detail(
+    match_id: int,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    return {"data": await match_service.detail(db, member, match_id)}
+
+
+@router.post("/match/{match_id}/accept")
+async def match_accept(
+    match_id: int,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    return {"data": await match_service.accept(db, member, match_id)}
+
+
+@router.post("/match/{match_id}/decline")
+async def match_decline(
+    match_id: int,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """받은 도전 거절 또는 보낸 도전 취소 — 업무 시간에도 할 수 있다."""
+    return {"data": await match_service.decline(db, member, match_id)}
+
+
+@router.post("/match/{match_id}/move")
+async def match_move(
+    match_id: int,
+    body: MatchMove,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    return {"data": await match_service.move(db, member, match_id, body.x, body.y, body.seq)}
+
+
+@router.post("/match/{match_id}/resign")
+async def match_resign(
+    match_id: int,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    return {"data": await match_service.resign(db, member, match_id)}
 
 
 @router.post("/{game}/run")

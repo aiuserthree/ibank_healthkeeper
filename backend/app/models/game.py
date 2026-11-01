@@ -3,10 +3,39 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, BigInteger, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
+
+
+class GameMatch(Base):
+    """턴제 대전 한 판 — 오목. 직원끼리는 도전 → 수락 → 번갈아 두기, 컴퓨터와는 바로 시작."""
+
+    __tablename__ = "game_match"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    game: Mapped[str] = mapped_column(String(30), nullable=False)
+    challenger_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False)
+    # 컴퓨터와 두는 판은 비어 있고 bot 에 난이도가 있다
+    opponent_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=True)
+    bot: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)  # easy · normal · hard
+    # 흑(먼저 두는 쪽) — 수락할 때 무작위로 정한다
+    black_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # PENDING · ACTIVE · DONE · DECLINED · EXPIRED
+    moves: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # 둔 순서대로 [x, y]
+    winner_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    end_reason: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # FIVE · RESIGN · TIMEOUT · DRAW
+    # 수락·다음 수의 기한 — 넘기면 도전은 만료, 판은 기한을 넘긴 쪽의 패
+    deadline_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ix_game_match_challenger", "challenger_id", "status"),
+        Index("ix_game_match_opponent", "opponent_id", "status"),
+        Index("ix_game_match_game_status", "game", "status"),
+    )
 
 
 class GamePlay(Base):
