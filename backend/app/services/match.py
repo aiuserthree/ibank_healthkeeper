@@ -1,4 +1,4 @@
-"""턴제 대전 — 오목. 직원끼리 또는 컴퓨터와. 수는 아케이드가 열린 시간에만 둘 수 있다."""
+"""턴제 대전 — 오목 · 체스. 직원끼리 또는 컴퓨터와. 수는 아케이드가 열린 시간에만 둘 수 있다."""
 
 from __future__ import annotations
 
@@ -7,26 +7,37 @@ import random
 from datetime import timedelta
 from typing import Optional
 
+import chess
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
 from app.core.time import KST, now_kst, today_kst
 from app.models import GameMatch, Member, MemberStatus
-from app.services import gomoku_ai
+from app.services import chess_game, gomoku_ai
 from app.services.avatar import member_avatar_url
 from app.services.game import _give_stamp, ensure_open
 
 GOMOKU = "gomoku"
+CHESS = "chess"
+MATCH_GAMES = (GOMOKU, CHESS)
 BOARD = 15
 ACCEPT_HOURS = 24  # 받은 도전을 기다리는 시간
 MOVE_HOURS = 24  # 한 수를 기다리는 시간 — 넘기면 기한을 넘긴 쪽의 패
-MAX_OPEN = 10  # 한 사람이 동시에 걸어 둘 수 있는 대국
+MAX_OPEN = 10  # 한 사람이 게임마다 동시에 걸어 둘 수 있는 대국
 MIN_MOVES = 10  # 기권·시간 초과는 이만큼 둔 판만 도장과 순위에 반영 — 바로 기권해 도장·승수를 얻지 못하게
 RANK_SIZE = 20
 BOT_NAME = {"easy": "컴퓨터 · 쉬움", "normal": "컴퓨터 · 보통", "hard": "컴퓨터 · 어려움"}
 
 OPEN_STATUS = ("PENDING", "ACTIVE")
+NO_WINNER = ("DRAW", "STALEMATE")      # 승부가 나지 않은 끝
+PLAYED_OUT = ("FIVE", "CHECKMATE", *NO_WINNER)
+
+
+def _check_game(game: str) -> str:
+    if game not in MATCH_GAMES:
+        raise_app_error("MATCH_NOT_FOUND", 404)
+    return game
 
 
 def _mine(member_id: int):
@@ -38,12 +49,13 @@ def _rival_id(m: GameMatch, member_id: int) -> Optional[int]:
 
 
 def _turn_id(m: GameMatch) -> Optional[int]:
+    """black_id 는 먼저 두는 쪽 — 오목은 흑, 체스는 백이다."""
     if m.status != "ACTIVE":
         return None
     if m.bot:  # 컴퓨터는 사람이 둔 요청 안에서 바로 두므로 저장된 판은 늘 사람 차례
         return m.challenger_id
-    white = m.opponent_id if m.black_id == m.challenger_id else m.challenger_id
-    return m.black_id if len(m.moves) % 2 == 0 else white
+    second = m.opponent_id if m.black_id == m.challenger_id else m.challenger_id
+    return m.black_id if len(m.moves) % 2 == 0 else second
 
 
 def _five(moves: list, x: int, y: int) -> bool:
@@ -66,7 +78,7 @@ def _five(moves: list, x: int, y: int) -> bool:
 def _counts(m: GameMatch) -> bool:
     if m.end_reason == "TIMEOUT" and m.bot:
         return False
-    return m.end_reason in ("FIVE", "DRAW") or len(m.moves) >= MIN_MOVES
+    return m.end_reason in PLAYED_OUT or len(m.moves) >= MIN_MOVES
 
 
 def _finish(m: GameMatch, winner_id: Optional[int], reason: str) -> None:
@@ -75,6 +87,33 @@ def _finish(m: GameMatch, winner_id: Optional[int], reason: str) -> None:
     m.end_reason = reason
     m.deadline_at = None
     m.finished_at = now_kst()
+
+
+def _apply(m: GameMatch, step, mover_id: Optional[int]) -> None:
+    """수를 판에 더하고 끝났는지 본다. 컴퓨터가 이긴 판은 승자 칸이 빈다."""
+    m.moves = [*m.moves, step]
+    if m.game == CHESS:
+        reason = chess_game.ending(chess_game.board_of(m.moves))
+        if reason:
+            _finish(m, mover_id if reason == "CHECKMATE" else None, reason)
+    elif _five(m.moves, step[0], step[1]):
+        _finish(m, mover_id, "FIVE")
+    elif len(m.moves) >= BOARD * BOARD:
+        _finish(m, None, "DRAW")
+    if m.status == "ACTIVE":
+        m.deadline_at = now_kst() + timedelta(hours=MOVE_HOURS)
+
+
+def _bot_step(game: str, moves: list, level: str):
+    return (chess_game if game == CHESS else gomoku_ai).choose(moves, level)
+
+
+async def _bot_reply(m: GameMatch) -> None:
+    step = await asyncio.to_thread(_bot_step, m.game, m.moves, m.bot)
+    if step is None:
+        _finish(m, None, "DRAW")
+    else:
+        _apply(m, step, None)
 
 
 async def _sweep(db: AsyncSession, member_id: Optional[int] = None) -> None:
@@ -96,7 +135,7 @@ async def _sweep(db: AsyncSession, member_id: Optional[int] = None) -> None:
         await db.commit()
 
 
-async def _people(db: AsyncSession, ids: set[int]) -> dict[int, Member]:
+async def _people(db: AsyncSession, ids: set) -> dict:
     ids = {i for i in ids if i is not None}
     if not ids:
         return {}
@@ -109,31 +148,46 @@ def _person(p: Optional[Member]) -> dict:
     return {"id": p.id, "name": p.name, "department": p.department or "", "avatarUrl": member_avatar_url(p.id)}
 
 
-def _payload(m: GameMatch, member_id: int, people: dict[int, Member], board: bool = False) -> dict:
+def _color(m: GameMatch, member_id: int) -> Optional[str]:
+    if m.status == "PENDING" or (m.black_id is None and not m.bot):
+        return None
+    first = m.black_id == member_id
+    if m.game == CHESS:
+        return "white" if first else "black"
+    return "black" if first else "white"
+
+
+def _payload(m: GameMatch, member_id: int, people: dict, board: bool = False) -> dict:
     rival = _rival_id(m, member_id)
-    is_black = m.black_id == member_id
     out = {
         "id": m.id,
+        "game": m.game,
         "status": m.status,
         "bot": m.bot,
         "opponent": {"id": None, "name": BOT_NAME[m.bot], "department": "연습 상대", "avatarUrl": None} if m.bot else _person(people.get(rival)),
         "incoming": m.status == "PENDING" and m.opponent_id == member_id,
-        "myColor": None if m.status == "PENDING" else ("black" if is_black else "white"),
+        "myColor": _color(m, member_id),
         "myTurn": _turn_id(m) == member_id,
         "moveCount": len(m.moves),
-        "result": None if m.status != "DONE" else ("draw" if m.end_reason == "DRAW" else "win" if m.winner_id == member_id else "lose"),
+        "result": None if m.status != "DONE" else ("draw" if m.end_reason in NO_WINNER else "win" if m.winner_id == member_id else "lose"),
         "endReason": m.end_reason,
         "deadlineAt": m.deadline_at.astimezone(KST).isoformat() if m.deadline_at else None,
         "finishedAt": m.finished_at.astimezone(KST).isoformat() if m.finished_at else None,
     }
     if board:
         out["moves"] = m.moves
-        out["size"] = BOARD
+        if m.game == CHESS:
+            b = chess_game.board_of(m.moves)
+            out["fen"] = b.fen()
+            out["check"] = b.is_check()
+            out["legal"] = [x.uci() for x in b.legal_moves] if out["myTurn"] else []
+        else:
+            out["size"] = BOARD
     return out
 
 
 async def _get(db: AsyncSession, member: Member, match_id: int, lock: bool = False) -> GameMatch:
-    q = select(GameMatch).where(GameMatch.id == match_id, GameMatch.game == GOMOKU, _mine(member.id))
+    q = select(GameMatch).where(GameMatch.id == match_id, _mine(member.id))
     if lock:
         q = q.with_for_update()
     m = (await db.execute(q)).scalars().first()
@@ -146,7 +200,7 @@ async def _view(db: AsyncSession, member: Member, m: GameMatch) -> dict:
     return _payload(m, member.id, await _people(db, {m.challenger_id, m.opponent_id}), board=True)
 
 
-async def search_members(db: AsyncSession, member: Member, q: str) -> list[dict]:
+async def search_members(db: AsyncSession, member: Member, q: str) -> list:
     q = (q or "").strip()[:30]
     stmt = select(Member).where(Member.status == MemberStatus.ACTIVE, Member.id != member.id).order_by(Member.name).limit(20)
     if q:
@@ -155,41 +209,43 @@ async def search_members(db: AsyncSession, member: Member, q: str) -> list[dict]
     return [_person(p) for p in (await db.execute(stmt)).scalars().all()]
 
 
-async def start_bot(db: AsyncSession, member: Member, level: str) -> dict:
+async def start_bot(db: AsyncSession, member: Member, level: str, game: str = GOMOKU) -> dict:
     ensure_open()
+    _check_game(game)
     if level not in gomoku_ai.LEVELS:
         raise_app_error("MATCH_BAD_LEVEL")
     await _sweep(db, member.id)
     going = (
         await db.execute(
             select(GameMatch).where(
-                GameMatch.game == GOMOKU, GameMatch.status == "ACTIVE", GameMatch.challenger_id == member.id, GameMatch.bot.is_not(None)
+                GameMatch.game == game, GameMatch.status == "ACTIVE", GameMatch.challenger_id == member.id, GameMatch.bot.is_not(None)
             )
         )
     ).scalars().first()
     if going is not None:
         return await _view(db, member, going)
-    # 흑은 먼저 두는 쪽 — 컴퓨터가 흑이면 black_id 를 비워 두고 첫 수를 바로 둔다
-    black = random.random() < 0.5
-    moves = [] if black else [await asyncio.to_thread(gomoku_ai.choose, [], level)]
+    # 컴퓨터가 먼저 두는 쪽이면 black_id 를 비워 두고 첫 수를 바로 둔다
+    first = random.random() < 0.5
+    moves = [] if first else [await asyncio.to_thread(_bot_step, game, [], level)]
     m = GameMatch(
-        game=GOMOKU, challenger_id=member.id, opponent_id=None, bot=level, status="ACTIVE", moves=moves,
-        black_id=member.id if black else None, deadline_at=now_kst() + timedelta(hours=MOVE_HOURS),
+        game=game, challenger_id=member.id, opponent_id=None, bot=level, status="ACTIVE", moves=moves,
+        black_id=member.id if first else None, deadline_at=now_kst() + timedelta(hours=MOVE_HOURS),
     )
     db.add(m)
     await db.commit()
     return await _view(db, member, m)
 
 
-async def create(db: AsyncSession, member: Member, opponent_id: int) -> dict:
+async def create(db: AsyncSession, member: Member, opponent_id: int, game: str = GOMOKU) -> dict:
     ensure_open()
+    _check_game(game)
     await _sweep(db, member.id)
     rival = await db.get(Member, opponent_id)
     if rival is None or rival.id == member.id or rival.status != MemberStatus.ACTIVE:
         raise_app_error("MATCH_BAD_OPPONENT")
     rows = (
         await db.execute(
-            select(GameMatch).where(GameMatch.game == GOMOKU, GameMatch.status.in_(OPEN_STATUS), _mine(member.id), GameMatch.bot.is_(None))
+            select(GameMatch).where(GameMatch.game == game, GameMatch.status.in_(OPEN_STATUS), _mine(member.id), GameMatch.bot.is_(None))
         )
     ).scalars().all()
     if any(_rival_id(m, member.id) == rival.id for m in rows):
@@ -197,7 +253,7 @@ async def create(db: AsyncSession, member: Member, opponent_id: int) -> dict:
     if len(rows) >= MAX_OPEN:
         raise_app_error("MATCH_LIMIT")
     m = GameMatch(
-        game=GOMOKU, challenger_id=member.id, opponent_id=rival.id, status="PENDING", moves=[],
+        game=game, challenger_id=member.id, opponent_id=rival.id, status="PENDING", moves=[],
         deadline_at=now_kst() + timedelta(hours=ACCEPT_HOURS),
     )
     db.add(m)
@@ -234,15 +290,29 @@ async def _stamp_both(db: AsyncSession, m: GameMatch, member: Member) -> Optiona
     if not _counts(m):
         return None
     today = today_kst()
-    mine = await _give_stamp(db, member, GOMOKU, today)
+    mine = await _give_stamp(db, member, m.game, today)
     rival_id = _rival_id(m, member.id)
     rival = await db.get(Member, rival_id) if rival_id else None
     if rival is not None:
-        await _give_stamp(db, rival, GOMOKU, today)
+        await _give_stamp(db, rival, m.game, today)
     return mine
 
 
-async def move(db: AsyncSession, member: Member, match_id: int, x: int, y: int, seq: int) -> dict:
+def _valid_step(m: GameMatch, x: Optional[int], y: Optional[int], uci: Optional[str]):
+    if m.game == CHESS:
+        try:
+            step = chess.Move.from_uci(uci or "")
+        except ValueError:
+            raise_app_error("MATCH_BAD_MOVE")
+        if step not in chess_game.board_of(m.moves).legal_moves:
+            raise_app_error("MATCH_BAD_MOVE")
+        return step.uci()
+    if x is None or y is None or not (0 <= x < BOARD and 0 <= y < BOARD) or [x, y] in m.moves:
+        raise_app_error("MATCH_BAD_MOVE")
+    return [x, y]
+
+
+async def move(db: AsyncSession, member: Member, match_id: int, x: Optional[int], y: Optional[int], uci: Optional[str], seq: int) -> dict:
     ensure_open()
     await _sweep(db, member.id)
     m = await _get(db, member, match_id, lock=True)
@@ -252,27 +322,9 @@ async def move(db: AsyncSession, member: Member, match_id: int, x: int, y: int, 
         raise_app_error("MATCH_NOT_YOUR_TURN")
     if seq != len(m.moves):
         raise_app_error("MATCH_STALE")
-    if not (0 <= x < BOARD and 0 <= y < BOARD) or [x, y] in m.moves:
-        raise_app_error("MATCH_BAD_MOVE")
-    m.moves = [*m.moves, [x, y]]
-    if _five(m.moves, x, y):
-        _finish(m, member.id, "FIVE")
-    elif len(m.moves) >= BOARD * BOARD:
-        _finish(m, None, "DRAW")
-    elif m.bot:
-        reply = await asyncio.to_thread(gomoku_ai.choose, m.moves, m.bot)
-        if reply is None:
-            _finish(m, None, "DRAW")
-        else:
-            m.moves = [*m.moves, reply]
-            if _five(m.moves, reply[0], reply[1]):
-                _finish(m, None, "FIVE")          # 승자 칸이 비면 컴퓨터가 이긴 판
-            elif len(m.moves) >= BOARD * BOARD:
-                _finish(m, None, "DRAW")
-            else:
-                m.deadline_at = now_kst() + timedelta(hours=MOVE_HOURS)
-    else:
-        m.deadline_at = now_kst() + timedelta(hours=MOVE_HOURS)
+    _apply(m, _valid_step(m, x, y, uci), member.id)
+    if m.bot and m.status == "ACTIVE":
+        await _bot_reply(m)
     await db.commit()
     stamp = await _stamp_both(db, m, member) if m.status == "DONE" else None
     return {**(await _view(db, member, m)), "stamp": stamp}
@@ -295,40 +347,36 @@ async def detail(db: AsyncSession, member: Member, match_id: int) -> dict:
 
 
 async def inbox(db: AsyncSession, member: Member) -> dict:
+    """게임별 내 차례 · 받은 도전 수 — 컴퓨터전은 알리지 않는다."""
     await _sweep(db, member.id)
     rows = (
-        await db.execute(
-            select(GameMatch).where(GameMatch.game == GOMOKU, GameMatch.status.in_(OPEN_STATUS), _mine(member.id), GameMatch.bot.is_(None))
-        )
+        await db.execute(select(GameMatch).where(GameMatch.status.in_(OPEN_STATUS), _mine(member.id), GameMatch.bot.is_(None)))
     ).scalars().all()
-    return {
-        "myTurn": sum(1 for m in rows if _turn_id(m) == member.id),
-        "incoming": sum(1 for m in rows if m.status == "PENDING" and m.opponent_id == member.id),
-    }
+    out = {}
+    for game in MATCH_GAMES:
+        mine = [m for m in rows if m.game == game]
+        out[game] = {
+            "myTurn": sum(1 for m in mine if _turn_id(m) == member.id),
+            "incoming": sum(1 for m in mine if m.status == "PENDING" and m.opponent_id == member.id),
+        }
+    return out
 
 
-async def _ranking(db: AsyncSession, member: Member) -> dict:
+async def _ranking(db: AsyncSession, member: Member, game: str) -> dict:
     """순위 — 승수로 줄을 세운다. 같은 상대에게 하루에 거둔 승은 1승으로 친다 (승수 몰아주기 방지). 컴퓨터전은 넣지 않는다."""
     rows = (
-        await db.execute(
-            select(GameMatch).where(
-                GameMatch.game == GOMOKU, GameMatch.status == "DONE", GameMatch.end_reason != "DRAW", GameMatch.bot.is_(None)
-            )
-        )
+        await db.execute(select(GameMatch).where(GameMatch.game == game, GameMatch.status == "DONE", GameMatch.bot.is_(None)))
     ).scalars().all()
-    wins: dict[int, set] = {}
-    losses: dict[int, int] = {}
+    wins: dict = {}
+    losses: dict = {}
     for m in rows:
         if not _counts(m) or m.winner_id is None:
             continue
         loser = _rival_id(m, m.winner_id)
         wins.setdefault(m.winner_id, set()).add((loser, m.finished_at.astimezone(KST).date()))
         losses[loser] = losses.get(loser, 0) + 1
-    ids = set(wins) | set(losses)
-    people = {i: p for i, p in (await _people(db, ids)).items() if p.status == MemberStatus.ACTIVE}
-    table = [
-        {**_person(p), "wins": len(wins.get(i, ())), "losses": losses.get(i, 0)} for i, p in people.items()
-    ]
+    people = {i: p for i, p in (await _people(db, set(wins) | set(losses))).items() if p.status == MemberStatus.ACTIVE}
+    table = [{**_person(p), "wins": len(wins.get(i, ())), "losses": losses.get(i, 0)} for i, p in people.items()]
     table.sort(key=lambda r: (-r["wins"], r["losses"], r["name"]))
     rank, prev = 0, None
     for i, row in enumerate(table, 1):
@@ -338,21 +386,21 @@ async def _ranking(db: AsyncSession, member: Member) -> dict:
     return {"top": table[:RANK_SIZE], "me": next((r for r in table if r["id"] == member.id), None)}
 
 
-async def overview(db: AsyncSession, member: Member) -> dict:
+async def overview(db: AsyncSession, member: Member, game: str = GOMOKU) -> dict:
+    _check_game(game)
     await _sweep(db, member.id)
     rows = (
-        await db.execute(select(GameMatch).where(GameMatch.game == GOMOKU, GameMatch.status.in_(OPEN_STATUS), _mine(member.id)))
+        await db.execute(select(GameMatch).where(GameMatch.game == game, GameMatch.status.in_(OPEN_STATUS), _mine(member.id)))
     ).scalars().all()
     done = (
         await db.execute(
             select(GameMatch)
-            .where(GameMatch.game == GOMOKU, GameMatch.status == "DONE", _mine(member.id))
+            .where(GameMatch.game == game, GameMatch.status == "DONE", _mine(member.id))
             .order_by(GameMatch.finished_at.desc())
             .limit(10)
         )
     ).scalars().all()
-    all_rows = [*rows, *done]
-    people = await _people(db, {_rival_id(m, member.id) for m in all_rows})
+    people = await _people(db, {_rival_id(m, member.id) for m in [*rows, *done]})
     items = [_payload(m, member.id, people) for m in rows]
     return {
         "incoming": [x for x in items if x["incoming"]],
@@ -360,5 +408,5 @@ async def overview(db: AsyncSession, member: Member) -> dict:
         "myTurn": [x for x in items if x["myTurn"]],
         "waiting": [x for x in items if x["status"] == "ACTIVE" and not x["myTurn"]],
         "recent": [_payload(m, member.id, people) for m in done],
-        "ranking": await _ranking(db, member),
+        "ranking": await _ranking(db, member, game),
     }

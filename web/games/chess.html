@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 사내 체스</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <style>
+    .cs__board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 100%; max-width: 620px; margin: 0 auto; aspect-ratio: 1; overflow: hidden; border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, .18); }
+    .cs__sq { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 1; min-width: 0; padding: 0; border: 0; background: #edd9b4; font: inherit; cursor: pointer; touch-action: manipulation; }
+    .cs__sq.is-dark { background: #a97c54; }
+    .cs__sq.is-last::after { content: ""; position: absolute; inset: 0; background: rgba(250, 204, 21, .38); }
+    .cs__sq.is-pick::after { content: ""; position: absolute; inset: 0; background: rgba(34, 197, 94, .45); }
+    .cs__sq.is-check::after { content: ""; position: absolute; inset: 0; background: rgba(239, 68, 68, .55); }
+    .cs__sq.is-to::before { content: ""; position: absolute; z-index: 2; width: 28%; height: 28%; border-radius: 50%; background: rgba(21, 128, 61, .6); }
+    .cs__sq.is-take::before { content: ""; position: absolute; z-index: 2; inset: 5%; border: 4px solid rgba(21, 128, 61, .7); border-radius: 50%; }
+    .cs__pc { position: relative; z-index: 1; font-family: "Apple Symbols", "Segoe UI Symbol", "Noto Sans Symbols2", serif; font-size: clamp(30px, 10.5vw, 62px); line-height: 1; }
+    .cs__pc.is-w { color: #fff; text-shadow: 0 0 1px #111827, 0 0 1px #111827, 0 1px 2px #111827, 1px 0 1px #111827, -1px 0 1px #111827; }
+    .cs__pc.is-b { color: #111827; text-shadow: 0 0 1px #fff; }
+    .cs__coord { position: absolute; z-index: 1; left: 3px; bottom: 1px; font-size: 10px; font-weight: 700; color: rgba(60, 35, 15, .65); }
+    .cs__promo { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+    .cs__promo button { padding: 8px 0; border: 1px solid var(--border-default); border-radius: 12px; background: #edd9b4; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 사내 체스 — 도전 → 수락 → 번갈아 두기, 또는 컴퓨터와. 규칙 판정은 서버가 하고, 화면은 서버가 준 둘 수 있는 수만 보여 준다
+    const { esc, REASON, ava, closedNote, due, fail } = HKMatch;
+    const GAME = "chess", POLL_MS = 6000;
+    const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+    const PROMO = { q: "퀸", r: "룩", b: "비숍", n: "나이트" };
+    const NEW_BOARD = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
+    let root = null, open = { open: true, opensAt: null }, match = null, chosen = null, timer = 0, sending = false, thinking = false;
+    function stopPoll() { clearTimeout(timer); timer = 0; }
+    async function showLobby() {
+      stopPoll(); match = null; chosen = null;
+      open = await HKMatch.lobby(root, GAME, { title: "사내 체스", lead: "동료에게 도전장을 보내거나 컴퓨터와 두어요. 한 수를 24시간 안에 두지 않으면 시간 초과로 져요. 대국이 끝나면 오늘 도장을 받아요." });
+    }
+
+    // ---------- 판 ----------
+    const sqName = (file, rank) => "abcdefgh"[file] + (rank + 1);
+    function pieces(fen) {
+      const map = {};
+      fen.split(" ")[0].split("/").forEach((row, i) => {
+        let file = 0;
+        for (const ch of row) {
+          if (/\d/.test(ch)) file += Number(ch);
+          else { map[sqName(file, 7 - i)] = ch; file++; }
+        }
+      });
+      return map;
+    }
+    function kingSquare(map, white) { return Object.keys(map).find((s) => map[s] === (white ? "K" : "k")); }
+    function boardHtml() {
+      const map = pieces(match.fen || NEW_BOARD);
+      const last = match.moves && match.moves[match.moves.length - 1];
+      const dests = chosen ? (match.legal || []).filter((u) => u.startsWith(chosen)).map((u) => u.slice(2, 4)) : [];
+      const whiteToMove = (match.fen || "").split(" ")[1] === "w";
+      const checked = match.check ? kingSquare(map, whiteToMove) : null;
+      const flip = match.myColor === "black";
+      let html = "";
+      for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+        const rank = flip ? r : 7 - r, file = flip ? 7 - f : f, sq = sqName(file, rank), pc = map[sq];
+        const cls = ["cs__sq"];
+        if ((rank + file) % 2 === 0) cls.push("is-dark");
+        if (last && (last.slice(0, 2) === sq || last.slice(2, 4) === sq)) cls.push("is-last");
+        if (sq === chosen) cls.push("is-pick");
+        if (sq === checked) cls.push("is-check");
+        if (dests.includes(sq)) cls.push(pc ? "is-take" : "is-to");
+        const glyph = pc ? `<span class="cs__pc ${pc === pc.toUpperCase() ? "is-w" : "is-b"}">${GLYPH[pc.toLowerCase()]}&#xFE0E;</span>` : "";
+        const coord = f === 0 ? `<span class="cs__coord">${rank + 1}</span>` : "";
+        html += `<button type="button" class="${cls.join(" ")}" data-sq="${sq}" aria-label="${sq}">${coord}${glyph}</button>`;
+      }
+      return html;
+    }
+    function statusText() {
+      if (thinking) return "컴퓨터가 생각 중…";
+      if (match.status === "DONE") return { win: "이겼어요", lose: "졌어요", draw: "비겼어요" }[match.result];
+      if (match.status === "ACTIVE") return match.myTurn ? (match.check ? "체크! 내 차례" : "내 차례") : "상대 차례";
+      if (match.status === "PENDING") return match.incoming ? "받은 도전" : "수락 기다리는 중";
+      return match.status === "DECLINED" ? "취소된 도전" : "만료된 도전";
+    }
+    function paintMatch() {
+      const bar = match.status === "ACTIVE"
+        ? `<span class="gk__place gk__due" style="margin:0;align-self:center">${!open.open ? `${esc(open.opensAt || "")}부터 둘 수 있어요` : !match.myTurn ? "상대 차례예요" : chosen ? "옮길 칸을 눌러 주세요" : "움직일 기물을 눌러 주세요"}</span>
+           <button type="button" class="hk-btn hk-btn--secondary" id="gk-resign" ${open.open ? "" : "disabled"}>기권</button>`
+        : `<a class="hk-btn hk-btn--primary gk__place" href="#" style="text-align:center;text-decoration:none">대국 목록</a>`;
+      const color = match.myColor ? `<span class="gk__stone is-${match.myColor}" title="내 색"></span>` : "";
+      const note = match.status === "ACTIVE" ? `${match.moveCount}수 · 이번 수 ${due(match.deadlineAt)}` : match.status === "DONE" ? `${REASON[match.endReason] || ""} · ${match.moveCount}수` : "";
+      root.innerHTML = `<div class="gk">
+          <a class="gk__back" href="#">‹ 대국 목록</a>
+          ${closedNote(open)}
+          <div class="gk__status">${ava(match.opponent)}<span class="gk__who"><b>${esc(match.opponent.name)}</b><small>${esc(match.opponent.department || "")}</small></span>${color}<span class="gk__msg">${esc(statusText())}</span></div>
+          <div class="cs__board" id="cs-board" role="grid" aria-label="체스 판">${boardHtml()}</div>
+          <div id="cs-promo"></div>
+          <div class="gk__bar">${bar}</div>
+          ${note ? `<div class="gk__due">${esc(note)}</div>` : ""}
+        </div>`;
+    }
+    function repaintBoard() {
+      const b = document.getElementById("cs-board");
+      if (b) b.innerHTML = boardHtml();
+    }
+    function tapSquare(sq) {
+      if (!match || match.status !== "ACTIVE" || !match.myTurn || !open.open || sending) return;
+      const legal = match.legal || [];
+      if (chosen) {
+        const options = legal.filter((u) => u.startsWith(chosen + sq));
+        if (options.length === 1) return play(options[0]);
+        if (options.length > 1) return askPromotion(options);
+      }
+      chosen = sq !== chosen && legal.some((u) => u.startsWith(sq)) ? sq : null;
+      document.getElementById("cs-promo").innerHTML = "";
+      paintMatch();
+    }
+    function askPromotion(options) {
+      const white = match.myColor === "white";
+      document.getElementById("cs-promo").innerHTML = `<div class="gk__due">승격할 기물을 골라 주세요</div><div class="cs__promo">${Object.keys(PROMO).map((k) => {
+        const uci = options.find((u) => u.endsWith(k));
+        return `<button type="button" data-promo="${uci}" aria-label="${PROMO[k]}"><span class="cs__pc ${white ? "is-w" : "is-b"}">${GLYPH[k]}&#xFE0E;</span></button>`;
+      }).join("")}</div>`;
+    }
+    async function play(uci) {
+      if (sending) return;
+      sending = true;
+      const seq = match.moves.length;
+      // 내 수를 먼저 보여 주고, 컴퓨터의 답을 기다린다
+      const map = pieces(match.fen), from = uci.slice(0, 2), to = uci.slice(2, 4);
+      const rows = [];
+      map[to] = map[from]; delete map[from];
+      for (let r = 7; r >= 0; r--) { let row = "", gap = 0; for (let f = 0; f < 8; f++) { const pc = map[sqName(f, r)]; if (pc) { row += (gap || "") + pc; gap = 0; } else gap++; } rows.push(row + (gap || "")); }
+      chosen = null;
+      match = { ...match, fen: `${rows.join("/")} ${match.myColor === "white" ? "b" : "w"} - - 0 1`, moves: [...match.moves, uci], myTurn: false, check: false, legal: [] };
+      thinking = !!match.bot;
+      paintMatch();
+      try {
+        const next = await HKApi.matchMove(match.id, { uci }, seq);
+        thinking = false;
+        match = next; paintMatch(); schedulePoll();
+        if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+      } catch (e) { thinking = false; fail(e); await showMatch(match.id); }
+      sending = false;
+    }
+    // 상대 차례면 판이 바뀌었는지 가끔 본다 — 화면이 보일 때만
+    function schedulePoll() {
+      stopPoll();
+      if (!match || ["DONE", "DECLINED", "EXPIRED"].includes(match.status) || match.myTurn) return;
+      timer = setTimeout(async () => {
+        if (document.hidden || !match) return schedulePoll();
+        const id = match.id;
+        try {
+          const next = await HKApi.matchDetail(id);
+          if (!match || match.id !== id) return;
+          const changed = next.moveCount !== match.moveCount || next.status !== match.status;
+          match = next;
+          if (changed) { chosen = null; paintMatch(); }
+        } catch (_) { /* 잠깐 끊겨도 다음 차례에 다시 본다 */ }
+        schedulePoll();
+      }, POLL_MS);
+    }
+    async function showMatch(id) {
+      stopPoll(); chosen = null;
+      try { [match, open] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
+      catch (e) { fail(e); location.hash = ""; return; }
+      if (match.game !== GAME) { location.href = `/games/${match.game}#m${id}`; return; }
+      paintMatch();
+      schedulePoll();
+    }
+    function route() {
+      const m = /^#m(\d+)$/.exec(location.hash);
+      if (m) showMatch(Number(m[1])); else showLobby();
+    }
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div id="gk-root"></div>`,
+      afterMount: () => {
+        root = document.getElementById("gk-root");
+        root.addEventListener("click", async (e) => {
+          const t = e.target.closest("button, a");
+          if (!t) return;
+          if (t.dataset.sq) return tapSquare(t.dataset.sq);
+          if (t.dataset.promo) return play(t.dataset.promo);
+          if (t.id === "gk-resign") {
+            if (!(await HKUI.confirmDialog("기권할까요?", "이 판은 패배로 끝나요.", { confirmLabel: "기권" }))) return;
+            try { match = await HKApi.matchResign(match.id); paintMatch(); schedulePoll(); if (match.stamp && match.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${match.stamp.count}/${match.stamp.goal})`); } catch (err) { fail(err); }
+            return;
+          }
+          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
+          await HKMatch.act(t, GAME, showLobby);
+        });
+        window.addEventListener("hashchange", route);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && match && !sending) showMatch(match.id); });
+        route();
+      },
+    });
+  </script>
+</body>
+</html>

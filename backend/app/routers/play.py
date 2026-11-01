@@ -25,15 +25,18 @@ class GameRequestBody(BaseModel):
 
 class MatchCreate(BaseModel):
     opponentId: int
+    game: str = "gomoku"
 
 
 class MatchBot(BaseModel):
     level: str  # easy · normal · hard
+    game: str = "gomoku"
 
 
 class MatchMove(BaseModel):
-    x: int
-    y: int
+    x: Optional[int] = None  # 오목
+    y: Optional[int] = None
+    uci: Optional[str] = None  # 체스 — e2e4, 승격은 e7e8q
     seq: int  # 내가 본 판의 수 — 그새 판이 바뀌었으면 두지 않는다
 
 
@@ -89,11 +92,12 @@ async def request_game(
 
 @router.get("/match")
 async def matches(
+    game: str = Query("gomoku"),
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    """내 오목 대국 — 받은 도전 · 진행 중 · 최근 결과 · 순위."""
-    return {"data": await match_service.overview(db, member)}
+    """내 대국 — 받은 도전 · 진행 중 · 최근 결과 · 순위."""
+    return {"data": await match_service.overview(db, member, game)}
 
 
 @router.get("/match/inbox")
@@ -101,7 +105,7 @@ async def match_inbox(
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    """내 차례인 판과 받은 도전 수 — 아케이드 알림."""
+    """게임별 내 차례인 판과 받은 도전 수 — 아케이드 알림."""
     return {"data": await match_service.inbox(db, member)}
 
 
@@ -121,7 +125,7 @@ async def match_create(
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    return {"data": await match_service.create(db, member, body.opponentId)}
+    return {"data": await match_service.create(db, member, body.opponentId, body.game)}
 
 
 @router.post("/match/bot")
@@ -131,7 +135,7 @@ async def match_bot(
     member: Member = Depends(get_current_active_member),
 ):
     """컴퓨터와 대국 시작 — 두던 판이 있으면 그 판을 돌려준다."""
-    return {"data": await match_service.start_bot(db, member, body.level)}
+    return {"data": await match_service.start_bot(db, member, body.level, body.game)}
 
 
 @router.get("/match/{match_id}")
@@ -169,7 +173,7 @@ async def match_move(
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    return {"data": await match_service.move(db, member, match_id, body.x, body.y, body.seq)}
+    return {"data": await match_service.move(db, member, match_id, body.x, body.y, body.uci, body.seq)}
 
 
 @router.post("/match/{match_id}/resign")

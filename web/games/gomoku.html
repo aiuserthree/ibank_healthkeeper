@@ -11,117 +11,24 @@
   <script src="/_shared/ui.js"></script>
   <script src="/_shared/api.js"></script>
   <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
   <style>
-    .gk { max-width: 760px; margin: 0 auto; padding: 28px 20px 72px; color: var(--color-midnight-navy); }
-    .gk__back { display: inline-block; margin-bottom: 14px; font-size: 14px; font-weight: 600; color: var(--text-secondary); text-decoration: none; }
-    .gk h1 { margin: 0 0 6px; font-size: 28px; font-weight: 800; }
-    .gk__lead { margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: var(--text-secondary); word-break: keep-all; }
-    .gk__closed { margin-bottom: 18px; padding: 12px 14px; border-radius: 12px; background: #fef3c7; color: #7c2d12; font-size: 14px; font-weight: 700; word-break: keep-all; }
-    .gk .gk__sec { margin-top: 26px; padding: 0; }
-    .gk__sec h2 { margin: 0 0 10px; font-size: 16px; font-weight: 800; }
-    .gk__row { display: flex; align-items: center; gap: 10px; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--border-default); border-radius: 14px; background: var(--surface-card, #fff); color: inherit; text-decoration: none; }
-    a.gk__row:hover { border-color: #94a3b8; }
-    .gk__row img, .gk__status img, .gk__ava { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: var(--color-mist); }
-    .gk__who { min-width: 0; flex: 1; }
-    .gk__who b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .gk__who small { display: block; font-size: 12.5px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .gk__tag { flex-shrink: 0; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; background: var(--color-mist); color: var(--text-secondary); }
-    .gk__tag.is-turn, .gk__tag.is-win { background: #dcfce7; color: #166534; }
-    .gk__tag.is-lose { background: #fee2e2; color: #991b1b; }
-    .gk__btns { display: flex; gap: 6px; flex-shrink: 0; }
-    .gk__empty { padding: 14px; font-size: 14px; color: var(--text-muted); text-align: center; }
-    .gk__search { width: 100%; box-sizing: border-box; padding: 12px 14px; margin-bottom: 8px; border: 1px solid var(--border-default); border-radius: 12px; font: inherit; font-size: 16px; }
-    .gk__levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-    .gk__rank { width: 26px; flex-shrink: 0; text-align: center; font-size: 14px; font-weight: 800; color: #b45309; }
-    .gk__me { border-color: #f59e0b; }
-    .gk__status { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 12px 14px; border-radius: 14px; background: var(--surface-card, #fff); border: 1px solid var(--border-default); }
-    .gk__stone { width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; border: 1px solid #475569; }
-    .gk__stone.is-black { background: #111827; }
-    .gk__stone.is-white { background: #fff; }
-    .gk__msg { margin-left: auto; flex-shrink: 0; font-size: 14px; font-weight: 800; }
     .gk__board { display: block; width: 100%; max-width: 620px; margin: 0 auto; aspect-ratio: 1; touch-action: manipulation; cursor: pointer; border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, .18); }
-    .gk__bar { display: flex; gap: 8px; max-width: 620px; margin: 12px auto 0; }
-    .gk__bar .gk__place { flex: 1; }
-    .gk__due { margin-top: 10px; text-align: center; font-size: 13px; color: var(--text-muted); word-break: keep-all; }
-    @media (max-width: 640px) { .gk { padding: 18px 12px 56px; } .gk h1 { font-size: 24px; } }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <script>
     // 사내 오목 — 도전 → 수락 → 번갈아 두기. 수는 아케이드가 열린 시간에만 둘 수 있고, 한 수 기한은 24시간
-    const esc = HKUI.escapeHtml;
+    const { esc, REASON, ava, closedNote, due, fail } = HKMatch;
+    const GAME = "gomoku";
     const POLL_MS = 6000; // 상대 차례일 때 판을 다시 불러오는 간격
     const PLACE_TEXT = matchMedia("(hover: hover) and (pointer: fine)").matches ? "여기에 두기 (Space)" : "여기에 두기"; // PC는 스페이스로도 둔다
     let root = null, open = { open: true, opensAt: null }, match = null, pick = null, timer = 0, sending = false;
-    const REASON = { FIVE: "오목 완성", RESIGN: "기권", TIMEOUT: "시간 초과", DRAW: "무승부" };
-    const ava = (p) => (p.avatarUrl ? `<img src="${esc(p.avatarUrl)}" alt="" onerror="this.remove()">` : `<span class="gk__ava"></span>`);
-    const person = (p, sub) => `${ava(p)}<span class="gk__who"><b>${esc(p.name)}</b><small>${esc(sub ?? p.department ?? "")}</small></span>`;
-    const closedNote = () => (open.open ? "" : `<div class="gk__closed">지금은 업무 시간이라 볼 수만 있어요. ${esc(open.opensAt || "")}부터 다시 둘 수 있어요.</div>`);
-    function due(iso) {
-      if (!iso) return "";
-      const h = Math.max(0, (new Date(iso) - Date.now()) / 3600e3);
-      return h >= 1 ? `${Math.floor(h)}시간 남음` : `${Math.max(1, Math.ceil(h * 60))}분 남음`;
-    }
-    function fail(e) { HKUI.toast(e.message || "처리하지 못했어요", "error"); }
     function stopPoll() { clearTimeout(timer); timer = 0; }
-
-    // ---------- 대국 목록 ----------
-    function rowHtml(m, tag, cls) {
-      return `<a class="gk__row" href="#m${m.id}">${person(m.opponent, m.status === "ACTIVE" ? `${m.moveCount}수 · ${due(m.deadlineAt)}` : undefined)}<span class="gk__tag ${cls || ""}">${tag}</span></a>`;
-    }
-    function resultRow(m) {
-      const tag = { win: "승", lose: "패", draw: "무" }[m.result];
-      return `<a class="gk__row" href="#m${m.id}">${person(m.opponent, `${REASON[m.endReason] || ""} · ${m.moveCount}수`)}<span class="gk__tag is-${m.result}">${tag}</span></a>`;
-    }
-    const section = (title, body) => (body ? `<section class="gk__sec"><h2>${title}</h2>${body}</section>` : "");
     async function showLobby() {
       stopPoll(); match = null; pick = null;
-      root.innerHTML = `<div class="gk"><div style="text-align:center;padding:40px"><span class="hk-spin"></span></div></div>`;
-      let d;
-      try { [d, open] = await Promise.all([HKApi.matchOverview(), HKApi.playStatus().catch(() => ({ open: true }))]); }
-      catch (e) { root.innerHTML = `<div class="gk"><div class="gk__empty">${esc(e.message || "불러오지 못했어요")}</div></div>`; return; }
-      const incoming = d.incoming.map((m) => `<div class="gk__row">${person(m.opponent, `도전장 · ${due(m.deadlineAt)}`)}<span class="gk__btns">
-          <button type="button" class="hk-btn hk-btn--primary" data-accept="${m.id}" ${open.open ? "" : "disabled"}>수락</button>
-          <button type="button" class="hk-btn hk-btn--secondary" data-decline="${m.id}">거절</button></span></div>`).join("");
-      const sent = d.sent.map((m) => `<div class="gk__row">${person(m.opponent, `수락 기다리는 중 · ${due(m.deadlineAt)}`)}<span class="gk__btns"><button type="button" class="hk-btn hk-btn--secondary" data-decline="${m.id}">취소</button></span></div>`).join("");
-      const r = d.ranking;
-      const rank = r.top.map((x) => `<div class="gk__row ${r.me && r.me.id === x.id ? "gk__me" : ""}"><span class="gk__rank">${x.rank}</span>${person(x)}<span class="gk__tag">${x.wins}승 ${x.losses}패</span></div>`).join("");
-      root.innerHTML = `<div class="gk">
-          <a class="gk__back" href="/arcade">‹ 아케이드</a>
-          <h1>사내 오목</h1>
-          <p class="gk__lead">동료에게 도전장을 보내거나 컴퓨터와 두어요. 한 수를 24시간 안에 두지 않으면 시간 초과로 져요. 대국이 끝나면 오늘 도장을 받아요.</p>
-          ${closedNote()}
-          ${section("받은 도전", incoming)}
-          ${section("내 차례", d.myTurn.map((m) => rowHtml(m, "내 차례", "is-turn")).join(""))}
-          ${section("상대 차례", d.waiting.map((m) => rowHtml(m, "기다리는 중")).join(""))}
-          ${section("보낸 도전", sent)}
-          <section class="gk__sec"><h2>컴퓨터와 두기</h2>
-            <div class="gk__levels">${[["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]].map(([k, t]) => `<button type="button" class="hk-btn hk-btn--secondary" data-bot="${k}" ${open.open ? "" : "disabled"}>${t}</button>`).join("")}</div>
-            <div class="gk__due">바로 시작해요. 컴퓨터전은 순위에 넣지 않아요.</div>
-          </section>
-          <section class="gk__sec"><h2>동료에게 도전하기</h2>
-            <input class="gk__search" id="gk-q" type="search" placeholder="이름이나 부서로 찾기" autocomplete="off" ${open.open ? "" : "disabled"}>
-            <div id="gk-people"></div>
-          </section>
-          ${section("최근 결과", d.recent.map(resultRow).join(""))}
-          <section class="gk__sec"><h2>순위</h2>${rank || `<div class="gk__empty">아직 끝난 대국이 없어요</div>`}
-            <div class="gk__due">기권·시간 초과는 10수 이상 둔 판만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요</div></section>
-        </div>`;
-      const q = document.getElementById("gk-q");
-      let wait = 0;
-      q.addEventListener("input", () => {
-        clearTimeout(wait);
-        wait = setTimeout(async () => {
-          const box = document.getElementById("gk-people");
-          if (!box) return;
-          if (!q.value.trim()) { box.innerHTML = ""; return; }
-          try {
-            const list = await HKApi.matchMembers(q.value);
-            box.innerHTML = list.map((p) => `<div class="gk__row">${person(p)}<span class="gk__btns"><button type="button" class="hk-btn hk-btn--primary" data-challenge="${p.id}">도전</button></span></div>`).join("") || `<div class="gk__empty">찾는 직원이 없어요</div>`;
-          } catch (e) { fail(e); }
-        }, 250);
-      });
+      open = await HKMatch.lobby(root, GAME, { title: "사내 오목", lead: "동료에게 도전장을 보내거나 컴퓨터와 두어요. 한 수를 24시간 안에 두지 않으면 시간 초과로 져요. 대국이 끝나면 오늘 도장을 받아요." });
     }
 
     // ---------- 판 ----------
@@ -171,7 +78,7 @@
       const note = match.status === "ACTIVE" ? `${match.moveCount}수 · 이번 수 ${due(match.deadlineAt)}` : match.status === "DONE" ? `${REASON[match.endReason] || ""} · ${match.moveCount}수` : "";
       root.innerHTML = `<div class="gk">
           <a class="gk__back" href="#">‹ 대국 목록</a>
-          ${closedNote()}
+          ${closedNote(open)}
           <div class="gk__status">${ava(match.opponent)}<span class="gk__who"><b>${esc(match.opponent.name)}</b><small>${esc(match.opponent.department || "")}</small></span>${color}<span class="gk__msg">${esc(statusText())}</span></div>
           <canvas class="gk__board" id="gk-board" aria-label="오목 판"></canvas>
           <div class="gk__bar">${place}</div>
@@ -212,6 +119,7 @@
       stopPoll(); pick = null;
       try { [match, open] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
       catch (e) { fail(e); location.hash = ""; return; }
+      if (match.game !== GAME) { location.href = `/games/${match.game}#m${id}`; return; }
       paintMatch();
       schedulePoll();
     }
@@ -232,7 +140,7 @@
     async function place() {
       if (!pick || sending) return;
       sending = true;
-      try { afterMove(await HKApi.matchMove(match.id, pick[0], pick[1], match.moves.length)); }
+      try { afterMove(await HKApi.matchMove(match.id, { x: pick[0], y: pick[1] }, match.moves.length)); }
       catch (e) { fail(e); await showMatch(match.id); }
       sending = false;
     }
@@ -257,13 +165,7 @@
             return;
           }
           if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
-          const { accept, decline, challenge, bot } = t.dataset;
-          try {
-            if (bot) { const m = await HKApi.matchBot(bot); location.hash = `m${m.id}`; }
-            else if (accept) { const m = await HKApi.matchAccept(Number(accept)); location.hash = `m${m.id}`; }
-            else if (decline) { await HKApi.matchDecline(Number(decline)); showLobby(); }
-            else if (challenge) { await HKApi.matchCreate(Number(challenge)); HKUI.toast("도전장을 보냈어요"); showLobby(); }
-          } catch (err) { fail(err); }
+          await HKMatch.act(t, GAME, showLobby);
         });
         window.addEventListener("hashchange", route);
         window.addEventListener("keydown", (e) => {

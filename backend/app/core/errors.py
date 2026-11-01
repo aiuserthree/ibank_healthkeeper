@@ -76,7 +76,7 @@ ERROR_MESSAGES = {
     "MATCH_NOT_PENDING": "이미 처리된 도전장이에요.",
     "MATCH_NOT_ACTIVE": "이미 끝난 대국이에요.",
     "MATCH_NOT_YOUR_TURN": "지금은 상대 차례예요.",
-    "MATCH_BAD_MOVE": "이미 돌이 있거나 둘 수 없는 자리예요.",
+    "MATCH_BAD_MOVE": "둘 수 없는 자리예요.",
     "MATCH_STALE": "판이 바뀌었어요. 새로고침한 뒤 다시 두어 주세요.",
     "GAME_CLOSED": "지금은 업무 시간이라 게임을 할 수 없어요. (점심 11:30~13:00 · 18:00 이후 · 9:00 이전)",
     "GAME_REQUEST_EMPTY": "내용을 적어 주세요.",

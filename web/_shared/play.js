@@ -165,6 +165,7 @@ window.HKSound = (function () {
     buzz: () => { [0, 0.05, 0.13].forEach((delay) => tone({ type: "sawtooth", f: 120, t: 0.04, v: 0.09, delay })); },
     // 야간 퍼레이드 — 오르골 음(단조 음계 번호) · 박자 나무 소리 · 작은 찰랑 소리. delay 초 뒤에 울린다
     mbox: ({ n = 0, delay = 0 } = {}) => tone({ type: "triangle", f: [440, 494, 523, 587, 659, 698, 784, 880][n % 8], t: 0.3, v: 0.16, delay }),
+    bass: ({ f = 110, delay = 0 } = {}) => tone({ type: "square", f, t: 0.2, v: 0.07, delay }),
     beat: ({ delay = 0, strong = false } = {}) => { tone({ type: "triangle", f: strong ? 1100 : 900, f2: 420, t: 0.06, v: strong ? 0.3 : 0.22, delay }); noise({ t: 0.03, v: 0.1, f: 3200, delay }); },
     shake: ({ delay = 0 } = {}) => noise({ t: 0.03, v: 0.05, f: 7000, delay }),
   };
@@ -256,6 +257,7 @@ window.HKPlay = (function () {
     crossing: ["#16a06a", "#7bd389"],
     blocks: ["#2f6bff", "#45c3ff"],
     gomoku: ["#92400e", "#d97706"],
+    chess: ["#334155", "#64748b"],
     pairs: ["#0f8b8d", "#57cc99"],
     shooter: ["#2b1055", "#d53369"],
     bricks: ["#c2410c", "#fb923c"],
