@@ -43,6 +43,7 @@
       setup(stage, ctx) {
         const W = 180, H = 250, LANES = 3, LANE_W = W / LANES, HIT_Y = 214, TOP_Y = 66;
         const PERFECT = 0.07, GOOD = 0.13, FALL_SEC = 1.25; // 판정 시간(초) · 풍선이 내려오는 시간
+        const EMPTY = 400; // 풍선이 없는 곳을 눌렀을 때 깎이는 점수 — 같이 누른 칸의 최고 점수(300)보다 커야 한다
         const LOOK = 0.25; // 소리를 미리 예약하는 시간(초)
         const COUNT_IN = 4; // 구간 앞 예비박 수
         const LANE_C = ["#38bdf8", "#facc15", "#a3e635"];
@@ -68,7 +69,7 @@
               <canvas class="gm-canvas" aria-label="야간 퍼레이드 게임 화면"></canvas>
               <div class="gm-overlay" data-overlay></div>
             </div>
-            <div class="gm-note">PC는 키보드 ← ↓ → 또는 A·S·D · 모바일은 칸을 터치 · 빨간 풍선은 그냥 보내요 · Esc 일시정지</div>
+            <div class="gm-note">PC는 키보드 ← ↓ → 또는 A·S·D · 모바일은 칸을 터치 · 빨간 풍선은 그냥 보내요 · 풍선이 없는 곳을 누르면 빨간 풍선처럼 벌점 · Esc 일시정지</div>
           </div>`;
         const shell = stage.querySelector(".gm-shell");
         const canvas = stage.querySelector("canvas");
@@ -136,7 +137,15 @@
             if (d < bd) { bd = d; best = n; }
             if (n.t - S.t > 0.5) break;
           }
-          if (!best || bd > GOOD) return; // 아무것도 없는 칸은 벌점 없이 지나간다
+          if (!best || bd > GOOD) { // 풍선이 없는 곳을 누르면 빨간 풍선을 건드린 것과 같다 — 점수까지 깎인다
+            S.score = Math.max(0, S.score - EMPTY);
+            S.gauge -= 18; S.combo = 0; S.angry = 0.6; S.shake = 0.25; S.miss++;
+            text(lane, `헛눌림 -${EMPTY}`, "#fca5a5");
+            ctx.sfx("hurt");
+            hud();
+            if (S.gauge <= 0) finish(false);
+            return;
+          }
           best.done = true;
           if (best.red) {
             S.gauge -= 18; S.combo = 0; S.angry = 0.6; S.shake = 0.25; S.miss++;
