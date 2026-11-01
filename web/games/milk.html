@@ -48,14 +48,14 @@
         const W = 180, H = 240;                      // 도트 그림 해상도
         const ROAD_L = 58, ROAD_R = 122, BIKE_Y = 196;
         const ZONE_TOP = 158, ZONE_BOTTOM = 218;     // 이 안의 집에만 우유를 던질 수 있다
-        const SHIFT_SEC = 180, RULE_SEC = 22;        // 새벽 4시 ~ 아침 7시 · 규칙은 22초마다 바뀐다
+        const SHIFT_SEC = 180, RULE_SEC = 20, DOUBLE_SEC = 60; // 새벽 4시 ~ 아침 7시 · 규칙은 20초마다 바뀌다 10초까지 빨라지고, 5시부터는 두 개가 함께 걸린다
         const DOORS = { red: "#dc2626", blue: "#2563eb", green: "#16a34a", gray: "#64748b" };
         const RULES = [
-          { text: "빨간 문에는 넣지 말 것", bad: (h) => h.door === "red", make: (h) => { h.door = "red"; } },
-          { text: "불 켜진 집에는 넣지 말 것", bad: (h) => h.lit, make: (h) => { h.lit = true; } },
-          { text: "우유가 쌓인 집에는 넣지 말 것", bad: (h) => h.pile, make: (h) => { h.pile = true; } },
-          { text: "문 앞에 누가 서 있으면 넣지 말 것", bad: (h) => h.man, make: (h) => { h.man = true; } },
-          { text: "파란 문에는 넣지 말 것", bad: (h) => h.door === "blue", make: (h) => { h.door = "blue"; } },
+          { text: "빨간 문에는 넣지 말 것", short: "빨간 문", bad: (h) => h.door === "red", make: (h) => { h.door = "red"; } },
+          { text: "불 켜진 집에는 넣지 말 것", short: "불 켜진 집", bad: (h) => h.lit, make: (h) => { h.lit = true; } },
+          { text: "우유가 쌓인 집에는 넣지 말 것", short: "우유 쌓인 집", bad: (h) => h.pile, make: (h) => { h.pile = true; } },
+          { text: "문 앞에 누가 서 있으면 넣지 말 것", short: "사람 선 집", bad: (h) => h.man, make: (h) => { h.man = true; } },
+          { text: "파란 문에는 넣지 말 것", short: "파란 문", bad: (h) => h.door === "blue", make: (h) => { h.door = "blue"; } },
         ];
 
         stage.innerHTML = `
@@ -99,13 +99,15 @@
         function setRule(i) {
           S.ruleIdx = i;
           S.rule = RULES[i];
-          S.ruleT = RULE_SEC;
-          elRule.textContent = `근무 규칙 · ${S.rule.text}`;
+          S.rule2 = S.t >= DOUBLE_SEC ? RULES[(i + 1 + Math.floor(Math.random() * (RULES.length - 1))) % RULES.length] : null;
+          S.ruleT = RULE_SEC - (S.t / SHIFT_SEC) * 10;
+          elRule.textContent = `근무 규칙 · ${S.rule2 ? `${S.rule.short}, ${S.rule2.short}에는 넣지 말 것` : S.rule.text}`;
           elRule.classList.remove("is-new");
           void elRule.offsetWidth;
           elRule.classList.add("is-new");
         }
-        // 집 하나 — 금지된 집은 약 3분의 1. 다른 특징은 규칙과 헷갈리게 섞어 둔다
+        const banned = (h) => S.rule.bad(h) || (S.rule2 && S.rule2.bad(h));
+        // 집 하나 — 금지된 집은 약 3분의 1에서 시작해 점점 늘어난다. 다른 특징은 규칙과 헷갈리게 섞어 둔다
         function addHouse() {
           S.side = Math.random() < 0.72 ? 1 - S.side : S.side;
           const h = { side: S.side, y: S.nextY, door: pickOf(["green", "gray", "green", "gray", "blue", "red"]), lit: Math.random() < 0.28, pile: Math.random() < 0.22, man: Math.random() < 0.14, wall: pickOf(["#475569", "#57534e", "#52525b"]), done: false, open: 0 };
@@ -115,11 +117,10 @@
           fixHouse(h);
         }
         function fixHouse(h) {
-          const r = S.rule;
-          if (!r) return;
-          const makeBad = Math.random() < 0.34;
-          if (makeBad) r.make(h);
-          else if (r.bad(h)) { if (h.door === "red" || h.door === "blue") h.door = "green"; h.lit = h.pile = h.man = false; }
+          if (!S.rule) return;
+          const makeBad = Math.random() < 0.34 + (S.t / SHIFT_SEC) * 0.1;
+          if (makeBad) (S.rule2 && Math.random() < 0.5 ? S.rule2 : S.rule).make(h);
+          else if (banned(h)) { if (h.door === "red" || h.door === "blue") h.door = "green"; h.lit = h.pile = h.man = false; }
         }
         function hud() {
           if (!S) return;
@@ -128,7 +129,7 @@
           elClock.textContent = `${4 + Math.floor(m / 60)}:${String(m % 60).padStart(2, "0")}`;
           if (elLives.childElementCount !== Math.max(0, S.lives)) elLives.innerHTML = "<i></i>".repeat(Math.max(0, S.lives));
         }
-        const speed = () => 30 + (S.t / SHIFT_SEC) * 34;
+        const speed = () => 36 + (S.t / SHIFT_SEC) * 54;
         function text(x, y, t, c) { S.texts.push({ x, y, t, c, life: 0.9 }); }
 
         function deliver(side) {
@@ -139,7 +140,7 @@
           S.bottles.push({ x: W / 2, y: BIKE_Y - 6, tx: side ? ROAD_R + 16 : ROAD_L - 16, ty: h ? h.y + 18 : BIKE_Y - 20, t: 0 });
           if (!h) return;
           h.done = true;
-          if (S.rule.bad(h)) {
+          if (banned(h)) {
             // 규칙을 어겼다 — 문이 열리고 안에서 뭔가 내다본다
             h.open = 1.2; S.shake = 0.3; S.redT = 0.5; S.lives--; S.combo = 0; S.wrongs++;
             ctx.sfx("ghost");
@@ -172,11 +173,11 @@
           for (const h of S.houses) {
             if (!h.done && h.y > ZONE_BOTTOM) {
               h.done = true;
-              if (S.rule.bad(h)) { S.score += 50; text(h.side ? ROAD_R + 4 : 8, 200, "+50", "#86efac"); } // 잘 지나쳤다
+              if (banned(h)) { S.score += 50; text(h.side ? ROAD_R + 4 : 8, 200, "+50", "#86efac"); } // 잘 지나쳤다
               else {
                 S.combo = 0; S.misses++;
                 text(h.side ? ROAD_R + 4 : 8, 200, "놓침", "#fca5a5");
-                if (S.misses % 3 === 0) { S.lives--; S.redT = 0.3; ctx.sfx("hurt"); hud(); if (S.lives <= 0) return finish(false); }
+                if (S.misses % 2 === 0) { S.lives--; S.redT = 0.3; ctx.sfx("hurt"); hud(); if (S.lives <= 0) return finish(false); }
               }
             }
           }
@@ -285,8 +286,8 @@
           showOverlay(`<div class="gm-card">
             <h2>새벽 우유 배달</h2>
             <p>새벽 4시부터 아침 7시까지 골목에 우유를 넣어요. 지나가는 집마다 왼쪽·오른쪽을 눌러요.</p>
-            <p class="gm-warn">근무 규칙은 <b>22초마다 바뀌어요</b>.<br>넣으면 안 되는 집에 넣지 마세요.</p>
-            <p>금지된 집은 그냥 지나가면 돼요. 넣어야 할 집을 3번 놓쳐도 실수 하나예요.</p>
+            <p class="gm-warn">근무 규칙은 <b>갈수록 빨리 바뀌고</b>, 5시부터는 <b>두 개가 함께</b> 걸려요.<br>넣으면 안 되는 집에 넣지 마세요.</p>
+            <p>금지된 집은 그냥 지나가면 돼요. 넣어야 할 집을 2번 놓쳐도 실수 하나예요.</p>
             <button type="button" class="gm-go" data-act="start">출근하기</button>
           </div>`);
         }
