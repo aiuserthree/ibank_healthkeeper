@@ -49,7 +49,8 @@
         const W = COLS * CELL, H = ROWS * CELL;
         const HOUR_SEC = 40, HOURS = 6; // 게임 안의 1시간 = 40초 · 밤 12시부터 아침 6시까지 4분
         const LIGHT_RANGE = 170, LIGHT_HALF = 0.52, NEAR_LIGHT = 44;
-        const BURN = { roach: 0.08, rat: 0.2, spider: 0.3 }; // 빛에 닿고 쓰러지기까지 걸리는 시간
+        const SPRAY_RANGE = 125, SPRAY_EVERY = 0.3; // 손전등에 잡힌 가까운 벌레에게 살충제가 저절로 뿌려진다
+        const BUG_HP = { roach: 1, rat: 3, spider: 4 }; // 살충제를 몇 번 맞아야 쓰러지는지
         const SHADOW_HITS = 3; // 그림자 손님은 빛을 세 번 비춰야 사라진다
         const BOSS_HP = 100, BOSS_BURN = 12, BOSS_PTS = 3000, BOSS_R = 24; // 냉동고의 그것 — 8초 남짓 비추면 쓰러진다
         const MAX_ENEMIES = 42;
@@ -168,7 +169,7 @@
         function newGame() {
           S = {
             t: 0, score: 0, lives: 3, kills: 0, x: (PANEL_C + 0.5) * CELL, y: 17.5 * CELL, a: -Math.PI / 2, inv: 0, step: 0,
-            panel: 100, blackout: 0, flicker: 0, flickCd: 3, roachCd: 1.5, ratCd: 26, spiderCd: HOUR_SEC, shadowCd: HOUR_SEC * 2, slow: 0, dim: 0, bat: 0, fast: 0, itemCd: 12, items: [], boss: null, bossDown: false, rings: [], hour: 0, line: null, field: null, fieldCd: 0,
+            panel: 100, blackout: 0, flicker: 0, flickCd: 3, fireCd: 0, roachCd: 1.5, ratCd: 26, spiderCd: HOUR_SEC, shadowCd: HOUR_SEC * 2, slow: 0, dim: 0, bat: 0, fast: 0, itemCd: 12, items: [], boss: null, bossDown: false, rings: [], hour: 0, line: null, field: null, fieldCd: 0,
             en: [], webs: [], puffs: [], texts: [],
           };
           keys.left = keys.right = keys.up = keys.down = false;
@@ -190,7 +191,7 @@
           const T = { rat: { sp: 88, r: 9, pts: 40 }, roach: { sp: 56 + Math.random() * 16, r: 6, pts: 10 } }[type];
           S.en.push({ type, ...T, x: (c + 0.5) * CELL, y: (r + 0.5) * CELL, ...fresh(), toPanel: Math.random() < (type === "rat" ? 0.3 : 0.55) });
         }
-        const fresh = () => ({ a: 0, walk: Math.random() * 6, lit: false, flee: 0, burn: 0, hurt: 0, wob: Math.random() * 6, toPanel: false });
+        const fresh = () => ({ a: 0, walk: Math.random() * 6, lit: false, flee: 0, fleeCd: 0, sprayed: 0, hurt: 0, wob: Math.random() * 6, toPanel: false });
         // 내 눈앞이 아닌 빈 바닥 칸 하나
         function farCell(min) {
           for (let i = 0; i < 60; i++) {
@@ -326,7 +327,7 @@
         }
         function range() { return (S.blackout > 0 ? 95 : S.dim > 0 ? 105 : LIGHT_RANGE) * (S.bat > 0 ? 1.3 : 1); }
         function beamHalf() { return LIGHT_HALF + (S.bat > 0 ? 0.16 : 0); }
-        // 손전등 빛 안인지 — 몸 주변은 보이기만 할 뿐, 빛줄기에 닿은 벌레만 타 버린다
+        // 손전등 빛 안인지 — 몸 주변은 보이기만 할 뿐, 빛을 비춰야 멈칫하고 살충제가 나간다
         function inBeam(e) {
           const d = Math.hypot(e.x - S.x, e.y - S.y);
           if (d > range()) return false;
@@ -405,6 +406,7 @@
           if (S.t >= HOUR_SEC) { S.spiderCd -= dt; if (S.spiderCd <= 0) { spawnSpider(); S.spiderCd = Math.max(4.5, 12 - 1.5 * h); } }
           if (S.t >= HOUR_SEC * 2) { S.shadowCd -= dt; if (S.shadowCd <= 0) { spawnShadow(); S.shadowCd = Math.max(11, 20 - 1.8 * h); } }
           // 벌레 움직임
+          let target = null, td = 1e9;
           for (const e of S.en) {
             e.walk += dt * 14;
             if (e.hurt > 0) e.hurt -= dt;
@@ -426,9 +428,9 @@
               e.a = Math.atan2(S.y - e.y, S.x - e.x);
               e.x += ((S.x - e.x) / n) * e.sp * dt; e.y += ((S.y - e.y) / n) * e.sp * dt;
             } else {
-              e.burn = beam ? e.burn + dt : Math.max(0, e.burn - dt);
-              if (e.burn >= BURN[e.type]) { kill(e); continue; }
-              if (beam) e.hurt = 0.05;
+              if (beam && d < SPRAY_RANGE && d < td) { target = e; td = d; }
+              if (beam && e.type === "rat" && e.flee <= 0 && e.fleeCd <= 0) { e.flee = 0.5; e.fleeCd = 2.4; } // 쥐는 빛을 보면 잠깐 달아난다
+              e.fleeCd -= dt;
             }
             if (e.type === "spider") {
               e.webCd -= dt;
@@ -439,7 +441,7 @@
                 ctx.sfx("webshot");
               }
             }
-            let sp = e.sp * (beam ? 0.4 : 1);
+            let sp = e.sp * (beam ? (e.type === "rat" ? 1 : 0.45) : 1);
             let v;
             if (e.type === "shadow") v = null;
             else if (e.flee > 0) {
@@ -474,6 +476,19 @@
                 S.en.forEach((o) => { o.toPanel = false; });
               }
             }
+          }
+          // 살충제 — 손전등에 잡힌 가까운 벌레를 저절로 뿌린다
+          S.fireCd -= dt;
+          if (target && S.fireCd <= 0) {
+            S.fireCd = SPRAY_EVERY;
+            target.sprayed++; target.hurt = 0.1;
+            const a = Math.atan2(target.y - S.y, target.x - S.x);
+            for (let i = 0; i < 6; i++) {
+              const sa = a + (Math.random() - 0.5) * 0.3, sp = 200 + Math.random() * 90;
+              S.puffs.push({ x: S.x, y: S.y, vx: Math.cos(sa) * sp, vy: Math.sin(sa) * sp, life: 0.28, color: "#a5f3fc" });
+            }
+            ctx.sfx("shoot");
+            if (target.sprayed >= BUG_HP[target.type]) kill(target);
           }
           S.en = S.en.filter((e) => !e.dead);
           for (const w of S.webs) {
@@ -768,7 +783,7 @@
           draw();
           showOverlay(`<div class="gm-card">
             <h2>심야 편의점</h2>
-            <p>혼자 남은 새벽 근무. 손전등 빛에 닿은 벌레는 타 버려요.<br>거미줄을 피하고, 그림자 손님은 <b>세 번</b> 비춰야 사라져요.<br>바닥의 아이템은 밟으면 바로 써요.<br><b>아침 6시</b>까지 체력과 <b>두꺼비집</b>을 지켜요.</p>
+            <p>혼자 남은 새벽 근무. 손전등으로 비추면 살충제를 뿌려요.<br>거미줄을 피하고, 그림자 손님은 <b>세 번</b> 비춰야 사라져요.<br>바닥의 아이템은 밟으면 바로 써요.<br><b>아침 6시</b>까지 체력과 <b>두꺼비집</b>을 지켜요.</p>
             <div class="gm-keys">PC 방향키 또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 또는 마우스 왼쪽 버튼을 누른 채 끌어 이동 · 마우스로 손전등 · <kbd>Esc</kbd> 일시정지<br>모바일은 왼쪽을 끌어 이동, 오른쪽을 끌어 손전등</div>
             <button type="button" class="gm-go" data-act="start">시작</button>
           </div>`);
