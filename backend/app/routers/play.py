@@ -72,11 +72,12 @@ async def games(
 
 @router.get("/weekly")
 async def weekly(
+    period: str = Query("week", pattern="^(week|month|all)$"),
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    """지난주(월~일) 게임별 1~3위 — 아케이드 '지난주 명예의 전당'."""
-    return {"data": await game_service.last_week_board(db)}
+    """게임별 1~3위 — 아케이드 '명예의 전당'. week 지난주 · month 지난달 · all 전체."""
+    return {"data": await game_service.hall_of_fame(db, period)}
 
 
 @router.get("/stamps")

@@ -321,11 +321,25 @@ async def _week_bests(db: AsyncSession, game: Game, start: date, end: date) -> t
     return rows, where
 
 
-async def last_week_board(db: AsyncSession) -> dict:
-    """지난주(월~일) 게임별 1~3위 — 아케이드 '지난주 명예의 전당'. 월요일마다 저절로 바뀐다."""
+HALL_PERIODS = ("week", "month", "all")
+
+
+async def hall_of_fame(db: AsyncSession, period: str = "week") -> dict:
+    """게임별 1~3위 — 아케이드 '명예의 전당'.
+
+    week 는 지난주(월~일, 월요일마다 바뀜), month 는 지난달(1일~말일, 1일마다 바뀜), all 은 오늘까지 전체 기록.
+    """
+    if period not in HALL_PERIODS:
+        period = "week"
     today = today_kst()
-    end = today - timedelta(days=today.weekday() + 1)  # 지난주 일요일
-    start = end - timedelta(days=6)
+    if period == "month":
+        end = today.replace(day=1) - timedelta(days=1)  # 지난달 말일
+        start = end.replace(day=1)
+    elif period == "all":
+        start, end = None, today
+    else:
+        end = today - timedelta(days=today.weekday() + 1)  # 지난주 일요일
+        start = end - timedelta(days=6)
     picked: list[tuple[Game, list[tuple[int, int, int]], dict[int, str]]] = []
     for game in GAMES.values():
         rows, where = await _week_bests(db, game, start, end)
@@ -349,7 +363,12 @@ async def last_week_board(db: AsyncSession) -> dict:
         ]
         if top:
             games.append({**_game_payload(game), "top": top})
-    return {"from": start.isoformat(), "to": end.isoformat(), "games": games}
+    return {"period": period, "from": start.isoformat() if start else None, "to": end.isoformat(), "games": games}
+
+
+async def last_week_board(db: AsyncSession) -> dict:
+    """지난주(월~일) 게임별 1~3위."""
+    return await hall_of_fame(db, "week")
 
 
 # ── 참여 도장 — 하루에 한 판이라도 끝까지 하면 도장 1개, 한 달에 STAMP_GOAL 개면 무적 쿠폰 1장(월 1장)

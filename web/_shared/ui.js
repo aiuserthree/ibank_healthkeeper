@@ -321,7 +321,7 @@ window.HKUI = (function () {
     if (src) {
       const safeName = escapeHtml(name || "");
       const safeInitial = escapeHtml(initial);
-      return `<span class="hk-avatar hk-avatar--${size}"><img src="${escapeHtml(src)}" alt="${safeName}" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();this.parentElement.textContent='${safeInitial}'"></span>`;
+      return `<span class="hk-avatar hk-avatar--${size}"><img src="${escapeHtml(src)}" alt="${safeName}" loading="lazy" referrerpolicy="no-referrer" onerror="var p=this.parentElement;this.remove();if(p)p.textContent='${safeInitial}'"></span>`;
     }
     return `<span class="hk-avatar hk-avatar--${size}">${escapeHtml(initial)}</span>`;
   }

@@ -206,9 +206,14 @@
         </div>`;
     }
 
-    // 지난주 명예의 전당 — 게임별 1~3위 (월요일마다 저절로 바뀜)
-    function weeklyHtml(wk) {
-      if (!wk || !wk.games || !wk.games.length) return "";
+    // 명예의 전당 — 게임별 1~3위. 지난주(월요일마다) · 지난달(1일마다) · 전체를 골라 본다
+    const HOF = {
+      week: { tab: "지난주", title: "지난주,<br>게임별 1등은 누구?", sub: "매주 월요일에 지난주(월~일) 기록으로 새로 바뀌어요.", empty: "지난주에는 남은 기록이 없어요." },
+      month: { tab: "지난달", title: "지난달,<br>게임별 1등은 누구?", sub: "매달 1일에 지난달 기록으로 새로 바뀌어요.", empty: "지난달에는 남은 기록이 없어요." },
+      all: { tab: "전체", title: "지금까지,<br>게임별 1등은 누구?", sub: "아케이드가 열린 뒤 남긴 모든 기록 중 최고 기록이에요.", empty: "아직 남은 기록이 없어요." },
+    };
+    const hofCache = {};
+    function hofInner(wk) {
       const md = (iso) => `${Number(iso.slice(5, 7))}/${Number(iso.slice(8, 10))}`;
       const medal = ["#f5b301", "#a8b3c2", "#cd8a4b"];
       const VARIANT = { sci: "과학", khist: "한국사", whist: "세계사", geo: "지리", econ: "경제·사회", lit: "문학", art: "음악·미술", sport: "스포츠", lang: "언어·어원", life: "생활·건강" }; // 상식 퀴즈 분야 — 어느 분야 기록인지 점수 옆에
@@ -221,12 +226,39 @@
               <span class="hk-aa-hof__score">${HKPlay.formatScore(g, r.score)}${VARIANT[r.variant] ? `<small class="hk-aa-hof__var">${VARIANT[r.variant]}</small>` : ""}</span>
             </li>`).join("")}</ol>
         </a>`;
+      const t = HOF[wk.period] || HOF.week;
+      const range = wk.from ? ` · ${md(wk.from)} ~ ${md(wk.to)}` : ` · ${md(wk.to)}까지`;
+      return `<span class="hk-aa-offer__eyebrow">${HKUI.icon("trophy", 16, "currentColor")} 명예의 전당${range}</span>
+          <h2 class="hk-aa-h2">${t.title}</h2>
+          <p class="hk-aa-hofs__sub">${t.sub}</p>
+          ${wk.games && wk.games.length ? `<div class="hk-aa-hofs__grid">${wk.games.map(card).join("")}</div>` : `<div class="hk-aa-hofs__empty">${t.empty}</div>`}`;
+    }
+    function weeklyHtml(wk) {
+      if (!wk) return "";
+      hofCache[wk.period || "week"] = wk;
       return `<div class="hk-aa-hofs hk-aa-wrap" id="aa-hof">
-          <span class="hk-aa-offer__eyebrow">${HKUI.icon("trophy", 16, "currentColor")} 지난주 명예의 전당 · ${md(wk.from)} ~ ${md(wk.to)}</span>
-          <h2 class="hk-aa-h2">지난주,<br>게임별 1등은 누구?</h2>
-          <p class="hk-aa-hofs__sub">매주 월요일에 지난주(월~일) 기록으로 새로 바뀌어요.</p>
-          <div class="hk-aa-hofs__grid">${wk.games.map(card).join("")}</div>
+          <div class="hk-aa-hofs__tabs" role="tablist">${Object.entries(HOF).map(([k, t]) => `<button type="button" role="tab" data-hof="${k}" aria-selected="${k === (wk.period || "week")}">${t.tab}</button>`).join("")}</div>
+          <div id="aa-hof-body">${hofInner(wk)}</div>
         </div>`;
+    }
+    function bindHof(root) {
+      const box = root.querySelector("#aa-hof");
+      if (!box) return;
+      box.addEventListener("click", async (e) => {
+        const b = e.target.closest("[data-hof]");
+        if (!b || b.getAttribute("aria-selected") === "true") return;
+        const period = b.dataset.hof;
+        box.querySelectorAll("[data-hof]").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+        const body = box.querySelector("#aa-hof-body");
+        try {
+          const wk = hofCache[period] || (hofCache[period] = await HKApi.playWeekly(period));
+          if (b.getAttribute("aria-selected") !== "true") return; // 그새 다른 탭을 눌렀으면 그대로 둔다
+          body.innerHTML = hofInner(wk);
+          HKUI.refreshIcons(body);
+        } catch (err) {
+          HKUI.toast(err.message || "불러오지 못했어요", "error");
+        }
+      });
     }
 
     // 흘러가는 썸네일 줄은 화면에 보일 때만 움직인다 — 배터리 절약
@@ -456,6 +488,7 @@
           body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + seriesHtml() + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
           animateSeriesEntrance(body);
+          bindHof(body);
           matchNotice(body);
           seriesPopup();
         } catch (e) {
