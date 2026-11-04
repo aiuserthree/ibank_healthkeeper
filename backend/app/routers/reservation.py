@@ -283,6 +283,27 @@ async def request_transfer(
     }
 
 
+@router.post("/reservation/{reservation_id}/return")
+async def return_reservation(
+    reservation_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    from app.services.reservation_return import return_reservation as do_return
+    from app.services.teams import deliver_teams_messages
+
+    reservation, _slot, teams_message_ids = await do_return(db, member, reservation_id)
+    background_tasks.add_task(deliver_teams_messages, teams_message_ids)
+    return {
+        "data": {
+            "reservationId": reservation.id,
+            "status": reservation.status.value,
+            "message": "예약을 반납했어요.",
+        }
+    }
+
+
 @router.get("/reservation/{reservation_id}/swap/targets")
 async def swap_targets(
     reservation_id: int,

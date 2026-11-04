@@ -82,6 +82,7 @@ window.HKApi = (function () {
       request("/admin/coupons/grant", { method: "POST", body: JSON.stringify({ memberId, count, note }) }),
     adminRevokeCoupon: (couponId) => request(`/admin/coupons/${couponId}/revoke`, { method: "POST" }),
     cancelReservation: (id) => request(`/reservation/${id}/cancel`, { method: "POST" }),
+    returnReservation: (id) => request(`/reservation/${id}/return`, { method: "POST" }),
     reapplySlots: () => request("/reservation/reapply/slots"),
     reapplySlot: (slotId) => request(`/reservation/reapply/slots/${slotId}`, { method: "POST" }),
     myReservations: (page = 1, pageSize = 10) =>

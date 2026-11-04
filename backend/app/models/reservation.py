@@ -47,6 +47,8 @@ class Reservation(Base):
     confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     dropped_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     cancelled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # 회원이 확정 예약을 직접 반납한 시각 — 월 반납 횟수 집계용 (관리자 취소·양도는 비어 있음)
+    returned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     confirmed_by: Mapped[Optional[ConfirmedBy]] = mapped_column(nullable=True)
     is_priority: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     # 무적 쿠폰을 걸고 신청한 경우 — 경합에서 지면 쿠폰은 반환되고 기록은 남는다.

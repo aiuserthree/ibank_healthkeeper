@@ -452,6 +452,7 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
                 "applied_at": format_kst_iso(reservation.applied_at),
                 "priority_rank": rank_info.get("priority_rank"),
                 "is_priority": reservation.is_priority,
+                "returned": reservation.returned_at is not None,
             }
             if (
                 reservation.type == ReservationType.ADMIN_ASSIGN

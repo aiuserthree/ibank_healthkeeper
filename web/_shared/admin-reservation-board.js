@@ -58,6 +58,12 @@ window.HKReservationBoard = (function () {
       };
     }
 
+    // 회원 본인 반납은 「취소」 대신 「본인 반납」으로 보여 준다
+    function applicantStatusBadge(a) {
+      if (a.status === "CANCELLED" && a.returned) return HKUI.badge("본인 반납", "neutral");
+      return HKUI.statusBadge(a.status);
+    }
+
     function typeBadge(a) {
       const type = a.type;
       if (a.used_coupon) return `<span class="hk-badge" style="color:var(--color-ultraviolet);background:#efe8ff">무적 쿠폰</span>`;
@@ -176,7 +182,7 @@ window.HKReservationBoard = (function () {
         <div style="font-size:13px;color:${noHist ? "var(--color-warning)" : "var(--text-secondary)"};font-weight:${noHist ? 700 : 400}">${noHist ? "이력 없음" : a.last_used_date ? HKUI.formatDate(a.last_used_date) : "-"}</div>
         <div>${typeBadge(a)}</div>
         <div>${a.priority_rank === 1 || isTop ? HKUI.badge("O", "info") : HKUI.badge("X", "neutral")}</div>
-        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">${HKUI.statusBadge(a.status)}${adminCancelConfirmedBtn(a, slot)}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">${applicantStatusBadge(a)}${adminCancelConfirmedBtn(a, slot)}</div>
       </div>`;
     }
 
@@ -235,7 +241,7 @@ window.HKReservationBoard = (function () {
         const cancelBtn = isAdminCancelConfirmedType(a.type) && canConfirm ? adminCancelConfirmedBtn(a, slot) : "";
         return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">${HKUI.statusBadge("CONFIRMED")}${cancelBtn}</div>`;
       }
-      return HKUI.statusBadge(a.status);
+      return applicantStatusBadge(a);
     }
 
     function assignBtnHtml(slotId) {
@@ -425,7 +431,7 @@ window.HKReservationBoard = (function () {
                         <div style="font-size:14px;font-weight:700;color:var(--color-midnight-navy)">${HKUI.escapeHtml(a.member_name)}${HKUI.couponApplicantTag(a)}</div>
                         <div style="font-size:12px;color:var(--text-muted)">${HKUI.escapeHtml(dept ? `${dept} · ${a.member_email || ""}` : a.member_email || "")}</div>
                       </div>
-                      ${HKUI.statusBadge(a.status)}
+                      ${applicantStatusBadge(a)}
                     </div>
                   </div>`;
                 }).join("")}</div>
@@ -895,6 +901,7 @@ window.HKReservationBoard = (function () {
       const designated = isDesignatedConfirmSlot(slot);
       const emptyLabel = designated ? "" : assignSlotHint(slot);
       const cancelVacancy = slot.adminCancelVacancy === true;
+      const vacancyWord = all.some((x) => x.returned) ? "반납" : "확정 취소";
       const head = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
         ${HKUI.icon("clock", 18, "var(--color-slate-blue)")}
         <span style="font-size:15px;font-weight:700;color:var(--color-midnight-navy)">${slot.startTime || ""} – ${slot.endTime || ""}</span>
@@ -903,7 +910,7 @@ window.HKReservationBoard = (function () {
         ${adminAssign ? HKUI.badge("관리자 지정", "warning") : ""}
         ${pending.length > 1 ? HKUI.badge(`중복 ${pending.length}명`, "warning") : ""}
         ${reapply ? HKUI.badge("재신청 포함", "info") : ""}
-        ${cancelVacancy && !adminAssign ? HKUI.badge(isSlotPastForAssign(slot) ? "확정 취소 · 지정 불가" : "확정 취소 · 지정 가능", isSlotPastForAssign(slot) ? "neutral" : "warning") : ""}
+        ${cancelVacancy && !adminAssign ? HKUI.badge(isSlotPastForAssign(slot) ? `${vacancyWord} · 지정 불가` : `${vacancyWord} · 지정 가능`, isSlotPastForAssign(slot) ? "neutral" : "warning") : ""}
         ${confirmed && !adminAssign ? HKUI.badge("확정 완료", "success", true) : ""}
         <div style="flex:1"></div>
         ${showDesignateBtn(slot) ? designateBtnHtml(slot.slotId, canConfirm) : ""}

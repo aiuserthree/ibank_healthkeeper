@@ -203,6 +203,7 @@ async def restore_cancelled_reservation(db: AsyncSession, reservation_id: int) -
 
     reservation.status = ReservationStatus.CONFIRMED
     reservation.cancelled_at = None
+    reservation.returned_at = None
 
     slot.status = SlotStatus.CONFIRMED
     slot.confirmed_reservation_id = reservation.id

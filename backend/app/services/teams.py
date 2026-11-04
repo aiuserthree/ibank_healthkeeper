@@ -41,6 +41,7 @@ _TRANSFER_NOTIFY_TYPES = frozenset({
     TeamsMessageType.SWAP_ACCEPTED,
     TeamsMessageType.SWAP_ACCEPT_FAILED,
     TeamsMessageType.SWAP_CANCELLED,
+    TeamsMessageType.RESERVATION_RETURNED,
 })
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
@@ -449,6 +450,67 @@ def render_transfer_request_admin_body(
         f"<strong>{slot_text}</strong> 예약 양도를 신청했습니다.</p>"
         f"<p>관리자 화면에서 승인해 주세요.</p>"
     )
+
+
+def render_reservation_returned_admin_body(
+    *,
+    member_name: str,
+    slot: Slot,
+    cycle,
+    now: datetime,
+) -> str:
+    """회원 본인 반납 → 관리자 안내. 빈자리가 어떻게 채워지는지 시점별로 알려 준다."""
+    import html
+
+    slot_text = _slot_label(slot)
+    now = to_kst(now)
+    reapply_open = to_kst(cycle.reapply_open_at)
+    reapply_close = to_kst(cycle.reapply_close_at)
+    if not cycle.reapply_skipped and now < reapply_open:
+        how = (
+            f"{_datetime_label(reapply_open)} 재신청이 열리면 탈락자가 가져갈 수 있어요. "
+            "그 전에 관리자 화면에서 바로 지정할 수도 있어요."
+        )
+    elif not cycle.reapply_skipped and now < reapply_close:
+        how = "지금 재신청 중이라 탈락자가 가져갈 수 있어요. 관리자 화면에서 바로 지정할 수도 있어요."
+    else:
+        how = "관리자 화면 예약 관리에서 다른 직원을 지정해 주세요."
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 예약 반납</p>"
+        f"<p><b>{html.escape(member_name)}</b>님이 <strong>{slot_text}</strong> 예약을 반납했어요.</p>"
+        f"<p>{how}</p>"
+    )
+
+
+async def enqueue_reservation_returned_admin_notices(
+    db: AsyncSession,
+    *,
+    reservation,
+    member: Member,
+    slot: Slot,
+    cycle,
+    now: datetime,
+) -> list[int]:
+    from app.services.transfer import TRANSFER_ADMIN_NOTIFY_EMAILS
+
+    body = render_reservation_returned_admin_body(
+        member_name=member.name, slot=slot, cycle=cycle, now=now
+    )
+    admins = await _lookup_members_by_emails(db, TRANSFER_ADMIN_NOTIFY_EMAILS)
+    message_ids: list[int] = []
+    for admin in admins:
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.RESERVATION_RETURNED,
+            to_member_id=admin.id,
+            to_entra_oid=admin.entra_oid,
+            body=body,
+            dedupe_key=f"reservation-returned-admin:{reservation.id}:{admin.id}",
+            reservation_id=reservation.id,
+        )
+        if msg:
+            message_ids.append(msg.id)
+    return message_ids
 
 
 def render_transfer_completed_body(

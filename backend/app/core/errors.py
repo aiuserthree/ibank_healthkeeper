@@ -91,6 +91,10 @@ ERROR_MESSAGES = {
     "SLOT_ALREADY_STARTED": "예약 시간이 지나 교환할 수 없습니다.",
     "SWAP_NOT_PENDING": "이미 처리된 제안입니다.",
     "SWAP_ACCEPT_FAILED": "교환을 완료할 수 없어 제안이 종료되었습니다.",
+    "NOT_RETURNABLE": "반납할 수 없는 예약입니다.",
+    "RETURN_DEADLINE_PASSED": "반납은 예약 시작 2시간 전까지만 할 수 있습니다.",
+    "RETURN_MONTHLY_LIMIT": "반납은 한 사람당 한 달에 1회까지 가능합니다. 이번 달 한도를 모두 사용했습니다.",
+    "RETURN_BLOCKED_PENDING": "진행 중인 양도·교환 제안이 있어 반납할 수 없습니다. 제안을 먼저 정리해 주세요.",
 }
 
 
@@ -144,6 +148,10 @@ def raise_app_error(code: str, http_status: Optional[int] = None) -> None:
         "SLOT_ALREADY_STARTED": 409,
         "SWAP_NOT_PENDING": 409,
         "SWAP_ACCEPT_FAILED": 409,
+        "NOT_RETURNABLE": 409,
+        "RETURN_DEADLINE_PASSED": 409,
+        "RETURN_MONTHLY_LIMIT": 409,
+        "RETURN_BLOCKED_PENDING": 409,
         "GAME_REQUEST_LIMIT": 429,
         "AUTH_FAILED": 401,
         "UNAUTHORIZED": 401,

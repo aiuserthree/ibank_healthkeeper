@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
@@ -326,7 +326,11 @@ async def list_my_reservations(
     page_size = min(max(1, page_size), 50)
     offset = (page - 1) * page_size
 
-    visible = Reservation.status != ReservationStatus.CANCELLED
+    # 취소된 예약은 숨기되, 본인이 반납한 예약은 「반납」으로 남겨 보여 준다
+    visible = or_(
+        Reservation.status != ReservationStatus.CANCELLED,
+        Reservation.returned_at.isnot(None),
+    )
 
     total_result = await db.execute(
         select(func.count())
@@ -395,6 +399,15 @@ async def list_my_reservations(
     now = now_kst()
     monthly_transfer_used = await count_donor_monthly_transfers(db, member.id, now=now)
     monthly_transfer_limit_reached = monthly_transfer_used >= MONTHLY_TRANSFER_LIMIT
+    from app.services.reservation_return import (
+        MONTHLY_RETURN_LIMIT,
+        can_return_slot,
+        count_monthly_returns,
+        return_deadline_dt,
+    )
+
+    monthly_return_used = await count_monthly_returns(db, member.id, now=now)
+    monthly_return_limit_reached = monthly_return_used >= MONTHLY_RETURN_LIMIT
     for reservation, slot, cycle in rows:
         cancelable = (
             state == CycleState.OPEN
@@ -455,6 +468,17 @@ async def list_my_reservations(
             elif now >= slot_start:
                 swap_ended = True
 
+        # 반납 — 확정 예약을 시작 2시간 전까지 직접 내놓기 (월 1회, 진행 중인 양도·교환이 없을 때)
+        return_candidate = (
+            reservation.status == ReservationStatus.CONFIRMED
+            and not pending
+            and not swap_pending
+        )
+        return_in_time = return_candidate and can_return_slot(slot, now)
+        returnable = return_in_time and not monthly_return_limit_reached
+        return_ended = return_candidate and not return_in_time
+        return_limit = return_in_time and monthly_return_limit_reached
+
         reapply_available = (
             in_reapply
             and reservation.status == ReservationStatus.DROPPED
@@ -491,6 +515,13 @@ async def list_my_reservations(
                 ),
                 "incomingSwapCount": incoming_swap_count,
                 "reapplyAvailable": reapply_available,
+                "returnable": returnable,
+                "returnEnded": return_ended,
+                "returnMonthlyLimitReached": return_limit,
+                "returnDeadline": (
+                    format_kst_iso(return_deadline_dt(slot)) if return_candidate else None
+                ),
+                "returned": reservation.returned_at is not None,
             }
         )
 
@@ -504,5 +535,6 @@ async def list_my_reservations(
         "activeTotal": active_total,
         "transferMonthlyLimit": MONTHLY_TRANSFER_LIMIT,
         "transferMonthlyUsed": monthly_transfer_used,
+        "returnMonthlyUsed": monthly_return_used,
         "transferMonthlyLimitReached": monthly_transfer_limit_reached,
     }

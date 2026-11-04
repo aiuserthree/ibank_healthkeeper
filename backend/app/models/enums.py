@@ -66,6 +66,7 @@ class TeamsMessageType(str, enum.Enum):
     SWAP_CANCELLED = "SWAP_CANCELLED"
     SERVICE_NOTICE = "SERVICE_NOTICE"
     REAPPLY_NOTICE = "REAPPLY_NOTICE"
+    RESERVATION_RETURNED = "RESERVATION_RETURNED"
 
 
 class TransferRequestStatus(str, enum.Enum):

@@ -887,7 +887,7 @@ window.HKUI = (function () {
     else if (r.type === "TRANSFER" && r.status === "CONFIRMED") sub = "양도 수령 · 예약 확정";
     else if (r.type === "ADMIN_ASSIGN" && r.status === "CONFIRMED") sub = "관리자 지정 · 예약 확정";
     else if (r.status === "CONFIRMED") sub = "일반 신청 · 예약 확정";
-    else if (r.status === "CANCELLED") sub = "취소됨";
+    else if (r.status === "CANCELLED") sub = r.returned ? "반납함" : "취소됨";
     if (r.usedCoupon && r.status === "CONFIRMED") sub = "무적 쿠폰 · 예약 확정 (양도·교환 불가)";
     // 확정 예약의 시간이 끝났으면 「이용 완료」 — 배지·설명을 바꾸고 교환·양도 버튼은 뺀다
     const used = r.status === "CONFIRMED" && !!r.endTime && new Date(`${r.slotDate}T${r.endTime}:00+09:00`) <= new Date();
@@ -956,6 +956,15 @@ window.HKUI = (function () {
       } else if (transferEnded) {
         actions.push(`<span title="예약 시간이 지나 양도할 수 없습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="양도하기">${transferLabel}</button></span>`);
       }
+      // 반납하기 — 교환·양도할 사람이 없을 때. 시작 2시간 전까지, 한 달에 1회
+      const returnLabel = `<span class="hk-btn-label-full">반납하기</span><span class="hk-btn-label-short" aria-hidden="true">반납</span>`;
+      if (r.returnable) {
+        actions.push(`<button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" data-return="${r.id}" aria-label="반납하기">${returnLabel}</button>`);
+      } else if (r.returnMonthlyLimitReached) {
+        actions.push(`<span title="반납은 한 달에 1회까지 가능합니다. 이번 달 한도를 모두 사용했습니다." style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="반납하기">${returnLabel}</button></span>`);
+      } else if (r.returnEnded) {
+        actions.push(`<span title="반납은 예약 시작 2시간 전까지만 할 수 있습니다" style="display:inline-flex"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" disabled aria-label="반납하기">${returnLabel}</button></span>`);
+      }
     }
     const action = `<div class="hk-rsv-card__actions">${actions.join("")}</div>`;
     const dateBg = muted ? "var(--color-fog)" : "var(--color-signal-blue-soft)";
@@ -976,7 +985,7 @@ window.HKUI = (function () {
           </div>
         </div>
         <div class="hk-rsv-card__aside">
-          <div class="hk-rsv-card__status">${used ? badge("이용 완료", "neutral") : statusBadge(r.status)}</div>
+          <div class="hk-rsv-card__status">${used ? badge("이용 완료", "neutral") : r.returned ? badge("반납", "neutral") : statusBadge(r.status)}</div>
           ${action}
         </div>
       </div>
