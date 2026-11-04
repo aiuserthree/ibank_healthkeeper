@@ -99,6 +99,8 @@ ERROR_MESSAGES = {
     "WORDS_BANNED": "제시어나 금지어가 들어 있어요. 다른 말로 설명해 주세요.",
     "WORDS_NOT_YOUR_TURN": "지금은 상대 차례예요.",
     "WORDS_CHAT_OFF": "게임 중에는 대화창 대신 설명 칸을 써 주세요.",
+    "MAZE_NOT_WALKER": "지금은 상대가 걷는 차례예요. CCTV로 길을 알려 주세요.",
+    "MAZE_STUNNED": "미끄러져서 잠깐 못 움직여요.",
     "GAME_CLOSED": "지금은 업무 시간이라 게임을 할 수 없어요. (점심 11:30~13:00 · 18:00 이후 · 9:00 이전)",
     "GAME_REQUEST_EMPTY": "내용을 적어 주세요.",
     "GAME_REQUEST_LIMIT": "오늘은 의견을 충분히 보내 주셨어요. 내일 또 보내 주세요.",

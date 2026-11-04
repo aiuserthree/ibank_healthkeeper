@@ -21,14 +21,14 @@ from app.config import get_settings
 from app.core.errors import raise_app_error
 from app.core.time import KST, now_kst, today_kst
 from app.models import EscapeRoom, Member, MemberStatus, TeamsMessageType
-from app.services import kitchen_game, realtime, word_game
+from app.services import kitchen_game, maze_game, realtime, word_game
 from app.services import teams as teams_service
 from app.services.escape_rooms import DEFAULT_ROOM, ROOMS, Puzzle, Room
 
 # 협동 방 종류 — 방탈출 방들 + 점심 분식집
-ALL_ROOMS = {**ROOMS, kitchen_game.ROOM.key: kitchen_game.ROOM, word_game.ROOM.key: word_game.ROOM}
+ALL_ROOMS = {**ROOMS, **{e.ROOM.key: e.ROOM for e in (kitchen_game, word_game, maze_game)}}
 # 시간제 게임 엔진 — start · advance · act · view · score · end_code · summary · START_TEXT 를 갖춘다
-ENGINES = {"kitchen": kitchen_game, "words": word_game}
+ENGINES = {"kitchen": kitchen_game, "words": word_game, "maze": maze_game}
 
 
 def _engine(room):

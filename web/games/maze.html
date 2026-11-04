@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 깜깜한 주차장</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/coop.js"></script>
+  <style>
+    .er-hero.is-maze { background: radial-gradient(60% 70% at 78% 18%, rgba(253, 224, 71, .35) 0%, rgba(253, 224, 71, 0) 60%), linear-gradient(160deg, #020617, #1e293b); }
+    .mz-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .mz-stat { display: flex; align-items: baseline; gap: 6px; padding: 8px 12px; border-radius: 12px; background: #f1f5f9; font-size: 13px; font-weight: 700; color: #475569; }
+    .mz-stat b { font-size: 18px; color: #0f172a; font-variant-numeric: tabular-nums; }
+    .mz-stat.is-key { background: #fef9c3; color: #854d0e; }
+    .mz-role { margin-left: auto; padding: 8px 12px; border-radius: 12px; font-size: 13.5px; font-weight: 800; }
+    .mz-role.is-walk { background: #fef3c7; color: #92400e; }
+    .mz-role.is-cctv { background: #dbeafe; color: #1e40af; }
+    .mz-wrap { position: relative; width: 100%; max-width: 540px; margin: 0 auto; }
+    .mz-map { display: grid; gap: 2px; width: 100%; aspect-ratio: 1; padding: 6px; border-radius: 16px; background: #020617; box-sizing: border-box; }
+    .mz-map.is-cctv { background: #0b1d12; box-shadow: inset 0 0 0 2px #14532d; }
+    .mz-c { position: relative; display: grid; place-items: center; border-radius: 3px; font-size: clamp(11px, 3.2vw, 22px); line-height: 1; }
+    .mz-c.is-wall { background: #334155; }
+    .mz-c.is-road { background: #94a3b8; }
+    .is-cctv .mz-c.is-wall { background: #1f3b2c; }
+    .is-cctv .mz-c.is-road { background: #4d7c5d; }
+    .mz-c.is-fog { background: #020617; }
+    .mz-c.is-dim.is-road { background: #64748b; }
+    .mz-c.is-me { background: #fde68a !important; box-shadow: 0 0 14px 4px rgba(253, 230, 138, .65); z-index: 1; }
+    .mz-c.is-puddle { background: #38bdf8 !important; }
+    .mz-cctv-tag { position: absolute; top: 12px; left: 14px; padding: 3px 8px; border-radius: 6px; background: rgba(220, 38, 38, .85); color: #fff; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+    .mz-say { display: flex; align-items: center; gap: 8px; min-height: 40px; max-width: 540px; margin: 0 auto 10px; padding: 8px 12px; border-radius: 12px; background: #eff6ff; font-size: 15px; font-weight: 800; color: #1e3a8a; box-sizing: border-box; transition: opacity .2s; }
+    .mz-say.is-off { opacity: .35; font-weight: 600; color: #64748b; background: #f8fafc; }
+    .mz-say small { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #64748b; }
+    .mz-note { min-height: 22px; margin: 10px 0 4px; text-align: center; font-size: 15px; font-weight: 800; color: #0f172a; }
+    .mz-note.is-bad { color: #b91c1c; }
+    .mz-pad { display: grid; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(3, 52px); gap: 6px; justify-content: center; margin-top: 8px; }
+    .mz-pad button { border: 0; border-radius: 12px; background: #0f172a; color: #fff; font: inherit; font-size: 22px; cursor: pointer; touch-action: manipulation; }
+    .mz-pad button:active { transform: scale(.95); }
+    .mz-pad button:disabled { opacity: .4; cursor: not-allowed; }
+    .mz-pad [data-move="U"] { grid-column: 2; grid-row: 1; }
+    .mz-pad [data-move="L"] { grid-column: 1; grid-row: 2; }
+    .mz-pad [data-move="R"] { grid-column: 3; grid-row: 2; }
+    .mz-pad [data-move="D"] { grid-column: 2; grid-row: 3; }
+    .mz-help { margin-top: 10px; text-align: center; font-size: 13px; color: var(--text-muted); word-break: keep-all; }
+    .mz-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 10px; font-size: 12.5px; color: #475569; }
+    .mz-done { margin: 0; padding: 0; list-style: none; }
+    .mz-done li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    .mz-done li:last-child { border-bottom: 0; }
+    .mz-done small { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+    .er-end.is-maze { background: linear-gradient(160deg, #0f172a, #ca8a04); }
+    @media (max-width: 640px) {
+      .mz-wrap { max-width: min(100%, 50vh); } /* 지도와 방향 버튼이 한 화면에 들어오게 */
+      .mz-pad { grid-template-columns: repeat(3, 72px); grid-template-rows: repeat(3, 52px); margin-top: 4px; }
+      .mz-note { margin-top: 6px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 깜깜한 주차장 — 2인 협동. 한 명은 CCTV(지도 전체), 한 명은 손전등(바로 옆 칸만)으로 차 키 → 내 차. 층마다 역할 교대 (방 공용은 /_shared/coop.js)
+    const { esc } = HKMatch;
+    let room = null, z = null, offset = 0, tickFor = null, busy = false;
+    const queue = []; // 누른 방향 — 응답을 기다리는 동안 누른 것도 순서대로 (최대 6칸)
+    const now = () => (Date.now() + offset) / 1000;
+    const same = (a, x, y) => a && a[0] === x && a[1] === y;
+
+    function mapHtml() {
+      const cctv = z.role === "cctv";
+      const wet = new Set(z.puddles.map((p) => `${p[0]},${p[1]}`));
+      const [px, py] = z.pos;
+      let cells = "";
+      for (let y = 0; y < z.n; y++) {
+        for (let x = 0; x < z.n; x++) {
+          const ch = z.grid[y][x];
+          const near = Math.abs(x - px) <= 1 && Math.abs(y - py) <= 1;
+          let cls = ch === "?" ? "is-fog" : ch === "#" ? "is-wall" : "is-road";
+          if (!cctv && ch === "." && !near) cls += " is-dim"; // 지나온 길은 어둡게 기억
+          let icon = "";
+          if (wet.has(`${x},${y}`)) { cls += " is-puddle"; icon = "💧"; }
+          if (same(z.key, x, y)) icon = "🔑";
+          if (same(z.car, x, y)) icon = "🚗";
+          if (x === px && y === py) { cls += " is-me"; icon = "🔦"; }
+          cells += `<div class="mz-c ${cls}">${icon}</div>`;
+        }
+      }
+      return `<div class="mz-wrap"><div class="mz-map ${cctv ? "is-cctv" : ""}" style="grid-template-columns:repeat(${z.n},1fr);grid-template-rows:repeat(${z.n},1fr)">${cells}</div>${cctv ? `<span class="mz-cctv-tag">● CCTV</span>` : ""}</div>`;
+    }
+    // 상대가 대화창에 보낸 마지막 말 — 지도 바로 위에 8초 동안 크게 (휴대폰에서 대화창까지 내려가지 않게)
+    function lastSay() {
+      const c = (room.chat || []).filter((m) => !m.me).slice(-1)[0];
+      if (!c) return null;
+      const fresh = Date.now() + offset - Date.parse(c.t) < 8000;
+      return { text: c.text, fresh };
+    }
+    function sayHtml() {
+      const s = lastSay();
+      const who = z.role === "walk" ? "📹 CCTV" : "🔦 손전등";
+      return `<div class="mz-say ${s && s.fresh ? "" : "is-off"}" id="mz-say"><small>${who} ${esc(room.partner.name)}</small><span>${s ? esc(s.text) : z.role === "walk" ? "안내를 기다리는 중…" : "동료의 말이 여기 떠요"}</span></div>`;
+    }
+    function noteText() {
+      const stun = z.stunUntil - now();
+      if (stun > 0) return [`미끄러져서 ${stun.toFixed(1)}초 동안 못 움직여요`, true];
+      if (z.note && now() - z.note.t < 4) return [z.note.text, /쿵|미끄|잠겨/.test(z.note.text)];
+      return ["", false];
+    }
+    function playHtml() {
+      if (!z) return "";
+      const walk = z.role === "walk";
+      const [note, bad] = noteText();
+      return `<div class="er-card">
+          <div class="mz-stats">
+            <div class="mz-stat">지금 <b>${esc(z.floor)}</b></div>
+            <div class="mz-stat">탈출 <b>${z.cleared}</b>층</div>
+            <div class="mz-stat ${z.hasKey ? "is-key" : ""}">${z.hasKey ? "🔑 차 키 있음" : "🔑 차 키 없음"}</div>
+            <span class="mz-role ${walk ? "is-walk" : "is-cctv"}">${walk ? "🔦 내가 걷는 차례" : "📹 내가 CCTV로 안내"}</span>
+          </div>
+          ${sayHtml()}
+          ${mapHtml()}
+          <div class="mz-note ${bad ? "is-bad" : ""}" id="mz-note">${esc(note)}</div>
+          ${walk
+            ? `<div class="mz-pad">${[["U", "↑"], ["L", "←"], ["R", "→"], ["D", "↓"]].map(([d, t]) => `<button type="button" data-move="${d}" aria-label="${t}">${t}</button>`).join("")}</div>
+               <div class="mz-help">바로 옆 칸만 보여요. 물웅덩이는 밟기 전엔 안 보이니 CCTV 안내를 잘 들어요. PC는 방향키로도 움직여요.</div>`
+            : `<div class="mz-legend"><span>🔦 동료</span><span>🔑 차 키</span><span>🚗 내 차</span><span>💧 물웅덩이</span></div>
+               <div class="mz-help">${esc(room.partner.name)}님은 바로 옆 칸만 보여요. 대화창의 방향 버튼이나 말로 길을 알려 주세요. 먼저 🔑, 그다음 🚗!</div>`}
+        </div>`;
+    }
+    function doneHtml() {
+      const items = (z ? z.done : []).slice().reverse().map((d) => `<li>🚗 <b>${esc(d.floor)} 탈출</b><small>${d.sec}초</small></li>`).join("");
+      return `<div class="er-card"><h2>빠져나온 층</h2>${items ? `<ul class="mz-done">${items}</ul>` : `<div style="font-size:13px;color:var(--text-muted)">아직 없어요</div>`}</div>`;
+    }
+
+    async function move(ctx, dir) {
+      if (!room || room.status !== "PLAYING" || !z || z.role !== "walk") return;
+      if (z.stunUntil > now() || queue.length >= 6) return; // 미끄러진 동안은 안내 문구만
+      queue.push(dir);
+      if (busy) return;
+      busy = true;
+      while (queue.length && room && room.status === "PLAYING") {
+        const d = queue.shift();
+        try { ctx.set(await HKApi.coopAct(room.id, "move", d)); }
+        catch (e) { queue.length = 0; if (!/천천히|미끄러져/.test(e.message || "")) HKUI.toast(e.message || "움직일 수 없어요", "error"); }
+        if (z && z.stunUntil > now()) queue.length = 0; // 웅덩이에 빠지면 남은 걸음은 버린다
+      }
+      busy = false;
+    }
+
+    const coop = HKCoop.mount({
+      room: "parking",
+      listName: "주차장 목록",
+      heroClass: "is-maze",
+      tickMs: 100,
+      hero: { facts: ["2인 협동", "3분", "CCTV · 손전등", "층마다 역할 교대", "끝까지 하면 오늘 도장"], note: "한 명은 CCTV로 주차장 전체를, 한 명은 손전등으로 바로 옆만 봐요. 대화창의 방향 버튼이나 Teams 통화로 길을 알려 주세요." },
+      rankTitle: "탈출 층수 순위",
+      rankNote: "같은 두 사람은 가장 많이 내려간 한 판만 올라요.",
+      rankText: (x) => `${x.score}층`,
+      recentText: (r) => (r.status === "CLEAR" ? [`${r.score}층 탈출`, "is-clear"] : ["포기", "is-fail"]),
+      failTitle: "그만뒀어요",
+      quick: ["⬆️ 위로", "⬇️ 아래로", "⬅️ 왼쪽", "➡️ 오른쪽", "✋ 멈춰!", "💧 웅덩이 조심", "🔑 키 거의 다 왔어", "🚗 차가 코앞이야"],
+      remain: () => (z ? z.end - now() : null),
+      readyNote: (ctx) => (ctx.room.sideName === "먼저 걷기"
+        ? "첫 층은 <b>내가 손전등</b>을 들고 걸어요. 바로 옆 칸만 보이니 CCTV를 보는 동료의 안내를 따라 🔑 차 키를 줍고 🚗 내 차까지 가요. 층을 빠져나가면 역할이 바뀌어요."
+        : "첫 층은 <b>내가 CCTV</b>로 주차장 전체를 봐요. 대화창의 방향 버튼이나 말로 동료를 🔑 차 키, 🚗 내 차까지 안내해 주세요. 💧 물웅덩이는 동료 눈에 안 보여요!"),
+      reset: () => { tickFor = null; busy = false; queue.length = 0; },
+      changed: (prev, next) => {
+        room = next;
+        z = next.maze || null;
+        if (z) offset = z.now * 1000 - Date.now();
+      },
+      play: () => playHtml(),
+      side: () => (z ? doneHtml() : ""),
+      end: (ctx, again) => `<div class="er-end is-maze"><h2>시간 끝!</h2><p>${esc(room.outro)}</p>
+          <div class="er-end__time">${room.score ?? 0}층</div>
+          <p>${z ? `미끄러진 횟수 ${z.slips}번` : ""}</p>
+          <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">목록</a></div></div>`,
+      after: () => (z ? `<div style="margin-top:14px">${doneHtml()}</div>` : ""),
+      tick: (ctx) => {
+        if (!room || room.status !== "PLAYING" || !z) return;
+        const el = document.getElementById("mz-note");
+        if (el) { const [t, bad] = noteText(); if (el.textContent !== t) { el.textContent = t; el.classList.toggle("is-bad", bad); } }
+        const say = document.getElementById("mz-say");
+        if (say) { const s2 = lastSay(); say.classList.toggle("is-off", !(s2 && s2.fresh)); }
+        if (z.nextAt && now() >= z.nextAt + 0.05 && tickFor !== z.nextAt) {
+          tickFor = z.nextAt;
+          HKApi.coopTick(room.id).then((next) => ctx.set(next)).catch(() => { tickFor = null; });
+        }
+      },
+      click: async (t, ctx) => { if (t.dataset.move) return move(ctx, t.dataset.move); },
+    });
+    // 방향키 · WASD — 입력 칸에 글을 쓰는 중이면 건드리지 않는다
+    const KEYS = { ArrowUp: "U", ArrowDown: "D", ArrowLeft: "L", ArrowRight: "R", w: "U", s: "D", a: "L", d: "R" };
+    document.addEventListener("keydown", (e) => {
+      if (e.target.closest && e.target.closest("input, textarea")) return;
+      const dir = KEYS[e.key];
+      if (!dir || !z || z.role !== "walk" || !room || room.status !== "PLAYING") return;
+      e.preventDefault();
+      move(coop, dir);
+    });
+  </script>
+</body>
+</html>
