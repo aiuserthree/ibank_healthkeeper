@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import json
 import logging
 from datetime import date, datetime, time, timedelta
@@ -42,6 +43,10 @@ _TRANSFER_NOTIFY_TYPES = frozenset({
     TeamsMessageType.SWAP_ACCEPT_FAILED,
     TeamsMessageType.SWAP_CANCELLED,
     TeamsMessageType.RESERVATION_RETURNED,
+    TeamsMessageType.MATCH_CHALLENGED,
+    TeamsMessageType.MATCH_ACCEPTED,
+    TeamsMessageType.MATCH_DECLINED,
+    TeamsMessageType.MATCH_CANCELLED,
 })
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
@@ -1213,3 +1218,92 @@ async def send_test_chat_to_member(
     db.add(msg)
     await db.commit()
     return chat_id
+
+
+# ── 대전 게임(오목 · 체스) ─────────────────────────────────────────
+
+MATCH_GAME_NAME = {"gomoku": "오목", "chess": "체스"}
+
+
+def match_page_url(game: str, match_id: Optional[int] = None) -> str:
+    """대전 화면 — 미로그인이면 로그인 뒤 같은 판으로 돌아온다."""
+    url = f"{get_settings().app_base_url.rstrip('/')}/games/{game}"
+    return f"{url}#m{match_id}" if match_id else url
+
+
+def _who(member: Member) -> str:
+    dept = (member.department or "").strip()
+    name = f"<b>{html.escape(member.name)}</b>님"
+    return f"{html.escape(dept)} {name}" if dept else name
+
+
+def render_match_challenged_body(*, game: str, match_id: int, target: Member, challenger: Member, deadline_at: Optional[datetime]) -> str:
+    name = MATCH_GAME_NAME.get(game, "대전")
+    url = match_page_url(game, match_id)
+    due = f"{_datetime_label(deadline_at)}까지 수락하지 않으면 신청이 사라져요. " if deadline_at else ""
+    return (
+        f"<p><strong>[헬스키퍼]</strong> {name} 대전 신청</p>"
+        f"<p>{html.escape(target.name)}님, {_who(challenger)}이 {name} 대전을 신청했어요.</p>"
+        f"<p>{due}수락은 아케이드가 열린 시간에만 할 수 있어요.</p>"
+        f'<p><a href="{url}">대전 화면 열기</a>에서 수락하거나 거절해 주세요.</p>'
+    )
+
+
+def render_match_accepted_body(*, game: str, match_id: int, challenger: Member, opponent: Member, first: Member) -> str:
+    name = MATCH_GAME_NAME.get(game, "대전")
+    url = match_page_url(game, match_id)
+    side = "백" if game == "chess" else "흑"
+    turn = "내 차례예요" if first.id == challenger.id else f"{html.escape(first.name)}님 차례예요"
+    return (
+        f"<p><strong>[헬스키퍼]</strong> {name} 대전 수락</p>"
+        f"<p>{html.escape(challenger.name)}님, {_who(opponent)}이 {name} 대전 신청을 수락했어요.</p>"
+        f"<p>첫 수({side})는 {turn}.</p>"
+        f'<p><a href="{url}">대전 화면 열기</a></p>'
+    )
+
+
+def render_match_declined_body(*, game: str, challenger: Member, opponent: Member) -> str:
+    name = MATCH_GAME_NAME.get(game, "대전")
+    url = match_page_url(game)
+    return (
+        f"<p><strong>[헬스키퍼]</strong> {name} 대전 거절</p>"
+        f"<p>{html.escape(challenger.name)}님, {_who(opponent)}이 {name} 대전 신청을 거절했어요.</p>"
+        f'<p><a href="{url}">{name} 화면 열기</a>에서 다른 사람에게 도전할 수 있어요.</p>'
+    )
+
+
+def render_match_cancelled_body(*, game: str, opponent: Member, challenger: Member) -> str:
+    name = MATCH_GAME_NAME.get(game, "대전")
+    return (
+        f"<p><strong>[헬스키퍼]</strong> {name} 대전 신청 취소</p>"
+        f"<p>{html.escape(opponent.name)}님, {_who(challenger)}이 {name} 대전 신청을 취소했어요.</p>"
+    )
+
+
+async def _enqueue_match_notice(db: AsyncSession, *, kind: TeamsMessageType, to: Member, body: str, key: str) -> list[int]:
+    if not to.entra_oid:
+        return []
+    msg = await enqueue_teams_message(
+        db, message_type=kind, to_member_id=to.id, to_entra_oid=to.entra_oid, body=body, dedupe_key=key,
+    )
+    return [msg.id] if msg else []
+
+
+async def enqueue_match_challenged_notice(db: AsyncSession, *, game: str, match_id: int, challenger: Member, target: Member, deadline_at: Optional[datetime]) -> list[int]:
+    body = render_match_challenged_body(game=game, match_id=match_id, target=target, challenger=challenger, deadline_at=deadline_at)
+    return await _enqueue_match_notice(db, kind=TeamsMessageType.MATCH_CHALLENGED, to=target, body=body, key=f"match-challenged:{match_id}")
+
+
+async def enqueue_match_accepted_notice(db: AsyncSession, *, game: str, match_id: int, challenger: Member, opponent: Member, first: Member) -> list[int]:
+    body = render_match_accepted_body(game=game, match_id=match_id, challenger=challenger, opponent=opponent, first=first)
+    return await _enqueue_match_notice(db, kind=TeamsMessageType.MATCH_ACCEPTED, to=challenger, body=body, key=f"match-accepted:{match_id}")
+
+
+async def enqueue_match_declined_notice(db: AsyncSession, *, game: str, match_id: int, challenger: Member, opponent: Member) -> list[int]:
+    body = render_match_declined_body(game=game, challenger=challenger, opponent=opponent)
+    return await _enqueue_match_notice(db, kind=TeamsMessageType.MATCH_DECLINED, to=challenger, body=body, key=f"match-declined:{match_id}")
+
+
+async def enqueue_match_cancelled_notice(db: AsyncSession, *, game: str, match_id: int, challenger: Member, opponent: Member) -> list[int]:
+    body = render_match_cancelled_body(game=game, opponent=opponent, challenger=challenger)
+    return await _enqueue_match_notice(db, kind=TeamsMessageType.MATCH_CANCELLED, to=opponent, body=body, key=f"match-cancelled:{match_id}")

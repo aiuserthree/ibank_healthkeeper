@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
 from datetime import timedelta
 from typing import Optional
@@ -15,6 +16,7 @@ from app.core.errors import raise_app_error
 from app.core.time import KST, now_kst, today_kst
 from app.models import GameMatch, Member, MemberStatus
 from app.services import chess_game, gomoku_ai
+from app.services import teams as teams_service
 from app.services.avatar import member_avatar_url
 from app.services.game import _give_stamp, ensure_open
 
@@ -27,11 +29,32 @@ MOVE_HOURS = 24  # 한 수를 기다리는 시간 — 넘기면 기한을 넘긴
 MAX_OPEN = 10  # 한 사람이 게임마다 동시에 걸어 둘 수 있는 대국
 MIN_MOVES = 10  # 기권·시간 초과는 이만큼 둔 판만 도장과 순위에 반영 — 바로 기권해 도장·승수를 얻지 못하게
 RANK_SIZE = 20
+WAIT_SECONDS = 20  # 상대 수를 기다리는 한 번의 요청 — 그 안에 판이 바뀌면 바로 돌려준다
 BOT_NAME = {"easy": "컴퓨터 · 쉬움", "normal": "컴퓨터 · 보통", "hard": "컴퓨터 · 어려움"}
 
 OPEN_STATUS = ("PENDING", "ACTIVE")
 NO_WINNER = ("DRAW", "STALEMATE")      # 승부가 나지 않은 끝
 PLAYED_OUT = ("FIVE", "CHECKMATE", *NO_WINNER)
+
+
+logger = logging.getLogger(__name__)
+
+
+def _channel(redis, match_id: int) -> str:
+    # pub/sub 채널은 Redis DB 번호와 상관없이 서버 전체에서 하나 — 개발·운영이 같은 Redis를 써도 섞이지 않게 DB 번호를 붙인다
+    return f"hk:{redis.connection_pool.connection_kwargs.get('db', 0)}:match:{match_id}"
+
+
+async def _publish(*match_ids: int) -> None:
+    """판이 바뀌었다고 기다리는 쪽에 알린다. 알림이 실패해도 수는 이미 저장됐다."""
+    try:
+        from app.database import get_redis
+
+        redis = await get_redis()
+        for match_id in match_ids:
+            await redis.publish(_channel(redis, match_id), "1")
+    except Exception:  # noqa: BLE001
+        logger.warning("match publish failed", exc_info=True)
 
 
 def _check_game(game: str) -> str:
@@ -133,6 +156,7 @@ async def _sweep(db: AsyncSession, member_id: Optional[int] = None) -> None:
             _finish(m, m.challenger_id if turn == m.opponent_id else m.opponent_id, "TIMEOUT")
     if rows:
         await db.commit()
+        await _publish(*(m.id for m in rows))
 
 
 async def _people(db: AsyncSession, ids: set) -> dict:
@@ -257,8 +281,12 @@ async def create(db: AsyncSession, member: Member, opponent_id: int, game: str =
         deadline_at=now_kst() + timedelta(hours=ACCEPT_HOURS),
     )
     db.add(m)
+    await db.flush()
+    notify = await teams_service.enqueue_match_challenged_notice(
+        db, game=game, match_id=m.id, challenger=member, target=rival, deadline_at=m.deadline_at
+    )
     await db.commit()
-    return await _view(db, member, m)
+    return await _view(db, member, m), notify
 
 
 async def accept(db: AsyncSession, member: Member, match_id: int) -> dict:
@@ -270,8 +298,16 @@ async def accept(db: AsyncSession, member: Member, match_id: int) -> dict:
     m.status = "ACTIVE"
     m.black_id = random.choice((m.challenger_id, m.opponent_id))
     m.deadline_at = now_kst() + timedelta(hours=MOVE_HOURS)
+    challenger = await db.get(Member, m.challenger_id)
+    notify = []
+    if challenger is not None:
+        notify = await teams_service.enqueue_match_accepted_notice(
+            db, game=m.game, match_id=m.id, challenger=challenger, opponent=member,
+            first=challenger if m.black_id == challenger.id else member,
+        )
     await db.commit()
-    return await _view(db, member, m)
+    await _publish(m.id)
+    return await _view(db, member, m), notify
 
 
 async def decline(db: AsyncSession, member: Member, match_id: int) -> dict:
@@ -281,8 +317,16 @@ async def decline(db: AsyncSession, member: Member, match_id: int) -> dict:
     m.status = "DECLINED"
     m.deadline_at = None
     m.finished_at = now_kst()
+    rival = await db.get(Member, _rival_id(m, member.id))
+    notify = []
+    if rival is not None:
+        if member.id == m.opponent_id:  # 받은 사람이 거절
+            notify = await teams_service.enqueue_match_declined_notice(db, game=m.game, match_id=m.id, challenger=rival, opponent=member)
+        else:  # 건 사람이 신청을 거둠
+            notify = await teams_service.enqueue_match_cancelled_notice(db, game=m.game, match_id=m.id, challenger=member, opponent=rival)
     await db.commit()
-    return await _view(db, member, m)
+    await _publish(m.id)
+    return await _view(db, member, m), notify
 
 
 async def _stamp_both(db: AsyncSession, m: GameMatch, member: Member) -> Optional[dict]:
@@ -326,6 +370,8 @@ async def move(db: AsyncSession, member: Member, match_id: int, x: Optional[int]
     if m.bot and m.status == "ACTIVE":
         await _bot_reply(m)
     await db.commit()
+    if not m.bot:
+        await _publish(m.id)
     stamp = await _stamp_both(db, m, member) if m.status == "DONE" else None
     return {**(await _view(db, member, m)), "stamp": stamp}
 
@@ -338,12 +384,52 @@ async def resign(db: AsyncSession, member: Member, match_id: int) -> dict:
         raise_app_error("MATCH_NOT_ACTIVE")
     _finish(m, _rival_id(m, member.id), "RESIGN")
     await db.commit()
+    if not m.bot:
+        await _publish(m.id)
     return {**(await _view(db, member, m)), "stamp": await _stamp_both(db, m, member)}
 
 
 async def detail(db: AsyncSession, member: Member, match_id: int) -> dict:
     await _sweep(db, member.id)
     return await _view(db, member, await _get(db, member, match_id))
+
+
+async def wait(db: AsyncSession, member: Member, match_id: int, seq: int, status: str) -> dict:
+    """판이 내가 본 것(수 · 상태)과 달라질 때까지 최대 WAIT_SECONDS 기다렸다가 판을 돌려준다.
+    상대가 두면 그 즉시 깨어나므로 화면이 바로 바뀐다."""
+    from app.database import get_redis
+
+    pubsub = None
+    try:
+        redis = await get_redis()
+        pubsub = redis.pubsub()
+        await pubsub.subscribe(_channel(redis, match_id))  # 판을 읽기 전에 먼저 귀를 연다 — 그 사이 둔 수도 놓치지 않게
+    except Exception:  # noqa: BLE001
+        logger.warning("match subscribe failed", exc_info=True)
+        pubsub = None
+    try:
+        await _sweep(db, member.id)
+        m = await _get(db, member, match_id)
+        if len(m.moves) != seq or m.status != status or pubsub is None:
+            return await _view(db, member, m)
+        await db.commit()  # 읽기만 했다 — 기다리는 동안 DB 연결을 쥐고 있지 않게 끝낸다
+        loop = asyncio.get_running_loop()
+        end = loop.time() + WAIT_SECONDS
+        while (left := end - loop.time()) > 0:
+            if await pubsub.get_message(ignore_subscribe_messages=True, timeout=left):
+                break
+            await asyncio.sleep(0.05)  # 구독 확인 같은 빈 응답에 헛돌지 않게
+        await _sweep(db, member.id)
+        m = await _get(db, member, match_id)
+        await db.refresh(m)  # 같은 세션에 남은 옛 판이 아니라 방금 저장된 판을 읽는다
+        return await _view(db, member, m)
+    finally:
+        if pubsub is not None:
+            try:
+                await pubsub.unsubscribe()
+                await pubsub.aclose()
+            except Exception:  # noqa: BLE001
+                pass
 
 
 async def inbox(db: AsyncSession, member: Member) -> dict:

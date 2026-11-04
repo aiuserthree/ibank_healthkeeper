@@ -34,12 +34,13 @@
   <script>
     // 사내 체스 — 도전 → 수락 → 번갈아 두기, 또는 컴퓨터와. 규칙 판정은 서버가 하고, 화면은 서버가 준 둘 수 있는 수만 보여 준다
     const { esc, REASON, ava, closedNote, due, fail } = HKMatch;
-    const GAME = "chess", POLL_MS = 6000;
+    const GAME = "chess";
     const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
     const PROMO = { q: "퀸", r: "룩", b: "비숍", n: "나이트" };
     const NEW_BOARD = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
     let root = null, open = { open: true, opensAt: null }, match = null, chosen = null, timer = 0, sending = false, thinking = false;
-    function stopPoll() { clearTimeout(timer); timer = 0; }
+    let waiter = null; // 서버에서 상대 수를 기다리는 요청
+    function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
     async function showLobby() {
       stopPoll(); match = null; chosen = null;
       open = await HKMatch.lobby(root, GAME, { title: "사내 체스", lead: "동료에게 도전장을 보내거나 컴퓨터와 두어요. 한 수를 24시간 안에 두지 않으면 시간 초과로 져요. 대국이 끝나면 오늘 도장을 받아요." });
@@ -149,22 +150,28 @@
       } catch (e) { thinking = false; fail(e); await showMatch(match.id); }
       sending = false;
     }
-    // 상대 차례면 판이 바뀌었는지 가끔 본다 — 화면이 보일 때만
-    function schedulePoll() {
+    // 상대 차례면 서버에서 판이 바뀔 때까지 기다린다 — 상대가 두는 즉시 돌아와 바로 그린다. 화면이 보일 때만
+    function schedulePoll(delay = 0) {
       stopPoll();
       if (!match || ["DONE", "DECLINED", "EXPIRED"].includes(match.status) || match.myTurn) return;
       timer = setTimeout(async () => {
-        if (document.hidden || !match) return schedulePoll();
-        const id = match.id;
-        try {
-          const next = await HKApi.matchDetail(id);
-          if (!match || match.id !== id) return;
-          const changed = next.moveCount !== match.moveCount || next.status !== match.status;
-          match = next;
-          if (changed) { chosen = null; paintMatch(); }
-        } catch (_) { /* 잠깐 끊겨도 다음 차례에 다시 본다 */ }
+        timer = 0;
+        if (document.hidden || !match) return; // 다시 보이면 visibilitychange 에서 판을 새로 연다
+        const id = match.id, ctl = new AbortController();
+        waiter = ctl;
+        let next;
+        try { next = await HKApi.matchWait(id, match.moveCount, match.status, ctl.signal); }
+        catch (_) {
+          if (waiter === ctl) { waiter = null; schedulePoll(3000); } // 잠깐 끊기면 3초 뒤 다시
+          return;
+        }
+        if (waiter !== ctl || !match || match.id !== id) return; // 그새 내가 두었거나 다른 판으로 감
+        waiter = null;
+        const changed = next.moveCount !== match.moveCount || next.status !== match.status;
+        match = next;
+        if (changed) { chosen = null; paintMatch(); }
         schedulePoll();
-      }, POLL_MS);
+      }, delay);
     }
     async function showMatch(id) {
       stopPoll(); chosen = null;

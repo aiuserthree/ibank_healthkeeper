@@ -55,6 +55,9 @@ window.HKApi = (function () {
     matchCreate: (opponentId, game) => request("/play/match", { method: "POST", body: JSON.stringify({ opponentId, game }) }),
     matchBot: (level, game) => request("/play/match/bot", { method: "POST", body: JSON.stringify({ level, game }) }),
     matchDetail: (id) => request(`/play/match/${id}`),
+    // 상대 수를 기다린다 — 판이 바뀌면 바로, 아니면 20초 뒤 돌아온다
+    matchWait: (id, seq, status, signal) =>
+      request(`/play/match/${id}/wait?seq=${seq}&status=${encodeURIComponent(status)}`, { signal }),
     matchAccept: (id) => request(`/play/match/${id}/accept`, { method: "POST" }),
     matchDecline: (id) => request(`/play/match/${id}/decline`, { method: "POST" }),
     matchMove: (id, step, seq) => request(`/play/match/${id}/move`, { method: "POST", body: JSON.stringify({ ...step, seq }) }),

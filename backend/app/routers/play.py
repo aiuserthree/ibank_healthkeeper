@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,14 @@ from app.services import game as game_service
 from app.services import match as match_service
 
 router = APIRouter(prefix="/play", tags=["play"])
+
+
+def _deliver(background_tasks: BackgroundTasks, message_ids: list) -> None:
+    """대전 신청 · 수락 · 거절 Teams 알림 — 응답을 먼저 주고 뒤에서 보낸다."""
+    if message_ids:
+        from app.services.teams import deliver_teams_messages
+
+        background_tasks.add_task(deliver_teams_messages, message_ids)
 
 
 class GameRequestBody(BaseModel):
@@ -122,10 +130,13 @@ async def match_members(
 @router.post("/match")
 async def match_create(
     body: MatchCreate,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    return {"data": await match_service.create(db, member, body.opponentId, body.game)}
+    data, notify = await match_service.create(db, member, body.opponentId, body.game)
+    _deliver(background_tasks, notify)
+    return {"data": data}
 
 
 @router.post("/match/bot")
@@ -136,6 +147,18 @@ async def match_bot(
 ):
     """컴퓨터와 대국 시작 — 두던 판이 있으면 그 판을 돌려준다."""
     return {"data": await match_service.start_bot(db, member, body.level, body.game)}
+
+
+@router.get("/match/{match_id}/wait")
+async def match_wait(
+    match_id: int,
+    seq: int = Query(..., ge=0),
+    status: str = Query(..., max_length=16),
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """상대 차례일 때 화면이 거는 요청 — 판이 바뀌면 그 즉시, 아니면 20초 뒤에 판을 돌려준다."""
+    return {"data": await match_service.wait(db, member, match_id, seq, status)}
 
 
 @router.get("/match/{match_id}")
@@ -150,20 +173,26 @@ async def match_detail(
 @router.post("/match/{match_id}/accept")
 async def match_accept(
     match_id: int,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    return {"data": await match_service.accept(db, member, match_id)}
+    data, notify = await match_service.accept(db, member, match_id)
+    _deliver(background_tasks, notify)
+    return {"data": data}
 
 
 @router.post("/match/{match_id}/decline")
 async def match_decline(
     match_id: int,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
     """받은 도전 거절 또는 보낸 도전 취소 — 업무 시간에도 할 수 있다."""
-    return {"data": await match_service.decline(db, member, match_id)}
+    data, notify = await match_service.decline(db, member, match_id)
+    _deliver(background_tasks, notify)
+    return {"data": data}
 
 
 @router.post("/match/{match_id}/move")

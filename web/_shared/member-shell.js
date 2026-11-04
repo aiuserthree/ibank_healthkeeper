@@ -140,7 +140,7 @@ window.HKMember = (function () {
     catch (e) {
       if (e.status === 401 || e.status === 403) {
         rememberProfile(null);
-        window.location.href = `${R.login}?returnTo=${encodeURIComponent(redirectTo || window.location.pathname)}`;
+        window.location.href = `${R.login}?returnTo=${encodeURIComponent(redirectTo || window.location.pathname + window.location.search + window.location.hash)}`;
         return null;
       }
       throw e;
@@ -158,7 +158,7 @@ window.HKMember = (function () {
     await HKUI.loadLucide();
     let profile = null;
     if (auth) {
-      profile = await requireAuth(window.location.pathname);
+      profile = await requireAuth(); // 주소의 ?…·#… 도 그대로 — 알림 링크로 온 판으로 로그인 뒤 돌아오게
       if (!profile) return;
     } else if (!authPage) {
       try { profile = await HKApi.profile(); rememberProfile(profile); } catch (_) { profile = null; rememberProfile(null); }

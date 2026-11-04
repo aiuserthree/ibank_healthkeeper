@@ -719,6 +719,14 @@
     if(AC.state !== 'running') AC.resume(); // iOS can report 'interrupted', not just 'suspended'
     return AC;
   }
+  // leaving the page (lock screen, other app) closes audio so iOS drops the site from Now Playing
+  function releaseAudio(){
+    if(!AC) return;
+    var old = AC; AC = null; master = null;
+    try{ old.close().catch(function(){}); }catch(e){}
+  }
+  document.addEventListener('visibilitychange', function(){ if(document.hidden) releaseAudio(); });
+  window.addEventListener('pagehide', releaseAudio);
   function tone(freq, dur, type, vol, sweepTo, at){
     // a non-running context (iOS background) would queue sounds and burst them on resume
     if(!AC || muted || AC.state !== 'running') return;

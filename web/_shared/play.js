@@ -79,6 +79,16 @@ window.HKSound = (function () {
     if (ac.state !== "running") ac.resume().catch(() => {});
     return ac;
   }
+  // 화면을 떠나면(폰 잠금 · 다른 앱 · 다른 탭) 소리 장치를 닫는다 — 아이폰 잠금화면·제어 센터에
+  // 사이트 주소가 '재생 중'으로 남지 않게. 돌아와서 화면을 누르면 다시 연다
+  function release() {
+    if (!ac) return;
+    const old = ac;
+    ac = null; master = null; noiseBuf = null; hum = null;
+    try { old.close().catch(() => {}); } catch (_) { /* 이미 닫힘 */ }
+  }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) release(); });
+  window.addEventListener("pagehide", release);
   // 입력할 때마다 오디오 잠금 해제 — 아이폰은 touchend·click 같은 '손을 뗄 때' 입력에서만 풀리고,
   // 게임 판은 길게 누르기를 막느라 click 이 안 생기므로 손을 뗄 때(pointerup·touchend)도 듣는다
   ["pointerdown", "pointerup", "touchstart", "touchend", "click", "keydown"].forEach((t) =>
