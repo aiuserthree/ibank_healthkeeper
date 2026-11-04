@@ -83,7 +83,7 @@ from app.models import GameMatch, Member, MemberStatus
 from app.services import chess_game, gomoku_ai
 from app.services import teams as teams_service
 from app.services.avatar import member_avatar_url
-from app.services.game import _give_stamp, ensure_open
+from app.services.game import _give_stamp, ensure_open, game_visible
 
 GOMOKU = "gomoku"
 CHESS = "chess"
@@ -140,7 +140,7 @@ async def _publish(*match_ids: int) -> None:
 
 
 def _check_game(game: str) -> str:
-    if game not in MATCH_GAMES:
+    if game not in MATCH_GAMES or not game_visible(game):  # 비공개 게임은 운영에서 도전 · 목록을 열지 않는다
         raise_app_error("MATCH_NOT_FOUND", 404)
     return game
 
@@ -741,6 +741,8 @@ async def inbox(db: AsyncSession, member: Member) -> dict:
     ).scalars().all()
     out = {}
     for game in MATCH_GAMES:
+        if not game_visible(game):
+            continue
         mine = [m for m in rows if m.game == game]
         out[game] = {
             "myTurn": sum(1 for m in mine if _my_turn_safe(m, member.id)),

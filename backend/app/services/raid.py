@@ -59,7 +59,7 @@ from app.models import ArcadeStamp, EscapeRoom, GameMatch, GamePlay, Member, Mem
 from app.services.avatar import member_avatar_url
 from app.services.escape_rooms import ROOMS as PUZZLE_ROOMS
 from app.services.fun_stats import DEPARTMENT_MIN_MEMBERS, DEPARTMENT_RANKING_EXCLUDED
-from app.services.game import GAMES
+from app.services.game import GAMES, game_visible
 from app.services.transfer import _TRANSFER_EXCLUDED_EMAIL_DOMAINS, _TRANSFER_EXCLUDED_EMAIL_LOCAL
 
 logger = logging.getLogger(__name__)
@@ -500,7 +500,8 @@ def rules_payload() -> dict:
     join = "절반" if JOIN_RATE == 50 else f"{JOIN_RATE}%"
     return {
         "dailyCap": DAILY_CAP,
-        "sources": [{"key": s.key, "label": s.label, "dmg": s.dmg, "note": s.note} for s in SOURCES],
+        # 협동 게임이 아직 비공개인 환경(운영)에서는 규칙 표에서 「2인 협동」 줄을 뺀다
+        "sources": [{"key": s.key, "label": s.label, "dmg": s.dmg, "note": s.note} for s in SOURCES if s.key != "coop" or game_visible("escape")],
         "crossBonus": CROSS_BONUS,
         "minMembers": DEPARTMENT_MIN_MEMBERS,
         "hpPerMember": HP_PER_MEMBER,

@@ -126,6 +126,19 @@ DEPARTMENT_TOP_N = 3
 SUBMIT_PER_MINUTE = 20
 
 
+# 아직 비공개 — 로컬(DEBUG=true)에서만 보이는 대전 · 협동 게임. 운영(DEBUG=false)에서는 아케이드 목록 · 순위 · 도전 · 초대에서 빠진다.
+# 공개할 때는 여기서 빼고, deploy/nginx/app-locations.inc 의 「아직 비공개」 블록과 화면(HKLunch.isLocal 로 가린 함께하기 링크)도 함께 정리한다.
+LOCAL_ONLY_GAMES = frozenset({
+    "baseball", "boxes", "quizduel", "gostop", "memory", "soccer", "volley",  # 1:1 대전(오목 · 체스는 공개)
+    "escape", "kitchen", "words", "maze", "sketch", "sync", "spotdiff",  # 2인 협동
+})
+
+
+def game_visible(key: str) -> bool:
+    """이 환경에서 보이는 게임인지 — 비공개 게임은 로컬(DEBUG)에서만."""
+    return key not in LOCAL_ONLY_GAMES or get_settings().debug
+
+
 def get_game(key: str) -> Game:
     game = GAMES.get(key)
     if not game:
@@ -244,6 +257,8 @@ async def list_games(db: AsyncSession, member: Member) -> list[dict]:
     show_ranks = play_window()["open"]
     out = []
     for game in GAMES.values():
+        if not game_visible(game.key):
+            continue
         rows = by_game.get(game.key, []) if show_ranks else []
         top = None
         if show_ranks and game.key in tops and tops[game.key][0] in members:
@@ -358,6 +373,8 @@ async def hall_of_fame(db: AsyncSession, period: str = "week") -> dict:
         start = end - timedelta(days=6)
     picked: list[tuple[Game, list[tuple[int, int, int]], dict[int, str]]] = []
     for game in GAMES.values():
+        if not game_visible(game.key):
+            continue
         rows, where = await _week_bests(db, game, start, end)
         ranked = _ranked(rows)[:3]
         if ranked:

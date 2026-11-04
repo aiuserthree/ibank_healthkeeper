@@ -33,7 +33,7 @@ ENGINES = {"kitchen": kitchen_game, "words": word_game, "maze": maze_game, "sket
 
 def _engine(room):
     return ENGINES.get(room.game)
-from app.services.game import CLOSED_WINDOWS, _give_stamp, ensure_open, is_public_holiday
+from app.services.game import CLOSED_WINDOWS, _give_stamp, ensure_open, game_visible, is_public_holiday
 from app.services.match import _person, _real_person
 
 KIND = "escape"
@@ -653,8 +653,13 @@ async def _ranking(db: AsyncSession, member: Member, room_key: str) -> dict:
     return {"top": table[:RANK_SIZE], "me": me}
 
 
+def _room_visible(key: str) -> bool:
+    """비공개 협동 게임(game.LOCAL_ONLY_GAMES)은 운영에서 목록 · 초대 · 알림에 나오지 않는다."""
+    return key in ALL_ROOMS and game_visible(ALL_ROOMS[key].game)
+
+
 async def overview(db: AsyncSession, member: Member, room_key: str = DEFAULT_ROOM) -> dict:
-    if room_key not in ALL_ROOMS:
+    if not _room_visible(room_key):
         raise_app_error("ESCAPE_NOT_FOUND", 404)
     await _sweep(db, member.id)
     mine = (EscapeRoom.room == room_key, _mine(member.id))
@@ -682,6 +687,8 @@ async def inbox(db: AsyncSession, member: Member) -> dict:
     rows = (await db.execute(select(EscapeRoom).where(EscapeRoom.status.in_(OPEN), _mine(member.id)))).scalars().all()
     games = {}
     for key, room in ALL_ROOMS.items():
+        if not _room_visible(key):
+            continue
         mine = [r for r in rows if r.room == key]
         games[key] = {
             "title": room.title, "page": room.page,
@@ -719,7 +726,7 @@ async def series(db: AsyncSession, member: Member) -> list:
     · partners 같이 끝까지 해 본 동료 수 · incoming 받은 초대 · ready 같이 할 방(수락했거나 진행 중).
     """
     await _sweep(db, member.id)
-    keys = [k for k in (*CHAPTER_ORDER, *EXTRA_ORDER) if k in ALL_ROOMS]
+    keys = [k for k in (*CHAPTER_ORDER, *EXTRA_ORDER) if _room_visible(k)]
     rows = (
         await db.execute(
             select(
@@ -754,7 +761,7 @@ async def series(db: AsyncSession, member: Member) -> list:
 
 async def invite(db: AsyncSession, member: Member, partner_id: int, room_key: str = DEFAULT_ROOM):
     ensure_open()
-    if room_key not in ALL_ROOMS:
+    if not _room_visible(room_key):
         raise_app_error("ESCAPE_NOT_FOUND", 404)
     await _sweep(db, member.id)
     partner = await db.get(Member, partner_id)
@@ -784,6 +791,8 @@ async def accept(db: AsyncSession, member: Member, room_id: int):
     r = await _get(db, member, room_id, lock=True)
     if r.status != "PENDING" or r.guest_id != member.id:
         raise_app_error("ESCAPE_NOT_PENDING")
+    if not _room_visible(r.room):  # 비공개 게임의 남은 초대는 받지 않는다
+        raise_app_error("ESCAPE_NOT_FOUND", 404)
     room = _room(r)
     sides = list(room.sides)
     random.shuffle(sides)
