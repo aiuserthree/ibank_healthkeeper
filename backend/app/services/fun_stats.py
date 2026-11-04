@@ -27,6 +27,7 @@ DEPARTMENT_RANKING_SIZE = 20  # PC는 전체, 모바일은 8위까지 (app.css)
 DEPARTMENT_RANKING_EXCLUDED = frozenset({"(주)아이뱅크"})
 # 회원이 이만큼은 있어야 부서 대항전에 나온다 — 한 명뿐인 부서는 개인 기록이라 뺀다
 DEPARTMENT_MIN_MEMBERS = 2
+DEPARTMENT_PER_CAPITA_SIZE = 3  # 1인당 이용 순위는 위 3개 부서만
 _WEEKDAY_KO = ("월", "화", "수", "목", "금", "토", "일")
 
 
@@ -280,8 +281,20 @@ def _departments(snap: _Snapshot, usages: list[_Usage], me_key: str) -> dict:
                 "isMine": dept == my_dept,
             }
         )
+    # 1인당 이용 — 부서 이용 횟수를 회원 수로 나눈다. 소수 첫째 자리가 같으면 같은 순위
+    per = sorted(((round(uses[d] / members[d], 1), d) for d in uses), key=lambda x: (-x[0], x[1]))
+    per_rows: list[dict] = []
+    prev_value = None
+    for idx, (value, dept) in enumerate(per, start=1):
+        if value != prev_value:
+            rank = idx
+            prev_value = value
+        if rank > DEPARTMENT_PER_CAPITA_SIZE:
+            break
+        per_rows.append({"rank": rank, "name": dept, "perCapita": value, "members": members[dept], "isMine": dept == my_dept})
     return {
         "top": rows[:DEPARTMENT_RANKING_SIZE],
+        "perCapita": per_rows,
         "mine": next((r for r in rows if r["isMine"]), None),
         "myDepartment": my_dept,
         "soloDepartment": solo,

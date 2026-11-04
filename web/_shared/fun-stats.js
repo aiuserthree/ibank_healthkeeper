@@ -127,14 +127,15 @@ window.HKFun = (function () {
     </div>`;
   }
 
-  function deptRows(rows) {
-    const max = Math.max(1, ...rows.map((r) => r.uses));
+  // value: 막대와 숫자에 쓸 값 (기본은 이용 횟수) · sub: 이름 옆 작은 글씨 · badge: 「우리 부서」 표시 (좁은 1인당 목록은 색으로만)
+  function deptRows(rows, value = (r) => r.uses, label = (r) => `${r.uses}회`, sub = () => "", badge = true) {
+    const max = Math.max(1, ...rows.map(value));
     return `<ol class="hk-rank-list">${rows.map((r) => `
       <li class="hk-rank-row${r.isMine ? " hk-rank-row--me" : ""}">
         <span class="hk-rank-medal${r.rank <= 3 ? ` hk-rank-medal--${r.rank}` : ""}">${r.rank === 1 ? HKUI.icon("crown", 15, "#7a4d00") : r.rank}</span>
-        <span class="hk-rank-name">${HKUI.escapeHtml(r.name)}${r.isMine ? ' <span class="hk-badge hk-badge--soft" style="padding:1px 7px;font-size:11px;background:#fff">우리 부서</span>' : ""}</span>
-        <span class="hk-rank-bar"><span data-width="${Math.round((r.uses / max) * 100)}%"></span></span>
-        <span class="hk-rank-uses">${r.uses}회</span>
+        <span class="hk-rank-name">${HKUI.escapeHtml(r.name)}${sub(r)}${r.isMine && badge ? ' <span class="hk-badge hk-badge--soft" style="padding:1px 7px;font-size:11px;background:#fff">우리 부서</span>' : ""}</span>
+        <span class="hk-rank-bar"><span data-width="${Math.round((value(r) / max) * 100)}%"></span></span>
+        <span class="hk-rank-uses">${label(r)}</span>
       </li>`).join("")}</ol>`;
   }
 
@@ -177,6 +178,10 @@ window.HKFun = (function () {
       <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px">부서별 올해 이용 횟수 합계예요 · 동률은 같은 순위 · 한 명뿐인 부서는 빠져요</p>
       ${deptRows(board.top)}
       <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border-default);font-size:14px;color:var(--color-midnight-navy);display:flex;align-items:center;gap:8px">${HKUI.icon("users-round", 16, "var(--color-slate-blue)")}<span>${mineLine}</span></div>
+      ${(board.perCapita || []).length ? `<div class="hk-dept-per">
+        <div class="hk-dept-per__head"><b>1인당 이용 TOP 3</b><span>부서 이용 횟수 ÷ 회원 수</span></div>
+        ${deptRows(board.perCapita, (r) => r.perCapita, (r) => `${r.perCapita.toFixed(1)}회`, (r) => ` <span class="hk-dept-per__n">${r.members}명</span>`, false)}
+      </div>` : ""}
     </div>`;
   }
 
