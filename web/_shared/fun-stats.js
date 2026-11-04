@@ -1,5 +1,6 @@
 /** 숫자로 보는 헬스키퍼 — 서비스 소개·예약하기 공용 섹션 */
 window.HKFun = (function () {
+  const COUPON_NOTICE_ID = 1; // 「[새 기능] 무적 쿠폰과 배지 등급 혜택을 소개합니다」 공지
   const stretchTips = [
     ["목 옆 늘리기", "오른손으로 머리 왼쪽을 감싸 오른쪽으로 천천히 당겨 15초. 반대쪽도 똑같이.",
       '<path d="M12 58v-4c0-7 6-11 14-11h12c8 0 14 4 14 11v4"/><path d="M31 43l2-9"/><circle cx="36" cy="25" r="9"/><path d="M50 46c7-10 6-22-2-30-4-3-9-3-13-1"/><path class="a" d="M19 31c-2-6-1-12 3-17M17 15l5-1 1 5"/>'],
@@ -165,13 +166,15 @@ window.HKFun = (function () {
     let mineLine;
     if (mine) {
       mineLine = `우리 부서는 <b style="color:var(--color-signal-blue)">${mine.rank}위</b> · ${mine.uses}회 <span style="color:var(--text-muted)">(전체 ${board.total}개 부서)</span>`;
+    } else if (board.soloDepartment) {
+      mineLine = `우리 부서는 한 명이라 부서 대항전에서 빠져요.`;
     } else if (board.myDepartment) {
       mineLine = `우리 부서는 올해 아직 기록이 없어요. 이번 주에 신청해 보세요!`;
     } else {
       mineLine = `부서 정보가 없어 우리 부서 순위를 표시할 수 없어요.`;
     }
     return `<div class="hk-card hk-card--pad hk-dept-card">${head}
-      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px">부서별 올해 이용 횟수 합계예요 · 동률은 같은 순위</p>
+      <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 12px">부서별 올해 이용 횟수 합계예요 · 동률은 같은 순위 · 한 명뿐인 부서는 빠져요</p>
       ${deptRows(board.top)}
       <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border-default);font-size:14px;color:var(--color-midnight-navy);display:flex;align-items:center;gap:8px">${HKUI.icon("users-round", 16, "var(--color-slate-blue)")}<span>${mineLine}</span></div>
     </div>`;
@@ -214,7 +217,7 @@ window.HKFun = (function () {
     return `<div class="hk-coupon-line">
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
         <span style="display:inline-flex;align-items:center;gap:6px;font-weight:700;color:var(--color-ultraviolet)">${HKUI.icon("ticket", 16, "currentColor")} 무적 쿠폰 ${c.available}장 ${couponSources(c)}</span>
-        <a href="${HKRoutes.notice}" style="font-size:12.5px;color:var(--color-slate-blue);text-decoration:none">쿠폰 안내 →</a>
+        <a href="${HKRoutes.notice}?id=${COUPON_NOTICE_ID}" style="font-size:12.5px;color:var(--color-slate-blue);text-decoration:none">쿠폰 안내 →</a>
       </div>
       <div class="hk-progress hk-progress--coupon" style="margin-top:8px" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span data-width="${pct}%"></span></div>
       <div style="font-size:12.5px;color:var(--text-secondary);margin-top:6px">탈락 ${c.dropProgress}/${c.dropPerCoupon} · 다음 쿠폰까지 ${c.dropPerCoupon - c.dropProgress}회${couponDeadline(c)}${c.badgeMonthlyQuota ? ` · 등급 혜택 매월 ${c.badgeMonthlyQuota}장` : ""}</div>

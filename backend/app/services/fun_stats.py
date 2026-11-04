@@ -25,6 +25,8 @@ CACHE_TTL_SECONDS = 60
 DEPARTMENT_RANKING_SIZE = 20  # PC는 전체, 모바일은 8위까지 (app.css)
 # 부서 대항전에서 뺄 부서 (회사명이 부서로 들어간 경영진 계정 등)
 DEPARTMENT_RANKING_EXCLUDED = frozenset({"(주)아이뱅크"})
+# 회원이 이만큼은 있어야 부서 대항전에 나온다 — 한 명뿐인 부서는 개인 기록이라 뺀다
+DEPARTMENT_MIN_MEMBERS = 2
 _WEEKDAY_KO = ("월", "화", "수", "목", "금", "토", "일")
 
 
@@ -245,15 +247,22 @@ def _top_percent(snap: _Snapshot, usages: list[_Usage], me_key: str) -> int | No
 
 def _departments(snap: _Snapshot, usages: list[_Usage], me_key: str) -> dict:
     """부서별 이용 횟수 순위. 동률은 같은 순위."""
+    members = Counter(d for d in snap.departments_by_key.values() if d)
+
+    def ranked(dept: str | None) -> bool:
+        return bool(dept) and dept not in DEPARTMENT_RANKING_EXCLUDED and members[dept] >= DEPARTMENT_MIN_MEMBERS
+
     uses: Counter[str] = Counter()
     for u in usages:
         dept = snap.departments_by_key.get(u.key)
-        if not dept or dept in DEPARTMENT_RANKING_EXCLUDED:
+        if not ranked(dept):
             continue
         uses[dept] += 1
 
     my_dept = snap.departments_by_key.get(me_key) or None
-    if my_dept in DEPARTMENT_RANKING_EXCLUDED:
+    # 한 명뿐인 부서 — 부서 정보가 없는 것과 구분해 안내한다
+    solo = bool(my_dept) and my_dept not in DEPARTMENT_RANKING_EXCLUDED and members[my_dept] < DEPARTMENT_MIN_MEMBERS
+    if not ranked(my_dept):
         my_dept = None
     ordered = sorted(uses, key=lambda d: (-uses[d], d))
     rows: list[dict] = []
@@ -275,6 +284,7 @@ def _departments(snap: _Snapshot, usages: list[_Usage], me_key: str) -> dict:
         "top": rows[:DEPARTMENT_RANKING_SIZE],
         "mine": next((r for r in rows if r["isMine"]), None),
         "myDepartment": my_dept,
+        "soloDepartment": solo,
         "total": len(rows),
     }
 
