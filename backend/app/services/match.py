@@ -224,9 +224,30 @@ async def _view(db: AsyncSession, member: Member, m: GameMatch) -> dict:
     return _payload(m, member.id, await _people(db, {m.challenger_id, m.opponent_id}), board=True)
 
 
+def _real_person(p: Member) -> bool:
+    from app.services.transfer import _TRANSFER_EXCLUDED_EMAIL_DOMAINS, _TRANSFER_EXCLUDED_EMAIL_LOCAL
+
+    local, _, domain = (p.email or "").lower().partition("@")
+    oid = (p.entra_oid or "").lower()
+    return bool(oid) and not oid.startswith("mock-") and local != _TRANSFER_EXCLUDED_EMAIL_LOCAL and domain not in _TRANSFER_EXCLUDED_EMAIL_DOMAINS
+
+
 async def search_members(db: AsyncSession, member: Member, q: str) -> list:
     q = (q or "").strip()[:30]
-    stmt = select(Member).where(Member.status == MemberStatus.ACTIVE, Member.id != member.id).order_by(Member.name).limit(20)
+    from sqlalchemy import func
+
+    from app.services.transfer import _TRANSFER_EXCLUDED_EMAIL_DOMAINS, _TRANSFER_EXCLUDED_EMAIL_LOCAL
+
+    # 양도 상대 목록과 같은 기준 — 실제 Teams 로그인 직원만. 시연용(mock-*·healthkeeper.local)·발송 계정(healthkeeper@) 제외
+    stmt = (
+        select(Member)
+        .where(Member.status == MemberStatus.ACTIVE, Member.id != member.id)
+        .where(Member.entra_oid.is_not(None), ~func.lower(Member.entra_oid).like("mock-%"))
+        .where(func.lower(func.split_part(Member.email, "@", 1)) != _TRANSFER_EXCLUDED_EMAIL_LOCAL)
+        .where(~func.lower(func.split_part(Member.email, "@", 2)).in_(list(_TRANSFER_EXCLUDED_EMAIL_DOMAINS)))
+        .order_by(Member.name)
+        .limit(20)
+    )
     if q:
         like = f"%{q.replace('%', '').replace('_', '')}%"
         stmt = stmt.where(or_(Member.name.ilike(like), Member.department.ilike(like)))
@@ -265,7 +286,7 @@ async def create(db: AsyncSession, member: Member, opponent_id: int, game: str =
     _check_game(game)
     await _sweep(db, member.id)
     rival = await db.get(Member, opponent_id)
-    if rival is None or rival.id == member.id or rival.status != MemberStatus.ACTIVE:
+    if rival is None or rival.id == member.id or rival.status != MemberStatus.ACTIVE or not _real_person(rival):
         raise_app_error("MATCH_BAD_OPPONENT")
     rows = (
         await db.execute(
