@@ -269,6 +269,7 @@ window.HKPlay = (function () {
     gomoku: ["#92400e", "#d97706"],
     chess: ["#334155", "#64748b"],
     escape: ["#0f172a", "#1e3a8a"],
+    kitchen: ["#c2410c", "#f59e0b"],
     pairs: ["#0f8b8d", "#57cc99"],
     shooter: ["#2b1055", "#d53369"],
     bricks: ["#c2410c", "#fb923c"],

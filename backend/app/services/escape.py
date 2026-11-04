@@ -1,7 +1,8 @@
-"""2인 협동 방탈출 — 초대 → 수락 → 둘 다 준비 → 20분 안에 탈출.
+"""2인 협동 방 — 초대 → 수락 → 둘 다 준비 → 시작. 방탈출(escape)과 점심 분식집(kitchen)이 함께 쓴다.
 
-두 사람은 서로 다른 쪽을 보고, 자물쇠의 단서는 늘 반대쪽에 있다. 정답은 서버에서만 맞춰 보고,
-화면에는 내 쪽에서 보이는 것만 보낸다. 바뀔 때마다 seq 를 올리고 알려서 상대 화면이 바로 바뀐다.
+방탈출: 두 사람은 서로 다른 쪽을 보고, 자물쇠의 단서는 늘 반대쪽에 있다. 정답은 서버에서만 맞춰 보고,
+화면에는 내 쪽에서 보이는 것만 보낸다. 분식집: 홀과 주방이 3분 동안 가게를 운영한다(kitchen_game).
+바뀔 때마다 seq 를 올리고 알려서 상대 화면이 바로 바뀐다.
 """
 
 from __future__ import annotations
@@ -20,9 +21,12 @@ from app.config import get_settings
 from app.core.errors import raise_app_error
 from app.core.time import KST, now_kst, today_kst
 from app.models import EscapeRoom, Member, MemberStatus, TeamsMessageType
-from app.services import realtime
+from app.services import kitchen_game, realtime
 from app.services import teams as teams_service
 from app.services.escape_rooms import DEFAULT_ROOM, ROOMS, Puzzle, Room
+
+# 협동 방 종류 — 방탈출 방들 + 점심 분식집
+ALL_ROOMS = {**ROOMS, kitchen_game.ROOM.key: kitchen_game.ROOM}
 from app.services.game import CLOSED_WINDOWS, _give_stamp, ensure_open, is_public_holiday
 from app.services.match import _person, _real_person
 
@@ -50,8 +54,28 @@ def _partner_id(r: EscapeRoom, member_id: int) -> int:
     return r.guest_id if r.host_id == member_id else r.host_id
 
 
-def _room(r: EscapeRoom) -> Room:
-    return ROOMS[r.room]
+def _room(r: EscapeRoom):
+    return ALL_ROOMS[r.room]
+
+
+def _escape_room(r: EscapeRoom) -> Room:
+    room = _room(r)
+    if room.game != "escape":
+        raise_app_error("ESCAPE_BAD_PUZZLE")
+    return room
+
+
+def _finish_kitchen(r: EscapeRoom, st: dict) -> None:
+    """분식집 영업 끝 — 매출이 기록이 되고, 끝까지 한 판은 모두 순위에 든다."""
+    k = st["k"]
+    r.status = "CLEAR"
+    r.score = k["money"]
+    r.ranked = True
+    r.finished_at = now_kst()
+    r.deadline_at = None
+    st["end"] = "SHIFT" if k["reason"] == "time" else "HEARTS"
+    head = "영업 끝!" if k["reason"] == "time" else "손님을 너무 많이 놓쳐 가게 문을 일찍 닫았어요."
+    _log(st, f"{head} 매출 {k['money']:,}원 · 손님 {k['served']}명")
 
 
 def _iso(dt: Optional[datetime]) -> Optional[str]:
@@ -126,7 +150,7 @@ async def _stamp_pair(db: AsyncSession, r: EscapeRoom, first_id: int) -> Optiona
     for mid in (first_id, _partner_id(r, first_id)):
         m = await db.get(Member, mid)
         if m is not None:
-            got = await _give_stamp(db, m, KIND, today)
+            got = await _give_stamp(db, m, _room(r).page, today)
             if mid == first_id:
                 mine = got
     return mine
@@ -142,6 +166,12 @@ async def _sweep(db: AsyncSession, member_id: Optional[int] = None) -> None:
     failed = []
     for r in rows:
         st = _state(r)
+        if r.status == "PLAYING" and _room(r).game == "kitchen" and "k" in st:
+            kitchen_game.advance(st, time.time())
+            _finish_kitchen(r, st)
+            failed.append(r)
+            _save(r, st)
+            continue
         if r.status == "PLAYING":
             r.status = "FAILED"
             st["end"] = "TIMEOUT"
@@ -250,6 +280,9 @@ async def _view(db: AsyncSession, r: EscapeRoom, member: Member, full: bool = Tr
         "startedAt": _iso(r.started_at),
         "finishedAt": _iso(r.finished_at),
         "recordSec": r.record_sec,
+        "score": r.score,
+        "game": room.game,
+        "label": room.label,
         "ranked": r.ranked,
         "limitSec": room.limit_sec,
         "end": st.get("end"),
@@ -263,6 +296,13 @@ async def _view(db: AsyncSession, r: EscapeRoom, member: Member, full: bool = Tr
         "intro": room.intro,
         "outro": room.outro,
         "ready": {"me": member.id in ready, "partner": pid in ready},
+        "chat": [{"me": c["by"] == member.id, "name": names.get(c["by"], ""), "text": c["text"], "t": c["t"]} for c in chat[-40:]],
+        "log": st.get("log", [])[-20:],
+    })
+    if room.game == "kitchen":
+        out["kitchen"] = kitchen_game.view(st, side, time.time()) if "k" in st else None
+        return out
+    out.update({
         "things": _things(room, side, st) if side and r.status in ("PLAYING", *ENDED) else [],
         "progress": _progress(room, st, side),
         "hints": len(st.get("hints", [])),
@@ -271,8 +311,6 @@ async def _view(db: AsyncSession, r: EscapeRoom, member: Member, full: bool = Tr
         "hintPenalty": room.hint_penalty,
         "wrongPenalty": room.wrong_penalty,
         "cards": _cards(room, st, member.id, pid),
-        "chat": [{"me": c["by"] == member.id, "name": names.get(c["by"], ""), "text": c["text"], "t": c["t"]} for c in chat[-40:]],
-        "log": st.get("log", [])[-20:],
     })
     return out
 
@@ -280,13 +318,17 @@ async def _view(db: AsyncSession, r: EscapeRoom, member: Member, full: bool = Tr
 # ── 목록 ──────────────────────────────────────────────────────
 
 async def _ranking(db: AsyncSession, member: Member, room_key: str) -> dict:
+    """방탈출은 빠른 기록 순, 분식집은 매출이 많은 순 — 같은 두 사람은 가장 좋은 판 하나만."""
+    kitchen = ALL_ROOMS[room_key].game == "kitchen"
+    order = (EscapeRoom.score.desc(), EscapeRoom.finished_at) if kitchen else (EscapeRoom.record_sec, EscapeRoom.finished_at)
     rows = (
         await db.execute(
             select(EscapeRoom)
             .where(EscapeRoom.room == room_key, EscapeRoom.status == "CLEAR", EscapeRoom.ranked.is_(True))
-            .order_by(EscapeRoom.record_sec, EscapeRoom.finished_at)
+            .order_by(*order)
         )
     ).scalars().all()
+    seen_pairs = set()
     ids = {i for r in rows for i in (r.host_id, r.guest_id)}
     people = {m.id: m for m in (await db.execute(select(Member).where(Member.id.in_(ids)))).scalars().all()} if ids else {}
     table, me = [], None
@@ -294,7 +336,11 @@ async def _ranking(db: AsyncSession, member: Member, room_key: str) -> dict:
         a, b = people.get(r.host_id), people.get(r.guest_id)
         if not a or not b or a.status != MemberStatus.ACTIVE or b.status != MemberStatus.ACTIVE:
             continue
-        row = {"rank": len(table) + 1, "sec": r.record_sec, "team": [_person(a), _person(b)],
+        pair = frozenset((r.host_id, r.guest_id))
+        if pair in seen_pairs:
+            continue
+        seen_pairs.add(pair)
+        row = {"rank": len(table) + 1, "sec": r.record_sec, "score": r.score, "team": [_person(a), _person(b)],
                "date": r.finished_at.astimezone(KST).date().isoformat() if r.finished_at else None,
                "mine": member.id in (r.host_id, r.guest_id)}
         table.append(row)
@@ -303,18 +349,21 @@ async def _ranking(db: AsyncSession, member: Member, room_key: str) -> dict:
     return {"top": table[:RANK_SIZE], "me": me}
 
 
-async def overview(db: AsyncSession, member: Member) -> dict:
+async def overview(db: AsyncSession, member: Member, room_key: str = DEFAULT_ROOM) -> dict:
+    if room_key not in ALL_ROOMS:
+        raise_app_error("ESCAPE_NOT_FOUND", 404)
     await _sweep(db, member.id)
-    rows = (await db.execute(select(EscapeRoom).where(EscapeRoom.status.in_(OPEN), _mine(member.id)).order_by(EscapeRoom.id.desc()))).scalars().all()
+    mine = (EscapeRoom.room == room_key, _mine(member.id))
+    rows = (await db.execute(select(EscapeRoom).where(EscapeRoom.status.in_(OPEN), *mine).order_by(EscapeRoom.id.desc()))).scalars().all()
     done = (
         await db.execute(
-            select(EscapeRoom).where(EscapeRoom.status.in_(ENDED), _mine(member.id)).order_by(EscapeRoom.finished_at.desc()).limit(10)
+            select(EscapeRoom).where(EscapeRoom.status.in_(ENDED), *mine).order_by(EscapeRoom.finished_at.desc()).limit(10)
         )
     ).scalars().all()
     items = [await _view(db, r, member, full=False) for r in rows]
-    room = ROOMS[DEFAULT_ROOM]
+    room = ALL_ROOMS[room_key]
     return {
-        "room": {"key": room.key, "title": room.title, "intro": room.intro, "limitSec": room.limit_sec},
+        "room": {"key": room.key, "title": room.title, "intro": room.intro, "limitSec": room.limit_sec, "game": room.game, "label": room.label},
         "incoming": [x for x in items if x["incoming"]],
         "sent": [x for x in items if x["status"] == "PENDING" and not x["incoming"]],
         "active": [x for x in items if x["status"] in ("READY", "PLAYING")],
@@ -327,9 +376,18 @@ async def inbox(db: AsyncSession, member: Member) -> dict:
     """아케이드 알림 — 받은 초대 · 같이 할 방(수락됐거나 진행 중)."""
     await _sweep(db, member.id)
     rows = (await db.execute(select(EscapeRoom).where(EscapeRoom.status.in_(OPEN), _mine(member.id)))).scalars().all()
+    games = {}
+    for key, room in ALL_ROOMS.items():
+        mine = [r for r in rows if r.room == key]
+        games[key] = {
+            "title": room.title, "page": room.page,
+            "incoming": sum(1 for r in mine if r.status == "PENDING" and r.guest_id == member.id),
+            "ready": sum(1 for r in mine if r.status in ("READY", "PLAYING")),
+        }
     return {
-        "incoming": sum(1 for r in rows if r.status == "PENDING" and r.guest_id == member.id),
-        "ready": sum(1 for r in rows if r.status in ("READY", "PLAYING")),
+        "incoming": sum(g["incoming"] for g in games.values()),
+        "ready": sum(g["ready"] for g in games.values()),
+        "rooms": games,
     }
 
 
@@ -337,14 +395,14 @@ async def inbox(db: AsyncSession, member: Member) -> dict:
 
 async def invite(db: AsyncSession, member: Member, partner_id: int, room_key: str = DEFAULT_ROOM):
     ensure_open()
-    if room_key not in ROOMS:
+    if room_key not in ALL_ROOMS:
         raise_app_error("ESCAPE_NOT_FOUND", 404)
     await _sweep(db, member.id)
     partner = await db.get(Member, partner_id)
     if partner is None or partner.id == member.id or partner.status != MemberStatus.ACTIVE or not _real_person(partner):
         raise_app_error("ESCAPE_BAD_PARTNER")
     rows = (await db.execute(select(EscapeRoom).where(EscapeRoom.status.in_(OPEN), _mine(member.id)))).scalars().all()
-    if any(_partner_id(r, member.id) == partner.id for r in rows):
+    if any(_partner_id(r, member.id) == partner.id and r.room == room_key for r in rows):
         raise_app_error("ESCAPE_ALREADY")
     if len(rows) >= MAX_OPEN:
         raise_app_error("ESCAPE_LIMIT")
@@ -352,10 +410,10 @@ async def invite(db: AsyncSession, member: Member, partner_id: int, room_key: st
                    deadline_at=now_kst() + timedelta(hours=INVITE_HOURS))
     db.add(r)
     await db.flush()
-    room = ROOMS[room_key]
+    room = ALL_ROOMS[room_key]
     notify = await teams_service.enqueue_escape_notice(
         db, kind=TeamsMessageType.ESCAPE_INVITED, to=partner, key=f"escape-invited:{r.id}",
-        body=teams_service.render_escape_invited_body(room_title=room.title, room_id=r.id, guest=partner, host=member, deadline_at=r.deadline_at),
+        body=teams_service.render_escape_invited_body(room=room, room_id=r.id, guest=partner, host=member, deadline_at=r.deadline_at),
     )
     await db.commit()
     return await _view(db, r, member), notify
@@ -381,7 +439,7 @@ async def accept(db: AsyncSession, member: Member, room_id: int):
     if host is not None:
         notify = await teams_service.enqueue_escape_notice(
             db, kind=TeamsMessageType.ESCAPE_ACCEPTED, to=host, key=f"escape-accepted:{r.id}",
-            body=teams_service.render_escape_accepted_body(room_title=room.title, room_id=r.id, host=host, guest=member),
+            body=teams_service.render_escape_accepted_body(room=room, room_id=r.id, host=host, guest=member),
         )
     await _commit(db, r)
     return await _view(db, r, member), notify
@@ -409,12 +467,12 @@ async def leave(db: AsyncSession, member: Member, room_id: int):
             if was == "PENDING" and member.id == r.guest_id:
                 notify = await teams_service.enqueue_escape_notice(
                     db, kind=TeamsMessageType.ESCAPE_DECLINED, to=partner, key=f"escape-declined:{r.id}",
-                    body=teams_service.render_escape_declined_body(room_title=room.title, host=partner, guest=member),
+                    body=teams_service.render_escape_declined_body(room=room, host=partner, guest=member),
                 )
             else:
                 notify = await teams_service.enqueue_escape_notice(
                     db, kind=TeamsMessageType.ESCAPE_CANCELLED, to=partner, key=f"escape-cancelled:{r.id}",
-                    body=teams_service.render_escape_cancelled_body(room_title=room.title, to=partner, by=member),
+                    body=teams_service.render_escape_cancelled_body(room=room, to=partner, by=member),
                 )
     r.deadline_at = None
     r.finished_at = now_kst()
@@ -434,7 +492,7 @@ async def call(db: AsyncSession, member: Member, room_id: int):
         raise_app_error("ESCAPE_BAD_PARTNER")
     notify = await teams_service.enqueue_escape_notice(
         db, kind=TeamsMessageType.ESCAPE_CALL, to=partner, key=f"escape-call:{r.id}:{partner.id}:{int(time.time() // 300)}",
-        body=teams_service.render_escape_call_body(room_title=_room(r).title, room_id=r.id, to=partner, by=member),
+        body=teams_service.render_escape_call_body(room=_room(r), room_id=r.id, to=partner, by=member),
     )
     if not notify:
         raise_app_error("ESCAPE_CALL_WAIT")
@@ -466,8 +524,13 @@ async def ready(db: AsyncSession, member: Member, room_id: int, on: bool = True)
             raise_app_error("ESCAPE_CLOSING_SOON")
         r.status = "PLAYING"
         r.started_at = now
-        r.deadline_at = now + timedelta(seconds=room.limit_sec)
-        _log(st, f"탈출 시작! {room.limit_sec // 60}분 안에 출입문을 열어요.")
+        if room.game == "kitchen":
+            kitchen_game.start(st, time.time())
+            r.deadline_at = now + timedelta(seconds=room.limit_sec + 5)  # 끝은 advance 가 정한다 — 정리는 조금 뒤에
+            _log(st, f"영업 시작! {room.limit_sec // 60}분 동안 손님을 받아요.")
+        else:
+            r.deadline_at = now + timedelta(seconds=room.limit_sec)
+            _log(st, f"탈출 시작! {room.limit_sec // 60}분 안에 출입문을 열어요.")
     st["ready"] = sorted(ready_ids)
     _save(r, st)
     await _commit(db, r)
@@ -497,7 +560,7 @@ def _normalize(p: Puzzle, answer) -> tuple:
 
 async def solve(db: AsyncSession, member: Member, room_id: int, puzzle_key: str, answer) -> dict:
     r = await _playing(db, member, room_id)
-    room, st = _room(r), _state(r)
+    room, st = _escape_room(r), _state(r)
     p = room.puzzle(puzzle_key)
     side = st.get("roles", {}).get(str(member.id))
     solved = set(st.get("solved", []))
@@ -522,7 +585,7 @@ async def solve(db: AsyncSession, member: Member, room_id: int, puzzle_key: str,
 
 async def hint(db: AsyncSession, member: Member, room_id: int, puzzle_key: str) -> dict:
     r = await _playing(db, member, room_id)
-    room, st = _room(r), _state(r)
+    room, st = _escape_room(r), _state(r)
     p = room.puzzle(puzzle_key)
     solved = set(st.get("solved", []))
     if p is None or p.key in solved or not _met(p, solved):
@@ -538,7 +601,7 @@ async def hint(db: AsyncSession, member: Member, room_id: int, puzzle_key: str) 
 async def card(db: AsyncSession, member: Member, room_id: int) -> dict:
     """마지막 문 — 두 사람이 card_window 초 안에 각자 사원증을 대면 열린다."""
     r = await _playing(db, member, room_id)
-    room, st = _room(r), _state(r)
+    room, st = _escape_room(r), _state(r)
     door = next(p for p in room.puzzles if p.kind == "cards")
     solved = set(st.get("solved", []))
     if door.key in solved or not _met(door, solved):
@@ -592,6 +655,46 @@ async def say(db: AsyncSession, member: Member, room_id: int, text: str) -> dict
     _save(r, st)
     await _commit(db, r)
     return await _view(db, r, member)
+
+
+# ── 점심 분식집 ───────────────────────────────────────────────
+
+async def kitchen_act(db: AsyncSession, member: Member, room_id: int, action: str, arg) -> dict:
+    """홀·주방의 동작 하나 — 먼저 지금까지의 흐름(손님 도착 등)을 맞추고 나서 한다."""
+    r = await _playing(db, member, room_id)
+    if _room(r).game != "kitchen":
+        raise_app_error("KITCHEN_BAD_ACTION")
+    st = _state(r)
+    now = time.time()
+    kitchen_game.advance(st, now)
+    if not st["k"]["over"]:
+        side = st.get("roles", {}).get(str(member.id))
+        kitchen_game.act(st, side, member.id, action, arg, now)
+    if st["k"]["over"]:
+        _finish_kitchen(r, st)
+    _save(r, st)
+    await _commit(db, r)
+    stamp = await _stamp_pair(db, r, member.id) if r.status == "CLEAR" else None
+    return {**(await _view(db, r, member)), "stamp": stamp}
+
+
+async def kitchen_tick(db: AsyncSession, member: Member, room_id: int) -> dict:
+    """정해 둔 시각(손님 도착 · 떠남 · 결제 · 영업 끝)이 되면 화면이 부른다. 바뀐 게 있으면 저장하고 알린다."""
+    await _sweep(db, member.id)
+    r = await _get(db, member, room_id, lock=True)
+    stamp = None
+    if r.status == "PLAYING" and _room(r).game == "kitchen":
+        st = _state(r)
+        if kitchen_game.advance(st, time.time()):
+            if st["k"]["over"]:
+                _finish_kitchen(r, st)
+            _save(r, st)
+            await _commit(db, r)
+            if r.status == "CLEAR":
+                stamp = await _stamp_pair(db, r, member.id)
+        else:
+            await db.commit()
+    return {**(await _view(db, r, member)), "stamp": stamp}
 
 
 # ── 보기 · 기다리기 ────────────────────────────────────────────

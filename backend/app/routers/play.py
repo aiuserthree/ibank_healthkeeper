@@ -76,7 +76,7 @@ async def weekly(
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    """게임별 1~3위 — 아케이드 '명예의 전당'. week 지난주 · month 지난달 · all 전체."""
+    """게임별 1~3위 — 아케이드 '명예의 전당'. week 지난주 · month 이번 달 · all 전체."""
     return {"data": await game_service.hall_of_fame(db, period)}
 
 
@@ -240,16 +240,27 @@ class EscapeSay(BaseModel):
     text: str
 
 
+class KitchenAct(BaseModel):
+    action: str  # seat · send · serve · clean · cook · take · roll · toss
+    arg: Union[int, dict, None] = None
+
+
+@router.get("/coop")
 @router.get("/escape")
-async def escape_overview(db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
-    return {"data": await escape_service.overview(db, member)}
+async def escape_overview(
+    room: str = Query("overtime", max_length=20),
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    return {"data": await escape_service.overview(db, member, room)}
 
 
+@router.get("/coop/inbox")
 @router.get("/escape/inbox")
 async def escape_inbox(db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
     return {"data": await escape_service.inbox(db, member)}
 
 
+@router.post("/coop")
 @router.post("/escape")
 async def escape_invite(
     body: EscapeInvite, background_tasks: BackgroundTasks,
@@ -260,11 +271,13 @@ async def escape_invite(
     return {"data": data}
 
 
+@router.get("/coop/{room_id}")
 @router.get("/escape/{room_id}")
 async def escape_detail(room_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
     return {"data": await escape_service.detail(db, member, room_id)}
 
 
+@router.get("/coop/{room_id}/wait")
 @router.get("/escape/{room_id}/wait")
 async def escape_wait(
     room_id: int, seq: int = Query(..., ge=0), here: bool = Query(False),
@@ -274,6 +287,7 @@ async def escape_wait(
     return {"data": await escape_service.wait(db, member, room_id, seq, here)}
 
 
+@router.post("/coop/{room_id}/accept")
 @router.post("/escape/{room_id}/accept")
 async def escape_accept(
     room_id: int, background_tasks: BackgroundTasks,
@@ -284,6 +298,7 @@ async def escape_accept(
     return {"data": data}
 
 
+@router.post("/coop/{room_id}/leave")
 @router.post("/escape/{room_id}/leave")
 async def escape_leave(
     room_id: int, background_tasks: BackgroundTasks,
@@ -295,6 +310,7 @@ async def escape_leave(
     return {"data": data}
 
 
+@router.post("/coop/{room_id}/call")
 @router.post("/escape/{room_id}/call")
 async def escape_call(
     room_id: int, background_tasks: BackgroundTasks,
@@ -305,6 +321,7 @@ async def escape_call(
     return {"data": data}
 
 
+@router.post("/coop/{room_id}/ready")
 @router.post("/escape/{room_id}/ready")
 async def escape_ready(
     room_id: int, body: EscapeReady,
@@ -313,6 +330,7 @@ async def escape_ready(
     return {"data": await escape_service.ready(db, member, room_id, body.on)}
 
 
+@router.post("/coop/{room_id}/solve")
 @router.post("/escape/{room_id}/solve")
 async def escape_solve(
     room_id: int, body: EscapeSolve,
@@ -321,6 +339,7 @@ async def escape_solve(
     return {"data": await escape_service.solve(db, member, room_id, body.puzzle, body.answer)}
 
 
+@router.post("/coop/{room_id}/hint")
 @router.post("/escape/{room_id}/hint")
 async def escape_hint(
     room_id: int, body: EscapeHint,
@@ -329,17 +348,34 @@ async def escape_hint(
     return {"data": await escape_service.hint(db, member, room_id, body.puzzle)}
 
 
+@router.post("/coop/{room_id}/card")
 @router.post("/escape/{room_id}/card")
 async def escape_card(room_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
     return {"data": await escape_service.card(db, member, room_id)}
 
 
+@router.post("/coop/{room_id}/say")
 @router.post("/escape/{room_id}/say")
 async def escape_say(
     room_id: int, body: EscapeSay,
     db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
 ):
     return {"data": await escape_service.say(db, member, room_id, body.text)}
+
+
+@router.post("/coop/{room_id}/act")
+async def coop_act(
+    room_id: int, body: KitchenAct,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    """점심 분식집 — 홀·주방 동작 하나."""
+    return {"data": await escape_service.kitchen_act(db, member, room_id, body.action, body.arg)}
+
+
+@router.post("/coop/{room_id}/tick")
+async def coop_tick(room_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    """점심 분식집 — 손님 도착·떠남·결제·영업 끝 같은 시간 일을 맞춘다."""
+    return {"data": await escape_service.kitchen_tick(db, member, room_id)}
 
 
 @router.post("/{game}/run")

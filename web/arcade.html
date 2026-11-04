@@ -22,7 +22,7 @@
     const GENRE = {
       blocks: "퍼즐", shooter: "슈팅", match3: "퍼즐", stairs: "액션", crossing: "액션", pairs: "퍼즐", bricks: "액션",
       bubble: "캐주얼", sudoku: "퍼즐", chosung: "퀴즈", trivia: "퀴즈", korean: "퀴즈", typing: "어학",
-      snake: "액션", stack: "액션", coffee: "액션", mines: "퍼즐", promote: "퍼즐", nightshift: "액션", gomoku: "대전", chess: "대전", escape: "협동", clown: "액션", milk: "액션", theater: "액션", trial: "액션", silent: "액션", parade: "액션", finale: "액션",
+      snake: "액션", stack: "액션", coffee: "액션", mines: "퍼즐", promote: "퍼즐", nightshift: "액션", gomoku: "대전", chess: "대전", escape: "협동", kitchen: "협동", clown: "액션", milk: "액션", theater: "액션", trial: "액션", silent: "액션", parade: "액션", finale: "액션",
     };
     const esc = (t) => HKUI.escapeHtml(t);
     // 게임 그림 — 서버가 그림을 한 달 동안 캐시하므로, 그림을 바꾸면 여기 숫자를 올려 새 그림을 받게 한다
@@ -206,10 +206,10 @@
         </div>`;
     }
 
-    // 명예의 전당 — 게임별 1~3위. 지난주(월요일마다) · 지난달(1일마다) · 전체를 골라 본다
+    // 명예의 전당 — 게임별 1~3위. 지난주(월요일마다) · 이번 달(1일~오늘) · 전체를 골라 본다
     const HOF = {
       week: { tab: "지난주", title: "지난주,<br>게임별 1등은 누구?", sub: "매주 월요일에 지난주(월~일) 기록으로 새로 바뀌어요.", empty: "지난주에는 남은 기록이 없어요." },
-      month: { tab: "지난달", title: "지난달,<br>게임별 1등은 누구?", sub: "매달 1일에 지난달 기록으로 새로 바뀌어요.", empty: "지난달에는 남은 기록이 없어요." },
+      month: { tab: "이번 달", title: "이번 달,<br>게임별 1등은 누구?", sub: "이번 달 1일부터 오늘까지의 기록이에요. 매일 바뀌어요.", empty: "이번 달에는 아직 남은 기록이 없어요." },
       all: { tab: "전체", title: "지금까지,<br>게임별 1등은 누구?", sub: "아케이드가 열린 뒤 남긴 모든 기록 중 최고 기록이에요.", empty: "아직 남은 기록이 없어요." },
     };
     const hofCache = {};
@@ -305,15 +305,17 @@
         a.textContent = [n.incoming ? `받은 도전 ${n.incoming}개` : "", n.myTurn ? `내 차례 ${n.myTurn}판` : ""].filter(Boolean).join(" · ") + ` · ${name} 두러 가기 ›`;
         box.parentElement.prepend(a);
       });
-      // 방탈출 — 받은 초대 · 같이 할 방
-      let room = null;
-      try { room = await HKApi.escapeInbox(); } catch (_) { return; }
-      if (!room || (!room.incoming && !room.ready)) return;
-      const a = document.createElement("a");
-      a.className = "hk-aa-match";
-      a.href = "/games/escape";
-      a.textContent = [room.incoming ? `방탈출 초대 ${room.incoming}개` : "", room.ready ? `같이 할 방 ${room.ready}개` : ""].filter(Boolean).join(" · ") + " · 방탈출 하러 가기 ›";
-      box.parentElement.prepend(a);
+      // 협동 게임(방탈출 · 분식집) — 받은 초대 · 같이 할 방
+      let co = null;
+      try { co = await HKApi.coopInbox(); } catch (_) { return; }
+      Object.values((co && co.rooms) || {}).forEach((g) => {
+        if (!g.incoming && !g.ready) return;
+        const a = document.createElement("a");
+        a.className = "hk-aa-match";
+        a.href = `/games/${g.page}`;
+        a.textContent = [g.incoming ? `받은 초대 ${g.incoming}개` : "", g.ready ? `같이 할 방 ${g.ready}개` : ""].filter(Boolean).join(" · ") + ` · ${g.title} 하러 가기 ›`;
+        box.parentElement.prepend(a);
+      });
     }
 
     // 꿀알바 시리즈 소개 창 — 들어올 때 한 번. '오늘 그만 보기'를 누르면 그날은 안 뜬다

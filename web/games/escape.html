@@ -12,44 +12,8 @@
   <script src="/_shared/api.js"></script>
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/coop.js"></script>
   <style>
-    .er { max-width: 1080px; margin: 0 auto; padding: 24px 20px 72px; color: var(--color-midnight-navy); }
-    .er-lobby { max-width: 760px; }
-    .er h1 { margin: 0 0 6px; font-size: 28px; font-weight: 800; }
-    .er-hero { position: relative; overflow: hidden; margin-bottom: 18px; padding: 22px 22px 20px; border-radius: 18px; color: #e2e8f0;
-      background: radial-gradient(120% 90% at 85% 0%, #1e3a8a 0%, rgba(30, 58, 138, 0) 60%), linear-gradient(160deg, #0b1220, #1e293b); }
-    .er-hero h1 { color: #fff; }
-    .er-hero p { margin: 8px 0 0; font-size: 15px; line-height: 1.65; word-break: keep-all; color: #cbd5e1; }
-    .er-hero__facts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-    .er-hero__facts span { padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, .1); font-size: 12.5px; font-weight: 700; color: #e2e8f0; }
-    .er-team { display: flex; align-items: center; gap: 4px; min-width: 0; flex: 1; }
-    .er-team img, .er-team .gk__ava { width: 30px; height: 30px; }
-    .er-team b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .gk__tag.is-clear { background: #dcfce7; color: #166534; }
-    .gk__tag.is-fail { background: #fee2e2; color: #991b1b; }
-    .gk__tag.is-live { background: #dbeafe; color: #1d4ed8; }
-    .er-dot { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: #cbd5e1; vertical-align: middle; }
-    .er-dot.is-on { background: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, .2); }
-
-    /* 방 */
-    .er-top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 14px; padding: 12px 14px; border-radius: 14px; background: #0f172a; color: #e2e8f0; }
-    .er-top__title { font-size: 16px; font-weight: 800; color: #fff; }
-    .er-top__side { font-size: 13px; color: #94a3b8; }
-    .er-top__mate { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; }
-    .er-top__mate img, .er-top__mate .gk__ava { width: 28px; height: 28px; border-radius: 50%; }
-    .er-timer { min-width: 86px; padding: 6px 12px; border-radius: 10px; background: #1e293b; text-align: center; color: #fff; }
-    .er-timer__t { display: block; font: 800 20px/1.1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .er-timer.is-low .er-timer__t { color: #fca5a5; }
-    .er-timer small { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: #94a3b8; }
-    .er-top .gk__ava { background: #334155; }
-    .gk__row .er-team { flex: 0 1 auto; margin-right: 14px; }
-    .gk__row .er-team + .gk__tag, .gk__row .er-team ~ .gk__tag { margin-left: auto; }
-    .er-btn-call { padding: 5px 10px; border: 1px solid #334155; border-radius: 8px; background: transparent; color: #e2e8f0; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; }
-    .er-btn-call:hover { background: #1e293b; }
-    .er-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
-    .er-card { padding: 16px; border: 1px solid var(--border-default); border-radius: 16px; background: var(--surface-card, #fff); }
-    .er-card + .er-card { margin-top: 14px; }
-    .er-card h2 { margin: 0 0 10px; font-size: 15px; font-weight: 800; }
     .er-things { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; }
     .er-thing { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-height: 92px; padding: 12px; border: 1.5px solid var(--border-default); border-radius: 14px; background: #f8fafc; color: inherit; font: inherit; text-align: left; cursor: pointer; }
     .er-thing:hover { border-color: #94a3b8; }
@@ -85,7 +49,6 @@
     .er-switch.is-up .er-switch__knob { top: 5px; background: #fde047; }
     .er-switch.is-down .er-switch__knob { top: 33px; }
     .er-hint { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: #fef9c3; color: #713f12; font-size: 14px; line-height: 1.6; word-break: keep-all; }
-    .er-linkbtn { padding: 0; border: 0; background: none; color: #2563eb; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
     .er-cardbtn { width: 100%; padding: 16px; font-size: 17px; }
     .er-cardnote { margin-top: 10px; text-align: center; font-size: 14px; font-weight: 800; color: #1d4ed8; }
     .er-prog { margin: 0; padding: 0; list-style: none; }
@@ -95,110 +58,18 @@
     .er-prog .is-solved b { text-decoration: line-through; color: var(--text-muted); }
     .er-prog .is-closed { opacity: .5; }
     .er-prog__hint { display: block; margin: -2px 0 8px 26px; font-size: 12.5px; line-height: 1.55; color: #713f12; word-break: keep-all; }
-    .er-chat { display: flex; flex-direction: column; gap: 6px; height: 260px; overflow-y: auto; margin-bottom: 10px; padding: 10px; border-radius: 12px; background: #f8fafc; }
-    .er-msg { max-width: 85%; padding: 7px 11px; border-radius: 12px; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .08); font-size: 14px; line-height: 1.5; word-break: break-word; }
-    .er-msg small { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); }
-    .er-msg.is-me { align-self: flex-end; background: #2563eb; color: #fff; }
-    .er-msg.is-me small { color: #bfdbfe; }
-    .er-msg.is-log { align-self: center; max-width: 100%; padding: 4px 10px; background: transparent; box-shadow: none; font-size: 12.5px; color: #64748b; text-align: center; }
-    .er-say { display: flex; gap: 6px; }
-    .er-say input { flex: 1; min-width: 0; padding: 10px 12px; border: 1px solid var(--border-default); border-radius: 10px; font: inherit; font-size: 15px; }
-    .er-quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-    .er-quick button { padding: 5px 10px; border: 1px solid var(--border-default); border-radius: 999px; background: #fff; font: inherit; font-size: 12.5px; cursor: pointer; }
-    .er-wait { text-align: center; }
-    .er-wait p { margin: 8px 0 0; font-size: 15px; line-height: 1.7; word-break: keep-all; color: var(--text-secondary); }
-    .er-sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
-    .er-side { padding: 14px; border-radius: 14px; background: #f1f5f9; text-align: center; }
-    .er-side small { display: block; font-size: 12px; color: var(--text-muted); }
-    .er-side b { display: block; margin: 4px 0; font-size: 16px; }
-    .er-side span { font-size: 13px; font-weight: 700; }
-    .er-side.is-ready span { color: #16a34a; }
-    .er-end { padding: 26px 18px; border-radius: 18px; text-align: center; color: #fff; background: linear-gradient(160deg, #065f46, #10b981); }
-    .er-end.is-fail { background: linear-gradient(160deg, #334155, #64748b); }
-    .er-end h2 { margin: 0; font-size: 26px; font-weight: 800; }
-    .er-end p { margin: 8px 0 0; font-size: 15px; line-height: 1.6; word-break: keep-all; }
-    .er-end__time { margin-top: 10px; font: 800 40px/1 ui-monospace, SFMono-Regular, Menlo, monospace; }
-    .er-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
-    @media (max-width: 860px) {
-      .er-grid { grid-template-columns: minmax(0, 1fr); }
-      .er-top__mate { margin-left: 0; }
-    }
-    @media (max-width: 640px) {
-      .er { padding: 14px 12px 56px; }
-      .er h1 { font-size: 24px; }
-      .er-things { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .er-timer { font-size: 18px; min-width: 76px; }
-      .er-chat { height: 220px; }
-    }
+    @media (max-width: 640px) { .er-things { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <script>
-    // 야근 사무실 탈출 — 2인 협동 방탈출. 초대 → 수락 → 둘 다 준비 → 20분 안에 탈출
-    const { esc, ava, closedNote, due, fail } = HKMatch;
+    // 야근 사무실 탈출 — 2인 협동 방탈출. 초대 → 수락 → 둘 다 준비 → 20분 안에 탈출 (방 공용은 /_shared/coop.js)
+    const { esc } = HKMatch;
+    const { mmss } = HKCoop;
     const COLORS = { red: ["#ef4444", "빨강"], yellow: ["#eab308", "노랑"], green: ["#22c55e", "초록"], blue: ["#3b82f6", "파랑"] };
-    const QUICK = ["이거 봐 줘", "찾았어!", "숫자 불러 줄게", "잠깐만", "다시 한 번 말해 줘"];
-    let root = null, open = { open: true, opensAt: null }, room = null, timer = 0, tick = 0, waiter = null;
-    let pick = null, seen = new Set(), sending = false;
-    const draft = { digits: {}, colors: {}, switches: {}, chat: "" };
-
-    const mmss = (s) => { s = Math.max(0, Math.round(s)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
-    const mini = (p) => `<span class="er-team">${ava(p)}<b>${esc(p.name)}</b></span>`;
-
-    // ---------- 목록 ----------
-    function stopWait() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
-    async function showLobby() {
-      stopWait(); room = null; pick = null; seen = new Set();
-      root.innerHTML = `<div class="er er-lobby"><div style="text-align:center;padding:40px"><span class="hk-spin"></span></div></div>`;
-      let d;
-      try { [d, open] = await Promise.all([HKApi.escapeOverview(), HKApi.playStatus().catch(() => open)]); }
-      catch (e) { root.innerHTML = `<div class="er er-lobby"><div class="gk__empty">${esc(e.message || "불러오지 못했어요")}</div></div>`; return; }
-      const row = (r, tag, cls, btns = "") => `<${btns ? "div" : "a"} class="gk__row" ${btns ? "" : `href="#r${r.id}"`}>${ava(r.partner)}<span class="gk__who"><b>${esc(r.partner.name)}</b><small>${esc(r.partner.department || "")}</small></span>${tag ? `<span class="gk__tag ${cls || ""}">${tag}</span>` : ""}${btns}</${btns ? "div" : "a"}>`;
-      const incoming = d.incoming.map((r) => row(r, "", "", `<span class="gk__btns">
-          <button type="button" class="hk-btn hk-btn--primary" data-accept="${r.id}" ${open.open ? "" : "disabled"}>수락</button>
-          <button type="button" class="hk-btn hk-btn--secondary" data-leave="${r.id}">거절</button></span>`)).join("");
-      const sent = d.sent.map((r) => row(r, "", "", `<span class="gk__btns"><small style="color:var(--text-muted);font-size:12.5px">${due(r.deadlineAt)}</small><button type="button" class="hk-btn hk-btn--secondary" data-leave="${r.id}">취소</button></span>`)).join("");
-      const active = d.active.map((r) => row(r, `${r.partnerHere ? `<span class="er-dot is-on"></span>` : ""}${r.status === "PLAYING" ? "진행 중" : "준비 중"}`, "is-live")).join("");
-      const recent = d.recent.map((r) => row(r, r.status === "CLEAR" ? `탈출 ${mmss(r.recordSec)}` : "실패", r.status === "CLEAR" ? "is-clear" : "is-fail")).join("");
-      const rk = d.ranking;
-      const rank = rk.top.map((x) => `<div class="gk__row ${x.mine ? "gk__me" : ""}"><span class="gk__rank">${x.rank}</span>${mini(x.team[0])}${mini(x.team[1])}<span class="gk__tag">${mmss(x.sec)}</span></div>`).join("");
-      const sec = (t, body) => (body ? `<section class="gk__sec"><h2>${t}</h2>${body}</section>` : "");
-      root.innerHTML = `<div class="er er-lobby">
-          <a class="gk__back" href="/arcade">‹ 아케이드</a>
-          <div class="er-hero">
-            <h1>${esc(d.room.title)}</h1>
-            <p>${esc(d.room.intro)}</p>
-            <div class="er-hero__facts"><span>2인 협동</span><span>제한 ${Math.round(d.room.limitSec / 60)}분</span><span>힌트 +60초 · 오답 +15초</span><span>탈출하면 오늘 도장</span></div>
-          </div>
-          ${closedNote(open)}
-          ${sec("받은 초대", incoming)}
-          ${sec("같이 할 방", active)}
-          ${sec("보낸 초대", sent)}
-          <section class="gk__sec"><h2>동료 초대하기</h2>
-            <input class="gk__search" id="er-q" type="search" placeholder="이름이나 부서로 찾기" autocomplete="off" ${open.open ? "" : "disabled"}>
-            <div id="er-people"></div>
-            <div class="gk__due">서로 다른 쪽에 갇혀 단서를 말로 주고받아요. 옆자리 동료나 Teams 통화를 켜고 하면 더 재밌어요.</div>
-          </section>
-          ${sec("지난 기록", recent)}
-          <section class="gk__sec"><h2>탈출 순위</h2>${rank || `<div class="gk__empty">아직 탈출한 팀이 없어요. 첫 기록을 남겨 보세요!</div>`}
-            <div class="gk__due">두 사람 모두 처음 탈출한 판만 순위에 올라요. 기록은 걸린 시간에 힌트·오답 벌점을 더한 시간이에요.</div></section>
-        </div>`;
-      const q = document.getElementById("er-q");
-      let t = 0;
-      q.addEventListener("input", () => {
-        clearTimeout(t);
-        t = setTimeout(async () => {
-          const box = document.getElementById("er-people");
-          if (!box) return;
-          if (!q.value.trim()) { box.innerHTML = ""; return; }
-          try {
-            const list = await HKApi.matchMembers(q.value);
-            box.innerHTML = list.map((p) => `<div class="gk__row">${ava(p)}<span class="gk__who"><b>${esc(p.name)}</b><small>${esc(p.department || "")}</small></span><span class="gk__btns"><button type="button" class="hk-btn hk-btn--primary" data-invite="${p.id}">초대</button></span></div>`).join("") || `<div class="gk__empty">찾는 직원이 없어요</div>`;
-          } catch (e) { fail(e); }
-        }, 250);
-      });
-    }
+    let room = null, pick = null, seen = new Set();
+    const draft = { digits: {}, colors: {}, switches: {} };
 
     // ---------- 그림(단서) ----------
     function artHtml(a) {
@@ -287,34 +158,7 @@
       return `<div class="er-lock"><div class="er-lock__head">${HKUI.icon("lock-keyhole", 16)} ${L.kind === "cards" ? "카드 리더기" : "자물쇠"}</div>${body}${hint}</div>`;
     }
 
-    // ---------- 방 ----------
-    function remain() {
-      if (room.status !== "PLAYING" || !room.deadlineAt) return null;
-      return (new Date(room.deadlineAt) - Date.now()) / 1000;
-    }
-    function topHtml() {
-      const left = remain();
-      const timerBox = room.status === "PLAYING"
-        ? `<div class="er-timer ${left < 180 ? "is-low" : ""}" id="er-timer"><span class="er-timer__t">${mmss(left)}</span><small>${room.penaltySec ? `벌점 +${room.penaltySec}초` : "남은 시간"}</small></div>` : "";
-      const callBtn = ["READY", "PLAYING"].includes(room.status) && !room.partnerHere ? `<button type="button" class="er-btn-call" data-call>Teams로 부르기</button>` : "";
-      return `<div class="er-top">
-          <div><div class="er-top__title">${esc(room.title)}</div><div class="er-top__side">${room.sideName ? `나는 <b style="color:#e2e8f0">${esc(room.sideName)}</b>` : "초대"}</div></div>
-          ${timerBox}
-          <div class="er-top__mate">${ava(room.partner)}<span><b>${esc(room.partner.name)}</b><br><small style="color:#94a3b8"><span class="er-dot ${room.partnerHere ? "is-on" : ""}"></span>${["READY", "PLAYING"].includes(room.status) ? (room.partnerHere ? "들어와 있어요" : "아직 안 들어왔어요") : esc(room.partnerSideName || "")}</small></span>${callBtn}</div>
-        </div>`;
-    }
-    function chatHtml() {
-      const items = [
-        ...room.log.map((l) => ({ t: l.t, html: `<div class="er-msg is-log">${esc(l.text)}</div>` })),
-        ...room.chat.map((c) => ({ t: c.t, html: `<div class="er-msg ${c.me ? "is-me" : ""}"><small>${esc(c.name)}</small>${esc(c.text)}</div>` })),
-      ].sort((a, b) => (a.t < b.t ? -1 : a.t > b.t ? 1 : 0));
-      const can = ["READY", "PLAYING", "CLEAR", "FAILED"].includes(room.status);
-      return `<div class="er-card"><h2>대화</h2>
-          <div class="er-chat" id="er-chat">${items.map((x) => x.html).join("") || `<div class="er-msg is-log">본 것을 여기에 적어 알려 주세요</div>`}</div>
-          ${can ? `<form class="er-say" id="er-say"><input id="er-say-in" maxlength="120" placeholder="상대에게 보낼 말" autocomplete="off" value="${esc(draft.chat)}"><button class="hk-btn hk-btn--primary" type="submit">보내기</button></form>
-          <div class="er-quick">${QUICK.map((q) => `<button type="button" data-quick="${esc(q)}">${esc(q)}</button>`).join("")}</div>` : ""}
-        </div>`;
-    }
+    // ---------- 진행 화면 ----------
     function progressHtml() {
       return `<div class="er-card"><h2>자물쇠 ${room.progress.filter((p) => p.solved).length} / ${room.progress.length}</h2><ul class="er-prog">${room.progress.map((p) => `<li class="${p.solved ? "is-solved" : p.open ? "" : "is-closed"}">${HKUI.icon(p.solved ? "circle-check-big" : p.open ? "lock-keyhole" : "lock", 18, p.solved ? "#16a34a" : p.open ? "#b45309" : "#94a3b8")}<b>${esc(p.title)}</b><small>${esc(p.where)}</small></li>${p.hint && !p.solved ? `<span class="er-prog__hint">💡 ${esc(p.hint)}</span>` : ""}`).join("")}</ul></div>`;
     }
@@ -329,210 +173,62 @@
       const detail = t ? `<div class="er-detail"><h3>${HKUI.icon(t.icon, 20)} ${esc(t.title)}</h3><p>${esc(t.text)}</p>${t.art ? `<div class="er-art">${artHtml(t.art)}</div>` : ""}${room.status === "PLAYING" ? lockHtml(t) : ""}</div>` : "";
       return `<div class="er-card"><h2>${esc(room.sideName)}에서 보이는 것</h2><div class="er-things">${tiles}</div>${detail}</div>`;
     }
-    function readyHtml() {
-      const me = room.ready.me, mate = room.ready.partner;
-      return `<div class="er-card er-wait">
-          <h2 style="font-size:18px">출발 전 대기실</h2>
-          <p>${esc(room.intro)}</p>
-          <div class="er-sides">
-            <div class="er-side ${me ? "is-ready" : ""}"><small>나</small><b>${esc(room.sideName)}</b><span>${me ? "준비 완료" : "준비 전"}</span></div>
-            <div class="er-side ${mate ? "is-ready" : ""}"><small>${esc(room.partner.name)}</small><b>${esc(room.partnerSideName)}</b><span>${mate ? "준비 완료" : room.partnerHere ? "준비 전" : "아직 안 들어왔어요"}</span></div>
-          </div>
-          <button type="button" class="hk-btn hk-btn--primary" data-ready="${me ? 0 : 1}" style="min-width:200px" ${open.open || me ? "" : "disabled"}>${me ? "준비 취소" : "준비"}</button>
-          <p style="font-size:13px">둘 다 준비를 누르면 ${Math.round(room.limitSec / 60)}분 타이머가 바로 시작돼요. 서로 화면이 달라서 말로 알려 줘야 풀려요.</p>
-          <div class="er-actions"><button type="button" class="er-linkbtn" style="color:var(--text-muted)" data-leave="${room.id}">방 나가기</button></div>
-        </div>`;
-    }
-    function pendingHtml() {
-      return `<div class="er-card er-wait"><h2 style="font-size:18px">${room.incoming ? `${esc(room.partner.name)}님의 초대` : "수락을 기다리고 있어요"}</h2>
-          <p>${esc(room.intro)}</p>
-          <div class="er-actions">${room.incoming
-            ? `<button type="button" class="hk-btn hk-btn--primary" data-accept="${room.id}" ${open.open ? "" : "disabled"}>수락</button><button type="button" class="hk-btn hk-btn--secondary" data-leave="${room.id}">거절</button>`
-            : `<button type="button" class="hk-btn hk-btn--secondary" data-leave="${room.id}">초대 취소</button>`}</div>
-          <p style="font-size:13px">${due(room.deadlineAt)}</p></div>`;
-    }
-    function endHtml() {
-      if (room.status === "CLEAR") {
-        return `<div class="er-end"><h2>탈출 성공!</h2><p>${esc(room.outro)}</p><div class="er-end__time">${mmss(room.recordSec)}</div>
+    const lockOf = (k) => room.things.find((x) => x.lock && x.lock.key === k).lock;
+
+    HKCoop.mount({
+      room: "overtime",
+      listName: "방탈출 목록",
+      hero: { facts: ["2인 협동", "제한 20분", "힌트 +60초 · 오답 +15초", "탈출하면 오늘 도장"], note: "서로 다른 쪽에 갇혀 단서를 말로 주고받아요. 옆자리 동료나 Teams 통화를 켜고 하면 더 재밌어요." },
+      rankTitle: "탈출 순위",
+      rankNote: "두 사람 모두 처음 탈출한 판만 순위에 올라요. 기록은 걸린 시간에 힌트·오답 벌점을 더한 시간이에요.",
+      rankText: (x) => mmss(x.sec),
+      recentText: (r) => (r.status === "CLEAR" ? [`탈출 ${mmss(r.recordSec)}`, "is-clear"] : ["실패", "is-fail"]),
+      failTitle: "탈출 실패",
+      quick: ["이거 봐 줘", "찾았어!", "숫자 불러 줄게", "잠깐만", "다시 한 번 말해 줘"],
+      timerNote: (ctx) => (ctx.room.penaltySec ? `벌점 +${ctx.room.penaltySec}초` : "남은 시간"),
+      reset: () => { pick = null; seen = new Set(); },
+      changed: (prev, next) => { room = next; },
+      painted: (ctx) => { (ctx.room.things || []).forEach((t) => seen.add(t.key)); },
+      play: () => playHtml(),
+      side: () => progressHtml(),
+      end: () => `<div class="er-end"><h2>탈출 성공!</h2><p>${esc(room.outro)}</p><div class="er-end__time">${mmss(room.recordSec)}</div>
             <p>${room.penaltySec ? `벌점 ${room.penaltySec}초 포함 · ` : ""}${room.ranked ? "탈출 순위에 올랐어요" : "처음 탈출한 판이 아니라 순위에는 넣지 않아요"}</p>
-            <div class="er-actions"><a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">방탈출 목록</a></div></div>`;
-      }
-      const why = { TIMEOUT: "시간이 다 됐어요.", GIVEUP: "포기한 방이에요.", LEFT: "나간 방이에요." }[room.end] || "끝난 방이에요.";
-      return `<div class="er-end is-fail"><h2>${room.status === "FAILED" ? "탈출 실패" : room.status === "EXPIRED" ? "만료된 초대" : "닫힌 방"}</h2><p>${why}</p>
-          <div class="er-actions">${room.status === "FAILED" ? `<button type="button" class="hk-btn hk-btn--primary" data-invite="${room.partner.id}" ${open.open ? "" : "disabled"}>${esc(room.partner.name)}님과 다시 도전</button>` : ""}<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">방탈출 목록</a></div></div>`;
-    }
-    function paint() {
-      const focus = document.activeElement && document.activeElement.id;
-      const caret = focus && document.activeElement.selectionStart;
-      const chatBox = document.getElementById("er-chat");
-      const stick = !chatBox || chatBox.scrollTop + chatBox.clientHeight >= chatBox.scrollHeight - 30;
-      let main = "";
-      if (room.status === "PENDING") main = pendingHtml();
-      else if (room.status === "READY") main = readyHtml();
-      else if (room.status === "PLAYING") main = playHtml();
-      else main = endHtml() + (room.things.length ? `<div style="margin-top:14px">${playHtml()}</div>` : "");
-      const side = ["READY", "PLAYING", "CLEAR", "FAILED"].includes(room.status) ? `${room.status !== "READY" ? progressHtml() : ""}${chatHtml()}` : "";
-      root.innerHTML = `<div class="er">
-          <a class="gk__back" href="#">‹ 방탈출 목록</a>
-          ${closedNote(open)}
-          ${topHtml()}
-          <div class="er-grid" style="${side ? "" : "grid-template-columns:minmax(0,1fr)"}"><div>${main}</div>${side ? `<div>${side}</div>` : ""}</div>
-          ${room.status === "PLAYING" ? `<div class="er-actions"><button type="button" class="er-linkbtn" style="color:var(--text-muted)" data-giveup>포기하기</button></div>` : ""}
-        </div>`;
-      HKUI.refreshIcons(root);
-      room.things.forEach((t) => seen.add(t.key));
-      const box = document.getElementById("er-chat");
-      if (box && stick) box.scrollTop = box.scrollHeight;
-      if (focus) {
-        const el = document.getElementById(focus);
-        if (el) { el.focus(); try { if (caret != null) el.setSelectionRange(caret, caret); } catch (_) {} }
-      }
-    }
-    function tickClock() {
-      if (!room) return;
-      const el = document.getElementById("er-timer");
-      const left = remain();
-      if (el && left != null) {
-        el.firstChild.textContent = mmss(left);
-        el.classList.toggle("is-low", left < 180);
-        if (left <= 0 && !el.dataset.ended) { el.dataset.ended = "1"; refresh(); }
-      }
-      const note = document.getElementById("er-cardnote");
-      if (note && room.cards) {
+            <div class="er-actions"><a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">방탈출 목록</a></div></div>`,
+      after: () => (room.things && room.things.length ? `<div style="margin-top:14px">${playHtml()}</div>` : ""),
+      click: async (t, ctx) => {
+        const d = t.dataset;
+        if (d.thing) { pick = d.thing; ctx.paint(); return; }
+        if (d.color) { const [k, c] = d.color.split(":"); const cur = draft.colors[k] || []; if (cur.length < lockOf(k).length) draft.colors[k] = [...cur, c]; ctx.paint(); return; }
+        if (d.clear) { draft.colors[d.clear] = []; ctx.paint(); return; }
+        if (d.switch) { const [k, i] = d.switch.split(":"); const L = lockOf(k); const cur = draft.switches[k] || Array(L.length).fill(0); cur[Number(i)] = cur[Number(i)] ? 0 : 1; draft.switches[k] = cur; ctx.paint(); return; }
+        if (d.solve) {
+          const k = d.solve, L = lockOf(k);
+          const answer = L.kind === "digits" ? (draft.digits[k] || "") : L.kind === "colors" ? (draft.colors[k] || []) : (draft.switches[k] || Array(L.length).fill(0));
+          if (L.kind === "digits" && answer.length !== L.length) { HKUI.toast(`숫자 ${L.length}자리를 눌러 주세요`, "error"); return; }
+          const r = await ctx.act(() => HKApi.coopSolve(room.id, k, answer));
+          if (r && r.ok === false) { HKUI.toast(`안 열려요… (+${room.wrongPenalty}초)`, "error"); if (L.kind === "colors") { draft.colors[k] = []; ctx.paint(); } }
+          return;
+        }
+        if (d.hint) {
+          if (!(await HKUI.confirmDialog("힌트를 볼까요?", `힌트를 보면 기록에 ${room.hintPenalty}초가 더해져요. 상대 화면에도 같은 힌트가 보여요.`, { confirmLabel: "힌트 보기" }))) return;
+          return ctx.act(() => HKApi.coopHint(room.id, d.hint));
+        }
+        if ("card" in d) {
+          const r = await ctx.act(() => HKApi.coopCard(room.id));
+          if (r && r.stamp && r.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${r.stamp.count}/${r.stamp.goal})`);
+        }
+      },
+      input: (el) => { if (el.dataset.digits) { el.value = el.value.replace(/\D/g, ""); draft.digits[el.dataset.digits] = el.value; } },
+      keydown: (e) => { if (e.key === "Enter" && e.target.dataset && e.target.dataset.digits) { e.preventDefault(); document.querySelector(`[data-solve="${e.target.dataset.digits}"]`)?.click(); } },
+      tick: () => {
+        const note = document.getElementById("er-cardnote");
+        if (!note || !room || !room.cards) return;
         const now = Date.now(), c = room.cards;
         const mine = c.mine && c.mine > now, theirs = c.partner && c.partner > now;
         note.textContent = theirs ? `${room.partner.name}님이 사원증을 댔어요! ${Math.ceil((c.partner - now) / 1000)}초 안에 대세요`
           : mine ? `${room.partner.name}님을 기다리는 중… ${Math.ceil((c.mine - now) / 1000)}초` : `${c.window}초 안에 둘 다 대야 열려요`;
-        const btn = root.querySelector("[data-card]");
+        const btn = document.querySelector("[data-card]");
         if (btn && !mine && btn.disabled) { btn.disabled = false; btn.textContent = "사원증 대기"; }
-      }
-    }
-    // 상대가 한 일(새 진행 기록)은 알림으로 — 내가 한 일과 처음 들어올 때는 조용히
-    let myName = "";
-    function setRoom(next) {
-      const prev = room;
-      room = next;
-      if (prev && prev.id === next.id && prev.log && next.log) {
-        const lastT = prev.log.length ? prev.log[prev.log.length - 1].t : "";
-        next.log.filter((l) => l.t > lastT && !l.text.startsWith(`${myName}님`))
-          .forEach((l) => HKUI.toast(l.text, l.text.includes("틀렸") ? "error" : "success"));
-      }
-      paint();
-      schedule();
-    }
-    async function refresh() {
-      if (!room) return;
-      try { setRoom(await HKApi.escapeDetail(room.id)); } catch (e) { fail(e); }
-    }
-    function schedule(delay = 0) {
-      stopWait();
-      if (!room || !["PENDING", "READY", "PLAYING", "CLEAR", "FAILED"].includes(room.status)) return;
-      timer = setTimeout(async () => {
-        timer = 0;
-        if (document.hidden || !room) return;
-        const id = room.id, ctl = new AbortController();
-        waiter = ctl;
-        let next;
-        try { next = await HKApi.escapeWait(id, room.seq, room.partnerHere, ctl.signal); }
-        catch (_) { if (waiter === ctl) { waiter = null; schedule(3000); } return; }
-        if (waiter !== ctl || !room || room.id !== id) return;
-        waiter = null;
-        if (next.seq !== room.seq || next.partnerHere !== room.partnerHere || next.status !== room.status) setRoom(next);
-        else { room = next; schedule(); }
-      }, delay);
-    }
-    async function showRoom(id) {
-      stopWait(); pick = null; seen = new Set();
-      try { [room, open] = await Promise.all([HKApi.escapeDetail(id), HKApi.playStatus().catch(() => open)]); }
-      catch (e) { fail(e); location.hash = ""; return; }
-      paint();
-      schedule();
-    }
-    async function act(fn) {
-      if (sending) return;
-      sending = true;
-      try { const next = await fn(); if (next && next.id) setRoom(next); return next; }
-      catch (e) { fail(e); }
-      finally { sending = false; }
-    }
-
-    function route() {
-      const m = /^#r(\d+)$/.exec(location.hash);
-      if (m) showRoom(Number(m[1])); else showLobby();
-    }
-    HKMember.mountPage({
-      active: "lounge",
-      auth: true,
-      render: () => `<div id="er-root"></div>`,
-      afterMount: async () => {
-        root = document.getElementById("er-root");
-        try { myName = (await HKApi.profile()).name || ""; } catch (_) {}
-        root.addEventListener("click", async (e) => {
-          const t = e.target.closest("button, a");
-          if (!t) return;
-          const d = t.dataset;
-          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
-          if (d.invite) {
-            try { const r = await HKApi.escapeInvite(Number(d.invite)); HKUI.toast("초대를 보냈어요. 수락하면 Teams로 알려 드려요"); location.hash = `r${r.id}`; } catch (err) { fail(err); }
-            return;
-          }
-          if (d.accept) { try { const r = await HKApi.escapeAccept(Number(d.accept)); location.hash = `r${r.id}`; if (room && room.id === r.id) setRoom(r); } catch (err) { fail(err); } return; }
-          if (d.leave) {
-            const pending = !room || room.status === "PENDING";
-            if (!pending && !(await HKUI.confirmDialog("방을 나갈까요?", "나가면 이 방은 닫혀요. 상대에게도 Teams로 알려요.", { confirmLabel: "나가기", confirmVariant: "danger" }))) return;
-            try { await HKApi.escapeLeave(Number(d.leave)); if (room) await refresh(); else showLobby(); } catch (err) { fail(err); }
-            return;
-          }
-          if (!room) return;
-          if (d.thing) { pick = d.thing; paint(); return; }
-          if (d.ready) return act(() => HKApi.escapeReady(room.id, d.ready === "1"));
-          if ("call" in d) { try { setRoom(await HKApi.escapeCall(room.id)); HKUI.toast(`${room.partner.name}님에게 Teams로 알렸어요`); } catch (err) { fail(err); } return; }
-          if ("giveup" in d) {
-            if (!(await HKUI.confirmDialog("포기할까요?", "이 방은 실패로 끝나고 도장도 받지 못해요.", { confirmLabel: "포기", confirmVariant: "danger" }))) return;
-            return act(() => HKApi.escapeLeave(room.id));
-          }
-          if (d.color) { const [k, c] = d.color.split(":"); const cur = draft.colors[k] || []; const L = room.things.find((x) => x.lock && x.lock.key === k).lock; if (cur.length < L.length) draft.colors[k] = [...cur, c]; paint(); return; }
-          if (d.clear) { draft.colors[d.clear] = []; paint(); return; }
-          if (d.switch) { const [k, i] = d.switch.split(":"); const L = room.things.find((x) => x.lock && x.lock.key === k).lock; const cur = draft.switches[k] || Array(L.length).fill(0); cur[Number(i)] = cur[Number(i)] ? 0 : 1; draft.switches[k] = cur; paint(); return; }
-          if (d.solve) {
-            const k = d.solve, L = room.things.find((x) => x.lock && x.lock.key === k).lock;
-            const answer = L.kind === "digits" ? (draft.digits[k] || "") : L.kind === "colors" ? (draft.colors[k] || []) : (draft.switches[k] || Array(L.length).fill(0));
-            if (L.kind === "digits" && answer.length !== L.length) { HKUI.toast(`숫자 ${L.length}자리를 눌러 주세요`, "error"); return; }
-            const r = await act(() => HKApi.escapeSolve(room.id, k, answer));
-            if (r && r.ok === false) { HKUI.toast(`안 열려요… (+${room.wrongPenalty}초)`, "error"); if (L.kind === "colors") { draft.colors[k] = []; paint(); } }
-            return;
-          }
-          if (d.hint) {
-            if (!(await HKUI.confirmDialog("힌트를 볼까요?", `힌트를 보면 기록에 ${room.hintPenalty}초가 더해져요. 상대 화면에도 같은 힌트가 보여요.`, { confirmLabel: "힌트 보기" }))) return;
-            return act(() => HKApi.escapeHint(room.id, d.hint));
-          }
-          if ("card" in d) {
-            const r = await act(() => HKApi.escapeCard(room.id));
-            if (r && r.stamp && r.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${r.stamp.count}/${r.stamp.goal})`);
-            return;
-          }
-          if (d.quick) { try { setRoom(await HKApi.escapeSay(room.id, d.quick)); } catch (err) { fail(err); } }
-        });
-        root.addEventListener("input", (e) => {
-          const el = e.target;
-          if (el.dataset.digits) { el.value = el.value.replace(/\D/g, ""); draft.digits[el.dataset.digits] = el.value; }
-          if (el.id === "er-say-in") draft.chat = el.value;
-        });
-        root.addEventListener("keydown", (e) => {
-          if (e.key === "Enter" && e.target.dataset && e.target.dataset.digits) { e.preventDefault(); root.querySelector(`[data-solve="${e.target.dataset.digits}"]`)?.click(); }
-        });
-        root.addEventListener("submit", async (e) => {
-          if (e.target.id !== "er-say") return;
-          e.preventDefault();
-          const text = draft.chat.trim();
-          if (!text || !room) return;
-          try { draft.chat = ""; setRoom(await HKApi.escapeSay(room.id, text)); document.getElementById("er-say-in")?.focus(); }
-          catch (err) { draft.chat = text; fail(err); }
-        });
-        window.addEventListener("hashchange", route);
-        document.addEventListener("visibilitychange", () => { if (!document.hidden && room) refresh(); });
-        tick = setInterval(tickClock, 250);
-        route();
       },
     });
   </script>

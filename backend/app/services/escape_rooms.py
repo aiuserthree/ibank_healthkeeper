@@ -48,6 +48,10 @@ class Room:
     hint_penalty: int = 60
     wrong_penalty: int = 15
     card_window: int = 5  # 두 사람이 사원증을 대야 하는 간격(초)
+    label: str = "방탈출"
+    page: str = "escape"
+    game: str = "escape"
+    blurb: str = "둘이 단서를 나눠 20분 안에 탈출하는 협동 게임이에요."
     outro: str = ""
 
     def puzzle(self, key: str) -> Optional[Puzzle]:

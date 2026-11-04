@@ -71,6 +71,7 @@ GAMES: dict[str, Game] = {
         Game("gomoku", "사내 오목", "MINI", "동료에게 도전장 · 번갈아 두는 턴제 대전", "swords", "승", 1_000_000),
         Game("chess", "사내 체스", "MINI", "동료 또는 컴퓨터와 두는 턴제 체스", "crown", "승", 1_000_000),
         Game("escape", "야근 사무실 탈출", "MINI", "동료와 둘이 단서를 나눠 20분 안에 탈출하는 협동 방탈출", "door-open", "time", 3600, lower_better=True),
+        Game("kitchen", "점심 분식집", "MINI", "동료와 홀·주방을 나눠 3분 동안 분식집 운영 · 협동", "chef-hat", "원", 10_000_000),
         Game("typing", "영어 타자 레이스", "STUDY", "뜻을 보고 영어 단어 치기 · 첫 글자 힌트", "keyboard", "점", 1_000_000),
     )
 }
@@ -327,14 +328,13 @@ HALL_PERIODS = ("week", "month", "all")
 async def hall_of_fame(db: AsyncSession, period: str = "week") -> dict:
     """게임별 1~3위 — 아케이드 '명예의 전당'.
 
-    week 는 지난주(월~일, 월요일마다 바뀜), month 는 지난달(1일~말일, 1일마다 바뀜), all 은 오늘까지 전체 기록.
+    week 는 지난주(월~일, 월요일마다 바뀜), month 는 이번 달(1일~오늘), all 은 오늘까지 전체 기록.
     """
     if period not in HALL_PERIODS:
         period = "week"
     today = today_kst()
     if period == "month":
-        end = today.replace(day=1) - timedelta(days=1)  # 지난달 말일
-        start = end.replace(day=1)
+        start, end = today.replace(day=1), today  # 이번 달 1일 ~ 오늘
     elif period == "all":
         start, end = None, today
     else:

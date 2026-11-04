@@ -132,6 +132,8 @@ class EscapeRoom(Base):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # 탈출 기록(초) — 걸린 시간 + 힌트·오답 벌점
     record_sec: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # 점수 — 점심 분식집 매출(원)
+    score: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     # 두 사람 모두 이 방을 처음 탈출한 판만 순위에 — 답을 알고 다시 하는 판은 빼려고
     ranked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
