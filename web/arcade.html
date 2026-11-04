@@ -14,6 +14,8 @@
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/play.js"></script>
   <script src="/_shared/series-art.js"></script>
+  <script src="/_shared/coop-story.js"></script>
+  <script src="/_shared/raid.js"></script>
 </head>
 <body>
   <div id="app"></div>
@@ -23,6 +25,8 @@
       blocks: "퍼즐", shooter: "슈팅", match3: "퍼즐", stairs: "액션", crossing: "액션", pairs: "퍼즐", bricks: "액션",
       bubble: "캐주얼", sudoku: "퍼즐", chosung: "퀴즈", trivia: "퀴즈", korean: "퀴즈", typing: "어학",
       snake: "액션", stack: "액션", coffee: "액션", mines: "퍼즐", promote: "퍼즐", nightshift: "액션", gomoku: "대전", chess: "대전", escape: "협동", kitchen: "협동", words: "협동", maze: "협동", clown: "액션", milk: "액션", theater: "액션", trial: "액션", silent: "액션", parade: "액션", finale: "액션",
+      baseball: "대전", boxes: "대전", quizduel: "대전", gostop: "대전", memory: "대전", soccer: "대전", volley: "대전",
+      sketch: "협동", sync: "협동", spotdiff: "협동", bounce: "액션", dodge: "액션",
     };
     const esc = (t) => HKUI.escapeHtml(t);
     // 게임 그림 — 서버가 그림을 한 달 동안 캐시하므로, 그림을 바꾸면 여기 숫자를 올려 새 그림을 받게 한다
@@ -44,7 +48,7 @@
       const keys = games.map((g) => g.key);
       const row = (shift) => {
         const list = keys.slice(shift).concat(keys.slice(0, shift));
-        const imgs = list.map((k) => `<img src="${loungeImg(k)}" alt="">`).join("");
+        const imgs = list.map((k) => `<img src="${loungeImg(k)}" alt="" onerror="this.remove()">`).join("");
         return `<div class="hk-aa-wall__row">${imgs}${imgs}</div>`;
       };
       // 업무 시간에도 버튼은 그대로 — 누르면 안내 창 (아래 click 처리)
@@ -274,6 +278,19 @@
       return `<div class="hk-aa-wrap"><a class="hk-aa-series" href="/series"><canvas class="hk-aa-series__art" width="${HKSeriesArt.width}" height="${HKSeriesArt.height}" aria-hidden="true"></canvas><small>새 시리즈 · 게임 8편</small><b>꿀알바 시리즈</b><span>밤에만 여는 인력사무소의 구인 공고 보러 가기 ›</span></a></div>`;
     }
 
+    // 함께하기 입구 — 둘이서 하는 게임(협동 · 대전)을 모은 /together. 하루를 따라 그림 넷
+    // 문구에 게임 이름 · 편 수를 적지 않는다 — 게임이 늘어도 고칠 필요 없게
+    function togetherHtml() {
+      const S = window.HKCoopStory;
+      const tiles = S ? S.order.map((k) => `<span class="tg-entry__tile" style="${S.vars(k)}">${S.scene(k)}<i>${esc(S.chapters[k].time)}</i></span>`).join("") : "";
+      return `<div class="hk-aa-wrap"><a class="tg-entry" href="/together">
+          <span class="tg-entry__copy"><small>새 카테고리 · 둘이서 하는 게임</small><b>함께하기</b>
+            <span>동료를 초대해 같이 해요. 입사 동기의 긴 하루를 그린 협동 시리즈${S ? ` 「${esc(S.series.title)}」` : ""}부터 1:1로 겨루는 대전까지.</span>
+            <span class="tg-entry__go">함께하기 보러 가기 ›</span></span>
+          ${tiles ? `<span class="tg-entry__day" aria-hidden="true">${tiles}</span>` : ""}
+        </a></div>`;
+    }
+
     // 입구 배경 — 시리즈 페이지와 같은 밤골목 그림. 화면에 보일 때만 움직인다
     function animateSeriesEntrance(root) {
       const art = root.querySelector(".hk-aa-series__art");
@@ -291,31 +308,42 @@
     }
 
     // 대전 알림 — 내 차례이거나 받은 도전이 있으면 꿀알바 입구 위에 띄운다
+    // [게임 key, 이름, 「…러 가기」] — 실시간 경기(축구 · 배구)의 「내 차례」는 아직 들어가지 않은 경기
+    const MATCH_NOTICE = [
+      ["chess", "체스", "두러"], ["gomoku", "오목", "두러"], ["baseball", "숫자 야구"], ["boxes", "칸 따먹기"], ["quizduel", "1:1 퀴즈", "풀러"],
+      ["gostop", "고스톱", "치러"], ["memory", "도형 짝맞추기"], ["soccer", "헤딩 축구"], ["volley", "옥상 배구"],
+    ];
     async function matchNotice(root) {
       const box = root.querySelector(".hk-aa-series");
       if (!box) return;
-      let inbox = null;
-      try { inbox = await HKApi.matchInbox(); } catch (_) { return; }
-      [["chess", "체스"], ["gomoku", "오목"]].forEach(([key, name]) => {
-        const n = inbox[key];
-        if (!n || (!n.myTurn && !n.incoming)) return;
+      const [inbox, co] = await Promise.all([HKApi.matchInbox().catch(() => null), HKApi.coopInbox().catch(() => null)]);
+      const link = (href, text) => {
         const a = document.createElement("a");
         a.className = "hk-aa-match";
-        a.href = `/games/${key}`;
-        a.textContent = [n.incoming ? `받은 도전 ${n.incoming}개` : "", n.myTurn ? `내 차례 ${n.myTurn}판` : ""].filter(Boolean).join(" · ") + ` · ${name} 두러 가기 ›`;
-        box.parentElement.prepend(a);
+        a.href = href;
+        a.textContent = text;
+        return a;
+      };
+      // 대전은 MATCH_NOTICE 순서대로, 그다음 협동(받은 초대 · 같이 할 방) — 모아서 한 번에 넣는다
+      const list = [];
+      MATCH_NOTICE.forEach(([key, name, verb]) => {
+        const n = inbox && inbox[key];
+        if (!n || (!n.myTurn && !n.incoming)) return;
+        list.push(link(`/games/${key}`, [n.incoming ? `받은 도전 ${n.incoming}개` : "", n.myTurn ? `내 차례 ${n.myTurn}판` : ""].filter(Boolean).join(" · ") + ` · ${name} ${verb || "하러"} 가기 ›`));
       });
-      // 협동 게임(방탈출 · 분식집) — 받은 초대 · 같이 할 방
-      let co = null;
-      try { co = await HKApi.coopInbox(); } catch (_) { return; }
       Object.values((co && co.rooms) || {}).forEach((g) => {
         if (!g.incoming && !g.ready) return;
-        const a = document.createElement("a");
-        a.className = "hk-aa-match";
-        a.href = `/games/${g.page}`;
-        a.textContent = [g.incoming ? `받은 초대 ${g.incoming}개` : "", g.ready ? `같이 할 방 ${g.ready}개` : ""].filter(Boolean).join(" · ") + ` · ${g.title} 하러 가기 ›`;
-        box.parentElement.prepend(a);
+        list.push(link(`/games/${g.page}`, [g.incoming ? `받은 초대 ${g.incoming}개` : "", g.ready ? `같이 할 방 ${g.ready}개` : ""].filter(Boolean).join(" · ") + ` · ${g.title} 하러 가기 ›`));
       });
+      if (!list.length) return;
+      // 넷 이상이면 둘만 보이고 나머지는 한 줄로 — 휴대폰에서 꿀알바 입구가 너무 밀려나지 않게
+      const shown = list.length > 3 ? list.slice(0, 2) : list;
+      if (shown.length < list.length) {
+        const more = link("/together", `다른 게임 ${list.length - shown.length}개에도 받은 도전 · 초대 · 내 차례가 있어요 · 함께하기에서 보기 ›`);
+        more.style.cssText = "background:#f1f5f9;color:#334155";
+        shown.push(more);
+      }
+      box.parentElement.prepend(...shown);
     }
 
     // 꿀알바 시리즈 소개 창 — 들어올 때 한 번. '오늘 그만 보기'를 누르면 그날은 안 뜬다
@@ -487,11 +515,12 @@
           const [st, allGames, sp, wk] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null), HKApi.playWeekly().catch(() => null)]);
           status = st;
           const games = allGames.filter((g) => !SERIES_ONLY.includes(g.key));
-          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + seriesHtml() + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + seriesHtml() + togetherHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
           animateSeriesEntrance(body);
           bindHof(body);
           matchNotice(body);
+          if (window.HKRaid) HKRaid.renderWidget(document.getElementById("aa-raid")).catch(() => null);
           seriesPopup();
         } catch (e) {
           body.innerHTML = `<div class="hk-aa-wrap" style="padding:48px 32px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "게임 목록을 불러오지 못했어요."))}</div>`;

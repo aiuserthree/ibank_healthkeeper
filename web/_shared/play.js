@@ -182,6 +182,8 @@ window.HKSound = (function () {
 
   function play(name, arg) {
     if (muted || !SFX[name]) return;
+    // 아직 화면을 한 번도 누르지 않았으면(Teams 링크로 바로 들어온 경우 등) 어차피 소리가 안 나고 브라우저 경고만 쌓인다
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     // 같은 소리가 한꺼번에 몰리면 귀가 아프니 25ms 안의 중복은 건너뜀
     const now = performance.now();
     if (lastAt[name] && now - lastAt[name] < 25) return;
@@ -272,6 +274,18 @@ window.HKPlay = (function () {
     kitchen: ["#c2410c", "#f59e0b"],
     words: ["#312e81", "#7c3aed"],
     maze: ["#0b1120", "#334155"],
+    dodge: ["#1e3a8a", "#f59e0b"],
+    bounce: ["#e11d48", "#fb7185"],
+    sketch: ["#0f766e", "#2dd4bf"],
+    sync: ["#be185d", "#f472b6"],
+    spotdiff: ["#7c2d12", "#ea580c"],
+    baseball: ["#14532d", "#22c55e"],
+    boxes: ["#1d4ed8", "#60a5fa"],
+    quizduel: ["#6d28d9", "#a78bfa"],
+    gostop: ["#14532d", "#b91c1c"],
+    memory: ["#0369a1", "#38bdf8"],
+    soccer: ["#166534", "#84cc16"],
+    volley: ["#0ea5e9", "#ff7a3d"],
     pairs: ["#0f8b8d", "#57cc99"],
     shooter: ["#2b1055", "#d53369"],
     bricks: ["#c2410c", "#fb923c"],
@@ -946,6 +960,7 @@ window.HKPlay = (function () {
           submit: async (score) => {
             setPlaying(false);
             const value = Math.max(0, Math.round(score));
+            const run = runNo; // 저장을 기다리는 사이에 새 판이 시작됐으면 그 판의 상태를 건드리지 않는다
             let result;
             try {
               result = await HKApi.playSubmit(key, value, dailyToken, variant);
@@ -961,11 +976,11 @@ window.HKPlay = (function () {
             }
             resultBanner(game, result);
             stampToast(result.stamp);
+            if (run !== runNo) return result;
             inRun = false;
             armRun(); // 다음 판 길이 재기
             canRestart = true;
             endQuit(true);
-            const run = runNo;
             await loadBoard();
             // 끝나자마자 순위표를 연다 — 휴대폰은 닫으면 게임의 끝 화면이 보이고, '순위' 버튼으로 다시 연다
             if (run === runNo) {

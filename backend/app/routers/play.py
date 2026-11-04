@@ -46,6 +46,7 @@ class MatchMove(BaseModel):
     x: Optional[int] = None  # 오목
     y: Optional[int] = None
     uci: Optional[str] = None  # 체스 — e2e4, 승격은 e7e8q
+    data: Optional[dict] = None  # 그 밖의 대전 게임 — 게임마다 모양이 다르다(숫자 야구 추측 · 칸 따먹기 선 · 퀴즈 답 등)
     seq: int  # 내가 본 판의 수 — 그새 판이 바뀌었으면 두지 않는다
 
 
@@ -204,7 +205,7 @@ async def match_move(
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    return {"data": await match_service.move(db, member, match_id, body.x, body.y, body.uci, body.seq)}
+    return {"data": await match_service.move(db, member, match_id, body.x, body.y, body.uci, body.seq, data=body.data)}
 
 
 @router.post("/match/{match_id}/resign")
@@ -258,6 +259,13 @@ async def escape_overview(
 @router.get("/escape/inbox")
 async def escape_inbox(db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
     return {"data": await escape_service.inbox(db, member)}
+
+
+# /coop/{room_id} 보다 먼저 둔다 — 뒤에 두면 "series" 가 방 번호로 읽혀 422 가 난다
+@router.get("/coop/series")
+async def coop_series(db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    """협동 시리즈 「오늘도 둘이서」 화마다 내 기록 — 함께하기 페이지 · 협동 방 목록."""
+    return {"data": await escape_service.series(db, member)}
 
 
 @router.post("/coop")
@@ -321,6 +329,19 @@ async def escape_call(
     return {"data": data}
 
 
+class CoopOptions(BaseModel):
+    opts: dict
+
+
+@router.post("/coop/{room_id}/options")
+async def coop_options(
+    room_id: int, body: CoopOptions,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    """대기실 게임 설정 — 주제 · 난이도 등(게임마다 다름). 바뀌면 둘 다 다시 준비."""
+    return {"data": await escape_service.set_options(db, member, room_id, body.opts)}
+
+
 @router.post("/coop/{room_id}/ready")
 @router.post("/escape/{room_id}/ready")
 async def escape_ready(
@@ -352,6 +373,29 @@ async def escape_hint(
 @router.post("/escape/{room_id}/card")
 async def escape_card(room_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
     return {"data": await escape_service.card(db, member, room_id)}
+
+
+@router.post("/coop/{room_id}/hint/{level}")
+async def escape_hint_level(
+    room_id: int, level: int, body: EscapeHint,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    """방탈출 힌트 한 단계(1 살짝 · 2 확실하게) — 이미 본 단계면 그대로라 둘이 같이 눌러도 벌점은 한 번."""
+    return {"data": await escape_service.hint(db, member, room_id, body.puzzle, level)}
+
+
+class EscapeItem(BaseModel):
+    item: str  # fuse · panelkey · card · kimbap
+    action: str  # send 서류 투입구로 넘기기 · use 여기에 쓰기 · eat 먹기
+
+
+@router.post("/coop/{room_id}/item")
+async def escape_item(
+    room_id: int, body: EscapeItem,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    """방탈출 물건 — 서류 투입구로 넘기기 · 퓨즈 끼우기 같은 쓰기 · 김밥 먹기."""
+    return {"data": await escape_service.item(db, member, room_id, body.item, body.action)}
 
 
 @router.post("/coop/{room_id}/say")

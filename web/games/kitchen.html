@@ -12,201 +12,1051 @@
   <script src="/_shared/api.js"></script>
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/coop-story.js"></script>
   <script src="/_shared/coop.js"></script>
   <style>
+    /* ── 점심 분식집 (협동 시리즈 1화) — 화 색: 주황 · 나무 · 크림 ── */
     .er-hero.is-kitchen { background: radial-gradient(120% 90% at 85% 0%, #f59e0b 0%, rgba(245, 158, 11, 0) 55%), linear-gradient(160deg, #431407, #9a3412); }
-    .ks-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-    .ks-stat { display: flex; align-items: baseline; gap: 6px; padding: 8px 12px; border-radius: 12px; background: #fff7ed; font-size: 13px; font-weight: 700; color: #9a3412; }
-    .ks-stat b { font-size: 18px; color: #431407; font-variant-numeric: tabular-nums; }
-    .ks-hearts { letter-spacing: 2px; color: #ef4444; font-size: 16px; }
-    .ks-hearts .is-off { color: #fecaca; }
-    .ks-sec { margin-top: 14px; }
-    .ks-sec:first-child { margin-top: 0; }
-    .ks-sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 14px; font-weight: 800; color: #475569; }
-    .ks-sec h3 small { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--text-muted); }
-    .ks-row { display: flex; flex-wrap: wrap; gap: 8px; }
-    .ks-dish { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px 4px 4px; border-radius: 999px; background: #fff; border: 1px solid #e2e8f0; font-size: 13px; font-weight: 700; }
-    .ks-dish i { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: #fff; font-style: normal; font-size: 11.5px; font-weight: 800; }
-    .ks-dish.is-ok { border-color: #86efac; background: #f0fdf4; }
-    .ks-dish.is-ok::after { content: "✓"; color: #16a34a; font-weight: 800; }
-    .ks-bar { position: relative; height: 6px; margin-top: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
-    .ks-bar span { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: #22c55e; }
+    .ks { --wood: #e7ad79; --wood-d: #c98552; --cream: #fff7ed; --ink: #431407; --steel: #e2e8f0; position: relative; overflow: hidden; overflow: clip; padding: 0; container: ks / inline-size; }
+    .ks h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 13.5px; font-weight: 800; color: #7c2d12; letter-spacing: -.01em; }
+    .ks h3 small { margin-left: auto; font-size: 12px; font-weight: 700; color: #b45309; font-variant-numeric: tabular-nums; }
+    .ks-svg { display: block; width: 100%; height: 100%; }
+
+    /* 머리 — 매출 · 하트 · 콤보 · 오늘의 메뉴 · (내리면) 남은 시간. 화면을 내려도 위에 붙어 있다(sticky — top 은 사이트 머리 높이) */
+    .ks-hud { position: sticky; top: var(--ks-stick, 0px); z-index: 6; display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; grid-template-areas: "money hearts combo today clock";
+      align-items: center; gap: 6px 14px; min-height: 62px; box-sizing: border-box; padding: 8px 14px; background: linear-gradient(180deg, #431407, #7c2d12); color: #fff7ed; transition: box-shadow .2s ease; }
+    .ks-hud.is-stuck { box-shadow: 0 6px 14px rgba(67, 20, 7, .28); }
+    .ks-money { grid-area: money; display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .ks-money .ks-coin { width: 30px; height: 30px; flex-shrink: 0; }
+    .ks-money b { display: block; font-size: 21px; font-weight: 900; line-height: 1.05; color: #fde68a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ks-money small, .ks-hearts small, .ks-combo small, .ks-today small, .ks-clock small { display: block; font-size: 11px; font-weight: 700; color: rgba(255, 237, 213, .72); white-space: nowrap; }
+    .ks-money.is-bump b { animation: ks-bump .45s ease; }
+    @keyframes ks-bump { 30% { transform: scale(1.18); color: #fff; } }
+    .ks-hearts { grid-area: hearts; display: flex; flex-direction: column; gap: 2px; }
+    .ks-hearts span { display: flex; gap: 2px; }
+    .ks-hearts svg { width: 17px; height: 17px; }
+    .ks-hearts.is-hurt span { animation: ks-shake .45s ease; }
+    @keyframes ks-shake { 20%, 60% { transform: translateX(-4px); } 40%, 80% { transform: translateX(4px); } }
+    .ks-combo { grid-area: combo; min-width: 0; }
+    .ks-combo__top { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+    .ks-combo__top b { font-size: 15px; font-weight: 900; color: #fff; }
+    .ks-combo__top em { font-style: normal; font-size: 12.5px; font-weight: 800; color: #fdba74; overflow: hidden; text-overflow: ellipsis; }
+    .ks-combo__segs { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; max-width: 170px; margin-top: 4px; }
+    .ks-combo__segs i { height: 7px; border-radius: 3px; background: rgba(255, 255, 255, .16); }
+    .ks-combo__segs i.is-on { background: linear-gradient(90deg, #fbbf24, #f97316); box-shadow: 0 0 8px rgba(251, 146, 60, .7); }
+    .ks-combo.is-hot .ks-combo__top b { color: #fde047; }
+    .ks-combo.is-pop .ks-combo__segs { animation: ks-bump .5s ease; }
+    .ks-today { grid-area: today; display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 6px; border: 1.5px dashed rgba(253, 186, 116, .55); border-radius: 12px; background: #1c1917; }
+    .ks-today .ks-dishi { width: 32px; height: 32px; }
+    .ks-today b { display: block; font-size: 13px; font-weight: 800; color: #fef3c7; white-space: nowrap; }
+    /* 남은 시간 — 위 막대의 시계가 화면 밖으로 나갔을 때만 */
+    .ks-clock { grid-area: clock; justify-self: end; display: none; min-width: 58px; padding: 3px 8px; border-radius: 10px; background: rgba(255, 255, 255, .1); text-align: center; }
+    .ks-clock b { display: block; font: 800 17px/1.15 ui-monospace, SFMono-Regular, Menlo, monospace; color: #fff; }
+    .ks-clock.is-low b { color: #fca5a5; }
+    .ks-hud.is-stuck .ks-clock { display: block; }
+    /* 점심 러시 — 머리 칸 오른쪽 아래에 걸린 띠(자리를 차지하지 않아 아래 버튼이 밀리지 않는다 · 눌러도 아래로 지나간다) */
+    .ks-rush { position: absolute; right: 14px; bottom: -14px; z-index: 2; display: none; align-items: center; gap: 6px; height: 22px; padding: 0 12px; border-radius: 999px;
+      font-size: 12.5px; font-weight: 900; color: #fff; white-space: nowrap; pointer-events: none; box-shadow: 0 2px 8px rgba(185, 28, 28, .45);
+      background: repeating-linear-gradient(135deg, #dc2626 0 10px, #ea580c 10px 20px); background-size: 28px 28px; animation: ks-stripe 1s linear infinite; }
+    .ks-hud.is-rush { box-shadow: inset 0 -3px 0 #ef4444; }
+    .ks-hud.is-rush.is-stuck { box-shadow: inset 0 -3px 0 #ef4444, 0 6px 14px rgba(67, 20, 7, .28); }
+    .ks-hud.is-rush .ks-rush { display: flex; }
+    .ks-rush b { font-variant-numeric: tabular-nums; }
+    @keyframes ks-stripe { to { background-position: 28px 0; } }
+
+    /* 소식 줄 — 사장님 전화 · 도움말. 높이가 늘 같다(글은 두 줄까지) — 말이 뜨고 사라져도 아래 버튼이 움직이지 않는다 */
+    .ks-news { position: relative; display: flex; align-items: center; gap: 10px; height: 60px; box-sizing: border-box; padding: 0 14px; overflow: hidden; background: #fff7ed; border-bottom: 1px solid #fed7aa; }
+    .ks-news__face { flex-shrink: 0; width: 40px; height: 40px; }
+    .ks-news__face svg { width: 40px; height: 40px; }
+    .ks-news__tip { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; line-height: 1.45; color: #9a3412; word-break: keep-all; }
+    .ks-news__tip i { flex-shrink: 0; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #ffedd5; color: #c2410c; font-style: normal; font-weight: 900; font-size: 13px; }
+    .ks-news__tip span, .ks-news__clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .ks-news__say { display: none; align-items: center; gap: 10px; min-width: 0; }
+    .ks-news.is-say .ks-news__tip { display: none; }
+    .ks-news.is-say .ks-news__say { display: flex; }
+    .ks-news__bub { position: relative; min-width: 0; padding: 5px 11px; border-radius: 12px; background: #fff; border: 1.5px solid #fb923c; font-size: 13.5px; font-weight: 600; line-height: 1.42; color: #431407; word-break: keep-all; }
+    .ks-news__who { display: inline-flex; align-items: center; gap: 3px; margin-right: 6px; font-size: 12px; font-weight: 800; color: #c2410c; white-space: nowrap; vertical-align: 1px; }
+    .ks-news__who em { display: inline-flex; align-items: center; gap: 2px; padding: 0 5px; border-radius: 999px; background: #ffedd5; font-style: normal; font-size: 10.5px; line-height: 16px; }
+    .ks-news__bub::before { content: ""; position: absolute; left: -7px; top: 50%; width: 10px; height: 10px; margin-top: -5px; background: #fff; border-left: 1.5px solid #fb923c; border-bottom: 1.5px solid #fb923c; transform: rotate(45deg); }
+    .ks-news.is-say.is-new .ks-news__say { animation: ks-in .35s ease both; }
+    .ks-news.is-shop .ks-news__bub { border-color: #dc2626; }
+    .ks-news.is-shop .ks-news__who { color: #dc2626; }
+    .ks-news.is-shop .ks-news__bub::before { border-color: #dc2626; }
+    .ks-megaphone { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: #dc2626; color: #fff; }
+    @keyframes ks-in { from { opacity: 0; transform: translateY(-6px); } }
+
+    /* 장면 공통 */
+    .ks-scene { display: grid; gap: 12px; padding: 14px; }
+    .ks-scene--hall { background: repeating-linear-gradient(90deg, #f6dcc0 0 46px, #f1d2b1 46px 48px), #f6dcc0; }
+    .ks-scene--kitchen { background-color: #f8fafc; background-image: linear-gradient(#e2e8f0 1.5px, transparent 1.5px), linear-gradient(90deg, #e2e8f0 1.5px, transparent 1.5px); background-size: 28px 28px; }
+    .ks-panel { min-width: 0; padding: 10px; border-radius: 16px; background: rgba(255, 255, 255, .86); box-shadow: 0 1px 0 rgba(67, 20, 7, .06), 0 6px 16px rgba(67, 20, 7, .06); }
+    .ks-empty { display: grid; place-items: center; flex: 1; min-height: 72px; padding: 8px; border: 1.5px dashed #fdba74; border-radius: 14px; font-size: 13px; font-weight: 600; color: #b45309; text-align: center; word-break: keep-all; }
+
+    /* 막대(기다림 · 익는 정도) */
+    .ks-bar { position: relative; height: 7px; margin-top: 6px; border-radius: 999px; background: rgba(15, 23, 42, .1); overflow: hidden; }
+    .ks-bar span { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: #22c55e; transition: background-color .3s ease; }
     .ks-bar.is-warn span { background: #f59e0b; }
     .ks-bar.is-bad span { background: #ef4444; }
-    .ks-queue { display: flex; gap: 8px; min-height: 76px; }
-    .ks-guest { width: 92px; padding: 10px 8px 8px; border: 1.5px solid #fed7aa; border-radius: 14px; background: #fffbeb; text-align: center; font: inherit; cursor: pointer; }
-    .ks-guest:hover { border-color: #f59e0b; }
-    .ks-guest:disabled { cursor: not-allowed; opacity: .6; }
-    .ks-guest b { display: block; font-size: 22px; line-height: 1; }
-    .ks-guest small { display: block; margin-top: 4px; font-size: 11.5px; font-weight: 700; color: #92400e; }
-    .ks-empty { display: grid; place-items: center; flex: 1; min-height: 70px; border: 1.5px dashed #e2e8f0; border-radius: 14px; font-size: 13px; color: var(--text-muted); }
+    .ks-bar.is-eat span { background: #fb923c; }
+
+    /* 음식 그림 */
+    .ks-dishi { display: inline-block; width: 30px; height: 30px; flex-shrink: 0; }
+    .ks-items { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
+    .ks-it { position: relative; display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; }
+    .ks-it .ks-dishi { width: 28px; height: 28px; }
+    .ks-it.is-ok { background: #dcfce7; }
+    .ks-it.is-ok::after { content: "✓"; position: absolute; right: -3px; top: -4px; display: grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 10px; font-weight: 900; }
+    .ks-it.is-cook { background: #ffedd5; }
+    .ks-it.is-cook::after { content: ""; position: absolute; right: -2px; top: -3px; width: 11px; height: 11px; border-radius: 50%; background: #f97316; box-shadow: 0 0 0 2px #fff; animation: ks-blink 1s ease-in-out infinite; }
+    .ks-it.is-today::before { content: "+"; position: absolute; left: -3px; bottom: -4px; display: grid; place-items: center; width: 14px; height: 14px; border-radius: 50%; background: #7c2d12; color: #fde68a; font-size: 10px; font-weight: 900; }
+    @keyframes ks-blink { 50% { opacity: .35; } }
+
+    /* 손님(그림) — 기분은 data-mood 로 바꾼다 */
+    .cu { display: block; width: 52px; height: 58px; overflow: visible; }
+    .cu .m0, .cu .m1, .cu .m2, .cu .m3, .cu .me { display: none; }
+    .cu[data-mood="0"] .m0, .cu[data-mood="1"] .m1, .cu[data-mood="2"] .m2, .cu[data-mood="3"] .m3, .cu[data-mood="eat"] .me { display: inline; }
+    .cu[data-mood="3"] { animation: ks-shake .6s ease-in-out infinite; }
+    .cu[data-mood="eat"] .cu__head { animation: ks-nom .5s ease-in-out infinite alternate; transform-origin: 32px 46px; }
+    @keyframes ks-nom { to { transform: rotate(3deg) translateY(1px); } }
+
+    /* 배식구(홀 · 주방 같이) — 왼쪽 이름표 · 오른쪽 선반(열등 아래) */
+    .ks-window { position: relative; display: flex; align-items: stretch; gap: 0; min-height: 68px; border-radius: 16px; background: #f1f5f9; box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .1); overflow: hidden; }
+    .ks-window__label { flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; width: 84px; padding: 0 10px; background: linear-gradient(180deg, #334155, #1e293b); color: #f8fafc; }
+    .ks-window__label b { display: flex; align-items: center; gap: 5px; font-size: 13.5px; font-weight: 800; white-space: nowrap; }
+    .ks-window__label small { font-size: 12px; font-weight: 700; color: #cbd5e1; font-variant-numeric: tabular-nums; }
+    .ks-window__label small.is-full { color: #fca5a5; }
+    .ks-window__label em { font-style: normal; }
+    .ks-window__ic { display: inline-flex; }
+    .ks-window__in { position: relative; flex: 1; min-width: 0; padding: 10px 10px 0; background: linear-gradient(180deg, rgba(251, 146, 60, .16), rgba(251, 146, 60, 0) 26px), #f8fafc; }
+    .ks-lamps { position: absolute; right: 16px; top: 0; display: flex; gap: 26px; pointer-events: none; }
+    .ks-lamps i { position: relative; width: 16px; height: 6px; border-radius: 0 0 8px 8px; background: #64748b; }
+    .ks-lamps i::after { content: ""; position: absolute; left: 50%; top: 6px; width: 30px; height: 16px; margin-left: -15px; background: linear-gradient(180deg, rgba(251, 191, 36, .32), rgba(251, 191, 36, 0)); clip-path: polygon(35% 0, 65% 0, 100% 100%, 0 100%); }
+    .ks-window.is-ring { animation: ks-ring 1s ease; }
+    @keyframes ks-ring { 0%, 100% { box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .1); } 15%, 55% { box-shadow: inset 0 0 0 3px #facc15, 0 0 0 4px rgba(250, 204, 21, .35), 0 0 28px rgba(250, 204, 21, .6); } }
+    .ks-shelf { position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px; min-height: 46px; padding: 0 2px 4px; border-bottom: 6px solid #94a3b8; }
+    .ks-shelf__item { position: relative; display: grid; place-items: center; width: 46px; height: 46px; padding: 0; border: 0; border-radius: 12px; background: #fff; box-shadow: 0 2px 0 rgba(15, 23, 42, .12); cursor: pointer; }
+    .ks-shelf__item .ks-dishi { width: 38px; height: 38px; }
+    .ks-shelf__item:hover { box-shadow: 0 0 0 2px #fca5a5; }
+    .ks-shelf__item.is-new { animation: ks-drop .4s cubic-bezier(.3, 1.6, .5, 1) both; }
+    @keyframes ks-drop { from { transform: translateY(-14px); opacity: 0; } }
+    .ks-shelf__empty { align-self: center; padding-bottom: 6px; font-size: 13px; font-weight: 600; color: #64748b; word-break: keep-all; }
+    .ks-ding { position: absolute; right: 10px; bottom: 14px; z-index: 1; display: none; padding: 2px 10px; border-radius: 999px; background: #facc15; color: #422006; font-size: 13px; font-weight: 900; box-shadow: 0 2px 8px rgba(161, 98, 7, .35); }
+    .ks-window.is-ring .ks-ding { display: block; animation: ks-in .3s ease both; }
+
+    /* 홀 — 테이블(넓으면 손님 옆에 주문 말풍선, 좁으면 위에) */
     .ks-tables { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-    .ks-table { display: flex; flex-direction: column; min-height: 168px; padding: 12px; border: 1.5px solid var(--border-default); border-radius: 14px; background: #f8fafc; }
-    .ks-table__n { font-size: 12px; font-weight: 800; color: #94a3b8; }
-    .ks-table__body { flex: 1; margin-top: 6px; }
-    .ks-table__state { font-size: 14px; font-weight: 700; color: #64748b; }
-    .ks-table .ks-row { gap: 5px; }
-    .ks-table .hk-btn { width: 100%; margin-top: 8px; padding-left: 8px; padding-right: 8px; }
-    .ks-table.is-wait { border-color: #fdba74; background: #fff; }
-    .ks-table.is-ready { border-color: #22c55e; box-shadow: 0 0 0 3px rgba(34, 197, 94, .15); }
-    .ks-table.is-dirty { background: #f1f5f9; }
-    .ks-sent { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: #16a34a; text-align: center; }
-    .ks-pass { display: flex; flex-wrap: wrap; gap: 6px; min-height: 40px; padding: 8px; border-radius: 12px; background: #fff7ed; border: 1px dashed #fdba74; }
-    .ks-pass .ks-dish { padding-right: 4px; }
-    .ks-toss { display: inline-grid; place-items: center; width: 20px; height: 20px; margin-left: 2px; padding: 0; border: 0; border-radius: 50%; background: #f1f5f9; color: #64748b; font: inherit; font-size: 12px; cursor: pointer; }
-    .ks-tickets { display: flex; flex-direction: column; gap: 8px; }
-    .ks-ticket { padding: 10px 12px; border-left: 4px solid #f59e0b; border-radius: 10px; background: #fffbeb; }
-    .ks-ticket__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13px; font-weight: 800; }
-    .ks-burners { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-    .ks-burner { position: relative; padding: 12px; border-radius: 16px; background: #1f2937; color: #f8fafc; min-height: 150px; }
-    .ks-burner__ring { display: grid; place-items: center; width: 64px; height: 64px; margin: 2px auto 8px; border-radius: 50%; border: 5px solid #4b5563; font-size: 13px; font-weight: 800; }
-    .ks-burner.is-cook .ks-burner__ring { border-color: #f97316; box-shadow: 0 0 18px rgba(249, 115, 22, .55); }
-    .ks-burner.is-done .ks-burner__ring { border-color: #22c55e; box-shadow: 0 0 18px rgba(34, 197, 94, .6); }
-    .ks-burner.is-burn .ks-burner__ring { border-color: #111827; background: #111827; color: #9ca3af; }
-    .ks-burner__label { text-align: center; font-size: 13px; font-weight: 700; color: #cbd5e1; }
-    .ks-burner .ks-bar { background: #374151; }
-    .ks-burner__pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
-    .ks-burner__pick button, .ks-burner__go { padding: 9px 4px; border: 0; border-radius: 10px; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
-    .ks-burner__pick button { background: #374151; color: #f8fafc; white-space: nowrap; }
-    .ks-burner__pick button:hover { background: #4b5563; }
-    .ks-burner__go { width: 100%; margin-top: 8px; background: #22c55e; color: #052e16; }
-    .ks-burner.is-burn .ks-burner__go { background: #6b7280; color: #fff; }
-    .ks-burner.is-cook .ks-burner__go { background: #374151; color: #94a3b8; cursor: default; }
-    .ks-gimbap { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: #f0fdf4; }
-    .ks-steps { display: flex; gap: 4px; flex: 1; }
-    .ks-steps span { flex: 1; padding: 6px 2px; border-radius: 8px; background: #dcfce7; text-align: center; font-size: 11.5px; font-weight: 700; color: #166534; word-break: keep-all; }
-    .ks-steps span.is-done { background: #16a34a; color: #fff; }
-    .ks-roll { flex-shrink: 0; min-width: 104px; }
-    .ks-note { margin-top: 8px; font-size: 12.5px; color: var(--text-muted); word-break: keep-all; }
+    .ks-table { position: relative; display: flex; flex-direction: column; align-items: stretch; min-width: 0; padding: 6px 8px 8px; border: 2px solid rgba(255, 255, 255, .6); border-radius: 16px; background: rgba(255, 255, 255, .55); transition: border-color .2s ease, background .2s ease; }
+    .ks-table__top { display: flex; align-items: center; gap: 6px; min-width: 0; height: 22px; }
+    .ks-table__n { flex-shrink: 0; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: #7c2d12; color: #fff7ed; font-size: 12px; font-weight: 900; }
+    .ks-table__tag { min-width: 0; font-size: 12px; font-weight: 800; color: #9a3412; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ks-table .ks-star { top: -9px; right: -7px; }
+    .ks-table__mid { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 4px 8px; min-height: 64px; }
+    .ks-table__bub { position: relative; min-height: 40px; padding: 3px; border-radius: 12px; background: #fff; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); display: grid; place-items: center; }
+    .ks-table__bub::after { content: ""; position: absolute; left: -5px; top: 50%; width: 10px; height: 10px; margin-top: -5px; background: #fff; transform: rotate(45deg); box-shadow: -1px 1px 1px rgba(15, 23, 42, .08); }
+    .ks-table__bub.is-blank { visibility: hidden; }
+    .ks-table__bub.is-say { padding: 3px 6px; font-size: 12px; font-weight: 800; color: #c2410c; text-align: center; line-height: 1.3; }
+    .ks-table__stage { position: relative; display: flex; flex-direction: column; align-items: center; }
+    .ks-table__stage .cu { width: 46px; height: 50px; margin-bottom: -8px; }
+    .ks-desk { position: relative; width: 100%; height: 22px; }
+    .ks-desk::before { content: ""; position: absolute; left: 2%; right: 2%; top: 4px; height: 9px; border-radius: 6px; background: linear-gradient(180deg, var(--wood), var(--wood-d)); box-shadow: 0 3px 0 #a16207; }
+    .ks-desk::after { content: ""; position: absolute; left: 14%; right: 14%; top: 13px; height: 9px; background: linear-gradient(90deg, #a16207 0 5px, transparent 5px calc(100% - 5px), #a16207 calc(100% - 5px)); }
+    .ks-desk__on { position: absolute; left: 0; right: 0; top: -15px; display: flex; justify-content: center; gap: 0; z-index: 1; }
+    .ks-desk__on .ks-dishi { width: 24px; height: 24px; }
+    .ks-desk__on.is-dirty { filter: grayscale(1) opacity(.7); }
+    .ks-chair { width: 32px; height: 32px; margin-bottom: -8px; border-radius: 10px 10px 4px 4px; background: linear-gradient(180deg, #fb923c, #ea580c); opacity: .55; }
+    .ks-table .ks-btn, .ks-table .ks-sent, .ks-table .ks-hint { margin-top: 6px; }
+    .ks-table.is-wait { background: #fff; border-color: #fed7aa; }
+    .ks-table.is-ready { border-color: #22c55e; box-shadow: 0 0 0 4px rgba(34, 197, 94, .18); }
+    .ks-table.is-vip { background: linear-gradient(180deg, #fffbeb, #fff); border-color: #facc15; }
+    .ks-table.is-vip.is-ready { border-color: #22c55e; }
+    .ks-table.is-eat { background: rgba(255, 255, 255, .8); }
+    .ks-table.is-dirty .ks-table__tag, .ks-table.is-empty .ks-table__tag { color: #78716c; }
+    .ks-crumbs { position: absolute; left: 30%; top: 0; width: 40%; height: 6px; background: radial-gradient(circle, #a8a29e 1.2px, transparent 1.6px) 0 0 / 7px 6px; }
+    .ks-sent { display: flex; align-items: center; justify-content: center; gap: 4px; min-height: 40px; border-radius: 12px; background: #f0fdf4; font-size: 12.5px; font-weight: 800; color: #15803d; text-align: center; white-space: nowrap; }
+    .ks-hint { display: flex; align-items: center; justify-content: center; min-height: 40px; font-size: 12.5px; font-weight: 800; color: #b45309; text-align: center; white-space: nowrap; }
+    .ks-eatlabel { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 40px; margin-top: 6px; border-radius: 12px; background: #fff7ed; font-size: 13px; font-weight: 900; color: #c2410c; text-align: center; white-space: nowrap; line-height: 1.2; }
+    .ks-eatlabel small { font-size: 11px; font-weight: 700; color: #b45309; }
+
+    /* 버튼 */
+    .ks-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 100%; min-height: 40px; padding: 6px 8px; border: 0; border-radius: 12px; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; white-space: nowrap; transition: transform .08s ease, filter .15s ease; -webkit-tap-highlight-color: transparent; }
+    .ks-btn:active:not(:disabled) { transform: translateY(1px) scale(.98); }
+    .ks-btn:disabled { cursor: not-allowed; }
+    .ks-btn.is-send { background: #fff7ed; color: #c2410c; box-shadow: inset 0 0 0 1.5px #fdba74; }
+    .ks-btn.is-send:hover { background: #ffedd5; }
+    .ks-btn.is-go { background: #16a34a; color: #fff; box-shadow: 0 3px 0 #15803d; }
+    .ks-btn.is-go:hover { filter: brightness(1.06); }
+    .ks-btn.is-wait { background: #f1f5f9; color: #94a3b8; }
+    .ks-btn.is-clean { background: #e0f2fe; color: #0369a1; box-shadow: inset 0 0 0 1.5px #7dd3fc; }
+    .ks-btn.is-busy { opacity: .6; pointer-events: none; }
+
+    /* 홀 — 문 앞(줄) · 포장대 */
+    .ks-front { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 10px; }
+    .ks-door { background: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 247, 237, .9)); }
+    .ks-front h3 { margin-bottom: 6px; }
+    .ks-queue { display: flex; gap: 6px; min-height: 92px; }
+    .ks-guest { position: relative; display: flex; flex-direction: column; align-items: center; flex: 1 1 0; min-width: 0; max-width: 92px; padding: 4px 3px 5px; border: 2px solid #fed7aa; border-radius: 14px; background: #fff; font: inherit; color: inherit; cursor: pointer; transition: transform .12s ease, border-color .15s ease; -webkit-tap-highlight-color: transparent; }
+    .ks-guest:hover:not(:disabled) { border-color: #f97316; transform: translateY(-2px); }
+    .ks-guest:disabled { cursor: not-allowed; }
+    .ks-guest:disabled .cu { opacity: .8; }
+    .ks-guest .cu { width: 40px; height: 44px; }
+    .ks-guest__cnt { margin-top: 1px; font-size: 11.5px; font-weight: 800; color: #9a3412; white-space: nowrap; }
+    .ks-guest__go { font-size: 11px; font-weight: 800; color: #16a34a; white-space: nowrap; }
+    .ks-guest:disabled .ks-guest__go { color: #94a3b8; }
+    .ks-guest .ks-bar { width: 100%; margin-top: 3px; }
+    .ks-guest.is-vip { border-color: #facc15; background: linear-gradient(180deg, #fefce8, #fff); }
+    .ks-guest.is-new, .ks-togo.is-walk { animation: ks-walk .5s ease both; }
+    @keyframes ks-walk { from { opacity: 0; transform: translateX(-18px); } }
+    .ks-star { position: absolute; right: -6px; top: -9px; z-index: 1; display: grid; place-items: center; height: 18px; padding: 0 5px; border-radius: 999px; background: #facc15; color: #713f12; font-size: 10.5px; font-weight: 900; white-space: nowrap; }
+    .ks-counter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+    .ks-togo { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 5px 6px 6px; border-radius: 14px; background: #fff; border: 2px solid #c4b5fd; }
+    .ks-togo__row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+    .ks-togo .cu { flex-shrink: 0; width: 38px; height: 42px; }
+    .ks-togo .ks-items { flex: 1; min-width: 0; min-height: 30px; align-content: center; }
+    .ks-togo .ks-bar { width: 100%; margin-top: 4px; }
+    .ks-togo.is-ready { border-color: #22c55e; box-shadow: 0 0 0 4px rgba(34, 197, 94, .18); }
+    .ks-togo .ks-btn, .ks-togo .ks-sent { margin-top: 5px; }
+    .ks-togo__tag { position: absolute; left: 6px; top: -9px; padding: 0 6px; border-radius: 999px; background: #ede9fe; color: #6d28d9; font-size: 10.5px; font-weight: 900; line-height: 17px; box-shadow: 0 0 0 1.5px #fff; }
+    .ks-slot { display: grid; place-items: center; min-height: 92px; border: 1.5px dashed #c4b5fd; border-radius: 14px; background: rgba(245, 243, 255, .6); font-size: 12px; font-weight: 700; color: #7c3aed; text-align: center; word-break: keep-all; padding: 6px; }
+
+    /* 주방 — 주문서 */
+    .ks-tickets { position: relative; display: grid; grid-template-columns: repeat(auto-fill, minmax(126px, 1fr)); gap: 8px; padding-top: 14px; }
+    .ks-tickets::before { content: ""; position: absolute; left: -2px; right: -2px; top: 0; height: 6px; border-radius: 3px; background: linear-gradient(180deg, #cbd5e1, #94a3b8); }
+    .ks-ticket { position: relative; min-width: 0; padding: 12px 8px 8px; border-radius: 4px 4px 12px 12px; background: #fffdf5; box-shadow: 0 2px 6px rgba(15, 23, 42, .12); text-align: center; }
+    .ks-ticket::before { content: ""; position: absolute; left: 50%; top: -10px; width: 18px; height: 14px; margin-left: -9px; border-radius: 3px; background: #64748b; }
+    .ks-ticket__head { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 4px; font-size: 12.5px; font-weight: 900; color: #431407; white-space: nowrap; }
+    .ks-ticket__head .ks-star { position: static; }
+    .ks-ticket.is-togo { background: #faf5ff; }
+    .ks-ticket.is-togo .ks-ticket__head { color: #6d28d9; }
+    .ks-ticket.is-vip { background: #fefce8; box-shadow: 0 0 0 2px #facc15, 0 2px 6px rgba(15, 23, 42, .12); }
+    .ks-ticket.is-ready { box-shadow: 0 0 0 2px #22c55e, 0 2px 6px rgba(15, 23, 42, .12); }
+    .ks-ticket.is-new { animation: ks-drop .45s cubic-bezier(.3, 1.6, .5, 1) both; }
+    .ks-ticket__ready { margin-top: 4px; font-size: 11.5px; font-weight: 800; color: #15803d; }
+    .ks-ticket.is-urgent .ks-ticket__head::after { content: "급해요"; padding: 0 5px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 10.5px; line-height: 16px; }
+    .ks-rail h3 small.is-wait { padding: 1px 8px; border-radius: 999px; background: #ffedd5; color: #c2410c; }
+
+    /* 주방 — 화구 */
+    .ks-line { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 12px; }
+    .ks-stove { padding: 10px; border-radius: 18px; background: linear-gradient(180deg, #374151, #1f2937); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .08); }
+    .ks-stove h3 { color: #f8fafc; }
+    .ks-stove h3 small { color: #cbd5e1; }
+    .ks-burners { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .ks-burner { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 8px 6px 8px; border-radius: 14px; background: #111827; color: #e5e7eb; --p: 0; }
+    .ks-burner__ring { position: relative; display: grid; place-items: center; width: 92px; height: 92px; border-radius: 50%;
+      background: conic-gradient(var(--ring, #f97316) calc(var(--p) * 360deg), rgba(255, 255, 255, .08) 0); }
+    .ks-burner__ring::before { content: ""; position: absolute; inset: 6px; border-radius: 50%; background: radial-gradient(circle at 50% 60%, #374151, #111827 70%); }
+    .ks-burner__pot { position: relative; z-index: 1; display: grid; place-items: center; width: 60px; height: 60px; }
+    .ks-burner__pot .ks-dishi { width: 56px; height: 56px; }
+    .ks-burner__pot.is-empty { width: 54px; height: 54px; border-radius: 50%; border: 4px solid #4b5563; box-sizing: border-box; }
+    .ks-flames { position: absolute; left: 50%; bottom: 4px; z-index: 0; display: flex; gap: 3px; transform: translateX(-50%); }
+    .ks-flames i { width: 9px; height: 15px; border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%; background: linear-gradient(0deg, #2563eb, #60a5fa 40%, #fde68a); opacity: .9; animation: ks-flame .35s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+    .ks-flames i:nth-child(2) { animation-delay: .12s; height: 18px; }
+    .ks-flames i:nth-child(3) { animation-delay: .22s; }
+    @keyframes ks-flame { to { transform: scaleY(.72) translateY(1px); opacity: .7; } }
+    .ks-steam { position: absolute; left: 50%; top: -6px; z-index: 2; width: 60px; height: 40px; margin-left: -30px; pointer-events: none; }
+    .ks-steam i { position: absolute; bottom: 0; width: 12px; height: 12px; border-radius: 50%; background: rgba(255, 255, 255, .55); filter: blur(2px); animation: ks-steam 1.6s ease-in infinite; }
+    .ks-steam i:nth-child(1) { left: 12px; }
+    .ks-steam i:nth-child(2) { left: 26px; animation-delay: .5s; }
+    .ks-steam i:nth-child(3) { left: 38px; animation-delay: 1s; }
+    @keyframes ks-steam { from { transform: translateY(10px) scale(.6); opacity: 0; } 30% { opacity: .9; } to { transform: translateY(-26px) scale(1.4); opacity: 0; } }
+    .ks-burner.is-done .ks-burner__ring { --ring: #22c55e; animation: ks-glow 1s ease-in-out infinite alternate; }
+    @keyframes ks-glow { to { box-shadow: 0 0 22px rgba(34, 197, 94, .55); } }
+    .ks-burner.is-warn .ks-burner__ring { --ring: #ef4444; animation: ks-glow-r .4s ease-in-out infinite alternate; }
+    @keyframes ks-glow-r { to { box-shadow: 0 0 22px rgba(239, 68, 68, .75); } }
+    .ks-burner.is-warn .ks-steam i, .ks-burner.is-burn .ks-steam i { background: rgba(71, 85, 105, .9); }
+    .ks-burner.is-burn .ks-burner__pot .ks-dishi { filter: brightness(.25) saturate(0); }
+    .ks-burner.is-burn .ks-burner__ring { --ring: #475569; }
+    .ks-burner__label { min-height: 18px; margin-top: 4px; font-size: 12.5px; font-weight: 800; color: #cbd5e1; white-space: nowrap; }
+    .ks-burner.is-done .ks-burner__label { color: #86efac; }
+    .ks-burner.is-warn .ks-burner__label { color: #fca5a5; }
+    .ks-burner .ks-btn { margin-top: 6px; }
+    .ks-burner .ks-btn.is-go { box-shadow: 0 3px 0 #14532d; }
+    .ks-burner .ks-btn.is-wait { background: #1f2937; color: #6b7280; }
+    .ks-burner .ks-btn.is-trash { background: #475569; color: #fff; }
+    .ks-pick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; width: 100%; margin-top: 6px; }
+    .ks-pick button { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; min-height: 52px; padding: 3px 0 4px; border: 0; border-radius: 10px; background: #374151; color: #f8fafc; font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+    .ks-pick button:hover { background: #4b5563; }
+    .ks-pick button.is-need { background: #9a3412; box-shadow: inset 0 0 0 1.5px #fdba74; }
+    .ks-pick .ks-dishi { width: 28px; height: 28px; }
+    .ks-burner.is-busy .ks-pick, .ks-burner.is-busy .ks-btn { opacity: .55; pointer-events: none; }
+
+    /* 주방 — 김밥 · 벨 */
+    .ks-side { display: grid; gap: 10px; align-content: start; }
+    .ks-gimbap { text-align: center; }
+    .ks-mat { position: relative; height: 62px; margin: 0 auto 6px; max-width: 150px; border-radius: 10px; background: repeating-linear-gradient(90deg, #a3a83a 0 7px, #c5c96b 7px 9px); box-shadow: inset 0 0 0 2px rgba(0, 0, 0, .08); }
+    .ks-mat svg { position: absolute; inset: 6px; width: calc(100% - 12px); height: calc(100% - 12px); }
+    .ks-mat.is-step { animation: ks-bump .3s ease; }
+    .ks-dots { display: flex; justify-content: center; gap: 5px; margin-bottom: 6px; }
+    .ks-dots i { width: 22px; height: 6px; border-radius: 3px; background: #d1fae5; }
+    .ks-dots i.is-on { background: #16a34a; }
+    .ks-gimbap .ks-btn { background: #16a34a; color: #fff; box-shadow: 0 3px 0 #15803d; min-height: 44px; }
+    .ks-q { position: absolute; right: 6px; top: -8px; padding: 0 6px; border-radius: 999px; background: #fde68a; color: #713f12; font-style: normal; font-size: 11px; font-weight: 900; line-height: 17px; box-shadow: 0 0 0 1.5px #fff; }
+    .ks-q[hidden] { display: none; }
+    .ks-bell { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 56px; padding: 6px 10px; border: 0; border-radius: 16px; background: linear-gradient(180deg, #fde68a, #f59e0b); color: #422006; font: inherit; font-size: 15px; font-weight: 900; box-shadow: 0 4px 0 #b45309; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .ks-bell svg { width: 34px; height: 34px; transform-origin: 50% 10%; }
+    .ks-bell:active { transform: translateY(2px); box-shadow: 0 2px 0 #b45309; }
+    .ks-bell.is-ring svg { animation: ks-swing .6s ease; }
+    .ks-bell.is-hint { animation: ks-pulse 1.2s ease-in-out infinite; }
+    @keyframes ks-swing { 20% { transform: rotate(18deg); } 45% { transform: rotate(-14deg); } 70% { transform: rotate(8deg); } }
+    @keyframes ks-pulse { 50% { box-shadow: 0 4px 0 #b45309, 0 0 0 6px rgba(250, 204, 21, .45); } }
+    .ks-bell small { display: block; font-size: 11px; font-weight: 700; color: #78350f; }
+
+    /* 떠다니는 효과(동전 · 콤보 · 놓침) — 화면을 다시 그려도 끊기지 않게 body 아래에 둔다 */
+    #ks-fx { position: absolute; left: 0; top: 0; width: 0; height: 0; z-index: 80; pointer-events: none; }
+    .ks-float { position: absolute; transform: translate(-50%, 0); padding: 3px 10px; border-radius: 999px; font-size: 15px; font-weight: 900; white-space: nowrap; animation: ks-float 1.4s ease-out forwards; }
+    .ks-float.is-coin { background: #fde68a; color: #713f12; box-shadow: 0 3px 10px rgba(180, 83, 9, .35); }
+    .ks-float.is-coin small { margin-left: 4px; font-size: 11.5px; color: #b45309; }
+    .ks-float.is-combo { background: #f97316; color: #fff; font-size: 16px; box-shadow: 0 3px 12px rgba(234, 88, 12, .45); }
+    .ks-float.is-miss { background: #fee2e2; color: #b91c1c; }
+    .ks-float.is-break { background: #334155; color: #e2e8f0; font-size: 13px; }
+    .ks-float.is-bell { background: #facc15; color: #422006; font-size: 18px; }
+    @keyframes ks-float { 0% { opacity: 0; transform: translate(-50%, 6px) scale(.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } 30% { transform: translate(-50%, -6px) scale(1); } 100% { opacity: 0; transform: translate(-50%, -48px); } }
+    #ks-flash { position: fixed; inset: 0; z-index: 79; pointer-events: none; background: radial-gradient(80% 60% at 50% 30%, rgba(250, 204, 21, 0), rgba(250, 204, 21, .32)); animation: ks-flash .8s ease-out forwards; }
+    #ks-flash.is-miss { background: radial-gradient(80% 60% at 50% 40%, rgba(239, 68, 68, 0), rgba(239, 68, 68, .22)); }
+    @keyframes ks-flash { from { opacity: 1; } to { opacity: 0; } }
+
+    /* 가게 소식(옆 칸) */
     .ks-feed { margin: 0; padding: 0; list-style: none; font-size: 13px; color: #475569; }
-    .ks-feed li { padding: 5px 0; border-bottom: 1px solid #f1f5f9; }
+    .ks-feed li { display: flex; gap: 6px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; line-height: 1.45; word-break: keep-all; }
     .ks-feed li:last-child { border-bottom: 0; }
-    .er-end.is-kitchen { background: linear-gradient(160deg, #9a3412, #f59e0b); }
-    .ks-end-stats { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-    .ks-end-stats span { padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, .18); font-size: 13.5px; font-weight: 700; }
+    .ks-feed li i { flex-shrink: 0; width: 18px; font-style: normal; text-align: center; }
+    .ks-feed li.is-pay { color: #9a3412; font-weight: 700; }
+    .ks-feed li.is-miss, .ks-feed li.is-burn { color: #b91c1c; }
+    .ks-feed li.is-say { color: #431407; }
+
+    /* 대기실 — 이렇게 해요 */
+    .ks-role__head { font-size: 14px; font-weight: 600; color: var(--ch-ink, #7c2d12); }
+    .ks-role__head b { font-weight: 900; }
+    .ks-flow { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; counter-reset: st; }
+    .ks-flow li { position: relative; display: flex; align-items: center; gap: 7px; min-width: 0; padding: 9px 8px 9px 10px; border-radius: 12px; background: #fff; text-align: left; }
+    .ks-flow li .ks-dishi, .ks-flow li .cu, .ks-flow li > span:first-child { flex-shrink: 0; width: 32px !important; height: 32px !important; }
+    .ks-flow li > span:last-child { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0; }
+    .ks-flow li b { font-size: 13px; font-weight: 900; color: #431407; }
+    .ks-flow li small { font-size: 11.5px; line-height: 1.35; color: #78350f; word-break: keep-all; }
+    .ks-flow li::before { counter-increment: st; content: counter(st); position: absolute; left: 3px; top: 3px; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: var(--ch-accent, #f97316); color: #fff; font-size: 10.5px; font-weight: 900; }
+    .ks-how { padding: 12px; border-radius: 14px; background: #fffbeb; border: 1px solid #fde68a; }
+    .ks-how h4 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 14px; font-weight: 900; color: #78350f; }
+    .ks-rules { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .ks-rules li { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 8px; border-radius: 10px; background: #fff; font-size: 12px; line-height: 1.35; color: #57534e; word-break: keep-all; }
+    .ks-rules li > i { flex-shrink: 0; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; font-style: normal; font-size: 13px; font-weight: 900; }
+    .ks-rules li b { display: block; font-size: 12.5px; color: #292524; }
+
+    /* 끝 카드 */
+    .er-end.is-kitchen { position: relative; overflow: hidden; background: linear-gradient(160deg, #7c2d12, #ea580c 60%, #f59e0b); text-shadow: 0 1px 2px rgba(67, 20, 7, .35); }
+    .er-end.is-kitchen.is-great { background: radial-gradient(90% 70% at 50% 0%, #fde68a 0%, rgba(253, 230, 138, 0) 60%), linear-gradient(160deg, #9a3412, #f97316 55%, #f59e0b); }
+    .er-end.is-kitchen .ks-endsub span { background: rgba(67, 20, 7, .22); }
+    .er-end.is-kitchen.is-low { background: linear-gradient(160deg, #44403c, #78716c); }
+    .ks-endart { display: flex; justify-content: center; align-items: flex-end; gap: 4px; margin: 0 auto 8px; }
+    .ks-endart .ks-dishi { width: 44px; height: 44px; filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .25)); }
+    .ks-endart .ks-dishi:nth-child(2) { width: 56px; height: 56px; }
+    .ks-endart .ks-coin { width: 40px; height: 40px; }
+    .ks-endsub { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .ks-endsub span { padding: 5px 12px; border-radius: 999px; background: rgba(255, 255, 255, .18); font-size: 13px; font-weight: 700; }
+
+    /* 넓은 장면 — 빈 자리 · 다 먹은 자리는 의자 · 탁자를 가운데에 */
+    @container ks (min-width: 601px) {
+      .ks-table.is-empty .ks-table__mid, .ks-table.is-dirty .ks-table__mid { grid-template-columns: 96px; justify-content: center; }
+      .ks-table.is-empty .ks-table__bub, .ks-table.is-dirty .ks-table__bub { display: none; }
+    }
+    /* 좁은 장면(휴대폰 · 옆 칸이 붙은 좁은 PC) — 화면 너비가 아니라 .ks 너비로 고른다 */
+    @container ks (max-width: 600px) {
+      /* 두 줄(매출 · 하트 · 시계 / 콤보 · 오늘의 메뉴) — 줄마다 너비를 따로 나눈다(grid 칸을 같이 쓰면 오늘의 메뉴 칸 때문에 매출이 눌린다) */
+      .ks-hud { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-height: 0; padding: 7px 12px 9px; }
+      .ks-hud::after { content: ""; order: 3; flex-basis: 100%; height: 0; }
+      .ks-money { order: 0; flex: 1 1 auto; }
+      .ks-hearts { order: 1; }
+      .ks-clock { order: 2; }
+      .ks-combo { order: 4; flex: 1 1 0; }
+      .ks-today { order: 5; flex-shrink: 0; gap: 5px; padding: 2px 8px 2px 3px; }
+      .ks-today small { display: none; }
+      .ks-today .ks-dishi { width: 26px; height: 26px; }
+      .ks-money small, .ks-hearts small, .ks-combo small { display: none; }
+      .ks-hearts { align-items: flex-end; }
+      .ks-combo__segs { max-width: none; margin-top: 3px; }
+      .ks-clock { min-width: 52px; padding: 2px 6px; }
+      .ks-clock small { display: none; }
+      .ks-news { height: 80px; padding: 0 12px; }
+      .ks-news__clamp { display: block; overflow: visible; }
+      .ks-news__who { display: flex; margin: 0 0 1px; }
+      .ks-news__text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+      .ks-table__mid { grid-template-columns: minmax(0, 1fr); gap: 0; }
+      .ks-table__bub { order: -1; margin: 3px 0 7px; }
+      .ks-table__bub::after { left: 50%; top: auto; bottom: -5px; margin: 0 0 0 -5px; box-shadow: 1px 1px 1px rgba(15, 23, 42, .08); }
+      .ks-front { grid-template-columns: minmax(0, 1fr); }
+      .ks-togo .ks-btn, .ks-togo .ks-sent { min-height: 40px; }
+    }
+
     @media (max-width: 640px) {
-      .ks-tables { grid-template-columns: minmax(0, 1fr); }
-      .ks-table { min-height: 0; }
-      .ks-guest { width: 76px; }
-      .ks-queue { overflow-x: auto; }
-      .ks-burner__pick { grid-template-columns: minmax(0, 1fr); }
-      .ks-burner__ring { width: 56px; height: 56px; font-size: 12px; }
+      .ks-money .ks-coin { width: 24px; height: 24px; }
+      .ks-money b { font-size: 18px; }
+      .ks-hearts svg { width: 15px; height: 15px; }
+      .ks-today .ks-dishi { width: 24px; height: 24px; }
+      .ks-today b { font-size: 12px; }
+      .ks-clock b { font-size: 15px; }
+      .ks-news__bub { font-size: 13px; padding: 5px 10px; }
+      .ks-news__tip { font-size: 12.5px; }
+      .ks-window { min-height: 60px; }
+      .ks-window__label { width: 50px; padding: 0 6px; align-items: center; text-align: center; }
+      .ks-window__label b { font-size: 12px; }
+      .ks-window__ic, .ks-window__label em { display: none; }
+      .ks-window__label small { font-size: 11.5px; }
+      .ks-window__in { padding: 8px 6px 0; }
+      .ks-shelf { min-height: 42px; gap: 3px; padding: 0 0 4px; flex-wrap: nowrap; }
+      .ks-shelf__item { flex: 0 0 auto; width: clamp(40px, calc((100% - 15px) / 6), 44px); height: 42px; }
+      .ks-shelf__item .ks-dishi { width: 34px; height: 34px; }
+      .ks-lamps { right: 10px; gap: 18px; }
+      .ks-scene { gap: 8px; padding: 10px; }
+      .ks-panel { padding: 8px; }
+      .ks-tables { gap: 6px; }
+      .ks-table { padding: 5px 4px 6px; }
+      .ks-table__top { gap: 4px; height: 20px; }
+      .ks-table__n { width: 20px; height: 20px; font-size: 11px; }
+      .ks-table__tag { font-size: 11px; }
+      .ks-table__mid { min-height: 0; }
+      .ks-table__bub { min-height: 34px; padding: 2px; }
+      .ks-table__stage .cu { width: 40px; height: 44px; margin-bottom: -7px; }
+      .ks-desk__on .ks-dishi { width: 20px; height: 20px; }
+      .ks-chair { width: 28px; height: 28px; }
+      .ks-hint, .ks-sent, .ks-eatlabel { font-size: 11.5px; }
+      .ks-eatlabel small { font-size: 10.5px; }
+      .ks-guest { padding: 4px 2px 5px; }
+      .ks-guest__cnt { font-size: 11px; }
+      .ks-it { width: 27px; height: 27px; border-radius: 8px; }
+      .ks-it .ks-dishi { width: 24px; height: 24px; }
+      .ks-btn { font-size: 13px; padding: 6px 4px; }
+      .ks-queue { min-height: 88px; }
+      .ks-slot { min-height: 62px; }
+      .ks-tickets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ks-line { grid-template-columns: minmax(0, 1fr); }
+      .ks-side { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
+      .ks-bell { flex-direction: column; gap: 2px; min-height: 100%; }
+      .ks-burner__ring { width: 84px; height: 84px; }
+      .ks-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .ks-flow li { gap: 6px; padding: 8px 6px 8px 8px; }
+      .ks-flow li::before { width: 15px; height: 15px; font-size: 9.5px; }
+      .ks-flow li small { font-size: 11px; }
+      .ks-how { padding: 10px; }
+      .ks-rules li { padding: 5px 6px; gap: 6px; font-size: 11.5px; }
+      .ks-rules li > i { width: 26px; height: 26px; }
+      .ks-rules { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    /* 움직임 줄이기 — 떠다니는 글자 · 번쩍임 · 흔들림을 모두 끈다(번쩍임은 아예 그리지 않는다) */
+    @media (prefers-reduced-motion: reduce) {
+      .ks *, .ks-float, #ks-flash { animation: none !important; transition: none !important; }
+      .ks-float, #ks-flash { display: none !important; }
     }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <script>
-    // 점심 분식집 — 2인 협동. 홀(손님 · 주문 전달 · 서빙 · 치우기)과 주방(화구 · 김밥)이 3분 동안 가게를 운영 (방 공용은 /_shared/coop.js)
+    // 점심 분식집 — 협동 시리즈 「오늘도 둘이서」 1화. 홀(손님 · 주문 전달 · 서빙 · 치우기 · 포장 건네기)과
+    // 주방(화구 · 김밥 · 벨)이 3분 동안 가게를 운영한다. 방 공용(목록 · 대기실 · 대화 · 끝 이야기)은 /_shared/coop.js
+    // 서버가 모든 걸 정한다(kitchen_game.py) — 화면은 받은 상태를 그리고, 시간 막대 · 손님 기분 · 화구 불만 0.1초마다 맞춘다.
+    // 효과(동전 · 콤보 · 벨 · 놓친 손님)는 서버의 ev 목록에서 처음 보는 것만 한 번씩 보여 주고 소리를 낸다.
     const { esc } = HKMatch;
-    const { won } = HKCoop;
-    const DISH = { tteok: ["떡", "#dc2626"], ramen: ["라", "#ea580c"], odeng: ["어", "#a16207"], gimbap: ["김", "#16a34a"] };
-    let room = null, k = null, offset = 0, tickFor = null, phases = "";
+    const { won, mmss } = HKCoop;
+    const DISHES = ["tteok", "ramen", "odeng", "gimbap"];
+    const GREAT = 150000; // 이 매출을 넘기면 끝 이야기 「최고예요」(봇 시뮬레이션: 손이 맞는 팀의 가운데쯤)
+    // 대기실 안내에 쓰는 규칙 숫자 — 대기실에는 아직 판 정보(room.kitchen)가 없어서 서버(kitchen_game.py) 상수와 같게 둔다.
+    // 판이 시작되면 화면은 서버가 보낸 값(maxHearts · burnSec · rush · gimbapSteps)을 쓴다.
+    const RULES = { hearts: 5, rushAt: 95, burnSec: 6, gimbapSteps: 4 };
+    const FX_FRESH = 3; // 초 — 이보다 오래된 효과는 다시 보여 주지 않는다(다른 앱에 갔다 돌아와도 한꺼번에 쏟아지지 않게)
+    const FX_MAX = 5; // 한 번에 띄우는 떠다니는 글자 수(넘으면 마지막 것들만)
+    let room = null, k = null, offset = 0, tickFor = null, phases = "", lastEv = -1, fxQ = [], lastSay = 0, sayOn = null, stuck = null;
+    let ringUntil = 0, lastCount = null, lastWarn = "", lastTip = -1, seenTickets = new Set(), seenGuests = new Set(), lastPass = 0, firstPaint = true;
+    let rollQ = 0, rollBusy = false, lastSend = 0;
+    const busy = new Set();
 
     const now = () => (Date.now() + offset) / 1000; // 서버 시계(초)
-    const dishName = (key) => (k && k.menu[key] ? k.menu[key].name : key);
-    const chip = (key, ok, extra = "") => `<span class="ks-dish ${ok ? "is-ok" : ""}"><i style="background:${DISH[key][1]}">${DISH[key][0]}</i>${esc(dishName(key))}${extra}</span>`;
-    // 줄어드는 막대(남은 참을성) · 차오르는 막대(익는 정도) — tick 이 너비를 맞춘다
-    const bar = (from, to, mode) => `<div class="ks-bar" data-from="${from}" data-to="${to}" data-mode="${mode}"><span></span></div>`;
-    const heartsHtml = () => `<span class="ks-hearts">${Array.from({ length: k.maxHearts }, (_, i) => `<span class="${i < k.hearts ? "" : "is-off"}">♥</span>`).join("")}</span>`;
+    // 늦게 도착한 옛 응답(seq 가 더 낮음)은 버린다 — 시각 맞추기 · 동작 응답 · 실시간 소식이 엇갈려 와도 화면이 뒤로 가지 않게
+    const fresher = (next) => next && next.id && (!room || room.id !== next.id || (next.seq || 0) >= (room.seq || 0));
+    const isHall = () => room && room.sideName === "홀";
+    const dishName = (key) => (k && k.menu && k.menu[key] ? k.menu[key].name : ({ tteok: "떡볶이", ramen: "라면", odeng: "어묵", gimbap: "김밥" }[key] || ""));
+    const known = (key) => DISHES.includes(key);
+    // 받침에 맞는 조사 — josa("떡볶이", "을", "를") → "를"
+    const josa = (word, withFinal, withoutFinal) => {
+      const c = String(word || "").slice(-1).charCodeAt(0);
+      if (!(c >= 0xac00 && c <= 0xd7a3)) return withFinal;
+      return (c - 0xac00) % 28 ? withFinal : withoutFinal;
+    };
+    const reduced = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // 사이트 머리(위 메뉴)가 화면 위에 붙어 있으면 그 높이 — 분식집 머리 칸이 그 아래에 붙는다
+    function stickTop() {
+      const h = document.querySelector(".hk-site-header");
+      if (!h) return 0;
+      const cs = getComputedStyle(h);
+      if (!["sticky", "fixed"].includes(cs.position) || cs.display === "none") return 0;
+      return Math.max(0, Math.round(h.getBoundingClientRect().height));
+    }
 
-    function statsHtml() {
-      return `<div class="ks-stats">
-          <div class="ks-stat">매출 <b>${won(k.money)}</b></div>
-          <div class="ks-stat">손님 <b>${k.served}</b>명</div>
-          <div class="ks-stat">${heartsHtml()}</div>
+    // ---------- 그림 ----------
+    function dishSvg(key, cls = "ks-dishi") {
+      const body = {
+        tteok: `<path d="M5 25Q24 52 43 25Z" fill="#fff"/><path d="M6.5 29Q24 49 41.5 29" fill="none" stroke="#f97316" stroke-width="2.6"/>
+          <ellipse cx="24" cy="25" rx="19" ry="6.5" fill="#b91c1c"/><ellipse cx="24" cy="24.4" rx="16" ry="4.6" fill="#dc2626"/>
+          <g fill="#fff1e6" stroke="#fecaca" stroke-width=".6"><rect x="11" y="20" width="11" height="4.6" rx="2.3" transform="rotate(-12 16 22)"/><rect x="21" y="22.5" width="11" height="4.6" rx="2.3" transform="rotate(10 26 25)"/><rect x="27" y="18.6" width="10" height="4.4" rx="2.2" transform="rotate(-6 32 21)"/></g>
+          <path d="M14 26l6 1.5-5 2.2z" fill="#fbbf24"/><g fill="#16a34a"><rect x="23" y="20" width="3" height="1.6" rx=".8"/><rect x="33" y="25" width="3" height="1.6" rx=".8"/></g>`,
+        ramen: `<rect x="2" y="25" width="9" height="3.2" rx="1.6" fill="#ca8a04"/><rect x="37" y="25" width="9" height="3.2" rx="1.6" fill="#ca8a04"/>
+          <path d="M8 22h32v15a5 5 0 0 1-5 5H13a5 5 0 0 1-5-5z" fill="#facc15"/><path d="M8 30h32" stroke="#eab308" stroke-width="1.4"/>
+          <ellipse cx="24" cy="22" rx="16" ry="5" fill="#c2410c"/><path d="M11 22q3-3 6 0t6 0 6 0 6 0" fill="none" stroke="#fde68a" stroke-width="2" stroke-linecap="round"/>
+          <ellipse cx="30" cy="20.6" rx="4.4" ry="2.8" fill="#fff"/><circle cx="30" cy="20.6" r="1.8" fill="#f59e0b"/><g fill="#22c55e"><circle cx="17" cy="20" r="1.1"/><circle cx="20" cy="23" r="1.1"/></g>`,
+        odeng: `<g stroke="#a16207" stroke-width="1.6" stroke-linecap="round"><path d="M18 28L15 4"/><path d="M28 28L32 5"/></g>
+          <g fill="none" stroke="#d97706" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8q5 2 1 4.5t1 4.5-1 4.5"/><path d="M31 9q5 2 1 4.5t1 4.5-1 4.5"/></g>
+          <g fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"><path d="M14 8q5 2 1 4.5t1 4.5-1 4.5"/><path d="M31 9q5 2 1 4.5t1 4.5-1 4.5"/></g>
+          <path d="M11 26h26l-3.4 17a2 2 0 0 1-2 1.6H16.4a2 2 0 0 1-2-1.6z" fill="#fff" stroke="#e2e8f0"/><path d="M12.4 32h23.2" stroke="#ef4444" stroke-width="3"/><ellipse cx="24" cy="26.4" rx="13" ry="2.4" fill="#fde68a"/>`,
+        gimbap: `<ellipse cx="24" cy="35" rx="21" ry="7.5" fill="#fff" stroke="#e2e8f0"/><ellipse cx="24" cy="34" rx="16" ry="4.6" fill="#f1f5f9"/>
+          ${[[13, 27], [24, 26], [35, 27]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="7.4" fill="#14532d"/><circle cx="${x}" cy="${y}" r="5.8" fill="#fff"/><circle cx="${x - 1.8}" cy="${y - 1}" r="1.6" fill="#f59e0b"/><circle cx="${x + 1.8}" cy="${y - .6}" r="1.4" fill="#16a34a"/><circle cx="${x}" cy="${y + 1.8}" r="1.4" fill="#ef4444"/>`).join("")}`,
+      }[key];
+      if (!body) return "";
+      return `<svg class="${cls}" viewBox="0 0 48 48" aria-hidden="true">${body}</svg>`;
+    }
+    const coinSvg = (cls = "ks-coin") => `<svg class="${cls}" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="17" r="13" fill="#b45309"/><circle cx="16" cy="15" r="13" fill="#facc15"/><circle cx="16" cy="15" r="9.5" fill="none" stroke="#f59e0b" stroke-width="2"/><text x="16" y="19.5" text-anchor="middle" font-size="12" font-weight="900" fill="#92400e">원</text></svg>`;
+    const heartSvg = (on) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.2 0 3.7 1.3 5.3 3.2 1.6-1.9 3.1-3.2 5.3-3.2 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z" fill="${on ? "#f87171" : "rgba(255,255,255,.18)"}" stroke="${on ? "#fecaca" : "none"}" stroke-width="1.2"/></svg>`;
+    const bellSvg = () => `<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="17" y="3" width="6" height="5" rx="2" fill="#78350f"/><path d="M8 30c2-2 3-4 3-10a9 9 0 0 1 18 0c0 6 1 8 3 10z" fill="#fbbf24" stroke="#b45309" stroke-width="1.6"/><rect x="5" y="29" width="30" height="5" rx="2.5" fill="#b45309"/><circle cx="20" cy="36" r="2.6" fill="#78350f"/><path d="M15 15a6 6 0 0 1 4-4" stroke="#fef3c7" stroke-width="2" fill="none" stroke-linecap="round"/></svg>`;
+
+    // 손님 — id 로 생김새를 고른다(머리 · 머리색 · 옷 · 피부). 단골(★)은 금테 안경 · 금별 배지 · 짙은 정장,
+    // 문 반장님은 파란 모자 · 작업복, 포장 손님은 봉투를 든다. 기분(m0 좋음 ~ m3 화남 · me 냠냠)은 CSS 로 고른다
+    const SKIN = ["#fcd9b6", "#f5c9a0", "#eab38a", "#fde0c5"];
+    const HAIR = ["#1f2937", "#3f2a1d", "#6b3f1d", "#111827", "#7c2d12", "#57534e"];
+    const SHIRT = ["#60a5fa", "#34d399", "#f472b6", "#a78bfa", "#fbbf24", "#94a3b8", "#f87171", "#2dd4bf"];
+    function guestSvg(g, { togo = false, mood = "0" } = {}) {
+      const id = Number(g.id) || 0;
+      const mun = g.who === "mun";
+      const skin = SKIN[(id * 7 + 1) % SKIN.length];
+      const hair = HAIR[(id * 5 + 2) % HAIR.length];
+      const shirt = mun ? "#0369a1" : g.vip ? "#3b0764" : SHIRT[(id * 3) % SHIRT.length];
+      const style = mun ? -1 : (id * 11 + 3) % 4;
+      const hairs = [
+        `<path d="M15 29Q15 11 32 11Q49 11 49 29Q45 19 32 19Q20 19 15 29Z" fill="${hair}"/>`,
+        `<path d="M14 37Q11 10 32 10Q53 10 50 37L46 37Q47 21 32 19Q17 21 18 37Z" fill="${hair}"/>`,
+        `<circle cx="32" cy="9.5" r="6" fill="${hair}"/><path d="M15 29Q15 12 32 12Q49 12 49 29Q44 20 32 20Q20 20 15 29Z" fill="${hair}"/>`,
+        `<g fill="${hair}"><circle cx="20" cy="20" r="6"/><circle cx="27" cy="15" r="6.4"/><circle cx="35" cy="14.5" r="6.4"/><circle cx="43" cy="19" r="6"/><circle cx="46" cy="25" r="4.4"/><circle cx="17.5" cy="25.5" r="4.4"/></g>`,
+      ];
+      const head = mun
+        ? `<path d="M15 26q17-20 34 0z" fill="#0369a1"/><rect x="31" y="22.4" width="23" height="5" rx="2.5" fill="#075985"/><rect x="29" y="15" width="6" height="5" rx="1" fill="#facc15"/>`
+        : hairs[style];
+      const glasses = g.vip && !mun ? `<g fill="none" stroke="#d4a017" stroke-width="1.9"><circle cx="26.2" cy="31" r="4.6"/><circle cx="37.8" cy="31" r="4.6"/><path d="M30.8 31h2.4"/></g>` : "";
+      const badge = g.vip ? `<path d="M41 55l1.6 3.3 3.6.5-2.6 2.5.6 3.6-3.2-1.7-3.2 1.7.6-3.6-2.6-2.5 3.6-.5z" fill="#facc15" stroke="#a16207" stroke-width=".8"/>` : "";
+      const tie = g.vip && !mun ? `<path d="M30 50h4l-1 3 1.6 9-2.6 3-2.6-3 1.6-9z" fill="#facc15"/>` : "";
+      const bag = togo ? `<g><path d="M50 57q0-5 4-5t4 5" fill="none" stroke="#92400e" stroke-width="1.6"/><rect x="46" y="56" width="16" height="15" rx="2.5" fill="#fde68a" stroke="#d97706" stroke-width="1.2"/><path d="M50 62h8" stroke="#d97706" stroke-width="1.4"/></g>` : "";
+      const E = "#1f2937";
+      const face = `
+        <g class="m0"><path d="M23.6 31.4q2.6-3.2 5.2 0M35.2 31.4q2.6-3.2 5.2 0" stroke="${E}" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M27 37q5 5 10 0" stroke="${E}" stroke-width="2" fill="none" stroke-linecap="round"/><g fill="#fb7185" opacity=".45"><circle cx="21.5" cy="36" r="2.6"/><circle cx="42.5" cy="36" r="2.6"/></g></g>
+        <g class="m1"><circle cx="26.2" cy="31" r="2"/><circle cx="37.8" cy="31" r="2"/><path d="M28 38.5h8" stroke="${E}" stroke-width="2" stroke-linecap="round"/></g>
+        <g class="m2"><circle cx="26.2" cy="31.6" r="2"/><circle cx="37.8" cy="31.6" r="2"/><path d="M22.6 26.6l5 1.4M41.4 26.6l-5 1.4" stroke="${E}" stroke-width="1.8" stroke-linecap="round"/><path d="M27 39.5q2.5-2 5 0t5 0" stroke="${E}" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M48 21q3.4 4.4 0 6.6q-3.4-2.2 0-6.6z" fill="#38bdf8"/></g>
+        <g class="m3"><circle cx="26.2" cy="32" r="2"/><circle cx="37.8" cy="32" r="2"/><path d="M22.4 27l5.4 2.6M41.6 27l-5.4 2.6" stroke="${E}" stroke-width="2.2" stroke-linecap="round"/><path d="M27 41q5-5.4 10 0" stroke="${E}" stroke-width="2.2" fill="none" stroke-linecap="round"/><g fill="#ef4444" opacity=".5"><circle cx="21.5" cy="37" r="3"/><circle cx="42.5" cy="37" r="3"/></g><path d="M45 9l3 3m0-3l-3 3M51 13l3 3m0-3l-3 3" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/></g>
+        <g class="me"><path d="M23.6 31q2.6 2.6 5.2 0M35.2 31q2.6 2.6 5.2 0" stroke="${E}" stroke-width="2" fill="none" stroke-linecap="round"/><ellipse cx="32" cy="38.6" rx="3.2" ry="2.8" fill="#7f1d1d"/><g fill="#fb7185" opacity=".5"><circle cx="21.5" cy="36" r="2.6"/><circle cx="42.5" cy="36" r="2.6"/></g></g>`;
+      return `<svg class="cu" viewBox="0 0 64 72" data-mood="${mood}" aria-hidden="true">
+          <path d="M10 72Q10 48 32 48Q54 48 54 72Z" fill="${shirt}"/>${tie}${badge}
+          <g class="cu__head"><circle cx="32" cy="31" r="17" fill="${skin}"/>${head}<g fill="${E}">${face}</g>${glasses}</g>${bag}
+        </svg>`;
+    }
+    // 남은 기다림 비율 → 기분 0(좋음) ~ 3(화남)
+    const moodOf = (ratio) => (ratio >= 0.6 ? "0" : ratio >= 0.35 ? "1" : ratio >= 0.15 ? "2" : "3");
+    const ratioOf = (g, t = now()) => Math.max(0, Math.min(1, (g.until - t) / (g.pat || 1)));
+    // 줄어드는 막대(남은 기다림) · 차오르는 막대(먹는 중) — tick 이 너비를 맞춘다
+    const bar = (from, to, mode, cls = "") => `<div class="ks-bar ${cls}" data-from="${from}" data-to="${to}" data-mode="${mode}"><span></span></div>`;
+    const moodAttrs = (g) => `data-until="${g.until}" data-pat="${g.pat}"`;
+    // 주문 칸 — 배식구에 있는 것(✓) · 끓는 것(●) 을 급한 주문부터 나눠 표시
+    function marks(orders) {
+      const pass = [...(k.pass || [])];
+      const cooking = (k.burners || []).filter((b) => b && !b.burnt).map((b) => b.dish);
+      if (k.gimbap && k.gimbap.step > 0) cooking.push("gimbap");
+      const out = new Map();
+      [...orders].sort((a, b) => a.until - b.until).forEach((o) => {
+        out.set(o, o.items.map((it) => {
+          const i = pass.indexOf(it);
+          if (i >= 0) { pass.splice(i, 1); return "ok"; }
+          const j = cooking.indexOf(it);
+          if (j >= 0) { cooking.splice(j, 1); return "cook"; }
+          return "";
+        }));
+      });
+      return out;
+    }
+    // 홀 — 이 주문만 놓고 배식구에 있는지(서버 규칙과 같다: 다 있으면 서빙할 수 있다)
+    function passMarks(items) {
+      const left = [...(k.pass || [])];
+      return items.map((it) => { const i = left.indexOf(it); if (i < 0) return ""; left.splice(i, 1); return "ok"; });
+    }
+    const itemsHtml = (items, st = []) => `<div class="ks-items">${items.filter(known).map((it, i) => `<span class="ks-it ${st[i] ? `is-${st[i]}` : ""} ${it === k.today ? "is-today" : ""}" title="${esc(dishName(it))}${st[i] === "ok" ? " · 배식구에 있어요" : st[i] === "cook" ? " · 만드는 중" : ""}">${dishSvg(it)}</span>`).join("")}</div>`;
+
+    // ---------- 머리 · 소식 ----------
+    const inRush = (t = now()) => !!(k && k.rush && t >= k.rush.at && t < k.rush.end);
+    function hudHtml() {
+      const c = k.combo || 0;
+      const segs = Array.from({ length: 5 }, (_, i) => `<i class="${i < Math.min(c, 5) ? "is-on" : ""}"></i>`).join("");
+      const mult = c >= 1 ? 1 + 0.25 * (Math.min(c, 5) - 1) : 1;
+      const left = Math.max(0, k.end - now());
+      const max = k.maxHearts || RULES.hearts;
+      return `<div class="ks-hud ${inRush() ? "is-rush" : ""} ${stuck ? "is-stuck" : ""}" data-hud>
+          <div class="ks-money" data-spot="money">${coinSvg()}<span><b>${won(k.money)}</b><small>매출 · 손님 ${k.served}명</small></span></div>
+          <div class="ks-hearts" data-spot="hearts" aria-label="남은 하트 ${k.hearts}개(${max}개 가운데)"><span>${Array.from({ length: max }, (_, i) => heartSvg(i < k.hearts)).join("")}</span><small>놓치면 하나씩 줄어요</small></div>
+          <div class="ks-combo ${c >= 3 ? "is-hot" : ""}" data-spot="combo"><div class="ks-combo__top"><b>콤보 ${c}</b><em>${c >= 1 ? `팁 ×${mult.toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}` : "빨리 내면 올라요"}</em></div><div class="ks-combo__segs">${segs}</div><small>막대가 반 넘게 남았을 때 내면 +1</small></div>
+          ${known(k.today) ? `<div class="ks-today">${dishSvg(k.today)}<span><small>오늘의 메뉴</small><b>${esc(dishName(k.today))} +${won(k.todayBonus)}</b></span></div>` : ""}
+          <div class="ks-clock ${left < 30 ? "is-low" : ""}" aria-hidden="true"><b data-clock>${mmss(left)}</b><small>남은 시간</small></div>
+          <div class="ks-rush" data-rush aria-hidden="true">${HKUI.icon("zap", 13, "currentColor")} 점심 러시! <b data-rush-left>${k.rush ? `${Math.max(0, Math.ceil(k.rush.end - now()))}초` : ""}</b></div>
         </div>`;
     }
-    function passHtml(canToss = true) {
-      const items = k.pass.map((d, i) => chip(d, false, canToss ? `<button type="button" class="ks-toss" data-toss="${i}" aria-label="버리기">×</button>` : "")).join("");
-      return `<div class="ks-sec"><h3>${HKUI.icon("utensils", 15)} 배식구<small>${k.pass.length} / ${k.passMax}</small></h3><div class="ks-pass">${items || `<span style="font-size:13px;color:var(--text-muted)">아직 나온 음식이 없어요</span>`}</div></div>`;
+    // 도움말 — 숫자는 서버가 보낸 값으로
+    function tips() {
+      const burn = (k && k.burnSec) || RULES.burnSec;
+      const steps = (k && k.gimbapSteps) || RULES.gimbapSteps;
+      return isHall()
+        ? ["★ 단골은 1.5배를 내지만 금방 가요. 먼저 앉혀요.", "막대가 반 넘게 남았을 때 내면 콤보! 팁이 최대 2배예요.", "포장 손님도 주문을 전달하고, 다 나오면 포장대에서 건네요.", "주방은 주문을 못 봐요. 앉히면 바로 「주문 전달」!", "서빙은 주문한 음식이 배식구에 다 있을(✓) 때 돼요.", "배식구 음식을 누르면 버릴 수 있어요."]
+        : ["주문서는 급한 것부터 왼쪽에 있어요.", `다 익으면 바로 꺼내요. ${burn}초 지나면 타요.`, "다 나오면 벨을 눌러 홀을 불러요.", `김밥은 버튼을 ${steps}번 눌러 말아요.`, "주황 칸은 지금 필요한 음식이에요."];
     }
-    function hasAll(items) {
-      const left = [...k.pass];
-      return items.every((it) => { const i = left.indexOf(it); if (i < 0) return false; left.splice(i, 1); return true; });
+    const tipAt = (t) => { const list = tips(); return list[Math.floor(Math.max(0, t - k.start) / 9) % list.length]; };
+    function sayActive(t = now()) { return k.say && t - k.say.at < (k.saySec || 6) ? k.say : null; }
+    function newsHtml() {
+      const s = sayActive();
+      const face = s && window.HKCoopStory && s.name && s.who !== "shop" ? HKCoopStory.npcFace(s.name) : "";
+      const isNew = s && s.id !== lastSay;
+      if (s) lastSay = s.id;
+      sayOn = !!s;
+      const call = s && (s.call || s.who === "boksun") ? `<em>${HKUI.icon("phone", 10, "currentColor")} 전화</em>` : "";
+      return `<div class="ks-news ${s ? "is-say" : ""} ${isNew ? "is-new" : ""} ${s && s.who === "shop" ? "is-shop" : ""}" data-news aria-live="polite">
+          <div class="ks-news__tip"><i>?</i><span data-tip>${esc(tipAt(now()))}</span></div>
+          <div class="ks-news__say">${s ? `<span class="ks-news__face">${face || `<span class="ks-megaphone">${HKUI.icon("megaphone", 20, "currentColor")}</span>`}</span><div class="ks-news__bub"><span class="ks-news__clamp"><b class="ks-news__who">${esc(s.name || "가게 소식")}${call}</b><span class="ks-news__text">${esc(s.text)}</span></span></div>` : ""}</div>
+        </div>`;
     }
 
     // ---------- 홀 ----------
+    function windowHtml() {
+      const items = (k.pass || []).filter(known);
+      const fresh = items.length > lastPass;
+      const shelf = items.map((d, i) => `<button type="button" class="ks-shelf__item ${fresh && i >= lastPass ? "is-new" : ""}" data-toss="${esc(d)}" title="${esc(dishName(d))} — 누르면 버려요" aria-label="${esc(dishName(d))} 버리기">${dishSvg(d)}</button>`).join("");
+      const full = items.length >= k.passMax;
+      return `<div class="ks-window ${now() < ringUntil ? "is-ring" : ""}" data-spot="pass">
+          <div class="ks-window__label"><b><span class="ks-window__ic">${HKUI.icon("concierge-bell", 14, "currentColor")}</span>배식구</b><small class="${full ? "is-full" : ""}">${items.length} / ${k.passMax}${full ? `<em> 꽉 참</em>` : ""}</small></div>
+          <div class="ks-window__in"><span class="ks-lamps" aria-hidden="true"><i></i><i></i><i></i></span>
+            <div class="ks-shelf">${shelf || `<span class="ks-shelf__empty">${isHall() ? "주방에서 음식이 나오면 여기에 올라와요" : "다 된 음식을 꺼내면 여기에 올라가요"}</span>`}</div>
+            <span class="ks-ding">띵! 다 됐대요</span></div></div>`;
+    }
+    function tableHtml(t, free) {
+      const head = (tag) => `<div class="ks-table__top"><span class="ks-table__n">${t.n + 1}</span><span class="ks-table__tag">${tag}</span></div>`;
+      const spot = `data-spot="t${t.n}"`;
+      if (t.s === "empty") {
+        return `<div class="ks-table is-empty" ${spot}>${head("빈 자리")}
+            <div class="ks-table__mid"><div class="ks-table__stage"><div class="ks-chair"></div><div class="ks-desk"></div></div><div class="ks-table__bub is-blank"></div></div>
+            <div class="ks-hint">${free && k.queue.length ? "손님을 안내해요" : ""}</div></div>`;
+      }
+      if (t.s === "dirty") {
+        return `<div class="ks-table is-dirty" ${spot}>${head("다 먹은 그릇")}
+            <div class="ks-table__mid"><div class="ks-table__stage"><div class="ks-chair"></div><div class="ks-desk"><div class="ks-desk__on is-dirty">${dishSvg("tteok")}</div><span class="ks-crumbs"></span></div></div><div class="ks-table__bub is-blank"></div></div>
+            <button type="button" class="ks-btn is-clean ${busy.has(`clean:${t.n}`) ? "is-busy" : ""}" data-clean="${t.n}">${HKUI.icon("sparkles", 15, "currentColor")} 치우기</button></div>`;
+      }
+      const star = t.vip ? `<span class="ks-star">★${t.who ? "" : " 단골"}</span>` : "";
+      if (t.s === "eat") {
+        return `<div class="ks-table is-eat ${t.vip ? "is-vip" : ""}" ${spot}>${star}${head(t.name ? esc(t.name) : "냠냠 먹는 중")}
+            <div class="ks-table__mid"><div class="ks-table__stage">${guestSvg(t, { mood: "eat" })}<div class="ks-desk"><div class="ks-desk__on">${(t.items || []).filter(known).map((d) => dishSvg(d)).join("")}</div></div></div><div class="ks-table__bub is-say">맛있어요!</div></div>
+            ${bar(t.eatEnd - (k.eatSec || 4), t.eatEnd, "fill", "is-eat")}<div class="ks-eatlabel">${won(t.pay)}${t.tip ? `<small>팁 ${won(t.tip)}</small>` : ""}</div></div>`;
+      }
+      const st = passMarks(t.items || []);
+      const ready = st.length && st.every((x) => x === "ok");
+      const key = `t${t.n}`;
+      const btn = ready
+        ? `<button type="button" class="ks-btn is-go ${busy.has(`serve:${key}`) ? "is-busy" : ""}" data-serve="${key}">${HKUI.icon("hand-platter", 15, "currentColor")} 서빙</button>`
+        : !t.sent
+          ? `<button type="button" class="ks-btn is-send ${busy.has(`send:${key}`) ? "is-busy" : ""}" data-send="${key}">${HKUI.icon("send", 14, "currentColor")} 주문 전달</button>`
+          : `<div class="ks-sent">${HKUI.icon("check", 14, "currentColor")} 전달함</div>`;
+      return `<div class="ks-table is-wait ${ready ? "is-ready" : ""} ${t.vip ? "is-vip" : ""}" ${spot}>${star}${head(t.name ? esc(t.name) : t.vip ? "단골손님" : "주문했어요")}
+          <div class="ks-table__mid"><div class="ks-table__stage"><span ${moodAttrs(t)} data-cu>${guestSvg(t, { mood: moodOf(ratioOf(t)) })}</span><div class="ks-desk"></div></div><div class="ks-table__bub">${itemsHtml(t.items, st)}</div></div>
+          ${bar(t.until - t.pat, t.until, "left")}${btn}</div>`;
+    }
     function hallHtml() {
-      const freeTable = k.tables.some((t) => t.s === "empty");
-      const queue = k.queue.map((q) => `<button type="button" class="ks-guest" data-seat="${q.id}" ${freeTable ? "" : "disabled"} title="${freeTable ? "자리 안내" : "빈 테이블이 없어요"}">
-          <b>${["🙂", "😀", "🧑", "🙋"][q.id % 4]}</b><small>${freeTable ? "자리 안내" : "자리 없음"}</small>${bar(q.until - k.queuePatience, q.until, "left")}</button>`).join("");
-      const tables = k.tables.map((t) => {
-        if (t.s === "empty") return `<div class="ks-table"><span class="ks-table__n">${t.n + 1}번 테이블</span><div class="ks-table__body"><span class="ks-table__state">빈 자리</span></div></div>`;
-        if (t.s === "dirty") return `<div class="ks-table is-dirty"><span class="ks-table__n">${t.n + 1}번 테이블</span><div class="ks-table__body"><span class="ks-table__state">🍽️ 다 먹은 그릇</span></div><button type="button" class="hk-btn hk-btn--secondary" data-clean="${t.n}">치우기</button></div>`;
-        if (t.s === "eat") return `<div class="ks-table"><span class="ks-table__n">${t.n + 1}번 테이블</span><div class="ks-table__body"><span class="ks-table__state">😋 먹는 중 · ${won(t.pay)}</span>${bar(t.eatEnd - 4, t.eatEnd, "fill")}</div></div>`;
-        const ready = hasAll(t.items);
-        return `<div class="ks-table is-wait ${ready ? "is-ready" : ""}"><span class="ks-table__n">${t.n + 1}번 테이블 · 주문</span>
-            <div class="ks-table__body"><div class="ks-row">${t.items.map((it) => chip(it, false)).join("")}</div>${bar(t.until - k.tablePatience, t.until, "left")}</div>
-            ${t.sent ? `<div class="ks-sent">✓ 주방에 전달함</div>` : `<button type="button" class="hk-btn hk-btn--secondary" data-send="${t.n}">주방에 전달</button>`}
-            <button type="button" class="hk-btn hk-btn--primary" data-serve="${t.n}" ${ready ? "" : "disabled"}>서빙</button></div>`;
+      const free = k.tables.some((t) => t.s === "empty");
+      const queue = k.queue.map((q) => {
+        const isNew = !seenGuests.has(`q${q.id}`) && !firstPaint;
+        seenGuests.add(`q${q.id}`);
+        const label = q.name ? esc(q.name) : `${q.size}개 주문`;
+        return `<button type="button" class="ks-guest ${q.vip ? "is-vip" : ""} ${isNew ? "is-new" : ""}" data-seat="${q.id}" ${free ? "" : "disabled"} aria-label="${q.vip ? "단골 " : ""}손님 자리 안내">
+            ${q.vip ? `<span class="ks-star">★ 단골</span>` : ""}
+            <span ${moodAttrs(q)} data-cu>${guestSvg(q, { mood: moodOf(ratioOf(q)) })}</span>
+            <span class="ks-guest__cnt">${label}</span><span class="ks-guest__go">${free ? "눌러서 안내" : "자리 없음"}</span>
+            ${bar(q.until - q.pat, q.until, "left")}</button>`;
       }).join("");
-      return `<div class="ks-sec"><h3>${HKUI.icon("users", 15)} 대기 줄<small>${k.queue.length} / ${k.queueMax}</small></h3><div class="ks-queue">${queue || `<div class="ks-empty">기다리는 손님이 없어요</div>`}</div></div>
-        <div class="ks-sec"><h3>${HKUI.icon("armchair", 15)} 테이블</h3><div class="ks-tables">${tables}</div></div>
-        ${passHtml()}`;
+      const counter = k.counter.map((c) => {
+        if (c.s !== "wait") return `<div class="ks-slot" data-spot="c${c.n}">포장 손님<br>자리</div>`;
+        const st = passMarks(c.items || []);
+        const ready = st.length && st.every((x) => x === "ok");
+        const key = `c${c.n}`;
+        const btn = ready
+          ? `<button type="button" class="ks-btn is-go ${busy.has(`give:${key}`) ? "is-busy" : ""}" data-give="${key}">${HKUI.icon("shopping-bag", 15, "currentColor")} 건네기</button>`
+          : !c.sent
+            ? `<button type="button" class="ks-btn is-send ${busy.has(`send:${key}`) ? "is-busy" : ""}" data-send="${key}">${HKUI.icon("send", 14, "currentColor")} 전달</button>`
+            : `<div class="ks-sent">${HKUI.icon("check", 14, "currentColor")} 전달함</div>`;
+        const isNew = !seenGuests.has(`c${c.id}`) && !firstPaint;
+        seenGuests.add(`c${c.id}`);
+        return `<div class="ks-togo ${ready ? "is-ready" : ""} ${isNew ? "is-walk" : ""}" data-spot="c${c.n}"><span class="ks-togo__tag">포장 ${c.n + 1}</span>
+            <div class="ks-togo__row"><span ${moodAttrs(c)} data-cu>${guestSvg(c, { togo: true, mood: moodOf(ratioOf(c)) })}</span>${itemsHtml(c.items, st)}</div>${bar(c.until - c.pat, c.until, "left")}${btn}</div>`;
+      }).join("");
+      return `<div class="ks-scene ks-scene--hall">
+          ${windowHtml()}
+          <div class="ks-tables" aria-label="테이블">${k.tables.map((t) => tableHtml(t, free)).join("")}</div>
+          <div class="ks-front">
+            <div class="ks-panel ks-door" data-spot="queue"><h3>${HKUI.icon("door-open", 15, "currentColor")} 줄 선 손님<small>${k.queue.length} / ${k.queueMax}</small></h3>
+              <div class="ks-queue">${queue || `<div class="ks-empty">기다리는 손님이 없어요</div>`}</div></div>
+            <div class="ks-panel"><h3>${HKUI.icon("shopping-bag", 15, "currentColor")} 포장대<small>자리 안 써요</small></h3><div class="ks-counter">${counter}</div></div>
+          </div>
+        </div>`;
     }
 
     // ---------- 주방 ----------
-    function burnerPhase(b) {
+    function burnerPhase(b, t = now()) {
       if (!b) return "empty";
-      const t = now();
-      return t < b.done ? "cook" : t <= b.burn ? "done" : "burn";
+      if (b.burnt || t >= b.burn) return "burn";
+      if (t < b.done) return "cook";
+      return t >= b.burn - 2 ? "warn" : "done";
+    }
+    function needs() {
+      // 주문서에서 아직 배식구 · 화구 · 김밥말이에 없는 음식(급한 것 먼저)
+      const mk = marks(k.tickets);
+      const out = [];
+      [...k.tickets].sort((a, b) => a.until - b.until).forEach((tk) => (mk.get(tk) || []).forEach((m, i) => { if (!m) out.push(tk.items[i]); }));
+      return out;
     }
     function kitchenHtml() {
-      const tickets = k.tickets.map((t) => `<div class="ks-ticket"><div class="ks-ticket__head"><span>${t.n + 1}번 테이블</span></div><div class="ks-row">${t.items.map((it) => chip(it, false)).join("")}</div>${bar(t.until - k.tablePatience, t.until, "left")}</div>`).join("");
+      const mk = marks(k.tickets);
+      const need = needs();
+      const tickets = k.tickets.map((tk) => {
+        const st = mk.get(tk) || [];
+        const ready = st.length && st.every((x) => x === "ok");
+        const isNew = !seenTickets.has(tk.where + tk.until) && !firstPaint;
+        seenTickets.add(tk.where + tk.until);
+        const urgent = ratioOf(tk) < 0.3;
+        return `<div class="ks-ticket ${tk.togo ? "is-togo" : ""} ${tk.vip ? "is-vip" : ""} ${ready ? "is-ready" : ""} ${urgent ? "is-urgent" : ""} ${isNew ? "is-new" : ""}" ${moodAttrs(tk)} data-ticket>
+            <div class="ks-ticket__head">${tk.togo ? HKUI.icon("shopping-bag", 13, "currentColor") : ""}${esc(tk.label)}${tk.vip ? `<span class="ks-star">★ 단골</span>` : ""}</div>
+            ${itemsHtml(tk.items, st)}${bar(tk.until - tk.pat, tk.until, "left")}${ready ? `<div class="ks-ticket__ready">다 나왔어요 · 벨!</div>` : ""}</div>`;
+      }).join("");
+      const allReady = k.tickets.some((tk) => (mk.get(tk) || []).every((x) => x === "ok"));
       const burners = k.burners.map((b, i) => {
         const ph = burnerPhase(b);
+        const isBusy = busy.has(`b${i}`);
         if (ph === "empty") {
-          return `<div class="ks-burner"><div class="ks-burner__ring">${i + 1}번 화구</div>
-              <div class="ks-burner__pick">${Object.keys(k.menu).filter((d) => k.menu[d].cook).map((d) => `<button type="button" data-cook="${i}:${d}">${esc(dishName(d))}</button>`).join("")}</div></div>`;
+          const pick = DISHES.filter((d) => k.menu[d] && k.menu[d].cook).map((d) => `<button type="button" class="${need.includes(d) ? "is-need" : ""}" data-cook="${i}:${d}" aria-label="${esc(dishName(d))} 올리기">${dishSvg(d)}${esc(dishName(d))}</button>`).join("");
+          return `<div class="ks-burner is-empty ${isBusy ? "is-busy" : ""}" data-spot="b${i}"><div class="ks-burner__ring" style="--p:0"><div class="ks-burner__pot is-empty"></div></div>
+              <div class="ks-burner__label">${i + 1}번 화구 · 비었어요</div><div class="ks-pick">${pick}</div></div>`;
         }
-        const label = { cook: "끓는 중…", done: "다 됐어요! 꺼내세요", burn: "타 버렸어요" }[ph];
-        const barHtml = ph === "cook" ? bar(b.start, b.done, "fill") : ph === "done" ? bar(b.done, b.burn, "left") : "";
-        return `<div class="ks-burner is-${ph}" data-phase="${ph}"><div class="ks-burner__ring">${esc(dishName(b.dish))}</div>
-            <div class="ks-burner__label">${label}</div>${barHtml}
-            <button type="button" class="ks-burner__go" data-take="${i}" ${ph === "cook" ? "disabled" : ""}>${ph === "burn" ? "버리기" : ph === "done" ? "꺼내기" : "기다리는 중"}</button></div>`;
+        const label = { cook: `${esc(dishName(b.dish))} 끓는 중`, done: "다 됐어요! 꺼내요", warn: "곧 타요! 빨리!", burn: "타 버렸어요" }[ph];
+        const btn = ph === "cook"
+          ? `<button type="button" class="ks-btn is-wait" disabled>${Math.max(0, Math.ceil(b.done - now()))}초 남았어요</button>`
+          : ph === "burn"
+            ? `<button type="button" class="ks-btn is-trash" data-take="${i}">${HKUI.icon("trash-2", 14, "currentColor")} 버리기</button>`
+            : `<button type="button" class="ks-btn is-go" data-take="${i}">${HKUI.icon("arrow-up-from-line", 14, "currentColor")} 꺼내기</button>`;
+        const p = ph === "cook" ? Math.max(0, Math.min(1, (now() - b.start) / (b.done - b.start))) : ph === "burn" ? 1 : Math.max(0, Math.min(1, 1 - (now() - b.done) / (b.burn - b.done)));
+        return `<div class="ks-burner is-${ph} ${isBusy ? "is-busy" : ""}" data-spot="b${i}" data-burner="${i}" data-start="${b.start}" data-done="${b.done}" data-burnat="${b.burn}">
+            <div class="ks-burner__ring" style="--p:${p.toFixed(3)}"><div class="ks-steam"><i></i><i></i><i></i></div><div class="ks-burner__pot">${dishSvg(b.dish)}</div>${ph !== "burn" ? `<div class="ks-flames"><i></i><i></i><i></i></div>` : ""}</div>
+            <div class="ks-burner__label">${label}</div>${btn}</div>`;
       }).join("");
       const g = k.gimbap;
-      return `<div class="ks-sec"><h3>${HKUI.icon("clipboard-list", 15)} 주문서<small>홀이 전달한 주문만 보여요</small></h3><div class="ks-tickets">${tickets || `<div class="ks-empty">아직 들어온 주문이 없어요</div>`}</div>
-          ${k.waiting ? `<div class="ks-note">홀에 아직 전달 안 된 손님이 ${k.waiting}명 있어요.</div>` : ""}</div>
-        <div class="ks-sec"><h3>${HKUI.icon("flame", 15)} 화구<small>다 익고 ${k.burnSec}초 안에 꺼내야 안 타요</small></h3><div class="ks-burners">${burners}</div></div>
-        <div class="ks-sec"><h3>${HKUI.icon("hand", 15)} 김밥 말기</h3><div class="ks-gimbap"><div class="ks-steps">${g.steps.map((s, i) => `<span class="${i < g.step ? "is-done" : ""}">${esc(s)}</span>`).join("")}</div>
-          <button type="button" class="hk-btn hk-btn--primary ks-roll" data-roll>${esc(g.steps[g.step])}</button></div></div>
-        ${passHtml()}`;
+      const step = g.step;
+      const mat = `<svg viewBox="0 0 120 56" aria-hidden="true">${step === 3
+          ? `<rect x="10" y="16" width="100" height="26" rx="13" fill="#14532d"/><path d="M18 20h84" stroke="#166534" stroke-width="2"/><ellipse cx="110" cy="29" rx="6" ry="12" fill="#fff"/><circle cx="110" cy="27" r="2.4" fill="#f59e0b"/><circle cx="110" cy="33" r="2" fill="#16a34a"/>`
+          : `<rect x="6" y="4" width="108" height="48" rx="3" fill="#14532d"/>${step >= 1 ? `<rect x="10" y="12" width="100" height="36" rx="3" fill="#fff"/>` : ""}${step >= 2 ? `<g stroke-width="5" stroke-linecap="round"><path d="M18 22h84" stroke="#f59e0b"/><path d="M18 29h84" stroke="#16a34a"/><path d="M18 36h84" stroke="#f97316"/><path d="M18 43h84" stroke="#fda4af"/></g>` : ""}`}</svg>`;
+      const needG = need.includes("gimbap");
+      return `<div class="ks-scene ks-scene--kitchen">
+          <div class="ks-panel ks-rail"><h3>${HKUI.icon("clipboard-list", 15, "currentColor")} 주문서<small class="${k.waiting ? "is-wait" : ""}">${k.waiting ? `홀에 전달 안 된 손님 ${k.waiting}명` : "홀이 전달한 주문만 보여요"}</small></h3>
+            <div class="ks-tickets">${tickets || `<div class="ks-empty" style="grid-column:1/-1">아직 들어온 주문이 없어요</div>`}</div></div>
+          <div class="ks-line">
+            <div class="ks-stove"><h3>${HKUI.icon("flame", 15, "currentColor")} 화구<small>다 익고 ${k.burnSec}초 지나면 타요</small></h3><div class="ks-burners">${burners}</div></div>
+            <div class="ks-side">
+              <div class="ks-panel ks-gimbap"><h3>${HKUI.icon("hand", 15, "currentColor")} 김밥 말기${needG ? `<small style="color:#c2410c">필요해요!</small>` : ""}</h3>
+                <div class="ks-mat" data-mat>${mat}</div><div class="ks-dots">${g.steps.map((_, i) => `<i class="${i < step ? "is-on" : ""}"></i>`).join("")}</div>
+                <button type="button" class="ks-btn" data-roll>${esc(g.steps[step] || "")}<em class="ks-q" ${rollQ ? "" : "hidden"}>+${rollQ}</em></button></div>
+              <button type="button" class="ks-bell ${allReady ? "is-hint" : ""}" data-bell aria-label="벨 울려 홀 부르기">${bellSvg()}<span>벨 띵!<small>다 되면 홀을 불러요</small></span></button>
+            </div>
+          </div>
+          ${windowHtml()}
+        </div>`;
     }
 
     function feedHtml() {
-      const items = (k.log || []).slice().reverse().map((l) => `<li>${esc(l.text)}</li>`).join("");
-      return `<div class="er-card"><h2>가게 소식</h2>${items ? `<ul class="ks-feed">${items}</ul>` : `<div style="font-size:13px;color:var(--text-muted)">아직 소식이 없어요</div>`}</div>`;
+      const ic = { pay: "🪙", miss: "💢", burn: "🔥", say: "📞" };
+      // 사장님 전화만 전화 그림 — 문 반장님 말 · 가게 소식은 말풍선
+      const icon = (l) => (l.kind === "say" && !String(l.text).includes("(전화)") ? "💬" : ic[l.kind] || "·");
+      const items = (k.log || []).slice().reverse().map((l) => `<li class="is-${esc(l.kind || "")}"><i aria-hidden="true">${icon(l)}</i><span>${esc(l.text)}</span></li>`).join("");
+      return `<div class="er-card"><h2>${HKUI.icon("store", 16, "currentColor")} 가게 소식</h2>${items ? `<ul class="ks-feed">${items}</ul>` : `<div style="font-size:13px;color:var(--text-muted)">아직 소식이 없어요</div>`}</div>`;
     }
 
-    // 막대 너비 · 화구 상태 · 시간 일(손님 도착 등) 맞추기 — 0.1초마다
+    // ---------- 효과(떠다니는 글자 · 번쩍임) ----------
+    function fxLayer() {
+      let el = document.getElementById("ks-fx");
+      if (!el) { el = document.createElement("div"); el.id = "ks-fx"; document.body.appendChild(el); }
+      return el;
+    }
+    // 떠다니는 글자 — 그 자리가 화면 밖이면 back 자리(위에 붙은 머리 칸의 하트 · 매출)에, 그것도 없으면 화면 위쪽 가운데에 띄운다
+    function float(spot, html, cls, dy = 0, back = "money") {
+      if (reduced()) return;
+      const top = stickTop();
+      const hud = document.querySelector("[data-hud]");
+      const hudBottom = hud ? hud.getBoundingClientRect().bottom : top;
+      // 글자가 뜰 자리가 보이는지 — 위에 붙은 머리 칸 아래(머리 칸 안의 자리는 그 칸 안)부터 화면 아래까지
+      const seen = (el) => {
+        if (!el) return null;
+        const r = el.getBoundingClientRect();
+        const y = r.top + Math.min(r.height * 0.35, 60);
+        const minTop = hud && hud.contains(el) ? top : Math.max(top, hudBottom);
+        return r.height && y > minTop + 8 && y < innerHeight - 24 ? r : null;
+      };
+      const r = seen(document.querySelector(`[data-spot="${spot}"]`)) || seen(document.querySelector(`[data-spot="${back}"]`));
+      const el = document.createElement("div");
+      el.className = `ks-float ${cls}`;
+      el.innerHTML = html;
+      if (r) {
+        el.style.left = `${r.left + r.width / 2 + scrollX}px`;
+        el.style.top = `${r.top + Math.min(r.height * 0.35, 60) + scrollY + dy}px`;
+      } else {
+        el.style.left = `${innerWidth / 2 + scrollX}px`;
+        el.style.top = `${top + 70 + scrollY}px`;
+      }
+      fxLayer().appendChild(el);
+      setTimeout(() => el.remove(), 1500);
+    }
+    function flash(kind = "") {
+      if (reduced()) return;
+      const el = document.createElement("div");
+      el.id = "ks-flash";
+      if (kind) el.className = `is-${kind}`;
+      document.getElementById("ks-flash")?.remove();
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 850);
+    }
+    function pulse(sel, cls, ms = 600) {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+      setTimeout(() => el.classList.remove(cls), ms);
+    }
+    // 새 효과 알림 하나 — 소리와 그림. sfx 는 한 번에 들어온 효과들 사이에서 같은 소리를 한 번만 낸다
+    function runFx(e, sfx, show) {
+      const hall = isHall();
+      if (e.k === "pay") {
+        if (show) float(hall ? e.where : "money", `+${won(e.amount)}${e.tip ? `<small>팁 ${won(e.tip)}</small>` : ""}`, "is-coin");
+        pulse(".ks-money", "is-bump", 500);
+        sfx("coin");
+      } else if (e.k === "combo") {
+        if (show) float("combo", `콤보 ${e.n}! ×${String(e.mult).replace(/0+$/, "").replace(/\.$/, "")}`, "is-combo", 10);
+        pulse(".ks-combo", "is-pop", 600);
+        sfx("combo", Math.min(10, e.n));
+      } else if (e.k === "break") {
+        if (show) float("combo", `콤보 ${e.n} 끊겼어요`, "is-break", 10);
+        sfx("invalid");
+      } else if (e.k === "miss") {
+        if (show) float(hall ? (e.where === "counter" ? "queue" : e.where) : "hearts", "♥ −1 손님을 놓쳤어요", "is-miss", 0, "hearts");
+        pulse(".ks-hearts", "is-hurt", 500);
+        flash("miss");
+        sfx("hurt");
+      } else if (e.k === "burn") {
+        if (!hall && show) float(`b${e.burner}`, "타 버렸어요…", "is-break", 0, "combo");
+        sfx("fail");
+      } else if (e.k === "bell") {
+        if (hall) { ringUntil = now() + 1.2; pulse(".ks-window", "is-ring", 1000); if (show) float("pass", "띵!", "is-bell", -10); flash(); sfx("success"); }
+      } else if (e.k === "arrive") {
+        if (hall) sfx(e.vip ? "powerup" : "pop");
+      } else if (e.k === "ticket") {
+        if (!hall) sfx("pop");
+      }
+    }
+    // 서버의 새 효과 — 처음 보는 id 이면서 방금(FX_FRESH 초 안) 일어난 것만. 오래된 건 본 것으로 치고 넘긴다
+    function takeFx(next) {
+      const list = (next && next.ev) || [];
+      const max = list.reduce((m, e) => Math.max(m, e.id), 0);
+      if (lastEv < 0) { lastEv = max; return; } // 처음 들어올 때는 지난 효과를 다시 보여 주지 않는다
+      const t = Number(next.now) || now();
+      list.filter((e) => e.id > lastEv && t - e.at <= FX_FRESH).forEach((e) => fxQ.push(e));
+      lastEv = Math.max(lastEv, max);
+      if (next.say && next.say.id > lastSay && t - next.say.at < 2) fxQ.push({ k: "say", id: next.say.id, who: next.say.who });
+    }
+
+    // ---------- 0.1초마다 — 막대 · 기분 · 화구 · 소식 · 머리 칸(붙음 · 시계 · 러시) · 마지막 5초 ----------
     function tick(ctx) {
       if (!room || room.status !== "PLAYING" || !k) return;
       const t = now();
       document.querySelectorAll(".ks-bar[data-from]").forEach((el) => {
         const from = Number(el.dataset.from), to = Number(el.dataset.to);
-        let f = Math.max(0, Math.min(1, (t - from) / (to - from)));
+        let f = Math.max(0, Math.min(1, (t - from) / Math.max(0.01, to - from)));
         if (el.dataset.mode === "left") f = 1 - f;
         el.firstChild.style.width = `${(f * 100).toFixed(1)}%`;
         if (el.dataset.mode === "left") { el.classList.toggle("is-warn", f < 0.5 && f >= 0.25); el.classList.toggle("is-bad", f < 0.25); }
       });
-      if (k.burners) {
-        const p = k.burners.map(burnerPhase).join(",");
-        if (p !== phases) { phases = p; ctx.paint(); }
+      document.querySelectorAll("[data-cu][data-until]").forEach((el) => {
+        const m = moodOf(Math.max(0, Math.min(1, (Number(el.dataset.until) - t) / Number(el.dataset.pat || 1))));
+        const svg = el.firstElementChild;
+        if (svg && svg.dataset.mood !== m) svg.dataset.mood = m;
+      });
+      document.querySelectorAll("[data-ticket][data-until]").forEach((el) => {
+        el.classList.toggle("is-urgent", (Number(el.dataset.until) - t) / Number(el.dataset.pat || 1) < 0.3);
+      });
+      document.querySelectorAll(".ks-burner[data-burner]").forEach((el) => {
+        const s = Number(el.dataset.start), d = Number(el.dataset.done), bu = Number(el.dataset.burnat);
+        const p = t < d ? (t - s) / (d - s) : t < bu ? 1 - (t - d) / (bu - d) : 1;
+        el.querySelector(".ks-burner__ring").style.setProperty("--p", Math.max(0, Math.min(1, p)).toFixed(3));
+        const w = el.querySelector(".ks-btn.is-wait");
+        if (w && t < d) w.textContent = `${Math.max(0, Math.ceil(d - t))}초 남았어요`;
+      });
+      // 소식 줄 — 사장님 말이 끝나면 도움말로(다시 그리지 않고 칸만 바꾼다 · 높이는 그대로)
+      const news = document.querySelector("[data-news]");
+      if (news) {
+        const on = !!sayActive(t);
+        if (on !== sayOn) { sayOn = on; news.classList.toggle("is-say", on); news.classList.remove("is-new"); }
+        const ti = Math.floor(Math.max(0, t - k.start) / 9);
+        if (ti !== lastTip) { lastTip = ti; const el = news.querySelector("[data-tip]"); if (el) el.textContent = tipAt(t); }
       }
+      // 머리 칸 — 화면 위에 붙었는지(위 막대 시계가 가려지면 머리 칸에 남은 시간을 보인다) · 러시 띠 · 시계
+      const hud = document.querySelector("[data-hud]");
+      if (hud) {
+        const top = stickTop();
+        const ks = hud.parentElement;
+        if (ks && ks.style.getPropertyValue("--ks-stick") !== `${top}px`) ks.style.setProperty("--ks-stick", `${top}px`);
+        const timer = document.getElementById("er-timer");
+        const isStuck = timer ? timer.getBoundingClientRect().bottom < top + 4 : hud.getBoundingClientRect().top <= top + 1;
+        if (isStuck !== stuck) { stuck = isStuck; hud.classList.toggle("is-stuck", isStuck); }
+        const rush = inRush(t);
+        if (hud.classList.contains("is-rush") !== rush) hud.classList.toggle("is-rush", rush);
+        if (rush) { const el = hud.querySelector("[data-rush-left]"); const txt = `${Math.ceil(k.rush.end - t)}초`; if (el && el.textContent !== txt) el.textContent = txt; }
+        const clock = hud.querySelector("[data-clock]");
+        if (clock) {
+          const left = Math.max(0, k.end - t);
+          const txt = mmss(left);
+          if (clock.textContent !== txt) clock.textContent = txt;
+          clock.parentElement.classList.toggle("is-low", left < 30);
+        }
+      }
+      // 화구 단계가 바뀌면(다 익음 · 곧 탐 · 탐) 다시 그리고 알린다
+      if (k.burners) {
+        const ps = k.burners.map((b) => burnerPhase(b, t));
+        const p = ps.join(",");
+        if (p !== phases) {
+          const before = phases.split(",");
+          phases = p;
+          ps.forEach((ph, i) => {
+            if (before[i] === "cook" && (ph === "done" || ph === "warn")) ctx.sfx("select");
+          });
+          ctx.paint();
+        }
+        const warnKey = ps.map((ph, i) => (ph === "warn" ? `${i}:${Math.ceil(k.burners[i].burn - t)}` : "")).join(",");
+        if (warnKey !== lastWarn) { if (/\d:\d/.test(warnKey)) ctx.sfx("tick"); lastWarn = warnKey; }
+      }
+      // 마지막 5초
+      const left = Math.ceil(k.end - t);
+      if (left <= 5 && left >= 1 && left !== lastCount) { lastCount = left; ctx.sfx("countdown"); }
       if (k.nextAt && t >= k.nextAt + 0.05 && tickFor !== k.nextAt) {
         tickFor = k.nextAt;
-        HKApi.coopTick(room.id).then((next) => ctx.set(next)).catch(() => { tickFor = null; });
+        HKApi.coopTick(room.id).then((next) => { if (fresher(next)) ctx.set(next); }).catch(() => { tickFor = null; });
       }
     }
 
-    async function doAct(ctx, action, arg) {
+    // ---------- 보내기 — 같은 버튼을 빠르게 두 번 눌러도 한 번만 ----------
+    const ACT_SFX = { seat: "select", send: "swap", serve: "tap", clean: "whoosh", cook: "sizzle", take: "drop", bell: "select", toss: "drop" };
+    const SEND_GAP = 170; // ms — 서버의 연타 막기(같은 사람 0.15초)보다 조금 길게
+    async function doAct(ctx, action, arg, key, el) {
+      if (busy.has(key)) return;
+      busy.add(key);
+      if (el) el.classList.add("is-busy");
+      const before = k;
       try {
+        lastSend = Date.now();
         const next = await HKApi.coopAct(room.id, action, arg);
-        ctx.set(next);
+        if (action === "roll") { const nk = next.kitchen; ctx.sfx(nk && nk.gimbap && nk.gimbap.step === 0 && before && before.gimbap && before.gimbap.step > 0 ? "pop" : "tap"); }
+        else if (action === "take") { const b = before && before.burners && before.burners[arg]; ctx.sfx(b && burnerPhase(b) === "burn" ? "invalid" : "drop"); }
+        else if (ACT_SFX[action]) ctx.sfx(ACT_SFX[action]);
+        if (action === "bell") pulse(".ks-bell", "is-ring", 700);
+        busy.delete(key);
+        if (fresher(next)) ctx.set(next); else ctx.paint();
+        if (action === "roll") pulse("[data-mat]", "is-step", 300);
         if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
-      } catch (e) { HKUI.toast(e.message || "할 수 없어요", "error"); }
+        return true;
+      } catch (e) {
+        busy.delete(key);
+        if (el) el.classList.remove("is-busy");
+        if (e.code === "ESCAPE_TOO_FAST") return "fast"; // 연타 — 조용히
+        ctx.sfx("invalid");
+        HKUI.toast(e.message || "할 수 없어요", "error");
+        if (["KITCHEN_GONE", "ESCAPE_NOT_PLAYING"].includes(e.code)) ctx.refresh();
+        return false;
+      }
+    }
+    // 김밥 말기 — 빠르게 여러 번 눌러도 사라지지 않게 눌린 횟수를 세어 두었다가 하나씩 보낸다(한 줄 = 단계 수만큼까지)
+    function rollBadge() {
+      const el = document.querySelector("[data-roll] .ks-q");
+      if (el) { el.textContent = `+${rollQ}`; el.hidden = !rollQ; }
+    }
+    function queueRoll(ctx) {
+      const steps = (k && k.gimbap && k.gimbap.steps.length) || RULES.gimbapSteps;
+      if (rollQ >= steps) return;
+      rollQ += 1;
+      rollBadge();
+      pumpRoll(ctx);
+    }
+    async function pumpRoll(ctx) {
+      if (rollBusy || !rollQ) return;
+      rollBusy = true;
+      let tries = 0;
+      while (rollQ > 0 && room && room.status === "PLAYING") {
+        const wait = SEND_GAP - (Date.now() - lastSend);
+        if (wait > 0) await new Promise((res) => setTimeout(res, wait));
+        const ok = await doAct(ctx, "roll", null, "roll");
+        if (ok === "fast" && tries < 3) { tries += 1; continue; } // 연타 막기에 걸리면 조금 뒤 다시
+        tries = 0;
+        if (ok !== true) { rollQ = 0; break; } // 배식구가 꽉 찼거나 끝남 — 남은 탭은 버린다
+        rollQ -= 1;
+        rollBadge();
+      }
+      rollQ = Math.max(0, rollQ);
+      rollBadge();
+      rollBusy = false;
+    }
+
+    // ---------- 대기실 — 내 할 일 · 이렇게 해요 ----------
+    function readyNote(ctx) {
+      const hall = ctx.room.sideName === "홀";
+      const g = { id: 3, vip: false };
+      const steps = hall
+        ? [[guestSvg(g, { mood: "0" }), "안내", "줄 선 손님을 눌러 자리에"], [`<span style="display:grid;place-items:center;width:34px;height:34px;color:#c2410c">${HKUI.icon("send", 22, "currentColor")}</span>`, "전달", "주문을 주방에 알려요"], [dishSvg("tteok"), "서빙", "음식이 다 ✓ 이면"], [`<span style="display:grid;place-items:center;width:34px;height:34px;color:#0369a1">${HKUI.icon("sparkles", 22, "currentColor")}</span>`, "치우기", "다 먹은 자리를 비워요"]]
+        : [[`<span style="display:grid;place-items:center;width:34px;height:34px;color:#c2410c">${HKUI.icon("clipboard-list", 22, "currentColor")}</span>`, "주문서", "홀이 전달한 것만 보여요"], [dishSvg("ramen"), "끓이기", "화구에 올리고 다 익으면 꺼내요"], [dishSvg("gimbap"), "김밥", `버튼 ${RULES.gimbapSteps}번으로 말아요`], [`<span style="display:grid;place-items:center;width:34px;height:34px">${bellSvg()}</span>`, "벨", "다 되면 띵! 홀을 불러요"]];
+      return `<div class="ks-role__head"><b>나는 ${esc(ctx.room.sideName || "")}</b> — ${hall ? "손님과 주방 사이를 바쁘게 오가요. 주방은 주문을 못 보니 꼭 전달해 줘요." : "주문을 직접 못 봐요. 홀이 전달한 주문서를 보고 만들어요."}</div>
+        <ol class="ks-flow">${steps.map(([ic, b, s]) => `<li>${ic}<span><b>${b}</b><small>${s}</small></span></li>`).join("")}</ol>`;
+    }
+    function readyExtra(ctx) {
+      // 화면 시계는 남은 시간을 거꾸로 센다 — 러시가 시작하는 때를 그 시계로 말한다(3분 판이면 1분 25초)
+      const limit = (ctx && ctx.room && ctx.room.limitSec) || 180;
+      const r = Math.max(0, limit - RULES.rushAt);
+      const rushLeft = `${Math.floor(r / 60) ? `${Math.floor(r / 60)}분 ` : ""}${r % 60 ? `${r % 60}초` : ""}`.trim();
+      const rules = [
+        ["#fef9c3", "#a16207", "★", "단골손님", "1.5배를 내지만 금방 가요"],
+        ["#ede9fe", "#6d28d9", HKUI.icon("shopping-bag", 15, "currentColor"), "포장", "전달하고 나오면 포장대에서 건네요"],
+        ["#ffedd5", "#c2410c", "×2", "콤보", "빨리 내면 팁이 최대 2배"],
+        ["#fef3c7", "#b45309", HKUI.icon("bell-ring", 15, "currentColor"), "벨", "다 되면 주방이 띵!"],
+        ["#fee2e2", "#dc2626", HKUI.icon("zap", 15, "currentColor"), "점심 러시", `남은 시간 ${rushLeft}쯤 몰려와요`],
+        ["#fce7f3", "#db2777", `♥${RULES.hearts}`, `하트 ${RULES.hearts}개`, "다 잃으면 문을 닫아요"],
+      ];
+      return `<div class="ks-how"><h4>${HKUI.icon("lightbulb", 16, "currentColor")} 이렇게 해요</h4><ul class="ks-rules">${rules.map(([bg, fg, ic, b, s]) => `<li><i style="background:${bg};color:${fg}">${ic}</i><span><b>${b}</b>${s}</span></li>`).join("")}</ul></div>`;
+    }
+
+    // ---------- 끝 ----------
+    function tierOf(r) {
+      if (!r || r.status !== "CLEAR" || r.end === "HEARTS" || !(Number(r.score) > 0)) return "fail";
+      return Number(r.score) >= GREAT ? "great" : "ok";
+    }
+    function endCard() {
+      const kk = room.kitchen || {};
+      const tier = tierOf(room);
+      const hearts = room.end === "HEARTS";
+      const title = hearts ? "가게 문을 일찍 닫았어요" : tier === "great" ? "대박 영업이에요!" : tier === "ok" ? "영업 끝!" : "영업 끝";
+      const msg = hearts
+        ? "손님을 너무 많이 놓쳤어요. 다음엔 더 크게 말해 봐요!"
+        : tier === "great" ? "사장님보다 많이 팔았어요. 단골 단톡방이 들썩여요!"
+          : tier === "ok" ? "손님들이 맛있게 먹고 갔어요. 둘이 손발이 척척!"
+            : "아직 한 그릇도 못 팔았어요. 다시 해 봐요!";
+      const art = tier === "great" ? `${dishSvg("tteok")}${coinSvg()}${dishSvg("ramen")}` : tier === "ok" ? `${dishSvg("gimbap")}${dishSvg("tteok")}${dishSvg("odeng")}` : `${dishSvg("odeng")}`;
+      return `<div class="er-end is-kitchen is-${tier} ${tier === "fail" ? "is-low" : ""}">
+          <div class="ks-endart">${art}</div>
+          <h2>${title}</h2><p>${msg}</p>
+          <div class="er-end__time">${won(room.score)}</div>
+          <div class="ks-endsub">${kk.tips ? `<span>팁 ${won(kk.tips)}</span>` : ""}${known(kk.today) ? `<span>오늘의 메뉴 ${esc(dishName(kk.today))}</span>` : ""}<span>남은 하트 ${kk.hearts ?? 0}개</span></div>
+        </div>`;
     }
 
     HKCoop.mount({
@@ -215,46 +1065,105 @@
       heroClass: "is-kitchen",
       wide: true,
       tickMs: 100,
-      hero: { facts: ["2인 협동", "3분 영업", "홀 · 주방", "끝까지 하면 오늘 도장"], note: "주방은 주문을 직접 볼 수 없어요. 홀이 주문을 전달해 주고, 주방은 다 된 음식을 배식구에 올려요. 서로 말로 알려 주면 매출이 쑥쑥 올라요." },
+      hero: { facts: ["2인 협동", "3분 영업", "홀 · 주방", "단골 · 포장 · 콤보", "끝까지 하면 오늘 도장"], note: "주방은 주문을 직접 볼 수 없어요. 홀이 주문을 전달하고, 주방은 다 된 음식을 배식구에 올리고 벨을 울려요. 서로 말로 알려 주면 매출이 쑥쑥 올라요." },
       rankTitle: "매출 순위",
       rankNote: "같은 두 사람은 가장 높은 매출 한 판만 올라요.",
       rankText: (x) => won(x.score),
-      recentText: (r) => (r.status === "CLEAR" ? [`매출 ${won(r.score)}`, "is-clear"] : ["포기", "is-fail"]),
+      recentText: (r) => (r.status === "CLEAR" ? (r.end === "HEARTS" ? [`일찍 닫음 · ${won(r.score)}`, "is-fail"] : [`매출 ${won(r.score)}`, "is-clear"]) : ["포기", "is-fail"]),
       failTitle: "영업 중단",
-      quick: ["주문 들어가요!", "떡볶이 빨리요", "라면 올려 주세요", "김밥 말아 주세요", "배식구 확인해요", "잠깐만요"],
+      quick: ["주문 들어가요!", "단골 왔어요 ★", "포장 하나요", "떡볶이 빨리요", "다 됐어요, 벨!", "배식구 확인해요", "잠깐만요"],
       remain: () => (k ? k.end - now() : null),
       timerNote: () => "영업 남은 시간",
-      readyNote: (ctx) => (ctx.room.sideName === "홀"
-        ? "<b>홀</b>은 줄 선 손님을 눌러 자리에 앉히고, 주문을 <b>「주방에 전달」</b>해요. 배식구에 음식이 다 나오면 <b>「서빙」</b>, 손님이 다 먹으면 <b>「치우기」</b>. 손님을 3명 놓치면 가게 문을 닫아요."
-        : "<b>주방</b>은 주문을 직접 못 봐요. 홀이 전달한 주문서를 보고 화구에 떡볶이·라면·어묵을 올리고, 다 익으면 바로 <b>「꺼내기」</b>(늦으면 타요). 김밥은 버튼을 4번 눌러 말아요."),
-      reset: () => { tickFor = null; phases = ""; },
+      readyNote,
+      readyExtra,
+      reset: () => { tickFor = null; phases = ""; lastEv = -1; fxQ = []; lastSay = 0; seenTickets = new Set(); seenGuests = new Set(); lastPass = 0; firstPaint = true; busy.clear(); rollQ = 0; stuck = null; },
       changed: (prev, next) => {
         room = next;
-        k = next.kitchen || null;
+        const nk = next.kitchen || null;
+        if (prev && prev.id === next.id && nk) takeFx(nk);
+        else if (nk) { lastEv = (nk.ev || []).reduce((m, e) => Math.max(m, e.id), 0); lastSay = nk.say ? nk.say.id : 0; }
+        k = nk;
         if (k) offset = k.now * 1000 - Date.now();
       },
-      play: () => (k ? `<div class="er-card">${statsHtml()}${room.sideName === "홀" ? hallHtml() : kitchenHtml()}</div>` : ""),
-      side: () => (k ? feedHtml() : ""),
-      end: (ctx, again) => {
-        const kk = room.kitchen || {};
-        return `<div class="er-end is-kitchen"><h2>${room.end === "HEARTS" ? "가게 문을 일찍 닫았어요" : "영업 끝!"}</h2><p>${esc(room.outro)}</p>
-            <div class="er-end__time">${won(room.score)}</div>
-            <div class="ks-end-stats"><span>손님 ${kk.served || 0}명</span><span>놓친 손님 ${kk.missed || 0}명</span><span>탄 음식 ${kk.burnt || 0}개</span></div>
-            <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">분식집 목록</a></div></div>`;
+      painted: (ctx) => {
+        if (room && room.status === "PLAYING" && k) {
+          lastPass = (k.pass || []).length;
+          firstPaint = false;
+          const ks = document.querySelector(".ks");
+          if (ks) ks.style.setProperty("--ks-stick", `${stickTop()}px`);
+          // 한 번에 들어온 효과들 — 같은 소리는 한 번만, 떠다니는 글자는 마지막 몇 개만
+          const list = fxQ.splice(0);
+          const played = new Set();
+          const sfx = (name, arg) => { if (played.has(name)) return; played.add(name); ctx.sfx(name, arg); };
+          const floats = list.filter((e) => ["pay", "combo", "break", "miss", "burn", "bell"].includes(e.k));
+          list.forEach((e) => { if (e.k === "say") sfx("whoosh"); else runFx(e, sfx, floats.indexOf(e) >= floats.length - FX_MAX); });
+        } else { fxQ = []; rollQ = 0; }
       },
+      play: () => (k ? `<div class="er-card ks">${hudHtml()}${newsHtml()}${isHall() ? hallHtml() : kitchenHtml()}</div>` : ""),
+      side: () => (k ? feedHtml() : ""),
+      end: () => endCard(),
+      failEnd: () => {
+        const kk = room.kitchen || {};
+        return `<div class="er-end is-fail"><div class="ks-endart">${dishSvg("odeng")}</div><h2>영업 중단</h2>
+            <p>${room.end === "LEFT" ? "한 사람이 가게를 나가서 영업을 멈췄어요." : room.end === "TIMEOUT" ? "시간이 다 됐어요." : "포기해서 가게 문을 잠시 닫았어요."}</p>
+            ${kk.money ? `<div class="ks-endsub"><span>그때까지 매출 ${won(kk.money)}</span><span>손님 ${kk.served || 0}명</span></div>` : ""}</div>`;
+      },
+      stats: () => {
+        const kk = room.kitchen || {};
+        if (!room.kitchen) return [];
+        return [
+          { label: "손님", value: `${kk.served || 0}명` },
+          { label: "최고 콤보", value: `${kk.bestCombo || 0}` },
+          { label: "★ 단골", value: `${kk.vip || 0}명` },
+          { label: "포장", value: `${kk.togo || 0}건` },
+          { label: "놓친 손님", value: `${kk.missed || 0}명` },
+          { label: "탄 음식", value: `${kk.burnt || 0}개` },
+        ];
+      },
+      storyTier: (ctx) => tierOf(ctx.room),
       tick,
       click: async (t, ctx) => {
         const d = t.dataset;
-        if (d.seat) return doAct(ctx, "seat", Number(d.seat));
-        if (d.send) return doAct(ctx, "send", Number(d.send));
-        if (d.serve) return doAct(ctx, "serve", Number(d.serve));
-        if (d.clean) return doAct(ctx, "clean", Number(d.clean));
-        if (d.cook) { const [b, dish] = d.cook.split(":"); return doAct(ctx, "cook", { burner: Number(b), dish }); }
-        if (d.take) return doAct(ctx, "take", Number(d.take));
-        if ("roll" in d) return doAct(ctx, "roll", null);
-        if (d.toss) return doAct(ctx, "toss", Number(d.toss));
+        if (!room || room.status !== "PLAYING") return;
+        if (d.seat) return doAct(ctx, "seat", Number(d.seat), `seat:${d.seat}`, t);
+        if (d.send) return doAct(ctx, "send", d.send, `send:${d.send}`, t);
+        if (d.serve) return doAct(ctx, "serve", d.serve, `serve:${d.serve}`, t);
+        if (d.give) return doAct(ctx, "give", d.give, `give:${d.give}`, t);
+        if (d.clean) return doAct(ctx, "clean", Number(d.clean), `clean:${d.clean}`, t);
+        if (d.cook) { const [b, dish] = d.cook.split(":"); return doAct(ctx, "cook", { burner: Number(b), dish }, `b${b}`, t.closest(".ks-burner")); }
+        if (d.take) return doAct(ctx, "take", Number(d.take), `b${d.take}`, t.closest(".ks-burner"));
+        if ("roll" in d) return queueRoll(ctx);
+        if ("bell" in d) return doAct(ctx, "bell", null, "bell");
+        if (d.toss) {
+          if (!known(d.toss)) return;
+          if (!(await HKUI.confirmDialog(`${dishName(d.toss)}${josa(dishName(d.toss), "을", "를")} 버릴까요?`, "배식구에서 하나를 버려요. 잘못 만든 음식만 버려 주세요.", { confirmLabel: "버리기", confirmVariant: "danger" }))) return;
+          return doAct(ctx, "toss", d.toss, `toss:${d.toss}`);
+        }
       },
     });
+
+    // PC 마우스 — 누르고 떼는 사이에 실시간 소식(상대가 한 일)으로 방 화면이 통째로 다시 그려지면 눌렀던 버튼이 없어져
+    // 브라우저가 click 을 보내지 않는다(분식집은 1초에 두 번쯤 다시 그려져 열 번에 한 번꼴로 눌림이 사라졌다).
+    // 뗀 자리에 같은 버튼(data-* 가 같은 것)이 다시 그려져 있으면 그 버튼을 대신 눌러 준다.
+    // 터치는 브라우저가 뗀 자리의 버튼에 click 을 보내 주므로 손대지 않는다.
+    let press = null;
+    const btnSig = (b) => JSON.stringify({ ...b.dataset });
+    document.addEventListener("pointerdown", (e) => {
+      const b = e.pointerType === "mouse" && e.button === 0 && e.target.closest ? e.target.closest("#er-root button") : null;
+      press = b ? { b, sig: btnSig(b), x: e.clientX, y: e.clientY, clicked: false } : null;
+    }, true);
+    document.addEventListener("click", () => { if (press) press.clicked = true; }, true);
+    document.addEventListener("pointerup", (e) => {
+      const p = press;
+      if (!p || e.pointerType !== "mouse") return;
+      setTimeout(() => { // 브라우저가 보낸 click 이 있으면 그걸로 끝
+        if (press === p) press = null;
+        if (p.clicked || p.b.isConnected || Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) return;
+        const at = document.elementFromPoint(e.clientX, e.clientY);
+        const b = at && at.closest ? at.closest("#er-root button") : null;
+        if (b && !b.disabled && btnSig(b) === p.sig) b.click();
+      }, 0);
+    }, true);
   </script>
 </body>
 </html>

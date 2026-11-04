@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 통하는 사이</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/coop-story.js"></script>
+  <script src="/_shared/coop.js"></script>
+  <style>
+    /* 통하는 사이 — 번외편 1화(16:40 탕비실). 화 색(--ch-*)은 coop.js 가 .er 에 붙인다. 나는 화 색, 동료는 하늘색으로 구분한다 */
+    .er-hero.is-sync:not(.er-hero--story) { background: radial-gradient(70% 90% at 88% 0%, rgba(94, 234, 212, .45) 0%, rgba(94, 234, 212, 0) 60%), linear-gradient(160deg, #134e4a, #0d9488); }
+    /* 화 정보(coop-story.js)가 없을 때만 — 공용 파랑 대신 청록. 화가 있으면 coop.js 가 style 에 화 색을 넣어 이게 덮인다 */
+    .er:not(.has-story) { --ch-accent: #14b8a6; --ch-glow: #5eead4; --ch-strong: #0f766e; --ch-soft: #f0fdfa; --ch-deep: #042f2e; --ch-ink: #134e4a; }
+    .sy-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    /* 얼굴 — 프로필 사진이 없거나 못 불러오면 이름 첫 글자 */
+    .sy-ava { position: relative; display: inline-grid; place-items: center; flex-shrink: 0; width: 30px; height: 30px; overflow: hidden; border-radius: 50%;
+      background: var(--ch-strong, #4d7c0f); color: #fff; font-size: 13px; font-style: normal; font-weight: 900; line-height: 1; }
+    .sy-ava img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .sy-ava.is-mate { background: #0284c7; }
+    .sy-ava.is-sm { width: 26px; height: 26px; font-size: 12px; }
+    .sy-ava.is-xs { width: 20px; height: 20px; font-size: 10.5px; box-shadow: 0 0 0 2px #fff; }
+
+    /* ── 문제판 ── */
+    .sy-stage { position: relative; padding: 14px; border-radius: 24px; border: 1px solid rgba(101, 163, 13, .18);
+      background: radial-gradient(80% 50% at 50% 0%, rgba(190, 242, 100, .32), transparent 70%), linear-gradient(180deg, var(--ch-soft) 0%, #fff 72%);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 12px 30px rgba(54, 83, 20, .08); }
+    .sy-strip { display: flex; align-items: center; gap: 10px; }
+    .sy-theme { flex-shrink: 0; padding: 6px 12px; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1.5px rgba(101, 163, 13, .28); font-size: 13px; font-weight: 800; color: var(--ch-ink); white-space: nowrap; }
+    .sy-dots { display: flex; flex: 1; justify-content: center; gap: 6px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+    .sy-dots li { flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: inset 0 0 0 2px rgba(101, 163, 13, .3); transition: background .3s ease; }
+    .sy-dots li.is-p3 { background: #f59e0b; box-shadow: none; }
+    .sy-dots li.is-p2 { background: #16a34a; box-shadow: none; }
+    .sy-dots li.is-p1 { background: #86efac; box-shadow: none; }
+    .sy-dots li.is-p0 { background: #cbd5e1; box-shadow: none; }
+    .sy-dots li.is-cur { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ch-strong); }
+    .sy-count { flex-shrink: 0; font-size: 13px; font-weight: 700; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sy-count b { font-size: 15px; font-weight: 900; color: var(--ch-ink); }
+    .sy-pts { flex-shrink: 0; display: inline-flex; align-items: baseline; gap: 2px; padding: 5px 13px; border-radius: 999px; background: var(--ch-deep); color: #fff; font-size: 13px; font-weight: 800; white-space: nowrap; }
+    .sy-pts b { display: inline-block; font-size: 18px; font-weight: 900; color: var(--ch-glow); font-variant-numeric: tabular-nums; }
+    .sy-pts.is-bump b { animation: sy-bump .5s ease; }
+    @keyframes sy-bump { 35% { transform: scale(1.45); color: #fde68a; } }
+    /* 남은 시간 — 휴대폰만(위 막대 시계가 화면 위로 밀려나 안 보인다). PC 는 위 막대 시계 */
+    .sy-clock { display: none; }
+
+    /* 질문 카드 */
+    .sy-q { position: relative; margin-top: 12px; padding: 20px 18px; border: 2px solid transparent; border-radius: 22px; background: #fff; text-align: center;
+      box-shadow: 0 6px 0 rgba(190, 242, 100, .55), 0 14px 28px rgba(54, 83, 20, .1); transition: border-color .4s ease; }
+    .sy-stage.is-late .sy-q { border-color: #fdba74; }
+    .sy-q__no { position: absolute; top: 12px; left: 14px; padding: 3px 10px; border-radius: 999px; background: var(--ch-soft); color: var(--ch-strong); font-size: 12.5px; font-weight: 900; }
+    .sy-q__ic { display: block; font-size: 44px; line-height: 1.15; }
+    .sy-q__t { margin: 8px 0 0; font-size: 22px; font-weight: 900; line-height: 1.4; color: var(--color-midnight-navy); word-break: keep-all; }
+    .sy-q.is-slide { animation: sy-slide .24s ease-out both; }
+    @keyframes sy-slide { from { opacity: 0; transform: translateX(32px); } }
+    .sy-q.is-mini { display: flex; align-items: center; gap: 10px; padding: 10px 14px; text-align: left; box-shadow: 0 4px 0 rgba(190, 242, 100, .5), 0 8px 18px rgba(54, 83, 20, .07); }
+    .sy-q.is-mini .sy-q__no { position: static; flex-shrink: 0; }
+    .sy-q.is-mini .sy-q__ic { flex-shrink: 0; font-size: 28px; }
+    .sy-q.is-mini .sy-q__t { margin: 0; font-size: 16.5px; }
+
+    /* 고르기 — ① 나는? ② 동료는? */
+    .sy-step { margin-top: 14px; padding: 12px; border: 1.5px solid rgba(101, 163, 13, .16); border-radius: 18px; background: #fff; scroll-margin-top: 76px; transition: opacity .2s ease, border-color .2s ease, box-shadow .2s ease; }
+    .sy-step.is-cur { border-color: var(--ch-accent); box-shadow: 0 0 0 4px rgba(190, 242, 100, .35); }
+    .sy-step.is-guess.is-cur { border-color: #38bdf8; box-shadow: 0 0 0 4px rgba(186, 230, 253, .6); }
+    .sy-step.is-dim { opacity: .55; }
+    .sy-step__h { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .sy-step__n { display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--ch-strong); color: #fff; font-size: 13.5px; font-weight: 900; }
+    .sy-step.is-guess .sy-step__n { background: #0284c7; }
+    .sy-step__h b { font-size: 17px; font-weight: 900; color: var(--color-midnight-navy); white-space: nowrap; }
+    .sy-step__h small { min-width: 0; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .sy-step__h .sy-ava { margin-left: auto; }
+    .sy-opts { display: grid; grid-template-columns: repeat(var(--n, 4), minmax(0, 1fr)); gap: 8px; }
+    .sy-opts.is-n2 { --n: 2; } .sy-opts.is-n3 { --n: 3; } .sy-opts.is-n4 { --n: 4; }
+    .sy-opt { position: relative; display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 66px; padding: 14px 10px; box-sizing: border-box;
+      border: 2px solid #e2e8f0; border-radius: 16px; background: #fff; color: var(--color-midnight-navy); font: inherit; font-size: 16px; font-weight: 800; line-height: 1.3;
+      text-align: center; word-break: keep-all; overflow-wrap: anywhere; cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: border-color .15s ease, background .15s ease, transform .12s ease, box-shadow .15s ease; }
+    .sy-opt:hover { border-color: var(--ch-accent); transform: translateY(-1px); }
+    .sy-step.is-guess .sy-opt:hover { border-color: #38bdf8; }
+    .sy-opt:active { transform: translateY(1px); }
+    .sy-opt:focus-visible { outline: 3px solid #0ea5e9; outline-offset: 2px; }
+    .sy-opt kbd { position: absolute; top: 6px; left: 8px; font: 700 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #94a3b8; }
+    .sy-step.is-own .sy-opt.is-on { border-color: var(--ch-strong); background: var(--ch-strong); color: #fff; box-shadow: 0 4px 0 var(--ch-ink); }
+    .sy-step.is-own .sy-opt.is-on kbd { color: rgba(255, 255, 255, .7); }
+    .sy-step.is-guess .sy-opt.is-on { border-color: #0284c7; background: #f0f9ff; color: #075985; box-shadow: 0 0 0 3px rgba(2, 132, 199, .16); }
+    .sy-opt__tag { position: absolute; top: -9px; right: -6px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px 2px 3px; border-radius: 999px;
+      background: #fff; box-shadow: 0 2px 6px rgba(15, 23, 42, .16); font-size: 11.5px; font-style: normal; font-weight: 900; white-space: nowrap; animation: sy-tag .22s ease-out both; }
+    .sy-step.is-own .sy-opt__tag { padding: 2px 8px; color: var(--ch-strong); }
+    .sy-step.is-guess .sy-opt__tag { color: #0369a1; }
+    @keyframes sy-tag { from { opacity: 0; transform: scale(.6); } }
+
+    /* 낸 뒤 — 접힌 카드 */
+    .sy-sent { display: flex; align-items: center; gap: 14px; margin-top: 14px; padding: 16px; border: 2px dashed rgba(101, 163, 13, .45); border-radius: 18px; background: #fff; }
+    .sy-sent__badge { display: grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%; background: var(--ch-strong); color: #fff; font-size: 22px; font-weight: 900; animation: sy-pop .3s ease both; }
+    .sy-sent__txt { flex: 1; min-width: 0; }
+    .sy-sent__txt > b { display: block; font-size: 17px; font-weight: 900; color: var(--color-midnight-navy); }
+    .sy-sent__pair { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+    .sy-sent__pair span { padding: 4px 11px; border-radius: 999px; background: var(--ch-soft); font-size: 13.5px; font-weight: 700; color: var(--ch-ink); word-break: keep-all; }
+    .sy-sent__pair span + span { background: #f0f9ff; color: #075985; }
+    .sy-sent__pair em { font-style: normal; font-weight: 900; }
+    .sy-sent__txt small { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+    .sy-relink { flex-shrink: 0; min-height: 40px; padding: 0 14px; border: 1.5px solid #e2e8f0; border-radius: 999px; background: #fff; color: #475569; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+    .sy-relink:hover { border-color: var(--ch-accent); color: var(--ch-strong); }
+
+    /* 아래 줄 — 동료 상태 · 제출 · 다음 */
+    .sy-foot { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+    .sy-foot__mate { flex: 1; min-width: 0; }
+    .sy-mate { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; padding: 5px 12px 5px 5px; box-sizing: border-box; border-radius: 999px; background: #fff;
+      box-shadow: inset 0 0 0 1.5px #e2e8f0; font-size: 14px; font-weight: 700; color: #475569; }
+    .sy-mate > span:not(.sy-ava):not(.sy-dots3) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sy-mate.is-done { background: #f0fdf4; box-shadow: inset 0 0 0 1.5px #86efac; color: #15803d; }
+    .sy-mate.is-done i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 12px; font-style: normal; font-weight: 900; }
+    .sy-mate.is-pop { animation: sy-pop .26s ease both; }
+    @keyframes sy-pop { 0% { transform: scale(.8); } 60% { transform: scale(1.1); } 100% { transform: none; } }
+    .sy-dots3 { display: inline-flex; gap: 3px; }
+    .sy-dots3 i { width: 5px; height: 5px; border-radius: 50%; background: #94a3b8; animation: cs-dot 1.1s ease-in-out infinite; }
+    .sy-dots3 i:nth-child(2) { animation-delay: .15s; }
+    .sy-dots3 i:nth-child(3) { animation-delay: .3s; }
+    .sy-submit { flex-shrink: 0; min-width: 210px; min-height: 52px; padding: 0 24px; border: 0; border-radius: 999px; background: var(--ch-strong); color: #fff;
+      font: inherit; font-size: 16.5px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 0 var(--ch-ink); transition: background .15s ease, transform .1s ease; }
+    .sy-submit:hover:not(:disabled) { filter: brightness(1.08); }
+    .sy-submit:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--ch-ink); }
+    .sy-submit:disabled { background: #e2e8f0; color: #64748b; box-shadow: none; cursor: default; font-size: 15px; }
+    .sy-keys { margin: 8px 0 0; font-size: 12px; font-weight: 600; color: #94a3b8; text-align: right; }
+    .sy-keys kbd { display: inline-block; min-width: 16px; padding: 1px 5px; border-radius: 5px; background: #f1f5f9; box-shadow: inset 0 -1px 0 #cbd5e1; font: 700 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: #475569; text-align: center; }
+
+    /* ── 공개 ── */
+    .sy-res { position: relative; margin-top: 12px; padding: 14px 12px 6px; border-radius: 22px; background: #fff; box-shadow: 0 6px 0 rgba(190, 242, 100, .55), 0 14px 28px rgba(54, 83, 20, .1); }
+    .sy-kind { display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .sy-kind b { font-size: 23px; font-weight: 900; letter-spacing: -.01em; color: var(--color-midnight-navy); }
+    .sy-kind > span { font-size: 24px; line-height: 1; }
+    .sy-kind em { padding: 3px 12px; border-radius: 999px; background: #e2e8f0; color: #475569; font-size: 16px; font-style: normal; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .sy-res.is-perfect .sy-kind b { color: #b45309; }
+    .sy-res.is-perfect .sy-kind em { background: linear-gradient(90deg, #f59e0b, #facc15); color: #422006; box-shadow: 0 3px 10px rgba(245, 158, 11, .35); }
+    .sy-res.is-sameOne .sy-kind em, .sy-res.is-same .sy-kind em, .sy-res.is-both .sy-kind em { background: #16a34a; color: #fff; }
+    .sy-res.is-sameOne .sy-kind b, .sy-res.is-same .sy-kind b, .sy-res.is-both .sy-kind b { color: #15803d; }
+    .sy-res.is-one .sy-kind em { background: #dcfce7; color: #166534; }
+    .sy-line { display: flex; align-items: flex-end; justify-content: center; gap: 8px; max-width: 480px; margin: 10px auto 0; }
+    .sy-line .cs-face { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px rgba(190, 242, 100, .9); }
+    .sy-line p { min-width: 0; margin: 0; padding: 8px 14px; border-radius: 16px; border-bottom-left-radius: 4px; background: var(--ch-soft); color: var(--ch-ink); font-size: 15px; font-weight: 700; line-height: 1.45; word-break: keep-all; }
+    .sy-line p b { display: block; font-size: 11px; font-weight: 900; color: var(--ch-strong); }
+
+    /* 나 · 동료 두 칸 — 줄마다 같은 높이(고른 답 카드가 나란히 서고, 같은 답이면 가운데 띠로 잇는다) */
+    .sy-pair { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr); margin-top: 4px; }
+    .sy-panel { grid-row: 2 / 6; border-radius: 18px; }
+    .sy-panel.is-me { grid-column: 1; background: var(--ch-soft); }
+    .sy-panel.is-mate { grid-column: 3; background: #f0f9ff; }
+    .sy-cell { position: relative; z-index: 1; min-width: 0; padding: 0 10px; }
+    .sy-cell.c1 { grid-column: 1; } .sy-cell.c2 { grid-column: 2; padding: 0; } .sy-cell.c3 { grid-column: 3; }
+    .sy-cell.r1 { grid-row: 1; } .sy-cell.r2 { grid-row: 2; } .sy-cell.r3 { grid-row: 3; } .sy-cell.r4 { grid-row: 4; } .sy-cell.r5 { grid-row: 5; }
+    .sy-bubrow { display: flex; align-items: flex-end; justify-content: center; min-height: 40px; padding-bottom: 6px; }
+    .sy-bub { position: relative; display: inline-block; max-width: 100%; padding: 6px 12px; border-radius: 14px; background: #fff; box-shadow: 0 4px 14px rgba(15, 23, 42, .14);
+      font-size: 14px; font-weight: 800; color: #334155; white-space: nowrap; transition: opacity .3s ease, transform .3s ease; }
+    .sy-bub::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px; margin-left: -5px; background: #fff; transform: rotate(45deg); }
+    .sy-bub.is-new { animation: sy-bubin .28s ease-out both; }
+    .sy-bub.is-out { opacity: 0; transform: translateY(-6px); }
+    @keyframes sy-bubin { from { opacity: 0; transform: translateY(8px); } }
+    .sy-who { display: flex; align-items: center; justify-content: center; gap: 6px; padding-top: 10px; min-width: 0; }
+    .sy-who b { min-width: 0; overflow: hidden; font-size: 14.5px; font-weight: 900; color: var(--color-midnight-navy); text-overflow: ellipsis; white-space: nowrap; }
+    .sy-card { position: relative; margin: 8px 0; transform-style: preserve-3d; }
+    .sy-card__f { display: flex; flex-direction: column; justify-content: center; height: 100%; min-height: 74px; padding: 10px 8px; box-sizing: border-box; border-radius: 15px; background: #fff;
+      text-align: center; backface-visibility: hidden; -webkit-backface-visibility: hidden; box-shadow: 0 3px 0 rgba(77, 124, 15, .18), 0 6px 14px rgba(15, 23, 42, .06); }
+    .c3 .sy-card__f { box-shadow: 0 3px 0 rgba(2, 132, 199, .18), 0 6px 14px rgba(15, 23, 42, .06); }
+    .sy-card__f small { font-size: 11.5px; font-weight: 800; color: #94a3b8; }
+    .sy-card__f b { margin-top: 2px; font-size: 20px; font-weight: 900; line-height: 1.25; color: var(--ch-ink); word-break: keep-all; overflow-wrap: anywhere; }
+    .c3 .sy-card__f b { color: #075985; }
+    .sy-card__b { position: absolute; inset: 0; display: grid; place-items: center; border-radius: 15px; color: #fff; font-size: 26px; font-weight: 900;
+      background: repeating-linear-gradient(45deg, var(--ch-strong) 0 9px, var(--ch-accent) 9px 18px); transform: rotateY(180deg); backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .c3 .sy-card__b { background: repeating-linear-gradient(45deg, #0369a1 0 9px, #0ea5e9 9px 18px); }
+    .sy-guess { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 2px 6px; font-size: 14px; line-height: 1.35; text-align: center; }
+    .sy-guess small { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+    .sy-guess b { font-weight: 900; color: #334155; word-break: keep-all; }
+    .sy-guess i { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 13px; font-style: normal; font-weight: 900; }
+    .sy-guess.is-hit i { background: #16a34a; color: #fff; }
+    .sy-guess.is-miss i { background: #e2e8f0; color: #64748b; }
+    .sy-guess.is-miss b { color: #94a3b8; }
+    .sy-hitnote { padding: 4px 0 12px; font-size: 12.5px; font-weight: 800; color: #94a3b8; text-align: center; word-break: keep-all; overflow-wrap: anywhere; }
+    .sy-hitnote.is-hit { color: #15803d; }
+    .sy-tie { position: relative; display: flex; align-items: center; justify-content: center; height: 100%; }
+    .sy-tie::before { content: ""; position: absolute; left: -10px; right: -10px; top: 50%; height: 5px; margin-top: -2.5px; border-radius: 3px; background: linear-gradient(90deg, var(--ch-accent), #facc15, #38bdf8); }
+    .sy-tie span { position: relative; display: flex; flex-direction: column; align-items: center; padding: 6px 0; width: 46px; border-radius: 14px; background: #fff; box-shadow: 0 0 0 2px #facc15, 0 4px 12px rgba(245, 158, 11, .3); }
+    .sy-tie span i { font-size: 16px; font-style: normal; line-height: 1.1; }
+    .sy-tie span b { font-size: 12.5px; font-weight: 900; color: #b45309; }
+    .sy-tie span small { font-size: 11.5px; font-weight: 900; color: #16a34a; }
+    .sy-vs { display: grid; place-items: center; height: 100%; font-size: 12px; font-weight: 900; color: #cbd5e1; }
+    .sy-float { position: absolute; left: 50%; top: 42%; z-index: 3; width: 74px; margin-left: -37px; padding: 6px 0; border-radius: 999px; pointer-events: none; text-align: center;
+      background: var(--ch-strong); box-shadow: 0 8px 20px rgba(54, 83, 20, .35); font-size: 24px; font-weight: 900; line-height: 1.1; color: #fff; opacity: 0; }
+    .sy-res.is-perfect .sy-float { background: linear-gradient(90deg, #f59e0b, #facc15); color: #422006; box-shadow: 0 8px 22px rgba(245, 158, 11, .45); }
+    .sy-res.is-none .sy-float { background: #94a3b8; box-shadow: none; }
+    .sy-spark { position: absolute; inset: 30px 0 0; z-index: 2; pointer-events: none; }
+    .sy-spark i { position: absolute; width: 14px; height: 14px; background: #facc15; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+    .sy-spark i:nth-child(1) { left: 4%; top: 32%; } .sy-spark i:nth-child(2) { left: 40%; top: 18%; width: 10px; height: 10px; }
+    .sy-spark i:nth-child(3) { right: 4%; top: 30%; } .sy-spark i:nth-child(4) { left: 8%; bottom: 26%; width: 10px; height: 10px; }
+    .sy-spark i:nth-child(5) { right: 40%; bottom: 20%; } .sy-spark i:nth-child(6) { right: 8%; bottom: 30%; width: 11px; height: 11px; }
+
+    /* 공개 애니메이션 — 한 문제에 한 번만(.is-anim). 다시 그릴 때는 다 보인 채로 */
+    .sy-res.is-anim .sy-card { animation: sy-flip .38s cubic-bezier(.3, .7, .3, 1) both; }
+    .sy-res.is-anim .c3 .sy-card { animation-delay: .2s; }
+    @keyframes sy-flip { from { transform: perspective(800px) rotateY(180deg); } to { transform: perspective(800px) rotateY(0deg); } }
+    /* 뒷면은 backface-visibility 에 기대지 않는다(웹킷이 뒷면을 앞면 위에 그리는 일) — 뒤집는 동안 반 바퀴(옆으로 선 때)까지만 두고, 그 밖에는 아예 숨긴다 */
+    .sy-res:not(.is-anim) .sy-card__b { display: none; }
+    .sy-res.is-anim .sy-card__b { animation: sy-backoff 0s .075s both; } /* sy-flip 곡선은 앞쪽이 빨라 약 78ms 에 옆으로 선다 */
+    .sy-res.is-anim .c3 .sy-card__b { animation-delay: .275s; }
+    @keyframes sy-backoff { to { visibility: hidden; } }
+    .sy-res.is-anim .sy-guess i { animation: sy-stamp .22s .55s ease-out both; }
+    .sy-res.is-anim .sy-hitnote { animation: sy-fade .25s .6s ease both; }
+    @keyframes sy-stamp { from { opacity: 0; transform: scale(1.5); } }
+    @keyframes sy-fade { from { opacity: 0; } }
+    .sy-res.is-anim .sy-tie::before { animation: sy-band .3s .75s ease-out both; }
+    .sy-res.is-anim .sy-tie span { animation: sy-pop .3s .8s ease both; }
+    @keyframes sy-band { from { transform: scaleX(0); } }
+    .sy-res.is-anim .sy-kind { animation: sy-rise .4s .9s ease-out both; }
+    .sy-res.is-anim .sy-line { animation: sy-rise .35s 1.05s ease-out both; }
+    @keyframes sy-rise { from { opacity: 0; transform: translateY(10px) scale(.94); } }
+    .sy-res.is-anim .sy-float { animation: sy-float 1.15s .9s ease-out both; }
+    @keyframes sy-float { 0% { opacity: 0; transform: translateY(14px) scale(.7); } 22% { opacity: 1; transform: scale(1.18); } 60% { opacity: 1; } 100% { opacity: 0; transform: translateY(-50px); } }
+    .sy-res.is-anim .sy-spark i { animation: sy-twinkle 1.1s .95s ease-out both; }
+    .sy-res.is-anim .sy-spark i:nth-child(even) { animation-delay: 1.05s; }
+    @keyframes sy-twinkle { 0% { opacity: 0; transform: scale(0) rotate(0); } 45% { opacity: 1; transform: scale(1.5) rotate(45deg); } 100% { opacity: .85; transform: scale(1) rotate(90deg); } }
+
+    /* 반응 · 다음 */
+    .sy-reacts { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 12px; }
+    .sy-react { flex-shrink: 0; min-height: 40px; padding: 0 13px; border: 1.5px solid #e2e8f0; border-radius: 999px; background: #fff; color: #334155; font: inherit; font-size: 14px; font-weight: 800;
+      white-space: nowrap; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .12s ease; }
+    /* 막힘은 disabled 대신 aria-disabled — 초점이 그대로 남아야 Enter 가 「다음」으로 새지 않는다 */
+    .sy-react:hover:not([aria-disabled="true"]) { border-color: var(--ch-accent); background: var(--ch-soft); transform: translateY(-1px); }
+    .sy-react[aria-disabled="true"] { opacity: .45; cursor: default; }
+    .sy-react:focus-visible { outline: 3px solid #0ea5e9; outline-offset: 2px; }
+    .sy-foot.is-reveal { flex-direction: column; gap: 6px; }
+    .sy-next { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; max-width: 420px; min-height: 56px; padding: 0 10px 0 26px; box-sizing: border-box; border: 0; border-radius: 999px;
+      background: var(--ch-strong); color: #fff; font: inherit; font-size: 17px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 0 var(--ch-ink); transition: background .2s ease; }
+    .sy-next:hover:not(:disabled) { filter: brightness(1.08); }
+    .sy-next:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 var(--ch-ink); }
+    .sy-next:disabled { background: #94a3b8; box-shadow: none; cursor: default; }
+    .sy-next.is-wait { background: #cbd5e1; color: #475569; }
+    .sy-ring { position: relative; flex-shrink: 0; width: 38px; height: 38px; }
+    .sy-ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .sy-ring circle { fill: none; stroke-width: 3.5; }
+    .sy-ring .bg { stroke: rgba(255, 255, 255, .28); }
+    .sy-ring .fg { stroke: #fff; stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
+    .sy-next.is-wait .sy-ring .fg { stroke: #475569; }
+    .sy-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 13.5px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .sy-nextnote { min-height: 18px; font-size: 13px; font-weight: 700; color: var(--text-muted); text-align: center; }
+    .sy-nextnote.is-on { color: #15803d; }
+
+    /* ── 옆 칸 — 통함 막대 · 지난 문제 ── */
+    .er-card h2 small { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .sy-meter { padding: 12px; border-radius: 14px; background: var(--ch-soft); }
+    .sy-meter__top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+    .sy-meter__top span { font-size: 13px; font-weight: 800; color: var(--ch-ink); }
+    .sy-meter__top b { font-size: 22px; font-weight: 900; color: var(--ch-strong); font-variant-numeric: tabular-nums; }
+    .sy-meter__bar { height: 10px; margin-top: 6px; overflow: hidden; border-radius: 99px; background: rgba(255, 255, 255, .9); box-shadow: inset 0 0 0 1px rgba(101, 163, 13, .2); }
+    .sy-meter__bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--ch-accent), #facc15); transition: width .6s ease; }
+    .sy-meter small { display: block; margin-top: 6px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+    .sy-rules { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 0; padding: 0; list-style: none; }
+    .sy-rules li { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 4px; border-radius: 999px; background: #f8fafc; font-size: 12px; font-weight: 700; color: #475569; white-space: nowrap; }
+    .sy-rules li b { display: grid; place-items: center; min-width: 22px; height: 18px; padding: 0 3px; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1px #e2e8f0; font-size: 11.5px; color: var(--ch-strong); }
+    .sy-hist { margin: 12px 0 0; padding: 0; list-style: none; }
+    .sy-hist li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid #f1f5f9; }
+    .sy-hist__main { flex: 1; min-width: 0; }
+    .sy-hist__q { display: block; overflow: hidden; font-size: 14px; font-weight: 800; color: var(--color-midnight-navy); text-overflow: ellipsis; white-space: nowrap; }
+    .sy-hist__a { display: flex; flex-wrap: wrap; gap: 2px 10px; margin-top: 2px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .sy-hist__a b { font-weight: 800; color: var(--ch-ink); }
+    .sy-hist__a span + span b { color: #075985; }
+    .sy-badge { flex-shrink: 0; min-width: 34px; padding: 3px 8px; border-radius: 999px; font-size: 13px; font-style: normal; font-weight: 900; text-align: center; font-variant-numeric: tabular-nums; }
+    .sy-badge.is-p3 { background: linear-gradient(90deg, #f59e0b, #facc15); color: #422006; }
+    .sy-badge.is-p2 { background: #16a34a; color: #fff; }
+    .sy-badge.is-p1 { background: #dcfce7; color: #166534; }
+    .sy-badge.is-p0 { background: #f1f5f9; color: #94a3b8; }
+    .sy-empty { padding: 14px 12px; border-radius: 12px; background: #f8fafc; text-align: center; font-size: 13.5px; font-weight: 600; color: var(--text-muted); }
+    .sy-more { display: none; width: 100%; min-height: 40px; margin-top: 6px; border: 1.5px solid #e2e8f0; border-radius: 12px; background: #fff; color: #475569; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; }
+    /* 결과 갈래(끝난 뒤 옆 칸) */
+    .sy-kinds { display: grid; gap: 7px; margin: 12px 0 0; padding: 0; list-style: none; }
+    .sy-kinds li { display: grid; grid-template-columns: 22px minmax(0, 1fr) 70px 30px; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 700; color: #334155; }
+    .sy-kinds li.is-zero { color: #94a3b8; }
+    .sy-kinds li > span:first-child { text-align: center; }
+    .sy-kinds li i { display: block; height: 8px; overflow: hidden; border-radius: 99px; background: #f1f5f9; }
+    .sy-kinds li i s { display: block; height: 100%; border-radius: inherit; background: var(--ch-accent); text-decoration: none; }
+    .sy-kinds li.is-perfect i s { background: #f59e0b; }
+    .sy-kinds li b { text-align: right; font-variant-numeric: tabular-nums; }
+
+    /* ── 대기실 — 주제 고르기 · 이렇게 해요 (방 소개 글은 「이렇게 해요」와 겹쳐서 숨긴다 — 준비 버튼이 첫 화면에 오게) ── */
+    .er-wait:not(.er-pending) > h2 + p { display: none; }
+    .sy-pick { padding: 12px 14px 14px; border-radius: 16px; background: var(--ch-soft); border: 1px solid rgba(101, 163, 13, .18); }
+    .sy-pick__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin-bottom: 8px; }
+    .sy-pick__head b { font-size: 15px; font-weight: 900; color: var(--ch-ink); }
+    .sy-pick__head small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .sy-pick__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .sy-theme-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; min-width: 0; min-height: 64px; padding: 8px 4px; border: 1.5px solid rgba(101, 163, 13, .25);
+      border-radius: 14px; background: #fff; color: var(--ch-ink); font: inherit; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; word-break: keep-all; }
+    .sy-theme-btn:hover { border-color: var(--ch-accent); transform: translateY(-1px); }
+    .sy-theme-btn span { font-size: 20px; line-height: 1.2; }
+    .sy-theme-btn b { font-size: 14px; font-weight: 900; white-space: nowrap; }
+    .sy-theme-btn small { font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+    .sy-theme-btn.is-on { border-color: var(--ch-strong); background: var(--ch-strong); color: #fff; box-shadow: 0 4px 12px rgba(77, 124, 15, .28); }
+    .sy-theme-btn.is-on small { color: rgba(255, 255, 255, .8); }
+    .sy-how { margin-top: 10px; border-radius: 16px; background: #fff; border: 1px solid var(--border-default); }
+    .sy-how summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 900; color: var(--color-midnight-navy); cursor: pointer; list-style: none; }
+    .sy-how summary::-webkit-details-marker { display: none; }
+    .sy-how summary small { font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .sy-how summary::after { content: "펼치기"; margin-left: auto; font-size: 12.5px; font-weight: 800; color: var(--ch-strong); }
+    .sy-how[open] summary::after { content: "접기"; }
+    .sy-how__in { padding: 0 14px 14px; }
+    .sy-how ol { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; counter-reset: sy; }
+    .sy-how ol li { position: relative; padding-left: 28px; font-size: 14px; line-height: 1.55; color: var(--text-secondary); word-break: keep-all; counter-increment: sy; }
+    .sy-how ol li::before { content: counter(sy); position: absolute; left: 0; top: 1px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ch-strong); color: #fff; font-size: 12px; font-weight: 900; }
+    .sy-how ol li em { font-style: normal; font-weight: 800; color: var(--ch-ink); }
+    .sy-points { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .sy-points span { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px; background: var(--ch-soft); font-size: 12.5px; font-weight: 700; color: var(--text-secondary); }
+    .sy-points span b { display: grid; place-items: center; min-width: 30px; height: 22px; padding: 0 4px; border-radius: 999px; background: #fff; font-size: 13px; font-weight: 900; color: var(--ch-strong); }
+    .sy-how__note { margin: 10px 0 0 !important; font-size: 12.5px !important; line-height: 1.5 !important; color: var(--text-muted) !important; text-align: left; }
+
+    /* ── 끝 카드 ── */
+    .er-end.sy-end { position: relative; overflow: hidden; isolation: isolate; padding: 26px 18px 22px;
+      background: radial-gradient(90% 70% at 50% 0%, rgba(190, 242, 100, .38), transparent 70%), linear-gradient(165deg, var(--ch-deep), var(--ch-ink) 55%, var(--ch-strong)); }
+    .er-end.sy-end.is-zero { background: radial-gradient(90% 70% at 50% 0%, rgba(203, 213, 225, .3), transparent 70%), linear-gradient(165deg, #1f2937, #475569); }
+    .sy-end::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+      background: radial-gradient(circle, rgba(255, 255, 255, .5) 0 1.4px, transparent 2px) 0 0 / 34px 34px, radial-gradient(circle, rgba(190, 242, 100, .5) 0 1.2px, transparent 1.8px) 17px 17px / 34px 34px; }
+    .sy-end__ep { display: inline-block; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, .14); font-size: 12.5px; font-weight: 800; color: #ecfccb; }
+    .sy-gauge { position: relative; width: 172px; height: 172px; margin: 14px auto 2px; }
+    .sy-gauge svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .sy-gauge circle { fill: none; stroke-width: 12; }
+    .sy-gauge .bg { stroke: rgba(255, 255, 255, .14); }
+    .sy-gauge .fg { stroke: var(--ch-glow); stroke-linecap: round; }
+    .sy-end.is-great .sy-gauge .fg { stroke: #facc15; }
+    .sy-gauge__in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .sy-gauge__in small { font-size: 12.5px; font-weight: 800; color: var(--ch-glow); }
+    .sy-gauge__in b { font-size: 50px; font-weight: 900; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; text-shadow: 0 4px 0 rgba(0, 0, 0, .18); }
+    .sy-gauge__in b i { margin-left: 1px; font-size: 22px; font-style: normal; color: #ecfccb; }
+    .er-end.sy-end h2.sy-end__grade { margin-top: 6px; font-size: 26px; font-weight: 900; }
+    .er-end.sy-end p.sy-end__sub { margin-top: 4px; font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, .88); }
+    .sy-end__sub b { font-size: 17px; color: #fde68a; }
+    .er-end.sy-end p.sy-end__outro { margin-top: 10px; font-size: 15px; font-weight: 600; color: rgba(255, 255, 255, .82); }
+    .sy-end__best { display: inline-flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 4px 8px; max-width: 100%; margin-top: 12px; padding: 7px 14px; box-sizing: border-box; border-radius: 16px;
+      background: rgba(255, 255, 255, .13); font-size: 13.5px; font-weight: 700; color: #ecfccb; word-break: keep-all; }
+    .sy-end__best b { color: #fff; font-weight: 800; }
+    .sy-end .er-actions .hk-btn--secondary { border-color: rgba(255, 255, 255, .4); background: transparent; color: #fff; text-decoration: none; }
+    .sy-end .er-actions .hk-btn--primary { border-color: #fff; background: #fff; color: var(--ch-ink); }
+
+    /* ── 끝난 뒤 — 문제별 다시 보기 ── */
+    .sy-recap { margin-top: 14px; }
+    .sy-recap ol { margin: 0; padding: 0; list-style: none; }
+    .sy-recap li.sy-rq { padding: 12px 0; border-top: 1px solid #f1f5f9; }
+    .sy-recap li.sy-rq:first-child { border-top: 0; padding-top: 2px; }
+    .sy-rq__head { display: flex; align-items: flex-start; gap: 8px; }
+    .sy-rq__head > span { flex-shrink: 0; font-size: 20px; line-height: 1.2; }
+    .sy-rq__head b { flex: 1; min-width: 0; font-size: 15px; font-weight: 800; line-height: 1.4; color: var(--color-midnight-navy); word-break: keep-all; }
+    .sy-rq__chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0 28px; }
+    .sy-chip { display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 3px 11px; box-sizing: border-box; border: 1.5px solid #e2e8f0; border-radius: 999px; background: #fff;
+      font-size: 13.5px; font-weight: 700; color: #64748b; word-break: keep-all; }
+    .sy-chip.is-mine { border-color: var(--ch-strong); background: var(--ch-strong); color: #fff; }
+    .sy-chip.is-theirs { border-color: #0284c7; background: #f0f9ff; color: #075985; }
+    .sy-chip.is-both { border-color: #f59e0b; background: linear-gradient(90deg, #fef3c7, #fef9c3); color: #92400e; }
+    .sy-chip em { padding: 1px 6px; border-radius: 999px; background: rgba(255, 255, 255, .85); color: var(--ch-strong); font-size: 11px; font-style: normal; font-weight: 900; white-space: nowrap; }
+    .sy-chip.is-theirs em { background: #0284c7; color: #fff; }
+    .sy-chip.is-both em { background: #f59e0b; color: #fff; }
+    .sy-rq__g { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 7px 0 0 28px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .sy-rq__g span b { color: #334155; font-weight: 800; }
+    .sy-rq__g .is-hit i { color: #16a34a; font-style: normal; font-weight: 900; }
+    .sy-rq__g .is-miss i { color: #94a3b8; font-style: normal; font-weight: 900; }
+    .sy-rq__line { margin: 5px 0 0 28px; font-size: 12.5px; font-weight: 600; color: var(--ch-strong); }
+    .sy-recap__left { margin-top: 10px; padding: 10px 12px; border-radius: 12px; background: #fff7ed; font-size: 13px; font-weight: 700; color: #9a3412; text-align: center; }
+
+    /* 시계 마지막 10초 */
+    .er-timer.sy-last { animation: sy-blink 1s steps(2) infinite; }
+    @keyframes sy-blink { 50% { background: rgba(248, 113, 113, .3); } }
+
+    @media (max-width: 860px) {
+      .sy-opt kbd, .sy-keys { display: none; }
+      .sy-hist:not(.is-open) li:nth-child(n+4) { display: none; }
+      .sy-more { display: block; }
+    }
+    @media (max-width: 640px) {
+      .sy-stage { padding: 12px; border-radius: 20px; }
+      .sy-strip { flex-wrap: wrap; gap: 8px; }
+      .sy-strip .sy-count { margin-left: auto; }
+      .sy-clock { display: inline-flex; flex-shrink: 0; padding: 5px 10px; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1.5px rgba(101, 163, 13, .28);
+        font-size: 13px; font-weight: 900; color: var(--ch-ink); font-variant-numeric: tabular-nums; white-space: nowrap; transition: color .3s ease, box-shadow .3s ease; }
+      .sy-stage.is-late .sy-clock { color: #c2410c; box-shadow: inset 0 0 0 1.5px #fdba74; }
+      .sy-dots { order: 5; flex: 1 1 100%; justify-content: space-between; padding: 2px 4px 0; }
+      .sy-q { padding: 18px 14px 16px; }
+      .sy-q__no { top: 10px; left: 10px; }
+      .sy-q__ic { font-size: 36px; }
+      .sy-q__t { font-size: 19px; }
+      .sy-q.is-mini .sy-q__t { font-size: 15px; }
+      .sy-step { padding: 10px; }
+      .sy-step__h b { font-size: 16px; }
+      .sy-opts.is-n4 { --n: 2; }
+      .sy-opts.is-n2, .sy-opts.is-n3 { --n: 1; }
+      .sy-opt { min-height: 52px; padding: 10px 12px; font-size: 16px; }
+      .sy-sent { flex-wrap: wrap; padding: 14px; gap: 10px 12px; }
+      .sy-sent__txt { flex: 1 1 calc(100% - 60px); }
+      .sy-sent .sy-relink { margin-left: 58px; }
+      /* 제출 · 다음 줄은 화면 아래에 붙는다 */
+      .sy-foot { position: sticky; bottom: 0; z-index: 6; flex-wrap: wrap; gap: 8px; margin: 12px -12px -12px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+        border-radius: 0 0 20px 20px; background: rgba(255, 255, 255, .95); box-shadow: 0 -6px 18px rgba(15, 23, 42, .08); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+      .sy-foot__mate { flex: 1 1 100%; }
+      .sy-mate { font-size: 13px; }
+      .sy-submit { flex: 1 1 100%; min-width: 0; }
+      .sy-foot.is-sent { position: static; margin: 12px 0 0; padding: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+      .sy-res { padding: 12px 8px 4px; }
+      .sy-kind b { font-size: 20px; }
+      .sy-line p { font-size: 14px; }
+      .sy-pair { grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); }
+      .sy-cell { padding: 0 6px; }
+      .sy-tie span { width: 38px; }
+      .sy-tie::before { left: -6px; right: -6px; }
+      .sy-card__f b { font-size: 15px; }
+      .sy-card__f { min-height: 66px; }
+      .sy-guess { font-size: 13px; }
+      .sy-bub { padding: 5px 9px; font-size: 13px; }
+      .sy-reacts { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; margin-left: -12px; margin-right: -12px; padding: 0 12px 4px; scrollbar-width: none; }
+      .sy-reacts::-webkit-scrollbar { display: none; }
+      .sy-next { max-width: none; }
+      .sy-pick__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sy-how ol li { font-size: 13.5px; }
+      .sy-gauge { width: 150px; height: 150px; }
+      .sy-gauge__in b { font-size: 44px; }
+      .sy-rq__chips, .sy-rq__g, .sy-rq__line { margin-left: 0; }
+      .er .er-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+      .er .er-stat { padding: 10px 4px; }
+      .er .er-stat b { font-size: 18px; }
+      .er .er-stat small { font-size: 12px; }
+    }
+    /* 아주 좁은 휴대폰(320) — 주제 · 시간 · 점수가 한 줄에 들어가게. 몇 번째 문제인지는 아래 진행 점이 보여 준다 */
+    @media (max-width: 350px) {
+      .sy-strip .sy-count { display: none; }
+      .sy-strip .sy-pts { margin-left: auto; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sy-res.is-anim *, .sy-res.is-anim .sy-tie::before, .sy-q.is-slide, .sy-mate.is-pop, .sy-pts.is-bump b, .sy-bub.is-new, .sy-sent__badge, .sy-opt__tag, .sy-dots3 i, .er-timer.sy-last { animation: none !important; }
+      .sy-float { display: none; }
+      .sy-opt, .sy-react, .sy-meter__bar i, .sy-bub, .sy-ring .fg { transition: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 통하는 사이 — 2인 협동(협동 시리즈 「오늘도 둘이서」 번외 1화). 같은 질문에 둘이 몰래 답하고, 동료가 고를 답을 예상한다.
+    // 방 공용(목록 · 대기실 · 끝 화면 · 실시간)은 /_shared/coop.js, 이야기는 /_shared/coop-story.js. 점수 · 공개 · 한마디는 서버(sync_game.py)가 정한다.
+    // 보기 순서는 사람마다 다르다 — 화면은 q.options 를 받은 순서 그대로 그리고, 보기 번호를 사람에게 보여 주거나 말하게 하지 않는다(공개 · 기록도 보기 글자로).
+    const { esc } = HKMatch;
+    const S = window.HKCoopStory || null;
+    const MA = "마 팀장님";
+    // 만점 — 순위 줄(x)에는 score 만 오므로 숫자로 둔다. 서버 sync_game.MAX_POINTS(3) × QUESTIONS(10) 와 같게 유지할 것
+    const SYNC_MAX = 30;
+    const THEMES = [
+      { key: "mix", name: "섞어서", emo: "🎲", note: "세 주제 골고루" },
+      { key: "work", name: "회사 생활", emo: "💼", note: "회의 · 책상 · 출근" },
+      { key: "food", name: "음식", emo: "🍜", note: "점심 · 간식 · 카페" },
+      { key: "leisure", name: "여가", emo: "🏖️", note: "휴가 · 주말 · 취미" },
+    ];
+    const THEME_EMO = { mix: "🎲", work: "💼", food: "🍜", leisure: "🏖️" };
+    // 공개 결과 갈래 — 이름표 · 결과 소리(공개 애니메이션 900ms 시점)
+    const KINDS = {
+      perfect: { emo: "⚡", name: "찌찌뽕!", snd: "combo" },
+      sameOne: { emo: "🔗", name: "통함 + 한 명 맞힘", snd: "success" },
+      same: { emo: "🔗", name: "통함!", snd: "success" },
+      both: { emo: "👀", name: "서로 맞힘", snd: "success" },
+      one: { emo: "🙂", name: "반쯤 통함", snd: "coin" },
+      none: { emo: "🌀", name: "엇갈림", snd: "land" },
+    };
+    const KIND_ORDER = ["perfect", "sameOne", "same", "both", "one", "none"];
+    const REACT_KEYS = ["KeyQ", "KeyW", "KeyE", "KeyR", "KeyT", "KeyY"];
+    const DIGITS = { Digit1: 0, Digit2: 1, Digit3: 2, Digit4: 3, Numpad1: 0, Numpad2: 1, Numpad3: 2, Numpad4: 3 };
+    const RING = 2 * Math.PI * 15.5; // 「다음」 버튼 고리 둘레
+    const GAUGE = 2 * Math.PI * 52; // 끝 화면 게이지 둘레
+    const PLAYED_KEY = "hk-sync-played";
+
+    let C = null, room = null, v = null, offset = 0, tickFor = null;
+    // 고르던 값 — 문제 번호(no)가 바뀌면 비운다. step: 지금 고르는 칸(1 내 답 · 2 동료 예상) · edit: 낸 뒤 다시 고르는 중
+    let draft = { no: null, own: null, guess: null, step: 1, edit: false };
+    let animatedFor = null, slideFor = null, endAnimFor = null, revealSeen = { no: null, at: 0 };
+    let busy = false, warned10 = false, moreOpen = false, reactLock = 0, timers = [], toStage = false;
+    const bubSeen = new Set(); // 이미 떠오른 반응 말풍선(다시 그릴 때 또 튀지 않게)
+    const fresh = { partner: false };
+    let howOpen = (() => { try { return !localStorage.getItem(PLAYED_KEY); } catch (_) { return true; } })(); // 처음이면 「이렇게 해요」를 펼쳐 둔다
+    document.addEventListener("toggle", (e) => { if (e.target.classList && e.target.classList.contains("sy-how")) howOpen = e.target.open; }, true);
+
+    const now = () => (Date.now() + offset) / 1000;
+    const mate = () => (room && room.partner && room.partner.name) || "동료";
+    const reduce = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (_) { return false; } };
+    const sfx = (name) => { if (C) C.sfx(name); };
+    const opt = (o, i) => (i == null || !o || o[i] == null ? "—" : o[i]);
+    const ptsCls = (p) => `is-p${Math.max(0, Math.min(3, Number(p) || 0))}`;
+    const maFace = () => (S ? S.npcFace(MA) : "");
+    // 조금 뒤에 할 일 — 그 사이 목록으로 나갔거나 판이 끝났으면 하지 않는다(목록에서 결과 소리가 나지 않게)
+    function later(fn, ms) { timers.push(setTimeout(() => { if (live()) fn(); }, ms)); }
+    function clearLater() { timers.forEach(clearTimeout); timers = []; }
+    function resetDraft(no) { draft = { no, own: null, guess: null, step: 1, edit: false }; }
+    // 얼굴 — 사진이 없거나 못 불러오면 이름 첫 글자
+    function face(p, cls = "") {
+      const name = String((p && p.name) || "?").trim();
+      const img = p && p.avatarUrl ? `<img src="${esc(p.avatarUrl)}" alt="" onerror="this.remove()">` : "";
+      return `<span class="sy-ava ${cls}" aria-hidden="true">${esc(name.charAt(0) || "?")}${img}</span>`;
+    }
+    const meP = () => (C && C.me) || { name: (C && C.myName) || "나", avatarUrl: null };
+    const mateP = () => (room && room.partner) || { name: "동료", avatarUrl: null };
+    // 「다음」을 받기 시작하는 시각 — 공개를 처음 본 때와 서버 공개 시각 중 늦은 쪽 + nextAfter(실수로 넘기지 않게)
+    function nextOpenAt() {
+      if (!v || !v.reveal) return 0;
+      const seen = revealSeen.no === v.no ? revealSeen.at : 0;
+      return Math.max(seen, v.reveal.until - v.revealSec) + (v.nextAfter || 0.8);
+    }
+    function timerNote() {
+      if (!v || v.over) return "남은 시간";
+      if (v.phase === "pick") {
+        const leftQ = Math.max(0, v.total - v.answered);
+        return leftQ && (v.end - now()) / leftQ < 20 ? "서둘러요!" : `남은 문제 ${leftQ}개`;
+      }
+      return v.phase === "reveal" ? "공개 중" : "남은 시간";
+    }
+    // 띠 안 남은 시간(휴대폰) — 위 막대 시계와 같은 꼴
+    const clock = () => HKCoop.mmss(v ? v.end - now() : 0);
+    // 끝 이야기 갈래 — 성공한 판(그만두지 않고 1점 이상)은 fail 이 아니다: 21점(통함 지수 70%) 이상 great · 그 밖 ok · 0점 · 그만둠은 fail.
+    // 성공 수 · 도장이 1점부터 세므로(coop-story.js cleared · 서버 series) 끝 이야기도 그에 맞춘다. 끝 카드 등급 글자(v.grade)는 서버 그대로
+    function tierOf(r) {
+      const ok = S && S.cleared ? S.cleared(r) : !!r && r.status === "CLEAR" && Number(r.score) > 0;
+      return !ok ? "fail" : Number(r.score) >= 21 ? "great" : "ok";
+    }
+
+    // ── 위 띠 — 주제 · 진행 점 · 점수 ──
+    function stripHtml(anim) {
+      const q = v.q || {};
+      const th = v.theme === "mix" ? q.theme || "mix" : v.theme;
+      const thName = v.theme === "mix" ? q.themeName || v.themeName : v.themeName;
+      const dots = Array.from({ length: v.total }, (_, i) => {
+        const h = v.history[i], cur = i + 1 === v.no;
+        return `<li class="${h ? ptsCls(h.pts) : ""} ${cur ? "is-cur" : ""}"></li>`;
+      }).join("");
+      const pts = anim && v.reveal ? v.points - v.reveal.pts : v.points;
+      return `<div class="sy-strip">
+          <span class="sy-theme">${THEME_EMO[th] || "🎲"} ${esc(thName || "")}</span>
+          <span class="sy-clock" id="sy-clock" role="timer" aria-label="남은 시간">${clock()}</span>
+          <ol class="sy-dots" aria-label="${v.total}문제 중 ${v.no}번째">${dots}</ol>
+          <span class="sy-count"><b>${v.no}</b> / ${v.total}</span>
+          <span class="sy-pts" id="sy-pts"><b id="sy-pts-n">${pts}</b>점</span>
+        </div>`;
+    }
+    function qHtml(mini, slide) {
+      const q = v.q;
+      return `<div class="sy-q ${mini ? "is-mini" : ""} ${slide ? "is-slide" : ""}">
+          <span class="sy-q__no">Q${q.no}</span><span class="sy-q__ic" aria-hidden="true">${esc(q.icon)}</span>
+          <p class="sy-q__t">${esc(q.text)}</p></div>`;
+    }
+
+    // ── 고르기 ──
+    function pickHtml() {
+      const q = v.q, n = q.options.length;
+      const sent = !!v.mine && !draft.edit;
+      let body;
+      if (sent) {
+        body = `<div class="sy-sent">
+            <span class="sy-sent__badge" aria-hidden="true">✓</span>
+            <div class="sy-sent__txt"><b>냈어요!</b>
+              <span class="sy-sent__pair"><span>나 <em>${esc(opt(q.options, v.mine.own))}</em></span><span>예상 <em>${esc(opt(q.options, v.mine.guess))}</em></span></span>
+              <small>${esc(mate())}님을 기다려요. ${esc(mate())}님이 내기 전이면 바꿀 수 있어요.</small></div>
+            <button type="button" class="sy-relink" id="sy-edit" data-edit>다시 고르기</button>
+          </div>`;
+      } else {
+        const grid = (kind) => q.options.map((o, i) => {
+          const on = (kind === "own" ? draft.own : draft.guess) === i;
+          const tag = on ? (kind === "own" ? `<i class="sy-opt__tag">✓ 나</i>` : `<i class="sy-opt__tag">${face(mateP(), "is-xs is-mate")}예상</i>`) : "";
+          return `<button type="button" class="sy-opt ${on ? "is-on" : ""}" id="sy-${kind}-${i}" data-${kind}="${i}" role="radio" aria-checked="${on}"><kbd aria-hidden="true">${i + 1}</kbd><span>${esc(o)}</span>${tag}</button>`;
+        }).join("");
+        body = `<div class="sy-step is-own ${draft.step === 1 ? "is-cur" : ""}" id="sy-step-own">
+            <div class="sy-step__h"><span class="sy-step__n">1</span><b>나는?</b><small>내 답을 하나 골라요</small>${face(meP(), "is-sm")}</div>
+            <div class="sy-opts is-n${n}" role="radiogroup" aria-label="나는?">${grid("own")}</div>
+          </div>
+          <div class="sy-step is-guess ${draft.step === 2 ? "is-cur" : ""} ${draft.own == null ? "is-dim" : ""}" id="sy-step-guess">
+            <div class="sy-step__h"><span class="sy-step__n">2</span><b>${esc(mate())}님은?</b><small>${esc(mate())}님이 고를 답을 예상해요</small>${face(mateP(), "is-sm is-mate")}</div>
+            <div class="sy-opts is-n${n}" role="radiogroup" aria-label="${esc(mate())}님은?">${grid("guess")}</div>
+          </div>`;
+      }
+      const ready = draft.own != null && draft.guess != null;
+      const label = draft.own == null ? "내 답을 골라 주세요" : draft.guess == null ? `${mate()}님 답을 예상해 주세요` : draft.edit ? "다시 내기" : "제출하기";
+      const mateLine = v.partnerDone
+        ? `<span class="sy-mate is-done ${fresh.partner ? "is-pop" : ""}">${face(mateP(), "is-sm is-mate")}<span>${esc(mate())}님 냈어요</span><i aria-hidden="true">✓</i></span>`
+        : `<span class="sy-mate">${face(mateP(), "is-sm is-mate")}<span>${esc(mate())}님 고르는 중</span><span class="sy-dots3" aria-hidden="true"><i></i><i></i><i></i></span></span>`;
+      return `${body}
+        <div class="sy-foot ${sent ? "is-sent" : ""}">
+          <div class="sy-foot__mate" aria-live="polite">${mateLine}</div>
+          ${draft.edit && v.mine ? `<button type="button" class="sy-relink" data-keep>그대로 두기</button>` : ""}
+          ${sent ? "" : `<button type="button" class="sy-submit" id="sy-submit" data-submit ${ready ? "" : "disabled"}>${esc(label)}${ready ? ` <span aria-hidden="true">›</span>` : ""}</button>`}
+        </div>
+        ${sent ? "" : `<p class="sy-keys">단축키: 숫자 <kbd>1</kbd>~<kbd>${n}</kbd> 고르기 · <kbd>⌫</kbd> 내 답 다시 · <kbd>Enter</kbd> 제출 (번호는 내 화면에서만 맞아요)</p>`}`;
+    }
+
+    // ── 공개 ──
+    function bubHtml(x) {
+      if (!x || now() - x.t >= 3) return "";
+      const key = `${x.t}:${x.i}`;
+      return `<span class="sy-bub ${bubSeen.has(key) ? "" : "is-new"}" data-bub="${esc(key)}" data-until="${x.t + 3}">${esc(x.text)}</span>`;
+    }
+    function revealHtml(anim) {
+      const r = v.reveal, o = r.options;
+      const k = KINDS[r.kind] || KINDS.none;
+      const myOwn = opt(o, r.mine.own), thOwn = opt(o, r.theirs.own);
+      const reacts = v.reacts || {};
+      const left = Math.max(0, r.until - now());
+      const frac = Math.max(0, Math.min(1, left / (v.revealSec || 7)));
+      const early = now() < nextOpenAt();
+      const last = v.no >= v.total;
+      const label = r.nextMe ? "기다리는 중…" : last ? "결과 보기" : "다음 문제";
+      // 공개 시간은 게임 끝에서 잘릴 수 있어 초를 적지 않는다(남은 초는 고리에) — 마지막 문제면 결과로
+      const note = r.nextPartner ? `${mate()}님도 「다음」을 눌렀어요` : r.nextMe ? `${mate()}님이 누르면 바로 넘어가요`
+        : `둘 다 누르거나 시간이 다 되면 ${last ? "결과로" : "다음 문제로"} 넘어가요`;
+      const lock = Date.now() < reactLock;
+      const spark = r.kind === "perfect" ? `<span class="sy-spark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>` : "";
+      return `${qHtml(true, false)}
+        <div class="sy-res is-${esc(r.kind)} ${anim ? "is-anim" : ""}">
+          <div class="sy-kind"><span aria-hidden="true">${k.emo}</span><b>${k.name}</b><em>${r.pts ? `+${r.pts}` : "0"}</em></div>
+          <div class="sy-line">${maFace()}<p><b>${MA}</b>${esc(r.line || "")}</p></div>
+          <div class="sy-pair">
+            <div class="sy-panel is-me"></div><div class="sy-panel is-mate"></div>
+            <div class="sy-cell c1 r1 sy-bubrow">${bubHtml(reacts.me)}</div><div class="sy-cell c3 r1 sy-bubrow">${bubHtml(reacts.partner)}</div>
+            <div class="sy-cell c1 r2 sy-who">${face(meP(), "is-sm")}<b>나</b></div><div class="sy-cell c3 r2 sy-who">${face(mateP(), "is-sm is-mate")}<b>${esc(mate())}</b></div>
+            <div class="sy-cell c1 r3"><div class="sy-card"><div class="sy-card__f"><small>고른 답</small><b>${esc(myOwn)}</b></div><div class="sy-card__b" aria-hidden="true">?</div></div></div>
+            <div class="sy-cell c2 r3">${r.same ? `<div class="sy-tie"><span><i aria-hidden="true">⚡</i><b>통함</b><small>+1</small></span></div>` : `<div class="sy-vs" aria-hidden="true">·</div>`}</div>
+            <div class="sy-cell c3 r3"><div class="sy-card"><div class="sy-card__f"><small>고른 답</small><b>${esc(thOwn)}</b></div><div class="sy-card__b" aria-hidden="true">?</div></div></div>
+            <div class="sy-cell c1 r4"><div class="sy-guess ${r.myHit ? "is-hit" : "is-miss"}"><small>내 예상</small><b>${esc(opt(o, r.mine.guess))}</b><i aria-hidden="true">${r.myHit ? "✓" : "✗"}</i></div></div>
+            <div class="sy-cell c3 r4"><div class="sy-guess ${r.theirHit ? "is-hit" : "is-miss"}"><small>${esc(mate())}님 예상</small><b>${esc(opt(o, r.theirs.guess))}</b><i aria-hidden="true">${r.theirHit ? "✓" : "✗"}</i></div></div>
+            <div class="sy-cell c1 r5"><div class="sy-hitnote ${r.myHit ? "is-hit" : ""}">${r.myHit ? "내가 맞혔어요 +1" : "빗나갔어요"}</div></div>
+            <div class="sy-cell c3 r5"><div class="sy-hitnote ${r.theirHit ? "is-hit" : ""}">${r.theirHit ? `${esc(mate())}님이 맞혔어요 +1` : "빗나갔어요"}</div></div>
+            ${spark}
+            ${anim ? `<span class="sy-float" aria-hidden="true">${r.pts ? `+${r.pts}` : "0"}</span>` : ""}
+          </div>
+          <p class="sy-sr" aria-live="polite">나 ${esc(myOwn)}, ${esc(mate())}님 ${esc(thOwn)}. ${k.name} ${r.pts}점.</p>
+        </div>
+        <div class="sy-reacts" role="group" aria-label="반응 보내기">${(v.reactions || []).map((x, i) => `<button type="button" class="sy-react" id="sy-react-${i}" data-react="${i}" ${lock ? `aria-disabled="true"` : ""} title="단축키 ${"QWERTY"[i] || ""}">${esc(x)}</button>`).join("")}</div>
+        <div class="sy-foot is-reveal">
+          <button type="button" class="sy-next ${r.nextMe ? "is-wait" : ""}" id="sy-next" data-next ${r.nextMe || early ? "disabled" : ""}>
+            <span>${label}${r.nextMe ? "" : ` <span aria-hidden="true">›</span>`}</span>
+            <span class="sy-ring" aria-hidden="true"><svg viewBox="0 0 38 38"><circle class="bg" cx="19" cy="19" r="15.5"/><circle class="fg" id="sy-ring" cx="19" cy="19" r="15.5" stroke-dasharray="${RING.toFixed(2)}" stroke-dashoffset="${(RING * (1 - frac)).toFixed(2)}"/></svg><b id="sy-ring-n">${Math.ceil(left)}</b></span>
+          </button>
+          <small class="sy-nextnote ${r.nextPartner ? "is-on" : ""}">${esc(note)}</small>
+        </div>`;
+    }
+
+    function playHtml() {
+      if (!v) return "";
+      if (v.over || !v.q) return `<div class="er-card"><div class="sy-empty">결과를 불러오고 있어요…</div></div>`;
+      const anim = v.phase === "reveal" && !!v.reveal && animatedFor !== v.no && !reduce();
+      const slide = v.phase === "pick" && slideFor !== v.no && !reduce();
+      const late = v.end - now() < 30;
+      return `<section class="sy-stage ${late ? "is-late" : ""}" id="sy-stage" aria-label="통하는 사이 문제판">
+          ${stripHtml(anim)}
+          ${v.phase === "reveal" && v.reveal ? revealHtml(anim) : `${qHtml(false, slide)}${pickHtml()}`}
+        </section>`;
+    }
+
+    // ── 옆 칸 ──
+    function meterHtml() {
+      const w = v.maxPoints ? Math.round((v.points / v.maxPoints) * 100) : 0;
+      return `<div class="sy-meter"><div class="sy-meter__top"><span>통함 지수</span><b>${v.syncPct}%</b></div>
+          <div class="sy-meter__bar"><i style="width:${w}%"></i></div>
+          <small>${v.points} / ${v.maxPoints}점 · 같은 답 ${v.matches}번</small></div>`;
+    }
+    function histSide() {
+      const items = v.history.slice().reverse().map((h) => `<li>
+          <span class="sy-hist__main"><span class="sy-hist__q">${esc(h.icon)} ${h.no}. ${esc(h.text)}</span>
+            <span class="sy-hist__a"><span>나 <b>${esc(opt(h.options, h.mine.own))}</b></span><span>${esc(mate())} <b>${esc(opt(h.options, h.theirs.own))}</b></span></span></span>
+          <em class="sy-badge ${ptsCls(h.pts)}">${h.pts ? `+${h.pts}` : "0"}</em></li>`).join("");
+      const more = v.history.length > 3
+        ? `<button type="button" class="sy-more" data-more>${moreOpen ? "접기" : `더 보기 (${v.history.length - 3}개)`}</button>` : "";
+      return `<div class="er-card sy-side"><h2>${HKUI.icon("history", 16, "currentColor")} 지난 문제<small>${v.answered} / ${v.total}</small></h2>
+          ${meterHtml()}
+          <ul class="sy-rules"><li><b>+1</b>내 예상 맞힘</li><li><b>+1</b>${esc(mate())}님 예상 맞힘</li><li><b>+1</b>같은 답</li></ul>
+          ${items ? `<ol class="sy-hist ${moreOpen ? "is-open" : ""}">${items}</ol>${more}` : `<div class="sy-empty" style="margin-top:12px">첫 문제를 풀면 여기에 쌓여요</div>`}</div>`;
+    }
+    function endSide() {
+      const n = v.history.length || 1;
+      const rows = KIND_ORDER.map((key) => {
+        const c = v.history.filter((h) => h.kind === key).length;
+        return `<li class="is-${key} ${c ? "" : "is-zero"}"><span aria-hidden="true">${KINDS[key].emo}</span><span>${KINDS[key].name}</span><i><s style="width:${Math.round((c / n) * 100)}%"></s></i><b>${c}번</b></li>`;
+      }).join("");
+      const left = v.total - v.answered;
+      return `<div class="er-card sy-side"><h2>${HKUI.icon("sparkles", 16, "currentColor")} 결과 갈래<small>${v.answered}문제</small></h2>
+          ${meterHtml()}<ul class="sy-kinds">${rows}</ul>
+          ${left > 0 && v.reason === "time" ? `<div class="sy-recap__left">시간이 다 돼서 ${left}문제는 못 풀었어요</div>` : ""}</div>`;
+    }
+    // ── 끝난 뒤 — 문제별 다시 보기(보기 전체 · 둘의 답 · 예상) ──
+    function recapHtml() {
+      if (!v || !v.history.length) return "";
+      const rows = v.history.map((h) => {
+        const mo = h.mine.own, to = h.theirs.own;
+        const chips = h.options.length ? h.options.map((o, i) => {
+          const m = i === mo, t = i === to;
+          const cls = m && t ? "is-both" : m ? "is-mine" : t ? "is-theirs" : "";
+          const tag = m && t ? `<em>둘 다</em>` : m ? `<em>나</em>` : t ? `<em>${esc(mate())}</em>` : "";
+          return `<span class="sy-chip ${cls}">${esc(o)}${tag}</span>`;
+        }).join("") : `<span class="sy-chip">—</span>`;
+        const k = KINDS[h.kind] || KINDS.none;
+        return `<li class="sy-rq">
+            <div class="sy-rq__head"><span aria-hidden="true">${esc(h.icon)}</span><b>${h.no}. ${esc(h.text)}</b><em class="sy-badge ${ptsCls(h.pts)}">${h.pts ? `+${h.pts}` : "0"}</em></div>
+            <div class="sy-rq__chips">${chips}</div>
+            <div class="sy-rq__g"><span class="${h.myHit ? "is-hit" : "is-miss"}">내 예상 <b>${esc(opt(h.options, h.mine.guess))}</b> <i>${h.myHit ? "✓" : "✗"}</i></span>
+              <span class="${h.theirHit ? "is-hit" : "is-miss"}">${esc(mate())}님 예상 <b>${esc(opt(h.options, h.theirs.guess))}</b> <i>${h.theirHit ? "✓" : "✗"}</i></span></div>
+            <p class="sy-rq__line">${k.emo} ${k.name} · ${esc(h.line || "")}</p>
+          </li>`;
+      }).join("");
+      return `<section class="er-card sy-recap"><h2>${HKUI.icon("list-checks", 16, "currentColor")} 문제별 다시 보기<small>${v.answered}문제 · ${v.points}점</small></h2><ol>${rows}</ol></section>`;
+    }
+
+    // ── 끝 카드 ──
+    function gaugeSvg(pct) {
+      return `<svg viewBox="0 0 120 120"><circle class="bg" cx="60" cy="60" r="52"/><circle class="fg" id="sy-gauge" cx="60" cy="60" r="52" stroke-dasharray="${GAUGE.toFixed(2)}" stroke-dashoffset="${(GAUGE * (1 - pct / 100)).toFixed(2)}"/></svg>`;
+    }
+    function endCard(again) {
+      if (!v) return `<div class="er-end sy-end"><h2>끝!</h2><p class="sy-end__outro">${esc((room && room.outro) || "")}</p><div class="er-actions">${again}</div></div>`;
+      const pct = Math.max(0, Math.min(100, Number(v.syncPct) || 0));
+      const start = endAnimFor !== room.id && !reduce() ? 0 : pct; // 처음 그릴 때는 0 에서 차오른다(painted)
+      const sub = v.reason === "time" ? `시간 끝! ${v.answered}문제를 풀었어요` : `${v.total}문제 다 풀었어요`;
+      const best = v.history.find((h) => h.kind === "perfect");
+      return `<div class="er-end sy-end ${v.points ? "" : "is-zero"} is-${tierOf(room)}">
+          <span class="sy-end__ep">사내 소식지 · 우리 동기, 얼마나 통하나?</span>
+          <div class="sy-gauge" role="img" aria-label="통함 지수 ${pct}%">${gaugeSvg(start)}
+            <div class="sy-gauge__in" aria-hidden="true"><small>통함 지수</small><b><span id="sy-gauge-n">${start}</span><i>%</i></b></div></div>
+          <h2 class="sy-end__grade">「${esc(v.grade || "")}」</h2>
+          <p class="sy-end__sub"><b>${v.points}</b> / ${v.maxPoints}점 · ${esc(sub)}</p>
+          <p class="sy-end__outro">${esc(room.outro || "")}</p>
+          ${best ? `<div class="sy-end__best">⚡ 가장 잘 통한 문제 <b>${esc(best.icon)} ${esc(best.text)}</b></div>` : ""}
+          <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#">목록</a></div>
+        </div>`;
+    }
+    function runGauge() {
+      const pct = Math.max(0, Math.min(100, Number(v && v.syncPct) || 0));
+      const t0 = performance.now(), dur = 900;
+      const step = (t) => {
+        const p = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - p, 3), val = pct * e;
+        const ring = document.getElementById("sy-gauge"), num = document.getElementById("sy-gauge-n");
+        if (ring) ring.setAttribute("stroke-dashoffset", (GAUGE * (1 - val / 100)).toFixed(2));
+        if (num) num.textContent = String(Math.round(val));
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+    function bumpPts() {
+      const box = document.getElementById("sy-pts"), n = document.getElementById("sy-pts-n");
+      if (!box || !n || !v) return;
+      n.textContent = String(v.points);
+      box.classList.remove("is-bump"); void box.offsetWidth; box.classList.add("is-bump");
+    }
+
+    // 받은 방이 지금 화면의 방보다 새것인가 — 내 동작의 응답이 상대 소식(/wait)보다 늦게 오면 버린다
+    // (안 버리면 화면이 한 칸 앞으로 돌아갔다 오면서 소리가 두 번 나고, 새 문제에서 고르던 값이 지워진다). 목록으로 나갔으면 버린다
+    function fresher(next) {
+      const cur = C && C.room;
+      return !!(next && next.id && cur && next.id === cur.id) && (Number(next.seq) || 0) > (Number(cur.seq) || 0);
+    }
+    // ── 보내기 — 한 번에 하나만. 상대 화면보다 늦은 것뿐이면 조용히 다시 받는다 ──
+    async function send(action, arg) {
+      if (busy || !room || !C) return null;
+      busy = true;
+      try {
+        const next = await HKApi.coopAct(room.id, action, arg);
+        if (fresher(next)) C.set(next);
+        if (next && next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+        return next;
+      } catch (e) {
+        if (["SYNC_STALE", "SYNC_NOT_PICKING", "SYNC_NOT_REVEAL", "ESCAPE_NOT_PLAYING"].includes(e.code)) { resetDraft(null); C.refresh(); return null; }
+        if (e.code === "ESCAPE_TOO_FAST") return null;
+        HKUI.toast(e.message || "보낼 수 없어요", "error");
+        return null;
+      } finally {
+        busy = false;
+      }
+    }
+    // 지금 이 방 화면을 보고 있나 — 목록으로 나가면 껍데기의 방은 비지만 여기 room · v 는 남아 있다(그때 단축키가 먹지 않게)
+    const live = () => !!(C && C.room && room && C.room.id === room.id && C.room.status === "PLAYING" && v && !v.over);
+    const isPicking = () => live() && v.phase === "pick" && !!v.q;
+    const isRevealing = () => live() && v.phase === "reveal" && !!v.reveal;
+    const mobile = () => { try { return matchMedia("(max-width: 640px)").matches; } catch (_) { return false; } };
+    // 위에 붙은 사이트 머리 높이(PC 는 붙어 있고 휴대폰은 아니다)
+    function stickyHead() {
+      const h = document.querySelector(".hk-site-header, .hk-header, header");
+      return h && /sticky|fixed/.test(getComputedStyle(h).position) ? h.getBoundingClientRect().height : 0;
+    }
+    // start — 대기실에서 막 시작했을 때. 「준비」 버튼이 대기실 아래쪽이라 화면이 내려간 채로 시작한다
+    // (휴대폰은 ② 보기 · 제출 줄만 보이고, PC 는 위 막대의 시계 · 진행 점이 사이트 머리 밑에 가린다)
+    function showStage(start) {
+      const el = document.getElementById("sy-stage");
+      if (!el) return;
+      const behavior = reduce() ? "auto" : "smooth";
+      if (!mobile()) {
+        if (!start) return;
+        const bar = document.querySelector(".er-top") || el; // PC 는 시계가 있는 위 막대부터 보이게
+        const top = bar.getBoundingClientRect().top - stickyHead() - 8;
+        if (top < 0) window.scrollTo({ top: Math.max(0, window.scrollY + top), behavior });
+        return;
+      }
+      const top = el.getBoundingClientRect().top;
+      if (top < 0) window.scrollTo({ top: Math.max(0, window.scrollY + top - 12), behavior });
+    }
+    function focusLater(id) { setTimeout(() => { const el = document.getElementById(id); if (el) el.focus({ preventScroll: true }); }, 0); }
+    // 손가락(또는 휴대폰 화면에서 마우스)으로 누른 버튼은 초점을 놓는다 — 껍데기가 다시 그릴 때 id 로 초점을 되돌리며
+    // 그 버튼 쪽으로 화면을 끌어올리지 않게(①을 누르고 ② 로 내려간 뒤 동료 소식에 다시 ① 로 튀는 일). 키보드로 누른 건 그대로
+    let ptrAt = 0, ptrTouch = false;
+    document.addEventListener("pointerdown", (e) => { ptrAt = Date.now(); ptrTouch = e.pointerType === "touch"; }, true);
+    const tapped = () => Date.now() - ptrAt < 1500 && (ptrTouch || mobile());
+    function dropTapFocus() {
+      const a = document.activeElement;
+      if (tapped() && a && a !== document.body && a.blur) a.blur();
+    }
+    function choose(kind, i, byKey) {
+      if (!isPicking() || (v.mine && !draft.edit)) return;
+      if (!(i >= 0 && i < v.q.options.length)) return;
+      const first = kind === "own" && draft.own == null;
+      if (kind === "own") draft.own = i; else draft.guess = i;
+      draft.step = draft.own == null ? 1 : 2; // ②를 먼저 골랐으면 숫자 키 · 강조는 아직 ①
+      sfx("select");
+      const tap = !byKey && tapped();
+      if (tap) dropTapFocus();
+      C.paint();
+      // ①을 처음 고르면 휴대폰은 ② 칸 머리가 위쪽에 오게 스크롤
+      if (kind === "own" && first && mobile()) setTimeout(() => { const el = document.getElementById("sy-step-guess"); if (el) el.scrollIntoView({ block: "start", behavior: reduce() ? "auto" : "smooth" }); }, 0);
+      if (tap) return;
+      if (byKey) {
+        // 숫자 키로 골랐는데 초점이 보기 위에 있으면 고른 보기로 옮긴다 — 다음 Enter 가 초점 둔 다른 보기를 고르지 않고 제출하게
+        const a = document.activeElement;
+        if (a && a.classList && a.classList.contains("sy-opt")) focusLater(`sy-${kind}-${i}`);
+        return;
+      }
+      // PC 에서 마우스 · 키보드(Space · Enter)로 누르면 다음 할 칸에 초점 — ① 다음은 ②, ② 다음은 제출(① 이 비었으면 ①)
+      if (mobile()) return;
+      if (kind === "own") focusLater(`sy-guess-${draft.guess != null ? draft.guess : 0}`);
+      else focusLater(draft.own == null ? "sy-own-0" : "sy-submit");
+    }
+    async function submit() {
+      if (!isPicking() || draft.own == null || draft.guess == null || busy) return;
+      if (v.mine && !draft.edit) return;
+      const wasEdit = draft.edit;
+      sfx("drop");
+      draft.edit = false;
+      const res = await send("pick", { mine: draft.own, guess: draft.guess, no: v.no });
+      if (!res && draft.no === (v && v.no) && wasEdit) { draft.edit = true; C.paint(); }
+    }
+    function goNext() {
+      if (!isRevealing() || v.reveal.nextMe || busy || now() < nextOpenAt()) return;
+      send("next", { no: v.no });
+    }
+    function react(i) {
+      if (!isRevealing() || Date.now() < reactLock || !(i >= 0 && i < (v.reactions || []).length)) return;
+      reactLock = Date.now() + 1200; // 같은 반응을 연달아 못 누르게(서버도 1.2초) — 이 화면 시계로
+      sfx("tap");
+      dropTapFocus();
+      document.querySelectorAll(".sy-react").forEach((b) => { b.setAttribute("aria-disabled", "true"); });
+      send("react", { i });
+    }
+
+    // ── 단축키(데스크톱) — 리스너는 document 하나만(껍데기 keydown 훅은 넘기지 않는다: 둘 다 달면 한 번 눌러 두 번 고른다) ──
+    document.addEventListener("keydown", (e) => {
+      if (e.isComposing || e.keyCode === 229) return;
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+      const tg = e.target;
+      if (tg && tg.closest && tg.closest("input, textarea, select, [contenteditable]")) return;
+      if (document.querySelector(".hk-dialog__overlay")) return;
+      if (!live()) return;
+      const onBtn = tg && tg.closest && tg.closest("button, a, summary");
+      if (isPicking()) {
+        if (e.code in DIGITS) {
+          if (v.mine && !draft.edit) return;
+          const i = DIGITS[e.code];
+          if (i >= v.q.options.length) return;
+          e.preventDefault();
+          choose(draft.step === 1 ? "own" : "guess", i, true);
+          return;
+        }
+        if ((e.code === "Backspace" || e.code === "ArrowLeft") && draft.step === 2 && !(v.mine && !draft.edit)) {
+          e.preventDefault(); draft.step = 1; C.paint(); return;
+        }
+        if (e.code === "Enter" || e.code === "NumpadEnter") {
+          const o = tg && tg.closest && tg.closest(".sy-opt");
+          // 안 고른 보기에 초점 → 버튼 그대로 눌려 그 보기를 고른다(초점은 다음 칸으로). 다른 버튼도 그 버튼 그대로
+          if ((o && !o.classList.contains("is-on")) || (onBtn && !o)) return;
+          // 이미 고른 보기 · 버튼 밖 → 다 골랐으면 제출, 아니면 아직 빈 칸으로 초점
+          e.preventDefault();
+          if (draft.own != null && draft.guess != null) submit();
+          else if (o) focusLater(draft.own == null ? "sy-own-0" : "sy-guess-0");
+        }
+        return;
+      }
+      if (isRevealing()) {
+        if ((e.code === "Enter" || e.code === "NumpadEnter" || e.code === "Space") && !onBtn) { e.preventDefault(); goNext(); return; }
+        const r = REACT_KEYS.indexOf(e.code);
+        if (r >= 0) { e.preventDefault(); react(r); }
+      }
+    });
+
+    const coop = HKCoop.mount({
+      room: "sync",
+      listName: "통하는 사이 목록",
+      heroClass: "is-sync",
+      tickMs: 250,
+      chatWhilePlaying: false, // 답을 미리 말하지 않게 — 진행 중에는 반응 버튼만
+      hero: {
+        facts: ["2인 협동", "5분 · 10문제", "몰래 고르고 함께 공개", "끝까지 하면 오늘 도장"],
+        note: "옆자리에서 해도 좋아요. 다만 답은 입 밖으로 내지 않기!",
+      },
+      rankTitle: "통함 점수 순위",
+      rankNote: "같은 두 사람은 가장 높은 한 판만 올라요.",
+      rankText: (x) => `${Number(x.score || 0)}점 · ${Math.round((Number(x.score || 0) * 100) / SYNC_MAX)}%`,
+      recentText: (r) => (r.status === "CLEAR" ? [`${Number(r.score || 0)}점`, Number(r.score) > 0 ? "is-clear" : "is-fail"] : ["그만둠", "is-fail"]),
+      failTitle: "그만뒀어요",
+      quick: ["준비됐어요!", "나 맞혀 봐요", "천천히 해요", "한 판 더?"],
+      remain: () => (v && !v.over ? v.end - now() : null),
+      timerNote: () => timerNote(),
+      readyNote: (ctx) => `둘이 하는 일은 같아요. 문제마다 <b>내 답</b>과 <b>${esc(ctx.room.partner.name)}님이 고를 답</b>을 하나씩 골라요. 둘 다 내기 전에는 서로의 답이 안 보여요. 보기 순서는 사람마다 달라요.`,
+      readyExtra: (ctx) => {
+        const cur = (ctx.room.opts && ctx.room.opts.theme) || "mix";
+        const m = esc(ctx.room.partner.name);
+        return `<div class="sy-pick">
+            <div class="sy-pick__head"><b>오늘의 주제</b><small>주제를 바꾸면 둘 다 다시 「준비」를 눌러야 해요.</small></div>
+            <div class="sy-pick__grid" role="radiogroup" aria-label="주제 고르기">${THEMES.map((t) => `<button type="button" class="sy-theme-btn ${t.key === cur ? "is-on" : ""}" id="sy-theme-${t.key}" data-theme="${t.key}" role="radio" aria-checked="${t.key === cur}"><span aria-hidden="true">${t.emo}</span><b>${esc(t.name)}</b><small>${esc(t.note)}</small></button>`).join("")}</div>
+          </div>
+          <details class="sy-how" ${howOpen ? "open" : ""}><summary>${HKUI.icon("book-open", 17, "currentColor")} 이렇게 해요<small>규칙 · 점수</small></summary>
+            <div class="sy-how__in">
+              <ol>
+                <li>질문이 나오면 <em>① 내 답</em>을 고르고, <em>② ${m}님이 고를 것 같은 답</em>을 예상해서 내요.</li>
+                <li>둘 다 내면 <em>한꺼번에 공개</em>! 그 전에는 「냈어요」만 보여요. ${m}님이 내기 전이면 다시 고를 수 있어요.</li>
+                <li>보기 순서는 사람마다 달라요. 「1번」 같은 번호 말고 <em>보기 글자</em>로 생각해요.</li>
+                <li>5분 동안 10문제. 공개 화면은 둘 다 「다음」을 누르거나 7초 뒤에 넘어가요.</li>
+              </ol>
+              <div class="sy-points"><span><b>+1</b>내 예상이 맞으면</span><span><b>+1</b>${m}님 예상이 맞으면</span><span><b>+1</b>둘이 같은 답(통함)</span><span><b>3</b>한 문제 최대 · 30점 만점</span></div>
+              <p class="sy-how__note">진행 중에는 대화창이 닫혀요. 공개 화면의 반응 버튼으로 마음을 전해 봐요.</p>
+            </div>
+          </details>`;
+      },
+      reset: () => {
+        v = null; room = null; tickFor = null; resetDraft(null);
+        animatedFor = slideFor = endAnimFor = null; revealSeen = { no: null, at: 0 };
+        busy = false; warned10 = false; moreOpen = false; reactLock = 0; toStage = false; bubSeen.clear(); clearLater();
+      },
+      changed: (prev, next, ctx) => {
+        C = ctx;
+        const pv = v;
+        room = next;
+        v = next.sync || null;
+        if (!v) return;
+        offset = v.now * 1000 - Date.now();
+        if (draft.no !== v.no) resetDraft(v.no);
+        if (v.phase === "reveal" && revealSeen.no !== v.no) revealSeen = { no: v.no, at: now() };
+        if (next.status === "PLAYING") { try { localStorage.setItem(PLAYED_KEY, "1"); } catch (_) { /* 기억 못 해도 그만 */ } }
+        // 처음 들어올 때(새로 고침 · 다시 들어옴)는 공개 애니메이션 · 소리 없이 지금 상태 그대로
+        if (!prev || prev.id !== next.id) {
+          if (v.phase === "reveal") animatedFor = v.no;
+          slideFor = v.no; warned10 = v.end - now() <= 10;
+          return;
+        }
+        if (!pv || next.status !== "PLAYING" || prev.status !== "PLAYING") {
+          // 대기실 → 시작 — 소리는 껍데기가 go 를 낸다. 화면은 문제판이 보이게 올린다(showStage)
+          if (prev.status === "READY" && next.status === "PLAYING") toStage = "start";
+          return;
+        }
+        // 효과음 — 내가 낸 동작은 누를 때 이미 소리를 냈다(제출 drop · 반응 tap). 여기서는 바뀐 것만
+        if (v.no > pv.no) { sfx("swap"); toStage = true; }
+        else if (pv.phase === "pick" && v.phase === "reveal") { sfx("whoosh"); toStage = true; }
+        else if (!pv.mine && v.mine) toStage = true;
+        else if (v.phase === "pick" && !pv.partnerDone && v.partnerDone) { sfx("pop"); fresh.partner = true; }
+        const pr = pv.reacts && pv.reacts.partner, nr = v.reacts && v.reacts.partner;
+        if (nr && (!pr || pr.t !== nr.t)) sfx("pop");
+      },
+      play: () => playHtml(),
+      side: () => {
+        if (!v) return "";
+        return room.status === "PLAYING" ? histSide() : endSide();
+      },
+      end: (ctx, again) => endCard(again),
+      failEnd: (ctx, again) => `<div class="er-end sy-end is-zero">
+          <span class="sy-end__ep">사내 소식지 · 우리 동기, 얼마나 통하나?</span>
+          <h2 style="margin-top:12px">그만뒀어요</h2>
+          ${v ? `<p class="sy-end__sub">그만둘 때까지 ${v.answered}문제 · <b>${v.points}</b>점</p>` : ""}
+          <p class="sy-end__outro">괜찮아요. 다음엔 끝까지 같이 해 봐요.</p>
+          <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#">목록</a></div>
+        </div>`,
+      stats: () => {
+        if (!v) return [];
+        const list = [
+          { label: "통함 지수", value: `${v.syncPct}%` },
+          { label: `점수 · ${v.maxPoints}점 만점`, value: `${v.points}점` },
+          { label: "같은 답", value: `${v.matches}번` },
+          { label: "내 예상 적중", value: `${v.hits.me} / ${v.answered}` },
+          { label: `${mate()}님 예상 적중`, value: `${v.hits.partner} / ${v.answered}` },
+        ];
+        // 결과 칸은 한 줄 6칸 — 시간 끝이면 찌찌뽕 횟수(옆 칸 「결과 갈래」에도 있다) 대신 못 푼 문제
+        if (v.reason === "time") list.push({ label: "못 푼 문제", value: `${Math.max(0, v.total - v.answered)}개` });
+        else list.push({ label: "찌찌뽕(3점)", value: `${v.perfect}번` });
+        return list;
+      },
+      storyTier: (ctx) => (ctx.room ? tierOf(ctx.room) : null),
+      after: () => recapHtml(),
+      painted: () => {
+        fresh.partner = false;
+        if (toStage) { const start = toStage === "start"; toStage = false; setTimeout(() => showStage(start), 0); }
+        document.querySelectorAll(".sy-bub[data-bub]").forEach((b) => bubSeen.add(b.dataset.bub));
+        if (!v || !room) return;
+        if (room.status === "PLAYING" && !v.over) {
+          if (v.phase === "reveal" && v.reveal && animatedFor !== v.no) {
+            animatedFor = v.no;
+            const k = KINDS[v.reveal.kind] || KINDS.none;
+            later(() => { sfx(k.snd); bumpPts(); }, reduce() ? 0 : 900);
+          }
+          if (v.phase === "pick") slideFor = v.no;
+        } else if (room.status === "CLEAR" && endAnimFor !== room.id) {
+          endAnimFor = room.id;
+          if (!reduce()) runGauge();
+        }
+      },
+      tick: (ctx) => {
+        if (!room || room.status !== "PLAYING" || !v) return;
+        const t = now(), left = v.end - t;
+        // 위 막대 시계 — 마지막 10초 깜빡임 · 아래 글자
+        const tm = document.getElementById("er-timer");
+        if (tm) {
+          tm.classList.toggle("sy-last", left <= 10 && left > 0);
+          const s = tm.querySelector("small"), note = timerNote();
+          if (s && s.textContent !== note) s.textContent = note;
+        }
+        if (left <= 10 && left > 0 && !warned10) { warned10 = true; sfx("countdown"); }
+        const stage = document.getElementById("sy-stage");
+        if (stage) stage.classList.toggle("is-late", left < 30);
+        const ck = document.getElementById("sy-clock");
+        if (ck) { const tx = clock(); if (ck.textContent !== tx) ck.textContent = tx; }
+        if (isRevealing()) {
+          const r = v.reveal, rl = Math.max(0, r.until - t);
+          const ring = document.getElementById("sy-ring"), num = document.getElementById("sy-ring-n");
+          if (ring) ring.setAttribute("stroke-dashoffset", (RING * (1 - Math.max(0, Math.min(1, rl / (v.revealSec || 7))))).toFixed(2));
+          if (num) num.textContent = String(Math.ceil(rl));
+          const btn = document.getElementById("sy-next");
+          if (btn && btn.disabled && !r.nextMe && t >= nextOpenAt()) btn.disabled = false;
+          if (Date.now() >= reactLock) document.querySelectorAll(`.sy-react[aria-disabled="true"]`).forEach((b) => { b.removeAttribute("aria-disabled"); });
+          document.querySelectorAll(".sy-bub[data-until]").forEach((b) => { if (t >= Number(b.dataset.until)) b.classList.add("is-out"); });
+        }
+        if (v.nextAt && t >= v.nextAt + 0.05 && tickFor !== v.nextAt) {
+          tickFor = v.nextAt;
+          HKApi.coopTick(room.id).then((next) => { if (fresher(next)) ctx.set(next); }).catch(() => { tickFor = null; });
+        }
+      },
+      click: async (t, ctx) => {
+        const d = t.dataset;
+        if (d.theme) {
+          if (t.classList.contains("is-on") || !ctx.room || ctx.room.status !== "READY") return;
+          ctx.sfx("select");
+          dropTapFocus();
+          return ctx.act(async () => { const next = await HKApi.coopOptions(ctx.room.id, { theme: d.theme }); return fresher(next) ? next : null; });
+        }
+        if ("own" in d) return choose("own", Number(d.own));
+        if ("guess" in d) return choose("guess", Number(d.guess));
+        if ("submit" in d) return submit();
+        if ("edit" in d) {
+          if (!isPicking() || !v.mine) return;
+          draft = { no: v.no, own: v.mine.own, guess: v.mine.guess, step: 1, edit: true };
+          sfx("tap");
+          ctx.paint();
+          if (!mobile()) focusLater(`sy-own-${draft.own}`);
+          return;
+        }
+        if ("keep" in d) { draft.edit = false; ctx.paint(); return; }
+        if ("next" in d) return goNext();
+        if ("react" in d) return react(Number(d.react));
+        if ("more" in d) { moreOpen = !moreOpen; ctx.paint(); }
+      },
+    });
+    C = coop;
+  </script>
+</body>
+</html>

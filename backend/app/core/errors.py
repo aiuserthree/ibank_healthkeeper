@@ -101,6 +101,7 @@ ERROR_MESSAGES = {
     "WORDS_CHAT_OFF": "게임 중에는 대화창 대신 설명 칸을 써 주세요.",
     "MAZE_NOT_WALKER": "지금은 상대가 걷는 차례예요. CCTV로 길을 알려 주세요.",
     "MAZE_STUNNED": "미끄러져서 잠깐 못 움직여요.",
+    "COOP_NO_OPTIONS": "이 게임은 고를 설정이 없어요.",
     "GAME_CLOSED": "지금은 업무 시간이라 게임을 할 수 없어요. (점심 11:30~13:00 · 18:00 이후 · 9:00 이전)",
     "GAME_REQUEST_EMPTY": "내용을 적어 주세요.",
     "GAME_REQUEST_LIMIT": "오늘은 의견을 충분히 보내 주셨어요. 내일 또 보내 주세요.",
@@ -119,6 +120,18 @@ ERROR_MESSAGES = {
     "RETURN_MONTHLY_LIMIT": "반납은 한 사람당 한 달에 1회까지 가능합니다. 이번 달 한도를 모두 사용했습니다.",
     "RETURN_BLOCKED_PENDING": "진행 중인 양도·교환 제안이 있어 반납할 수 없습니다. 제안을 먼저 정리해 주세요.",
 }
+
+
+# 게임 모듈이 자기 오류 문구를 직접 등록한다 — 여러 게임이 이 파일을 함께 고치지 않게
+_EXTRA_STATUS: dict = {}
+
+
+def register_messages(messages: dict, statuses: Optional[dict] = None) -> None:
+    """ERROR_MESSAGES 에 코드 · 문구를 더한다(이미 있는 코드는 덮어쓰지 않는다). statuses 는 코드별 HTTP 상태."""
+    for code, msg in messages.items():
+        ERROR_MESSAGES.setdefault(code, msg)
+    if statuses:
+        _EXTRA_STATUS.update(statuses)
 
 
 def raise_app_error(code: str, http_status: Optional[int] = None) -> None:
@@ -180,7 +193,7 @@ def raise_app_error(code: str, http_status: Optional[int] = None) -> None:
         "UNAUTHORIZED": 401,
         "TOKEN_EXPIRED": 410,
     }
-    status_code = http_status or status_map.get(code, 400)
+    status_code = http_status or status_map.get(code) or _EXTRA_STATUS.get(code, 400)
     raise HTTPException(
         status_code=status_code,
         detail={"error": {"code": code, "message": ERROR_MESSAGES.get(code, code)}},

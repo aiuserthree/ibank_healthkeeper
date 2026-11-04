@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 틀린 그림 찾기</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/coop-story.js"></script>
+  <script src="/_shared/coop.js"></script>
+  <style>
+    /* 틀린 그림 찾기 — 협동 시리즈 번외 3화. 화 색(--ch-*)은 coop.js 가 .er 에 붙인다 */
+    .er-hero.is-spot:not(.er-hero--story) { background: radial-gradient(60% 80% at 84% 8%, rgba(45, 212, 191, .45) 0%, rgba(45, 212, 191, 0) 60%), linear-gradient(160deg, #042f2e, #1e3a8a); }
+    .er-hero.is-spot:not(.er-hero--story)::after { content: ""; position: absolute; top: 14px; right: 18px; z-index: -1; width: 110px; height: 110px; opacity: .5; pointer-events: none;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='40' cy='40' r='26' fill='none' stroke='%235eead4' stroke-width='9'/%3E%3Cpath d='M60 60l26 26' stroke='%235eead4' stroke-width='13' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; }
+
+    /* ── 진행 화면 ── */
+    .er-card.sp { padding: 14px; }
+    .sp-hud { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 10px; }
+    .sp-scene { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border-radius: 999px; background: var(--ch-deep); color: #fff; font-size: 14px; font-weight: 700; white-space: nowrap; }
+    .sp-scene b { font-weight: 900; color: var(--ch-glow); }
+    .sp-dots { display: inline-flex; align-items: center; gap: 6px; }
+    .sp-dots i { display: block; width: 16px; height: 16px; box-sizing: border-box; border: 2.5px solid #cbd5e1; border-radius: 50%; background: #fff; }
+    .sp-dots i.is-me { border-color: var(--ch-accent); background: var(--ch-accent); }
+    .sp-dots i.is-mate { border-color: #1d4ed8; background: #1d4ed8; }
+    .sp-dots i.is-pop { animation: sp-pop .25s ease both; }
+    .sp-hud__end { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; }
+    .sp-miss { display: inline-flex; align-items: center; gap: 4px; min-height: 30px; padding: 0 10px; border-radius: 999px; background: #f1f5f9; font-size: 13px; font-weight: 800; color: #64748b; white-space: nowrap; }
+    .sp-miss b { font-size: 15px; color: #334155; font-variant-numeric: tabular-nums; }
+    .sp-miss.is-blink { animation: sp-redblink .4s ease both; }
+    .sp-time { position: relative; display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; border-radius: 999px; background: var(--ch-deep); color: #fff; white-space: nowrap; }
+    .sp-time b { font: 800 15px/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-variant-numeric: tabular-nums; }
+    .sp-time.is-low { background: #9f1239; }
+    .sp-time.is-last { background: #e11d48; animation: sp-beat 1s ease infinite; }
+    .sp-time .sp-minus { top: -16px; }
+    .sp-score { display: inline-flex; align-items: baseline; gap: 2px; min-height: 30px; padding: 4px 10px; box-sizing: border-box; border-radius: 999px; background: var(--ch-soft); font-size: 12.5px; font-weight: 800; color: var(--ch-ink); white-space: nowrap; }
+    .sp-score b { font-size: 15px; color: var(--ch-strong); font-variant-numeric: tabular-nums; }
+    .sp-msg { display: flex; align-items: center; gap: 10px; min-height: 48px; margin-bottom: 10px; padding: 6px 12px; box-sizing: border-box; border: 1px solid #e2e8f0; border-radius: 14px; background: #f8fafc;
+      font-size: 14.5px; font-weight: 700; line-height: 1.4; color: #334155; word-break: keep-all; overflow-wrap: anywhere; transition: background .2s ease; }
+    .sp-msg > span:last-child { min-width: 0; }
+    .sp-msg small { display: block; font-size: 11.5px; font-weight: 800; color: #64748b; }
+    .sp-msg__ic { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(15, 23, 42, .1); font-size: 17px; }
+    .sp-msg.is-say { border-color: #1d4ed8; background: #1d4ed8; font-size: 16.5px; color: #fff; box-shadow: 0 4px 14px rgba(29, 78, 216, .28); }
+    .sp-msg.is-say small { color: #dbeafe; }
+    .sp-msg.is-good { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
+    .sp-msg.is-good small { color: #e11d48; }
+    .sp-msg.is-pin { border-color: #bfdbfe; background: #eff6ff; color: #1e3a8a; }
+    .sp-msg.is-hint { font-weight: 600; color: #475569; }
+    /* 다 찾음 — 사진 위를 가리지 않게 사진 바깥(알림 줄)에 띄운다 */
+    .sp-msg.is-clear { position: relative; border-color: transparent; background: linear-gradient(135deg, var(--ch-strong), var(--ch-accent)); font-size: 16.5px; font-weight: 900; color: #fff; box-shadow: 0 6px 18px rgba(15, 23, 42, .22); }
+    .sp-msg.is-clear small { margin-top: 1px; font-size: 12.5px; font-weight: 700; color: rgba(255, 255, 255, .9); }
+    .sp-msg.is-clear.is-fresh { animation: sp-msgin .35s ease both; }
+    .sp-msg .sp-spark { position: absolute; top: 50%; left: 28px; width: 9px; height: 9px; border-radius: 2px; background: #fde047; pointer-events: none; animation: sp-spark 1s ease-out both; }
+
+    /* 사진 판 — 한 번 만들어 계속 옮겨 붙인다 */
+    .sp-slot { position: relative; }
+    .sp-photos { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 12px; }
+    .sp-frame { position: relative; width: min(100%, 620px, max(380px, calc(100vh - 206px))); aspect-ratio: 1 / 1; overflow: hidden; border-radius: 14px; background: #e2e8f0;
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, .14), 0 8px 20px rgba(15, 23, 42, .1); }
+    .sp-frame.is-mine { grid-area: 1 / 1 / 2 / 2; }
+    /* 상대 사진은 보기만 — 휴대폰은 내 사진 위에 겹쳐 번갈아 보이므로, 눌러도 아래 내 사진이 받게(「다음 사진을 펼치는 중이에요」) */
+    .sp-frame.is-other { display: none; pointer-events: none; }
+    .sp-frame:has(.sp-svg:focus-visible) { box-shadow: 0 0 0 3px var(--ch-accent), 0 8px 20px rgba(15, 23, 42, .1); }
+    .sp-svg { display: block; width: 100%; height: 100%; outline: none; cursor: pointer; touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+    .sp.is-ping .is-mine .sp-svg { cursor: crosshair; }
+    /* 맞대 볼 때 어느 사진인지 — 사진 위에는 아무것도 얹지 않는다. 사진 테두리 색(나 장미 · 동료 남색) + 사진 바로 아래 이름표.
+       이름표는 사진 칸(격자 칸)에 붙여 그 아래 누르기 방식 줄 자리에 겹쳐 놓는다(맞대 보는 동안 그 줄은 숨긴다 — 높이가 그대로라 화면이 들썩이지 않는다).
+       절대 위치 칸은 끝 줄을 안 적으면 격자 끝까지 늘어나므로 grid-area 는 네 값 모두 적는다 */
+    .sp-cap { position: absolute; top: calc(100% + 12px); left: 0; right: 0; display: none; justify-content: center; pointer-events: none; }
+    .sp-cap span { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 12px; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1.5px var(--ch-accent); font-size: 13.5px; font-weight: 800; color: #334155; white-space: nowrap; }
+    .sp-cap i { display: block; width: 10px; height: 10px; border-radius: 50%; background: var(--ch-accent); }
+    .sp-cap.is-other span { box-shadow: 0 0 0 1.5px #1d4ed8; }
+    .sp-cap.is-other i { background: #1d4ed8; }
+    .sp-cur { display: none; pointer-events: none; }
+    .sp-svg:focus-visible .sp-cur { display: inline; }
+    .sp-pops { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+    .sp-bub { position: absolute; max-width: 86%; padding: 6px 12px; border-radius: 12px; background: #e11d48; color: #fff; font-size: 13.5px; font-weight: 800; line-height: 1.35; text-align: center;
+      box-shadow: 0 6px 16px rgba(15, 23, 42, .25); transform: translate(-50%, calc(-100% - 16px)); white-space: nowrap; word-break: keep-all; animation: sp-bub 1.6s ease both; }
+    .sp-bub.is-l { transform: translate(-12%, calc(-100% - 16px)); }
+    .sp-bub.is-r { transform: translate(-88%, calc(-100% - 16px)); }
+    .sp-bub.is-below { transform: translate(-50%, 16px); }
+    .sp-bub.is-l.is-below { transform: translate(-12%, 16px); }
+    .sp-bub.is-r.is-below { transform: translate(-88%, 16px); }
+    .sp-bub.is-info { background: #0f172a; }
+    .sp-bub.is-mate { background: #1d4ed8; }
+    .sp-lock { position: absolute; inset: 0; display: none; place-items: center; align-content: center; gap: 6px; background: rgba(255, 255, 255, .5); pointer-events: none; }
+    .sp-lock.is-on { display: grid; }
+    .sp-lock i { display: block; width: 64px; height: 64px; border-radius: 50%; background: conic-gradient(#e11d48 calc(var(--p, 1) * 360deg), rgba(225, 29, 72, .16) 0);
+      -webkit-mask: radial-gradient(circle, transparent 54%, #000 55%); mask: radial-gradient(circle, transparent 54%, #000 55%); }
+    .sp-lock b { padding: 3px 12px; border-radius: 999px; background: #fff; font-size: 15px; font-weight: 900; color: #be123c; }
+    .sp-lock.is-nudge { animation: sp-nudge .3s ease; }
+    .sp-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    /* 다 찾으면 맞대 보기 — PC 는 나란히(내 사진 왼쪽), 휴대폰은 한 칸에서 번갈아 */
+    .sp-stage.is-reveal .sp-photos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sp-stage.is-reveal .sp-frame { width: 100%; }
+    .sp-stage.is-reveal .sp-frame.is-mine { box-shadow: 0 0 0 3px var(--ch-accent), 0 8px 20px rgba(15, 23, 42, .1); }
+    .sp-stage.is-reveal .sp-frame.is-other { display: block; grid-area: 1 / 2 / 2 / 3; box-shadow: 0 0 0 3px #1d4ed8, 0 8px 20px rgba(15, 23, 42, .1); animation: sp-slide .3s ease both; }
+    .sp-stage.is-reveal .sp-cap { display: flex; }
+    .sp-cap.is-mine { grid-area: 1 / 1 / 2 / 2; }
+    .sp-cap.is-other { grid-area: 1 / 2 / 2 / 3; }
+    .sp-stage.is-reveal .sp-cap.is-other { animation: sp-slide .3s ease both; }
+    .er-card.sp:has(.sp-stage.is-reveal) .sp-tools { visibility: hidden; }
+    .sp-frame.is-shake { animation: sp-shake .25s ease; }
+    .sp-frame.is-enter { animation: sp-enter .3s ease both; }
+    /* 사진 위 표시(SVG) */
+    .sp-halo { fill: none; stroke: #fff; stroke-width: 15; opacity: .8; }
+    .sp-ring { fill: none; stroke-width: 7; stroke-dasharray: 100; stroke-dashoffset: 0; }
+    .sp-ring.is-miss { stroke-dasharray: 4 3; }
+    .sp-mark.is-new .sp-ring { animation: sp-draw .4s ease-out both; }
+    .sp-mark.is-new .sp-halo { animation: sp-fadein .4s ease-out both; }
+    .sp-mark.is-flash { animation: sp-flash .6s ease; }
+    .sp-check { opacity: 0; transform-box: fill-box; transform-origin: center; }
+    .sp-mark.is-new .sp-check { animation: sp-check 1.3s ease both; }
+    .sp-ripple { fill: none; stroke-width: 6; transform-box: fill-box; transform-origin: center; animation: sp-ripple 1.2s ease-out both; }
+    .sp-press { fill: none; stroke: #1d4ed8; stroke-width: 8; stroke-dasharray: 100; transform-box: fill-box; transform-origin: center; animation: sp-press .45s linear both; }
+    .sp-xm { transform-box: fill-box; transform-origin: center; animation: sp-xm .9s ease both; }
+    .sp-pin { animation: sp-pin 4s ease both; }
+    .sp-pin.is-short { animation-duration: 1.6s; }
+    /* 위 막대 시계 옆 −5초 */
+    .er-timer { position: relative; }
+    .er-timer.is-last .er-timer__t { color: #fca5a5; animation: sp-beat 1s ease infinite; }
+    .sp-minus { position: absolute; top: -6px; left: 50%; z-index: 2; padding: 2px 8px; border-radius: 999px; background: #e11d48; color: #fff; font: 800 12.5px/1.25 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; pointer-events: none;
+      transform: translateX(-50%); animation: sp-minus 1s ease-out both; }
+    /* 누르기 방식 · 빠른 말 */
+    .sp-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 14px; margin-top: 12px; }
+    .sp-mode { display: inline-flex; gap: 2px; padding: 4px; border-radius: 999px; background: #f1f5f9; }
+    .sp-mode button { min-height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent; color: #475569; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; transition: background .15s ease, color .15s ease; }
+    .sp-mode button.is-on { background: #fff; color: var(--ch-strong); box-shadow: 0 1px 3px rgba(15, 23, 42, .16); }
+    .sp-mode button[data-mode="ping"].is-on { background: #1d4ed8; color: #fff; }
+    .sp-help { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--text-muted); word-break: keep-all; }
+    .er:has(.er-card.sp) .er-quick button { min-height: 40px; }
+    .sp-quick { display: none; }
+
+    /* ── 옆 칸 — 찾은 곳 · 끝낸 사진 ── */
+    .sp-list h2 small, .sp-answer h2 small { margin-left: auto; font-size: 13px; font-weight: 800; color: var(--text-muted); }
+    .sp-rows { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .sp-rows li { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 6px 10px; box-sizing: border-box; border-radius: 12px; background: #f8fafc; }
+    .sp-rows li > i { display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #e2e8f0; color: #64748b; font-size: 13px; font-style: normal; font-weight: 900; }
+    .sp-rows li > span { min-width: 0; }
+    .sp-rows b { display: block; font-size: 14px; font-weight: 800; line-height: 1.35; word-break: keep-all; }
+    .sp-rows small { display: block; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+    .sp-rows li.is-me { background: var(--ch-soft); }
+    .sp-rows li.is-me > i { background: var(--ch-accent); color: #fff; }
+    .sp-rows li.is-mate { background: #eff6ff; }
+    .sp-rows li.is-mate > i { background: #1d4ed8; color: #fff; }
+    .sp-rows li.is-empty b { font-weight: 700; color: #94a3b8; }
+    .sp-rows li.is-unfound { background: #fff7ed; }
+    .sp-rows li.is-unfound > i { background: #f97316; color: #fff; }
+    .sp-done { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .sp-done li { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border: 1.5px dashed #e2e8f0; border-radius: 12px; font-size: 13.5px; font-weight: 700; }
+    .sp-done li b { flex-shrink: 0; min-width: 34px; padding: 3px 7px; border-radius: 8px; background: var(--ch-deep); color: #fff; font-size: 12.5px; text-align: center; }
+    .sp-done li span { flex: 1; min-width: 0; color: #334155; }
+    .sp-done li em { font: 800 13.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace; font-style: normal; color: var(--ch-strong); }
+    .sp-empty { margin: 0; font-size: 13px; color: var(--text-muted); }
+    .sp-list .sp-empty { display: none; }
+    /* 진행 중 옆 칸은 촘촘히 — PC 1280x800 에서 대화 입력칸까지 첫 화면에(찾은 곳 줄 34px · 끝낸 사진은 한 줄 칩) */
+    .sp-list .sp-rows { gap: 4px; }
+    .sp-list .sp-rows li { min-height: 34px; padding: 4px 10px; }
+    .sp-list .sp-rows b, .sp-list .sp-rows small { line-height: 1.3; }
+    .sp-donebar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 5px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e2e8f0; }
+    .sp-donebar > b { margin-right: 2px; font-size: 13px; font-weight: 800; color: var(--color-midnight-navy); white-space: nowrap; }
+    .sp-donebar > span { display: inline-flex; align-items: baseline; gap: 3px; padding: 2px 8px; border-radius: 999px; background: var(--ch-deep); color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .sp-donebar em { font-style: normal; font-variant-numeric: tabular-nums; color: var(--ch-glow); }
+    .sp-donebar small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+
+    /* ── 대기실 — 장소 고르기 · 이렇게 해요 ── */
+    .sp-pick { padding: 12px 14px 14px; border: 1px solid rgba(15, 23, 42, .06); border-radius: 16px; background: var(--ch-soft); }
+    .sp-pick__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin-bottom: 8px; }
+    .sp-pick__head b { font-size: 15px; font-weight: 900; color: var(--ch-ink); }
+    .sp-pick__head small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .sp-pick__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .sp-place { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 6px 4px; border: 1.5px solid #e2e8f0; border-radius: 13px; background: #fff; color: #334155;
+      font: inherit; font-size: 14px; font-weight: 800; white-space: nowrap; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; }
+    .sp-place:hover { border-color: var(--ch-accent); transform: translateY(-1px); }
+    .sp-place.is-on { border-color: var(--ch-strong); background: var(--ch-strong); color: #fff; box-shadow: 0 4px 12px rgba(15, 23, 42, .18); }
+    .sp-how { display: grid; grid-template-columns: 220px minmax(0, 1fr); align-items: center; gap: 14px; margin-top: 12px; padding: 12px; border: 1px solid var(--border-default); border-radius: 16px; background: #fff; }
+    .sp-how__art svg { display: block; width: 100%; height: auto; }
+    .sp-how ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; counter-reset: sp; }
+    .sp-how li { position: relative; padding-left: 30px; font-size: 13px; line-height: 1.5; color: var(--text-secondary); word-break: keep-all; counter-increment: sp; }
+    .sp-how li::before { content: counter(sp); position: absolute; top: 1px; left: 0; display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--ch-strong); color: #fff; font-size: 12px; font-weight: 900; }
+    .sp-how li b { display: block; font-size: 14px; color: var(--color-midnight-navy); }
+
+    /* ── 끝 화면 ── */
+    .er-end.sp-end { position: relative; overflow: hidden; background: linear-gradient(160deg, var(--ch-deep) 0%, var(--ch-strong) 70%, var(--ch-accent) 130%); }
+    .er-end.sp-end.is-fail { background: linear-gradient(160deg, #1e293b, #475569); }
+    .sp-end__art { display: flex; justify-content: center; margin-bottom: 6px; }
+    .sp-end__art svg { width: 150px; height: auto; }
+    .sp-end__ep { font-size: 12.5px; font-weight: 800; color: var(--ch-glow); }
+    .er-end.sp-end h2 { margin-top: 4px; }
+    .sp-end__big { margin: 12px 0 0; font-size: 18px; font-weight: 800; color: rgba(255, 255, 255, .9); }
+    .sp-end__big b { margin-right: 4px; font: 900 56px/1 ui-monospace, SFMono-Regular, Menlo, monospace; color: #fff; text-shadow: 0 0 22px rgba(255, 255, 255, .35); }
+    .er-end.sp-end p.sp-end__sub { margin-top: 6px; font-size: 14px; font-weight: 700; color: rgba(255, 255, 255, .82); }
+    .sp-answer .sp-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .sp-answer figure { position: relative; margin: 0; }
+    .sp-answer svg { display: block; width: 100%; height: auto; border-radius: 12px; box-shadow: 0 0 0 1px rgba(15, 23, 42, .14); }
+    .sp-answer figcaption { margin-top: 6px; font-size: 13px; font-weight: 800; text-align: center; color: #334155; }
+    .sp-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; margin: 10px 0 12px; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .sp-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .sp-legend i { display: inline-block; width: 16px; height: 12px; box-sizing: border-box; border: 3px solid; border-radius: 50%; }
+
+    @keyframes sp-pop { 0% { transform: scale(1); } 50% { transform: scale(1.4); } 100% { transform: scale(1); } }
+    @keyframes sp-redblink { 0%, 100% { background: #f1f5f9; } 30% { background: #fecdd3; color: #be123c; } }
+    @keyframes sp-bub { 0% { opacity: 0; margin-top: 8px; } 12% { opacity: 1; margin-top: 0; } 82% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes sp-nudge { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    @keyframes sp-msgin { from { opacity: 0; transform: translateY(6px) scale(.98); } to { opacity: 1; transform: none; } }
+    @keyframes sp-spark { from { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateY(0) scale(1); } to { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateY(-70px) scale(.4); } }
+    @keyframes sp-slide { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: none; } }
+    @keyframes sp-shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+    @keyframes sp-enter { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+    @keyframes sp-draw { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 0; } }
+    @keyframes sp-fadein { from { opacity: 0; } }
+    @keyframes sp-flash { 0%, 100% { opacity: 1; } 25%, 75% { opacity: .15; } 50% { opacity: 1; } }
+    @keyframes sp-check { 0% { opacity: 0; transform: scale(.3); } 18% { opacity: 1; transform: scale(1.15); } 28% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
+    @keyframes sp-ripple { from { opacity: .95; transform: scale(.3); } to { opacity: 0; transform: scale(3.2); } }
+    @keyframes sp-press { from { stroke-dashoffset: 100; opacity: .4; } to { stroke-dashoffset: 0; opacity: 1; } }
+    @keyframes sp-xm { 0% { opacity: 0; transform: scale(.3); } 22% { opacity: 1; transform: scale(1.15); } 35% { transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes sp-pin { 0% { opacity: 0; transform: translateY(-24px); } 8% { opacity: 1; transform: none; } 86% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes sp-minus { 0% { opacity: 0; transform: translate(-50%, 6px); } 18% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -24px); } }
+    @keyframes sp-beat { 50% { opacity: .55; } }
+    @keyframes sp-swap { 0%, 44% { opacity: 0; } 50%, 94% { opacity: 1; } 100% { opacity: 0; } }
+    @keyframes sp-swap-back { 0%, 44% { opacity: 1; } 50%, 94% { opacity: 0; } 100% { opacity: 1; } }
+
+    @media (max-width: 860px) {
+      .sp-how { grid-template-columns: minmax(0, 1fr); }
+      .sp-how__art { max-width: 300px; margin: 0 auto; }
+    }
+    @media (max-width: 640px) {
+      .er-card.sp { padding: 8px 8px 10px; margin-left: -4px; margin-right: -4px; }
+      .sp-hud { gap: 6px 8px; margin: 2px 2px 8px; }
+      .sp-scene { min-height: 32px; padding: 0 11px; font-size: 13px; }
+      .sp-dots { gap: 4px; }
+      .sp-dots i { width: 14px; height: 14px; }
+      .sp-miss, .sp-score, .sp-time { min-height: 28px; padding: 0 8px; }
+      .sp-hud__end { gap: 5px; }
+      .sp-time b { font-size: 14px; }
+      .sp-msg { min-height: 44px; margin-bottom: 8px; padding: 5px 10px; font-size: 13.5px; }
+      .sp-msg.is-say { font-size: 15.5px; }
+      .sp-msg__ic { width: 28px; height: 28px; font-size: 15px; }
+      .sp-frame { width: min(100%, 58vh); border-radius: 12px; }
+      .sp-bub { font-size: 12.5px; padding: 5px 10px; }
+      .sp-stage.is-reveal .sp-photos { grid-template-columns: minmax(0, 1fr); }
+      .sp-stage.is-reveal .sp-frame { width: min(100%, 58vh); }
+      .sp-stage.is-reveal .sp-frame.is-other { grid-area: 1 / 1 / 2 / 2; position: absolute; top: 0; left: 50%; transform: translateX(-50%); animation: sp-swap 1.6s linear infinite; }
+      /* 내 사진 말풍선(「다음 사진을 펼치는 중이에요」)은 겹쳐 번갈아 보이는 상대 사진 위로 */
+      .sp-stage.is-reveal .sp-pops { z-index: 3; }
+      .sp-cap.is-other { grid-area: 1 / 1 / 2 / 2; }
+      .sp-cap { top: calc(100% + 10px); }
+      .sp-stage.is-reveal .sp-cap.is-mine { animation: sp-swap-back 1.6s linear infinite; }
+      .sp-stage.is-reveal .sp-cap.is-other { animation: sp-swap 1.6s linear infinite; }
+      .sp-msg.is-clear { font-size: 15px; }
+      .sp-msg.is-clear small { font-size: 12px; }
+      .sp-tools { margin-top: 10px; gap: 6px; }
+      .sp-help { width: 100%; text-align: center; font-size: 12px; }
+      .sp-quick { display: flex; gap: 6px; margin: 10px -8px 0; padding: 0 8px 2px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+      .sp-quick::-webkit-scrollbar { display: none; }
+      .sp-quick button { flex: 0 0 auto; min-height: 40px; padding: 0 13px; border: 1px solid var(--border-default); border-radius: 999px; background: #fff; color: #334155; font: inherit; font-size: 13.5px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+      .er:has(.er-card.sp) .er-talk .er-quick { display: none; }
+      .sp-list .sp-rows li.is-empty { display: none; }
+      .sp-list .sp-empty { display: block; }
+      .sp-list h2 { margin-bottom: 6px; }
+      .sp-list .sp-rows li { min-height: 36px; padding: 5px 10px; }
+      .sp-pc { display: none; }
+      .sp-pick__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .sp-answer .sp-pair { grid-template-columns: minmax(0, 1fr); }
+      .sp-end__big b { font-size: 48px; }
+      .er-wait:has(.sp-pick) { display: flex; flex-direction: column; }
+      .er-wait:has(.sp-pick) > .er-extra { order: 5; margin: 14px 0 0; }
+      .er-wait:has(.sp-pick) > .er-actions { order: 6; }
+    }
+    /* 가로로 든 휴대폰 · 낮은 창 — 사진이 화면 높이 안에 다 들어오게 */
+    @media (min-width: 641px) and (max-height: 520px) {
+      .sp-frame { width: min(100%, 620px, max(220px, calc(100vh - 92px))); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sp-dots i.is-pop, .sp-miss.is-blink, .sp-bub, .sp-lock.is-nudge, .sp-msg.is-clear.is-fresh, .sp-frame.is-shake, .sp-frame.is-enter,
+      .sp-stage.is-reveal .sp-frame.is-other, .sp-stage.is-reveal .sp-cap, .sp-mark.is-new .sp-ring, .sp-mark.is-new .sp-halo, .sp-mark.is-flash, .sp-ripple, .sp-press, .sp-xm, .sp-minus, .er-timer.is-last .er-timer__t, .sp-time.is-last { animation: none !important; }
+      .sp-mark.is-new .sp-check { display: none; }
+      .sp-pin { animation: none; }
+      .sp-msg .sp-spark { display: none; }
+      .sp-stage.is-reveal .sp-frame.is-other { position: relative; top: auto; left: auto; transform: none; }
+      .sp-bub { animation: none; }
+    }
+    /* 휴대폰 + 움직임 줄이기 — 번갈아 보기 대신 위아래로 놓고, 위 사진 이름표는 두 사진 사이에 */
+    @media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+      .sp-stage.is-reveal .sp-photos { row-gap: 54px; }
+      .sp-stage.is-reveal .sp-frame.is-other, .sp-cap.is-other { grid-area: 2 / 1 / 3 / 2; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+
+    // 틀린 그림 찾기 — 2인 협동(협동 시리즈 「오늘도 둘이서」 번외 3화 · 21:30 7층 사무실). 방 공용은 /_shared/coop.js
+    // 같은 곳을 찍은 사진 두 장 — 나는 내 사진만 본다(상대 사진은 다 찾고 맞대 볼 때 · 끝난 뒤에만 온다).
+    // 말로 맞춰 보며 내 사진에서 다른 곳을 누른다. 틀리면 둘이 같이 쓰는 시간이 5초 준다.
+    // 사진 판(.sp-stage)은 한 번 만들어 계속 쓴다 — 방 화면을 통째로 다시 그려도 새 자리로 옮겨 붙이기만 하고,
+    // 움직이던 표시는 시작 시각(data-t0)으로 애니메이션 지연을 다시 맞춰 끊기지 않게 이어 간다.
+    const { esc } = HKMatch;
+    let room = null, z = null, offset = 0, tickFor = null, coop = null;
+    let mode = "tap", busyTap = false, busyPing = false, pingAt = 0, lastBeep = null, scrollSoon = false;
+    const now = () => (Date.now() + offset) / 1000;
+    const T = () => performance.now();
+    const ME = "#e11d48", MATE = "#1d4ed8", MISSED = "#f97316";
+    const SVGNS = "http://www.w3.org/2000/svg";
+    const PLACES = [["mix", "섞어서", "shuffle"], ["desk", "내 자리", "monitor"], ["pantry", "탕비실", "coffee"], ["meeting", "회의실", "presentation"]];
+    const SURFACE = { desk: "책상", pantry: "조리대", meeting: "탁자" };
+    const sfx = (name) => { if (coop) coop.sfx(name); };
+    const mate = () => (room && room.partner && room.partner.name) || "동료";
+    const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // ── 사진 그림(SVG) — 물건 값({t, x, y, w, h, c, r, f, v, z})만으로 그린다 ──
+    // 같은 값이면 두 사진에서 픽셀까지 같게: 무작위 없이, 모든 그림은 물건 상자(-w/2..w/2 × -h/2..h/2) 안에서 끝난다.
+    // 개수(v)가 바뀌어도 상자는 그대로 — 칸을 최대 개수만큼 고정해 두고 정해진 순서로 채운다.
+    const Art = (function () {
+      const HEX = {
+        red: "#dc2626", orange: "#f97316", yellow: "#facc15", green: "#16a34a", sky: "#38bdf8", blue: "#2563eb", navy: "#1e3a8a",
+        purple: "#9333ea", pink: "#ec4899", brown: "#92400e", black: "#1f2937", gray: "#94a3b8", white: "#f8fafc",
+      };
+      const INK = "#1f2937";
+      const LIGHT = new Set(["white", "yellow", "gray", "sky"]); // 밝은 색 — 위에 얹는 무늬 · 키는 어둡게
+      const NUM = "Arial, Helvetica, sans-serif";
+      const N = (v) => Math.round(v * 10) / 10;
+      const D = (s, ...v) => s.reduce((o, t, i) => o + t + (i < v.length ? N(v[i]) : ""), "");
+      const NS = 'stroke="none"';
+      const SW = (n) => `stroke-width="${n}"`;
+      const ex = (e) => (e ? ` ${e}` : "");
+      const rect = (x, y, w, h, fill, rx = 0, e = "") => `<rect x="${N(x)}" y="${N(y)}" width="${N(Math.max(0, w))}" height="${N(Math.max(0, h))}"${rx ? ` rx="${N(rx)}"` : ""} fill="${fill}"${ex(e)}/>`;
+      const ell = (cx, cy, rx, ry, fill, e = "") => `<ellipse cx="${N(cx)}" cy="${N(cy)}" rx="${N(rx)}" ry="${N(ry)}" fill="${fill}"${ex(e)}/>`;
+      const circ = (cx, cy, r, fill, e = "") => `<circle cx="${N(cx)}" cy="${N(cy)}" r="${N(r)}" fill="${fill}"${ex(e)}/>`;
+      const path = (d, fill, e = "") => `<path d="${d}" fill="${fill}"${ex(e)}/>`;
+      const poly = (pts, fill, e = "") => `<polygon points="${pts.map(([x, y]) => `${N(x)},${N(y)}`).join(" ")}" fill="${fill}"${ex(e)}/>`;
+      const line = (x1, y1, x2, y2, col, sw, e = "") => `<line x1="${N(x1)}" y1="${N(y1)}" x2="${N(x2)}" y2="${N(y2)}" stroke="${col}" stroke-width="${N(sw)}"${ex(e)}/>`;
+      const stroke = (d, col, sw, e = "") => `<path d="${d}" fill="none" stroke="${col}" stroke-width="${N(sw)}"${ex(e)}/>`;
+      const rot = (deg, x, y, inner) => `<g transform="rotate(${deg} ${N(x)} ${N(y)})">${inner}</g>`;
+      // 숫자 — 가운데 (x, y). 좌우 뒤집힌 물건 안에서는 글자만 다시 뒤집어 바로 읽히게
+      const num = (x, y, s, size, fill, flip) => `<text transform="translate(${N(x)} ${N(y + size * 0.36)})${flip ? " scale(-1 1)" : ""}" x="0" y="0" font-family="${NUM}" font-size="${N(size)}" font-weight="900" text-anchor="middle" fill="${fill}" stroke="none">${s}</text>`;
+      function mix(hex, to, t) {
+        const a = parseInt(hex.slice(1), 16), b = parseInt(to.slice(1), 16);
+        const ch = (sh) => Math.round(((a >> sh) & 255) * (1 - t) + ((b >> sh) & 255) * t);
+        return `#${((1 << 24) | (ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).slice(1)}`;
+      }
+      const col = (c) => HEX[c] || HEX.gray;
+      const lite = (c, t = 0.3) => mix(col(c), "#ffffff", t);
+      const deep = (c, t = 0.25) => mix(col(c), "#000000", t);
+      function star(cx, cy, R, r, fill, e) {
+        const pts = [];
+        for (let i = 0; i < 10; i++) {
+          const a = (Math.PI / 5) * i - Math.PI / 2, rr = i % 2 ? r : R;
+          pts.push([cx + Math.cos(a) * rr, cy + Math.sin(a) * rr]);
+        }
+        return poly(pts, fill, e);
+      }
+
+      // 화면(모니터 · 노트북) — 0 막대그래프 · 1 글줄 · 2 표 · 3 산 바탕화면
+      function screen(v, x, y, w, h) {
+        const P = (fx, fy) => [x + w * fx, y + h * fy];
+        if (v === 1) return [0.74, 0.54, 0.66, 0.4].map((t, i) => rect(x + w * 0.1, y + h * (0.15 + i * 0.19), w * t, h * 0.09, "#e2e8f0", h * 0.04, NS)).join("");
+        if (v === 2) {
+          let s = "";
+          const cw = (w * 0.8) / 3, ch = (h * 0.7) / 2;
+          for (let r = 0; r < 2; r++) for (let k = 0; k < 3; k++) s += rect(x + w * 0.1 + k * cw, y + h * 0.15 + r * ch, cw, ch, r ? "#1e293b" : "#0e7490", 0, 'stroke="#67e8f9" stroke-width="2.5"');
+          return s;
+        }
+        if (v === 3) {
+          return rect(x, y, w, h, "#7dd3fc", 3, NS) + circ(x + w * 0.78, y + h * 0.28, Math.min(w, h) * 0.13, "#fde047", NS)
+            + poly([P(0, 1), P(0.33, 0.36), P(0.68, 1)], "#15803d", NS) + poly([P(0.4, 1), P(0.72, 0.5), P(1, 0.82), P(1, 1)], "#22c55e", NS);
+        }
+        const hs = [0.45, 0.72, 0.56, 0.88], cs = ["#facc15", "#38bdf8", "#facc15", "#38bdf8"];
+        return rect(x + w * 0.1, y + h * 0.86, w * 0.8, Math.max(2, h * 0.03), "#64748b", 0, NS)
+          + hs.map((t, i) => rect(x + w * (0.14 + i * 0.19), y + h * 0.86 - h * 0.7 * t, w * 0.13, h * 0.7 * t, cs[i], 2, NS)).join("");
+      }
+      // 액자 사진 — 0 산 · 1 해 · 2 나무 · 3 고양이
+      function picture(v, x, y, w, h) {
+        const m = Math.min(w, h);
+        if (v === 1) {
+          return rect(x, y, w, h, "#7dd3fc", 0, NS) + rect(x, y + h * 0.8, w, h * 0.2, "#86efac", 0, NS) + circ(x + w / 2, y + h * 0.44, m * 0.27, "#facc15", SW(2.5));
+        }
+        if (v === 2) {
+          return rect(x, y, w, h, "#e0f2fe", 0, NS) + rect(x, y + h * 0.78, w, h * 0.22, "#86efac", 0, NS)
+            + rect(x + w / 2 - m * 0.07, y + h * 0.5, m * 0.14, h * 0.36, "#92400e", 0, SW(2.5)) + circ(x + w / 2, y + h * 0.38, m * 0.3, "#16a34a", SW(2.5));
+        }
+        if (v === 3) {
+          const cx = x + w / 2, cy = y + h * 0.6, r = m * 0.3;
+          return rect(x, y, w, h, "#fef3c7", 0, NS)
+            + poly([[cx - r * 0.95, cy - r * 0.35], [cx - r * 0.78, cy - r * 1.42], [cx - r * 0.2, cy - r * 0.86]], "#fb923c", SW(2.5))
+            + poly([[cx + r * 0.95, cy - r * 0.35], [cx + r * 0.78, cy - r * 1.42], [cx + r * 0.2, cy - r * 0.86]], "#fb923c", SW(2.5))
+            + circ(cx, cy, r, "#fb923c", SW(2.5)) + circ(cx - r * 0.38, cy - r * 0.1, r * 0.13, INK, NS) + circ(cx + r * 0.38, cy - r * 0.1, r * 0.13, INK, NS)
+            + poly([[cx - r * 0.14, cy + r * 0.2], [cx + r * 0.14, cy + r * 0.2], [cx, cy + r * 0.38]], "#f472b6", NS);
+        }
+        return rect(x, y, w, h, "#bae6fd", 0, NS) + poly([[x, y + h], [x + w * 0.4, y + h * 0.22], [x + w * 0.82, y + h]], "#16a34a", NS)
+          + poly([[x + w * 0.4, y + h * 0.22], [x + w * 0.31, y + h * 0.4], [x + w * 0.49, y + h * 0.4]], "#ffffff", NS)
+          + poly([[x + w * 0.46, y + h], [x + w * 0.76, y + h * 0.5], [x + w, y + h * 0.76], [x + w, y + h]], "#4ade80", NS);
+      }
+      // 잎 — 칸마다 밑동 자리 · 각도 · 길이를 정해 둔 부채꼴(slots[i] = [밑동 x(너비 비율), 각도, 길이 비율]).
+      // 앞에서 n 칸만 채우고, 바깥 잎부터 그려 가운데 잎이 위에 온다 — 잎끼리 덜 겹쳐 한 장 한 장 셀 수 있게
+      function leaves(n, slots, by, w, W, H, hw) {
+        const on = slots.slice(0, Math.max(0, n)).map((s, i) => [s, i]);
+        on.sort((p, q) => Math.abs(q[0][1]) - Math.abs(p[0][1]) || p[1] - q[1]);
+        return on.map(([[bx, deg, k]]) => {
+          const a = (deg * Math.PI) / 180, sa = Math.abs(Math.sin(a)), ca = Math.cos(a), x0 = bx * w;
+          let L = (by + H) * 0.97 * k;
+          // 잎 끝 · 가장 넓은 곳이 상자 안에 들게 줄인다
+          for (let i = 0; i < 60; i++) {
+            const xr = Math.abs(x0) + Math.max(L * sa, L * 0.47 * sa + hw * ca) + 3, yu = Math.max(L * ca, L * 0.47 * ca + hw * sa) + 3;
+            if (xr <= W && yu <= by + H) break;
+            L *= 0.96;
+          }
+          const leaf = path(D`M 0 0 C ${hw * 1.3} ${-L * 0.25} ${hw * 1.3} ${-L * 0.7} 0 ${-L} C ${-hw * 1.3} ${-L * 0.7} ${-hw * 1.3} ${-L * 0.25} 0 0 Z`, "#22c55e", SW(3))
+            + line(0, -L * 0.12, 0, -L * 0.8, "#15803d", 2.5);
+          return `<g transform="translate(${N(x0)} ${N(by)}) rotate(${deg})">${leaf}</g>`;
+        }).join("");
+      }
+      function paper(cx, cy, r) {
+        return circ(cx, cy, r, "#f8fafc", SW(3)) + stroke(D`M ${cx - r * 0.5} ${cy - r * 0.2} L ${cx - r * 0.05} ${cy + r * 0.15} L ${cx + r * 0.45} ${cy - r * 0.3} M ${cx - r * 0.2} ${cy + r * 0.55} L ${cx + r * 0.2} ${cy + r * 0.25}`, "#94a3b8", 2.5);
+      }
+      function apple(cx, cy, r) {
+        return circ(cx, cy, r, "#ef4444", SW(3)) + line(cx, cy - r * 0.8, cx + r * 0.12, cy - r * 1.12, "#78350f", 3) + ell(cx + r * 0.42, cy - r * 0.98, r * 0.3, r * 0.14, "#22c55e", SW(2))
+          + ell(cx - r * 0.38, cy - r * 0.32, r * 0.2, r * 0.13, "rgba(255,255,255,.55)", NS);
+      }
+      function tangerine(cx, cy, r) {
+        return circ(cx, cy, r, "#fb923c", SW(3)) + ell(cx + r * 0.18, cy - r * 0.92, r * 0.28, r * 0.13, "#22c55e", SW(2)) + circ(cx, cy - r * 0.78, r * 0.07, "#9a3412", NS)
+          + ell(cx - r * 0.38, cy - r * 0.32, r * 0.2, r * 0.13, "rgba(255,255,255,.5)", NS);
+      }
+
+      const DRAW = {
+        monitor(o, w, h, W, H, c) {
+          const sh = h * 0.82, bz = w * 0.1, bh = h * 0.075, neck = -H + sh - 4;
+          return rect(-w * 0.075, neck, w * 0.15, H - bh - neck + 2, c) + rect(-w * 0.275, H - bh, w * 0.55, bh, c, bh * 0.4)
+            + rect(-W, -H, w, sh, c, w * 0.04) + rect(-W + bz, -H + bz, w - 2 * bz, sh - 2 * bz, "#0f172a", 3, SW(2))
+            + screen(o.v, -W + bz, -H + bz, w - 2 * bz, sh - 2 * bz);
+        },
+        laptop(o, w, h, W, H, c) {
+          const lw = w * 0.8, lh = h * 0.6, bz = w * 0.055, by = -H + lh, k = H - by;
+          return path(D`M ${-lw / 2} ${by} L ${lw / 2} ${by} L ${W} ${H} L ${-W} ${H} Z`, deep(o.c, 0.18))
+            + path(D`M ${-lw * 0.42} ${by + k * 0.18} L ${lw * 0.42} ${by + k * 0.18} L ${W * 0.84} ${H - k * 0.3} L ${-W * 0.84} ${H - k * 0.3} Z`, "rgba(15,23,42,.22)", NS)
+            + rect(-lw / 2, -H, lw, lh, c, w * 0.03) + rect(-lw / 2 + bz, -H + bz, lw - 2 * bz, lh - 2 * bz, "#0f172a", 2, SW(2))
+            + screen(o.v, -lw / 2 + bz, -H + bz, lw - 2 * bz, lh - 2 * bz);
+        },
+        keyboard(o, w, h, W, H, c) {
+          const key = LIGHT.has(o.c) ? "#64748b" : "#e2e8f0";
+          const px = w * 0.05, py = h * 0.14, cw = (w - 2 * px) / 10, ch = (h - 2 * py) / 3;
+          let s = rect(-W, -H, w, h, c, h * 0.14);
+          for (let r = 0; r < 3; r++) for (let k = 0; k < 10; k++) {
+            if (r === 2 && k >= 3 && k <= 6) continue;
+            s += rect(-W + px + k * cw + cw * 0.12, -H + py + r * ch + ch * 0.14, cw * 0.76, ch * 0.72, key, 2, NS);
+          }
+          return s + rect(-W + px + 3 * cw + cw * 0.12, -H + py + 2 * ch + ch * 0.14, cw * 3.76, ch * 0.72, key, 2, NS);
+        },
+        mouse(o, w, h, W, H, c) {
+          const ln = LIGHT.has(o.c) ? "#64748b" : "rgba(255,255,255,.6)";
+          return ell(0, 0, W - 2, H - 2, c) + stroke(D`M ${W * 0.18} ${-H * 0.9} Q ${-W * 0.04} 0 ${W * 0.18} ${H * 0.9} M ${W * 0.18} 0 L ${W * 0.94} 0`, ln, 3)
+            + rect(W * 0.42, -H * 0.16, W * 0.3, H * 0.32, "#475569", H * 0.14, NS);
+        },
+        mug(o, w, h, W, H, c) {
+          const bw = w * 0.74, by = -H + h * 0.22, bh = H - by, r = w * 0.1, t = w * 0.1;
+          const x0 = -W + bw - w * 0.08, y0 = by + bh * 0.16, y1 = by + bh * 0.72, R = W - 2;
+          const handle = path(D`M ${x0} ${y0} H ${R - t} Q ${R} ${y0} ${R} ${y0 + t} V ${y1 - t} Q ${R} ${y1} ${R - t} ${y1} H ${x0} Z M ${x0} ${y0 + t} H ${R - t * 1.6} Q ${R - t} ${y0 + t} ${R - t} ${y0 + t * 1.6} V ${y1 - t * 1.6} Q ${R - t} ${y1 - t} ${R - t * 1.6} ${y1 - t} H ${x0} Z`, c, 'fill-rule="evenodd"');
+          const pc = o.c === "white" ? "#64748b" : "#ffffff";
+          let pat = "";
+          if (o.v === 1) pat = [0.3, 0.56].map((fy) => rect(-W + 3, by + bh * fy, bw - 6, bh * 0.11, pc, 0, NS)).join("");
+          else if (o.v === 2) pat = [[0.27, 0.3], [0.66, 0.34], [0.42, 0.6], [0.74, 0.76]].map(([fx, fy]) => circ(-W + bw * fx, by + bh * fy, w * 0.055, pc, NS)).join("");
+          else if (o.v === 3) pat = star(-W + bw / 2, by + bh * 0.5, w * 0.2, w * 0.085, pc, NS);
+          const steam = [0.32, 0.6].map((fx) => {
+            const x = -W + bw * fx;
+            return stroke(D`M ${x} ${by - h * 0.03} q ${-w * 0.06} ${-h * 0.05} 0 ${-h * 0.09} t 0 ${-h * 0.07}`, "#94a3b8", 3, 'opacity=".7"');
+          }).join("");
+          return handle + rect(-W, by, bw, bh, c, r) + pat + rect(-W, by, bw, bh, "none", r) + steam;
+        },
+        plant(o, w, h, W, H, c) {
+          const pt = H - h * 0.36;
+          return leaves(o.v, [[0, 0, 1], [-0.1, -12, 0.9], [0.1, 12, 0.9], [-0.2, -27, 0.8], [0.2, 27, 0.8], [-0.28, -44, 0.72], [0.28, 44, 0.72]], pt + h * 0.03, w, W, H, w * 0.085)
+            + path(D`M ${-w * 0.43} ${pt} L ${w * 0.43} ${pt} L ${w * 0.31} ${H} L ${-w * 0.31} ${H} Z`, c) + rect(-w * 0.47, pt - 2, w * 0.94, h * 0.08, c, 3);
+        },
+        bigplant(o, w, h, W, H, c) {
+          const pt = H - h * 0.3;
+          return leaves(o.v, [[-0.05, -5, 1], [0.05, 5, 0.96], [-0.14, -17, 0.9], [0.14, 17, 0.9], [-0.22, -31, 0.8], [0.22, 31, 0.8], [-0.29, -47, 0.7], [0.29, 47, 0.7]], pt + h * 0.03, w, W, H, w * 0.07)
+            + path(D`M ${-w * 0.4} ${pt} L ${w * 0.4} ${pt} L ${w * 0.3} ${H} L ${-w * 0.3} ${H} Z`, c) + rect(-w * 0.44, pt - 2, w * 0.88, h * 0.06, c, 3)
+            + rect(-w * 0.36, pt + h * 0.1, w * 0.72, h * 0.03, deep(o.c, 0.2), 0, NS);
+        },
+        books(o, w, h, W, H, c) {
+          const sw = w / 6, HS = [0.94, 0.8, 1, 0.86, 0.97, 0.76], tone = [c, lite(o.c, 0.35), deep(o.c, 0.25)];
+          let s = "";
+          for (let i = 0; i < Math.min(6, o.v); i++) {
+            const bh = (h - 4) * HS[i], x = -W + i * sw + sw * 0.07, bw = sw * 0.86, y = H - bh;
+            s += rect(x, y, bw, bh, tone[i % 3], 3) + rect(x + 3, y + bh * 0.15, bw - 6, bh * 0.09, "#f8fafc", 0, NS) + rect(x + 3, y + bh * 0.78, bw - 6, bh * 0.05, "#f8fafc", 0, NS);
+          }
+          return s;
+        },
+        lamp(o, w, h, W, H, c) {
+          const k = w, bt = H - k * 0.15;
+          const sh = [[0.086 * k, -0.691 * k], [0.433 * k, -0.437 * k], [-0.033 * k, -0.163 * k], [-0.086 * k, -0.589 * k]];
+          const arm = D`M ${-0.18 * k} ${bt} L ${-0.36 * k} ${-0.02 * k} L ${-0.02 * k} ${-0.6 * k}`;
+          return poly([sh[1], sh[2], [0.08 * k, bt - 2], [0.47 * k, bt - 2]], "#fde68a", 'stroke="none" opacity=".55"')
+            + rect(-0.44 * k, bt, 0.8 * k, H - bt, c, k * 0.05)
+            + stroke(arm, INK, k * 0.075 + 6, 'stroke-linecap="round" stroke-linejoin="round"') + stroke(arm, c, k * 0.075, 'stroke-linecap="round" stroke-linejoin="round"')
+            + circ(-0.36 * k, -0.02 * k, k * 0.05, deep(o.c, 0.25), SW(3)) + circ(-0.18 * k, bt, k * 0.05, deep(o.c, 0.25), SW(3))
+            + poly(sh, c) + circ(0, -0.64 * k, k * 0.075, c, SW(3));
+        },
+        penholder(o, w, h, W, H, c) {
+          // 컵은 아래 52%, 펜은 굵게(0.16w) 컵 위로 길게 — 한 자루 차이가 휴대폰에서도 또렷하게. 바깥 펜 끝도 상자 안(0.47w)
+          const top = H - h * 0.52, PEN = ["#ef4444", "#2563eb", "#1f2937", "#16a34a", "#f97316"];
+          const XS = [-0.29, -0.145, 0, 0.145, 0.29], TOPS = [0.1, 0.03, 0, 0.06, 0.12], ROT = [-9, -4, 1, 5, 9];
+          const on = new Set([2, 1, 3, 0, 4].slice(0, Math.min(5, o.v)));
+          let s = "";
+          for (let i = 0; i < 5; i++) {
+            if (!on.has(i)) continue;
+            const x = XS[i] * w, bot = top + h * 0.18, pt = -H + h * TOPS[i] + 4, pw = w * 0.16;
+            s += rot(ROT[i], x, bot, rect(x - pw / 2, pt + pw, pw, bot - pt - pw, PEN[i], 2, SW(3)) + poly([[x - pw / 2, pt + pw], [x, pt], [x + pw / 2, pt + pw]], "#fde68a", SW(2.5)));
+          }
+          return s + rect(-w * 0.4, top, w * 0.8, H - top, c, w * 0.06) + rect(-w * 0.43, top - 2, w * 0.86, h * 0.07, c, 3)
+            + rect(-w * 0.3, top + h * 0.17, w * 0.6, h * 0.03, deep(o.c, 0.2), 0, NS);
+        },
+        phone(o, w, h, W, H, c) {
+          const isl = LIGHT.has(o.c) ? "#cbd5e1" : lite(o.c, 0.25);
+          return rect(-W, -H, w, h, c, h * 0.2) + rect(W - w * 0.3, -H + h * 0.12, w * 0.21, h * 0.56, isl, h * 0.12, SW(2.5))
+            + circ(W - w * 0.195, -H + h * 0.27, h * 0.085, "#111827", SW(2)) + circ(W - w * 0.195, -H + h * 0.52, h * 0.085, "#111827", SW(2));
+        },
+        tissue(o, w, h, W, H, c) {
+          const bt = -H + h * 0.36, sy = bt + h * 0.08;
+          return rect(-W, bt, w, H - bt, c, w * 0.04) + rect(-W + 3, bt + 3, w - 6, h * 0.13, lite(o.c, 0.3), 2, NS)
+            + stroke(D`M ${-W * 0.7} ${H - h * 0.24} q ${w * 0.09} ${-h * 0.1} ${w * 0.18} 0 t ${w * 0.18} 0 t ${w * 0.18} 0 t ${w * 0.18} 0`, lite(o.c, 0.45), 4)
+            + ell(0, sy, w * 0.2, h * 0.045, deep(o.c, 0.35), NS)
+            + path(D`M ${-w * 0.12} ${sy} C ${-w * 0.2} ${-H + h * 0.22} ${-w * 0.13} ${-H + h * 0.06} ${-w * 0.02} ${-H + 3} C ${w * 0.04} ${-H + h * 0.12} ${w * 0.12} ${-H + h * 0.03} ${w * 0.19} ${-H + h * 0.1} C ${w * 0.15} ${-H + h * 0.2} ${w * 0.17} ${sy - h * 0.06} ${w * 0.12} ${sy} Z`, "#ffffff", SW(3));
+        },
+        headphones(o, w, h, W, H, c) {
+          const bt = w * 0.1, cx = W - w * 0.14, cy = -H + h * 0.5, ry = h * 0.5 - bt / 2 - 4;
+          const band = D`M ${-cx} ${cy} A ${cx} ${ry} 0 0 1 ${cx} ${cy}`;
+          const cup = (sx) => rect(sx < 0 ? -W + 2 : W - 2 - w * 0.27, -H + h * 0.42, w * 0.27, h * 0.58 - 2, c, w * 0.09)
+            + rect(sx < 0 ? -W + w * 0.19 : W - w * 0.31, -H + h * 0.5, w * 0.12, h * 0.42, "#111827", w * 0.045, SW(2.5));
+          return stroke(band, INK, bt + 7) + stroke(band, c, bt) + cup(-1) + cup(1);
+        },
+        stapler(o, w, h, W, H, c) {
+          const by = H - h * 0.26;
+          return rect(-W + 1, by, w - 2, H - by - 1, "#475569", h * 0.08)
+            + path(D`M ${-W + 2} ${by + 2} L ${-W + 2} ${-H + h * 0.3} Q ${-W + 2} ${-H + 2} ${-W + w * 0.14} ${-H + 2} L ${w * 0.18} ${-H + h * 0.12} L ${W - 2} ${by - h * 0.14} L ${W - 2} ${by + 2} Z`, c)
+            + stroke(D`M ${-W + w * 0.17} ${-H + h * 0.2} L ${w * 0.12} ${-H + h * 0.28}`, lite(o.c, 0.45), 4)
+            + circ(-W + w * 0.12, by - h * 0.13, h * 0.09, deep(o.c, 0.3), SW(3));
+        },
+        bottle(o, w, h, W, H, c) {
+          const capH = h * 0.12, nk = -H + capH, by = nk + h * 0.05 - 2, bh = H - by - 2, r = w * 0.24;
+          const lv = [0.9, 0.5, 0.2][o.v] ?? 0.9, wh = (bh - 8) * lv;
+          return rect(-w * 0.24, nk - 2, w * 0.48, h * 0.05 + 4, "#e2e8f0", 2)
+            + rect(-W + 2, by, w - 4, bh, "#f0f9ff", r)
+            + rect(-W + 6, H - 6 - wh, w - 12, wh, "#7dd3fc", Math.min(r - 4, wh / 2), NS)
+            + rect(-W + 6, H - 6 - wh, w - 12, Math.min(4, wh), "#38bdf8", 0, NS)
+            + rect(-W + w * 0.18, by + bh * 0.1, w * 0.13, bh * 0.6, "#ffffff", w * 0.065, 'stroke="none" opacity=".85"')
+            + rect(-W + 2, by, w - 4, bh, "none", r)
+            + rect(-w * 0.32, -H + 2, w * 0.64, capH, c, w * 0.08);
+        },
+        clock(o, w, h, W, H, c) {
+          const R = W - 2, rd = R - w * 0.13, a = ((o.v % 12) * Math.PI) / 6;
+          let s = circ(0, 0, R, c) + circ(0, 0, rd, "#ffffff", SW(3));
+          for (let i = 0; i < 4; i++) {
+            const t = (i * Math.PI) / 2;
+            s += line(Math.sin(t) * rd * 0.72, -Math.cos(t) * rd * 0.72, Math.sin(t) * rd * 0.9, -Math.cos(t) * rd * 0.9, INK, w * 0.035);
+          }
+          return s + line(0, 0, 0, -rd * 0.86, INK, w * 0.028) + line(0, 0, Math.sin(a) * W * 0.55, -Math.cos(a) * W * 0.55, INK, w * 0.06) + circ(0, 0, w * 0.045, INK, NS);
+        },
+        calendar(o, w, h, W, H, c) {
+          const desk = o.z === "top", bot = desk ? H - h * 0.12 : H - 2, top = -H + h * 0.07;
+          const py = top + (bot - top) * 0.25, px = -W + w * 0.08, pw = w - w * 0.16, ph = bot - py - w * 0.08;
+          let s = desk ? path(D`M ${-w * 0.36} ${bot - 4} L ${w * 0.36} ${bot - 4} L ${w * 0.46} ${H - 2} L ${-w * 0.46} ${H - 2} Z`, "#475569") : "";
+          s += rect(-W + 2, top, w - 4, bot - top, c, w * 0.05) + rect(px, py, pw, ph, "#ffffff", w * 0.025, SW(3));
+          for (const rx of [-w * 0.24, w * 0.24]) s += rect(rx - w * 0.035, -H + 2, w * 0.07, h * 0.16, "#e5e7eb", w * 0.03, SW(3));
+          return s + num(0, py + ph * 0.5, o.v, ph * 0.6, INK, false);
+        },
+        sticky(o, w, h, W, H, c) {
+          const cw = w / 3, ch = h / 2, sd = Math.min(cw, ch) * 0.84, ROT = [-6, 4, -3, 5, -5, 3];
+          let s = "";
+          for (let i = 0; i < Math.min(6, o.v); i++) {
+            const cx = -W + cw * ((i % 3) + 0.5), cy = -H + ch * (Math.floor(i / 3) + 0.5);
+            s += `<g transform="translate(${N(cx)} ${N(cy)}) rotate(${ROT[i]})">${rect(-sd / 2, -sd / 2, sd, sd, c, 2, SW(3))}`
+              + rect(-sd * 0.3, -sd * 0.16, sd * 0.6, Math.max(3, sd * 0.08), "rgba(15,23,42,.35)", 2, NS)
+              + rect(-sd * 0.3, sd * 0.06, sd * 0.4, Math.max(3, sd * 0.08), "rgba(15,23,42,.35)", 2, NS) + "</g>";
+          }
+          return s;
+        },
+        frame(o, w, h, W, H, c) {
+          const desk = o.z === "top", bot = desk ? H - h * 0.08 : H - 2, t = w * 0.13;
+          let s = desk ? poly([[w * 0.06, 0], [w * 0.22, 0], [w * 0.34, H - 2], [w * 0.16, H - 2]], "#64748b") : "";
+          s += rect(-W + 2, -H + 2, w - 4, bot + H - 2, c, w * 0.03);
+          const mx = -W + t, my = -H + t, mw = w - 2 * t, mh = bot + H - 2 * t, p = w * 0.045;
+          return s + rect(mx, my, mw, mh, "#ffffff", 2, SW(3)) + picture(o.v, mx + p, my + p, mw - 2 * p, mh - 2 * p) + rect(mx + p, my + p, mw - 2 * p, mh - 2 * p, "none", 0, SW(2));
+        },
+        window(o, w, h, W, H, c) {
+          const t = w * 0.065, x = -W + t, y = -H + t, gw = w - 2 * t, gh = h - 2 * t;
+          let s = rect(-W + 2, -H + 2, w - 4, h - 4, c, w * 0.02);
+          if (o.v === 1) {
+            s += rect(x, y, gw, gh, "#bae6fd", 0, NS);
+            for (const [fx, fy, k] of [[0.27, 0.3, 1], [0.7, 0.68, 0.85]]) {
+              const cx = x + gw * fx, cy = y + gh * fy, r = gh * 0.11 * k;
+              s += circ(cx - r * 1.1, cy + r * 0.25, r * 0.8, "#ffffff", NS) + circ(cx, cy - r * 0.15, r, "#ffffff", NS) + circ(cx + r * 1.1, cy + r * 0.25, r * 0.8, "#ffffff", NS) + rect(cx - r * 1.8, cy + r * 0.2, r * 3.6, r * 0.85, "#ffffff", r * 0.4, NS);
+            }
+          } else if (o.v === 2) {
+            s += rect(x, y, gw, gh, "#94a3b8", 0, NS);
+            for (let i = 0; i < 6; i++) for (let j = 0; j < 4; j++) {
+              const rx = x + gw * (0.08 + i * 0.16 + (j % 2) * 0.07), ry = y + gh * (0.1 + j * 0.22);
+              s += line(rx, ry, rx - gw * 0.04, ry + gh * 0.1, "#e0f2fe", 3, 'stroke-linecap="round"');
+            }
+          } else if (o.v === 3) {
+            ["#f97316", "#fb923c", "#f472b6", "#f9a8d4"].forEach((cc, i) => { s += rect(x, y + (gh / 4) * i, gw, gh / 4 + 0.5, cc, 0, NS); });
+            const r = gh * 0.2;
+            s += path(D`M ${-r} ${y + gh} A ${r} ${r} 0 0 1 ${r} ${y + gh} Z`, "#fde047", NS);
+          } else {
+            s += rect(x, y, gw, gh, "#7dd3fc", 0, NS) + circ(x + gw * 0.76, y + gh * 0.27, gh * 0.13, "#fde047", SW(2.5));
+          }
+          return s + rect(x, y, gw, gh, "none", 0, SW(3)) + rect(-w * 0.025, y, w * 0.05, gh, c, 0, SW(3)) + rect(x, -h * 0.025, gw, h * 0.05, c, 0, SW(3));
+        },
+        poster(o, w, h, W, H, c) {
+          const cy = -H + h * 0.4, R = w * 0.3;
+          let s = rect(-W + 2, -H + 2, w - 4, h - 4, c, w * 0.025), shape;
+          if (o.v === 1) shape = circ(0, cy, R * 0.85, "#ffffff", SW(3));
+          else if (o.v === 2) shape = poly([[0, cy - R], [R * 0.98, cy + R * 0.72], [-R * 0.98, cy + R * 0.72]], "#ffffff", SW(3));
+          else if (o.v === 3) shape = poly([[0.18, -1], [-0.55, 0.12], [-0.05, 0.12], [-0.2, 1], [0.6, -0.16], [0.1, -0.16]].map(([a, b]) => [a * R, cy + b * R]), "#ffffff", SW(3));
+          else shape = star(0, cy, R, R * 0.44, "#ffffff", SW(3));
+          s += shape + rect(-w * 0.3, H - h * 0.22, w * 0.6, h * 0.045, "#ffffff", h * 0.02, NS) + rect(-w * 0.2, H - h * 0.13, w * 0.4, h * 0.045, "#ffffff", h * 0.02, NS);
+          for (const sx of [-1, 1]) s += circ(sx * (W - w * 0.1), -H + w * 0.1, w * 0.045, "#f1f5f9", SW(3));
+          return s;
+        },
+        whiteboard(o, w, h, W, H, c) {
+          const fb = H - h * 0.12, t = w * 0.03, bx = -W + t, by = -H + t, bw = w - 2 * t, bh = fb + H - 2 * t;
+          const X = (f) => bx + bw * f, Y = (f) => by + bh * f, BL = "#2563eb", RD = "#dc2626", lw = Math.max(4, w * 0.016);
+          let s = rect(-W + 2, -H + 2, w - 4, fb + H - 2, c, w * 0.015) + rect(bx, by, bw, bh, "#ffffff", 2, SW(2.5)), d = "";
+          if (o.v === 1) {
+            d = stroke(D`M ${X(0.14)} ${Y(0.33)} L ${X(0.8)} ${Y(0.33)} M ${X(0.68)} ${Y(0.2)} L ${X(0.82)} ${Y(0.33)} L ${X(0.68)} ${Y(0.46)}`, RD, lw * 1.3)
+              + stroke(D`M ${X(0.2)} ${Y(0.7)} L ${X(0.86)} ${Y(0.7)} M ${X(0.74)} ${Y(0.57)} L ${X(0.88)} ${Y(0.7)} L ${X(0.74)} ${Y(0.83)}`, BL, lw * 1.3);
+          } else if (o.v === 2) {
+            const r = bh * 0.27;
+            d = circ(X(0.36), Y(0.42), r, "none", `stroke="${BL}" stroke-width="${N(lw)}"`) + circ(X(0.64), Y(0.42), r, "none", `stroke="${RD}" stroke-width="${N(lw)}"`) + circ(X(0.5), Y(0.66), r, "none", `stroke="${BL}" stroke-width="${N(lw)}"`);
+          } else if (o.v === 3) {
+            for (let i = 0; i < 3; i++) {
+              const yy = Y(0.24 + i * 0.27);
+              d += stroke(D`M ${X(0.1)} ${yy} L ${X(0.15)} ${yy + bh * 0.07} L ${X(0.24)} ${yy - bh * 0.08}`, RD, lw * 1.2) + line(X(0.32), yy, X([0.86, 0.72, 0.8][i]), yy, BL, lw);
+            }
+          } else {
+            d = stroke(D`M ${X(0.1)} ${Y(0.12)} L ${X(0.1)} ${Y(0.88)} L ${X(0.9)} ${Y(0.88)}`, BL, lw);
+            [0.32, 0.56, 0.8].forEach((t2, i) => { d += rect(X(0.18 + i * 0.24), Y(0.88) - bh * 0.72 * t2, bw * 0.14, bh * 0.72 * t2, "none", 0, `stroke="${BL}" stroke-width="${N(lw)}"`); });
+            d += stroke(D`M ${X(0.2)} ${Y(0.6)} L ${X(0.46)} ${Y(0.42)} L ${X(0.78)} ${Y(0.16)}`, RD, lw);
+          }
+          return s + d + rect(-w * 0.3, fb - 2, w * 0.6, h * 0.07, "#94a3b8", 3) + rect(-w * 0.2, fb - 2 - h * 0.035, w * 0.12, h * 0.035, BL, 2, SW(2)) + rect(w * 0.06, fb - 2 - h * 0.035, w * 0.12, h * 0.035, RD, 2, SW(2));
+        },
+        trashcan(o, w, h, W, H, c) {
+          const top = -H + h * 0.22, XS = [-0.24, 0.02, 0.25];
+          const on = new Set([1, 0, 2].slice(0, Math.max(0, Math.min(3, o.v))));
+          let s = "";
+          for (let i = 0; i < 3; i++) if (on.has(i)) s += paper(XS[i] * w, top - h * 0.07, w * 0.15);
+          s += path(D`M ${-W + 2} ${top} L ${W - 2} ${top} L ${W * 0.76} ${H - 2} L ${-W * 0.76} ${H - 2} Z`, c);
+          for (const k of [-0.22, 0, 0.22]) s += line(k * w, top + h * 0.16, k * w * 0.82, H - h * 0.1, deep(o.c, 0.28), 4, 'stroke-linecap="round"');
+          return s + rect(-W + 2, top - 2, w - 4, h * 0.08, deep(o.c, 0.12), h * 0.03);
+        },
+        chair(o, w, h, W, H, c) {
+          const k = w, wy = H - k * 0.07, dark = "#374151";
+          return stroke(D`M ${-0.4 * k} ${wy - 0.05 * k} L ${0.4 * k} ${wy - 0.05 * k} M ${-0.22 * k} ${wy - 0.02 * k} L 0 ${wy - 0.1 * k} L ${0.22 * k} ${wy - 0.02 * k}`, dark, k * 0.045, 'stroke-linecap="round"')
+            + [-0.4, 0, 0.4].map((x) => circ(x * k, wy, k * 0.06, "#111827", SW(3))).join("")
+            + rect(-0.035 * k, 0.18 * k, 0.07 * k, wy - 0.12 * k - 0.18 * k, "#6b7280", 2)
+            + rect(0.24 * k, -0.06 * k, 0.12 * k, 0.2 * k, dark, 3)
+            + rect(0.2 * k, -H + 2, 0.28 * k, 0.6 * k, c, 0.09 * k)
+            + stroke(D`M ${-0.12 * k} ${0.06 * k} L ${-0.12 * k} ${-0.1 * k} L ${0.2 * k} ${-0.1 * k}`, dark, k * 0.035, 'stroke-linecap="round" stroke-linejoin="round"')
+            + rect(-0.46 * k, 0.05 * k, 0.84 * k, 0.15 * k, c, 0.06 * k);
+        },
+        fridge(o, w, h, W, H, c) {
+          const split = -H + h * 0.35, hc = LIGHT.has(o.c) ? "#64748b" : "#e2e8f0", MAG = ["#ef4444", "#facc15", "#3b82f6", "#22c55e"];
+          const SL = [[0.12, 0.1], [0.32, 0.1], [0.12, 0.24], [0.32, 0.24]];
+          let s = rect(-W + w * 0.1, H - w * 0.06, w * 0.12, w * 0.06 - 2, "#374151", 2) + rect(W - w * 0.22, H - w * 0.06, w * 0.12, w * 0.06 - 2, "#374151", 2)
+            + rect(-W + 2, -H + 2, w - 4, h - w * 0.05 - 2, c, w * 0.07)
+            + line(-W + 2, split, W - 2, split, INK, 4)
+            + rect(-W + w * 0.08, -H + h * 0.12, w * 0.05, h * 0.16, hc, 3, SW(3)) + rect(-W + w * 0.08, split + h * 0.06, w * 0.05, h * 0.22, hc, 3, SW(3))
+            + rect(W - w * 0.14, -H + h * 0.05, w * 0.05, h * 0.22, "rgba(255,255,255,.28)", 2, NS);
+          for (let i = 0; i < Math.min(4, o.v); i++) s += circ(SL[i][0] * w, -H + SL[i][1] * h, w * 0.068, MAG[i], SW(3));
+          return s;
+        },
+        dispenser(o, w, h, W, H, c) {
+          const bt = -H + h * 0.3;
+          return rect(-w * 0.14, -H + h * 0.24, w * 0.28, h * 0.08, "#38bdf8", 2, SW(3))
+            + rect(-w * 0.38, -H + 2, w * 0.76, h * 0.26, "#7dd3fc", w * 0.2, SW(3)) + rect(-w * 0.26, -H + h * 0.05, w * 0.1, h * 0.15, "#e0f2fe", w * 0.05, NS)
+            + rect(-W + 2, bt, w - 4, H - bt - 2, c, w * 0.08)
+            + rect(-w * 0.34, bt + h * 0.06, w * 0.68, h * 0.2, "#1f2937", w * 0.05, SW(3))
+            + rect(-w * 0.22, bt + h * 0.08, w * 0.13, h * 0.05, "#ef4444", 2, SW(2.5)) + rect(w * 0.09, bt + h * 0.08, w * 0.13, h * 0.05, "#3b82f6", 2, SW(2.5))
+            + rect(-w * 0.26, bt + h * 0.22, w * 0.52, h * 0.025, "#94a3b8", 2, SW(2.5))
+            + rect(-w * 0.36, bt + h * 0.34, w * 0.72, h * 0.28, "none", w * 0.03, `stroke="${deep(o.c, 0.25)}" stroke-width="3"`);
+        },
+        coffee(o, w, h, W, H, c) {
+          const bt = -H + h * 0.22, ry = bt + h * 0.24;
+          let s = path(D`M ${w * 0.06} ${-H + 2} L ${W - 2} ${-H + 2} L ${W - w * 0.07} ${bt + 2} L ${w * 0.12} ${bt + 2} Z`, "#78350f")
+            + ell(w * 0.22, -H + h * 0.1, w * 0.035, w * 0.022, "#d97706", NS) + ell(w * 0.32, -H + h * 0.13, w * 0.035, w * 0.022, "#d97706", NS) + ell(w * 0.38, -H + h * 0.07, w * 0.035, w * 0.022, "#d97706", NS)
+            + rect(-W + 2, bt, w - 4, H - bt - 2, c, w * 0.06)
+            + rect(-w * 0.08, ry, w * 0.5, h * 0.46, o.c === "black" || o.c === "navy" ? "#475569" : "#1f2937", w * 0.03, SW(3))
+            + rect(w * 0.14, ry - 2, w * 0.06, h * 0.07, "#94a3b8", 2, SW(2.5))
+            + rect(-w * 0.04, ry + h * 0.38, w * 0.42, h * 0.05, "#64748b", 2, SW(2.5))
+            + circ(-W + w * 0.16, bt + h * 0.2, w * 0.05, "#e5e7eb", SW(2.5)) + circ(-W + w * 0.16, bt + h * 0.38, w * 0.05, "#4ade80", SW(2.5));
+          if (o.v === 1) {
+            s += stroke(D`M ${w * 0.26} ${ry + h * 0.24} q ${w * 0.08} 0 ${w * 0.08} ${h * 0.06} t ${-w * 0.08} ${h * 0.06}`, "#ffffff", 5)
+              + rect(w * 0.06, ry + h * 0.2, w * 0.2, h * 0.18, "#ffffff", w * 0.03, SW(3)) + ell(w * 0.16, ry + h * 0.21, w * 0.08, h * 0.02, "#92400e", NS);
+          }
+          return s;
+        },
+        kettle(o, w, h, W, H, c) {
+          const bb = H - h * 0.09, top = -H + h * 0.24, hp = D`M ${-0.3 * w} ${-H + 0.34 * h} Q ${-0.42 * w} ${-H + 0.34 * h} ${-0.4 * w} ${-H + 0.55 * h} Q ${-0.39 * w} ${-H + 0.76 * h} ${-0.3 * w} ${-H + 0.76 * h}`;
+          return poly([[0.24 * w, -H + 0.5 * h], [W - 3, -H + 0.27 * h], [W - 3, -H + 0.36 * h], [0.26 * w, -H + 0.78 * h]], c)
+            + stroke(hp, INK, w * 0.09 + 7, 'stroke-linecap="round"') + stroke(hp, c, w * 0.09, 'stroke-linecap="round"')
+            + rect(-0.4 * w, bb - 2, 0.8 * w, H - bb, "#374151", w * 0.03)
+            + rect(-0.34 * w, top, 0.64 * w, bb - top, c, w * 0.2)
+            + ell(-0.02 * w, top + h * 0.03, w * 0.2, h * 0.05, deep(o.c, 0.15), SW(3)) + rect(-0.06 * w, -H + h * 0.13, w * 0.08, h * 0.09, "#1f2937", 3, SW(2.5))
+            + rect(-0.24 * w, top + h * 0.22, w * 0.07, h * 0.3, "rgba(255,255,255,.3)", w * 0.035, NS);
+        },
+        microwave(o, w, h, W, H, c) {
+          const dw = w * 0.62, px = -W + dw, pw = W - px, pc = px + pw / 2, dW = pw * 0.8, dH = h * 0.65, dy = -H + h * 0.08;
+          return rect(-W + 2, -H + 2, w - 4, h - 4, c, w * 0.04)
+            + rect(-W + 10, -H + 10, dw - 18, h - 20, "#111827", 6, SW(3))
+            + poly([[-W + dw * 0.2, -H + 12], [-W + dw * 0.38, -H + 12], [-W + dw * 0.16, H - 12], [-W + 12, H - 12], [-W + 12, H - 30]], "rgba(255,255,255,.12)", NS)
+            + line(px, -H + 4, px, H - 4, INK, 3)
+            + rect(pc - dW / 2, dy, dW, dH, "#052e16", 4, SW(3))
+            + num(pc, dy + dH / 2, o.v, h * 0.76, "#4ade80", !!o.f)
+            + circ(pc - pw * 0.2, -H + h * 0.865, h * 0.07, "#e5e7eb", SW(2.5)) + circ(pc + pw * 0.2, -H + h * 0.865, h * 0.07, "#e5e7eb", SW(2.5));
+        },
+        cups(o, w, h, W, H, c) {
+          const sw = w / 5, top = -H + 3, rim = h * 0.14;
+          let s = "";
+          for (let i = 0; i < Math.min(5, o.v); i++) {
+            const cx = -W + sw * (i + 0.5), tw = sw * 0.86, bw = sw * 0.6, k = (((tw - bw) / 2) * rim) / (H - 2 - top);
+            s += path(D`M ${cx - tw / 2} ${top} L ${cx + tw / 2} ${top} L ${cx + bw / 2} ${H - 2} L ${cx - bw / 2} ${H - 2} Z`, c)
+              + path(D`M ${cx - tw / 2} ${top} L ${cx + tw / 2} ${top} L ${cx + tw / 2 - k} ${top + rim} L ${cx - tw / 2 + k} ${top + rim} Z`, "#ffffff", SW(3));
+          }
+          return s;
+        },
+        snack(o, w, h, W, H, c) {
+          const bt = H - h * 0.55, XS = [-0.31, -0.155, 0, 0.155, 0.31], TOPS = [0.08, 0.02, 0, 0.04, 0.1], ROT = [-9, -4, 2, 6, 10];
+          const COL = ["#ef4444", "#f59e0b", "#3b82f6", "#a855f7", "#10b981"], on = new Set([2, 1, 3, 0, 4].slice(0, Math.min(5, o.v))), bw = w * 0.15;
+          let s = "";
+          for (let i = 0; i < 5; i++) {
+            if (!on.has(i)) continue;
+            const x = XS[i] * w, top = -H + h * TOPS[i] + 6, bot = bt + h * 0.25, z = bw / 4;
+            s += rot(ROT[i], x, bot, path(D`M ${x - bw / 2} ${bot} L ${x - bw / 2} ${top + 4} l ${z / 2} -4 l ${z / 2} 4 l ${z / 2} -4 l ${z / 2} 4 l ${z / 2} -4 l ${z / 2} 4 l ${z / 2} -4 l ${z / 2} 4 L ${x + bw / 2} ${bot} Z`, COL[i], SW(3))
+              + rect(x - bw * 0.32, top + (bot - top) * 0.3, bw * 0.64, (bot - top) * 0.22, "#ffffff", 3, NS));
+          }
+          s += path(D`M ${-W + 2} ${bt} L ${W - 2} ${bt} L ${W * 0.84} ${H - 2} L ${-W * 0.84} ${H - 2} Z`, c);
+          const dk = deep(o.c, 0.3);
+          for (const f of [0.38, 0.66]) {
+            const y = bt + (H - 2 - bt) * f, hw = W - 2 - (W - 2 - W * 0.84) * f;
+            s += line(-hw + 4, y, hw - 4, y, dk, 3);
+          }
+          for (let i = 0; i < 7; i++) {
+            const x = -W * 0.7 + (W * 1.4 * i) / 6;
+            s += line(x, bt + h * 0.08, x * 0.94, H - h * 0.08, dk, 3, 'opacity=".55"');
+          }
+          return s + rect(-W + 2, bt - 3, w - 4, h * 0.08, deep(o.c, 0.15), h * 0.03);
+        },
+        fruit(o, w, h, W, H, c) {
+          const SL = [[-0.17, -0.13], [0.17, -0.13], [-0.3, 0.02], [0, 0.02], [0.3, 0.02]], ord = [3, 0, 1, 2, 4], r = w * 0.12;
+          const kind = {};
+          ord.forEach((sl, i) => { kind[sl] = i % 2 ? "t" : "a"; });
+          const on = new Set(ord.slice(0, Math.min(5, o.v)));
+          let s = ell(0, H - h * 0.2, W - 2, h * 0.18, c) + ell(0, H - h * 0.22, W * 0.72, h * 0.1, lite(o.c, 0.3), NS);
+          for (let i = 0; i < 5; i++) if (on.has(i)) s += (kind[i] === "a" ? apple : tangerine)(SL[i][0] * w, SL[i][1] * w, r);
+          return s;
+        },
+      };
+
+      function thing(o) {
+        const w = o.w, h = o.h, W = w / 2, H = h / 2;
+        const draw = DRAW[o.t] || ((p, ww, hh, WW, HH, c) => rect(-WW, -HH, ww, hh, c, 8));
+        const shadow = o.z === "wall" ? "" : ell(0, H, w * 0.45, 8, "rgba(15,23,42,.12)", NS);
+        const tf = `translate(${N(o.x)} ${N(o.y)})${o.r ? ` rotate(${N(o.r)})` : ""}${o.f ? " scale(-1 1)" : ""}`;
+        return `<g transform="${tf}" stroke="${INK}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">${shadow}${draw(o, w, h, W, H, col(o.c))}</g>`;
+      }
+      // 장면 배경 — 벽 0~560 · 윗면 560~900 · 바닥 900~1000 (두 사진이 같다)
+      function back(theme) {
+        if (theme === "pantry") {
+          let g = "";
+          for (let x = 40; x < 1000; x += 40) g += `M${x} 0V560`;
+          for (let y = 40; y < 560; y += 40) g += `M0 ${y}H1000`;
+          let doors = "";
+          for (let x = 0; x < 1000; x += 125) doors += `<rect x="${x + 4}" y="904" width="117" height="54" rx="4" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="3"/><rect x="${x + 46}" y="912" width="34" height="6" rx="3" fill="#94a3b8"/>`;
+          return `<rect width="1000" height="560" fill="#d9f2ea"/><path d="${g}" stroke="#c3e8dc" stroke-width="2" fill="none"/>`
+            + `<rect y="560" width="1000" height="320" fill="#f1f5f9"/><rect y="556" width="1000" height="6" fill="#dbe4ee"/><rect y="880" width="1000" height="20" fill="#cbd5e1"/>`
+            + `<rect y="900" width="1000" height="100" fill="#cbd5e1"/>${doors}<rect y="962" width="1000" height="38" fill="#c2ccd8"/>`;
+        }
+        if (theme === "meeting") {
+          return `<rect width="1000" height="520" fill="#efe6da"/><rect y="520" width="1000" height="40" fill="#b08457"/><rect y="520" width="1000" height="5" fill="#c99a6b"/>`
+            + `<rect y="560" width="1000" height="320" fill="#7c5a3c"/><rect y="560" width="1000" height="6" fill="#6b4c32"/><rect y="880" width="1000" height="20" fill="#5b4129"/>`
+            + `<rect y="900" width="1000" height="100" fill="#64748b"/>`;
+        }
+        return `<rect width="1000" height="560" fill="#e8eef5"/><path d="M250 0V560M500 0V560M750 0V560" stroke="#d6dfea" stroke-width="6"/>`
+          + `<rect y="560" width="1000" height="320" fill="#c8a27a"/><rect y="560" width="1000" height="6" fill="#b48d65"/><path d="M0 700H1000M0 812H1000" stroke="#bf976d" stroke-width="3"/>`
+          + `<rect y="880" width="1000" height="20" fill="#a47e58"/><rect y="900" width="1000" height="100" fill="#94a3b8"/>`;
+      }
+      // 사진 한 장(배경 + 물건) — <svg> 안에 넣는 조각
+      function photo(objs, theme) {
+        return `<g class="sp-bg">${back(theme)}</g><g class="sp-objs">${(objs || []).map(thing).join("")}</g>`;
+      }
+      return { photo, thing, back, HEX };
+    })();
+    // ── 사진 그림 끝 ──
+
+    const THEME_NAME = { desk: "내 자리", pantry: "탕비실", meeting: "회의실" };
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const A = (t, d = 0) => `data-t0="${Math.round(t)}"${d ? ` data-d="${d}"` : ""} style="animation-delay:${d}ms"`;
+
+    // ── 사진 판(한 번 만들어 계속 쓴다) ──
+    const stage = document.createElement("div");
+    stage.className = "sp-stage";
+    stage.innerHTML = `<div class="sp-photos">
+        <div class="sp-frame is-mine">
+          <svg class="sp-svg" viewBox="0 0 1000 1000" role="img" tabindex="0" aria-label="내 사진"><g class="sp-pic"></g><g class="sp-marks"></g><g class="sp-fx"></g>
+            <g class="sp-cur" aria-hidden="true"><circle r="34" fill="none" stroke="#fff" stroke-width="11"/><circle r="34" fill="none" stroke="${ME}" stroke-width="5"/><path d="M-58 0H-24M24 0H58M0 -58V-24M0 24V58" stroke="#fff" stroke-width="11" stroke-linecap="round"/><path d="M-58 0H-24M24 0H58M0 -58V-24M0 24V58" stroke="${ME}" stroke-width="5" stroke-linecap="round"/></g></svg>
+          <div class="sp-pops"></div>
+          <div class="sp-lock" aria-hidden="true"><i></i><b>잠깐!</b></div>
+        </div>
+        <div class="sp-frame is-other" aria-hidden="true">
+          <svg class="sp-svg" viewBox="0 0 1000 1000"><g class="sp-pic"></g><g class="sp-marks"></g></svg>
+        </div>
+        <div class="sp-cap is-mine" aria-hidden="true"><span><i></i>내 사진</span></div>
+        <div class="sp-cap is-other" aria-hidden="true"><span><i></i><b></b></span></div>
+      </div>
+      <div class="sp-live" aria-live="polite"></div>`;
+    const pick = (sel) => stage.querySelector(sel);
+    const els = {
+      mine: pick(".is-mine"), svg: pick(".is-mine svg"), pic: pick(".is-mine .sp-pic"), marks: pick(".is-mine .sp-marks"), fx: pick(".is-mine .sp-fx"), cur: pick(".sp-cur"),
+      pops: pick(".sp-pops"), lock: pick(".sp-lock"), other: pick(".sp-frame.is-other"), caps: stage.querySelectorAll(".sp-cap"),
+      oPic: pick(".is-other .sp-pic"), oMarks: pick(".is-other .sp-marks"), oName: pick(".sp-cap.is-other b"), live: pick(".sp-live"),
+    };
+
+    // 움직이는 표시 — data-t0(시작 ms) · data-d(원래 지연 ms). 방 화면을 다시 그리며 판을 옮겨 붙이면 애니메이션이 처음부터
+    // 다시 돌기 때문에, 붙인 직후 지난 시간만큼 지연을 당겨 이어 간다(옮겨 붙인 직후에만 부른다)
+    function resume(root) {
+      const t = T();
+      root.querySelectorAll("[data-t0]").forEach((el) => { el.style.animationDelay = `${Math.round((Number(el.dataset.d) || 0) - (t - Number(el.dataset.t0)))}ms`; });
+    }
+    function svgEl(html) { const g = document.createElementNS(SVGNS, "g"); g.innerHTML = html; return g; }
+    function later(el, ms) { setTimeout(() => el.remove(), ms); }
+    function flick(el, cls, ms) {
+      el.classList.remove(cls);
+      void el.getBoundingClientRect();
+      el.classList.add(cls);
+      el.dataset.t0 = String(Math.round(T()));
+      el.style.animationDelay = "0ms";
+      clearTimeout(el.spTimer);
+      el.spTimer = setTimeout(() => { el.classList.remove(cls); delete el.dataset.t0; el.style.animationDelay = ""; }, ms);
+    }
+    function ripple(x, y, color, life = 1000) {
+      const g = svgEl(`<circle class="sp-ripple" cx="${x}" cy="${y}" r="30" stroke="${color}" ${A(T())}/>`);
+      els.fx.appendChild(g);
+      later(g, life);
+    }
+    function cross(x, y, color, s) {
+      const d = `M${-s} ${-s}L${s} ${s}M${s} ${-s}L${-s} ${s}`;
+      const g = svgEl(`<g transform="translate(${x} ${y})"><g class="sp-xm" ${A(T())}><path d="${d}" stroke="#fff" stroke-width="${s * 0.8}" stroke-linecap="round"/><path d="${d}" stroke="${color}" stroke-width="${s * 0.44}" stroke-linecap="round"/></g></g>`);
+      els.fx.appendChild(g);
+      later(g, 950);
+    }
+    // 「여기 봐요」 — 물결(받으면 3겹, 1.2초 간격) + 📍 핀. 위 가장자리면 핀을 거꾸로 세운다
+    function pingFx(x, y, mine) {
+      const t = T(), colr = mine ? ME : MATE, n = mine ? 1 : 3;
+      let h = "";
+      for (let i = 0; i < n; i++) h += `<circle class="sp-ripple" cx="${x}" cy="${y}" r="30" stroke="${colr}" ${A(t, i * 1200)}/>`;
+      h += `<g transform="translate(${x} ${y})${y < 96 ? " scale(1 -1)" : ""}"><g class="sp-pin${mine ? " is-short" : ""}" ${A(t)}><path d="M0 0C-7-16-28-28-28-50a28 28 0 1 1 56 0C28-28 7-16 0 0Z" fill="${colr}" stroke="#fff" stroke-width="6"/><circle cy="-50" r="10" fill="#fff"/></g></g>`;
+      const g = svgEl(h);
+      els.fx.appendChild(g);
+      later(g, mine ? 1700 : 4100);
+    }
+    // 사진 위 말풍선(HTML) — 누른 자리 위(위 가장자리면 아래), 양 끝이면 안쪽으로 기댄다
+    function bubble(x, y, text, kind = "", life = 1600) {
+      els.pops.querySelectorAll(".sp-bub").forEach((b) => b.remove());
+      const el = document.createElement("div");
+      el.className = `sp-bub${x < 280 ? " is-l" : x > 720 ? " is-r" : ""}${y < 170 ? " is-below" : ""}${kind ? ` is-${kind}` : ""}`;
+      el.style.left = `${x / 10}%`;
+      el.style.top = `${y / 10}%`;
+      el.textContent = text;
+      el.dataset.t0 = String(Math.round(T()));
+      els.pops.appendChild(el);
+      later(el, life);
+    }
+    function announce(text) { els.live.textContent = text; }
+    // 공용 알림(화면 오른쪽 위 고정, 휴대폰은 위 가운데)이 내 사진을 가릴 자리면 띄우지 않는다 — 같은 소식이 사진 위 알림 줄(sp-msg)에 뜬다
+    function toastFree() {
+      const r = els.mine.getBoundingClientRect();
+      if (!r.width || !stage.isConnected) return true;
+      return r.right < window.innerWidth - 430 || r.bottom < 60 || r.top > 170;
+    }
+
+    // ── 찾은 곳 동그라미 — 찾은 사람 색(나 · 동료), 끝난 뒤 못 찾은 곳은 주황 점선 ──
+    const markEls = new Map(); // 이번 장면 n → <g>
+    const tagAt = new Map(); // 이번 장면 n → 이름표 자리 [x, y, 상자] — 한 번 정하면 장면 끝까지 그대로, 맞대 볼 때 상대 사진에도 같은 자리
+    const animFound = new Set(); // 새로 찾아 그려지듯 보일 곳(n)
+    const shortName = (n) => { n = String(n || ""); return n.length > 4 ? `${n.slice(0, 3)}…` : n; };
+    const tagW = (s) => [...s].reduce((w, ch) => w + (/[ㄱ-힝]/.test(ch) ? 31 : 18), 24);
+    const overlap = (p, q) => Math.max(0, Math.min(p[2], q[2]) - Math.max(p[0], q[0])) * Math.max(0, Math.min(p[3], q[3]) - Math.max(p[1], q[1]));
+    const areaOf = (b) => Math.max(1, (b[2] - b[0]) * (b[3] - b[1]));
+    const ellBox = (e) => [e[0] - e[2], e[1] - e[3], e[0] + e[2], e[1] + e[3]];
+    const objBox = (o) => {
+      const a = ((o.r || 0) * Math.PI) / 180, c = Math.abs(Math.cos(a)), s = Math.abs(Math.sin(a)), bw = o.w * c + o.h * s, bh = o.w * s + o.h * c;
+      return [o.x - bw / 2, o.y - bh / 2, o.x + bw / 2, o.y + bh / 2];
+    };
+    // 이름표가 피할 물건 상자 — 표시된 곳(찾은 곳 · 정답 보기의 못 찾은 곳)의 물건은 빼고(이미 동그라미가 있으니 가려도 된다) 나머지 전부.
+    // 어느 게 아직 못 찾은 다른 곳인지는 화면도 모르니 모든 물건을 아낀다
+    function tagAvoid(objLists, marked) {
+      const out = [];
+      for (const objs of objLists) for (const o of objs || []) {
+        const b = objBox(o), ar = areaOf(b);
+        if (marked.some((f) => (f.box || []).some((q) => overlap(b, q) >= 0.5 * ar) || f.hit.some((e) => overlap(b, ellBox(e)) >= 0.6 * ar))) continue;
+        out.push(b);
+      }
+      return out;
+    }
+    // 이름표 자리 — 동그라미 둘레 후보(위 · 아래 · 옆 · 비스듬히, 마지막으로 동그라미 가운데) 가운데 가장 덜 가리는 곳.
+    // 다른 이름표와는 겹치거나 붙지 않는다. 물건은 가린 넓이 + 가린 비율(작은 물건일수록 무겁게), 다른 동그라미는 조금 가볍게 센다
+    function tagSpot(e, tw, placed, avoid, rings) {
+      const [cx, cy, rx, ry] = e, dx = rx * 0.72 + tw * 0.3, uy = cy - ry * 0.72 - 26, dy = cy + ry * 0.72 + 26;
+      const cands = [[cx, cy - ry - 28], [cx, cy + ry + 28], [cx + rx + tw / 2 + 10, cy], [cx - rx - tw / 2 - 10, cy], [cx + dx, uy], [cx - dx, uy], [cx + dx, dy], [cx - dx, dy], [cx, cy]];
+      let best = null, bestCost = Infinity;
+      cands.forEach(([x, y], i) => {
+        const bx = clamp(x, tw / 2 + 6, 994 - tw / 2), by = clamp(y, 30, 970), b = [bx - tw / 2 - 4, by - 25, bx + tw / 2 + 4, by + 25];
+        let cost = i * 40 + (i === cands.length - 1 ? 2500 : 0) + 12 * (Math.abs(bx - x) + Math.abs(by - y));
+        if (placed.some((q) => overlap(b, [q[0] - 10, q[1] - 10, q[2] + 10, q[3] + 10]) > 0)) cost += 1e6; // 이름표끼리는 붙지도 않게(어느 동그라미 것인지 헷갈리지 않게)
+        for (const q of avoid) { const ov = overlap(b, q); if (ov) cost += ov * (0.3 + 6000 / areaOf(q)); }
+        for (const q of rings) cost += overlap(b, q) * 0.6;
+        if (cost < bestCost) { bestCost = cost; best = [bx, by, b]; }
+      });
+      placed.push(best[2]);
+      return best;
+    }
+    const whoOf = (f, miss) => (miss ? "못 찾음" : f.by === z.side ? "나" : shortName(mate()));
+    const ringsBut = (list, f) => list.filter((g) => g !== f && g.n !== f.n).flatMap((g) => g.hit.map(ellBox));
+    // 이번 장면 이름표 자리 — 찾은 순서대로 정한다(먼저 놓인 이름표는 움직이지 않는다)
+    function tagFor(f) {
+      if (!tagAt.has(f.n)) tagAt.set(f.n, tagSpot(f.hit[0], tagW(whoOf(f)), [...tagAt.values()].map((t) => t[2]), tagAvoid([z.objs], z.found), ringsBut(z.found, f)));
+      return tagAt.get(f.n);
+    }
+    function markHtml(f, opt = {}) {
+      const mine = f.by === z.side, colr = opt.miss ? MISSED : mine ? ME : MATE, an = opt.anim ? ` ${A(opt.t)}` : "";
+      const ring = f.hit.map((e) => `<ellipse class="sp-halo" cx="${e[0]}" cy="${e[1]}" rx="${e[2]}" ry="${e[3]}"${an}/><ellipse class="sp-ring${opt.miss ? " is-miss" : ""}" cx="${e[0]}" cy="${e[1]}" rx="${e[2]}" ry="${e[3]}" stroke="${colr}" pathLength="100"${an}/>`).join("");
+      const who = whoOf(f, opt.miss), e = f.hit[0], tw = tagW(who), [tx, ty] = opt.tag || [e[0], e[1] - e[3] - 28];
+      const tag = `<g transform="translate(${tx} ${ty})"><rect x="${-tw / 2}" y="-23" width="${tw}" height="46" rx="23" fill="${colr}" stroke="#fff" stroke-width="4"/><text y="10" text-anchor="middle" font-size="29" font-weight="800" fill="#fff">${esc(who)}</text></g>`;
+      const check = opt.anim ? `<g transform="translate(${e[0]} ${e[1]})"><g class="sp-check"${an}><circle r="36" fill="${colr}" stroke="#fff" stroke-width="6"/><path d="M-16 1L-5 12L17-12" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></g></g>` : "";
+      return ring + tag + check;
+    }
+    function drawMarks() {
+      const have = new Set();
+      for (const f of z.found) {
+        have.add(f.n);
+        if (markEls.has(f.n)) continue;
+        const anim = animFound.has(f.n) && !reduced();
+        animFound.delete(f.n);
+        const g = svgEl(markHtml(f, { anim, t: T(), tag: tagFor(f) }));
+        g.setAttribute("class", `sp-mark${anim ? " is-new" : ""}`);
+        els.marks.appendChild(g);
+        markEls.set(f.n, g);
+      }
+      for (const [n, g] of markEls) if (!have.has(n)) { g.remove(); markEls.delete(n); tagAt.delete(n); }
+    }
+    // 이미 찾은 곳 반짝 — 그려지던 움직임은 끝낸 것으로 치고(다시 그려지지 않게) 동그라미 묶음째 깜빡
+    function flashMark(n) {
+      const g = markEls.get(n);
+      if (!g) return;
+      g.classList.remove("is-new");
+      g.querySelectorAll("[data-t0]").forEach((el) => { delete el.dataset.t0; delete el.dataset.d; el.style.animationDelay = ""; });
+      flick(g, "is-flash", 650);
+    }
+    // 서버 판정과 같은 규칙 — hit 타원 안 또는 box 상자 안
+    function foundAt(x, y, v = z) {
+      return (v.found || []).find((f) => f.hit.some((e) => ((x - e[0]) / e[2]) ** 2 + ((y - e[1]) / e[3]) ** 2 <= 1)
+        || (f.box || []).some((b) => x >= b[0] && x <= b[2] && y >= b[1] && y <= b[3]));
+    }
+
+    // ── 판 맞추기 — 장면 · 동그라미 · 맞대 보기 · 잠김 ──
+    let picKey = "", otherKey = "", pendingEnter = false, bannerAt = 0, revealAt = 0;
+    function sync() {
+      if (!z || !room) return;
+      const key = `${room.id}|${z.no}|${z.side}|${z.theme}|${z.objs.length}`;
+      if (key !== picKey) {
+        picKey = key;
+        els.pic.innerHTML = Art.photo(z.objs, z.theme);
+        els.marks.innerHTML = "";
+        markEls.clear();
+        tagAt.clear();
+        els.fx.innerHTML = "";
+        els.pops.innerHTML = "";
+        if (pendingEnter && !reduced()) flick(els.mine, "is-enter", 340);
+      }
+      pendingEnter = false;
+      drawMarks();
+      const reveal = !!(z.other && (z.pause != null || z.over)), was = stage.classList.contains("is-reveal");
+      stage.classList.toggle("is-reveal", reveal);
+      if (reveal) {
+        const ok = `${key}|${z.found.length}`;
+        if (ok !== otherKey) {
+          otherKey = ok;
+          els.oPic.innerHTML = Art.photo(z.other, z.theme);
+          els.oMarks.innerHTML = z.found.map((f) => `<g class="sp-mark">${markHtml(f, { tag: tagFor(f) })}</g>`).join("");
+        }
+        // 상대 사진이 미끄러져 나옴(PC) · 번갈아 보기(휴대폰) — 방 화면을 다시 그려 판을 옮겨 붙여도 처음부터 다시 돌지 않게 시작 시각을 단다
+        if (!was || !revealAt) revealAt = bannerAt && T() - bannerAt < 4000 ? bannerAt : T();
+        for (const el of [els.other, ...els.caps]) el.dataset.t0 = String(Math.round(revealAt));
+      } else {
+        otherKey = "";
+        revealAt = 0;
+        for (const el of [els.other, ...els.caps]) if (el.dataset.t0) { delete el.dataset.t0; el.style.animationDelay = ""; }
+      }
+      els.oName.textContent = `${mate()}님 사진`;
+      els.svg.setAttribute("aria-label", `내 사진 · ${z.themeName} · ${z.total}곳 중 ${z.found.length}곳 찾음`);
+      lockSync();
+      resume(stage);
+    }
+    function lockSync() {
+      const left = z ? z.lockUntil - now() : 0;
+      const on = !!z && !!room && room.status === "PLAYING" && left > 0;
+      els.lock.classList.toggle("is-on", on);
+      if (on) els.lock.style.setProperty("--p", String(clamp(left / (z.missLock || 1), 0, 1)));
+    }
+
+    // ── 누르기 — 찾기(tap) · 여기 봐요(ping). 좌표는 화면 → 사진(0~1000)으로 정확히 바꾼다(SVG 변환 그대로) ──
+    function toPhoto(cx, cy) {
+      const m = els.svg.getScreenCTM();
+      if (!m) return null;
+      const p = new DOMPoint(cx, cy).matrixTransform(m.inverse());
+      if (!(p.x >= 0 && p.x <= 1000 && p.y >= 0 && p.y <= 1000)) return null;
+      return { x: Math.round(p.x * 10) / 10, y: Math.round(p.y * 10) / 10 };
+    }
+    // 늦게 도착한 옛 응답(seq 가 더 낮음)은 버린다 — 동료 소식(/wait)이 내 동작 응답보다 먼저 와도 화면이 뒤로 가지 않게
+    const fresher = (next) => next && next.id && (!room || room.id !== next.id || (next.seq || 0) >= (room.seq || 0));
+    const QUIET = ["SPOT_MISS_WAIT", "ESCAPE_TOO_FAST", "SPOT_NEXT_WAIT", "SPOT_BAD_POINT"];
+    function oops(e) {
+      if (QUIET.includes(e.code)) return;
+      if (e.code === "SPOT_OLD_SCENE" || e.code === "ESCAPE_NOT_PLAYING") { if (coop) coop.refresh(); return; }
+      HKUI.toast(e.message || "보내지 못했어요", "error");
+    }
+    async function send(action, pt) {
+      if (!pt || !room || room.status !== "PLAYING" || !z || z.over) return;
+      if (z.pause != null) { bubble(pt.x, pt.y, "다음 사진을 펼치는 중이에요", "info", 1200); return; }
+      if (action === "ping") return ping(pt);
+      if (now() < z.lockUntil) { flick(els.lock, "is-nudge", 320); return; }
+      const f = foundAt(pt.x, pt.y);
+      if (f) { flashMark(f.n); bubble(pt.x, pt.y, "이미 찾았어요", "info", 1200); sfx("select"); return; }
+      if (busyTap) return;
+      busyTap = true;
+      ripple(pt.x, pt.y, ME, 900);
+      try { const next = await HKApi.coopAct(room.id, "tap", { x: pt.x, y: pt.y, n: z.no }); if (fresher(next)) coop.set(next); }
+      catch (e) { oops(e); }
+      finally { busyTap = false; }
+    }
+    async function ping(pt) {
+      if (busyPing) return;
+      if (T() - pingAt < 800) { bubble(pt.x, pt.y, "조금만 천천히요", "info", 900); return; }
+      busyPing = true;
+      pingAt = T();
+      setMode("tap");
+      pingFx(pt.x, pt.y, true);
+      sfx("tap");
+      try { const next = await HKApi.coopAct(room.id, "ping", { x: pt.x, y: pt.y, n: z.no }); if (fresher(next)) coop.set(next); }
+      catch (e) { oops(e); }
+      finally { busyPing = false; }
+    }
+    function setMode(m) {
+      mode = m === "ping" ? "ping" : "tap";
+      document.querySelectorAll(".sp-mode [data-mode]").forEach((b) => {
+        const on = b.dataset.mode === mode;
+        b.classList.toggle("is-on", on);
+        b.setAttribute("aria-pressed", String(on));
+      });
+      const card = document.querySelector(".er-card.sp");
+      if (card) card.classList.toggle("is-ping", mode === "ping");
+      updateMsg();
+    }
+    // 길게 누르기(450ms) · 오른쪽 클릭 · Shift+클릭 = 여기 봐요. 10px 넘게 움직이면(밀어서 내리기) 보내지 않는다
+    let press = null, longAt = 0; // longAt — 손가락 길게 누르기로 「여기 봐요」를 보낸 때
+    function endPress() {
+      if (!press) return;
+      clearTimeout(press.timer);
+      if (press.fx) press.fx.remove();
+      press = null;
+    }
+    els.svg.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      endPress();
+      const pt = toPhoto(e.clientX, e.clientY);
+      const p = press = { id: e.pointerId, x: e.clientX, y: e.clientY, pt, long: false, timer: 0, fx: null };
+      if (e.pointerType === "mouse" || !pt || !room || room.status !== "PLAYING" || !z || z.pause != null) return;
+      p.fx = svgEl(`<circle class="sp-press" cx="${pt.x}" cy="${pt.y}" r="46" pathLength="100" ${A(T(), 140)}/>`);
+      els.fx.appendChild(p.fx);
+      p.timer = setTimeout(() => {
+        if (press !== p) return;
+        p.long = true;
+        longAt = T();
+        if (p.fx) { p.fx.remove(); p.fx = null; }
+        try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) { /* 진동은 부가 기능 */ }
+        send("ping", p.pt);
+      }, 450);
+    });
+    els.svg.addEventListener("pointermove", (e) => {
+      if (press && press.id === e.pointerId && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 10) endPress();
+    });
+    els.svg.addEventListener("pointerup", (e) => {
+      if (!press || press.id !== e.pointerId) return;
+      const p = press;
+      clearTimeout(p.timer);
+      if (p.fx) p.fx.remove();
+      press = null;
+      if (p.long) return;
+      send(mode === "ping" || e.shiftKey ? "ping" : "tap", toPhoto(e.clientX, e.clientY) || p.pt);
+    });
+    els.svg.addEventListener("pointercancel", endPress);
+    els.svg.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      if (T() - longAt < 1000) return; // 손가락 길게 누르기 뒤에 따라오는 contextmenu — 이미 보냈다
+      if (press && press.fx) return; // 손가락을 누르고 있는 중(450ms 뒤 길게 누르기로 보낸다)
+      endPress();
+      const pt = toPhoto(e.clientX, e.clientY);
+      if (pt) send("ping", pt);
+    });
+    // 키보드 — 사진에 포커스, 방향키로 십자 표시(40씩), Enter 찾기 · Space 여기 봐요
+    // 키보드로 들어온 포커스 — 방 화면을 다시 그리면 사진이 잠깐 빠지며 포커스를 잃으니, 다른 곳을 누르거나 다른 칸으로
+    // 옮기기 전까지는 기억했다가 스크롤 없이 되돌린다
+    let keyFocus = false;
+    els.svg.addEventListener("focus", () => { keyFocus = els.svg.matches(":focus-visible"); });
+    document.addEventListener("focusin", (e) => { if (e.target !== els.svg) keyFocus = false; });
+    document.addEventListener("pointerdown", (e) => { if (!els.svg.contains(e.target)) keyFocus = false; }, true);
+    const cur = { x: 500, y: 500 };
+    const curSync = () => els.cur.setAttribute("transform", `translate(${cur.x} ${cur.y})`);
+    curSync();
+    els.svg.addEventListener("keydown", (e) => {
+      const mv = { ArrowLeft: [-40, 0], ArrowRight: [40, 0], ArrowUp: [0, -40], ArrowDown: [0, 40] }[e.key];
+      if (mv) {
+        e.preventDefault();
+        cur.x = clamp(cur.x + mv[0], 20, 980);
+        cur.y = clamp(cur.y + mv[1], 20, 980);
+        curSync();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        send(mode === "ping" ? "ping" : "tap", { ...cur });
+      } else if (e.key === " " || e.key === "Spacebar") {
+        e.preventDefault();
+        send("ping", { ...cur });
+      }
+    });
+
+    // ── 방이 바뀔 때 — 새것만 한 번씩 움직이고 소리 ──
+    const seen = { found: new Set(), taps: new Set(), pings: new Set() };
+    const freshDot = new Map(); // `${장면}:${n}` → 처음 본 때(점 톡)
+    let missAt = 0, minusAt = 0, localMsg = null;
+    const tapKey = (p) => `${p.t}|${p.x}|${p.y}`;
+    function syncSeen(v) {
+      seen.found.clear();
+      seen.taps.clear();
+      seen.pings.clear();
+      (v.found || []).forEach((f) => seen.found.add(`${v.no}:${f.n}`));
+      (v.taps || []).forEach((p) => seen.taps.add(tapKey(p)));
+      (v.pings || []).forEach((p) => seen.pings.add(tapKey(p)));
+    }
+    function onView(old, v) {
+      const t = T();
+      const clearing = v.pause != null && old.pause == null, mateFound = [];
+      if (v.no !== old.no) { pendingEnter = true; sfx("whoosh"); }
+      for (const f of v.found) {
+        const k = `${v.no}:${f.n}`;
+        if (seen.found.has(k)) continue;
+        seen.found.add(k);
+        freshDot.set(k, t);
+        animFound.add(f.n);
+        const mine = f.by === v.side;
+        announce(`${mine ? "내가" : `${mate()}님이`} 찾았어요. ${f.label}`);
+        if (mine) {
+          const tp = (v.taps || []).find((p) => p.me && p.ok === 1 && foundAt(p.x, p.y, { found: [f] }));
+          const e = f.hit[0];
+          bubble(tp ? tp.x : e[0], tp ? tp.y : e[1] - e[3] * 0.6, f.label, "", 1600);
+          if (!clearing) sfx("success");
+        } else mateFound.push(f.label);
+      }
+      if (mateFound.length) {
+        if (toastFree()) HKUI.toast(mateFound.length > 1 ? `${mate()}님이 ${mateFound.length}곳을 찾았어요` : `${mate()}님이 찾았어요 · ${mateFound[0]}`);
+        if (!clearing) sfx("coin");
+      }
+      for (const p of v.taps || []) {
+        const k = tapKey(p);
+        if (seen.taps.has(k)) continue;
+        seen.taps.add(k);
+        if (p.ok === 0) {
+          minusAt = t;
+          if (p.me) { cross(p.x, p.y, "#e11d48", 34); flick(els.mine, "is-shake", 260); sfx("hurt"); }
+          else { cross(p.x, p.y, "#64748b", 22); sfx("invalid"); }
+        } else if (p.ok === 2) {
+          const f = foundAt(p.x, p.y, v);
+          if (f) flashMark(f.n);
+          if (p.me) { bubble(p.x, p.y, "이미 찾은 곳이에요", "info", 1200); sfx("select"); }
+        }
+      }
+      for (const p of v.pings || []) {
+        const k = tapKey(p);
+        if (seen.pings.has(k)) continue;
+        seen.pings.add(k);
+        if (p.me) continue; // 내가 보낸 건 누를 때 이미 그렸다
+        pingFx(p.x, p.y, false);
+        localMsg = { t: now(), text: `${mate()}님이 📍를 꽂았어요. 내 사진 같은 자리를 봐요` };
+        sfx("pop");
+      }
+      if (v.misses > old.misses) missAt = t;
+      if (clearing) { bannerAt = t; sfx("combo"); announce(`${v.total}곳을 다 찾았어요! 다음 사진으로 넘어가요`); }
+    }
+
+    // ── 진행 화면 ──
+    const quickList = () => {
+      const top = SURFACE[z && z.theme] || "책상";
+      return ["🕐 시계 몇 시예요?", "🎨 그거 무슨 색이에요?", "🔢 몇 개예요?", "↖️ 왼쪽 위 봐요", "↗️ 오른쪽 위 봐요", `👀 ${top} 위 봐요`, "⬇️ 바닥 봐요",
+        "🎨 색이 달라요", "🙅 내 쪽엔 없어요", "🙆 그건 같아요", "📍 핀 꽂은 데 봐 주세요", "✅ 찾았어요!"];
+    };
+    function hint() {
+      if (!z) return "";
+      if (mode === "ping") return `사진을 누르면 그 자리에 📍가 ${mate()}님 사진에도 떠요`;
+      const left = z.total - z.found.length;
+      return z.found.length ? `${left}곳 남았어요. 다르다 싶은 곳을 말로 맞춰 봐요` : "「시계 몇 시예요?」처럼 물어보며 내 사진에서 다른 곳을 눌러요";
+    }
+    function msgInfo() {
+      // 다 찾음 — 맞대 보는 3초 동안은 이 알림이 먼저(사진 위를 가리지 않게 배너 대신 여기에 띄운다)
+      if (z.pause != null && !z.over) return { kind: "clear", ic: "🎉", text: `${z.total}곳 다 찾았어요! +${z.clearBonus}점`, sub: `${mate()}님 사진과 맞대 봐요` };
+      const c = (room.chat || []).filter((m) => !m.me).slice(-1)[0];
+      if (c && Date.now() + offset - Date.parse(c.t) < 8000) return { kind: "say", ic: "💬", who: mate(), text: c.text };
+      const pin = localMsg && now() - localMsg.t < 4 ? localMsg : null;
+      if (pin && !(z.note && z.note.t > pin.t)) return { kind: "pin", ic: "📍", text: pin.text };
+      if (z.note && now() - z.note.t < 4) {
+        const good = /찾았어요/.test(z.note.text) && !/이미/.test(z.note.text);
+        return { kind: good ? "good" : "hint", ic: good ? "⭕" : /초가/.test(z.note.text) ? "⏱️" : "💡", who: z.note.me ? "나" : mate(), text: z.note.text };
+      }
+      return { kind: "hint", ic: mode === "ping" ? "📍" : "🔍", text: hint() };
+    }
+    // 다 찾은 알림이 막 떴을 때(1초 안) — 올라오기 · 별가루. 알림 줄은 다시 그릴 때마다 새로 만들어지니 지난 시간만큼 지연을 당긴다
+    const clearAge = () => (bannerAt && !reduced() ? T() - bannerAt : 1e9);
+    const SPARK = ["#fde047", "#fff", "#5eead4", "#fda4af"];
+    function msgInner(m) {
+      const ic = `<span class="sp-msg__ic" aria-hidden="true">${m.ic}</span>`;
+      if (m.kind !== "clear") return `${ic}<span>${m.who ? `<small>${esc(m.who)}</small>` : ""}${esc(m.text)}</span>`;
+      const age = clearAge();
+      const sparks = age < 1000 ? [0, 45, 90, 135, 180, 225, 270, 315].map((a, i) => `<i class="sp-spark" aria-hidden="true" style="--a:${a}deg;background:${SPARK[i % 4]};animation-delay:${-Math.round(age)}ms"></i>`).join("") : "";
+      return `${ic}<span>${esc(m.text)}<small>${esc(m.sub)}</small></span>${sparks}`;
+    }
+    const msgCls = (m) => `sp-msg is-${m.kind}${m.kind === "clear" && clearAge() < 350 ? " is-fresh" : ""}`;
+    const msgStyle = (m) => (m.kind === "clear" && clearAge() < 350 ? `animation-delay:${-Math.round(clearAge())}ms` : "");
+    let msgSig = "";
+    function updateMsg() {
+      const el = document.getElementById("sp-msg");
+      if (!el || !z || !room) return;
+      const m = msgInfo(), sig = `${m.kind}|${m.who || ""}|${m.text}`;
+      if (sig === msgSig) return;
+      msgSig = sig;
+      el.className = msgCls(m);
+      el.setAttribute("style", msgStyle(m));
+      el.innerHTML = msgInner(m);
+    }
+    function hudHtml() {
+      const order = [...z.found].sort((a, b) => a.at - b.at), t = T(), still = reduced();
+      const dots = Array.from({ length: z.total }, (_, i) => {
+        const f = order[i];
+        if (!f) return "<i></i>";
+        const age = t - (freshDot.get(`${z.no}:${f.n}`) || -1e9), pop = age < 300 && !still;
+        return `<i class="${f.by === z.side ? "is-me" : "is-mate"}${pop ? " is-pop" : ""}"${pop ? ` style="animation-delay:${-Math.round(age)}ms"` : ""}></i>`;
+      }).join("");
+      const mAge = t - missAt, blink = mAge < 400 && !still, left = Math.max(0, z.end - now());
+      const minus = t - minusAt < 1000 && !still ? `<span class="sp-minus" style="animation-delay:${-Math.round(t - minusAt)}ms">−${z.missSec}초</span>` : "";
+      return `<div class="sp-hud">
+          <span class="sp-scene"><b>${z.no}장</b>· ${esc(z.themeName)}</span>
+          <span class="sp-dots" role="img" aria-label="${z.total}곳 중 ${z.found.length}곳 찾음">${dots}</span>
+          <span class="sp-hud__end">
+            <span class="sp-time${left <= 10 ? " is-last" : left < 30 ? " is-low" : ""}" id="sp-time" title="남은 시간"><b>${HKCoop.mmss(left)}</b>${minus}</span>
+            <span class="sp-miss${blink ? " is-blink" : ""}" title="틀린 횟수"${blink ? ` style="animation-delay:${-Math.round(mAge)}ms"` : ""}>✕ <b>${z.misses}</b></span>
+            <span class="sp-score"><b>${z.score}</b>점</span>
+          </span>
+        </div>`;
+    }
+    function playHtml() {
+      if (!z) return `<div class="er-card sp"><div style="text-align:center;padding:40px"><span class="hk-spin"></span></div></div>`;
+      const m = msgInfo();
+      msgSig = `${m.kind}|${m.who || ""}|${m.text}`;
+      const btn = (k, label) => `<button type="button" data-mode="${k}" class="${mode === k ? "is-on" : ""}" aria-pressed="${mode === k}">${label}</button>`;
+      return `<div class="er-card sp${mode === "ping" ? " is-ping" : ""}">
+          ${hudHtml()}
+          <div class="${msgCls(m)}" id="sp-msg" style="${msgStyle(m)}">${msgInner(m)}</div>
+          <div class="sp-slot" id="sp-slot"></div>
+          <div class="sp-tools">
+            <div class="sp-mode" role="group" aria-label="누르기 방식">${btn("tap", "👆 찾기")}${btn("ping", "📍 여기 봐요")}</div>
+            <p class="sp-help">${pingHow()}도 「여기 봐요」예요. 아무 데나 누르면 −${z.missSec}초!</p>
+          </div>
+          <div class="sp-quick" role="group" aria-label="빠른 말">${quickList().slice(0, 9).map((q) => `<button type="button" data-quick="${esc(q)}">${esc(q)}</button>`).join("")}</div>
+        </div>`;
+    }
+    // 「여기 봐요」 바로 하기 — 손가락 화면은 길게 누르기, 마우스는 오른쪽 클릭(둘 다 되는 기기는 둘 다 알려 준다)
+    function pingHow() {
+      const touch = navigator.maxTouchPoints > 0 || window.matchMedia("(pointer: coarse)").matches;
+      const mouse = window.matchMedia("(any-pointer: fine)").matches;
+      return touch && mouse ? "길게 누르기 · 오른쪽 클릭" : touch ? "길게 누르기" : "오른쪽 클릭 · Shift+클릭";
+    }
+    function pingHowSay() {
+      const h = pingHow();
+      return h === "길게 누르기" ? "길게 누르면" : h === "길게 누르기 · 오른쪽 클릭" ? "길게 누르거나 오른쪽 클릭하면" : "오른쪽 클릭이나 Shift+클릭하면";
+    }
+    // 위 막대 시계 옆 「−5초」 — 방 화면을 다시 그려도 남은 만큼 이어서
+    function decorate() {
+      const age = T() - minusAt, tm = document.getElementById("er-timer");
+      if (tm && z && age < 1000 && !reduced() && !tm.querySelector(".sp-minus")) tm.insertAdjacentHTML("beforeend", `<span class="sp-minus" style="animation-delay:${-Math.round(age)}ms">−${z.missSec}초</span>`);
+    }
+
+    // ── 옆 칸 — 이번 사진에서 찾은 곳 · 끝낸 사진 ──
+    function rowsHtml(list, total) {
+      return Array.from({ length: total }, (_, i) => {
+        const f = list[i];
+        if (!f) return `<li class="is-empty"><i>?</i><span><b>아직 못 찾았어요</b></span></li>`;
+        if (!f.by) return `<li class="is-unfound"><i>!</i><span><b>${esc(f.label)}</b><small>못 찾은 곳</small></span></li>`;
+        const mine = f.by === z.side;
+        return `<li class="${mine ? "is-me" : "is-mate"}"><i>${i + 1}</i><span><b>${esc(f.label)}</b><small>${mine ? "내가" : `${esc(mate())}님이`} · ${Math.max(0, f.at - z.sceneAt).toFixed(1)}초</small></span></li>`;
+      }).join("");
+    }
+    function doneHtml() {
+      const list = [...(z.done || [])].reverse();
+      return `<div class="er-card"><h2>📸 끝낸 사진</h2>${list.length
+        ? `<ul class="sp-done">${list.map((d) => `<li><b>${d.no}장</b><span>${esc(THEME_NAME[d.theme] || "")}</span><em>${Number(d.sec).toFixed(1)}초</em></li>`).join("")}</ul>`
+        : `<p class="sp-empty">5곳을 다 찾으면 여기에 남아요. 한 장에 ${z.clearBonus}점 더!</p>`}</div>`;
+    }
+    // 진행 중 끝낸 사진 — 찾은 곳 카드 아래 한 줄 칩(PC 옆 칸이 대화 입력칸까지 첫 화면에 들어오게). 휴대폰은 숨긴다(.sp-pc)
+    function doneBar() {
+      const list = z.done || [];
+      return `<div class="sp-donebar sp-pc"><b>📸 끝낸 사진</b>${list.length
+        ? list.map((d) => `<span title="${esc(THEME_NAME[d.theme] || "")}">${d.no}장 <em>${Number(d.sec).toFixed(1)}초</em></span>`).join("")
+        : `<small>다 찾으면 한 장에 ${z.clearBonus}점 더!</small>`}</div>`;
+    }
+    function sideHtml() {
+      if (!z || !room) return "";
+      if (room.status !== "PLAYING") return "";
+      const order = [...z.found].sort((a, b) => a.at - b.at);
+      return `<div class="er-card sp-list"><h2>🔎 이번 사진에서 찾은 곳 <small>${z.found.length}/${z.total}</small></h2>${order.length ? "" : `<p class="sp-empty">찾으면 여기에 하나씩 쌓여요.</p>`}<ol class="sp-rows">${rowsHtml(order, z.total)}</ol>${doneBar()}</div>`;
+    }
+
+    // ── 대기실 ──
+    // 미리 보기 — 같은 자리 사진 두 장(머그컵 색 · 시곗바늘이 다르다)
+    const SAMPLE = [
+      { t: "clock", x: 210, y: 190, w: 140, h: 140, c: "white", r: 0, f: 0, v: 10, z: "wall" },
+      { t: "poster", x: 760, y: 250, w: 150, h: 203, c: "sky", r: 0, f: 0, v: 0, z: "wall" },
+      { t: "plant", x: 150, y: 775, w: 120, h: 174, c: "orange", r: 0, f: 0, v: 5, z: "top" },
+      { t: "monitor", x: 480, y: 700, w: 260, h: 229, c: "black", r: 0, f: 0, v: 0, z: "top" },
+      { t: "mug", x: 810, y: 800, w: 104, h: 104, c: "red", r: 0, f: 0, v: 1, z: "top" },
+    ];
+    const SAMPLE_B = SAMPLE.map((o) => (o.t === "mug" ? { ...o, c: "blue" } : o.t === "clock" ? { ...o, v: 3 } : o));
+    let previewSvg = "";
+    function preview() {
+      if (previewSvg) return previewSvg;
+      const ring = `<ellipse cx="210" cy="190" rx="106" ry="106" fill="none" stroke="#fff" stroke-width="16"/><ellipse cx="210" cy="190" rx="106" ry="106" fill="none" stroke="${ME}" stroke-width="8" stroke-dasharray="22 14"/>`
+        + `<ellipse cx="810" cy="800" rx="90" ry="90" fill="none" stroke="#fff" stroke-width="16"/><ellipse cx="810" cy="800" rx="90" ry="90" fill="none" stroke="${ME}" stroke-width="8" stroke-dasharray="22 14"/>`;
+      const card = (objs, x, rot, label) => `<g transform="translate(${x} 70) rotate(${rot} 500 500)"><rect x="-14" y="-14" width="1028" height="1028" rx="40" fill="#fff"/><svg width="1000" height="1000" viewBox="0 0 1000 1000">${Art.photo(objs, "desk")}${ring}</svg>`
+        + `<rect x="330" y="-64" width="340" height="96" rx="48" fill="#0f172a"/><text x="500" y="1" text-anchor="middle" font-size="52" font-weight="800" fill="#fff">${label}</text></g>`;
+      previewSvg = `<svg viewBox="0 0 2200 1130" role="img" aria-label="같은 곳 사진 두 장 — 시곗바늘과 머그컵 색이 달라요">${card(SAMPLE, 40, -3, "사진 가")}${card(SAMPLE_B, 1160, 3, "사진 나")}</svg>`;
+      return previewSvg;
+    }
+    function readyNote(ctx) {
+      const r = ctx.room;
+      return `나는 <b>${esc(r.sideName || "사진 한 장")}</b>, ${esc(r.partner.name)}님은 <b>${esc(r.partnerSideName || "다른 사진")}</b>를 봐요. 두 사진은 <b>5곳</b>이 다르지만 서로 화면은 못 봐요.`
+        + ` 대화창이나 Teams 통화로 <b>말로 맞춰 보며</b> 내 사진에서 다른 곳을 눌러요.`;
+    }
+    function readyExtra(ctx) {
+      const cur = (ctx.room.opts && ctx.room.opts.place) || "mix";
+      return `<div class="sp-pick">
+          <div class="sp-pick__head"><b>어디 사진으로 할까요?</b><small>바꾸면 둘 다 다시 「준비」를 눌러요.</small></div>
+          <div class="sp-pick__grid" role="radiogroup" aria-label="장소 고르기">${PLACES.map(([k, name, ic]) => `<button type="button" class="sp-place ${k === cur ? "is-on" : ""}" data-place="${k}" role="radio" aria-checked="${k === cur}">${HKUI.icon(ic, 18, "currentColor")}<span>${name}</span></button>`).join("")}</div>
+        </div>
+        <div class="sp-how">
+          <div class="sp-how__art">${preview()}</div>
+          <ol>
+            <li><b>사진이 서로 달라요</b>같은 곳을 찍은 사진이 한 장씩 가요. 5곳이 달라요.</li>
+            <li><b>말로 맞춰 봐요</b>「시계 몇 시예요?」 「머그컵 무슨 색이에요?」처럼 물어보고 대답해요.</li>
+            <li><b>내 사진에서 눌러요</b>다른 곳을 누르면 둘 다에게 동그라미가 떠요. ${pingHowSay()} 📍 「여기 봐요」.</li>
+            <li><b>아무 데나 누르면 −5초</b>5곳을 다 찾으면 3점 더, 다음 사진은 물건이 더 많아요.</li>
+          </ol>
+        </div>`;
+    }
+
+    // ── 끝 화면 ──
+    // 끝 이야기 갈래 — 성공한 판(1점 이상)은 fail 이 아니다: 세 장(24점) 이상 great · 그 밖 ok · 0점은 fail
+    // (성공 수 · 도장이 1점부터 세므로 — coop-story.js cleared · 서버 series)
+    function tierOf(r) {
+      if (!r || r.status !== "CLEAR") return "fail";
+      const s = Number(r.score) || 0;
+      return s >= 24 ? "great" : s > 0 ? "ok" : "fail";
+    }
+    const GLASS = `<svg viewBox="0 0 170 96"><g transform="rotate(-4 44 50)"><rect x="8" y="14" width="72" height="72" rx="10" fill="#fff"/><rect x="8" y="58" width="72" height="28" rx="0" fill="#e9c9a4"/><rect x="8" y="76" width="72" height="10" fill="#cbd5e1"/><rect x="8" y="14" width="72" height="72" rx="10" fill="none" stroke="#fff" stroke-width="4"/><rect x="40" y="44" width="16" height="16" rx="4" fill="#e11d48" stroke="#1f2937" stroke-width="2.5"/><circle cx="28" cy="32" r="9" fill="#fff" stroke="#1f2937" stroke-width="2.5"/></g>`
+      + `<g transform="rotate(4 126 50)"><rect x="90" y="14" width="72" height="72" rx="10" fill="#fff"/><rect x="90" y="58" width="72" height="28" fill="#e9c9a4"/><rect x="90" y="76" width="72" height="10" fill="#cbd5e1"/><rect x="122" y="44" width="16" height="16" rx="4" fill="#2563eb" stroke="#1f2937" stroke-width="2.5"/><circle cx="110" cy="32" r="9" fill="#fff" stroke="#1f2937" stroke-width="2.5"/></g>`
+      + `<circle cx="132" cy="50" r="19" fill="rgba(255,255,255,.25)" stroke="#fde047" stroke-width="6"/><path d="M145 64l15 16" stroke="#fde047" stroke-width="9" stroke-linecap="round"/></svg>`;
+    function endCard(ctx) {
+      const r = ctx.room, t = tierOf(r), ch = ctx.chapter;
+      const score = z ? z.score : Number(r.score || 0), found = z ? z.foundTotal : score;
+      // 한 장도 다 못 찾은 판(1~4점)도 성공(ok) — 찾은 만큼 격려한다
+      const say = !found ? "아쉽게 다른 곳을 못 찾았어요. 다음엔 「시계 몇 시예요?」부터 물어봐요."
+        : (z ? !z.cleared : score < 8) ? `다른 곳 ${found}개를 둘이 찾아냈어요. 점점 손발이 맞아 가요!`
+        : r.outro || "눈썰미도 말솜씨도 척척 맞았어요!";
+      return `<div class="er-end sp-end is-${t}">
+          <div class="sp-end__art" aria-hidden="true">${GLASS}</div>
+          ${ch ? `<div class="sp-end__ep">${esc(ch.time)} · ${esc(ch.place)}</div>` : ""}
+          <h2>시간 끝!</h2>
+          <p>${esc(say)}</p>
+          <div class="sp-end__big"><b>${score}</b>점</div>
+          ${z ? `<p class="sp-end__sub">다른 곳 ${z.foundTotal}개 · 사진 ${z.cleared}장</p>` : ""}
+        </div>`;
+    }
+    // 마지막 사진 정답 — 두 사진 나란히(휴대폰은 위아래), 찾은 곳은 찾은 사람 색, 못 찾은 곳은 주황 점선
+    function answerHtml() {
+      if (!z || !room || room.status !== "CLEAR" || !z.other) return "";
+      const unf = z.unfound || [], all = [...z.found, ...unf];
+      // 이름표 — 두 사진의 물건(표시된 곳 말고)을 덜 가리는 자리, 두 사진에 같은 자리
+      const placed = [], avoid = tagAvoid([z.objs, z.other], all);
+      const marks = all.map((f, i) => {
+        const miss = i >= z.found.length;
+        return markHtml(f, { miss, tag: tagSpot(f.hit[0], tagW(whoOf(f, miss)), placed, avoid, ringsBut(all, f)) });
+      }).join("");
+      const pic = (objs, label) => `<svg viewBox="0 0 1000 1000" role="img" aria-label="${esc(label)}">${Art.photo(objs, z.theme)}${marks}</svg>`;
+      const list = [...z.found].sort((a, b) => a.at - b.at).concat(unf);
+      return `<div class="er-card sp-answer"><h2>🔍 마지막 사진 정답 <small>${z.no}장 · ${esc(z.themeName)}</small></h2>
+          <div class="sp-pair">
+            <figure>${pic(z.objs, "내 사진")}<figcaption>내 사진 · ${esc(z.sideName || "")}</figcaption></figure>
+            <figure>${pic(z.other, `${mate()}님 사진`)}<figcaption>${esc(mate())}님 사진은 이랬어요</figcaption></figure>
+          </div>
+          <div class="sp-legend"><span><i style="border-color:${ME}"></i>내가 찾음</span><span><i style="border-color:${MATE}"></i>${esc(mate())}님이 찾음</span><span><i style="border-color:${MISSED};border-style:dashed"></i>못 찾은 곳</span></div>
+          <ol class="sp-rows">${rowsHtml(list, z.total)}</ol>
+        </div>${doneHtml()}`;
+    }
+
+    coop = HKCoop.mount({
+      room: "spotdiff",
+      listName: "틀린 그림 목록",
+      heroClass: "is-spot",
+      wide: true,
+      tickMs: 100,
+      chatWhilePlaying: true, // 말로 맞춰 보는 게임 — 진행 중에도 대화창을 연다
+      hero: {
+        facts: ["2인 협동", "3분", "서로 다른 사진", "말로 맞춰 보기", "끝까지 하면 오늘 도장"],
+        note: "둘에게 서로 다른 사진이 가요. 대화창 빠른 말이나 Teams 통화로 맞춰 보며 다른 곳을 찾아요.",
+      },
+      rankTitle: "틀린 그림 점수 순위",
+      rankNote: "찾은 곳 1점 · 사진 한 장을 다 찾으면 3점 더. 같은 두 사람은 가장 좋은 한 판만 올라요.",
+      rankText: (x) => `${Number(x.score || 0)}점`,
+      recentText: (r) => (r.status === "CLEAR" ? (Number(r.score) > 0 ? [`${r.score}점`, "is-clear"] : ["0점", "is-fail"]) : ["그만둠", "is-fail"]),
+      failTitle: "그만뒀어요",
+      get quick() { return quickList(); }, // 장소에 따라 「책상 · 조리대 · 탁자 위」
+      remain: () => (z ? z.end - now() : null),
+      timerNote: () => `틀리면 −${z ? z.missSec : 5}초`,
+      readyNote,
+      readyExtra,
+      reset: () => {
+        tickFor = null; busyTap = false; busyPing = false; lastBeep = null; localMsg = null;
+        missAt = 0; minusAt = 0; bannerAt = 0; revealAt = 0; pendingEnter = false; picKey = ""; otherKey = ""; msgSig = "";
+        markEls.clear(); tagAt.clear(); animFound.clear(); freshDot.clear(); endPress();
+        for (const k of ["pic", "marks", "fx", "pops", "oPic", "oMarks"]) els[k].innerHTML = "";
+        stage.classList.remove("is-reveal");
+        mode = "tap";
+      },
+      changed: (prev, next) => {
+        const old = z;
+        room = next;
+        z = next.spotdiff || null;
+        if (z) offset = z.now * 1000 - Date.now();
+        if (!z) return;
+        if (!old || !prev || prev.id !== next.id) { syncSeen(z); scrollSoon = next.status === "PLAYING"; return; }
+        if (next.status === "PLAYING" && prev.status !== "PLAYING") scrollSoon = true;
+        if (prev.status === "PLAYING" || next.status === "PLAYING") onView(old, z);
+      },
+      play: () => playHtml(),
+      side: () => sideHtml(),
+      end: (ctx) => endCard(ctx),
+      failEnd: (ctx) => {
+        // 누가 그만뒀는지 — 마지막 진행 기록 「○○님이 포기했어요.」. 상대가 그만뒀으면 내가 그만둔 것처럼 읽히지 않게 제목 · 부제를 바꾼다
+        const r = ctx.room, me = ctx.myName;
+        const quit = r && r.end === "GIVEUP" ? [...(r.log || [])].reverse().find((l) => /님이 포기했어요/.test(l.text || "")) : null;
+        const other = !!(quit && me && !quit.text.startsWith(`${me}님`));
+        const found = z && z.foundTotal ? z.foundTotal : 0;
+        return `<div class="er-end sp-end is-fail"><div class="sp-end__art" aria-hidden="true">${GLASS}</div><h2>${other ? "그만둔 판이에요" : "그만뒀어요"}</h2>
+          ${other ? `<p class="sp-end__sub">${esc(quit.text)}</p>` : ""}
+          <p>${found ? `${other ? "그때까지" : "그만둘 때까지"} 다른 곳 ${found}개를 찾았어요. ` : ""}다음엔 끝까지 같이 찾아봐요.</p></div>`;
+      },
+      stats: () => (z ? [
+        { label: "찾은 곳", value: `${z.foundTotal}곳` },
+        { label: "다 찾은 사진", value: `${z.cleared}장` },
+        { label: `내가 · ${mate()}님이`, value: `${z.foundBy.me} · ${z.foundBy.partner}` },
+        { label: "틀린 횟수", value: `${z.misses}번` },
+        { label: "가장 빨리 끝낸 사진", value: z.done.length ? `${Math.min(...z.done.map((d) => Number(d.sec))).toFixed(1)}초` : "–" },
+      ] : []),
+      storyTier: (ctx) => tierOf(ctx.room),
+      after: () => answerHtml(),
+      painted: () => {
+        const slot = document.getElementById("sp-slot");
+        if (!slot || !z || !room) return;
+        if (stage.parentNode !== slot) {
+          slot.appendChild(stage);
+          if (keyFocus && document.activeElement !== els.svg) els.svg.focus({ preventScroll: true });
+        }
+        sync();
+        decorate();
+        // 시작하면 사진 칸이 화면에 들어오게 — 휴대폰은 늘, PC 는 카드 위가 안 보일 때만(붙어 있는 머리 메뉴 높이만큼 아래로)
+        if (scrollSoon && room.status === "PLAYING") {
+          scrollSoon = false;
+          const card = document.querySelector(".er-card.sp");
+          if (card) {
+            const head = document.querySelector(".hk-header, header");
+            const hs = head && /sticky|fixed/.test(getComputedStyle(head).position) ? head.offsetHeight : 0;
+            // 가로로 든 휴대폰처럼 낮은 창은 위 줄을 넘기고 사진 칸을 머리 메뉴 바로 아래로(사진이 화면 높이 안에 다 들어오게)
+            const short = window.innerWidth > 640 && window.innerHeight <= 520, pick = () => (short && document.getElementById("sp-slot")) || document.querySelector(".er-card.sp");
+            const r = pick().getBoundingClientRect(), top = r.top + window.scrollY - hs - 6;
+            // 진행 중에 방을 새로 열면(새로 고침 · 알림으로 들어옴) 카드 위는 보여도 사진 아래가 화면 밖일 수 있다 — 그때도 맞춘다
+            const cut = els.mine.getBoundingClientRect().bottom > window.innerHeight;
+            const need = short || window.innerWidth <= 640 || r.top < hs || r.top > window.innerHeight * 0.45 || cut;
+            if (need && Math.abs(window.scrollY - top) > 20) {
+              window.scrollTo({ top, behavior: reduced() ? "auto" : "smooth" });
+              // 시작 직후 위쪽 칸이 몇 px 줄어드는 동안 잰 자리라 조금 어긋날 수 있다 — 스크롤이 끝나면 한 번 맞춘다(그 사이 직접 움직였으면 그대로)
+              setTimeout(() => {
+                const el = pick();
+                if (!el || !room || room.status !== "PLAYING" || Math.abs(window.scrollY - top) > 40) return;
+                const d = el.getBoundingClientRect().top - hs - 6;
+                if (Math.abs(d) > 2) window.scrollBy({ top: d, behavior: "auto" });
+              }, reduced() ? 120 : 800);
+            }
+          }
+        }
+      },
+      tick: (ctx) => {
+        if (!room || room.status !== "PLAYING" || !z) return;
+        const left = z.end - now();
+        const tm = document.getElementById("er-timer");
+        if (tm) tm.classList.toggle("is-last", left <= 10 && left > 0);
+        const mine = document.getElementById("sp-time");
+        if (mine) {
+          mine.firstChild.textContent = HKCoop.mmss(Math.max(0, left));
+          mine.classList.toggle("is-low", left < 30 && left > 10);
+          mine.classList.toggle("is-last", left <= 10);
+        }
+        const s = Math.ceil(left);
+        if (s >= 1 && s <= 10 && s !== lastBeep) { lastBeep = s; ctx.sfx("tick"); }
+        updateMsg();
+        lockSync();
+        if (!z.pause && stage.classList.contains("is-reveal") && !z.over) stage.classList.remove("is-reveal");
+        if (z.nextAt && now() >= z.nextAt + 0.05 && tickFor !== z.nextAt) {
+          tickFor = z.nextAt;
+          HKApi.coopTick(room.id).then((next) => { if (fresher(next)) ctx.set(next); }).catch(() => { tickFor = null; });
+        }
+      },
+      click: async (t, ctx) => {
+        if (t.dataset.place) {
+          if (t.classList.contains("is-on") || !ctx.room || ctx.room.status !== "READY") return;
+          ctx.sfx("select");
+          return ctx.act(async () => { const next = await HKApi.coopOptions(ctx.room.id, { place: t.dataset.place }); return fresher(next) ? next : null; });
+        }
+        if (t.dataset.mode) {
+          ctx.sfx("select");
+          setMode(mode === t.dataset.mode && t.dataset.mode === "ping" ? "tap" : t.dataset.mode);
+        }
+      },
+    });
+  </script>
+</body>
+</html>

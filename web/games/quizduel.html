@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 1:1 퀴즈 대결</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* ── 목록 위 「이렇게 해요」 ── */
+    .qd-rules { margin: -6px 0 18px; border: 1px solid #ddd6fe; border-radius: 14px; background: #f5f3ff; color: #312e81; }
+    .qd-rules summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; font-size: 15px; font-weight: 800; cursor: pointer; list-style: none; }
+    .qd-rules summary::-webkit-details-marker { display: none; }
+    .qd-rules summary::after { content: "펼치기"; margin-left: auto; font-size: 12.5px; font-weight: 700; color: #6d28d9; }
+    .qd-rules[open] summary::after { content: "접기"; }
+    .qd-rules ol { margin: 0; padding: 0 16px 14px 36px; font-size: 14px; line-height: 1.65; word-break: keep-all; }
+    .qd-rules li { margin: 2px 0; }
+    .qd-rules b { color: #4c1d95; }
+
+    /* ── 대결 화면 ── */
+    .qd-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
+    .qd-top .gk__back { margin-bottom: 0; min-height: 40px; display: inline-flex; align-items: center; }
+    .qd-sound { display: inline-grid; place-items: center; flex-shrink: 0; width: 40px; height: 40px; padding: 0; border: 1px solid var(--border-default); border-radius: 50%; background: var(--surface-card, #fff); color: #4c1d95; cursor: pointer; }
+    .qd-sound:hover { border-color: #a78bfa; }
+    .qd-sound.is-off { color: #94a3b8; }
+
+    /* 무대 — 조명이 켜진 퀴즈 쇼 세트 */
+    .qd-stage { --qd-gold: #fbbf24; --qd-ok: #22c55e; --qd-ng: #f43f5e;
+      position: relative; overflow: hidden; overflow: clip; margin-top: 12px; padding: 22px 22px 24px; border-radius: 22px; color: #f8fafc; isolation: isolate;
+      background: radial-gradient(120% 70% at 50% -10%, rgba(167, 139, 250, .55), transparent 60%),
+                  radial-gradient(60% 50% at 0% 100%, rgba(236, 72, 153, .28), transparent 70%),
+                  radial-gradient(60% 50% at 100% 100%, rgba(56, 189, 248, .22), transparent 70%),
+                  linear-gradient(165deg, #1e1b4b 0%, #2e1065 55%, #3b0764 100%);
+      box-shadow: 0 14px 36px rgba(46, 16, 101, .32), inset 0 0 0 1px rgba(255, 255, 255, .08); }
+    .qd-bulbs { position: absolute; left: 14px; right: 14px; top: 8px; height: 6px; z-index: -1;
+      background: radial-gradient(circle, var(--qd-gold) 0 2px, transparent 2.6px) 0 50% / 16px 6px repeat-x; opacity: .75; animation: qd-bulb 1.6s steps(2) infinite; }
+    .qd-bulbs.is-b { top: auto; bottom: 8px; animation-delay: .8s; }
+    @keyframes qd-bulb { 50% { opacity: .35; } }
+    .qd-eyebrow { font-size: 13px; font-weight: 800; letter-spacing: .12em; color: #c4b5fd; text-align: center; }
+    .qd-big { margin: 6px 0 2px; font-size: 30px; font-weight: 900; text-align: center; letter-spacing: -.01em; word-break: keep-all; text-shadow: 0 2px 18px rgba(167, 139, 250, .6); }
+    .qd-sub { margin: 6px auto 0; max-width: 520px; font-size: 14.5px; line-height: 1.6; color: #ddd6fe; text-align: center; word-break: keep-all; }
+    .qd-cats { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 16px auto 4px; max-width: 560px; }
+    .qd-chip { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .14); font-size: 12.5px; font-weight: 700; color: #ede9fe; white-space: nowrap; }
+    .qd-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 16px 0 4px; padding: 0; list-style: none; }
+    .qd-steps li { padding: 12px 10px; border-radius: 14px; background: rgba(255, 255, 255, .07); text-align: center; font-size: 13.5px; line-height: 1.45; color: #e9e5ff; word-break: keep-all; }
+    .qd-steps b { display: block; margin-bottom: 2px; font-size: 20px; color: var(--qd-gold); }
+    .qd-go { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; max-width: 380px; min-height: 54px; margin: 18px auto 0; padding: 0 20px; border: 0; border-radius: 16px; font: inherit; font-size: 17px; font-weight: 900; color: #1e1b4b; cursor: pointer;
+      background: linear-gradient(180deg, #fde68a, #f59e0b); box-shadow: 0 6px 0 #b45309, 0 10px 24px rgba(245, 158, 11, .35); transition: transform .08s, box-shadow .08s; }
+    .qd-go:active:not([disabled]) { transform: translateY(4px); box-shadow: 0 2px 0 #b45309, 0 6px 14px rgba(245, 158, 11, .3); }
+    .qd-go[disabled] { cursor: default; color: #64748b; background: #e2e8f0; box-shadow: none; }
+    .qd-go.is-ghost { color: #f8fafc; background: rgba(255, 255, 255, .12); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .25); }
+    .qd-hint { margin-top: 8px; font-size: 12.5px; color: #a5b4fc; text-align: center; }
+    .qd-btns { display: flex; gap: 8px; justify-content: center; margin-top: 18px; }
+    .qd-btns .hk-btn { min-height: 44px; min-width: 120px; }
+
+    /* 문제 머리 — 번호 · 분야 · 시계 */
+    .qd-qhead { display: flex; align-items: center; gap: 12px; }
+    .qd-qno { display: flex; align-items: baseline; gap: 4px; flex-shrink: 0; }
+    .qd-qno b { font-size: 30px; font-weight: 900; color: var(--qd-gold); line-height: 1; font-variant-numeric: tabular-nums; }
+    .qd-qno small { font-size: 14px; font-weight: 700; color: #c4b5fd; }
+    .qd-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; flex: 1; }
+    .qd-lv { padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .qd-lv.lv-1 { background: #bbf7d0; color: #14532d; }
+    .qd-lv.lv-2 { background: #bae6fd; color: #0c4a6e; }
+    .qd-lv.lv-3 { background: #fde68a; color: #78350f; }
+    .qd-lv.lv-4 { background: #fecdd3; color: #881337; }
+    .qd-ring { position: relative; flex-shrink: 0; width: 64px; height: 64px; }
+    .qd-ring svg { display: block; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .qd-ring circle { fill: none; stroke-width: 6; }
+    .qd-ring .qd-ring__bg { stroke: rgba(255, 255, 255, .14); }
+    .qd-ring .qd-ring__fg { stroke: #a3e635; stroke-linecap: round; transition: stroke .2s; }
+    .qd-ring.is-low .qd-ring__fg { stroke: var(--qd-gold); }
+    .qd-ring.is-crit .qd-ring__fg { stroke: var(--qd-ng); }
+    .qd-ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 22px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .qd-ring.is-crit b { color: #fecdd3; animation: qd-beat .5s ease-in-out infinite alternate; }
+    @keyframes qd-beat { to { transform: scale(1.12); } }
+    .qd-verdict-chip { flex-shrink: 0; padding: 8px 12px; border-radius: 999px; font-size: 14px; font-weight: 900; }
+    .qd-verdict-chip.is-ok { background: var(--qd-ok); color: #052e16; }
+    .qd-verdict-chip.is-ng { background: var(--qd-ng); color: #fff; }
+
+    /* 10칸 진행 */
+    .qd-dots { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; margin: 14px 0 0; }
+    .qd-dots i { height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .16); }
+    .qd-dots i.is-ok { background: var(--qd-ok); }
+    .qd-dots i.is-ng { background: var(--qd-ng); }
+    .qd-dots i.is-now { background: var(--qd-gold); box-shadow: 0 0 0 2px rgba(251, 191, 36, .35); }
+
+    /* 문제 · 보기 */
+    .qd-qtext { display: flex; align-items: center; justify-content: center; min-height: 104px; margin: 16px 0 14px; padding: 16px 18px; border-radius: 18px; background: rgba(255, 255, 255, .96); color: #1e1b4b;
+      font-size: 21px; font-weight: 800; line-height: 1.5; text-align: center; word-break: keep-all; overflow-wrap: anywhere; box-shadow: 0 6px 0 rgba(0, 0, 0, .18); }
+    .qd-qtext.is-small { min-height: 0; font-size: 17px; padding: 12px 16px; }
+    .qd-qtext > span { display: block; min-width: 0; } /* 글을 한 덩어리로 — flex 안에서 강조 앞뒤 띄어쓰기가 사라지지 않게 */
+    .qd-qtext em { font-style: normal; color: #be123c; text-decoration: underline; text-underline-offset: 4px; }
+    .qd-opts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .qd-opt { position: relative; display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 14px; border: 2px solid rgba(255, 255, 255, .22); border-radius: 16px; background: rgba(255, 255, 255, .08);
+      color: #f8fafc; font: inherit; font-size: 16.5px; font-weight: 700; line-height: 1.35; text-align: left; word-break: keep-all; overflow-wrap: anywhere; cursor: pointer; transition: background .12s, border-color .12s, transform .08s; touch-action: manipulation; }
+    @media (hover: hover) { .qd-opt:hover:not([disabled]) { background: rgba(255, 255, 255, .16); border-color: #c4b5fd; } }
+    .qd-opt:active:not([disabled]) { transform: scale(.985); }
+    .qd-opt[disabled] { cursor: default; }
+    .qd-key { flex-shrink: 0; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: rgba(255, 255, 255, .16); font-size: 14px; font-weight: 900; color: #fde68a; }
+    .qd-opt.is-picked { border-color: var(--qd-gold); background: rgba(251, 191, 36, .2); }
+    .qd-opt.is-correct { border-color: var(--qd-ok); background: rgba(34, 197, 94, .24); }
+    .qd-opt.is-correct .qd-key { background: var(--qd-ok); color: #052e16; }
+    .qd-opt.is-wrong { border-color: var(--qd-ng); background: rgba(244, 63, 94, .22); animation: qd-shake .35s; }
+    .qd-opt.is-wrong .qd-key { background: var(--qd-ng); color: #fff; }
+    .qd-opt.is-dim { opacity: .45; }
+    .qd-opt .qd-tag { margin-left: auto; flex-shrink: 0; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 800; background: rgba(255, 255, 255, .9); color: #1e1b4b; }
+    @keyframes qd-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+
+    /* 판정 · 해설 */
+    .qd-verdict { margin: 16px 0 0; text-align: center; animation: qd-pop .35s cubic-bezier(.2, 1.6, .4, 1); }
+    .qd-verdict b { display: block; font-size: 34px; font-weight: 900; letter-spacing: -.01em; }
+    .qd-verdict small { display: block; margin-top: 2px; font-size: 14px; font-weight: 700; color: #ddd6fe; word-break: keep-all; }
+    .qd-verdict.is-ok b { color: #86efac; text-shadow: 0 0 22px rgba(34, 197, 94, .55); }
+    .qd-verdict.is-ng b { color: #fda4af; }
+    @keyframes qd-pop { from { transform: scale(.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .qd-note { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, .08); font-size: 14px; line-height: 1.6; color: #e9e5ff; word-break: keep-all; overflow-wrap: anywhere; }
+    .qd-note b { color: var(--qd-gold); margin-right: 6px; }
+
+    /* 상대 진행 */
+    .qd-rival { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 10px 12px; border-radius: 14px; background: rgba(15, 23, 42, .35); font-size: 13.5px; }
+    .qd-rival__name { max-width: 34%; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .qd-rival__bar { position: relative; flex: 1; min-width: 40px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, .14); overflow: hidden; }
+    .qd-rival__bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: linear-gradient(90deg, #38bdf8, #a78bfa); transition: width .5s ease; }
+    .qd-rival__n { font-weight: 900; font-variant-numeric: tabular-nums; }
+    .qd-rival small { flex-shrink: 0; font-size: 12px; font-weight: 700; color: #c4b5fd; }
+    .qd-rival.is-live small { color: #86efac; }
+    .qd-rival.is-live small::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%; background: #22c55e; vertical-align: 1px; animation: qd-bulb 1s steps(2) infinite; }
+    .qd-rival.is-bump { animation: qd-bump .6s ease; }
+    @keyframes qd-bump { 30% { background: rgba(167, 139, 250, .45); } }
+
+    /* 다 풀고 기다림 · 결과 */
+    .qd-score { display: flex; align-items: baseline; justify-content: center; gap: 6px; margin-top: 8px; }
+    .qd-score b { font-size: 64px; font-weight: 900; line-height: 1; color: var(--qd-gold); font-variant-numeric: tabular-nums; }
+    .qd-score small { font-size: 20px; font-weight: 800; color: #c4b5fd; }
+    .qd-result { margin-top: 2px; font-size: 38px; font-weight: 900; text-align: center; }
+    .qd-stage.is-win .qd-result { color: var(--qd-gold); text-shadow: 0 0 26px rgba(251, 191, 36, .55); }
+    .qd-stage.is-lose .qd-result { color: #e2e8f0; }
+    .qd-stage.is-draw .qd-result { color: #c7d2fe; }
+    .qd-board { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; max-width: 520px; margin: 18px auto 0; }
+    .qd-col { padding: 14px 10px; border-radius: 18px; background: rgba(255, 255, 255, .08); text-align: center; border: 2px solid transparent; min-width: 0; }
+    .qd-col.is-top { border-color: var(--qd-gold); background: rgba(251, 191, 36, .14); }
+    .qd-col span { display: block; font-size: 13px; font-weight: 800; color: #c4b5fd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .qd-col b { display: block; margin-top: 4px; font-size: 44px; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; }
+    .qd-col b small { font-size: 16px; color: #c4b5fd; }
+    .qd-col em { display: block; margin-top: 4px; font-style: normal; font-size: 13.5px; font-weight: 700; color: #e9e5ff; }
+    .qd-colon { font-size: 26px; font-weight: 900; color: #a5b4fc; }
+    .qd-sparks { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+    .qd-sparks i { position: absolute; top: -12px; width: 8px; height: 14px; border-radius: 2px; opacity: 0; animation: qd-fall 2.4s ease-in forwards; }
+    @keyframes qd-fall { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(420px) rotate(540deg); } }
+
+    /* 3 · 2 · 1 */
+    .qd-count { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; background: rgba(30, 27, 75, .88); }
+    .qd-count b { font-size: 96px; font-weight: 900; color: var(--qd-gold); text-shadow: 0 0 40px rgba(251, 191, 36, .6); animation: qd-pop .45s cubic-bezier(.2, 1.6, .4, 1); }
+
+    /* 문제 다시 보기 */
+    .qd-review { margin-top: 26px; }
+    .qd-review h2 { margin: 0 0 10px; font-size: 16px; font-weight: 800; }
+    .qd-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+    @media (min-width: 720px) { .qd-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .qd-li { padding: 14px 16px; border: 1px solid var(--border-default); border-radius: 16px; background: var(--surface-card, #fff); word-break: keep-all; overflow-wrap: anywhere; }
+    .qd-li__head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .qd-li__head b { padding: 2px 8px; border-radius: 8px; background: #ede9fe; color: #5b21b6; font-size: 12.5px; }
+    .qd-li__q { margin-top: 6px; font-size: 15px; font-weight: 700; line-height: 1.5; color: var(--color-midnight-navy); }
+    .qd-li__a { margin-top: 6px; font-size: 14px; color: var(--text-secondary); }
+    .qd-li__a b { color: #15803d; }
+    .qd-li__marks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .qd-mk { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 700; }
+    .qd-mk.is-ok { background: #dcfce7; color: #166534; }
+    .qd-mk.is-ng { background: #ffe4e6; color: #9f1239; }
+    .qd-mk.is-none { background: var(--color-mist); color: var(--text-muted); }
+    .qd-mk b { font-weight: 900; }
+    .qd-li__e { margin-top: 8px; font-size: 13px; line-height: 1.55; color: var(--text-muted); }
+    .qd-foot { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    .qd-resign { min-height: 40px; padding: 0 14px; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 700; color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+    .qd-foot .gk__due { margin-top: 0; }
+
+    @media (max-width: 640px) {
+      .qd-stage { padding: 18px 14px 20px; border-radius: 18px; }
+      .qd-big { font-size: 24px; }
+      .qd-steps { grid-template-columns: 1fr; gap: 6px; }
+      .qd-steps li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; text-align: left; }
+      .qd-steps b { display: inline; margin: 0; font-size: 18px; flex-shrink: 0; width: 22px; text-align: center; }
+      .qd-qno b { font-size: 26px; }
+      .qd-ring { width: 56px; height: 56px; }
+      .qd-ring b { font-size: 19px; }
+      .qd-qtext { min-height: 72px; font-size: 18px; padding: 12px 14px; margin: 12px 0 10px; }
+      .qd-opts { grid-template-columns: 1fr; gap: 7px; }
+      .qd-opt { min-height: 50px; padding: 8px 12px; font-size: 16px; }
+      .qd-verdict b { font-size: 28px; }
+      .qd-score b { font-size: 56px; }
+      .qd-result { font-size: 30px; }
+      .qd-col b { font-size: 36px; }
+      /* 문제를 푸는 동안은 화면 한 장에 들어오게 — 「나 vs 상대」는 한 줄로 줄이고(얼굴 · 차례 꼬리표 빼기),
+         문제를 열면 무대를 화면 위로 올린다(paint → fitStage). 판정 화면은 보기를 줄이고 「다음」 단추를 아래에 붙인다 */
+      .qd.is-play .qd-top { margin-bottom: 0; }
+      .qd.is-play .gk__vs { margin-bottom: 6px; }
+      .qd.is-play .gk__face, .qd.is-play .gk__turn, .qd.is-play .gk__vs-mid small { display: none; }
+      .qd.is-play .gk__side { flex-direction: row; align-items: center; gap: 6px; padding: 6px 10px; text-align: left; }
+      .qd.is-play .gk__side:not(.is-me) { flex-direction: row-reverse; text-align: right; }
+      .qd.is-play .gk__side .gk__who b { white-space: nowrap; font-size: 14px; }
+      .qd.is-play .gk__side .gk__who b em { display: none; }
+      .qd.is-play .gk__vs-mid { min-width: 30px; }
+      .qd-stage.is-q { padding-top: 16px; padding-bottom: 16px; }
+      .qd-stage.is-q .qd-dots { margin-top: 10px; }
+      .qd-stage.is-q .qd-rival { margin-top: 10px; padding: 8px 12px; }
+      .qd-stage.is-fb .qd-opt { min-height: 44px; padding: 6px 12px; font-size: 15px; }
+      .qd-stage.is-fb .qd-key { width: 26px; height: 26px; font-size: 13px; }
+      .qd-stage.is-fb .qd-verdict { margin-top: 10px; }
+      .qd-stage.is-fb .qd-verdict b { font-size: 24px; }
+      .qd-stage.is-fb .qd-qtext { margin: 10px 0; }
+      .qd-stage.is-fb .qd-go { position: sticky; bottom: 10px; z-index: 3; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .qd-bulbs, .qd-rival.is-live small::before, .qd-ring.is-crit b, .qd-opt.is-wrong, .qd-verdict, .qd-count b, .qd-rival.is-bump { animation: none; }
+      .qd-sparks { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 1:1 퀴즈 대결 — 도전 → 수락 → 같은 10문제를 각자 편할 때 풀기 → 둘 다 끝나면 결과.
+    // 문제는 하나씩 열고, 연 순간부터 15초(서버가 연 시각을 잰다). 상대 답은 끝나야 보이고, 그 전에는 몇 문제 풀었는지만.
+    // 행동: HKApi.matchMove(id, {data: {op: "next", q}}) · {data: {op: "answer", q, choice}} — 엔진은 backend/app/services/versus_quizduel.py
+    const { esc, closedNote, due, fail } = HKMatch;
+    const GAME = "quizduel";
+    // 분야 — 오늘의 상식 퀴즈(trivia.html)와 같은 키 · 같은 그림
+    const CATS = {
+      sci: ["과학", "atom"], khist: ["한국사", "landmark"], whist: ["세계사", "scroll-text"], geo: ["지리", "globe"], econ: ["경제·사회", "scale"],
+      lit: ["문학", "book-open"], art: ["음악·미술", "palette"], sport: ["스포츠", "trophy"], lang: ["언어·어원", "languages"], life: ["생활·건강", "heart-pulse"],
+    };
+    const LV = { 1: "쉬움", 2: "보통", 3: "어려움", 4: "아주 어려움" };
+    const FINE = matchMedia("(hover: hover) and (pointer: fine)").matches; // PC — 키보드 안내
+    const RULES_KEY = "hk-quizduel-rules"; // 「이렇게 해요」를 본 적 있으면 접어 둔다
+    const sfx = (name, arg) => { try { if (window.HKSound) HKSound.play(name, arg); } catch (_) { /* 소리는 부가 기능 */ } };
+    const sec = (ms) => `${(Math.round((ms || 0) / 100) / 10).toFixed(1)}초`;
+    const untilIso = (m) => (m.quiz && m.quiz.until ? new Date(m.quiz.until).toISOString() : m.deadlineAt);
+
+    let root = null, open = { open: true, opensAt: null }, match = null;
+    let timer = 0, waiter = null; // 판이 바뀌기를 서버에서 기다리는 요청
+    let sending = false; // 답 · 문제 열기를 보내는 중
+    let fbK = null; // 이 화면에서 방금 답한 문제 — 판정 · 해설을 보여 주는 중
+    let clock = 0, picked = null, counting = false, cheer = false, finalized = "";
+    let lateK = null; // 고른 답이 15초 + 여유 안에 서버에 닿지 않아 시간 초과로 적힌 문제 — 판정 문구를 「늦었어요」로
+    const OPEN_GUARD_MS = 17000; // 문제 15초 + 통신 여유 2초 — 판 기한이 이보다 덜 남으면 새 문제를 열지 않는다(서버 QUIZ_DUE)
+
+    // ---------- 목록 ----------
+    // 본 것으로 치는 때 — 접기를 누르거나 목록을 떠나 대결 화면으로 갈 때(같은 방문에서 목록을 다시 그려도 펼친 채로)
+    function rulesSeen() { try { localStorage.setItem(RULES_KEY, "1"); } catch (_) { /* 저장 못 하면 늘 펼침 */ } }
+    function rulesHtml() {
+      let seen = false;
+      try { seen = localStorage.getItem(RULES_KEY) === "1"; } catch (_) { /* 저장 못 하면 늘 펼침 */ }
+      return `<details class="qd-rules" ${seen ? "" : "open"}><summary>${HKUI.icon("circle-help", 18, "currentColor")} 이렇게 해요</summary><ol>
+          <li>동료에게 <b>도전장</b>을 보내요. 수락하면 두 사람에게 <b>똑같은 10문제</b>가 나와요.</li>
+          <li>수락부터 <b>24시간 안에</b> 각자 편할 때 풀어요. 문제는 하나씩 열리고, 연 순간부터 <b>15초</b>예요.</li>
+          <li><b>더 많이 맞힌 사람</b>이 이겨요. 맞힌 수가 같으면 <b>푼 시간 합</b>이 짧은 쪽이 이겨요.</li>
+          <li>상대가 고른 답은 <b>둘 다 끝나야</b> 보여요. 그 전에는 몇 문제 풀었는지만 보여요.</li>
+          <li>기한까지 한 사람만 다 풀면 <b>다 푼 사람</b>이 이겨요.</li>
+        </ol></details>`;
+    }
+    async function showLobby() {
+      stopAll(); match = null; fbK = null;
+      open = await HKMatch.lobby(root, GAME, {
+        title: "1:1 퀴즈 대결",
+        lead: "동료와 같은 10문제를 각자 편할 때 풀고, 더 많이 맞힌 사람이 이겨요. 둘 다 끝까지 풀면 오늘 도장을 받아요.",
+        intro: rulesHtml(),
+        bot: [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]],
+        botNote: "바로 시작해요. 컴퓨터는 내가 한 문제를 풀 때마다 같은 문제를 풀어요. 순위에는 넣지 않아요.",
+        labels: { myTurn: "풀 차례", waiting: "상대를 기다리는 중", bot: "컴퓨터와 겨루기", challenge: "동료에게 도전하기", turnTag: "풀기", waitTag: "기다리는 중" },
+        rowNote: (m) => { const q = m.quiz || {}, n = q.count || 10; return `나 ${q.mine || 0}/${n} · 상대 ${q.rival || 0}/${n} · ${due(untilIso(m))}`; },
+        resultNote: (m) => { const q = m.quiz || {}; return q.myScore != null ? `${q.myScore} : ${q.rivalScore} · ${HKMatch.reason(m)}` : HKMatch.reason(m); },
+        rankNote: "기권한 판은 둘이 합쳐 10문제 이상 푼 판만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요",
+        rankEmpty: "아직 끝난 대결이 없어요",
+      });
+      if (match) return; // 목록을 불러오는 사이 대결 화면으로 갔다 — 판 화면에 손대지 않는다
+      root.querySelector(".gk__back")?.insertAdjacentHTML("afterend", `<a class="gk__back" href="/together" style="margin-left:14px">함께하기 ›</a>`);
+      HKUI.refreshIcons(root);
+    }
+
+    // ---------- 판 상태 ----------
+    const quiz = () => (match && match.quiz) || { count: 10, mine: 0, rival: 0, items: [] };
+    const lastItem = () => { const it = quiz().items || []; return it[it.length - 1] || null; };
+    const openItem = () => { const x = lastItem(); return x && x.open ? x : null; };
+    const sig = (m) => { const q = (m && m.quiz) || {}; const it = q.items || []; const last = it[it.length - 1]; return `${m && m.status}:${q.mine}:${last && last.open ? last.k : "-"}`; };
+    // 지금 무엇을 보여 줄지 — 받은 도전 · 시작 전 · 문제 · 판정 · 다 풀고 기다림 · 결과
+    function phase() {
+      const q = quiz();
+      if (match.status === "DONE") return fbK != null && fbK === q.count - 1 ? "feedback" : "done";
+      if (match.status !== "ACTIVE" || !match.quiz) return "pending";
+      if (openItem()) return "question";
+      if (q.mine === 0) return "ready";
+      if (q.mine >= q.count) return fbK === q.count - 1 ? "feedback" : "finished";
+      return "feedback"; // 다음 문제를 열기 전 — 방금(또는 지난번에) 푼 문제의 판정
+    }
+    function statusText() {
+      const q = quiz();
+      if (match.status === "DONE") return { win: "이겼어요", lose: "졌어요", draw: "비겼어요" }[match.result] || "끝";
+      if (match.status === "PENDING") return match.incoming ? "받은 도전" : "수락 기다리는 중";
+      if (match.status !== "ACTIVE") return match.status === "DECLINED" ? "취소된 도전" : "만료된 도전";
+      if (q.mine >= q.count) return "결과 기다리는 중";
+      return q.rival >= q.count ? "내가 풀 차례" : "각자 푸는 중";
+    }
+    function versusHtml() {
+      const q = quiz(), n = q.count;
+      let me = "", rival = "";
+      if (match.status === "ACTIVE" && match.quiz) {
+        me = q.mine >= n ? "다 풀었어요" : `${q.mine}/${n} 풀었어요`;
+        rival = q.rival >= n ? "다 풀었어요" : q.rivalLive ? `${q.rival}/${n} · 푸는 중` : `${q.rival}/${n} 풀었어요`;
+      } else if (match.status === "DONE" && q.myScore != null) {
+        me = `${q.myScore}개 맞힘 · ${sec(q.myTime)}`;
+        rival = `${q.rivalScore}개 맞힘 · ${sec(q.rivalTime)}`;
+      }
+      return HKMatch.versus(match, statusText(), { me, rival });
+    }
+    function rivalHtml() {
+      const q = quiz(), n = q.count, pct = Math.round((Math.min(n, q.rival) / n) * 100);
+      const state = q.rival >= n ? "다 풀었어요" : q.rivalLive ? "푸는 중" : match.bot ? "" : q.rival ? "쉬는 중" : "아직 시작 전";
+      return `<div class="qd-rival ${q.rivalLive ? "is-live" : ""}" data-rival>
+          <span class="qd-rival__name">${esc(match.opponent.name)}</span>
+          <span class="qd-rival__bar" aria-hidden="true"><i style="width:${pct}%"></i></span>
+          <span class="qd-rival__n">${Math.min(n, q.rival)}/${n}</span>${state ? `<small>${esc(state)}</small>` : ""}
+        </div>`;
+    }
+    function dotsHtml(nowK) {
+      const q = quiz(), it = q.items || [];
+      return `<div class="qd-dots" aria-hidden="true">${Array.from({ length: q.count }, (_, k) => {
+        const x = it[k];
+        const cls = x && x.me ? (x.me.ok ? "is-ok" : "is-ng") : k === nowK ? "is-now" : "";
+        return `<i class="${cls}"></i>`;
+      }).join("")}</div>`;
+    }
+    const catChip = (c) => { const [label, ic] = CATS[c] || [c, "circle"]; return `<span class="qd-chip">${HKUI.icon(ic, 14, "currentColor")}${esc(label)}</span>`; };
+    const lvChip = (l) => `<span class="qd-lv lv-${Number(l) || 1}">${esc(LV[l] || "")}</span>`;
+    // 거꾸로 묻는 문제는 눈에 띄게 — 문장 끝이 「… 아닌 것은?」 · 「… 없는 행성은?」 꼴일 때만(문장 가운데 「없는」은 그대로)
+    const qText = (t) => esc(t).replace(/(^|\s)(아닌|않은|않는|없는|틀린)(\s+[^\s?]+[은는]\?\s*)$/, "$1<em>$2</em>$3");
+    const qHead = (x, right) => `<div class="qd-qhead"><div class="qd-qno"><b>Q${x.k + 1}</b><small>/ ${quiz().count}</small></div>
+        <div class="qd-tags">${catChip(x.cat)}${lvChip(x.level)}</div>${right}</div>`;
+    const bulbs = `<div class="qd-bulbs" aria-hidden="true"></div><div class="qd-bulbs is-b" aria-hidden="true"></div>`;
+    const blocked = () => !open.open;
+    const dueSoon = () => !!(match && match.status === "ACTIVE" && match.quiz && match.quiz.until && match.quiz.until - Date.now() < OPEN_GUARD_MS);
+    const noOpen = () => blocked() || dueSoon(); // 새 문제를 열 수 없음 — 아케이드가 닫혔거나 판 기한이 곧 끝남
+    const goLabel = (t) => (blocked() ? `${esc(open.opensAt || "")}부터 풀 수 있어요` : dueSoon() ? "대결 기한이 곧 끝나요" : t);
+
+    // ---------- 그리기 ----------
+    function readyHtml() {
+      const q = quiz();
+      return `<div class="qd-stage">${bulbs}
+          <div class="qd-eyebrow">1:1 퀴즈 대결</div>
+          <div class="qd-big">10문제 · 문제마다 15초</div>
+          <div class="qd-cats">${Object.keys(CATS).map(catChip).join("")}</div>
+          <p class="qd-sub">분야 10개에서 한 문제씩, 쉬운 문제부터 점점 어려워져요. 상대도 같은 문제를 풀어요.</p>
+          <ol class="qd-steps">
+            <li><b>1</b>문제를 열면 바로 15초가 흘러요</li>
+            <li><b>2</b>늦으면 오답이에요. 쉬었다 이어 풀어도 돼요</li>
+            <li><b>3</b>많이 맞히고, 같으면 빨리 푼 쪽이 이겨요</li>
+          </ol>
+          ${rivalHtml()}
+          <button type="button" class="qd-go" data-qd="start" ${noOpen() ? "disabled" : ""}>${goLabel(`${HKUI.icon("play", 18, "currentColor")} 시작하기`)}</button>
+          ${FINE && !noOpen() ? `<div class="qd-hint">Enter로 시작 · 보기는 숫자 1~4로 골라요</div>` : ""}
+        </div>`;
+    }
+    function questionHtml(x) {
+      return `<div class="qd-stage is-q">${bulbs}
+          ${qHead(x, `<div class="qd-ring" id="qd-ring" role="timer" aria-label="남은 시간"><svg viewBox="0 0 64 64"><circle class="qd-ring__bg" cx="32" cy="32" r="28"/><circle class="qd-ring__fg" cx="32" cy="32" r="28"/></svg><b id="qd-left">${Math.ceil(x.leftMs / 1000)}</b></div>`)}
+          ${dotsHtml(x.k)}
+          <div class="qd-qtext"><span>${qText(x.text)}</span></div>
+          <div class="qd-opts">${x.choices.map((c, i) => `<button type="button" class="qd-opt" data-choice="${i}"><span class="qd-key">${i + 1}</span><span>${esc(c)}</span></button>`).join("")}</div>
+          ${rivalHtml()}
+        </div>`;
+    }
+    function feedbackHtml(x) {
+      const q = quiz(), me = x.me || {}, last = x.k >= q.count - 1;
+      const timeout = me.late && me.choice == null;
+      const verdict = me.ok ? ["is-ok", "정답이에요!", sec(me.ms)]
+        : timeout && lateK === x.k ? ["is-ng", "늦었어요", "답이 15초 안에 닿지 않았어요"]
+        : timeout ? ["is-ng", "시간 초과", "15초 안에 답하지 못했어요"] : ["is-ng", me.late ? "늦었어요" : "아쉬워요, 오답", me.late ? "15초가 지나 오답으로 쳐요" : sec(me.ms)];
+      const opts = x.choices.map((c, i) => {
+        const cls = i === x.answer ? "is-correct" : i === me.choice ? "is-wrong" : "is-dim";
+        const tag = i === x.answer ? "정답" : i === me.choice ? "내 답" : "";
+        return `<button type="button" class="qd-opt ${cls}" disabled><span class="qd-key">${i + 1}</span><span>${esc(c)}</span>${tag ? `<span class="qd-tag">${tag}</span>` : ""}</button>`;
+      }).join("");
+      const next = match.status === "DONE" ? `${HKUI.icon("trophy", 18, "currentColor")} 결과 보기`
+        : last ? "다 풀었어요 · 결과 기다리기" : goLabel(`다음 문제 (Q${x.k + 2}) ›`);
+      const off = match.status !== "DONE" && !last && noOpen();
+      return `<div class="qd-stage is-fb">${bulbs}
+          ${qHead(x, `<span class="qd-verdict-chip ${verdict[0]}">${me.ok ? "○ 정답" : "✕ 오답"}</span>`)}
+          ${dotsHtml(-1)}
+          <div class="qd-verdict ${verdict[0]}" role="status"><b>${verdict[1]}</b><small>${esc(verdict[2])} · 지금까지 ${q.myScore}개 맞힘</small></div>
+          <div class="qd-qtext is-small"><span>${qText(x.text)}</span></div>
+          <div class="qd-opts">${opts}</div>
+          ${x.note ? `<div class="qd-note"><b>해설</b>${esc(x.note)}</div>` : ""}
+          ${match.status === "DONE" ? "" : rivalHtml()}
+          <button type="button" class="qd-go ${last && match.status !== "DONE" ? "is-ghost" : ""}" data-qd="${match.status === "DONE" ? "result" : "next"}" ${off ? "disabled" : ""}>${next}</button>
+          ${FINE && !off ? `<div class="qd-hint">Enter로 넘어가요</div>` : ""}
+        </div>`;
+    }
+    function finishedHtml() {
+      const q = quiz();
+      return `<div class="qd-stage">${bulbs}
+          <div class="qd-eyebrow">10문제 끝</div>
+          <div class="qd-score"><b>${q.myScore}</b><small>/ ${q.count}</small></div>
+          <p class="qd-sub">걸린 시간 ${sec(q.myTime)} · 상대가 다 풀면 바로 결과가 나와요.<br>이 화면을 닫아도 돼요 — 결과는 대결 목록에서 볼 수 있어요.</p>
+          ${rivalHtml()}
+        </div>`;
+    }
+    const REASON_LINE = {
+      SCORE: () => "맞힌 개수로 승부가 났어요.",
+      SPEED: () => "맞힌 개수가 같아서 푼 시간으로 가렸어요.",
+      DRAW: () => "맞힌 개수도, 푼 시간도 똑같아요.",
+      TIMEOUT: (r) => (r === "win" ? "상대가 기한 안에 다 풀지 못해서 이겼어요." : "기한 안에 다 풀지 못해서 졌어요."),
+      TIMEOUT_DRAW: () => "둘 다 기한 안에 다 풀지 못했어요.",
+      RESIGN: (r) => (r === "win" ? "상대가 기권했어요." : r === "lose" ? "기권해서 졌어요." : "기권으로 끝났어요."),
+    };
+    function doneHtml() {
+      const q = quiz(), r = match.result || "draw";
+      const line = (REASON_LINE[match.endReason] || (() => HKMatch.reason(match)))(r);
+      const top = (mine) => (r === "win" && mine) || (r === "lose" && !mine);
+      const col = (mine) => `<div class="qd-col ${top(mine) ? "is-top" : ""}"><span>${esc(mine ? "나" : match.opponent.name)}</span>
+          <b>${mine ? q.myScore : q.rivalScore}<small> /${q.count}</small></b><em>${(mine ? q.mine : q.rival) >= q.count ? sec(mine ? q.myTime : q.rivalTime) : `${mine ? q.mine : q.rival}문제 풂`}</em></div>`;
+      const title = { win: "이겼어요!", lose: "아쉽게 졌어요", draw: "비겼어요" }[r];
+      return `<div class="qd-stage is-done is-${r}">${bulbs}<div class="qd-sparks" aria-hidden="true"></div>
+          <div class="qd-eyebrow">${r === "win" ? "🏆 우승" : "최종 결과"}</div>
+          <div class="qd-result">${title}</div>
+          <p class="qd-sub">${esc(line)}</p>
+          <div class="qd-board">${col(true)}<div class="qd-colon">:</div>${col(false)}</div>
+          <div class="qd-btns">
+            <a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">대결 목록</a>
+            ${match.bot || (match.opponent && match.opponent.id) ? `<button type="button" class="hk-btn hk-btn--primary" data-qd="again">다시 겨루기</button>` : ""}
+          </div>
+        </div>`;
+    }
+    function reviewHtml(both) {
+      const items = (quiz().items || []).filter((x) => x.me || both);
+      if (!items.length) return "";
+      const mark = (m, who, x) => {
+        if (!m) return `<span class="qd-mk is-none">${esc(who)} · 안 풂</span>`;
+        const what = m.ok ? sec(m.ms) : m.choice == null ? "시간 초과" : `${esc(x.choices[m.choice] || "")}${m.late ? " (늦음)" : ` · ${sec(m.ms)}`}`;
+        return `<span class="qd-mk ${m.ok ? "is-ok" : "is-ng"}"><b>${m.ok ? "○" : "✕"}</b>${esc(who)} · ${what}</span>`;
+      };
+      return `<section class="qd-review"><h2>${both ? "문제와 정답" : "내 답 다시 보기"}</h2><ol class="qd-list">${items.map((x) => `<li class="qd-li">
+          <div class="qd-li__head"><b>Q${x.k + 1}</b><span>${esc((CATS[x.cat] || [x.cat])[0])} · ${esc(LV[x.level] || "")}</span></div>
+          <div class="qd-li__q">${esc(x.text)}</div>
+          <div class="qd-li__a">정답 <b>${esc(x.choices[x.answer] || "")}</b></div>
+          <div class="qd-li__marks">${mark(x.me, "나", x)}${both ? mark(x.rival, match.opponent.name, x) : ""}</div>
+          ${x.note ? `<div class="qd-li__e">${esc(x.note)}</div>` : ""}
+        </li>`).join("")}</ol></section>`;
+    }
+    function pendingHtml() {
+      const s = match.status;
+      const [title, sub] = s === "PENDING"
+        ? (match.incoming ? ["도전장이 왔어요", `${match.opponent.name} 님이 1:1 퀴즈 대결을 신청했어요. 수락하면 바로 같은 10문제가 정해져요. (도전장 ${due(match.deadlineAt)})`]
+          : ["수락을 기다리고 있어요", `${match.opponent.name} 님이 수락하면 이 화면에서 바로 풀 수 있어요. (도전장 ${due(match.deadlineAt)})`])
+        : s === "DECLINED" ? ["취소된 도전이에요", "다른 동료에게 도전해 보세요."] : ["만료된 도전이에요", "24시간 안에 수락하지 않아 끝났어요."];
+      const btns = s !== "PENDING" ? `<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">대결 목록</a>`
+        : match.incoming ? `<button type="button" class="hk-btn hk-btn--primary" data-qd="accept" ${blocked() ? "disabled" : ""}>수락</button><button type="button" class="hk-btn hk-btn--secondary" data-qd="decline">거절</button>`
+        : `<button type="button" class="hk-btn hk-btn--secondary" data-qd="decline">도전 취소</button>`;
+      return `<div class="qd-stage">${bulbs}
+          <div class="qd-eyebrow">1:1 퀴즈 대결</div>
+          <div class="qd-big">${esc(title)}</div>
+          <p class="qd-sub">${esc(sub)}</p>
+          <div class="qd-btns">${btns}</div>
+        </div>`;
+    }
+    function footHtml(ph) {
+      if (match.status !== "ACTIVE") return "";
+      const resign = ph === "question" || quiz().mine >= quiz().count ? "" : `<button type="button" class="qd-resign" data-qd="resign" ${blocked() ? "disabled" : ""}>기권하기</button>`;
+      return `<div class="qd-foot"><div class="gk__due">대결 기한 ${esc(due(untilIso(match)))} · 기한까지 다 못 풀면 다 푼 사람이 이겨요</div>${resign}</div>`;
+    }
+    function soundHtml() {
+      const off = !window.HKSound || HKSound.isMuted();
+      return `<button type="button" class="qd-sound ${off ? "is-off" : ""}" data-sound aria-pressed="${off ? "false" : "true"}" aria-label="${off ? "소리 켜기" : "소리 끄기"}" title="${off ? "소리 켜기" : "소리 끄기"}">${HKUI.icon(off ? "volume-x" : "volume-2", 18, "currentColor")}</button>`;
+    }
+    function paint() {
+      stopClock();
+      const ph = phase();
+      const x = ph === "question" ? openItem() : ph === "feedback" ? (quiz().items || [])[fbK != null ? fbK : quiz().mine - 1] : null;
+      const html = ph === "question" && x ? questionHtml(x) : ph === "feedback" && x ? feedbackHtml(x)
+        : ({ pending: pendingHtml, finished: finishedHtml, done: doneHtml }[ph] || readyHtml)();
+      root.innerHTML = `<div class="gk qd ${ph === "question" || ph === "feedback" ? "is-play" : ""}">
+          <div class="qd-top"><a class="gk__back" href="#">‹ 대결 목록</a>${soundHtml()}</div>
+          ${closedNote(open)}
+          ${versusHtml()}
+          ${html}
+          ${footHtml(ph)}
+          ${ph === "finished" ? reviewHtml(false) : ph === "done" ? reviewHtml(true) : ""}
+        </div>`;
+      HKUI.refreshIcons(root);
+      if (ph === "question" || ph === "feedback") fitStage();
+      if (ph === "question") startClock(x);
+      if (ph === "done" && cheer) { cheer = false; celebrate(); }
+    }
+    // 폰처럼 보이는 높이가 낮으면(브라우저 주소창 · Teams 안 브라우저) 무대가 잘린다 — 무대를 화면 맨 위로 올려
+    // 문제와 보기 4개가 한눈에 들어오게 한다. 무대가 이미 다 보이면(PC) 그대로 둔다
+    function fitStage() {
+      const st = root.querySelector(".qd-stage");
+      if (!st) return;
+      const r = st.getBoundingClientRect();
+      if (r.top >= 0 && r.bottom <= window.innerHeight) return;
+      window.scrollTo({ top: Math.max(0, window.scrollY + r.top - 8), behavior: "auto" });
+    }
+    // 상대만 움직였을 때 — 내 화면(문제 · 시계)은 그대로 두고 상대 쪽만 고친다
+    function paintRival() {
+      const vs = root.querySelector(".gk__vs");
+      if (vs) vs.outerHTML = versusHtml();
+      root.querySelectorAll("[data-rival]").forEach((el) => {
+        const before = el.querySelector(".qd-rival__n")?.textContent;
+        el.outerHTML = rivalHtml();
+        const now = root.querySelector("[data-rival]");
+        if (now && before !== now.querySelector(".qd-rival__n")?.textContent) now.classList.add("is-bump");
+      });
+    }
+    function celebrate() {
+      sfx({ win: "win", lose: "lose", draw: "success" }[match.result] || "success");
+      if (match.result !== "win") return;
+      const box = root.querySelector(".qd-sparks");
+      if (!box) return;
+      const colors = ["#fbbf24", "#f472b6", "#a78bfa", "#34d399", "#38bdf8"];
+      box.innerHTML = Array.from({ length: 36 }, (_, i) => `<i style="left:${(i * 37) % 100}%;background:${colors[i % colors.length]};animation-delay:${(i % 9) * 0.12}s"></i>`).join("");
+    }
+
+    // ---------- 문제 시계 ----------
+    function stopClock() { cancelAnimationFrame(clock); clock = 0; }
+    function startClock(x) {
+      const ring = document.getElementById("qd-ring");
+      if (!ring || !x) return;
+      const fg = ring.querySelector(".qd-ring__fg"), label = document.getElementById("qd-left");
+      const total = quiz().limitMs || 15000, C = 2 * Math.PI * 28, end = performance.now() + x.leftMs;
+      fg.style.strokeDasharray = String(C);
+      let shown = -1;
+      const step = () => {
+        clock = 0;
+        const left = Math.max(0, end - performance.now());
+        fg.style.strokeDashoffset = String(C * (1 - left / total));
+        const s = Math.ceil(left / 1000);
+        if (s !== shown) {
+          shown = s; label.textContent = s;
+          ring.classList.toggle("is-low", s <= 5); ring.classList.toggle("is-crit", s <= 3);
+          if (s > 0 && s <= 3 && picked == null) sfx("tick");
+        }
+        if (left <= 0) { if (picked == null) answer(null); return; }
+        clock = requestAnimationFrame(step);
+      };
+      step();
+    }
+
+    // ---------- 행동 ----------
+    // 오류 알림 — 동시에 푸는 퀴즈에 맞지 않는 공통 문구(「지금은 상대 차례예요」)는 퀴즈 말로 바꾼다
+    function quizFail(e) {
+      const code = e && e.code;
+      if (code === "QUIZ_OPEN") return; // 이미 열어 둔 문제 — 새로 불러오면 처음 연 때부터의 시간으로 이어 풀어요
+      if (code === "MATCH_NOT_YOUR_TURN") { HKUI.toast("10문제가 모두 끝났어요. 화면을 새로 불러올게요.", "error"); return; }
+      fail(e);
+    }
+    async function send(data) {
+      sending = true; stopPoll();
+      try { return await HKApi.matchMove(match.id, { data }, match.seq); }
+      finally { sending = false; }
+    }
+    async function answer(choice) {
+      const x = openItem();
+      if (!x || sending || picked != null) return;
+      picked = choice == null ? -1 : choice;
+      stopClock();
+      root.querySelectorAll(".qd-opt").forEach((b) => { b.disabled = true; if (Number(b.dataset.choice) === choice) b.classList.add("is-picked"); });
+      sfx(choice == null ? "invalid" : "select");
+      let next;
+      try { next = await send({ op: "answer", q: x.k, choice }); }
+      catch (e) { picked = null; quizFail(e); await showMatch(match.id); return; }
+      picked = null;
+      const wasActive = match.status === "ACTIVE";
+      match = next; fbK = x.k;
+      const mine = (next.quiz.items || []).find((it) => it.k === x.k);
+      lateK = choice != null && mine && mine.me && mine.me.late && mine.me.choice == null ? x.k : null;
+      if (mine && mine.me) sfx(mine.me.ok ? "success" : "fail");
+      if (wasActive && next.status === "DONE") cheer = true;
+      paint();
+      schedulePoll();
+      if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+    }
+    async function openNext() {
+      if (sending || !match || match.status !== "ACTIVE") return;
+      const k = quiz().mine;
+      if (k >= quiz().count) { fbK = null; paint(); return; }
+      let next;
+      try { next = await send({ op: "next", q: k }); }
+      catch (e) { quizFail(e); await showMatch(match.id); return; }
+      match = next; fbK = null;
+      sfx("whoosh");
+      paint();
+      schedulePoll();
+    }
+    // 첫 문제 — 3 · 2 · 1 뒤에 연다(시계는 서버가 문제를 연 때부터라 카운트다운은 시간에 들어가지 않는다)
+    async function countdownStart() {
+      if (counting || sending || noOpen()) return;
+      counting = true;
+      const stage = root.querySelector(".qd-stage");
+      const box = document.createElement("div");
+      box.className = "qd-count";
+      stage.appendChild(box);
+      for (const n of ["3", "2", "1"]) {
+        box.innerHTML = `<b>${n}</b>`; sfx("countdown");
+        await new Promise((f) => setTimeout(f, 650));
+        if (!match || !box.isConnected) { counting = false; return; }
+      }
+      box.innerHTML = `<b>시작!</b>`; sfx("go");
+      counting = false;
+      await openNext();
+    }
+    // 열어 둔 마지막 문제의 시간이 이미 다 됐는데 판이 아직 내 차례로 남아 있으면 — 시간 초과를 적어 판을 마무리한다
+    async function maybeFinalize() {
+      const q = quiz();
+      if (!match || match.status !== "ACTIVE" || !match.myTurn || q.mine < q.count || sending || blocked()) return;
+      const key = `${match.id}:${match.seq}`;
+      if (finalized === key) return;
+      finalized = key;
+      try { match = await send({ op: "answer", q: q.count - 1, choice: null }); } catch (_) { /* 기한 정리가 마무리한다 */ }
+      paint(); schedulePoll();
+    }
+
+    // ---------- 실시간 — 상대가 움직이면 서버가 바로 깨워 준다 ----------
+    function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
+    function stopAll() { stopPoll(); stopClock(); }
+    function schedulePoll(delay = 0) {
+      stopPoll();
+      if (!match || !["PENDING", "ACTIVE"].includes(match.status)) return;
+      if (match.bot) return; // 컴퓨터전은 내 요청 안에서 컴퓨터가 함께 풀어 판이 바뀐다 — 기다릴 것이 없다
+      timer = setTimeout(async () => {
+        timer = 0;
+        if (document.hidden || !match || sending) return; // 다시 보이면 visibilitychange 에서 판을 새로 연다
+        const id = match.id, ctl = new AbortController();
+        waiter = ctl;
+        let next;
+        try { next = await HKApi.matchWait(id, match.seq, match.status, ctl.signal); }
+        catch (_) {
+          if (waiter === ctl) { waiter = null; schedulePoll(3000); } // 잠깐 끊기면 3초 뒤 다시
+          return;
+        }
+        if (waiter !== ctl || !match || match.id !== id) return; // 그새 내가 답했거나 다른 판으로 감
+        waiter = null;
+        if (sending || next.seq < match.seq) { schedulePoll(); return; } // 내가 방금 받은 판이 더 새롭다
+        const before = match;
+        match = next;
+        if (sig(before) !== sig(next) && !(counting && next.status === before.status)) {
+          if (before.status !== "DONE" && next.status === "DONE") cheer = true;
+          if (fbK != null && next.quiz && fbK !== next.quiz.mine - 1) fbK = null;
+          paint();
+          maybeFinalize();
+        } else if (!counting) paintRival();
+        schedulePoll();
+      }, delay);
+    }
+    async function showMatch(id) {
+      stopAll();
+      rulesSeen(); // 목록을 떠나 대결 화면으로 왔다 — 다음에 목록에 오면 「이렇게 해요」는 접어 둔다
+      try { [match, open] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
+      catch (e) { fail(e); location.hash = ""; return; }
+      if (match.game !== GAME) { location.href = `/games/${match.game}#m${id}`; return; }
+      if (fbK != null && (!match.quiz || fbK !== match.quiz.mine - 1)) fbK = null;
+      paint();
+      schedulePoll();
+      maybeFinalize();
+    }
+
+    function route() {
+      const m = /^#m(\d+)$/.exec(location.hash);
+      fbK = null; cheer = false;
+      if (m) showMatch(Number(m[1])); else showLobby();
+    }
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div id="gk-root"></div>`,
+      afterMount: () => {
+        root = document.getElementById("gk-root");
+        root.addEventListener("click", async (e) => {
+          const t = e.target.closest("button, a");
+          if (!t || t.disabled) return;
+          if (t.dataset.choice != null) return answer(Number(t.dataset.choice));
+          if (t.dataset.sound != null) {
+            if (!window.HKSound) return;
+            HKSound.toggle();
+            if (!HKSound.isMuted()) sfx("select");
+            t.outerHTML = soundHtml();
+            HKUI.refreshIcons(root);
+            return;
+          }
+          const act = t.dataset.qd;
+          if (act === "start") return countdownStart();
+          if (act === "next") return quiz().mine >= quiz().count ? (fbK = null, paint()) : openNext();
+          if (act === "result") { fbK = null; cheer = true; paint(); return; }
+          if (act === "accept") {
+            try { match = await HKApi.matchAccept(match.id); sfx("go"); paint(); schedulePoll(); } catch (err) { fail(err); showMatch(match.id); }
+            return;
+          }
+          if (act === "decline") {
+            const mine = !match.incoming;
+            if (!(await HKUI.confirmDialog(mine ? "도전을 취소할까요?" : "도전을 거절할까요?", mine ? "보낸 도전장을 거둬요." : "상대에게 거절했다고 알려요.", { confirmLabel: mine ? "도전 취소" : "거절" }))) return;
+            try { await HKApi.matchDecline(match.id); location.hash = ""; } catch (err) { fail(err); }
+            return;
+          }
+          if (act === "resign") {
+            if (!(await HKUI.confirmDialog("기권할까요?", "이 대결은 패배로 끝나요.", { confirmLabel: "기권" }))) return;
+            try {
+              stopAll();
+              const next = await HKApi.matchResign(match.id);
+              match = next; fbK = null; cheer = true; paint();
+              if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+            } catch (err) { fail(err); showMatch(match.id); }
+            return;
+          }
+          if (act === "again") {
+            try {
+              if (match.bot) { const m = await HKApi.matchBot(match.bot, GAME); location.hash = `m${m.id}`; }
+              else { await HKApi.matchCreate(match.opponent.id, GAME); HKUI.toast("도전장을 보냈어요"); location.hash = ""; }
+            } catch (err) { fail(err); }
+            return;
+          }
+          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
+          await HKMatch.act(t, GAME, showLobby);
+        });
+        // 「이렇게 해요」를 접으면 본 것으로 친다(toggle 은 거품이 일지 않아 잡기 단계에서 듣는다)
+        root.addEventListener("toggle", (e) => { if (e.target.matches && e.target.matches(".qd-rules") && !e.target.open) rulesSeen(); }, true);
+        window.addEventListener("hashchange", route);
+        window.addEventListener("keydown", (e) => {
+          if (!match || e.repeat || e.altKey || e.ctrlKey || e.metaKey || document.querySelector(".hk-dialog__overlay")) return;
+          if (e.target.closest && e.target.closest("input, textarea, select")) return;
+          const ph = phase();
+          if (ph === "question" && /^[1-4]$/.test(e.key)) {
+            const b = root.querySelector(`.qd-opt[data-choice="${Number(e.key) - 1}"]`);
+            if (b && !b.disabled) { e.preventDefault(); answer(Number(e.key) - 1); }
+            return;
+          }
+          if ((e.key === "Enter" || e.code === "Space") && (ph === "ready" || ph === "feedback")) {
+            const f = document.activeElement;
+            if (f && f.matches && f.matches("button, a, summary") && !f.classList.contains("qd-go")) return; // 다른 단추에 초점이 있으면 그 단추대로
+            const go = root.querySelector(".qd-go:not([disabled])");
+            if (go) { e.preventDefault(); go.click(); }
+          }
+        });
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && match && !sending && !counting) showMatch(match.id); });
+        route();
+      },
+    });
+  </script>
+</body>
+</html>

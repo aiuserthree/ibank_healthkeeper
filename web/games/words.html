@@ -12,169 +12,840 @@
   <script src="/_shared/api.js"></script>
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/coop-story.js"></script>
   <script src="/_shared/coop.js"></script>
   <style>
-    .er-hero.is-words { background: radial-gradient(120% 90% at 85% 0%, #a855f7 0%, rgba(168, 85, 247, 0) 55%), linear-gradient(160deg, #1e1b4b, #4338ca); }
-    .wd-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-    .wd-stat { display: flex; align-items: baseline; gap: 6px; padding: 8px 12px; border-radius: 12px; background: #eef2ff; font-size: 13px; font-weight: 700; color: #4338ca; }
-    .wd-stat b { font-size: 20px; color: #1e1b4b; font-variant-numeric: tabular-nums; }
-    .wd-role { margin-left: auto; padding: 8px 12px; border-radius: 12px; font-size: 13.5px; font-weight: 800; }
-    .wd-role.is-explain { background: #fef3c7; color: #92400e; }
-    .wd-role.is-guess { background: #dcfce7; color: #166534; }
-    .wd-card { padding: 22px 18px; border-radius: 18px; text-align: center; background: linear-gradient(160deg, #312e81, #6d28d9); color: #fff; }
-    .wd-card small { display: block; font-size: 13px; font-weight: 700; color: #c4b5fd; }
-    .wd-word { margin: 6px 0 12px; font-size: 40px; font-weight: 900; letter-spacing: .04em; word-break: keep-all; }
-    .wd-banned { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-    .wd-banned span { padding: 5px 12px 5px 9px; border-radius: 999px; background: #fff; color: #b91c1c; font-size: 14px; font-weight: 800; }
-    .wd-banned span::before { content: "🚫 "; font-size: 12px; }
-    .wd-blanks { display: flex; justify-content: center; gap: 8px; margin: 10px 0 4px; }
-    .wd-blanks span { width: 44px; height: 52px; border-radius: 10px; background: rgba(255, 255, 255, .16); border: 2px dashed rgba(255, 255, 255, .45); }
-    .wd-form { display: flex; gap: 8px; margin-top: 14px; }
-    .wd-form input { flex: 1; min-width: 0; padding: 13px 14px; border: 1.5px solid #c7d2fe; border-radius: 12px; font: inherit; font-size: 17px; }
-    .wd-form input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, .18); }
-    .wd-form .hk-btn { flex-shrink: 0; min-width: 92px; }
-    .wd-sub { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12.5px; color: var(--text-muted); }
-    .wd-feed { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-    .wd-feed h3 { margin: 0; font-size: 14px; font-weight: 800; color: #475569; }
-    .wd-clue { align-self: flex-start; max-width: 92%; padding: 10px 14px; border-radius: 14px 14px 14px 4px; background: #eef2ff; font-size: 17px; font-weight: 700; color: #1e1b4b; word-break: keep-all; }
-    .wd-guesses { display: flex; flex-wrap: wrap; gap: 6px; }
-    .wd-guess { padding: 5px 11px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-size: 13.5px; font-weight: 700; }
-    .wd-guess.is-ok { background: #dcfce7; color: #166534; }
-    .wd-empty { padding: 14px; border-radius: 12px; background: #f8fafc; text-align: center; font-size: 13.5px; color: var(--text-muted); }
-    .wd-done { margin: 0; padding: 0; list-style: none; }
-    .wd-done li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
-    .wd-done li:last-child { border-bottom: 0; }
-    .wd-done small { margin-left: auto; font-size: 12px; color: var(--text-muted); }
-    .er-end.is-words { background: linear-gradient(160deg, #312e81, #7c3aed); }
+    /* 말해 봐 맞혀 봐 — 오후 워크숍 낱말 대회 무대. 화 색(보라)은 .er 의 --ch-* 를 쓴다 */
+    .er-hero.is-words { background: radial-gradient(120% 90% at 85% 0%, #7c3aed 0%, rgba(124, 58, 237, 0) 55%), linear-gradient(160deg, #1e0b45, #2e1065); }
+
+    /* ── 무대 ── */
+    .wd-stage { position: relative; overflow: hidden; isolation: isolate; padding: 22px 16px 16px; border-radius: 22px; color: #fff;
+      background: radial-gradient(90% 60% at 50% 0%, rgba(196, 181, 253, .32), transparent 70%), linear-gradient(180deg, #2e1065 0%, #1e0b45 64%, #160933 100%);
+      box-shadow: 0 12px 30px rgba(46, 16, 101, .22), inset 0 -4px 0 #7c3aed; }
+    .wd-stage::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+      background: linear-gradient(115deg, transparent 18%, rgba(255, 247, 214, .10) 24%, rgba(255, 247, 214, .02) 36%, transparent 40%),
+                  linear-gradient(245deg, transparent 18%, rgba(255, 247, 214, .10) 24%, rgba(255, 247, 214, .02) 36%, transparent 40%); }
+    .wd-bulbs, .wd-end__bulbs { position: absolute; top: 6px; left: 14px; right: 14px; height: 8px; pointer-events: none;
+      background: radial-gradient(circle, #fde68a 0 2.4px, rgba(253, 230, 138, .25) 3.4px, transparent 4.5px) 0 0 / 18px 8px repeat-x; animation: wd-bulb 1.6s steps(2) infinite; }
+    @keyframes wd-bulb { 50% { background-position: 9px 0; } }
+    .wd-board { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; }
+    .wd-score small, .wd-streak small.wd-lab { display: block; font-size: 12px; font-weight: 800; color: #c4b5fd; letter-spacing: .02em; }
+    .wd-score b { display: block; font-size: 38px; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; color: #fff; }
+    .wd-score b i { font-style: normal; font-size: 16px; font-weight: 800; color: #c4b5fd; margin-left: 2px; }
+    .wd-score span { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 700; color: rgba(255, 255, 255, .7); white-space: nowrap; }
+    .wd-score.is-bump b { animation: wd-bump .5s ease; }
+    @keyframes wd-bump { 30% { transform: scale(1.25); color: #fde68a; } }
+    .wd-clock { min-width: 136px; padding: 8px 16px 10px; border-radius: 16px; background: rgba(0, 0, 0, .3); box-shadow: inset 0 0 0 1.5px rgba(196, 181, 253, .35); text-align: center; }
+    .wd-clock b { display: block; font: 900 42px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; text-shadow: 0 0 18px rgba(196, 181, 253, .55); }
+    .wd-clock small { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 700; color: #a5b4fc; }
+    .wd-clock i { display: block; height: 6px; margin-top: 7px; overflow: hidden; border-radius: 99px; background: rgba(255, 255, 255, .12); }
+    .wd-clock i span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a78bfa, #f0abfc); transform-origin: left center; transition: transform .25s linear; }
+    .wd-clock.is-low b { color: #fecaca; text-shadow: 0 0 18px rgba(248, 113, 113, .7); }
+    .wd-clock.is-low i span { background: linear-gradient(90deg, #fb923c, #ef4444); }
+    .wd-clock.is-last { animation: wd-pulse 1s ease-in-out infinite; }
+    @keyframes wd-pulse { 50% { box-shadow: inset 0 0 0 2px #f87171, 0 0 22px rgba(248, 113, 113, .45); } }
+    .wd-streak { justify-self: end; text-align: right; }
+    .wd-flames { display: flex; justify-content: flex-end; gap: 1px; margin: 2px 0 2px; }
+    .wd-flame { width: 17px; height: 23px; }
+    .wd-flame .o { fill: rgba(255, 255, 255, .12); }
+    .wd-flame .i { fill: rgba(255, 255, 255, .08); }
+    .wd-flame.is-on .o { fill: #f97316; }
+    .wd-flame.is-on .i { fill: #fde047; }
+    .wd-flame.is-on { transform-origin: 50% 100%; animation: wd-flick .9s ease-in-out infinite alternate; filter: drop-shadow(0 0 5px rgba(251, 146, 60, .7)); }
+    .wd-flame.is-on:nth-child(2n) { animation-delay: -.45s; }
+    @keyframes wd-flick { to { transform: scale(1.08, .93) rotate(-2deg); } }
+    .wd-streak b { display: block; font-size: 18px; font-weight: 900; color: #fff; font-variant-numeric: tabular-nums; }
+    .wd-streak em { display: inline-block; margin-top: 3px; padding: 2px 8px; border-radius: 999px; background: rgba(255, 255, 255, .1); font-size: 11.5px; font-style: normal; font-weight: 800; color: #e9d5ff; white-space: nowrap; }
+    .wd-streak.is-ready em { background: rgba(251, 146, 60, .22); color: #fed7aa; }
+    .wd-streak.is-hot em { background: linear-gradient(90deg, #f97316, #facc15); color: #3b0764; }
+    /* 진행자 마 팀장님 */
+    .wd-mc { display: flex; align-items: center; gap: 9px; margin-top: 14px; }
+    .wd-mc .cs-face { flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; background: rgba(255, 255, 255, .92); box-shadow: 0 0 0 2px #a78bfa; }
+    .wd-mc p { position: relative; flex: 1; min-width: 0; margin: 0; padding: 7px 12px; border-radius: 14px; border-bottom-left-radius: 4px; background: #fff; color: #2e1065; font-size: 14px; font-weight: 700; line-height: 1.4; word-break: keep-all; }
+    .wd-mc p b { display: block; font-size: 11px; font-weight: 900; color: #7c3aed; }
+    .wd-mc p.is-new span { display: inline-block; animation: wd-say .35s ease both; }
+    @keyframes wd-say { from { opacity: 0; transform: translateY(4px); } }
+    /* 낱말 카드 */
+    .wd-cardwrap { margin-top: 14px; perspective: 900px; }
+    .wd-card { position: relative; padding: 14px 16px 16px; border-radius: 18px; background: #fff; color: #1e1b4b; text-align: center; box-shadow: 0 6px 0 rgba(167, 139, 250, .45), 0 18px 34px rgba(0, 0, 0, .28); }
+    .wd-card.is-explain { background: linear-gradient(180deg, #fffbeb 0%, #fff 46%); }
+    .wd-card.is-flip { animation: wd-flip .6s cubic-bezier(.2, .8, .25, 1) both; }
+    @keyframes wd-flip { 0% { transform: rotateY(-88deg) scale(.95); opacity: .3; } 65% { transform: rotateY(7deg); opacity: 1; } 100% { transform: none; } }
+    .wd-card__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+    .wd-tag { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; background: #f5f3ff; color: #6d28d9; font-size: 12.5px; font-weight: 800; }
+    .wd-tag.is-role { background: #6d28d9; color: #fff; }
+    .wd-card.is-explain .wd-tag.is-role { background: #b45309; }
+    .wd-card__lab { display: block; margin-top: 10px; font-size: 12px; font-weight: 800; color: #94a3b8; }
+    .wd-word { margin: 2px 0 10px; font-size: 48px; font-weight: 900; line-height: 1.12; letter-spacing: .01em; color: #2e1065; word-break: keep-all; }
+    .wd-ban { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; }
+    .wd-ban small { font-size: 12px; font-weight: 800; color: #b91c1c; margin-right: 2px; }
+    .wd-ban span { display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px 5px 8px; border-radius: 999px; background: #fef2f2; box-shadow: inset 0 0 0 1.5px #fecaca; color: #b91c1c; font-size: 15px; font-weight: 800; text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: rgba(185, 28, 28, .55); }
+    .wd-alias { margin-top: 8px; font-size: 12.5px; font-weight: 700; color: #92400e; word-break: keep-all; }
+    .wd-peek { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e9d5ff; font-size: 12.5px; font-weight: 700; color: #64748b; }
+    .wd-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 14px 0 4px; }
+    .wd-tile { display: grid; place-items: center; width: 54px; height: 62px; border-radius: 13px; background: linear-gradient(180deg, #ede9fe, #ddd6fe); box-shadow: inset 0 -4px 0 #c4b5fd; color: #6d28d9; font-size: 30px; font-weight: 900; }
+    .wd-tile.is-q { color: rgba(109, 40, 217, .35); }
+    .wd-tiles.is-reveal .wd-tile { animation: wd-tile .5s cubic-bezier(.2, .8, .25, 1) both; animation-delay: calc(var(--i) * 80ms); }
+    @keyframes wd-tile { from { transform: rotateX(90deg); } }
+    .wd-tiles + small { display: block; font-size: 12px; font-weight: 700; color: #94a3b8; }
+    .wd-say { margin-top: 12px; padding: 10px 14px; border-radius: 14px; border-bottom-left-radius: 4px; background: #f5f3ff; text-align: left; }
+    .wd-say small { display: block; font-size: 11.5px; font-weight: 800; color: #7c3aed; }
+    .wd-say p { margin: 2px 0 0; font-size: 20px; font-weight: 800; line-height: 1.35; color: #1e1b4b; word-break: keep-all; overflow-wrap: anywhere; }
+    .wd-say.is-new { animation: wd-say .35s ease both; }
+    .wd-say.is-wait p { font-size: 15px; font-weight: 700; color: #94a3b8; }
+    .wd-dots { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+    .wd-dots i { width: 5px; height: 5px; border-radius: 50%; background: #a78bfa; animation: cs-dot 1.1s ease-in-out infinite; }
+    .wd-dots i:nth-child(2) { animation-delay: .15s; }
+    .wd-dots i:nth-child(3) { animation-delay: .3s; }
+
+    /* ── 입력 칸과 진행 기록 (흰 카드) ── */
+    .wd-play { margin-top: 14px; }
+    .er-card.wd-play h2 { margin-bottom: 12px; }
+    .wd-slot { min-height: 82px; }
+    .wd-feed { display: grid; gap: 14px; margin-top: 14px; }
+    .wd-feed h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; font-size: 13.5px; font-weight: 800; color: #475569; }
+    .wd-feed h3 small { margin-left: auto; font-size: 12px; font-weight: 700; color: #94a3b8; }
+    .wd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .wd-chip-g { display: inline-flex; align-items: center; gap: 4px; padding: 5px 11px; border-radius: 999px; background: #fef2f2; color: #991b1b; font-size: 14px; font-weight: 700; text-decoration: line-through; text-decoration-color: rgba(153, 27, 27, .4); }
+    .wd-chip-g.is-new { animation: wd-shake .45s ease; }
+    .wd-clues { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .wd-clues li { align-self: flex-start; max-width: 94%; padding: 8px 12px; border-radius: 14px; border-bottom-left-radius: 4px; background: #f5f3ff; font-size: 15.5px; font-weight: 700; line-height: 1.45; color: #1e1b4b; word-break: keep-all; overflow-wrap: anywhere; }
+    .wd-clues li.is-mine { align-self: flex-end; border-radius: 14px; border-bottom-right-radius: 4px; background: #6d28d9; color: #fff; }
+    .wd-clues li:last-child:not(.is-mine) { box-shadow: inset 0 0 0 2px #c4b5fd; }
+    .wd-empty { padding: 12px; border-radius: 12px; background: #f8fafc; text-align: center; font-size: 13.5px; color: var(--text-muted); }
+    .wd-chips .wd-more { display: inline-flex; align-items: center; padding: 5px 4px; font-size: 12.5px; font-weight: 700; color: #94a3b8; }
+    .wd-clues li.wd-more { align-self: center; max-width: none; padding: 2px 10px; background: none; box-shadow: none; font-size: 12.5px; font-weight: 700; color: #94a3b8; }
+
+    /* 떠 있는 입력 칸 — 화면을 다시 그려도 그대로 남아(글자 · 한글 조합 · 휴대폰 자판 유지) 자리(.wd-slot) 위에 겹친다 */
+    .wd-dock { position: absolute; z-index: 30; box-sizing: border-box; font-family: inherit; }
+    .wd-dock[hidden] { display: none !important; }
+    .wd-dock__row { display: flex; gap: 8px; }
+    .wd-in { flex: 1; min-width: 0; height: 54px; box-sizing: border-box; padding: 0 14px; border: 2px solid #c4b5fd; border-radius: 15px; background: #fff; color: #1e1b4b; font: inherit; font-size: 18px; font-weight: 700; }
+    .wd-in::placeholder { color: #a8a2c4; font-weight: 600; font-size: 15.5px; }
+    .wd-in:focus { outline: none; border-color: #7c3aed; box-shadow: 0 0 0 4px rgba(139, 92, 246, .18); }
+    .wd-go { flex-shrink: 0; min-width: 88px; height: 54px; padding: 0 16px; border: 0; border-radius: 15px; background: #6d28d9; color: #fff; font: inherit; font-size: 16.5px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 0 #4c1d95; }
+    .wd-go:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 #4c1d95; }
+    .wd-go:disabled { background: #c4b5fd; box-shadow: none; cursor: default; }
+    .wd-aux { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 68px; height: 54px; padding: 0 10px; border: 1.5px solid #e9d5ff; border-radius: 15px; background: #faf5ff; color: #6d28d9; font: inherit; font-size: 14px; font-weight: 900; line-height: 1.15; cursor: pointer; }
+    .wd-aux small { font-size: 11px; font-weight: 700; color: #8b5cf6; }
+    .wd-aux:hover:not(:disabled) { border-color: #a78bfa; }
+    .wd-aux:disabled { opacity: .5; cursor: default; }
+    .wd-aux.is-used { border-color: #fde68a; background: #fffbeb; color: #b45309; opacity: 1; }
+    .wd-aux.is-used small { color: #b45309; }
+    .wd-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; margin-top: 6px; padding: 0 4px; font-size: 12.5px; font-weight: 600; color: #64748b; }
+    .wd-note b { font-variant-numeric: tabular-nums; font-weight: 700; color: #94a3b8; white-space: nowrap; }
+    .wd-dock.is-bad .wd-in { border-color: #ef4444; box-shadow: 0 0 0 4px rgba(239, 68, 68, .14); }
+    .wd-dock.is-bad .wd-note span { color: #dc2626; font-weight: 800; }
+    .wd-dock.is-shake .wd-dock__row { animation: wd-shake .45s ease; }
+    @keyframes wd-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+    /* 정답 · 넘김 터짐 — 화면을 다시 그려도 끊기지 않게 몸(body)에 잠깐 띄운다 */
+    .wd-fx { position: fixed; z-index: 70; pointer-events: none; transform: translate(-50%, -50%); text-align: center; }
+    .wd-fx b { display: block; font-size: 46px; font-weight: 900; line-height: 1; color: #fff; text-shadow: 0 4px 0 #6d28d9, 0 0 28px rgba(250, 204, 21, .75); white-space: nowrap; animation: wd-pop 1.15s cubic-bezier(.2, .9, .3, 1.2) both; }
+    .wd-fx span { display: inline-block; margin-top: 8px; padding: 4px 14px; border-radius: 999px; background: linear-gradient(90deg, #facc15, #fb923c); color: #3b0764; font-size: 18px; font-weight: 900; white-space: nowrap; animation: wd-pop 1.15s .06s cubic-bezier(.2, .9, .3, 1.2) both; }
+    .wd-fx.is-pass b { color: #ede9fe; text-shadow: 0 4px 0 #4c1d95; font-size: 36px; }
+    .wd-fx.is-pass span { background: rgba(255, 255, 255, .9); color: #4c1d95; }
+    .wd-fx i { position: absolute; left: 50%; top: 40%; width: 8px; height: 13px; border-radius: 2px; background: var(--c); animation: wd-conf 1s cubic-bezier(.15, .7, .3, 1) both; }
+    @keyframes wd-pop { 0% { opacity: 0; transform: scale(.4); } 18% { opacity: 1; transform: scale(1.12); } 30% { transform: scale(1); } 78% { opacity: 1; } 100% { opacity: 0; transform: translateY(-18px); } }
+    @keyframes wd-conf { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
+
+    /* ── 옆 칸 — 지나간 낱말 · 점수 규칙 · 끝난 뒤 낱말 기록 ── */
+    .er-card h2 small { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .wd-recent { margin: 0; padding: 0; list-style: none; }
+    .wd-recent li { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+    .wd-recent li:last-child { border-bottom: 0; }
+    .wd-mark { display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #dcfce7; color: #15803d; font-size: 13px; font-weight: 900; }
+    .is-pass > .wd-mark { background: #f1f5f9; color: #94a3b8; }
+    .is-last > .wd-mark { background: #fef3c7; color: #b45309; }
+    .wd-recent__txt, .wd-log__main { flex: 1; min-width: 0; }
+    .wd-recent b, .wd-log b { font-size: 15px; font-weight: 800; color: var(--color-midnight-navy); }
+    .is-pass b { color: #94a3b8; text-decoration: line-through; text-decoration-color: rgba(148, 163, 184, .6); }
+    .wd-recent small, .wd-log__meta { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .wd-pts { flex-shrink: 0; min-width: 38px; padding: 3px 8px; border-radius: 999px; background: #f5f3ff; color: #6d28d9; font-size: 13px; font-style: normal; font-weight: 900; text-align: center; font-variant-numeric: tabular-nums; }
+    .is-pass .wd-pts, .is-last .wd-pts { background: #f8fafc; color: #94a3b8; }
+    .wd-rules { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .wd-rules li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; color: var(--text-secondary); word-break: keep-all; }
+    .wd-rules li .wd-pts { min-width: 44px; }
+    .wd-log { margin: 0; padding: 0; list-style: none; max-height: 620px; overflow-y: auto; overscroll-behavior: contain; }
+    .wd-log li { display: flex; align-items: flex-start; gap: 9px; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+    .wd-log li:last-child { border-bottom: 0; }
+    .wd-log .wd-mark { margin-top: 1px; }
+    .wd-log__main small.wd-cat { margin-left: 6px; font-size: 11.5px; font-weight: 700; color: #a78bfa; }
+    .wd-log__clues { margin-top: 4px; font-size: 12.5px; line-height: 1.5; color: #475569; word-break: keep-all; overflow-wrap: anywhere; }
+    .wd-log__clues q { quotes: "“" "”"; }
+    .wd-log .wd-pts { margin-top: 1px; }
+
+    /* ── 대기실 — 주제 고르기 · 이렇게 해요 (방 소개 글은 「이렇게 해요」와 겹쳐서 숨긴다 — 준비 버튼이 첫 화면에 오게) ── */
+    .er-wait:not(.er-pending) > h2 + p { display: none; }
+    .wd-pick { padding: 12px 14px 14px; border-radius: 16px; background: var(--ch-soft); border: 1px solid #ede9fe; }
+    .wd-pick__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin-bottom: 8px; }
+    .wd-pick__head b { font-size: 15px; font-weight: 900; color: var(--ch-ink); }
+    .wd-pick__head small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .wd-pick__grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+    .wd-theme { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 44px; padding: 6px 4px; border: 1.5px solid #e9d5ff; border-radius: 13px; background: #fff; color: #4c1d95; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .15s ease; word-break: keep-all; white-space: nowrap; }
+    .wd-theme:hover { border-color: #a78bfa; transform: translateY(-1px); }
+    .wd-theme.is-on { border-color: #6d28d9; background: #6d28d9; color: #fff; box-shadow: 0 4px 12px rgba(109, 40, 217, .28); }
+    .wd-how { margin-top: 10px; border-radius: 16px; background: #fff; border: 1px solid var(--border-default); }
+    .wd-how summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 900; color: var(--color-midnight-navy); cursor: pointer; list-style: none; }
+    .wd-how summary::-webkit-details-marker { display: none; }
+    .wd-how summary small { font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .wd-how summary::after { content: "펼치기"; margin-left: auto; font-size: 12.5px; font-weight: 800; color: var(--ch-strong); }
+    .wd-how[open] summary::after { content: "접기"; }
+    .wd-how__in { padding: 0 14px 14px; }
+    .wd-how ol { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; counter-reset: wd; }
+    .wd-how ol li { position: relative; padding-left: 28px; font-size: 14px; line-height: 1.55; color: var(--text-secondary); word-break: keep-all; counter-increment: wd; }
+    .wd-how ol li::before { content: counter(wd); position: absolute; left: 0; top: 1px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ch-strong); color: #fff; font-size: 12px; font-weight: 900; }
+    .wd-how ol li em { font-style: normal; font-weight: 800; color: var(--ch-ink); }
+    .wd-points { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .wd-points span { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px; background: var(--ch-soft); font-size: 12.5px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+    .wd-points span b { display: grid; place-items: center; min-width: 30px; height: 22px; padding: 0 4px; border-radius: 999px; background: #fff; font-size: 13px; font-weight: 900; color: var(--ch-strong); }
+
+    /* ── 끝 카드 ── */
+    .er-end.wd-end { position: relative; overflow: hidden; isolation: isolate; padding: 30px 18px 22px;
+      background: radial-gradient(90% 70% at 50% 0%, rgba(196, 181, 253, .4), transparent 70%), linear-gradient(170deg, #2e1065, #4c1d95 60%, #6d28d9); }
+    .er-end.wd-end.is-zero { background: radial-gradient(90% 70% at 50% 0%, rgba(203, 213, 225, .3), transparent 70%), linear-gradient(170deg, #1e1b4b, #3b3561); }
+    .wd-end__ep { display: inline-block; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, .14); font-size: 12.5px; font-weight: 800; color: #e9d5ff; }
+    .er-end.wd-end h2 { margin-top: 10px; font-size: 24px; }
+    .wd-end__score { margin-top: 6px; line-height: 1; }
+    .wd-end__score b { font-size: 78px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; text-shadow: 0 6px 0 rgba(0, 0, 0, .18), 0 0 40px rgba(250, 204, 21, .35); }
+    .wd-end__score span { margin-left: 4px; font-size: 24px; font-weight: 900; color: #fde68a; }
+    .er-end.wd-end p.wd-end__sub { margin-top: 6px; font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, .85); }
+    .wd-end__mc { display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 460px; margin: 16px auto 0; text-align: left; }
+    .wd-end__mc .cs-face { flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #c4b5fd; }
+    .er-end.wd-end .wd-end__mc p { flex: 1; min-width: 0; margin: 0; padding: 9px 14px; border-radius: 16px; border-bottom-left-radius: 4px; background: #fff; color: #2e1065; font-size: 15px; font-weight: 700; line-height: 1.45; }
+    .wd-end__mc p b { display: block; font-size: 11.5px; font-weight: 900; color: #7c3aed; }
+    .wd-end__best { display: inline-flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-top: 14px; }
+    .wd-end__best span { padding: 5px 12px; border-radius: 999px; background: rgba(255, 255, 255, .14); font-size: 13px; font-weight: 700; color: #f5f3ff; }
+    .wd-end__best span b { color: #fde68a; }
+
     @media (max-width: 640px) {
-      .wd-word { font-size: 32px; }
-      .wd-blanks span { width: 34px; height: 42px; }
+      .wd-stage { padding: 20px 12px 12px; border-radius: 20px; }
+      .wd-board { gap: 6px; }
+      .wd-score b { font-size: 30px; }
+      .wd-score span { font-size: 11.5px; }
+      .wd-clock { min-width: 104px; padding: 7px 10px 9px; }
+      .wd-clock b { font-size: 32px; }
+      .wd-flame { width: 13px; height: 18px; }
+      .wd-streak b { font-size: 16px; }
+      .wd-streak em { font-size: 11px; padding: 2px 6px; }
+      .wd-mc { margin-top: 10px; }
+      .wd-mc .cs-face { width: 34px; height: 34px; }
+      .wd-mc p { font-size: 13.5px; padding: 6px 10px; }
+      .wd-cardwrap { margin-top: 10px; }
+      .wd-card { padding: 12px 12px 14px; }
+      .wd-word { font-size: 38px; }
+      .wd-ban span { font-size: 14px; padding: 4px 10px 4px 8px; }
+      .wd-tiles { gap: 6px; margin-top: 12px; }
+      .wd-tile { width: 42px; height: 50px; font-size: 24px; border-radius: 11px; }
+      .wd-say p { font-size: 18px; }
+      .wd-in { font-size: 17px; padding: 0 12px; }
+      .wd-go { min-width: 72px; padding: 0 12px; }
+      .wd-aux { min-width: 58px; padding: 0 6px; }
+      .wd-pick__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .wd-theme { font-size: 13px; gap: 4px; }
+      .wd-how ol li { font-size: 13.5px; }
+      .wd-end__score b { font-size: 64px; }
+      .er .er-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+      .er .er-stat { padding: 10px 4px; }
+      .er .er-stat b { font-size: 18px; }
+      .er .er-stat small { font-size: 12px; }
+      .wd-fx b { font-size: 38px; }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .wd-bulbs, .wd-end__bulbs, .wd-flame.is-on, .wd-clock.is-last, .wd-card.is-flip, .wd-tiles.is-reveal .wd-tile, .wd-say.is-new,
+      .wd-mc p.is-new span, .wd-chip-g.is-new, .wd-dock.is-shake .wd-dock__row, .wd-score.is-bump b, .wd-dots i { animation: none; }
+      .wd-fx i { display: none; }
+      .wd-fx b, .wd-fx span { animation: wd-fade 1.15s ease both; }
+    }
+    @keyframes wd-fade { 0%, 100% { opacity: 0; } 15%, 80% { opacity: 1; } }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <script>
-    // 말해 봐 맞혀 봐 — 2인 협동. 한 사람이 제시어를 설명(금지어 X)하고 다른 사람이 맞힌다. 낱말마다 역할이 바뀐다 (방 공용은 /_shared/coop.js)
+    // 말해 봐 맞혀 봐 — 2인 협동(협동 시리즈 2화). 한 사람이 제시어를 설명(금지어 X)하고 다른 사람이 맞힌다. 낱말마다 역할이 바뀐다.
+    // 방 공용(목록 · 대기실 · 끝 화면 · 실시간)은 /_shared/coop.js, 이야기는 /_shared/coop-story.js. 점수 · 금지어 검사는 서버(word_game.py)가 정한다.
     const { esc } = HKMatch;
-    let room = null, w = null, offset = 0, tickFor = null, lastRole = null;
-    const draft = { clue: "", guess: "" };
+    const S = window.HKCoopStory || null;
+    const MA = "마 팀장님";
+    const GREAT = 8; // 이만큼 맞히면 끝 이야기 「최고예요」
+    const THEMES = [
+      { key: "all", name: "전체", icon: "shuffle" },
+      { key: "office", name: "회사 생활", icon: "briefcase" },
+      { key: "health", name: "건강", icon: "heart-pulse" },
+      { key: "food", name: "음식", icon: "utensils" },
+      { key: "life", name: "생활", icon: "house" },
+      { key: "season", name: "계절·여가", icon: "leaf" },
+    ];
+    let C = null, room = null, w = null, offset = 0, tickFor = null;
+    let flipFor = null, lastBeep = null, busy = false, composing = false, pending = false, scrollSoon = false;
+    const fresh = { clue: false, guess: false, hint: false, bump: false }; // 이번에 그릴 때만 붙는 움직임
+    const PLAYED_KEY = "hk-words-played";
+    let howOpen = (() => { try { return !localStorage.getItem(PLAYED_KEY); } catch (_) { return true; } })(); // 처음이면 「이렇게 해요」를 펼쳐 둔다
+    document.addEventListener("toggle", (e) => { if (e.target.classList && e.target.classList.contains("wd-how")) howOpen = e.target.open; }, true);
     const now = () => (Date.now() + offset) / 1000;
+    const pick = (arr, i) => arr[((Math.floor(i) % arr.length) + arr.length) % arr.length];
+    const mate = () => (room && room.partner && room.partner.name) || "동료";
+    const myName = () => (C && C.myName) || "나";
+    const face = () => (S ? S.npcFace(MA) : "");
+    const sfx = (name) => { if (C) C.sfx(name); };
+    // 서버(word_game._fold · _norm)와 같은 비교 — 쪼개 쓴 한글은 붙이고, 전각 영문 · 첫가끝 자모는 보통 글자로,
+    // 한글 채움 글자는 지운 뒤 띄어쓰기 · 문장부호 · 대소문자를 뺀다
+    const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
+    const JUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ";
+    const JONG = "ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"; // 받침(없음 빼고)
+    const compat = (ch) => {
+      const c = ch.charCodeAt(0);
+      if (c >= 0x1100 && c <= 0x1112) return CHO[c - 0x1100];
+      if (c >= 0x1161 && c <= 0x1175) return JUNG[c - 0x1161];
+      if (c >= 0x11a8 && c <= 0x11c2) return JONG[c - 0x11a8];
+      return ch;
+    };
+    const fold = (t) => [...String(t || "").replace(/[\u115f\u1160\u3164\uffa0]/g, "").normalize("NFC")]
+      .map((ch) => [...ch.normalize("NFKC")].map(compat).join("")).join("");
+    const norm = (t) => fold(t).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+    const tokens = (t) => fold(t).toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+    const syl = (ch) => { const c = ch.charCodeAt(0) - 0xac00; return c >= 0 && c < 11172 ? [Math.floor(c / 588), Math.floor((c % 588) / 28), c % 28] : null; };
+    const cho = (t) => [...String(t || "")].map((ch) => { const s = syl(ch); return s ? CHO[s[0]] : ch; }).join("");
+    const jamo = (t) => [...String(t || "")].map((ch) => { const s = syl(ch); return s ? CHO[s[0]] + JUNG[s[1]] + (s[2] ? JONG[s[2] - 1] : "") : ch; }).join("");
+    // 글자 나눠 쓰기(「김 그리고 밥」) — 혼자 흔히 쓰는 한 글자가 든 제시어는 보지 않는다(서버 _COMMON1 · _spelled 와 같게)
+    const COMMON1 = new Set([..."안수건것거게이그저더잘못다또좀때줄뿐듯채걸데"]);
+    function spelled(target, toks) {
+      const letters = [...target];
+      if (letters.length < 2 || letters.some((c) => COMMON1.has(c))) return false;
+      for (let i = 0; i < toks.length; i++) {
+        if (toks[i] !== letters[0]) continue;
+        let at = i, j = 1;
+        while (j < letters.length) {
+          let nxt = -1;
+          for (let x = at + 1; x < Math.min(at + 3, toks.length); x++) if (toks[x] === letters[j]) { nxt = x; break; }
+          if (nxt < 0) break;
+          at = nxt; j += 1;
+        }
+        if (j === letters.length) return true;
+      }
+      return false;
+    }
+    const CLUE_SHOW = 6, GUESS_SHOW = 10; // 진행 중 기록 칸에 보이는 최근 설명 · 틀린 답 수(휴대폰에서 길어지지 않게)
 
-    function statsHtml() {
-      return `<div class="wd-stats">
-          <div class="wd-stat">맞힘 <b>${w.score}</b>개</div>
-          <div class="wd-stat">넘김 <b>${w.passed}</b>개</div>
-          <span class="wd-role ${w.role === "explain" ? "is-explain" : "is-guess"}">${w.role === "explain" ? "🗣️ 내가 설명할 차례" : "🤔 내가 맞힐 차례"}</span>
+    // ── 진행자 한마디 — 상태만 보고 정하므로 두 사람 화면에 같은 말이 나온다 ──
+    function mcLine() {
+      if (!w) return "";
+      const t = now(), left = w.end - t, sinceWord = t - w.wordAt;
+      const last = w.done.length ? w.done[w.done.length - 1] : null;
+      const sinceLast = last && last.t ? t - last.t : 99;
+      const exName = w.role === "explain" ? myName() : mate();
+      if (left <= 10) return "마지막 10초! 한 문제만 더 가 봐요!";
+      if (last && sinceLast < 5) {
+        if (last.ok) {
+          if (last.hint) return "초성 찬스로 정답! 1점 받고 연속은 새로 시작~";
+          if (last.streak >= 5) return `${last.streak}연속! 이건 워크숍 신기록감이에요!`;
+          if (last.streak >= 3) return `${last.streak}연속 정답! 불붙었어요, 보너스 1점 더!`;
+          return pick(["정답! 다 같이 박수~", "좋아요, 눈빛이 통하네요!", "설명이 딱이었어요! 다음 문제!"], w.total);
+        }
+        return pick(["괜찮아요, 넘기는 것도 전략이에요!", "다음 문제는 쉬울 거예요~"], w.total);
+      }
+      if (left <= 30) return "30초 남았어요! 집중, 집중!";
+      if (w.hint) return "초성 찬스! 맞히면 1점, 연속은 새로 시작해요~";
+      if (!w.total && sinceWord < 12) return "첫 문제 나갑니다! 금지어는 꼭 피해서~";
+      if (sinceWord > 25) return "막히면 넘겨도 괜찮아요~";
+      if (w.clues.length && sinceWord > hintAfter() + 3) return "막히면 초성 힌트도 볼 수 있어요. 대신 1점!";
+      if (w.streak >= STREAK_READY()) return "한 번만 더 맞히면 연속 보너스예요!";
+      return pick([`${exName}님이 설명할 차례! 짧고 쉽게~`, "금지어 조심! 다른 말로 돌려 말해 봐요.", "1등 팀엔 상품이 있어요~ 힘내요!", "띄어쓰기는 상관없어요. 떠오르는 대로 적어 봐요!"], (t - w.start) / 9);
+    }
+    const STREAK_READY = () => ((w && w.rule && w.rule.streakFrom) || 3) - 1;
+    const hintAfter = () => (w && (w.hintAfter || (w.rule && w.rule.hintAfter))) || 10;
+    // 초성 힌트까지 남은 초 — 설명을 하나 이상 받고, 낱말이 나오고 hintAfter 초 뒤(서버와 같은 조건). 설명이 없으면 -1
+    const hintLeft = () => (!w.clues.length ? -1 : Math.max(0, Math.ceil(w.wordAt + hintAfter() - now())));
+
+    // ── 그리기 조각 ──
+    function flames(n) {
+      let out = "";
+      for (let i = 0; i < 5; i++) {
+        out += `<svg class="wd-flame ${i < Math.min(n, 5) ? "is-on" : ""}" viewBox="0 0 20 26" aria-hidden="true"><path class="o" d="M10 1c.6 4.2 7.5 7.6 7.5 15.2A7.5 7.5 0 0 1 2.5 16.2c0-3.6 1.8-6.2 3.6-7.8.1 2.6 1 4.3 2.6 5.2C8 8.6 8.9 4.6 10 1z"/><path class="i" d="M10 12.5c.4 2.3 4 3.8 4 7.2a4 4 0 0 1-8 0c0-1.7.8-3 1.8-3.8.2 1.2.7 2 1.4 2.4-.3-2.3 0-4.3.8-5.8z"/></svg>`;
+      }
+      return out;
+    }
+    function clockText(left) { const s = Math.max(0, Math.ceil(left)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+    function boardHtml() {
+      const left = w.end - now(), from = w.rule.streakFrom;
+      const hot = w.streak >= from, ready = w.streak === from - 1;
+      const tip = w.hint && w.streak ? "초성이라 끊겨요" : hot ? `보너스 +${w.rule.bonus} 중!` : ready ? "다음 정답 +1" : `${from}연속부터 +1`;
+      return `<div class="wd-board">
+          <div class="wd-score ${fresh.bump ? "is-bump" : ""}"><small>점수</small><b>${w.score}<i>점</i></b><span>맞힘 ${w.right} · 넘김 ${w.passed}</span></div>
+          <div class="wd-clock ${left <= 30 ? "is-low" : ""} ${left <= 10 ? "is-last" : ""}" id="wd-clock" role="timer" aria-label="남은 시간"><b id="wd-clock-t">${clockText(left)}</b><i><span id="wd-clock-bar" style="transform:scaleX(${Math.max(0, Math.min(1, left / 180))})"></span></i><small>남은 시간</small></div>
+          <div class="wd-streak ${hot ? "is-hot" : ready ? "is-ready" : ""}"><small class="wd-lab">연속 정답</small><div class="wd-flames">${flames(w.streak)}</div><b>${w.streak}연속</b><em>${tip}</em></div>
+        </div>`;
+    }
+    function cardHtml() {
+      const flip = flipFor !== w.n;
+      if (w.role === "explain") {
+        const last = w.guesses.length ? w.guesses[w.guesses.length - 1] : null;
+        return `<div class="wd-card is-explain ${flip ? "is-flip" : ""}">
+            <div class="wd-card__top"><span class="wd-tag is-role">${HKUI.icon("megaphone", 14, "currentColor")} 내가 설명해요</span><span class="wd-tag">${esc(w.cat)} · ${w.letters}글자</span></div>
+            <small class="wd-card__lab">제시어</small>
+            <div class="wd-word">${esc(w.word)}</div>
+            <div class="wd-ban"><small>금지어</small>${(w.banned || []).map((b) => `<span>${esc(b)}</span>`).join("")}</div>
+            ${w.aliases && w.aliases.length ? `<div class="wd-alias">같은 말 ${w.aliases.map((a) => `「${esc(a)}」`).join(" ")}도 쓸 수 없어요</div>` : ""}
+            <div class="wd-peek">${w.hint ? `<span class="wd-tag">${HKUI.icon("sparkles", 13, "currentColor")} ${esc(mate())}님이 초성을 봤어요 · ${esc(w.cho || "")}</span>` : ""}
+              ${last ? `<span>${esc(mate())}님의 마지막 답 「${esc(last.text)}」</span>` : `<span>아직 ${esc(mate())}님의 답이 없어요</span>`}</div>
+          </div>`;
+      }
+      const letters = w.cho ? [...w.cho] : Array.from({ length: w.letters }, () => "");
+      const tiles = letters.map((ch, i) => `<span class="wd-tile ${ch ? "" : "is-q"}" style="--i:${i}">${ch ? esc(ch) : "?"}</span>`).join("");
+      const last = w.clues.length ? w.clues[w.clues.length - 1] : null;
+      return `<div class="wd-card is-guess ${flip ? "is-flip" : ""}">
+          <div class="wd-card__top"><span class="wd-tag is-role">${HKUI.icon("lightbulb", 14, "currentColor")} 내가 맞혀요</span><span class="wd-tag">${esc(w.cat)}</span></div>
+          <div class="wd-tiles ${fresh.hint ? "is-reveal" : ""}" aria-label="${w.letters}글자 낱말${w.cho ? `, 초성 ${esc(w.cho)}` : ""}">${tiles}</div>
+          <small>${w.letters}글자${w.hint ? " · 초성 힌트" : ""}</small>
+          ${last ? `<div class="wd-say ${fresh.clue ? "is-new" : ""}"><small>${esc(mate())}님의 설명 ${w.clues.length > 1 ? `· ${w.clues.length}번째` : ""}</small><p>${esc(last.text)}</p></div>`
+            : `<div class="wd-say is-wait"><p>${esc(mate())}님의 설명을 기다리고 있어요<span class="wd-dots" aria-hidden="true"><i></i><i></i><i></i></span></p></div>`}
         </div>`;
     }
     function feedHtml() {
-      const clues = w.clues.map((c) => `<div class="wd-clue">${esc(c.text)}</div>`).join("");
-      const guesses = w.guesses.map((g) => `<span class="wd-guess ${g.ok ? "is-ok" : ""}">${esc(g.text)}</span>`).join("");
-      return `<div class="wd-feed"><h3>${w.role === "explain" ? "내가 보낸 설명" : `${esc(room.partner.name)}님의 설명`}</h3>${clues || `<div class="wd-empty">${w.role === "explain" ? "제시어를 설명해 보세요" : "설명을 기다리는 중…"}</div>`}
-          ${guesses ? `<h3 style="margin-top:6px">${w.role === "explain" ? `${esc(room.partner.name)}님의 답` : "내가 낸 답"}</h3><div class="wd-guesses">${guesses}</div>` : ""}</div>`;
+      const explain = w.role === "explain";
+      const guesses = w.guesses.filter((g) => !g.ok);
+      const shownG = guesses.slice(-GUESS_SHOW), moreG = guesses.length - shownG.length;
+      const chips = (moreG ? `<span class="wd-more">앞의 ${moreG}개</span>` : "")
+        + shownG.map((g, i) => `<span class="wd-chip-g ${fresh.guess && i === shownG.length - 1 ? "is-new" : ""}">${esc(g.text)}</span>`).join("");
+      const shownC = w.clues.slice(-CLUE_SHOW), moreC = w.clues.length - shownC.length;
+      const clues = (moreC ? `<li class="wd-more">앞의 설명 ${moreC}개는 접어 뒀어요</li>` : "")
+        + shownC.map((c) => `<li class="${explain ? "is-mine" : ""}">${esc(c.text)}</li>`).join("");
+      const gBox = `<div><h3>${HKUI.icon("circle-x", 15, "currentColor")} ${explain ? `${esc(mate())}님이 낸 답` : "내가 낸 답"}<small>${guesses.length ? `${guesses.length}번 틀렸어요` : ""}</small></h3>
+          ${chips ? `<div class="wd-chips">${chips}</div>` : `<div class="wd-empty">${explain ? "아직 답이 없어요" : "틀려도 계속 낼 수 있어요"}</div>`}</div>`;
+      const cBox = `<div><h3>${HKUI.icon("message-circle", 15, "currentColor")} ${explain ? "내가 보낸 설명" : `${esc(mate())}님의 설명`}<small>${w.clues.length ? `${w.clues.length}개` : ""}</small></h3>
+          ${clues ? `<ol class="wd-clues">${clues}</ol>` : `<div class="wd-empty">${explain ? "짧고 쉽게 하나씩 보내 보세요" : "설명이 오면 여기에 쌓여요"}</div>`}</div>`;
+      return `<div class="wd-feed">${gBox}${cBox}</div>`;
     }
     function playHtml() {
       if (!w) return "";
-      if (w.role === "explain") {
-        return `<div class="er-card">${statsHtml()}
-            <div class="wd-card"><small>제시어</small><div class="wd-word">${esc(w.word)}</div><small style="margin-bottom:6px">금지어 — 설명에 쓰면 안 돼요</small><div class="wd-banned">${w.banned.map((b) => `<span>${esc(b)}</span>`).join("")}</div></div>
-            <form class="wd-form" id="wd-clue-form"><input id="wd-clue" maxlength="${w.clueMax}" placeholder="제시어를 설명해 주세요" autocomplete="off" value="${esc(draft.clue)}"><button class="hk-btn hk-btn--primary" type="submit">보내기</button></form>
-            <div class="wd-sub"><span>제시어·금지어가 들어간 설명은 보낼 수 없어요</span><button type="button" class="er-linkbtn" data-pass>넘기기 ›</button></div>
-            ${feedHtml()}</div>`;
-      }
-      return `<div class="er-card">${statsHtml()}
-          <div class="wd-card"><small>${esc(room.partner.name)}님이 설명하는 낱말</small><div class="wd-blanks">${Array.from({ length: w.letters }, () => "<span></span>").join("")}</div><small>${w.letters}글자</small></div>
-          <form class="wd-form" id="wd-guess-form"><input id="wd-guess" maxlength="20" placeholder="정답을 적어 주세요" autocomplete="off" value="${esc(draft.guess)}"><button class="hk-btn hk-btn--primary" type="submit">맞히기</button></form>
-          <div class="wd-sub"><span>띄어쓰기는 상관없어요. 틀려도 계속 낼 수 있어요</span></div>
-          ${feedHtml()}</div>`;
+      return `<section class="wd-stage" aria-label="낱말 대회 무대">
+          <div class="wd-bulbs" aria-hidden="true"></div>
+          ${boardHtml()}
+          <div class="wd-mc">${face()}<p id="wd-mc"><b>${MA}</b><span id="wd-mc-t">${esc(mcLine())}</span></p></div>
+          <div class="wd-cardwrap">${cardHtml()}</div>
+        </section>
+        <section class="er-card wd-play">
+          <h2>${w.role === "explain" ? `${HKUI.icon("pencil", 16, "currentColor")} 설명 보내기` : `${HKUI.icon("send", 16, "currentColor")} 정답 맞히기`}<small>${w.n + 1}번째 낱말</small></h2>
+          <div class="wd-slot" id="wd-slot"></div>
+          ${feedHtml()}
+        </section>`;
     }
-    function doneHtml() {
-      const items = (w ? w.done : []).slice().reverse().map((d) => `<li>${d.ok ? "✅" : "⏭️"} <b>${esc(d.word)}</b><small>${d.ok ? "맞힘" : "넘김"}</small></li>`).join("");
-      return `<div class="er-card"><h2>지나간 낱말</h2>${items ? `<ul class="wd-done">${items}</ul>` : `<div style="font-size:13px;color:var(--text-muted)">아직 없어요</div>`}</div>`;
+    function rulesHtml(r) {
+      r = r || { right: 2, hint: 1, streakFrom: 3, bonus: 1 };
+      return `<ul class="wd-rules">
+          <li><span class="wd-pts">+${r.right}</span>정답</li>
+          <li><span class="wd-pts">+${r.bonus}</span>${r.streakFrom}연속 정답부터 맞힐 때마다 더</li>
+          <li><span class="wd-pts">+${r.hint}</span>초성 힌트를 보고 정답 — 연속이 끊겨요</li>
+          <li><span class="wd-pts">0</span>넘기기 — 연속이 끊겨요</li>
+        </ul>`;
+    }
+    function who(d) { return d.me ? "내가 설명" : `${esc(mate())}님 설명`; }
+    function recentHtml() {
+      const items = w.done.slice().reverse().map((d) => `<li class="${d.ok ? "is-ok" : "is-pass"}"><span class="wd-mark">${d.ok ? "✓" : "–"}</span>
+          <span class="wd-recent__txt"><b>${esc(d.word)}</b><small>${who(d)} · ${d.ok ? (d.hint ? "초성 정답" : "정답") : "넘김"}${d.sec != null ? ` · ${Math.round(d.sec)}초` : ""}</small></span>
+          <em class="wd-pts">${d.ok ? `+${d.pts}` : "0"}</em></li>`).join("");
+      return `<div class="er-card"><h2>${HKUI.icon("history", 16, "currentColor")} 지나간 낱말<small>${w.total}개</small></h2>
+          ${items ? `<ul class="wd-recent">${items}</ul>` : `<div class="wd-empty">첫 낱말을 맞혀 보세요</div>`}</div>
+        <div class="er-card"><h2>${HKUI.icon("trophy", 16, "currentColor")} 점수 규칙</h2>${rulesHtml(w.rule)}</div>`;
+    }
+    // 끝난 뒤 — 모든 낱말: 설명한 사람 · 결과 · 점수 · 마지막 설명들
+    function logHtml() {
+      const rows = w.done.map((d) => `<li class="${d.ok ? "is-ok" : "is-pass"}"><span class="wd-mark">${d.ok ? "✓" : "–"}</span>
+          <div class="wd-log__main"><b>${esc(d.word)}</b><small class="wd-cat">${esc(d.cat)}</small>
+            <span class="wd-log__meta">${who(d)} · ${d.ok ? (d.hint ? "초성 보고 정답" : "정답") : "넘김"}${d.ok && d.streak >= ((w.rule && w.rule.streakFrom) || 3) ? ` · ${d.streak}연속` : ""}${d.sec != null ? ` · ${Math.round(d.sec)}초` : ""}</span>
+            ${d.clues && d.clues.length ? `<div class="wd-log__clues">${d.clues.map((c) => `<q>${esc(c)}</q>`).join(" · ")}</div>` : ""}</div>
+          <em class="wd-pts">${d.ok ? `+${d.pts}` : "0"}</em></li>`);
+      if (w.last) {
+        rows.push(`<li class="is-last"><span class="wd-mark">!</span><div class="wd-log__main"><b>${esc(w.last.word)}</b><small class="wd-cat">${esc(w.last.cat)}</small>
+            <span class="wd-log__meta">${w.last.me ? "내가 설명" : `${esc(mate())}님 설명`} · ${w.last.reason === "time" ? "시간이 다 됐어요" : "그만뒀어요"}</span>
+            ${w.last.clues.length ? `<div class="wd-log__clues">${w.last.clues.map((c) => `<q>${esc(c)}</q>`).join(" · ")}</div>` : ""}</div><em class="wd-pts">0</em></li>`);
+      }
+      return `<div class="er-card"><h2>${HKUI.icon("list-checks", 16, "currentColor")} 낱말 기록<small>${w.right}개 맞힘 · ${w.score}점</small></h2>
+          ${rows.length ? `<ol class="wd-log">${rows.join("")}</ol>` : `<div class="wd-empty">이번 판에는 기록이 없어요</div>`}</div>`;
+    }
+    function endMc(tier) {
+      if (!w || !w.right) return "괜찮아요! 금지어 피해 설명하기가 원래 제일 어려워요.";
+      if (tier === "great") return `결과 발표! ${w.right}개면 오늘 1등 후보예요!`;
+      if (w.best >= 3) return `수고했어요! ${w.best}연속은 정말 멋졌어요.`;
+      return "수고했어요! 다음엔 연속 보너스도 노려 봐요.";
+    }
+    function bestHtml() {
+      const fast = w.done.filter((d) => d.ok && d.sec != null).sort((a, b) => a.sec - b.sec)[0];
+      const bits = [];
+      if (fast) bits.push(`<span>가장 빨리 맞힌 낱말 <b>「${esc(fast.word)}」 ${Math.max(1, Math.round(fast.sec))}초</b></span>`);
+      if (w.hints) bits.push(`<span>초성 힌트 <b>${w.hints}번</b></span>`);
+      return bits.length ? `<div class="wd-end__best">${bits.join("")}</div>` : "";
     }
 
-    async function send(ctx, action, arg) {
+    // ── 떠 있는 입력 칸 ──
+    const dock = document.createElement("form");
+    dock.className = "wd-dock";
+    dock.hidden = true;
+    dock.noValidate = true;
+    dock.setAttribute("autocomplete", "off");
+    if (S) dock.setAttribute("style", S.vars("words"));
+    dock.innerHTML = `<div class="wd-dock__row">
+        <button type="button" class="wd-aux"></button>
+        <input class="wd-in" type="text" enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        <button type="submit" class="wd-go"></button>
+      </div><div class="wd-note" aria-live="polite"><span></span><b></b></div>`;
+    document.body.appendChild(dock);
+    const dIn = dock.querySelector(".wd-in"), dGo = dock.querySelector(".wd-go"), dAux = dock.querySelector(".wd-aux");
+    const dNote = dock.querySelector(".wd-note span"), dCount = dock.querySelector(".wd-note b");
+    // 버튼을 눌러도 입력 칸의 초점(휴대폰 자판)이 그대로 남게
+    [dGo, dAux].forEach((b) => b.addEventListener("mousedown", (e) => e.preventDefault()));
+
+    function hideDock() {
+      if (!dock.hidden) { dock.hidden = true; if (document.activeElement === dIn) dIn.blur(); }
+    }
+    function place() {
+      const slot = document.getElementById("wd-slot");
+      if (!slot || !room || room.status !== "PLAYING" || !w) { hideDock(); return; }
+      dock.hidden = false;
+      const r = slot.getBoundingClientRect();
+      const fixedBody = getComputedStyle(document.body).position !== "static";
+      const base = fixedBody ? document.body.getBoundingClientRect() : { top: -window.scrollY, left: -window.scrollX };
+      dock.style.top = `${Math.round(r.top - base.top)}px`;
+      dock.style.left = `${Math.round(r.left - base.left)}px`;
+      dock.style.width = `${Math.round(r.width)}px`;
+      const h = dock.offsetHeight;
+      if (h && Math.abs(slot.offsetHeight - h) > 1) slot.style.minHeight = `${h}px`;
+    }
+    // 설명에 걸리는 말 — 서버와 같은 규칙으로 미리 알려 준다(보내기 전에)
+    function badHit(text) {
+      if (!w || w.role !== "explain") return null;
+      const flat = norm(text);
+      if (!flat) return null;
+      if (norm(w.word) && flat.includes(norm(w.word))) return { msg: "제시어가 들어 있어요" };
+      for (const a of w.aliases || []) if (norm(a) && flat.includes(norm(a))) return { msg: `「${a}」 — 같은 말이라 쓸 수 없어요` };
+      for (const b of w.banned || []) if (norm(b) && flat.includes(norm(b))) return { msg: `「${b}」 — 금지어라 쓸 수 없어요` };
+      const targets = [w.word, ...(w.aliases || [])].map(norm).filter((x) => [...x].length >= 2);
+      for (const x of targets) {
+        if (/[가-힣]/.test(x) && (flat.includes(cho(x)) || flat.includes(jamo(x)))) return { msg: "초성이나 자모로는 알려 줄 수 없어요" };
+      }
+      const before = (w.clues || []).slice(-2).map((c) => norm(c.text)).join(""), toks = tokens(text);
+      for (const x of targets) {
+        if ((before + flat).includes(x) && !before.includes(x)) return { msg: "앞 설명과 이어 붙이면 제시어가 돼요" };
+        if (spelled(x, toks)) return { msg: "제시어를 한 글자씩 나눠 쓸 수 없어요" };
+      }
+      return null;
+    }
+    function checkInput() {
+      if (!w) return;
+      const explain = w.role === "explain";
+      const hit = explain ? badHit(dIn.value) : null;
+      dock.classList.toggle("is-bad", !!hit);
+      dGo.disabled = !!hit || !dIn.value.trim();
+      const max = explain ? w.clueMax : w.guessMax;
+      dCount.textContent = dIn.value ? `${[...dIn.value].length}/${max}` : "";
+      if (hit) dNote.textContent = hit.msg;
+      else if (explain) dNote.textContent = "제시어 · 금지어 · 초성은 쓸 수 없어요";
+      else dNote.textContent = w.hint ? `초성 힌트 — 맞히면 ${w.rule.hint}점, 연속은 끊겨요` : "띄어쓰기는 상관없어요";
+    }
+    function syncAux() {
+      if (!w) return;
+      const wait = w.role === "explain" ? now() - w.wordAt < w.passMin : w.hint ? "used" : hintLeft();
+      const key = `${w.n}:${w.role}:${w.hint}:${wait}`;
+      if (dAux.dataset.key === key) return; // 바뀐 게 없으면 그대로(누르는 중에 다시 만들지 않게)
+      dAux.dataset.key = key;
+      if (w.role === "explain") {
+        dAux.className = "wd-aux";
+        dAux.disabled = wait;
+        dAux.dataset.act = "pass";
+        dAux.innerHTML = `넘기기<small>0점</small>`;
+        dAux.setAttribute("aria-label", "이 낱말 넘기기 (0점, 연속이 끊겨요)");
+      } else {
+        dAux.className = `wd-aux ${w.hint ? "is-used" : ""}`;
+        dAux.disabled = !!w.hint || wait !== 0;
+        dAux.dataset.act = "hint";
+        if (w.hint) {
+          dAux.innerHTML = `초성 ✓<small>${w.rule.hint}점</small>`;
+          dAux.setAttribute("aria-label", "초성 힌트를 이미 봤어요");
+        } else if (wait !== 0) { // 아직 — 설명을 기다리거나 몇 초 뒤
+          dAux.innerHTML = `초성<small>${wait < 0 ? "설명 뒤" : `${wait}초 뒤`}</small>`;
+          dAux.setAttribute("aria-label", wait < 0 ? "설명을 받은 뒤 초성 힌트를 볼 수 있어요" : `${wait}초 뒤에 초성 힌트를 볼 수 있어요`);
+        } else {
+          dAux.innerHTML = `초성<small>힌트</small>`;
+          dAux.setAttribute("aria-label", `초성 힌트 보기 (맞히면 ${w.rule.hint}점, 연속이 끊겨요)`);
+        }
+      }
+    }
+    function syncDock() {
+      if (!w || !room || room.status !== "PLAYING") { hideDock(); return; }
+      const explain = w.role === "explain";
+      if (dock.dataset.n !== String(w.n)) { // 새 낱말 — 지난 낱말에 쓰던 글은 지운다(엉뚱한 설명이 나가지 않게)
+        if (dock.dataset.n != null) { dIn.value = ""; composing = false; pending = false; } // 조합이 끝났다는 알림이 안 와도 보내기가 멈추지 않게
+        dock.dataset.n = String(w.n);
+      }
+      dock.classList.toggle("is-explain", explain);
+      dIn.maxLength = explain ? w.clueMax : w.guessMax;
+      dIn.placeholder = explain ? "제시어를 설명해 주세요" : "정답을 적어 주세요";
+      dIn.setAttribute("aria-label", explain ? "설명 적기" : "정답 적기");
+      dGo.textContent = explain ? "보내기" : "맞히기";
+      syncAux();
+      checkInput();
+      const appear = dock.hidden;
+      place();
+      // 처음 나타날 때 — 마우스를 쓰는 화면(PC)에서는 바로 적을 수 있게 입력 칸에 초점(휴대폰은 눌러야 자판이 뜬다)
+      if (appear && !dock.hidden && document.activeElement === document.body && matchMedia("(pointer: fine)").matches) dIn.focus({ preventScroll: true });
+    }
+    function shake() {
+      dock.classList.remove("is-shake");
+      void dock.offsetWidth;
+      dock.classList.add("is-shake");
+    }
+    function burst(kind, big, small) {
+      const stage = document.querySelector(".wd-stage");
+      if (!stage) return;
+      const r = stage.getBoundingClientRect();
+      const top = Math.min(Math.max(r.top + r.height * 0.62, 90), window.innerHeight - 90);
+      const el = document.createElement("div");
+      el.className = `wd-fx is-${kind}`;
+      el.style.left = `${r.left + r.width / 2}px`;
+      el.style.top = `${top}px`;
+      const colors = ["#facc15", "#f472b6", "#a78bfa", "#34d399", "#60a5fa", "#fb923c"];
+      const bits = kind === "ok" ? Array.from({ length: 18 }, (_, i) => {
+        const a = (i / 18) * Math.PI * 2, d = 90 + (i % 3) * 34;
+        return `<i style="--c:${colors[i % colors.length]};--x:calc(-50% + ${Math.round(Math.cos(a) * d)}px);--y:calc(-50% + ${Math.round(Math.sin(a) * d * 0.7)}px);--r:${(i * 47) % 360}deg"></i>`;
+      }).join("") : "";
+      el.innerHTML = `${bits}<b>${esc(big)}</b>${small ? `<span>${esc(small)}</span>` : ""}`;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1250);
+    }
+
+    // 받은 방 정보가 지금 것보다 새것인지 — 내 동작의 응답이 상대 소식(wait)보다 늦게 오면 버린다
+    // (화면이 앞 낱말로 돌아갔다 오면 정답 효과 · 소리가 두 번 나고 적던 글이 지워진다)
+    function fresher(next) {
+      return !!(next && next.id) && (!room || next.id !== room.id || (Number(next.seq) || 0) > (Number(room.seq) || 0));
+    }
+    // 보내기 — 한 번에 하나만. 낱말이 바뀌었거나 시간이 끝났으면 조용히 다시 받는다
+    async function send(action, arg) {
+      if (busy || !room || !C) return null;
+      busy = true;
       try {
         const next = await HKApi.coopAct(room.id, action, arg);
-        if (action === "clue") draft.clue = "";
-        if (action === "guess") {
-          draft.guess = "";
-          const last = next.words && next.words.done[next.words.done.length - 1];
-          if (last && last.ok && next.words.score > w.score) HKUI.toast(`정답! 「${last.word}」`);
-          else HKUI.toast("아니에요, 다시 맞혀 보세요", "error");
-        }
-        ctx.set(next);
+        if (fresher(next)) C.set(next);
         if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
-        document.getElementById(action === "clue" ? "wd-clue" : "wd-guess")?.focus();
-      } catch (e) { HKUI.toast(e.message || "보낼 수 없어요", "error"); }
+        return next;
+      } catch (e) {
+        if (["WORDS_STALE", "ESCAPE_NOT_PLAYING"].includes(e.code)) { C.refresh(); return null; }
+        if (["WORDS_BANNED", "WORDS_NO_CHOSUNG", "WORDS_SPLIT"].includes(e.code)) { shake(); sfx("invalid"); }
+        HKUI.toast(e.message || "보낼 수 없어요", "error");
+        return undefined;
+      } finally {
+        busy = false;
+      }
+    }
+    async function submit() {
+      if (!w || !room || room.status !== "PLAYING" || busy) return;
+      const text = dIn.value.trim();
+      if (!text) return;
+      const explain = w.role === "explain";
+      if (explain) {
+        const hit = badHit(text);
+        if (hit) { shake(); sfx("invalid"); checkInput(); return; }
+      }
+      dIn.value = "";
+      checkInput();
+      const res = await send(explain ? "clue" : "guess", { text, n: w.n });
+      if (res === undefined && !dIn.value) { dIn.value = text; checkInput(); } // 못 보냈으면 적던 글을 돌려놓는다
+    }
+    let byButton = false; // 「보내기」를 손으로 눌렀는지(Enter 로 보내는 것도 버튼 click 이 오지만 detail 이 0)
+    dGo.addEventListener("click", (e) => { byButton = e.detail > 0; });
+    dock.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const tap = byButton;
+      byButton = false;
+      // 한글을 조합하는 중에 Enter — 조합이 끝난 뒤 보낸다. 버튼을 누르면 조합 중인 글자까지 바로 보낸다
+      if (composing && !tap) { pending = true; return; }
+      composing = pending = false; // 버튼으로 보내면 조합 중이던 글자도 함께 나간다(조합이 이어지면 다음 input 이 다시 알려 준다)
+      submit();
+    });
+    const settle = () => { composing = false; if (pending) { pending = false; setTimeout(submit, 0); } };
+    dIn.addEventListener("compositionstart", () => { composing = true; });
+    dIn.addEventListener("compositionend", settle);
+    dIn.addEventListener("input", (e) => {
+      if (e.isComposing === true) composing = true; // 조합 시작 알림을 못 받았어도
+      else if (composing && e.isComposing === false) settle(); // 조합이 끝났다는 알림을 못 받았어도 풀리게
+      checkInput();
+    });
+    dIn.addEventListener("blur", () => { composing = false; pending = false; });
+    dAux.addEventListener("click", () => {
+      if (!w || busy || dAux.disabled) return;
+      if (dAux.dataset.act === "pass") send("pass", { n: w.n });
+      else if (dAux.dataset.act === "hint") send("hint", { n: w.n });
+    });
+    window.addEventListener("resize", place);
+    window.addEventListener("hashchange", () => { if (!/^#r\d+$/.test(location.hash)) hideDock(); });
+    document.addEventListener("animationend", (e) => { if (e.target && e.target.classList && e.target.classList.contains("er-enter")) place(); });
+    if (window.ResizeObserver) new ResizeObserver(() => { if (!dock.hidden) place(); }).observe(document.body);
+
+    // 바뀐 것 알아채기 — 효과음 · 터짐 · 이번 그림의 움직임
+    function events(pw, nw) {
+      if (nw.n > pw.n) {
+        const d = nw.done.filter((x) => x.n >= pw.n).pop();
+        if (d && d.ok) {
+          burst("ok", "정답!", `「${d.word}」 +${d.pts}점`);
+          sfx(d.streak >= nw.rule.streakFrom ? "combo" : "success");
+          fresh.bump = true;
+        } else if (d) {
+          burst("pass", "넘겼어요", `「${d.word}」`);
+          sfx("whoosh");
+        }
+        return;
+      }
+      if (nw.n !== pw.n) return;
+      if (nw.clues.length > pw.clues.length) { fresh.clue = true; if (nw.role === "guess") sfx("pop"); }
+      if (nw.guesses.length > pw.guesses.length) {
+        fresh.guess = true;
+        if (nw.role === "guess") { shake(); sfx("invalid"); } else sfx("tap");
+      }
+      if (nw.hint && !pw.hint) { fresh.hint = true; sfx("powerup"); }
     }
 
     const coop = HKCoop.mount({
       room: "words",
-      listName: "말해 봐 맞혀 봐 목록",
+      listName: "낱말 대회 목록",
       heroClass: "is-words",
       tickMs: 250,
       chatWhilePlaying: false,
-      hero: { facts: ["2인 협동", "3분", "번갈아 설명 · 맞히기", "끝까지 하면 오늘 도장"], note: "설명은 글로 보내고, 금지어가 들어가면 보낼 수 없어요. 옆자리에서 하거나 Teams 통화를 켜고 해도 좋아요 — 다만 금지어는 말하지 않기!" },
-      rankTitle: "맞힌 낱말 순위",
-      rankNote: "같은 두 사람은 가장 많이 맞힌 한 판만 올라요.",
-      rankText: (x) => `${x.score}개`,
-      recentText: (r) => (r.status === "CLEAR" ? [`${r.score}개 맞힘`, "is-clear"] : ["포기", "is-fail"]),
+      hero: {
+        facts: ["2인 협동", "3분", "번갈아 설명 · 맞히기", "주제 고르기", "초성 힌트", "끝까지 하면 오늘 도장"],
+        note: "설명은 글로 보내고, 금지어가 들어가면 보낼 수 없어요. 옆자리에서 하거나 Teams 통화를 켜고 해도 좋아요 — 다만 금지어는 말하지 않기!",
+      },
+      rankTitle: "점수 순위",
+      rankNote: "같은 두 사람은 가장 높은 점수의 한 판만 올라요.",
+      rankText: (x) => `${Number(x.score || 0)}점`,
+      recentText: (r) => (r.status === "CLEAR" ? (Number(r.score) > 0 ? [`${r.score}점`, "is-clear"] : ["0점", "is-fail"]) : ["포기", "is-fail"]),
       failTitle: "그만뒀어요",
-      quick: ["준비됐어요!", "천천히 해요", "좋아요!", "한 판 더?"],
-      remain: () => (w ? w.end - now() : null),
-      timerNote: () => "남은 시간",
+      quick: ["준비됐어요!", "주제 바꿀까요?", "천천히 해요", "좋아요!", "한 판 더?"],
+      remain: () => null, // 위 막대 시계 대신 무대의 큰 시계를 쓴다
       readyNote: (ctx) => (ctx.room.sideName === "먼저 설명"
-        ? "첫 낱말은 <b>내가 설명</b>해요. 제시어와 금지어가 보이면 금지어를 피해서 글로 설명해 주세요. 낱말이 끝나면 역할이 바뀌어요."
-        : "첫 낱말은 <b>내가 맞혀요</b>. 동료가 보낸 설명을 보고 정답을 적어 주세요. 낱말이 끝나면 역할이 바뀌어요."),
-      reset: () => { tickFor = null; lastRole = null; draft.clue = ""; draft.guess = ""; },
-      changed: (prev, next) => {
+        ? "첫 낱말은 <b>내가 설명</b>해요. 제시어와 금지어가 보이면 금지어를 피해서 글로 설명해 주세요."
+        : `첫 낱말은 <b>내가 맞혀요</b>. ${esc(ctx.room.partner.name)}님의 설명을 보고 정답을 적어 주세요.`),
+      readyExtra: (ctx) => {
+        const cur = (ctx.room.opts && ctx.room.opts.theme) || "all";
+        return `<div class="wd-pick">
+            <div class="wd-pick__head"><b>오늘의 주제</b><small>둘 중 누가 바꿔도 같이 바뀌어요</small></div>
+            <div class="wd-pick__grid" role="radiogroup" aria-label="주제 고르기">${THEMES.map((t) => `<button type="button" class="wd-theme ${t.key === cur ? "is-on" : ""}" data-theme="${t.key}" role="radio" aria-checked="${t.key === cur}">${HKUI.icon(t.icon, 18, "currentColor")}<span>${esc(t.name)}</span></button>`).join("")}</div>
+          </div>
+          <details class="wd-how" ${howOpen ? "open" : ""}><summary>${HKUI.icon("book-open", 17, "currentColor")} 이렇게 해요<small>규칙 · 점수</small></summary>
+            <div class="wd-how__in">
+              <ol>
+                <li>설명하는 사람만 제시어와 <em>금지어 3개</em>를 봐요. 금지어 · 초성 · 글자 나눠 쓰기는 안 돼요.</li>
+                <li>맞히는 사람은 설명을 보고 답을 적어요. 10초 넘게 막히면 <em>초성 힌트</em>를 한 번 볼 수 있어요.</li>
+                <li>맞히거나 넘기면 다음 낱말로 가고, <em>역할이 바뀌어요</em>.</li>
+              </ol>
+              <div class="wd-points"><span><b>+2</b>정답</span><span><b>+1</b>3연속부터 더</span><span><b>+1</b>초성 보고 정답 · 연속 끊김</span><span><b>0</b>넘기기</span></div>
+            </div>
+          </details>`;
+      },
+      reset: () => {
+        tickFor = null; w = null; flipFor = null; lastBeep = null; busy = false; pending = false; scrollSoon = false;
+        dIn.value = ""; delete dock.dataset.n; delete dAux.dataset.key; hideDock();
+      },
+      changed: (prev, next, ctx) => {
+        C = ctx;
+        const pw = w;
         room = next;
         w = next.words || null;
-        if (w) {
-          offset = w.now * 1000 - Date.now();
-          const key = `${w.role}:${(w.done || []).length}`;
-          if (lastRole && lastRole !== key) { draft.clue = ""; draft.guess = ""; }
-          lastRole = key;
-        }
+        if (prev && prev.id === next.id && prev.status !== "PLAYING" && next.status === "PLAYING") scrollSoon = true; // 대기실 → 시작
+        if (w) offset = w.now * 1000 - Date.now();
+        // 위 막대 「나는 ○○」 — 쪽 이름(먼저 설명)은 처음 역할이라 진행 중에는 지금 낱말의 역할로 바꿔 보인다
+        if (w && next.status === "PLAYING" && !w.ended) next.sideName = w.role === "explain" ? "설명 차례" : "맞힐 차례";
+        if (next.status === "PLAYING") { try { localStorage.setItem(PLAYED_KEY, "1"); } catch (_) { /* 기억 못 해도 그만 */ } }
+        if (prev && pw && w && prev.id === next.id && next.status === "PLAYING" && prev.status === "PLAYING") events(pw, w);
       },
       play: () => playHtml(),
-      side: () => (w ? doneHtml() : ""),
-      painted: () => {
-        if (!room || room.status !== "PLAYING" || !w) return;
-        const el = document.getElementById(w.role === "explain" ? "wd-clue" : "wd-guess");
-        if (el && !document.activeElement?.matches("input")) el.focus();
+      side: () => {
+        if (!w) return "";
+        return room.status === "PLAYING" ? recentHtml() : logHtml();
       },
-      end: (ctx, again) => `<div class="er-end is-words"><h2>시간 끝!</h2><p>${esc(room.outro)}</p>
-          <div class="er-end__time">${room.score ?? 0}개</div>
-          <p>${w ? `넘긴 낱말 ${w.passed}개` : ""}</p>
-          <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">목록</a></div></div>`,
-      after: () => (w ? `<div style="margin-top:14px">${doneHtml()}</div>` : ""),
+      painted: () => {
+        if (w) flipFor = w.n;
+        fresh.clue = fresh.guess = fresh.hint = fresh.bump = false;
+        if (scrollSoon && room && room.status === "PLAYING") {
+          scrollSoon = false;
+          const st = document.querySelector(".wd-stage");
+          if (st && window.innerWidth <= 640) { // 폰 — 대기실 아래 「준비」를 누르느라 내려가 있으면 시계 · 제시어 카드가 화면 위로 잘린다
+            const hdr = document.querySelector(".hk-site-header");
+            const head = hdr && /sticky|fixed/.test(getComputedStyle(hdr).position) ? hdr.getBoundingClientRect().height : 0;
+            let y = 0; for (let el = st; el; el = el.offsetParent) y += el.offsetTop; // .er-enter translateY 에 흔들리지 않게
+            const top = Math.max(0, Math.round(y - head - 8));
+            if (Math.abs(window.scrollY - top) > 20) window.scrollTo({ top, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+          }
+        }
+        syncDock();
+      },
+      storyTier: (ctx) => {
+        const r = ctx.room;
+        if (!r || !w || typeof w.right !== "number") return null; // 예전 판은 화 기준(공용)으로
+        const ok = S && S.cleared ? S.cleared(r) : r.status === "CLEAR" && Number(r.score) > 0;
+        return !ok ? "fail" : w.right >= GREAT ? "great" : "ok";
+      },
+      stats: () => (w ? [
+        { label: "점수", value: `${w.score}점` },
+        { label: "맞힌 낱말", value: `${w.right}개` },
+        { label: "최고 연속", value: `${w.best}연속` },
+        { label: "넘긴 낱말", value: `${w.passed}개` },
+      ] : []),
+      end: (ctx) => {
+        const score = w ? w.score : Number(room.score || 0);
+        const tier = w && w.right >= GREAT ? "great" : "ok";
+        return `<div class="er-end wd-end ${score ? "" : "is-zero"}"><div class="wd-end__bulbs" aria-hidden="true"></div>
+            <span class="wd-end__ep">팀 워크숍 낱말 대회 · 결과 발표</span>
+            <h2>${score ? "시간 끝!" : "아쉬워요!"}</h2>
+            <div class="wd-end__score"><b>${score}</b><span>점</span></div>
+            ${w ? `<p class="wd-end__sub">낱말 ${w.right}개 맞힘 · 최고 ${w.best}연속</p>` : ""}
+            <div class="wd-end__mc">${face()}<p><b>${MA}</b>${esc(endMc(tier))}</p></div>
+            ${w ? bestHtml() : ""}
+          </div>`;
+      },
+      failEnd: () => `<div class="er-end wd-end is-zero"><div class="wd-end__bulbs" aria-hidden="true"></div>
+          <span class="wd-end__ep">팀 워크숍 낱말 대회</span>
+          <h2>그만뒀어요</h2>
+          ${w ? `<div class="wd-end__score"><b>${w.score}</b><span>점</span></div><p class="wd-end__sub">그만둘 때까지 낱말 ${w.right}개를 맞혔어요</p>` : ""}
+          <div class="wd-end__mc">${face()}<p><b>${MA}</b>괜찮아요! 다음엔 끝까지 같이 가 봐요.</p></div>
+        </div>`,
       tick: (ctx) => {
         if (!room || room.status !== "PLAYING" || !w) return;
+        const left = w.end - now();
+        const t = document.getElementById("wd-clock-t");
+        if (t) {
+          t.textContent = clockText(left);
+          const bar = document.getElementById("wd-clock-bar");
+          if (bar) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / 180))})`;
+          const box = document.getElementById("wd-clock");
+          box.classList.toggle("is-low", left <= 30);
+          box.classList.toggle("is-last", left <= 10);
+        }
+        const s = Math.ceil(left);
+        if (s >= 1 && s <= 5 && s !== lastBeep) { lastBeep = s; ctx.sfx("tick"); }
+        const mc = document.getElementById("wd-mc-t");
+        const line = mcLine();
+        if (mc && mc.textContent !== line) {
+          mc.textContent = line;
+          const p = mc.parentElement;
+          p.classList.remove("is-new"); void p.offsetWidth; p.classList.add("is-new");
+        }
+        syncAux(); // 넘기기 · 초성은 낱말이 나오고 조금 뒤에 켜진다
+        if (!dock.hidden) place();
         if (w.nextAt && now() >= w.nextAt + 0.05 && tickFor !== w.nextAt) {
           tickFor = w.nextAt;
-          HKApi.coopTick(room.id).then((next) => ctx.set(next)).catch(() => { tickFor = null; });
+          HKApi.coopTick(room.id).then((next) => { if (fresher(next)) ctx.set(next); }).catch(() => { tickFor = null; });
         }
       },
       click: async (t, ctx) => {
-        if ("pass" in t.dataset) return send(ctx, "pass", null);
-      },
-      input: (el) => {
-        if (el.id === "wd-clue") draft.clue = el.value;
-        if (el.id === "wd-guess") draft.guess = el.value;
+        if (t.dataset.theme) {
+          if (t.classList.contains("is-on") || !ctx.room || ctx.room.status !== "READY") return;
+          ctx.sfx("select");
+          return ctx.act(async () => { const next = await HKApi.coopOptions(ctx.room.id, { theme: t.dataset.theme }); return fresher(next) ? next : null; });
+        }
       },
     });
-    // 설명 · 답 보내기 (공용 모듈의 대화 보내기와 따로)
-    document.addEventListener("submit", (e) => {
-      if (!["wd-clue-form", "wd-guess-form"].includes(e.target.id)) return;
-      e.preventDefault();
-      const clue = e.target.id === "wd-clue-form";
-      const text = (clue ? draft.clue : draft.guess).trim();
-      if (!text || !room) return;
-      send(coop, clue ? "clue" : "guess", text);
-    });
+    C = coop;
   </script>
 </body>
 </html>

@@ -10,7 +10,8 @@ from app.models.base import Base
 
 
 class GameMatch(Base):
-    """턴제 대전 한 판 — 오목. 직원끼리는 도전 → 수락 → 번갈아 두기, 컴퓨터와는 바로 시작."""
+    """턴제 대전 한 판 — 오목 · 체스 · 숫자 야구 · 칸 따먹기 · 1:1 퀴즈 대결.
+    직원끼리는 도전 → 수락 → 번갈아 두기(또는 각자 풀기), 컴퓨터와는 바로 시작."""
 
     __tablename__ = "game_match"
 
@@ -23,9 +24,12 @@ class GameMatch(Base):
     # 흑(먼저 두는 쪽) — 수락할 때 무작위로 정한다
     black_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False)  # PENDING · ACTIVE · DONE · DECLINED · EXPIRED
-    moves: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # 둔 순서대로 [x, y]
+    moves: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # 오목 · 체스가 둔 순서대로 [x, y] · uci
+    # 그 밖의 대전 게임(대전 엔진 versus_<키>.py)의 판 — 숨긴 수 · 정답도 여기 있어 화면에는 엔진이 거른 것만 보낸다.
+    # "_v" 는 받아들인 행동 수(화면의 seq). 오목 · 체스는 비어 있다
+    state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     winner_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
-    end_reason: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # FIVE · RESIGN · TIMEOUT · DRAW
+    end_reason: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # FIVE · CHECKMATE · RESIGN · TIMEOUT · DRAW · 엔진마다 더
     # 수락·다음 수의 기한 — 넘기면 도전은 만료, 판은 기한을 넘긴 쪽의 패
     deadline_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

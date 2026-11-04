@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 숫자 야구</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 숫자 야구 — 점심시간 야구장 전광판 · 기록지 */
+    /* 「‹ 경기 목록」 · 「함께하기 ›」 링크도 누르기 쉽게 40px — 이 페이지에만 */
+    .gk__back { display: inline-flex; align-items: center; min-height: 40px; margin-bottom: 6px; }
+    :root { --bb-night: #0b2217; --bb-board: #113322; --bb-grid: rgba(255, 255, 255, .09); --bb-led: #ffcf4a; --bb-s: #ffd23f; --bb-b: #4ade80; --bb-o: #ff5d55; --bb-paper: #fffdf6; --bb-ink: #1d2b23; --bb-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; }
+
+    /* 숫자 칸(전광판 글자) — 목록 규칙 · 대화창에서도 쓴다 */
+    .bb-tiles { display: inline-flex; gap: 4px; vertical-align: middle; }
+    .bb-tile { display: inline-grid; place-items: center; width: 26px; height: 30px; border-radius: 7px; background: var(--bb-night); color: var(--bb-led); font: 800 17px/1 var(--bb-mono); text-shadow: 0 0 8px rgba(255, 207, 74, .45); }
+    .bb-tile.is-s { background: var(--bb-s); color: #3d2c00; text-shadow: none; }
+    .bb-tile.is-b { background: var(--bb-b); color: #053a1a; text-shadow: none; }
+    .bb-k { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 12px; font-weight: 800; vertical-align: 1px; }
+    .bb-k.is-s { background: #fde68a; color: #854d0e; }
+    .bb-k.is-b { background: #bbf7d0; color: #166534; }
+    .bb-k.is-o { background: #fee2e2; color: #b91c1c; }
+
+    /* 이렇게 해요 */
+    .bb-rules { margin: 0 0 18px; border: 1px solid #cfe3d4; border-radius: 16px; background: linear-gradient(180deg, #f1f9f3, #fff 70%); overflow: hidden; }
+    .bb-rules > summary { display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 0 16px; font-size: 15px; font-weight: 800; cursor: pointer; list-style: none; }
+    .bb-rules > summary::-webkit-details-marker { display: none; }
+    .bb-rules > summary .bb-ball { flex-shrink: 0; }
+    .bb-rules > summary::after { content: "펼치기"; margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .bb-rules[open] > summary::after { content: "접기"; }
+    .bb-rules > div { padding: 0 16px 16px; }
+    .bb-rules__list { margin: 0; padding: 0 0 0 20px; font-size: 14px; line-height: 1.7; color: var(--text-secondary); word-break: keep-all; }
+    .bb-rules__list li { margin-bottom: 4px; }
+    .bb-rules__list b { color: var(--color-midnight-navy); }
+    .bb-ex { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 10px; padding: 12px 14px; border-radius: 12px; background: var(--bb-board); color: #d5e8db; font-size: 13px; }
+    .bb-ex b { color: var(--bb-led); font-size: 14px; }
+    .bb-ex small { flex-basis: 100%; color: #9fc2ab; font-size: 12.5px; }
+    .bb-rules__tip { margin: 10px 0 0; font-size: 13px; color: var(--text-muted); word-break: keep-all; }
+    .hk-dialog .bb-rules__list { padding-left: 18px; text-align: left; }
+
+    /* 전광판 */
+    .bb-sb { position: relative; overflow: hidden; margin: 0 0 14px; padding: 10px 14px 14px; border-radius: 18px; background: radial-gradient(130% 100% at 50% -30%, #22573a 0%, var(--bb-board) 52%, var(--bb-night) 100%); color: #e5f1e9; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07), 0 10px 26px rgba(8, 30, 18, .25); }
+    .bb-sb__head { display: flex; align-items: center; gap: 8px; min-height: 40px; }
+    .bb-sb__inn { font-size: 16px; font-weight: 900; color: var(--bb-led); white-space: nowrap; text-shadow: 0 0 10px rgba(255, 207, 74, .35); }
+    .bb-sb__inn i { margin-left: 2px; font-size: 11px; font-style: normal; }
+    .bb-sb__tools { display: flex; gap: 6px; margin-left: auto; }
+    .bb-ibtn { display: inline-grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 1px solid rgba(255, 255, 255, .14); border-radius: 12px; background: rgba(255, 255, 255, .06); color: #d6eadd; cursor: pointer; }
+    .bb-ibtn:hover { background: rgba(255, 255, 255, .12); }
+    .bb-ibtn svg { width: 19px; height: 19px; }
+    .bb-ibtn.is-off { color: #7f9c8a; }
+    .bb-secret { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 10px; border: 1px solid rgba(255, 255, 255, .14); border-radius: 12px; background: rgba(0, 0, 0, .18); color: #a8c8b4; font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .bb-secret .bb-tile { width: 21px; height: 25px; font-size: 14px; }
+    .bb-secret small { color: #7fa48d; font-size: 11.5px; }
+    .bb-ls { display: grid; grid-template-columns: minmax(62px, 116px) repeat(12, minmax(0, 1fr)); margin-top: 8px; border-radius: 10px; background: rgba(0, 0, 0, .24); overflow: hidden; }
+    .bb-ls > span { display: grid; place-items: center; height: 28px; border-right: 1px solid var(--bb-grid); border-bottom: 1px solid var(--bb-grid); font: 800 15px/1 var(--bb-mono); color: var(--bb-led); text-shadow: 0 0 8px rgba(255, 207, 74, .35); transition: background .25s; }
+    .bb-ls > span:nth-child(13n) { border-right: 0; }
+    .bb-ls > span:nth-last-child(-n + 13) { border-bottom: 0; }
+    .bb-ls > .is-h { height: 22px; font: 700 11px/1 inherit; color: #8db59a; text-shadow: none; }
+    .bb-ls > .is-x { color: #5f8a6f; }
+    .bb-ls > .is-team { display: block; padding: 0 8px; overflow: hidden; font: 700 12.5px/28px inherit; color: #d2e6d9; text-align: left; text-shadow: none; white-space: nowrap; text-overflow: ellipsis; }
+    .bb-ls > .is-team i { margin-right: 4px; font-style: normal; font-size: 11px; color: #85ac93; }
+    .bb-ls > .is-team.is-me { color: var(--bb-led); }
+    .bb-ls > .is-hit { background: var(--bb-s); color: #3d2c00; text-shadow: none; }
+    .bb-ls > .is-now::after { content: ""; width: 9px; height: 2px; background: var(--bb-led); animation: bb-blink 1s steps(2, start) infinite; }
+    .bb-cnt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; }
+    .bb-lamps { display: flex; align-items: center; gap: 14px; }
+    .bb-lamps__row { display: inline-flex; align-items: center; gap: 4px; }
+    .bb-lamps__row b { margin-right: 3px; font-size: 13px; font-weight: 900; line-height: 1; color: #9ec0aa; }
+    .bb-lamp { width: 15px; height: 15px; border-radius: 50%; background: #1b3a29; box-shadow: inset 0 2px 3px rgba(0, 0, 0, .55); transition: background .12s, box-shadow .12s, transform .12s; }
+    .bb-lamp.is-on { transform: scale(1.12); }
+    .bb-lamp.is-s.is-on { background: var(--bb-s); box-shadow: 0 0 12px 2px rgba(255, 210, 63, .65); }
+    .bb-lamp.is-b.is-on { background: var(--bb-b); box-shadow: 0 0 12px 2px rgba(74, 222, 128, .6); }
+    .bb-lamp.is-o.is-on { background: var(--bb-o); box-shadow: 0 0 12px 2px rgba(255, 93, 85, .6); }
+    .bb-cnt__say { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; margin-left: auto; font-size: 13px; color: #cfe4d6; }
+    .bb-cnt__say.is-setup { margin-left: 0; margin-top: -2px; color: #a8c8b4; }
+    .bb-cnt__say .bb-tile { width: 21px; height: 25px; font-size: 14px; }
+    .bb-cnt__say b { color: #fff; }
+    .bb-sb__big { position: absolute; left: 50%; top: 50%; z-index: 4; padding: 10px 22px; border-radius: 14px; background: var(--bb-s); color: #3d2c00; font-size: 26px; font-weight: 900; white-space: nowrap; box-shadow: 0 10px 30px rgba(0, 0, 0, .35); transform: translate(-50%, -50%); animation: bb-big 1.1s ease forwards; pointer-events: none; }
+    .bb-sb.is-hit { animation: bb-flash 1s ease; }
+    /* 날아가는 공 */
+    .bb-ball { position: relative; display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: radial-gradient(circle at 34% 30%, #fff 0 55%, #e7e2d6 100%); box-shadow: 0 3px 8px rgba(0, 0, 0, .3); overflow: hidden; }
+    .bb-ball::before, .bb-ball::after { content: ""; position: absolute; top: 1px; bottom: 1px; width: 12px; border: 1.6px dashed #d92d3a; border-radius: 50%; }
+    .bb-ball::before { left: -7px; }
+    .bb-ball::after { right: -7px; }
+    .bb-ball.is-fly { position: absolute; z-index: 3; left: 4%; top: 60%; animation: bb-fly .52s cubic-bezier(.3, .05, .45, 1) forwards; pointer-events: none; }
+    .bb-ball.is-fly.is-rev { animation-name: bb-fly-rev; }
+    .bb-ball.is-bounce { width: 30px; height: 30px; animation: bb-bounce 1s cubic-bezier(.5, 0, .5, 1) infinite; }
+    .bb-ball.is-bounce::before, .bb-ball.is-bounce::after { width: 16px; }
+    .bb-ball.is-bounce::before { left: -9px; }
+    .bb-ball.is-bounce::after { right: -9px; }
+
+    /* 본문 */
+    /* 폰은 한 줄 — 내 차례면 숫자판이 첫 화면에 보이게 숫자판 · 기다리기를 맨 위에, 그 아래 기록지(짧은 상자) · 메모 */
+    .bb-main { display: grid; gap: 14px; grid-template-areas: "throw" "book" "memo"; }
+    .bb-main.is-done { grid-template-areas: "end" "book"; }
+    .bb-main.is-setup { grid-template-areas: "throw"; }
+    .bb-throw, .bb-wait { grid-area: throw; }
+    .bb-memo { grid-area: memo; }
+    .bb-book { grid-area: book; }
+    .bb-end { grid-area: end; }
+    @media (min-width: 720px) {
+      .bb-main { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "throw book" "memo book"; align-items: start; }
+      .bb-main.is-done { grid-template-columns: minmax(0, 1fr); grid-template-areas: "end" "book"; }
+      .bb-main.is-setup { grid-template-columns: minmax(0, 440px); justify-content: center; grid-template-areas: "throw"; }
+    }
+    .bb-card { min-width: 0; padding: 14px; border: 1px solid var(--border-default); border-radius: 16px; background: var(--surface-card, #fff); }
+    .bb-card__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin-bottom: 12px; }
+    .bb-card__head b { font-size: 16px; font-weight: 800; }
+    .bb-card__head small { font-size: 12.5px; color: var(--text-muted); word-break: keep-all; }
+    .bb-link { min-height: 40px; min-width: 40px; margin-left: auto; padding: 0 6px; border: 0; background: none; color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+
+    /* 숫자 넣기 */
+    .bb-throw.is-last { border-color: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, .18); }
+    .bb-throw.is-last .bb-card__head b { color: #b45309; }
+    .bb-slots { display: flex; justify-content: center; gap: 10px; margin: 2px 0 14px; }
+    .bb-slot { position: relative; display: grid; place-items: center; width: 58px; height: 66px; border-radius: 13px; background: var(--bb-night); color: var(--bb-led); font: 900 34px/1 var(--bb-mono); text-shadow: 0 0 12px rgba(255, 207, 74, .55); box-shadow: inset 0 0 0 2px #24503a; }
+    .bb-slot.is-cur { box-shadow: inset 0 0 0 2px var(--bb-led); }
+    .bb-slot.is-cur::after { content: ""; position: absolute; bottom: 12px; width: 22px; height: 3px; border-radius: 2px; background: var(--bb-led); animation: bb-blink 1s steps(2, start) infinite; }
+    .bb-slot.is-pop { animation: bb-pop .18s ease; }
+    .bb-slots.is-shake { animation: bb-shake .32s ease; }
+    .bb-pad { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .bb-key { position: relative; height: 52px; padding: 0; border: 1px solid #d4dbe3; border-radius: 14px; background: #fff; color: var(--color-midnight-navy); font: 800 22px/1 var(--bb-mono); cursor: pointer; touch-action: manipulation; box-shadow: 0 3px 0 #d4dbe3; transition: transform .05s, box-shadow .05s, background .15s; -webkit-tap-highlight-color: transparent; }
+    .bb-key:hover:not(:disabled) { background: #f6faf7; }
+    .bb-key:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 0 0 #d4dbe3; }
+    .bb-key.is-used { background: #e3efe7; border-color: #b9d8c3; color: #8fae9a; box-shadow: 0 1px 0 #b9d8c3; }
+    .bb-key.is-out { color: #b6bec8; }
+    .bb-key.is-out::before { content: ""; position: absolute; left: 30%; right: 30%; top: 50%; height: 2px; background: #c3c9d1; transform: rotate(-35deg); }
+    .bb-key.is-in::after { content: ""; position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: #16a34a; }
+    .bb-key:disabled { opacity: .5; cursor: default; }
+    .bb-acts { display: flex; gap: 8px; margin-top: 12px; }
+    .bb-acts .hk-btn { min-height: 48px; }
+    .bb-acts .bb-go { flex: 1; }
+    .bb-kbd { margin-top: 10px; text-align: center; font-size: 12px; color: var(--text-muted); }
+
+    /* 기다리는 동안 */
+    .bb-wait { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 210px; text-align: center; }
+    .bb-wait > b { font-size: 16px; font-weight: 800; word-break: keep-all; }
+    .bb-wait > small { max-width: 300px; font-size: 13px; color: var(--text-muted); word-break: keep-all; }
+    .bb-wait.is-hit { border-color: #f5d06b; background: linear-gradient(180deg, #fff8dc, #fff); }
+
+    /* 숫자 메모 */
+    .bb-memo { border-color: #ebe3cc; background: repeating-linear-gradient(180deg, #fffdf6 0 27px, #f3ecd8 27px 28px); }
+    .bb-memo__grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+    .bb-chip { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 46px; padding: 0; border: 1.5px dashed #d6caa6; border-radius: 999px; background: rgba(255, 255, 255, .7); color: #4a4231; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .bb-chip:hover { border-color: #b9a874; }
+    .bb-chip b { font: 800 17px/1 var(--bb-mono); }
+    .bb-chip small { min-height: 11px; font-size: 10.5px; font-weight: 800; line-height: 11px; color: #a0957a; }
+    .bb-chip.is-out { border-style: solid; border-color: #e2d9c0; background: #efe9d8; color: #b3a98c; }
+    .bb-chip.is-out b { text-decoration: line-through 2px #c0442f; }
+    .bb-chip.is-out small { color: #c0442f; }
+    .bb-chip.is-in { border-style: solid; border-color: #4ade80; background: #dcfce7; color: #166534; }
+    .bb-chip.is-in small { color: #15803d; }
+
+    /* 기록지 */
+    .bb-book { padding: 0; overflow: hidden; background: var(--bb-paper); border-color: #ebe3cc; }
+    .bb-book__title { display: flex; align-items: baseline; gap: 8px; padding: 12px 14px 8px; }
+    .bb-book__title b { font-size: 16px; font-weight: 800; }
+    .bb-book__title small { font-size: 12.5px; color: #8f8466; }
+    .bb-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) minmax(0, 1fr); align-items: center; min-height: 42px; border-top: 1px dashed #e6dcc0; }
+    .bb-row > span:first-child { font-size: 12px; font-weight: 800; color: #8f8466; text-align: center; }
+    .bb-row.is-head { min-height: 34px; border-top: 1px solid #e6dcc0; background: #fbf5e3; }
+    .bb-row.is-head > span { padding: 0 8px; font-size: 12px; font-weight: 800; color: #6d6349; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bb-row.is-head small { font-weight: 600; color: #a0957a; }
+    .bb-rows { max-height: none; overflow-y: auto; }
+    .bb-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-width: 0; padding: 6px 8px; border-radius: 10px; }
+    .bb-cell.is-empty { color: #c9bf9f; }
+    .bb-g { font: 800 16px/1 var(--bb-mono); letter-spacing: .16em; color: var(--bb-ink); }
+    .bb-r { display: inline-flex; gap: 3px; }
+    .bb-r i { padding: 3px 6px; border-radius: 999px; font-size: 11.5px; font-style: normal; font-weight: 800; line-height: 1.1; }
+    .bb-r .is-s { background: #fde68a; color: #854d0e; }
+    .bb-r .is-b { background: #bbf7d0; color: #166534; }
+    .bb-r .is-o { background: #fee2e2; color: #b91c1c; }
+    .bb-r .is-win { background: linear-gradient(135deg, #ffd23f, #f59e0b); color: #452c00; }
+    .bb-cell.is-pending { visibility: hidden; }
+    .bb-cell.is-new { animation: bb-new 1.4s ease; }
+    .bb-book__empty { padding: 18px 14px 20px; border-top: 1px dashed #e6dcc0; font-size: 13.5px; color: #a0957a; text-align: center; }
+
+    /* 경기 끝 */
+    .bb-end { position: relative; overflow: hidden; padding: 20px 16px; text-align: center; }
+    .bb-end.is-win { border-color: #f5d06b; background: linear-gradient(180deg, #fff6d2, #fff 75%); }
+    .bb-end.is-draw { border-color: #c7d2fe; background: linear-gradient(180deg, #eef2ff, #fff 75%); }
+    .bb-end__title { position: relative; font-size: 26px; font-weight: 900; }
+    .bb-end.is-win .bb-end__title { color: #b45309; }
+    .bb-end__why { position: relative; margin-top: 4px; font-size: 14px; color: var(--text-secondary); word-break: keep-all; }
+    .bb-end__reveal { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px 28px; margin: 16px 0; }
+    .bb-end__reveal > div { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+    .bb-end__reveal small { max-width: 160px; overflow: hidden; font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; text-overflow: ellipsis; }
+    .bb-end__reveal .bb-tile { width: 38px; height: 46px; font-size: 26px; border-radius: 10px; }
+    .bb-end__none { display: grid; place-items: center; height: 46px; font-size: 13px; color: var(--text-muted); }
+    .bb-flip .bb-tile { animation: bb-flip .5s ease both; }
+    .bb-flip .bb-tile:nth-child(2) { animation-delay: .12s; }
+    .bb-flip .bb-tile:nth-child(3) { animation-delay: .24s; }
+    .bb-flip > div + div .bb-tile { animation-delay: .4s; }
+    .bb-flip > div + div .bb-tile:nth-child(2) { animation-delay: .52s; }
+    .bb-flip > div + div .bb-tile:nth-child(3) { animation-delay: .64s; }
+    .bb-end__btns { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+    .bb-end__btns .hk-btn { min-width: 128px; min-height: 48px; text-decoration: none; }
+    .bb-confetti { position: absolute; top: -12px; width: 8px; height: 12px; border-radius: 2px; animation: bb-fall 2.4s ease-in forwards; pointer-events: none; }
+
+    /* 받은 도전 · 보낸 도전 */
+    .bb-invite { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 16px; text-align: center; }
+    .bb-invite > b { font-size: 18px; font-weight: 800; word-break: keep-all; }
+    .bb-invite > small { max-width: 360px; font-size: 14px; line-height: 1.6; color: var(--text-secondary); word-break: keep-all; }
+    .bb-invite .bb-end__btns { margin-top: 8px; }
+
+    .bb-foot { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+    .bb-foot .gk__due { flex: 1; margin: 0; text-align: left; }
+    .bb-foot .hk-btn { min-height: 44px; }
+
+    @keyframes bb-blink { to { visibility: hidden; } }
+    @keyframes bb-pop { 0% { transform: scale(.8); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+    @keyframes bb-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-7px); } 50% { transform: translateX(6px); } 75% { transform: translateX(-3px); } }
+    @keyframes bb-fly { 0% { left: 4%; top: 62%; transform: scale(.55) rotate(0); opacity: 1; } 55% { top: 14%; transform: scale(1.2) rotate(330deg); } 100% { left: 88%; top: 52%; transform: scale(.7) rotate(660deg); opacity: .15; } }
+    @keyframes bb-fly-rev { 0% { left: 88%; top: 62%; transform: scale(.55) rotate(0); opacity: 1; } 55% { top: 14%; transform: scale(1.2) rotate(-330deg); } 100% { left: 4%; top: 52%; transform: scale(.7) rotate(-660deg); opacity: .15; } }
+    @keyframes bb-bounce { 0%, 100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-18px) rotate(180deg); } }
+    @keyframes bb-big { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); } 20% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 75% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) scale(.96); } }
+    @keyframes bb-flash { 0%, 100% { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07), 0 10px 26px rgba(8, 30, 18, .25); } 30% { box-shadow: inset 0 0 0 3px var(--bb-s), 0 0 40px rgba(255, 210, 63, .55); } }
+    @keyframes bb-new { 0% { background: #fff1b8; } 100% { background: transparent; } }
+    @keyframes bb-flip { 0% { transform: rotateX(90deg); opacity: 0; } 100% { transform: rotateX(0); opacity: 1; } }
+    @keyframes bb-fall { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(260px) rotate(540deg); opacity: 0; } }
+
+    @media (max-width: 719px) {
+      .bb-rows { max-height: 254px; }
+      .bb-main.is-done .bb-rows { max-height: none; } /* 끝난 경기는 기록지를 다 펼친다 */
+    }
+    @media (max-width: 420px) {
+      .bb-sb { padding: 8px 10px 12px; }
+      .bb-ls { grid-template-columns: 58px repeat(12, minmax(0, 1fr)); }
+      .bb-ls > span { font-size: 13.5px; }
+      .bb-ls > .is-team { padding: 0 6px; font-size: 12px; }
+      .bb-lamps { gap: 10px; }
+      .bb-cnt__say { margin-left: 0; }
+      .bb-slot { width: 54px; height: 62px; font-size: 32px; }
+      .bb-pad { gap: 6px; }
+      .bb-row { grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr); }
+      .bb-cell { padding: 6px 4px; gap: 4px; }
+      .bb-g { font-size: 15px; letter-spacing: .1em; }
+      .bb-r i { padding: 3px 5px; font-size: 11px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bb *, .bb *::before, .bb *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 숫자 야구 — 도전 → 수락 → 둘 다 내 숫자 정하기 → 번갈아 던지기(초 · 말). 판정은 서버(versus_baseball.py)가 하고,
+    // 화면은 서버가 보낸 기록만 그린다 — 상대 숫자는 경기가 끝나야 온다. 던지기는 아케이드가 열린 시간에만, 한 차례 기한은 24시간
+    const { esc, closedNote, due, fail } = HKMatch;
+    const GAME = "baseball";
+    const KEY = { rules: "hk-bb-rules", peek: "hk-bb-peek", memo: (id) => `hk-bb-memo-${id}` };
+    const store = {
+      get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
+      set(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (_) { /* 저장 못 해도 이번 화면에서는 적용 */ } },
+    };
+    const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const FINE = matchMedia("(hover: hover) and (pointer: fine)").matches; // PC 는 키보드 안내를 보여 준다
+    const PHONE = matchMedia("(max-width: 719px)"); // 한 줄 배치(스타일의 폰 구간과 같은 폭)
+    const sleep = (ms) => new Promise((f) => setTimeout(f, REDUCED ? Math.min(ms, 80) : ms));
+    const sfx = (name, arg) => { try { if (window.HKSound) HKSound.play(name, arg); } catch (_) { /* 소리는 부가 기능 */ } };
+    const PAD = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+    const SVG = {
+      on: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>`,
+      off: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m22 9-6 6"/><path d="m16 9 6 6"/></svg>`,
+      help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.2 9.3a2.9 2.9 0 0 1 5.6 1c0 1.9-2.8 2.4-2.8 4.1"/><path d="M12 17.6h.01"/></svg>`,
+    };
+    let root = null, open = { open: true, opensAt: null }, match = null, timer = 0, waiter = null;
+    let sending = false, thinking = false, pendingLast = false, token = 0, input = [], memo = {};
+
+    // ---------- 판 읽기 ----------
+    const log = () => (match && match.log) || [];
+    const mine = () => log().filter((e) => e.mine);
+    const isBot = () => !!(match && match.bot);
+    const rivalName = () => (isBot() ? "컴퓨터" : (match.opponent && match.opponent.name) || "상대");
+    const rivalSubj = () => (isBot() ? "컴퓨터가" : `${rivalName()} 님이`);
+    // 지금 몇 회 초 · 말인지 — 초 · 말이 번갈아 던지므로 기록 수로 센다
+    const pos = () => { const n = log().length; return { inning: Math.floor(n / 2) + 1, top: n % 2 === 0 }; };
+    const halfText = (top) => (top ? "초" : "말");
+    // 「초」가 3스트라이크 — 「말」의 마지막 한 번이 남았다. 그 3스트라이크 기록(e.mine 이면 내가 맞힘)을 돌려준다.
+    // 날아가는 중인 공(pendingLast)은 아직 안 본 것으로 친다 — 불이 켜지기 전에 「마지막 기회」가 먼저 보이지 않게
+    const hitEntry = () => {
+      const L = pendingLast ? log().slice(0, -1) : log(), e = L[L.length - 1];
+      return match.status === "ACTIVE" && L.length % 2 === 1 && e && e.strike === 3 ? e : null;
+    };
+    const lastChance = () => !!hitEntry();
+    const flying = () => { const L = log(); return pendingLast && L.length ? L[L.length - 1] : null; }; // 지금 날아가는 공
+    const inSetup = () => match.status === "ACTIVE" && match.phase === "setup";
+    const canThrow = () => !!match && match.status === "ACTIVE" && match.myTurn && open.open && !sending && !thinking;
+    const tiles = (num, cls = "") => `<span class="bb-tiles">${String(num).split("").map((d) => `<span class="bb-tile ${cls}">${esc(d)}</span>`).join("")}</span>`;
+    const chips = (e) => (e.strike === 3 ? `<i class="is-win">3S 정답</i>`
+      : !e.strike && !e.ball ? `<i class="is-o">OUT</i>`
+      : `${e.strike ? `<i class="is-s">${e.strike}S</i>` : ""}${e.ball ? `<i class="is-b">${e.ball}B</i>` : ""}`);
+    const words = (e) => (e.strike === 3 ? "3스트라이크!" : !e.strike && !e.ball ? "아웃"
+      : [e.strike ? `${e.strike}스트라이크` : "", e.ball ? `${e.ball}볼` : ""].filter(Boolean).join(" "));
+    const where = (m) => (m.phase === "setup" ? "숫자 정하는 중" : `${m.inning}회 ${halfText(m.half === "top")}${m.lastChance ? " · 마지막 기회" : ""}`);
+
+    function rulesBody() {
+      return `<ol class="bb-rules__list">
+          <li><b>내 숫자 정하기</b> — 0~9 중 서로 다른 숫자 3개를 몰래 정해요. 0이 맨 앞에 와도 돼요.</li>
+          <li><b>번갈아 던지기</b> — 상대 숫자를 추측해 한 번씩 던져요. 먼저 던지는 쪽이 「초」, 나중이 「말」이에요.</li>
+          <li><b>힌트</b> — 숫자와 자리가 맞으면 <span class="bb-k is-s">S</span> 스트라이크, 숫자만 맞으면 <span class="bb-k is-b">B</span> 볼, 하나도 없으면 <span class="bb-k is-o">OUT</span> 아웃이에요.</li>
+          <li><b>승부</b> — 3스트라이크면 맞힌 거예요. 「초」가 먼저 맞혀도 「말」은 그 회에 한 번 더 던져요. 둘 다 맞히거나 12회까지 아무도 못 맞히면 무승부예요.</li>
+        </ol>
+        <div class="bb-ex"><span>예) 상대 숫자</span>${tiles("427")}<span>던진 공</span><span class="bb-tiles"><span class="bb-tile is-s">4</span><span class="bb-tile is-b">7</span><span class="bb-tile">1</span></span><b>1S 1B</b><small>4는 자리까지 맞고, 7은 숫자만 맞았어요.</small></div>
+        <p class="bb-rules__tip">숫자 메모에 없는 숫자 · 있는 숫자를 표시해 두면 풀기 쉬워요. 메모는 나만 보여요.</p>`;
+    }
+    const showRules = () => HKUI.confirmDialog("숫자 야구 — 이렇게 해요", rulesBody(), { hideCancel: true, confirmLabel: "알겠어요" });
+
+    // ---------- 목록 ----------
+    function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
+    async function showLobby() {
+      stopPoll(); token++; match = null; input = []; thinking = false; pendingLast = false;
+      const first = store.get(KEY.rules) !== "1"; // 처음 온 사람에게는 규칙을 펼쳐 둔다
+      open = await HKMatch.lobby(root, GAME, {
+        title: "숫자 야구",
+        lead: "서로 몰래 정한 세 자리 숫자를 스트라이크 · 볼 힌트로 먼저 맞히면 이겨요. 동료에게 도전하거나 컴퓨터와 해 보세요. 차례마다 24시간 안에 던지지 않으면 시간 초과로 져요. 끝까지 마친 경기는 오늘 도장을 받아요.",
+        intro: `<details class="bb-rules" ${first ? "open" : ""}><summary><span class="bb-ball" aria-hidden="true"></span>이렇게 해요</summary><div>${rulesBody()}</div></details>`,
+        bot: [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]],
+        labels: { bot: "컴퓨터와 하기", recent: "최근 경기" },
+        rankNote: "기권 · 시간 초과는 3회까지 했거나 이미 맞힌 경기만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요",
+        rankEmpty: "아직 끝난 경기가 없어요",
+        rowNote: (m) => `${where(m)} · ${due(m.deadlineAt)}`,
+        resultNote: (m) => { const r = HKMatch.reason(m); return m.endReason === "INNINGS" ? r : `${r} · ${m.inning ? `${m.inning}회` : "시작 전"}`; },
+      });
+      if (match) return; // 그새 경기 화면으로 갔다
+      store.set(KEY.rules, "1");
+      root.querySelector(".gk__back")?.insertAdjacentHTML("afterend", `<a class="gk__back" href="/together" style="margin-left:14px">함께하기 ›</a>`);
+    }
+
+    // ---------- 전광판 ----------
+    function soundBtn() {
+      if (!window.HKSound) return "";
+      const off = HKSound.isMuted();
+      return `<button type="button" class="bb-ibtn ${off ? "is-off" : ""}" data-sound aria-pressed="${off ? "false" : "true"}" aria-label="${off ? "소리 켜기" : "소리 끄기"}" title="${off ? "소리 켜기" : "소리 끄기"}">${off ? SVG.off : SVG.on}</button>`;
+    }
+    function innLabel() {
+      if (match.status === "DONE") return "경기 끝";
+      if (match.phase === "setup") return "숫자 정하는 중";
+      const p = pos();
+      return `${p.inning}회 ${halfText(p.top)}<i>${p.top ? "▲" : "▼"}</i>`;
+    }
+    function lineHtml() {
+      const L = log(), max = match.maxInnings || 12;
+      const now = match.status === "ACTIVE" && match.phase === "play" && !pendingLast ? L.length : -1;
+      const me = match.mySeat;
+      let h = `<span class="is-h is-team"></span>`;
+      for (let i = 1; i <= max; i++) h += `<span class="is-h ${i > 9 ? "is-x" : ""}">${i}</span>`;
+      for (const seat of [0, 1]) {
+        const isMe = seat === me;
+        h += `<span class="is-team ${isMe ? "is-me" : ""}"><i>${seat ? "말" : "초"}</i>${esc(isMe ? "나" : rivalName())}</span>`;
+        for (let i = 1; i <= max; i++) {
+          const idx = (i - 1) * 2 + seat, e = L[idx];
+          const hide = e && pendingLast && idx === L.length - 1;
+          h += `<span class="${e && !hide && e.strike === 3 ? "is-hit" : ""} ${idx === now ? "is-now" : ""}" data-ls="${idx}">${e && !hide ? e.strike : ""}</span>`;
+        }
+      }
+      return `<div class="bb-ls" role="img" aria-label="회마다 맞힌 스트라이크 수">${h}</div>`;
+    }
+    function lampsHtml(e) {
+      const lit = (k, i) => !!e && !pendingLast && ((k === "s" && i < e.strike) || (k === "b" && i < e.ball) || (k === "o" && !e.strike && !e.ball));
+      const row = (k, n) => `<span class="bb-lamps__row"><b>${k.toUpperCase()}</b>${Array.from({ length: n }, (_, i) => `<span class="bb-lamp is-${k} ${lit(k, i) ? "is-on" : ""}" data-lamp="${k}${i}"></span>`).join("")}</span>`;
+      return `<div class="bb-lamps" aria-hidden="true">${row("s", 3)}${row("b", 3)}${row("o", 1)}</div>`;
+    }
+    function sayHtml(e) {
+      if (!e) {
+        if (match.status === "DONE") return "공을 던지기 전에 끝났어요";
+        if (match.phase !== "setup") return "플레이 볼! 첫 공을 기다려요";
+        if (match.rivalSet && !match.mySet) return `${esc(rivalSubj())} 숫자를 정했어요. 내 숫자를 정하면 바로 시작해요`;
+        return "둘 다 숫자를 정하면 경기가 시작돼요";
+      }
+      return `<span>${e.inning}회 ${e.mine ? "내 공" : `${esc(rivalName())}의 공`}</span>${tiles(e.guess)}<b>${words(e)}</b>`;
+    }
+    // 내 숫자 — 사무실에서 옆 사람이 보지 않게 가려 두고, 누르면 보인다(기억함)
+    function secretHtml() {
+      if (!match.mySecret || match.status !== "ACTIVE") return "";
+      const peek = store.get(KEY.peek) === "1";
+      return `<button type="button" class="bb-secret" data-peek aria-pressed="${peek}" title="내 숫자 ${peek ? "가리기" : "보기"}">내 숫자 ${tiles(peek ? match.mySecret : "•••")}<small>${peek ? "가리기" : "보기"}</small></button>`;
+    }
+    function boardHtml() {
+      const L = log(), last = L[L.length - 1];
+      return `<section class="bb-sb" id="bb-sb">
+          <div class="bb-sb__head">
+            <span class="bb-sb__inn">${innLabel()}</span>
+            <span class="bb-sb__tools">${secretHtml()}<button type="button" class="bb-ibtn" data-help aria-label="규칙 보기" title="규칙 보기">${SVG.help}</button>${soundBtn()}</span>
+          </div>
+          ${inSetup() ? `<div class="bb-cnt"><div class="bb-cnt__say is-setup">${sayHtml(last)}</div></div>` : `${lineHtml()}
+          <div class="bb-cnt">${lampsHtml(last)}<div class="bb-cnt__say" id="bb-say" aria-live="polite">${pendingLast ? "&nbsp;" : sayHtml(last)}</div></div>`}
+        </section>`;
+    }
+
+    // ---------- 던지기 · 기다리기 ----------
+    function keyCls(d) {
+      const st = !inSetup() ? memo[d] : null; // 메모는 상대 숫자를 맞힐 때만 자판에 보인다
+      return `bb-key ${input.includes(d) ? "is-used" : ""} ${st === "out" ? "is-out" : st === "in" ? "is-in" : ""}`;
+    }
+    function slotsHtml() {
+      return [0, 1, 2].map((i) => `<span class="bb-slot ${i === input.length ? "is-cur" : ""}">${esc(input[i] || "")}</span>`).join("");
+    }
+    function throwHtml() {
+      if (match.status !== "ACTIVE") return "";
+      if (!match.myTurn || thinking) return waitHtml();
+      const setup = inSetup(), last = lastChance(), p = pos(), lock = !open.open;
+      const title = setup ? "내 숫자 정하기" : last ? "마지막 기회!" : `${p.inning}회 ${halfText(p.top)} · 내 차례`;
+      const hint = lock ? `${esc(open.opensAt || "")}부터 던질 수 있어요`
+        : setup ? "0~9 중 서로 다른 숫자 3개 · 상대가 이 숫자를 맞혀야 해요"
+        : last ? `${esc(rivalSubj())} 내 숫자를 맞혔어요. 이번에 맞히면 무승부예요`
+        : "상대 숫자를 추측해 던져요";
+      return `<div class="bb-card bb-throw ${last ? "is-last" : ""}">
+          <div class="bb-card__head"><b>${title}</b><small>${hint}</small></div>
+          <div class="bb-slots" id="bb-slots" aria-live="polite" aria-label="고른 숫자">${slotsHtml()}</div>
+          <div class="bb-pad">${PAD.map((d) => `<button type="button" class="${keyCls(d)}" data-key="${d}" ${lock ? "disabled" : ""}>${d}</button>`).join("")}</div>
+          <div class="bb-acts">
+            <button type="button" class="hk-btn hk-btn--secondary" data-del ${lock ? "disabled" : ""}>지우기</button>
+            ${setup ? `<button type="button" class="hk-btn hk-btn--secondary" data-rand ${lock ? "disabled" : ""}>아무거나</button>` : ""}
+            <button type="button" class="hk-btn hk-btn--primary bb-go" data-go ${lock || input.length < 3 ? "disabled" : ""}>${setup ? "이 숫자로 정하기" : "던지기"}</button>
+          </div>
+          ${FINE && !lock ? `<div class="bb-kbd">키보드 숫자로 넣고 Enter 로 ${setup ? "정해요" : "던져요"} · Backspace 지우기</div>` : ""}
+        </div>`;
+    }
+    function waitHtml() {
+      const ball = `<span class="bb-ball is-bounce" aria-hidden="true"></span>`;
+      if (inSetup()) {
+        return `<div class="bb-card bb-wait">${ball}<b>내 숫자를 정했어요</b><small>${esc(rivalSubj())} 숫자를 정하면 바로 시작해요. 내 숫자는 위 전광판에서 볼 수 있어요</small></div>`;
+      }
+      const hit = hitEntry(), fly = flying();
+      if (hit && hit.mine) { // 컴퓨터전에서 컴퓨터가 생각하는 동안에도 맞힌 것을 먼저 알린다
+        return `<div class="bb-card bb-wait is-hit">${ball}<b>3스트라이크! 맞혔어요</b><small>${esc(rivalSubj())} 마지막으로 한 번 더 던져요. 그 공까지 맞히면 무승부예요</small></div>`;
+      }
+      if (thinking) return `<div class="bb-card bb-wait">${ball}<b>컴퓨터가 생각 중…</b><small>곧 던져요</small></div>`;
+      // 내 공이 날아가는 중 — 답은 전광판 불로 먼저 보여 준다(결과를 미리 말하지 않는다)
+      if (fly && fly.mine) return `<div class="bb-card bb-wait">${ball}<b>공을 던졌어요</b><small>전광판에서 답을 확인해요</small></div>`;
+      return `<div class="bb-card bb-wait">${ball}<b>${esc(rivalSubj())} 던질 차례예요</b><small>던지면 이 화면에 바로 보여요. 그동안 메모로 정리해 두세요</small></div>`;
+    }
+    function memoHtml() {
+      const label = { out: "없음", in: "있음" };
+      return `<div class="bb-card bb-memo">
+          <div class="bb-card__head"><b>숫자 메모</b><small>눌러서 없음 · 있음 표시 · 나만 보여요</small>${Object.keys(memo).length ? `<button type="button" class="bb-link" data-memo-clear>지우기</button>` : ""}</div>
+          <div class="bb-memo__grid">${PAD.map((d) => `<button type="button" class="bb-chip ${memo[d] ? `is-${memo[d]}` : ""}" data-memo="${d}" aria-label="${d} ${label[memo[d]] || "표시 없음"}"><b>${d}</b><small>${label[memo[d]] || ""}</small></button>`).join("")}</div>
+        </div>`;
+    }
+    function bookHtml() {
+      const L = log(), rows = [], name = esc(rivalName());
+      for (let i = 1; i <= Math.ceil(L.length / 2); i++) {
+        const pair = [L[(i - 1) * 2], L[(i - 1) * 2 + 1]].map((e, k) => e && { ...e, idx: (i - 1) * 2 + k });
+        const cell = (e) => {
+          if (!e) return `<span class="bb-cell is-empty">—</span>`;
+          const hide = pendingLast && e.idx === L.length - 1;
+          return `<span class="bb-cell ${hide ? "is-pending" : ""}" data-cell="${e.idx}"><span class="bb-g">${esc(e.guess)}</span><span class="bb-r">${chips(e)}</span></span>`;
+        };
+        rows.push(`<div class="bb-row"><span>${i}회</span>${cell(pair.find((e) => e && e.mine))}${cell(pair.find((e) => e && !e.mine))}</div>`);
+      }
+      return `<div class="bb-card bb-book">
+          <div class="bb-book__title"><b>기록지</b><small>던진 공과 답</small></div>
+          <div class="bb-row is-head"><span>회</span><span>내 공 <small>→ ${name} 숫자</small></span><span>${name} 공 <small>→ 내 숫자</small></span></div>
+          ${rows.length ? `<div class="bb-rows">${rows.join("")}</div>` : `<div class="bb-book__empty">아직 던진 공이 없어요</div>`}
+        </div>`;
+    }
+
+    // ---------- 경기 끝 · 도전장 ----------
+    function endWhy() {
+      const r = match.endReason, win = match.result === "win", inn = match.inning ? ` · ${match.inning}회` : "";
+      const L = log(), tail = L[L.length - 1];
+      // 「초」가 맞힌 뒤 「말」이 마지막 공을 던지지 않고 끝난 판(기권 · 기한) — 기록이 홀수이고 마지막이 3스트라이크
+      const hitLeft = L.length % 2 === 1 && tail && tail.strike === 3 ? tail : null;
+      const hitBy = (me) => (me ? `${mine().length}번 던져 맞혔어요${inn}` : `${rivalSubj()} ${L.filter((e) => !e.mine).length}번 만에 맞혔어요${inn}`);
+      if (r === "HIT") {
+        if (hitLeft) return win ? `${hitBy(true)} · ${rivalSubj()} 마지막 공을 던지지 않았어요` : `${hitBy(false)} · 마지막 공을 24시간 안에 던지지 않았어요`;
+        return hitBy(win);
+      }
+      if (r === "BOTH") return `같은 회에 둘 다 맞혔어요${inn}`;
+      if (r === "INNINGS") return "12회까지 아무도 못 맞혔어요";
+      if (r === "RESIGN") {
+        if (hitLeft && hitLeft.mine && win) return `${hitBy(true)} · ${rivalSubj()} 마지막 기회에 기권했어요`;
+        if (hitLeft && !hitLeft.mine && !win) return `${hitBy(false)} · 마지막 기회에 기권했어요`;
+        return win ? `${rivalSubj()} 기권했어요` : "기권했어요";
+      }
+      if (r === "TIMEOUT") {
+        // 숫자를 정하지 않아 끝났는지, 던지지 않아 끝났는지
+        if (win) return `${rivalSubj()} 24시간 안에 ${match.rivalSecret ? "던지지" : "숫자를 정하지"} 않았어요`;
+        return `24시간 안에 ${match.mySecret ? "던지지" : "숫자를 정하지"} 않아 졌어요`;
+      }
+      if (r === "TIMEOUT_DRAW") return match.mySecret || match.rivalSecret ? "시간이 지나 무승부로 끝났어요" : "둘 다 24시간 안에 숫자를 정하지 않았어요";
+      return HKMatch.reason(match);
+    }
+    function endHtml(fresh) {
+      const res = match.result, title = { win: "이겼어요!", lose: "아쉽게 졌어요", draw: "비겼어요" }[res] || "경기 끝";
+      const again = isBot() || (match.opponent && match.opponent.id);
+      const conf = fresh && res === "win" && !REDUCED
+        ? Array.from({ length: 18 }, (_, i) => `<span class="bb-confetti" style="left:${(i * 37) % 100}%;background:${["#ffd23f", "#4ade80", "#60a5fa", "#f87171", "#c084fc"][i % 5]};animation-delay:${(i % 6) * 0.12}s"></span>`).join("") : "";
+      return `<div class="bb-card bb-end is-${esc(res || "")}">${conf}
+          <div class="bb-end__title">${title}</div>
+          <div class="bb-end__why">${esc(endWhy())}</div>
+          <div class="bb-end__reveal ${fresh ? "bb-flip" : ""}">
+            <div><small>내 숫자</small>${match.mySecret ? tiles(match.mySecret) : `<span class="bb-end__none">정하지 않았어요</span>`}</div>
+            <div><small>${esc(rivalName())} 숫자</small>${match.rivalSecret ? tiles(match.rivalSecret) : `<span class="bb-end__none">정하지 않았어요</span>`}</div>
+          </div>
+          <div class="bb-end__btns">
+            ${again ? `<button type="button" class="hk-btn hk-btn--primary" data-rematch ${open.open ? "" : "disabled"}>${isBot() ? "한 판 더" : "다시 도전하기"}</button>` : ""}
+            <a class="hk-btn hk-btn--secondary" href="#">경기 목록</a>
+          </div>
+        </div>`;
+    }
+    function inviteHtml() {
+      const ball = `<span class="bb-ball is-bounce" aria-hidden="true"></span>`, name = esc(rivalName()), list = `<a class="hk-btn hk-btn--secondary" href="#">경기 목록</a>`;
+      if (match.status === "PENDING" && match.incoming) {
+        return `<div class="bb-card bb-invite">${ball}<b>${name} 님의 도전장</b>
+            <small>서로 몰래 정한 세 자리 숫자를 먼저 맞히는 게임이에요.<br>수락 기한 · ${esc(due(match.deadlineAt))}</small>
+            <div class="bb-end__btns"><button type="button" class="hk-btn hk-btn--primary" data-take ${open.open ? "" : "disabled"}>수락</button><button type="button" class="hk-btn hk-btn--secondary" data-refuse>거절</button></div>
+            <button type="button" class="bb-link" data-help style="margin:4px 0 0">규칙 보기</button></div>`;
+      }
+      if (match.status === "PENDING") {
+        return `<div class="bb-card bb-invite">${ball}<b>도전장을 보냈어요</b><small>${name} 님이 수락하면 바로 시작해요 · ${esc(due(match.deadlineAt))}</small>
+            <div class="bb-end__btns"><button type="button" class="hk-btn hk-btn--secondary" data-withdraw>신청 취소</button>${list}</div></div>`;
+      }
+      return `<div class="bb-card bb-invite"><b>${match.status === "DECLINED" ? "성사되지 않은 도전이에요" : "기한이 지난 도전이에요"}</b><small>목록에서 다시 도전할 수 있어요.</small><div class="bb-end__btns">${list}</div></div>`;
+    }
+    function statusText() {
+      if (thinking) return "컴퓨터가 생각 중…";
+      if (match.status === "DONE") return { win: "이겼어요", lose: "졌어요", draw: "비겼어요" }[match.result] || "경기 끝";
+      if (match.status === "ACTIVE") {
+        if (match.phase === "setup") return match.mySet ? "상대를 기다려요" : "숫자를 정해요";
+        return match.myTurn ? (lastChance() ? "마지막 기회!" : "내 차례") : "상대 차례";
+      }
+      if (match.status === "PENDING") return match.incoming ? "받은 도전" : "수락 기다리는 중";
+      return match.status === "DECLINED" ? "성사되지 않은 도전" : "만료된 도전";
+    }
+    // 「나 vs 상대」 이름 아래 — 숫자를 정했는지, 초 · 말 어느 쪽인지
+    function sides() {
+      if (inSetup()) return { me: match.mySet ? "숫자 정함" : "숫자 정하는 중", rival: match.rivalSet ? "숫자 정함" : "숫자 정하는 중" };
+      if (match.mySeat === 0 || match.mySeat === 1) return { me: match.mySeat ? "말 공격" : "초 공격", rival: match.mySeat ? "초 공격" : "말 공격" };
+      return {};
+    }
+    function footHtml() {
+      const note = inSetup() ? `숫자 정하기 · ${due(match.deadlineAt)}` : `${pos().inning}회 ${halfText(pos().top)} · 이번 차례 ${due(match.deadlineAt)}`;
+      return `<div class="bb-foot"><span class="gk__due">${esc(note)}</span><button type="button" class="hk-btn hk-btn--secondary" id="gk-resign" ${open.open ? "" : "disabled"}>기권</button></div>`;
+    }
+
+    function paint(fresh = false) {
+      const started = (match.status === "ACTIVE" || match.status === "DONE") && Array.isArray(match.log);
+      const body = !started ? inviteHtml()
+        : match.status === "DONE" ? `<div class="bb-main is-done">${endHtml(fresh)}${bookHtml()}</div>`
+        : inSetup() ? `<div class="bb-main is-setup">${throwHtml()}</div>`
+        : `<div class="bb-main">${throwHtml()}${memoHtml()}${bookHtml()}</div>`;
+      root.innerHTML = `<div class="gk bb">
+          <a class="gk__back" href="#">‹ 경기 목록</a>
+          ${closedNote(open)}
+          ${HKMatch.versus(match, statusText(), sides())}
+          ${started ? boardHtml() : ""}
+          ${body}
+          ${match.status === "ACTIVE" && !thinking ? footHtml() : ""}
+        </div>`;
+      const rows = root.querySelector(".bb-rows");
+      if (rows) rows.scrollTop = rows.scrollHeight; // 폰에서는 기록지가 짧은 상자 — 최근 공이 보이게
+      if (!pendingLast && !thinking) revealPad();
+    }
+    // 폰에서 내 차례가 오면 숫자판 · 「던지기」가 보이게 한 번만 내려 준다 — 차례마다 한 번, 이미 보이거나
+    // 아래(기록지 · 메모)를 읽는 중이라 카드가 화면 위로 지나갔으면 그대로 둔다. 주소창 때문에 보이는 높이가 작은 폰을 위해
+    let revealed = "";
+    function revealPad() {
+      const card = root.querySelector(".bb-throw"), go = root.querySelector("[data-go]");
+      if (!card || !go || !open.open || !PHONE.matches) return;
+      const key = `${match.id}:${match.phase}:${log().length}`;
+      if (revealed === key) return;
+      revealed = key;
+      const c = card.getBoundingClientRect(), g = go.getBoundingClientRect();
+      if (c.top >= 0 && g.bottom > window.innerHeight) card.scrollIntoView({ block: "end", behavior: REDUCED ? "auto" : "smooth" });
+    }
+    // 숫자를 누를 때는 넣는 칸 · 자판만 다시 그린다(애니메이션 · 기록지 스크롤이 흔들리지 않게)
+    function paintInput(pop) {
+      const s = document.getElementById("bb-slots");
+      if (s) {
+        s.innerHTML = slotsHtml();
+        if (pop && input.length) s.children[input.length - 1].classList.add("is-pop");
+      }
+      root.querySelectorAll("[data-key]").forEach((k) => { k.className = keyCls(k.dataset.key); });
+      const go = root.querySelector("[data-go]");
+      if (go) go.disabled = !open.open || input.length < 3 || sending;
+    }
+    function shake() {
+      const s = document.getElementById("bb-slots");
+      if (!s) return;
+      s.classList.remove("is-shake"); void s.offsetWidth; s.classList.add("is-shake");
+    }
+
+    // ---------- 입력 ----------
+    function press(d) {
+      if (!canThrow()) return;
+      if (input.includes(d) || input.length >= 3) { sfx("invalid"); shake(); return; } // 같은 숫자는 한 번만
+      input.push(d); sfx("tap"); paintInput(true);
+    }
+    function del() {
+      if (!canThrow() || !input.length) return;
+      input.pop(); sfx("swap"); paintInput();
+    }
+    function randomPick() {
+      if (!canThrow()) return;
+      const pool = [...PAD];
+      input = [];
+      while (input.length < 3) input.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+      sfx("swap"); paintInput(true);
+    }
+    async function submit() {
+      if (!canThrow()) return;
+      if (input.length < 3) { sfx("invalid"); shake(); return; }
+      const num = input.join(""), setup = inSetup();
+      if (setup) {
+        const asked = HKUI.confirmDialog("이 숫자로 정할까요?", `<div style="margin:6px 0 10px">${tiles(num)}</div>정한 뒤에는 바꿀 수 없어요. 상대가 이 숫자를 맞혀야 해요.`, { confirmLabel: "정하기" });
+        document.querySelector('.hk-dialog [data-act="ok"]')?.focus(); // 키보드로 숫자 → Enter → Enter
+        const ok = await asked;
+        if (!ok || !canThrow() || input.join("") !== num) return;
+      } else if (mine().some((e) => e.guess === num)) {
+        sfx("invalid"); shake(); HKUI.toast("이미 던진 숫자예요. 다른 숫자를 골라 주세요", "info"); return;
+      }
+      sending = true; stopPoll();
+      const go = root.querySelector("[data-go]");
+      if (go) { go.disabled = true; go.textContent = setup ? "정하는 중…" : "던지는 중…"; }
+      try {
+        const next = await HKApi.matchMove(match.id, { data: setup ? { secret: num } : { guess: num, n: mine().length } }, match.seq);
+        input = [];
+        sending = false;
+        if (setup) sfx("success");
+        await apply(next);
+        if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+      } catch (e) {
+        sending = false;
+        // 다른 탭 · 기기에서 이미 숫자를 정했다 — 서버는 「상대 차례」로 막지만 숫자 정하기에서는 맞지 않는 말이라 바꿔 알린다
+        if (setup && (e.code === "MATCH_NOT_YOUR_TURN" || e.code === "BASEBALL_ALREADY_SET")) { input = []; HKUI.toast("숫자는 이미 정했어요", "info"); }
+        else { sfx("invalid"); fail(e); }
+        await showMatch(match.id); // 판이 바뀌었으면 새로 그린다 — 그 밖의 실패는 고른 숫자를 그대로 둔다
+        return;
+      }
+      schedulePoll();
+    }
+    function cycleMemo(d) {
+      const next = !memo[d] ? "out" : memo[d] === "out" ? "in" : null;
+      if (next) memo[d] = next; else delete memo[d];
+      store.set(KEY.memo(match.id), Object.keys(memo).length ? JSON.stringify(memo) : null);
+      sfx("tap");
+      const box = root.querySelector(".bb-memo");
+      if (box) box.outerHTML = memoHtml();
+      paintInput();
+    }
+    function loadMemo(id) {
+      try { const m = JSON.parse(store.get(KEY.memo(id)) || "{}"); return m && typeof m === "object" ? m : {}; } catch (_) { return {}; }
+    }
+
+    // ---------- 새 판 받기 — 새로 던진 공은 하나씩 보여 준다 ----------
+    // 컴퓨터전은 내 공과 컴퓨터 공이 한 응답에 같이 온다 — 내 공을 먼저 보여 주고 잠깐 뒤에 컴퓨터 공
+    const interim = (next, len) => ({
+      ...next, log: next.log.slice(0, len), status: "ACTIVE", phase: "play", result: null, endReason: null, reasonLabel: null,
+      rivalSecret: null, myTurn: false, rivalTurn: true,
+    });
+    async function apply(next, animate = true) {
+      const my = ++token;
+      const same = match && match.id === next.id;
+      const before = same && Array.isArray(match.log) ? match.log.length : null;
+      const prev = same ? { status: match.status, phase: match.phase } : null;
+      const fresh = before != null && Array.isArray(next.log) && next.log.length > before ? next.log.slice(before) : [];
+      thinking = false;
+      if (next.status === "DONE") store.set(KEY.memo(next.id), null); // 끝난 경기 메모는 지운다
+      if (prev && prev.phase === "setup" && next.status === "ACTIVE" && next.phase === "play") {
+        sfx("go");
+        HKUI.toast(`플레이 볼! ${next.mySeat === 0 ? "내가 먼저 던져요" : `${rivalSubj()} 먼저 던져요`}`, "info");
+      }
+      if (animate && fresh.length) {
+        for (let i = 0; i < fresh.length; i++) {
+          const len = before + i + 1, last = i === fresh.length - 1;
+          match = last && next.status !== "DONE" ? next : interim(next, len);
+          pendingLast = true; paint();
+          await pitchFx(fresh[i], my);
+          if (my !== token) return;
+          pendingLast = false;
+          if (!last && next.bot && !fresh[i + 1].mine) {
+            thinking = true; match = interim(next, len); paint();
+            await sleep(700);
+            if (my !== token) return;
+            thinking = false;
+          }
+        }
+      }
+      pendingLast = false;
+      match = next;
+      const ended = prev && prev.status !== "DONE" && next.status === "DONE";
+      paint(ended);
+      if (ended) sfx({ win: "win", lose: "lose", draw: "success" }[next.result] || "success");
+      else if (prev && prev.status === "PENDING" && next.status === "ACTIVE") sfx("go");
+    }
+    async function pitchFx(e, my) {
+      const sb = document.getElementById("bb-sb");
+      if (!sb) return;
+      if (!REDUCED) sb.insertAdjacentHTML("beforeend", `<span class="bb-ball is-fly ${e.mine ? "" : "is-rev"}" aria-hidden="true"></span>`);
+      sfx("whoosh");
+      await sleep(540);
+      if (my !== token) return;
+      sb.querySelector(".bb-ball.is-fly")?.remove();
+      const lamp = (k) => sb.querySelector(`[data-lamp="${k}"]`);
+      for (let i = 0; i < e.strike; i++) { lamp(`s${i}`)?.classList.add("is-on"); sfx("combo", i + 2); await sleep(200); if (my !== token) return; }
+      for (let i = 0; i < e.ball; i++) { lamp(`b${i}`)?.classList.add("is-on"); sfx("pop"); await sleep(200); if (my !== token) return; }
+      if (!e.strike && !e.ball) { lamp("o0")?.classList.add("is-on"); sfx("drop"); await sleep(220); if (my !== token) return; }
+      const idx = log().length - 1;
+      root.querySelectorAll(".is-pending").forEach((x) => { x.classList.remove("is-pending"); x.classList.add("is-new"); });
+      const ls = root.querySelector(`[data-ls="${idx}"]`);
+      if (ls) { ls.textContent = e.strike; if (e.strike === 3) ls.classList.add("is-hit"); }
+      const say = document.getElementById("bb-say");
+      if (say) say.innerHTML = sayHtml(e);
+      if (e.strike === 3) {
+        sb.classList.add("is-hit");
+        sb.insertAdjacentHTML("beforeend", `<span class="bb-sb__big">3스트라이크!</span>`);
+        sfx("powerup");
+        await sleep(1150);
+      } else await sleep(260);
+    }
+
+    // ---------- 기다리기 · 불러오기 ----------
+    // 경기가 이어지는 동안 서버에서 판이 바뀔 때까지 기다린다 — 상대가 숫자를 정하거나 던지면 바로 그린다. 화면이 보일 때만
+    function schedulePoll(delay = 0) {
+      stopPoll();
+      // 컴퓨터전은 컴퓨터가 내 요청 안에서 바로 던지므로 기다릴 일이 없다
+      if (!match || !["PENDING", "ACTIVE"].includes(match.status) || match.bot) return;
+      timer = setTimeout(async () => {
+        timer = 0;
+        if (document.hidden || !match || sending) return; // 다시 보이면 visibilitychange 에서 판을 새로 연다
+        const id = match.id, ctl = new AbortController();
+        waiter = ctl;
+        let next;
+        try { next = await HKApi.matchWait(id, match.seq, match.status, ctl.signal); }
+        catch (_) {
+          if (waiter === ctl) { waiter = null; schedulePoll(3000); } // 잠깐 끊기면 3초 뒤 다시
+          return;
+        }
+        if (waiter !== ctl || !match || match.id !== id || sending) return; // 그새 내가 던졌거나 다른 경기로 감
+        waiter = null;
+        if (next.seq !== match.seq || next.status !== match.status) await apply(next);
+        else match = { ...match, deadlineAt: next.deadlineAt };
+        if (match && match.id === id) schedulePoll();
+      }, delay);
+    }
+    async function showMatch(id) {
+      stopPoll();
+      const same = match && match.id === id;
+      if (!same) { token++; input = []; thinking = false; pendingLast = false; memo = loadMemo(id); }
+      let next;
+      try { [next, open] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
+      catch (e) { fail(e); location.hash = ""; return; }
+      if (next.game !== GAME) { location.href = `/games/${next.game}#m${id}`; return; }
+      if (!same) match = null;
+      await apply(next, same); // 다른 탭에서 돌아왔으면 그새 던진 공을 보여 준다
+      if (match && match.id === id) schedulePoll();
+    }
+    async function rematch() {
+      try {
+        if (isBot()) { const m = await HKApi.matchBot(match.bot, GAME); location.hash = `m${m.id}`; }
+        else { await HKApi.matchCreate(match.opponent.id, GAME); HKUI.toast("도전장을 보냈어요"); location.hash = ""; }
+      } catch (e) { fail(e); }
+    }
+    function route() {
+      const m = /^#m(\d+)$/.exec(location.hash);
+      if (m) showMatch(Number(m[1])); else showLobby();
+    }
+
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div id="gk-root"></div>`,
+      afterMount: () => {
+        root = document.getElementById("gk-root");
+        if (window.HKSound && HKSound.onChange) {
+          HKSound.onChange(() => root.querySelectorAll("[data-sound]").forEach((b) => { b.outerHTML = soundBtn(); }));
+        }
+        root.addEventListener("click", async (e) => {
+          const t = e.target.closest("button, a");
+          if (!t) return;
+          const d = t.dataset;
+          // 자판 · 메모는 누른 뒤 포커스를 풀어 Enter 가 「던지기」로 가게 한다
+          if (d.key != null) { t.blur(); return press(d.key); }
+          if ("del" in d) { t.blur(); return del(); }
+          if ("rand" in d) { t.blur(); return randomPick(); }
+          if ("go" in d) { t.blur(); return submit(); }
+          if (d.memo != null) { t.blur(); return cycleMemo(d.memo); }
+          if ("memoClear" in d) { memo = {}; store.set(KEY.memo(match.id), null); const box = root.querySelector(".bb-memo"); if (box) box.outerHTML = memoHtml(); paintInput(); return; }
+          if ("peek" in d) { store.set(KEY.peek, store.get(KEY.peek) === "1" ? "0" : "1"); sfx("tap"); t.outerHTML = secretHtml(); return; }
+          if ("sound" in d) { if (window.HKSound) { HKSound.toggle(); if (!HKSound.isMuted()) sfx("select"); } return; }
+          if ("help" in d) return showRules();
+          if ("rematch" in d) return rematch();
+          if ("take" in d) {
+            try { const next = await HKApi.matchAccept(match.id); await apply(next, false); schedulePoll(); } catch (err) { fail(err); showMatch(match.id); }
+            return;
+          }
+          if ("refuse" in d || "withdraw" in d) {
+            const refuse = "refuse" in d;
+            if (!(await HKUI.confirmDialog(refuse ? "도전을 거절할까요?" : "신청을 취소할까요?", refuse ? `${esc(rivalName())} 님에게 거절했다고 알려요.` : "보낸 도전장을 거둬요.", { confirmLabel: refuse ? "거절" : "신청 취소" }))) return;
+            try { await HKApi.matchDecline(match.id); HKUI.toast(refuse ? "거절했어요" : "신청을 취소했어요"); location.hash = ""; } catch (err) { fail(err); showMatch(match.id); }
+            return;
+          }
+          if (t.id === "gk-resign") {
+            if (!(await HKUI.confirmDialog("기권할까요?", "이 경기는 패배로 끝나요.", { confirmLabel: "기권" }))) return;
+            stopPoll();
+            try {
+              const next = await HKApi.matchResign(match.id);
+              await apply(next, false);
+              if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+            } catch (err) { fail(err); showMatch(match.id); }
+            return;
+          }
+          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
+          await HKMatch.act(t, GAME, showLobby);
+        });
+        window.addEventListener("hashchange", route);
+        window.addEventListener("keydown", (e) => {
+          if (!match || e.metaKey || e.ctrlKey || e.altKey || document.querySelector(".hk-dialog__overlay")) return;
+          const el = document.activeElement, tag = (el && el.tagName) || "";
+          if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (el && el.isContentEditable)) return;
+          if (/^[0-9]$/.test(e.key)) { if (canThrow()) { e.preventDefault(); press(e.key); } }
+          else if (e.key === "Backspace") { if (canThrow()) { e.preventDefault(); del(); } }
+          else if (e.key === "Enter" && tag !== "BUTTON" && tag !== "A") { if (canThrow()) { e.preventDefault(); submit(); } }
+          else if (e.key === "Escape" && input.length && canThrow()) { input = []; paintInput(); }
+        });
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && match && !sending) showMatch(match.id); });
+        route();
+      },
+    });
+  </script>
+</body>
+</html>

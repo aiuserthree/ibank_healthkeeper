@@ -1,0 +1,1622 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 화이트보드 그림 퀴즈</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/coop-story.js"></script>
+  <script src="/_shared/coop.js"></script>
+  <style>
+    /* 화이트보드 그림 퀴즈 — 17:40 본관 소회의실. 청록 벽 앞 은색 틀 화이트보드. 화 색(청록)은 .er 의 --ch-* 를 쓴다 */
+    .er-hero.is-sketch { background: radial-gradient(120% 90% at 85% 0%, #2dd4bf 0%, rgba(45, 212, 191, 0) 55%), linear-gradient(160deg, #0f766e, #155e75); }
+
+    /* ── 무대(소회의실 벽) ── */
+    /* 보드 너비 — 넓은 화면에서는 사이트 머리 · 상태 줄 · 카드 · 받침대 · 도구 줄까지 한 화면에 들어오게 높이에서 거꾸로 셈한다(답 · 반응은 옆 칸 맨 위) */
+    .sk-stage { --fw: min(100%, max(min(100%, 360px), calc((100vh - 420px) * 4 / 3 + 18px))); position: relative; isolation: isolate; padding: 14px 14px 12px; border-radius: 22px; color: #134e4a;
+      background: radial-gradient(90% 60% at 50% 0%, rgba(255, 255, 255, .75), transparent 70%), linear-gradient(180deg, #ecfeff 0%, #ccfbf1 100%);
+      box-shadow: 0 10px 28px rgba(15, 118, 110, .14), inset 0 -4px 0 #0d9488; }
+    .sk-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+    .sk-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .sk-chip { display: inline-flex; align-items: baseline; gap: 5px; padding: 5px 11px; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1.5px #99f6e4; font-size: 13px; font-weight: 700; color: #0f766e; white-space: nowrap; }
+    .sk-chip b { font-size: 16px; font-weight: 900; color: #134e4a; font-variant-numeric: tabular-nums; }
+    .sk-chip.is-score b { font-size: 18px; }
+    .sk-chip.is-bump { animation: sk-bump .55s ease; }
+    @keyframes sk-bump { 35% { transform: scale(1.18); box-shadow: inset 0 0 0 2px #f59e0b, 0 0 0 6px rgba(245, 158, 11, .25); } }
+    .sk-chip.is-fire { background: linear-gradient(90deg, #f97316, #facc15); box-shadow: none; color: #451a03; }
+    .sk-chip.is-fire b { color: #451a03; }
+    .sk-chip.is-clock { min-width: 74px; justify-content: center; background: #134e4a; box-shadow: none; color: #99f6e4; }
+    .sk-chip.is-clock b { color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .sk-chip.is-clock.is-low { background: #b91c1c; color: #fecaca; animation: sk-low 1s ease-in-out infinite; }
+    @keyframes sk-low { 50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, .25); } }
+    .sk-role { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 14px; border-radius: 999px; font-size: 14px; font-weight: 900; white-space: nowrap; }
+    .sk-role.is-draw { background: #fde047; color: #713f12; box-shadow: 0 3px 0 #ca8a04; }
+    .sk-role.is-guess { background: #22c55e; color: #fff; box-shadow: 0 3px 0 #15803d; }
+    .sk-role i { font-style: normal; }
+
+    /* 제시어 쪽지(그리는 사람) · 낱말 카드(맞히는 사람) */
+    .sk-cardwrap { margin-top: 12px; perspective: 900px; }
+    .sk-card { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 12px 16px; border-radius: 16px; background: #fff; box-shadow: 0 4px 0 rgba(13, 148, 136, .25), 0 10px 22px rgba(15, 118, 110, .12); }
+    .sk-card.is-draw { background: linear-gradient(180deg, #fef9c3, #fef08a); box-shadow: 0 4px 0 rgba(202, 138, 4, .35), 0 10px 22px rgba(113, 63, 18, .12); transform: rotate(-.5deg); }
+    .sk-card.is-draw::before { content: ""; position: absolute; top: -9px; left: 50%; width: 74px; height: 18px; margin-left: -37px; border-radius: 3px; background: rgba(255, 255, 255, .6); box-shadow: 0 1px 2px rgba(0, 0, 0, .08); transform: rotate(-2deg); }
+    .sk-card.is-rise { animation: sk-rise .45s cubic-bezier(.2, .8, .25, 1.1) both; animation-delay: var(--fxd, 0ms); }
+    @keyframes sk-rise { from { opacity: 0; transform: translateY(26px) rotate(-.5deg); } }
+    .sk-card.is-flip { animation: sk-flip .4s cubic-bezier(.2, .8, .25, 1) both; animation-delay: var(--fxd, 0ms); }
+    @keyframes sk-flip { 0% { transform: rotateY(-90deg); opacity: .2; } 70% { transform: rotateY(8deg); opacity: 1; } 100% { transform: none; } }
+    .sk-card__main { flex: 1 1 220px; min-width: 0; }
+    .sk-card__main > small { display: block; font-size: 12.5px; font-weight: 800; color: #0f766e; }
+    .sk-card.is-draw .sk-card__main > small { color: #92400e; }
+    .sk-word { display: inline-block; margin: 1px 0 2px; font-size: 38px; font-weight: 900; line-height: 1.15; color: #422006; word-break: keep-all; transition: filter .15s ease; user-select: none; -webkit-user-select: none; }
+    .sk-word.is-hidden { filter: blur(12px); cursor: pointer; }
+    .sk-word.is-hidden.is-peek { filter: none; }
+    .sk-foul { display: flex; align-items: center; gap: 5px; margin: 0; font-size: 13px; font-weight: 800; color: #b91c1c; }
+    .sk-card__side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+    .sk-card.is-draw .sk-card__main { flex-basis: 200px; }
+    .sk-next { display: inline-flex; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, .75); font-size: 12.5px; font-weight: 900; color: #0f766e; white-space: nowrap; }
+    .sk-card.is-draw .sk-next { color: #92400e; }
+    .sk-hide { display: inline-flex; align-items: center; gap: 5px; min-height: 40px; padding: 0 12px; border: 1.5px solid rgba(146, 64, 14, .25); border-radius: 999px; background: rgba(255, 255, 255, .7); color: #92400e; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+    .sk-hide[aria-pressed="true"] { background: #92400e; border-color: #92400e; color: #fff; }
+    .sk-peek { display: inline-block; padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, .55); font-size: 12.5px; font-weight: 700; color: #92400e; white-space: nowrap; }
+    .sk-peek b { font-weight: 900; font-variant-numeric: tabular-nums; }
+    .sk-peek.is-open { background: #92400e; color: #fff; }
+    .sk-peek.is-open b { letter-spacing: .08em; }
+    .sk-tiles { display: flex; flex-wrap: wrap; gap: 7px; margin: 6px 0 2px; }
+    .sk-tile { display: grid; place-items: center; width: 46px; height: 52px; border-radius: 12px; background: linear-gradient(180deg, #f0fdfa, #ccfbf1); box-shadow: inset 0 -4px 0 #5eead4; color: #0f766e; font-size: 26px; font-weight: 900; }
+    .sk-tile.is-q { color: rgba(15, 118, 110, .28); }
+    .sk-tiles.is-reveal .sk-tile { animation: sk-tile .5s cubic-bezier(.2, .8, .25, 1) both; animation-delay: calc(var(--i) * 80ms); }
+    @keyframes sk-tile { 0% { transform: rotateY(90deg); } 100% { transform: none; } }
+    .sk-hintbar { flex: 1 1 160px; min-width: 140px; }
+    .sk-hintbar i { display: block; height: 6px; overflow: hidden; border-radius: 99px; background: #ccfbf1; }
+    .sk-hintbar i span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #14b8a6, #f59e0b); transform-origin: left center; transition: transform .25s linear; }
+    .sk-hintbar small { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 800; color: #0f766e; }
+    .sk-hintbar.is-open small { color: #b45309; }
+
+    /* ── 화이트보드(은색 틀 · 받침대) ── */
+    .sk-boardwrap { margin-top: 12px; }
+    .sk-frame { position: relative; width: var(--fw); margin: 0 auto; padding: 9px; border-radius: 14px;
+      background: linear-gradient(145deg, #f8fafc 0%, #cbd5e1 40%, #94a3b8 100%); box-shadow: 0 10px 26px rgba(15, 23, 42, .18), inset 0 1px 0 #fff; }
+    .sk-board { position: relative; overflow: hidden; aspect-ratio: 4 / 3; border-radius: 6px; background: #ffffff; box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .08), inset 0 2px 8px rgba(15, 23, 42, .06); overscroll-behavior: contain; outline: none; }
+    .sk-board:focus-visible { box-shadow: inset 0 0 0 2px #99f6e4; }
+    .sk-cv, .sk-ghost { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+    .sk-cv { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+    .sk-stage.is-draw .sk-cv { touch-action: none; cursor: crosshair; }
+    .sk-stage.is-draw.is-locked .sk-cv { cursor: not-allowed; }
+    .sk-ghost { pointer-events: none; z-index: 2; }
+    .sk-ghost[hidden] { display: none; }
+    .sk-ghost.is-wipe { animation: sk-wipe .45s ease-in both; animation-delay: var(--wd, 1200ms); }
+    @keyframes sk-wipe { from { clip-path: inset(0 0 0 0); } to { clip-path: inset(0 0 0 100%); } }
+    .sk-eraser { position: absolute; z-index: 4; top: 50%; left: 0; width: 64px; height: 90px; margin: -45px 0 0 -32px; pointer-events: none; opacity: 0; }
+    .sk-eraser.is-on { animation: sk-eraser .45s ease-in both; animation-delay: var(--wd, 1200ms); }
+    @keyframes sk-eraser { 0% { opacity: 0; left: 0; } 8%, 90% { opacity: 1; } 100% { opacity: 0; left: 100%; } }
+    .sk-pen { position: absolute; z-index: 3; left: 0; top: 0; width: 34px; height: 34px; margin: -31px 0 0 -3px; pointer-events: none; opacity: 0; transition: opacity .4s ease; filter: drop-shadow(0 2px 2px rgba(15, 23, 42, .3)); }
+    .sk-pen.is-on { opacity: 1; transition: opacity .1s ease; }
+    .sk-react { position: absolute; z-index: 5; top: 10px; left: 50%; max-width: 86%; padding: 8px 16px; border-radius: 18px; background: #134e4a; color: #fff; font-size: 16px; font-weight: 900; line-height: 1.35; text-align: center; word-break: keep-all; transform: translateX(-50%); box-shadow: 0 6px 16px rgba(15, 23, 42, .25); pointer-events: none; }
+    .sk-react::after { content: ""; position: absolute; bottom: -8px; left: 22px; border: 9px solid transparent; border-top-color: #134e4a; border-bottom: 0; }
+    .sk-react.is-mine { background: #fde047; color: #713f12; }
+    .sk-react.is-mine::after { left: auto; right: 22px; border-top-color: #fde047; }
+    .sk-react small { display: block; font-size: 11px; font-weight: 800; opacity: .75; }
+    .sk-react.is-new { animation: sk-pop .38s cubic-bezier(.2, .9, .3, 1.3) both; }
+    .sk-react[hidden] { display: none; }
+    @keyframes sk-pop { from { opacity: 0; transform: translateX(-50%) scale(.6); } }
+    .sk-empty-hint { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; padding: 20px; pointer-events: none; text-align: center; color: #94a3b8; font-size: 15px; font-weight: 700; line-height: 1.6; word-break: keep-all; }
+    .sk-empty-hint[hidden] { display: none; }
+    .sk-empty-hint b { display: block; font-size: 30px; }
+
+    /* 낱말이 바뀔 때 — 정답 · 넘김 덮개 */
+    .sk-fx { position: absolute; z-index: 6; inset: 0; display: grid; place-items: center; align-content: center; gap: 8px; padding: 16px; text-align: center; pointer-events: none; opacity: 0; }
+    .sk-fx.is-on { animation: sk-fx var(--fxs, 1200ms) ease both; }
+    @keyframes sk-fx { 0% { opacity: 0; } 10%, 82% { opacity: 1; } 100% { opacity: 0; } }
+    .sk-fx.is-ok { background: rgba(22, 163, 74, .86); }
+    .sk-fx.is-pass { background: rgba(71, 85, 105, .84); }
+    .sk-fx b { display: block; font-size: 40px; font-weight: 900; line-height: 1.1; color: #fff; text-shadow: 0 3px 0 rgba(0, 0, 0, .18); word-break: keep-all; }
+    .sk-fx.is-on b { animation: sk-big .5s cubic-bezier(.2, .9, .3, 1.3) both; }
+    @keyframes sk-big { from { transform: scale(.5); } }
+    .sk-fx span { display: inline-block; padding: 5px 14px; border-radius: 999px; background: #fff; color: #14532d; font-size: 18px; font-weight: 900; word-break: keep-all; }
+    .sk-fx.is-pass span { color: #334155; }
+    .sk-fx em { display: inline-block; padding: 4px 12px; border-radius: 999px; background: linear-gradient(90deg, #f97316, #facc15); color: #451a03; font-size: 16px; font-style: normal; font-weight: 900; }
+    .sk-fx i { position: absolute; left: 50%; top: 45%; width: 9px; height: 14px; border-radius: 2px; background: var(--c); animation: sk-conf 1s cubic-bezier(.15, .7, .3, 1) both; }
+    @keyframes sk-conf { from { transform: translate(-50%, -50%); opacity: 1; } to { transform: translate(var(--x), var(--y)) rotate(var(--r)); opacity: 0; } }
+    .sk-fly { position: fixed; z-index: 80; padding: 4px 12px; border-radius: 999px; background: #fde047; color: #713f12; font-size: 20px; font-weight: 900; pointer-events: none; box-shadow: 0 6px 14px rgba(0, 0, 0, .2); }
+
+    /* 받침대 — 놓인 마커가 곧 색 고르기 */
+    .sk-ledge { position: relative; display: flex; align-items: flex-end; justify-content: center; gap: 4px; margin: 0 6px; padding: 0 10px; min-height: 18px; border-radius: 0 0 12px 12px;
+      background: linear-gradient(180deg, #94a3b8, #64748b); box-shadow: 0 6px 12px rgba(15, 23, 42, .18), inset 0 2px 0 rgba(255, 255, 255, .35); }
+    .sk-tools > .sk-ledge { width: calc(var(--fw) - 12px); box-sizing: border-box; margin: 0 auto; }
+    .sk-ledge.is-deco { width: min(60%, 320px); margin: 0 auto; gap: 10px; }
+    .sk-mk { position: relative; display: grid; place-items: end center; width: 52px; height: 46px; padding: 0 0 6px; border: 0; background: none; cursor: pointer; transition: transform .15s ease; }
+    .sk-mk svg { display: block; width: 50px; height: 18px; filter: drop-shadow(0 2px 1px rgba(15, 23, 42, .3)); }
+    .sk-mk[aria-pressed="true"] { transform: translateY(-6px); }
+    .sk-mk[aria-pressed="true"]::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #0f766e; }
+    .sk-mk:focus-visible { outline: 3px solid #14b8a6; outline-offset: -2px; border-radius: 10px; }
+    .sk-ledge.is-deco svg { width: 40px; height: 14px; margin-bottom: 4px; }
+
+    /* 도구 줄 */
+    .sk-tools { margin-top: 10px; }
+    .sk-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+    .sk-widths { position: relative; display: flex; align-items: center; gap: 4px; padding: 3px; border-radius: 999px; background: #fff; box-shadow: inset 0 0 0 1.5px #99f6e4; }
+    .sk-widths .sk-wcur { display: none; }
+    .sk-wlist { display: flex; gap: 2px; }
+    .sk-w { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+    .sk-w i { display: block; border-radius: 50%; background: #134e4a; }
+    .sk-w[aria-pressed="true"] { background: #ccfbf1; box-shadow: inset 0 0 0 2px #0d9488; }
+    .sk-tool { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1.5px solid #99f6e4; border-radius: 999px; background: #fff; color: #134e4a; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+    .sk-tool:hover:not(:disabled) { border-color: #14b8a6; background: #f0fdfa; }
+    .sk-tool:disabled { opacity: .45; cursor: default; }
+    .sk-tool.is-arm { border-color: #dc2626; background: #fef2f2; color: #b91c1c; }
+    .sk-tool .sk-ico { flex-shrink: 0; }
+    .sk-lab-m { display: none; }
+    .sk-pass { position: relative; isolation: isolate; border-color: transparent; background: #0f766e; color: #fff; box-shadow: 0 3px 0 #134e4a; }
+    .sk-pass::before { content: ""; position: absolute; inset: -4px; z-index: -1; border-radius: 999px; background: conic-gradient(#f59e0b calc(var(--p, 1) * 360deg), rgba(15, 118, 110, .18) 0); }
+    .sk-pass::after { content: ""; position: absolute; inset: -1.5px; z-index: -1; border-radius: 999px; background: inherit; }
+    .sk-pass:hover:not(:disabled) { background: #115e59; }
+    .sk-pass:disabled { opacity: 1; background: #5f9e98; box-shadow: none; }
+    .sk-pass.is-shake, .sk-shake { animation: sk-shake .45s ease; }
+    @keyframes sk-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+    .sk-passnote { flex-basis: 100%; margin: 0; text-align: center; font-size: 12px; font-weight: 700; color: #0f766e; }
+    .sk-ink { display: flex; align-items: center; gap: 8px; max-width: 420px; margin: 8px auto 0; font-size: 12px; font-weight: 800; color: #0f766e; }
+    .sk-ink i { flex: 1; height: 6px; overflow: hidden; border-radius: 99px; background: rgba(255, 255, 255, .8); }
+    .sk-ink i span { display: block; height: 100%; border-radius: inherit; background: #14b8a6; }
+    .sk-ink.is-hot { color: #c2410c; }
+    .sk-ink.is-hot i span { background: #f97316; }
+
+    /* 답 입력(맞히는 사람) — 노드 하나를 다시 끼워 쓴다(휴대폰 자판이 닫히지 않게) */
+    .sk-gslot { margin-top: 12px; }
+    .sk-gform { position: relative; z-index: 4; margin: 0; }
+    .sk-grow { display: flex; gap: 8px; }
+    .sk-gin { flex: 1; min-width: 0; height: 54px; box-sizing: border-box; padding: 0 14px; border: 2px solid #5eead4; border-radius: 15px; background: #fff; color: #134e4a; font: inherit; font-size: 18px; font-weight: 800; }
+    .sk-gin::placeholder { color: #94a3b8; font-weight: 600; font-size: 15px; }
+    .sk-gin:focus { outline: none; border-color: #0d9488; box-shadow: 0 0 0 4px rgba(20, 184, 166, .2); }
+    .sk-gin:disabled { background: #f1f5f9; border-color: #cbd5e1; }
+    .sk-ggo { flex-shrink: 0; min-width: 92px; height: 54px; padding: 0 16px; border: 0; border-radius: 15px; background: #0f766e; color: #fff; font: inherit; font-size: 16.5px; font-weight: 900; cursor: pointer; box-shadow: 0 4px 0 #134e4a; }
+    .sk-ggo:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px 0 #134e4a; }
+    .sk-ggo:disabled { background: #94a3b8; box-shadow: none; cursor: default; }
+    .sk-gnote { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 20px; margin-top: 6px; padding: 0 4px; font-size: 12.5px; font-weight: 700; color: #0f766e; }
+    .sk-gnote > span { min-width: 0; word-break: keep-all; }
+    .sk-gform.is-bad .sk-gnote > span { color: #dc2626; font-weight: 800; }
+    .sk-gform.is-good .sk-gnote > span { color: #15803d; font-weight: 900; }
+    .sk-gform.is-shake .sk-grow { animation: sk-shake .45s ease; }
+    .sk-tries { display: inline-flex; flex-shrink: 0; align-items: center; gap: 3px; }
+    .sk-tries i { width: 7px; height: 7px; border-radius: 50%; background: #14b8a6; }
+    .sk-tries i.is-off { background: #cbd5e1; }
+    .sk-tries.is-low i:not(.is-off) { background: #f97316; }
+
+    /* 답 칩 · 반응 버튼 */
+    .sk-answers { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; min-height: 32px; }
+    .sk-answers > small { font-size: 12.5px; font-weight: 800; color: #0f766e; }
+    .sk-answers .sk-left { margin-left: auto; font-size: 12px; font-weight: 700; color: #0f766e; }
+    .sk-a { display: inline-flex; align-items: center; gap: 5px; padding: 5px 11px; border-radius: 999px; background: #e2e8f0; color: #64748b; font-size: 14px; font-weight: 700; text-decoration: line-through; text-decoration-color: rgba(100, 116, 139, .6); }
+    .sk-gs .sk-a { background: #fee2e2; color: #991b1b; text-decoration-color: rgba(153, 27, 27, .45); }
+    .sk-a.is-near, .sk-gs .sk-a.is-near { background: #ffedd5; color: #9a3412; text-decoration: none; }
+    .sk-a.is-near em { padding: 1px 6px; border-radius: 999px; background: #f97316; color: #fff; font-size: 11px; font-style: normal; font-weight: 900; }
+    .sk-a.is-ok, .sk-gs .sk-a.is-ok { background: #dcfce7; color: #166534; text-decoration: none; }
+    .sk-a.is-new { animation: sk-chip .4s cubic-bezier(.2, .9, .3, 1.3) both; }
+    .sk-gs .sk-a.is-new:not(.is-near):not(.is-ok) { animation: sk-chip .4s cubic-bezier(.2, .9, .3, 1.3) both, sk-shake .45s .4s ease; }
+    @keyframes sk-chip { from { opacity: 0; transform: scale(.5); } }
+    .sk-reacts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(13, 148, 136, .35); }
+    .sk-reacts > small { flex-basis: 100%; font-size: 12px; font-weight: 800; color: #0f766e; }
+    .sk-rx { min-height: 40px; padding: 0 13px; border: 1.5px solid #99f6e4; border-radius: 999px; border-bottom-left-radius: 6px; background: #fff; color: #134e4a; font: inherit; font-size: 13.5px; font-weight: 800; cursor: pointer; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+    .sk-rx:hover:not(:disabled) { border-color: #14b8a6; background: #f0fdfa; }
+    .sk-reacts.is-wait .sk-rx { opacity: .5; cursor: default; }
+    /* 넓은 화면 — 답 칩 · 반응은 옆 칸 맨 위(보드 바로 옆이라 그리면서 보인다) */
+    .sk-talk .sk-answers { margin-top: 0; }
+    .sk-talk .sk-answers > small { order: -3; font-size: 14.5px; font-weight: 800; color: var(--color-midnight-navy); }
+    .sk-talk .sk-answers .sk-left { order: -2; }
+    .sk-talk .sk-answers::before { content: ""; order: -1; flex-basis: 100%; height: 0; }
+    .sk-talk .sk-reacts { margin-top: 12px; padding-top: 12px; }
+    .sk-talk .sk-reacts > small { font-size: 12.5px; }
+
+    /* ── 옆 칸 ── */
+    .er-card h2 small { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .sk-past > summary { display: flex; align-items: center; gap: 6px; min-height: 40px; list-style: none; cursor: pointer; font-size: 15px; font-weight: 800; color: var(--color-midnight-navy); }
+    .sk-past > summary::-webkit-details-marker { display: none; }
+    .sk-past > summary small { margin-left: auto; font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .sk-past > summary::after { content: "▾"; margin-left: 6px; font-size: 13px; color: var(--ch-strong); transition: transform .15s ease; }
+    .sk-past[open] > summary::after { transform: rotate(180deg); }
+    .sk-list { margin: 6px 0 0; padding: 0; list-style: none; }
+    .sk-list li { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+    .sk-list li:last-child { border-bottom: 0; }
+    .sk-mark { display: grid; place-items: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: #dcfce7; color: #15803d; font-size: 13px; font-weight: 900; }
+    .is-pass > .sk-mark { background: #f1f5f9; color: #94a3b8; }
+    .is-last > .sk-mark { background: #fef3c7; color: #b45309; }
+    .sk-list__txt { flex: 1; min-width: 0; }
+    .sk-list b { font-size: 15px; font-weight: 800; color: var(--color-midnight-navy); }
+    .sk-list .is-pass b { color: #94a3b8; text-decoration: line-through; text-decoration-color: rgba(148, 163, 184, .6); }
+    .sk-list small { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .sk-pts { flex-shrink: 0; min-width: 38px; padding: 3px 8px; border-radius: 999px; background: #f0fdfa; color: #0f766e; font-size: 13px; font-style: normal; font-weight: 900; text-align: center; font-variant-numeric: tabular-nums; }
+    .is-pass .sk-pts, .is-last .sk-pts { background: #f8fafc; color: #94a3b8; }
+    .sk-nolist { padding: 12px; border-radius: 12px; background: #f8fafc; text-align: center; font-size: 13.5px; color: var(--text-muted); }
+    .sk-rules { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+    .sk-rules li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; color: var(--text-secondary); word-break: keep-all; }
+    .sk-rules li .sk-pts { min-width: 44px; }
+    .sk-promise { display: flex; align-items: flex-start; gap: 8px; margin: 10px 0 0; padding: 10px 12px; border-radius: 12px; background: #fef2f2; color: #991b1b; font-size: 13.5px; font-weight: 800; line-height: 1.5; word-break: keep-all; }
+    .sk-promise span { flex-shrink: 0; }
+
+    /* ── 대기실 — 분야 고르기 · 이렇게 해요 (방 소개 글은 「이렇게 해요」와 겹쳐서 숨긴다 — 준비 버튼이 첫 화면에 오게) ── */
+    .er-wait:not(.er-pending) > h2 + p { display: none; }
+    .sk-pick { padding: 12px 14px 12px; border-radius: 16px; background: var(--ch-soft); border: 1px solid #ccfbf1; }
+    .sk-pick__head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin-bottom: 8px; }
+    .sk-pick__head b { font-size: 15px; font-weight: 900; color: var(--ch-ink); }
+    .sk-pick__head small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .sk-pick__row { display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain; padding: 2px 2px 6px; margin: 0 -2px; scrollbar-width: thin; }
+    .sk-cat { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1.5px solid #99f6e4; border-radius: 999px; background: #fff; color: #134e4a; font: inherit; font-size: 14px; font-weight: 800; cursor: pointer; white-space: nowrap; transition: border-color .15s ease, background .15s ease; }
+    .sk-cat:hover { border-color: #14b8a6; }
+    .sk-cat.is-on { border-color: #0f766e; background: #0f766e; color: #fff; box-shadow: 0 4px 12px rgba(15, 118, 110, .28); }
+    .sk-cat span { font-size: 17px; line-height: 1; }
+    .sk-pick .sk-promise { margin-top: 8px; }
+    .sk-how { margin-top: 10px; border-radius: 16px; background: #fff; border: 1px solid var(--border-default); }
+    .sk-how summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 900; color: var(--color-midnight-navy); cursor: pointer; list-style: none; }
+    .sk-how summary::-webkit-details-marker { display: none; }
+    .sk-how summary small { font-size: 12.5px; font-weight: 700; color: var(--text-muted); }
+    .sk-how summary::after { content: "펼치기"; margin-left: auto; font-size: 12.5px; font-weight: 800; color: var(--ch-strong); }
+    .sk-how[open] summary::after { content: "접기"; }
+    .sk-how__in { padding: 0 14px 14px; }
+    .sk-how ol { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; counter-reset: sk; }
+    .sk-how ol li { position: relative; padding-left: 28px; font-size: 14px; line-height: 1.55; color: var(--text-secondary); word-break: keep-all; counter-increment: sk; }
+    .sk-how ol li::before { content: counter(sk); position: absolute; left: 0; top: 1px; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--ch-strong); color: #fff; font-size: 12px; font-weight: 900; }
+    .sk-how ol li em { font-style: normal; font-weight: 800; color: var(--ch-ink); }
+    .sk-points { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .sk-points span { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px 5px 6px; border-radius: 999px; background: var(--ch-soft); font-size: 12.5px; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+    .sk-points span b { display: grid; place-items: center; min-width: 30px; height: 22px; padding: 0 4px; border-radius: 999px; background: #fff; font-size: 13px; font-weight: 900; color: var(--ch-strong); }
+
+    /* ── 끝 카드 — 청록 벽에 걸린 화이트보드 ── */
+    .er-end.sk-end { position: relative; overflow: hidden; isolation: isolate; padding: 24px 18px 20px; color: #fff;
+      background: radial-gradient(90% 70% at 50% 0%, rgba(94, 234, 212, .35), transparent 70%), linear-gradient(170deg, #0f766e, #155e75); }
+    .er-end.sk-end.is-zero { background: radial-gradient(90% 70% at 50% 0%, rgba(203, 213, 225, .3), transparent 70%), linear-gradient(170deg, #334155, #475569); }
+    .sk-end__ep { display: inline-block; padding: 4px 12px; border-radius: 999px; background: rgba(255, 255, 255, .16); font-size: 12.5px; font-weight: 800; color: #ccfbf1; }
+    .sk-end__wb { position: relative; max-width: 420px; margin: 14px auto 0; padding: 16px 16px 14px; border-radius: 10px; background: #fff; color: #1e3a8a; box-shadow: 0 0 0 8px #cbd5e1, 0 0 0 9px #94a3b8, 0 16px 30px rgba(0, 0, 0, .25); }
+    .er-end.sk-end h2 { margin: 0; font-size: 24px; color: #1f2937; }
+    .er-end.sk-end .sk-end__wb > p { margin: 4px 0 0; font-size: 14.5px; font-weight: 700; color: #475569; }
+    .sk-end__score { margin-top: 4px; line-height: 1; color: #2563eb; }
+    .sk-end__score b { font-size: 76px; font-weight: 900; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+    .sk-end__score span { margin-left: 2px; font-size: 26px; font-weight: 900; }
+    .sk-end__score svg { display: block; width: 160px; height: 14px; margin: 2px auto 0; }
+    .er-end.sk-end p.sk-end__sub { margin-top: 8px; font-size: 14.5px; font-weight: 800; color: #134e4a; }
+    .er-end.sk-end p.sk-end__last { margin-top: 4px; font-size: 13px; font-weight: 700; color: #64748b; }
+    .sk-end__mc { display: flex; align-items: center; justify-content: center; gap: 10px; max-width: 460px; margin: 22px auto 0; text-align: left; }
+    .sk-end__mc .cs-face { flex-shrink: 0; width: 46px; height: 46px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #5eead4; }
+    .er-end.sk-end .sk-end__mc p { flex: 1; min-width: 0; margin: 0; padding: 9px 14px; border-radius: 16px; border-bottom-left-radius: 4px; background: #fff; color: #134e4a; font-size: 15px; font-weight: 700; line-height: 1.45; }
+    .sk-end__mc p b { display: block; font-size: 11.5px; font-weight: 900; color: #8b5cf6; }
+    .er-end.sk-end .er-actions .hk-btn { min-height: 44px; border-radius: 999px; padding-left: 20px; padding-right: 20px; }
+    .er-end.sk-end .er-actions .hk-btn--primary { border-color: #fff; background: #fff; color: #0f766e; }
+    .er-end.sk-end .er-actions .hk-btn--secondary { border-color: rgba(255, 255, 255, .5); background: transparent; color: #fff; }
+
+    /* 그림첩 */
+    .sk-album { margin-top: 14px; }
+    .sk-album__grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .sk-art { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 6px 6px 8px; border: 1px solid var(--border-default); border-radius: 14px; background: #f8fafc; font: inherit; text-align: left; cursor: zoom-in; transition: transform .15s ease, border-color .15s ease; }
+    .sk-art:hover { transform: translateY(-2px); border-color: #14b8a6; }
+    .sk-art__pic { position: relative; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 0 0 3px #e2e8f0; }
+    .sk-art__pic canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .sk-art b { display: block; padding: 0 2px; overflow: hidden; font-size: 14px; font-weight: 800; color: var(--color-midnight-navy); white-space: nowrap; text-overflow: ellipsis; }
+    .sk-art small { display: block; padding: 0 2px; font-size: 12px; font-weight: 700; color: var(--text-muted); }
+    .sk-lb { position: fixed; z-index: 90; inset: 0; display: grid; place-items: center; padding: 16px; background: rgba(2, 6, 23, .72); }
+    .sk-lb[hidden] { display: none; }
+    .sk-lb__in { width: min(720px, 100%); padding: 12px; border-radius: 16px; background: #cbd5e1; box-shadow: 0 20px 50px rgba(0, 0, 0, .4); }
+    .sk-lb__pic { position: relative; aspect-ratio: 4 / 3; border-radius: 8px; background: #fff; overflow: hidden; }
+    .sk-lb__pic canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+    .sk-lb__cap { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 10px; }
+    .sk-lb__cap b { font-size: 18px; font-weight: 900; color: #0f172a; }
+    .sk-lb__cap small { display: block; font-size: 13px; font-weight: 700; color: #475569; }
+    .sk-lb__cap button { min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; background: #0f172a; color: #fff; font: inherit; font-size: 14.5px; font-weight: 800; cursor: pointer; }
+
+    @media (min-width: 861px) {
+      /* 제시어 카드 오른쪽(다음 정답 · 초성 · 가리기)을 한 줄로 — 카드가 낮아진 만큼 보드가 커진다 */
+      .sk-card__side { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+    }
+    @media (max-width: 860px) {
+      .sk-stage { --fw: 100%; }
+    }
+    @media (max-width: 640px) {
+      .sk-stage { margin: 0 -4px; padding: 10px 8px 8px; border-radius: 18px; }
+      .sk-chip { padding: 4px 9px; font-size: 12px; }
+      .sk-chip b { font-size: 14px; }
+      .sk-chip.is-score b { font-size: 15px; }
+      .sk-chip.is-clock { min-width: 62px; }
+      .sk-role { min-height: 32px; padding: 0 10px; font-size: 13px; }
+      .sk-role b { display: none; }
+      .sk-cardwrap { margin-top: 8px; }
+      .sk-card { gap: 4px 10px; padding: 8px 10px 8px 12px; }
+      .sk-card__main { flex-basis: 150px; }
+      .sk-card__main > small { display: none; }
+      .sk-word { margin: 0; font-size: 26px; }
+      .sk-word + .sk-cat-m { margin-left: 4px; }
+      .sk-cat-m { display: inline !important; font-size: 13px; font-weight: 800; color: inherit; opacity: .75; }
+      .sk-foul { font-size: 12px; }
+      .sk-card__side { flex-direction: row; align-items: center; }
+      .sk-next { display: none; }
+      .sk-hide { min-width: 44px; min-height: 40px; justify-content: center; padding: 0 10px; }
+      .sk-peek { padding: 3px 8px; font-size: 11.5px; }
+      .sk-hide span { display: none; }
+      .sk-tiles { gap: 5px; margin: 0; }
+      .sk-tile { width: 34px; height: 40px; border-radius: 9px; font-size: 20px; }
+      .sk-card.is-guess .sk-card__main { display: flex; align-items: center; gap: 8px; flex-basis: auto; flex-grow: 0; }
+      .sk-hintbar { flex: 1 1 120px; min-width: 110px; }
+      .sk-boardwrap { margin-top: 8px; }
+      .sk-frame { padding: 6px; border-radius: 10px; }
+      .sk-stage.is-guess { --fw: min(100%, calc(52vh * 4 / 3)); }
+      .sk-react { font-size: 14px; padding: 6px 12px; }
+      .sk-fx b { font-size: 30px; }
+      .sk-fx span { font-size: 15px; }
+      /* 그리는 사람 — 도구 막대를 화면 아래에 붙인다 */
+      .sk-tools { position: sticky; bottom: 0; z-index: 8; margin: 8px -8px 0; padding: 4px 8px calc(8px + env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; background: rgba(236, 254, 255, .96); box-shadow: 0 -6px 16px rgba(15, 118, 110, .12); backdrop-filter: blur(6px); }
+      .sk-tools > .sk-ledge { width: auto; margin: 0 -2px; padding: 0 2px; gap: 0; justify-content: space-between; border-radius: 12px; }
+      .sk-mk { width: 44px; height: 44px; padding-bottom: 7px; }
+      .sk-mk svg { width: 36px; height: 13px; }
+      .sk-row { flex-wrap: nowrap; justify-content: space-between; gap: 6px; margin-top: 8px; }
+      .sk-tool { min-width: 44px; padding: 0 11px; font-size: 13px; }
+      .sk-tool .sk-lab { display: none; }
+      .sk-pass .sk-lab, .sk-tool.is-arm .sk-lab-m { display: inline; }
+      .sk-widths { padding: 2px; }
+      .sk-widths .sk-wcur { display: grid; }
+      .sk-wlist { position: absolute; bottom: calc(100% + 8px); left: 0; z-index: 9; display: none; flex-direction: column; padding: 4px; border-radius: 22px; background: #fff; box-shadow: 0 8px 20px rgba(15, 23, 42, .2), inset 0 0 0 1.5px #99f6e4; }
+      .sk-widths.is-open .sk-wlist { display: flex; }
+      .sk-w { width: 44px; height: 44px; }
+      .sk-ink { margin-top: 6px; }
+      .sk-passnote { order: 9; }
+      /* 맞히는 사람 — 답 입력 줄을 화면 아래에 붙인다(자판이 올라오면 그 위로) */
+      .sk-gslot { position: sticky; bottom: 0; z-index: 8; margin: 8px -8px 0; padding: 8px 8px calc(6px + env(safe-area-inset-bottom)); border-radius: 16px 16px 0 0; background: rgba(236, 254, 255, .96); box-shadow: 0 -6px 16px rgba(15, 118, 110, .12); transform: translateY(calc(-1 * var(--kb, 0px))); }
+      .sk-gin { height: 50px; font-size: 17px; }
+      .sk-ggo { min-width: 76px; height: 50px; }
+      .sk-reacts { flex-wrap: nowrap; overflow-x: auto; margin: 10px -8px 0; padding: 10px 8px 4px; scrollbar-width: none; }
+      .sk-reacts::-webkit-scrollbar { display: none; }
+      .sk-reacts > small { display: none; }
+      .sk-rx { flex-shrink: 0; }
+      .sk-album__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .sk-end__score b { font-size: 62px; }
+      .er .er-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+      .er .er-stat { padding: 10px 4px; }
+      .er .er-stat b { font-size: 18px; }
+      .er .er-stat small { font-size: 12px; }
+    }
+    .sk-cat-m { display: none; }
+    @media (prefers-reduced-motion: reduce) {
+      .sk-card.is-rise, .sk-card.is-flip, .sk-tiles.is-reveal .sk-tile, .sk-a.is-new, .sk-gs .sk-a.is-new:not(.is-near):not(.is-ok), .sk-react.is-new,
+      .sk-chip.is-bump, .sk-chip.is-clock.is-low, .sk-gform.is-shake .sk-grow, .sk-pass.is-shake, .sk-shake, .sk-fx.is-on b { animation: none; }
+      .sk-fx i, .sk-eraser { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 화이트보드 그림 퀴즈 — 2인 협동(협동 시리즈 번외 2화). 한 사람이 제시어를 화이트보드에 그리고, 다른 사람이 그림을 보고 맞힌다.
+    // 낱말마다 그리는 사람 ↔ 맞히는 사람이 바뀐다. 점수 · 정답 확인 · 초성 힌트는 서버(sketch_game.py)가 정한다.
+    // 방 공용(목록 · 대기실 · 끝 화면 · 실시간)은 /_shared/coop.js, 이야기는 /_shared/coop-story.js.
+    //
+    // 그림 조각이 올 때마다 화면을 통째로 다시 그리면 캔버스가 새로 만들어지고(그리던 획이 끊김) 답 입력 칸이 다시 만들어져
+    // 휴대폰 자판이 닫힌다. 그래서 ① 캔버스 · 답 입력 칸은 노드 하나를 계속 쓰며 자리(#sk-slot · #sk-gslot)에 다시 끼우고,
+    // ② 같은 낱말 안의 소식은 coop.js 의 patch 훅으로 바뀐 칸만 고친다(낱말이 바뀔 때만 통째로 다시 그린다).
+    // 그리는 사람의 선은 곧바로 내 캔버스에 그리고, 서버에는 「보낼 때 묶어」 조각으로 하나씩 차례대로 보낸다(대기열 ops).
+    const { esc } = HKMatch;
+    const S = window.HKCoopStory || null;
+    const MA = "마 팀장님";
+    const GREAT = 20; // 이 점수부터 끝 이야기 「최고예요」(협동 시리즈 번외 2화 기준과 같게)
+    const GAP = 250; // 그림 조각 사이 최소 간격(ms) — 펜이 빨라도 초당 4조각 이하, 대신 한 조각에 점을 더 싣는다
+    const MIN_STEP = 4; // 바로 앞 점과 이만큼(좌표 단위)도 안 떨어진 점은 버린다(서버는 3)
+    const REACT_SEC = 2.5;
+    const CATS = [
+      { key: "all", name: "전체", ico: "🎲" },
+      { key: "office", name: "사무실 물건", ico: "📎" },
+      { key: "food", name: "음식", ico: "🍙" },
+      { key: "animal", name: "동물", ico: "🐱" },
+      { key: "sport", name: "운동·건강", ico: "🏀" },
+      { key: "life", name: "생활", ico: "🏠" },
+    ];
+    const DEF_PAL = ["#1f2937", "#dc2626", "#2563eb", "#16a34a", "#f59e0b", "#92400e", "#ffffff"];
+    const DEF_PALN = ["검정", "빨강", "파랑", "초록", "주황", "갈색", "지우개"];
+    const DEF_W = [4, 9, 18, 36];
+    const W_NAMES = ["가늘게", "보통", "굵게", "아주 굵게"];
+    const ERASER = 6;
+    const PLAYED_KEY = "hk-sketch-played", HIDE_KEY = "hk-sketch-hide", TOOL_KEY = "hk-sketch-tool";
+    const reduce = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (_) { return false; } };
+    const phone = () => { try { return matchMedia("(max-width: 640px)").matches; } catch (_) { return false; } };
+    const wideMq = window.matchMedia ? matchMedia("(min-width: 861px)") : null; // 옆 칸이 보드 옆에 서는 화면(app.css .er-grid 와 같은 기준)
+    const wide = () => !!(wideMq && wideMq.matches);
+    const store = {
+      get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } },
+      set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* 기억 못 해도 그만 */ } },
+    };
+
+    let C = null, room = null, w = null, offset = 0, tickFor = null, lastBeep = null;
+    let howOpen = !store.get(PLAYED_KEY, 0); // 처음이면 「이렇게 해요」를 펼쳐 둔다
+    let pastOpen = null; // 옆 칸 「지나간 낱말」 펼침 — 처음엔 넓은 화면만 펼친다
+    let hideWord = !!store.get(HIDE_KEY, 0);
+    const tool = Object.assign({ c: 0, w: 1, pw: 1 }, store.get(TOOL_KEY, {}));
+    document.addEventListener("toggle", (e) => {
+      const t = e.target;
+      if (!t.classList) return;
+      if (t.classList.contains("sk-how")) howOpen = t.open;
+      if (t.classList.contains("sk-past")) pastOpen = t.open;
+    }, true);
+    const now = () => (Date.now() + offset) / 1000;
+    const mate = () => (room && room.partner && room.partner.name) || "동료";
+    const sfx = (name) => { if (C) C.sfx(name); };
+    const pal = () => (w && w.pal) || DEF_PAL;
+    const palNames = () => (w && w.palNames) || DEF_PALN;
+    const widths = () => (w && w.widths) || DEF_W;
+    const face = () => (S ? S.npcFace(MA) : "");
+    const cnt = (s) => (s.p.length / 2) | 0;
+    const drawing = () => !!(w && room && room.status === "PLAYING" && w.role === "draw");
+
+    // ── 캔버스 — 노드 하나를 계속 쓴다(비트맵이 남아 깜빡이지 않게) ─────────────────
+    const cv = document.createElement("canvas");
+    cv.className = "sk-cv";
+    cv.setAttribute("role", "img"); // 보드 칸(group) 안의 말풍선 · 덮개(aria-live)가 읽히도록 그림 역할은 캔버스에만 준다
+    const g2 = cv.getContext("2d");
+    const ghost = document.createElement("canvas"); // 낱말이 바뀔 때 지난 그림을 잠깐 남겨 두고 지우개로 쓱
+    ghost.className = "sk-ghost";
+    ghost.hidden = true;
+    const eraserEl = document.createElement("div");
+    eraserEl.className = "sk-eraser";
+    eraserEl.setAttribute("aria-hidden", "true");
+    eraserEl.innerHTML = `<svg viewBox="0 0 64 90"><rect x="8" y="6" width="48" height="78" rx="8" fill="#0f766e"/><rect x="8" y="58" width="48" height="26" rx="6" fill="#e2e8f0"/><rect x="14" y="14" width="36" height="8" rx="4" fill="#5eead4"/></svg>`;
+    const penEl = document.createElement("div"); // 맞히는 사람 화면 — 상대가 지금 그리는 곳에 마커
+    penEl.className = "sk-pen";
+    penEl.setAttribute("aria-hidden", "true");
+    const fxEl = document.createElement("div");
+    fxEl.className = "sk-fx";
+    fxEl.setAttribute("aria-live", "polite");
+    let cw = 0, ch = 0, dpr = 1;
+
+    function fit() {
+      const host = cv.parentNode;
+      if (!host) return false;
+      const width = Math.round(host.getBoundingClientRect().width);
+      if (!width) return false;
+      const d = Math.min(window.devicePixelRatio || 1, 2.5);
+      const height = Math.round((width * 3) / 4);
+      if (width === cw && height === ch && d === dpr && cv.width === Math.round(width * d)) return false;
+      cw = width; ch = height; dpr = d;
+      cv.width = Math.round(width * d); cv.height = Math.round(height * d);
+      return true;
+    }
+    // 좌표는 0~1000(가로) · 0~1000(세로) — 세로는 3/4 로 줄여 같은 배율(굵기가 일그러지지 않게)로 그린다
+    function setT(ctx = g2, width = cw, ratio = dpr) { const s = (ratio * width) / 1000; ctx.setTransform(s, 0, 0, s, 0, 0); }
+    function wipe(ctx = g2, canvas = cv) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+    // 획 하나의 점 [from, to) 를 그린다 — 이웃한 두 점의 가운데를 잇는 2차 곡선. 이미 from 개를 그렸으면 그 뒤만 잇는다
+    function paintStroke(s, from, to, ctx = g2, minW = 0) {
+      if (to <= from || to < 1) return;
+      const p = s.p, Y = 0.75, colors = pal(), ws = widths();
+      const X = (i) => p[i * 2], YY = (i) => p[i * 2 + 1] * Y;
+      const lw = Math.max(ws[s.w] != null ? ws[s.w] : ws[1], minW);
+      ctx.strokeStyle = ctx.fillStyle = colors[s.c] || colors[0];
+      ctx.lineWidth = lw; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      if (to === 1) { ctx.beginPath(); ctx.arc(X(0), YY(0), lw / 2, 0, Math.PI * 2); ctx.fill(); return; }
+      ctx.beginPath();
+      let start;
+      if (from <= 1) { ctx.moveTo(X(0), YY(0)); ctx.lineTo((X(0) + X(1)) / 2, (YY(0) + YY(1)) / 2); start = 1; }
+      else { start = from - 1; ctx.moveTo((X(start - 1) + X(start)) / 2, (YY(start - 1) + YY(start)) / 2); }
+      for (let i = start; i < to - 1; i++) ctx.quadraticCurveTo(X(i), YY(i), (X(i) + X(i + 1)) / 2, (YY(i) + YY(i + 1)) / 2);
+      ctx.lineTo(X(to - 1), YY(to - 1));
+      ctx.stroke();
+    }
+
+    // ── 그리는 사람 — 내 모델(서버가 받은 획 + 아직 안 보낸 점) · 대기열 ─────────────────
+    // 획 = { kind: "stroke", i, n, c, w, p: [x, y, …], sent(보낸 점 수), seq(다음 조각 번호), done(펜을 뗌), drawn(캔버스에 그린 점 수) }
+    let mine = [];
+    let ops = []; // 획(위 객체 그대로) · { kind: "undo", s } · { kind: "clear" } — 한 번에 하나씩 차례대로 보낸다
+    let inflight = false, lastSent = 0, pumpTimer = 0, nextId = 0, penLock = false, retryN = 0;
+    let awaitRoom = false; // 방을 다시 받는 중(C.refresh) — 받기 전에는 서버 그림으로 맞추지 않는다
+    let active = null; // 지금 그리는 획 { s, id: pointerId }
+    let clearArm = 0, wOpen = false, passBusy = false, passShake = 0;
+
+    const localPts = () => mine.reduce((a, s) => a + cnt(s), 0);
+    function syncId() { if (w) nextId = Math.max(nextId, w.lastId || 0); }
+    function drawMine() { wipe(); setT(); for (const s of mine) { paintStroke(s, 0, cnt(s)); s.drawn = cnt(s); } }
+    function fromServer() {
+      mine = (w ? w.strokes : []).map((s) => ({ kind: "stroke", i: s.i, n: w.n, c: s.c, w: s.w, p: s.p.slice(), sent: s.p.length / 2, seq: 1e6, done: true, drawn: 0 }));
+      if (cv.parentNode) drawMine();
+    }
+    function resetDraw() {
+      mine = []; ops = []; active = null; penLock = false; clearArm = 0; retryN = 0;
+      clearTimeout(pumpTimer); pumpTimer = 0;
+    }
+    function removeOp(op) { const i = ops.indexOf(op); if (i >= 0) ops.splice(i, 1); }
+    function finishOp(op, take) {
+      if (op.kind === "stroke") {
+        op.sent += take; op.seq += 1; op.fix = 0;
+        if (op.done && op.sent >= cnt(op)) removeOp(op);
+      } else removeOp(op);
+    }
+    // 응답 받은 방으로 — 이미 더 새 방을 받았으면 버린다(응답 순서가 엇갈릴 때)
+    function accept(next) {
+      if (!next || !next.id || !C || !C.room || C.room.id !== next.id) return; // 그사이 다른 방으로 갔으면 버린다
+      if (Number(next.seq) < Number(C.room.seq)) return;
+      C.set(next);
+      if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+    }
+
+    async function pump() {
+      clearTimeout(pumpTimer); pumpTimer = 0;
+      if (inflight || !ops.length || !room || !w || room.status !== "PLAYING") return;
+      const wait = lastSent + GAP - Date.now();
+      if (wait > 0) { pumpTimer = setTimeout(pump, wait); return; }
+      const op = ops[0];
+      let action, arg = null, take = 0;
+      if (op.kind === "stroke") {
+        const have = cnt(op);
+        if (op.sent >= have) { if (op.done) { ops.shift(); pump(); } return; } // 새 점이 오면 pointermove 가 다시 부른다
+        // 응답이 끊겨 다시 보낼 때는 꼭 같은 조각(같은 점 수)으로 — 서버가 이미 받았으면 SKETCH_STALE 로 그대로 넘어가게
+        take = op.fix ? Math.min(op.fix, have - op.sent) : Math.min(have - op.sent, (w && w.chunkMax) || 80);
+        const pts = [];
+        for (let i = op.sent; i < op.sent + take; i++) pts.push([op.p[i * 2], op.p[i * 2 + 1]]);
+        action = "stroke";
+        arg = { id: op.i, seq: op.seq, n: op.n, c: op.c, w: op.w, pts };
+      } else if (op.kind === "undo") {
+        if (op.s && !op.s.sent) { ops.shift(); pump(); return; } // 서버에 닿지 못한 획 — 되돌릴 것도 없다
+        action = "undo";
+      } else action = op.kind;
+      inflight = true;
+      lastSent = Date.now();
+      op.flying = take; // 날아가는 중인 점 수 — 그사이 되돌리기를 눌러도 이 점까지는 남겨 둔다(같은 조각을 다시 보낼 수 있게)
+      const id = room.id;
+      const refetch = () => { awaitRoom = true; if (C) C.refresh(); };
+      try {
+        const next = await HKApi.coopAct(id, action, arg);
+        retryN = 0;
+        finishOp(op, take);
+        accept(next);
+      } catch (e) {
+        const code = e && e.code;
+        if (code === "ESCAPE_TOO_FAST") lastSent = Date.now() - GAP + 150; // 150ms 뒤 같은 조각을 다시(거절된 조각은 저장되지 않았다)
+        else if (code === "SKETCH_STALE") finishOp(op, take); // 이미 받았거나 지난 조각 — 받은 것으로 친다
+        else if (code === "SKETCH_RESYNC") await resync();
+        else if (code === "SKETCH_FULL") {
+          ops = ops.filter((o) => o.kind !== "stroke");
+          if (active) active = null;
+          penLock = true;
+          fromServer();
+          HKUI.toast(e.message || "그림이 너무 복잡해요. 조금 지우고 이어 그려 주세요.", "error");
+          syncTools(true);
+        } else if (code === "SKETCH_EMPTY") { removeOp(op); syncTools(true); }
+        else if (["SKETCH_NOT_DRAWER", "ESCAPE_NOT_PLAYING", "WORDS_NOT_YOUR_TURN"].includes(code)) { ops = []; refetch(); }
+        else if (code === "SKETCH_BAD_STROKE") { console.warn("sketch: 받지 않은 그림 조각", arg); if (op.kind === "stroke") { op.sent = cnt(op); op.done = true; } removeOp(op); }
+        else if (op.kind === "undo" && (!e || !e.status || e.status >= 500)) { // 되돌리기는 두 번 하면 안 된다 — 다시 받아 맞춘다
+          removeOp(op); refetch();
+        } else if (!e || !e.status || e.status >= 500) { // 연결이 끊김 — 순서를 지키려고 같은 조각을 조금 뒤에 다시
+          if (op.kind === "stroke") op.fix = take;
+          retryN += 1;
+          if (retryN > 8) { ops = []; retryN = 0; HKUI.toast("그림을 보내지 못했어요. 연결을 확인해 주세요.", "error"); refetch(); }
+          else lastSent = Date.now() + Math.min(3000, 300 * retryN) - GAP;
+        } else { removeOp(op); HKUI.toast(e.message || "지금은 할 수 없어요.", "error"); }
+      } finally {
+        inflight = false;
+        op.flying = 0;
+        pump();
+        reconcile(); // 보낼 것이 다 끝났으면 서버 그림과 맞춰 본다(응답이 끊긴 채 저장된 획 등)
+      }
+    }
+    // 새 획 번호가 뒤처졌다(다른 창 등) — 방을 다시 받아 lastId 로 맞추고, 아직 안 보낸 획은 새 번호로 처음부터 보낸다
+    async function resync() {
+      if (!room) return;
+      try {
+        const fresh = await HKApi.coopDetail(room.id);
+        const v = fresh && fresh.sketch;
+        if (!v || !w || v.n !== w.n) { ops = []; accept(fresh); return; }
+        nextId = Math.max(0, v.lastId || 0);
+        ops = ops.filter((o) => o.kind !== "stroke" || mine.includes(o));
+        for (const o of ops) if (o.kind === "stroke" && o.sent === 0) { o.i = ++nextId; o.seq = 0; o.fix = 0; }
+        accept(fresh);
+      } catch (_) { lastSent = Date.now() + 600; }
+    }
+
+    // ── 펜 입력 ──
+    function toPt(e) {
+      const r = cv.getBoundingClientRect();
+      const x = Math.round(((e.clientX - r.left) / r.width) * 1000), y = Math.round(((e.clientY - r.top) / r.height) * 1000);
+      return [Math.max(0, Math.min(1000, x)), Math.max(0, Math.min(1000, y))];
+    }
+    function full() { return mine.length >= ((w && w.strokesMax) || 200) || localPts() >= ((w && w.ptsMax) || 4000); }
+    function canPen() { return drawing() && !penLock && !(fx && performance.now() < fx.until); }
+    function down(e) {
+      if (!drawing()) return;
+      if (active) return; // 두 번째 손가락(핀치)은 무시
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      e.preventDefault();
+      const board = cv.parentNode;
+      if (board && board.focus) board.focus({ preventScroll: true });
+      if (!canPen()) {
+        if (penLock) HKUI.toast("그림이 너무 복잡해요. 조금 지우고 이어 그려 주세요.", "error");
+        return;
+      }
+      if (full()) { penLock = true; syncTools(true); HKUI.toast("그림이 너무 복잡해요. 조금 지우고 이어 그려 주세요.", "error"); return; }
+      syncId();
+      const [x, y] = toPt(e);
+      const s = { kind: "stroke", i: ++nextId, n: w.n, c: tool.c, w: tool.w, p: [x, y], sent: 0, seq: 0, done: false, drawn: 0 };
+      mine.push(s);
+      ops.push(s);
+      active = { s, id: e.pointerId };
+      try { cv.setPointerCapture(e.pointerId); } catch (_) { /* 캡처 못 해도 그린다 */ }
+      setT();
+      paintStroke(s, 0, 1);
+      s.drawn = 1;
+      emptyHint();
+      pump();
+    }
+    function move(e) {
+      if (!active || e.pointerId !== active.id) return;
+      const s = active.s;
+      const list = typeof e.getCoalescedEvents === "function" ? e.getCoalescedEvents() : [];
+      const evs = list && list.length ? list : [e];
+      const max = (w && w.ptsMax) || 4000;
+      let total = localPts();
+      for (const ev of evs) {
+        if (total >= max) break;
+        const [x, y] = toPt(ev);
+        const lx = s.p[s.p.length - 2], ly = s.p[s.p.length - 1];
+        if ((x - lx) ** 2 + (y - ly) ** 2 < MIN_STEP * MIN_STEP) continue;
+        s.p.push(x, y);
+        total += 1;
+      }
+      const have = cnt(s);
+      if (have > s.drawn) { setT(); paintStroke(s, s.drawn, have); s.drawn = have; pump(); syncInkBar(); }
+    }
+    function up(e) {
+      if (!active || (e && e.pointerId !== active.id)) return;
+      active.s.done = true;
+      active = null;
+      syncTools();
+      pump();
+    }
+    cv.addEventListener("pointerdown", down);
+    cv.addEventListener("pointermove", move);
+    cv.addEventListener("pointerup", up);
+    cv.addEventListener("pointercancel", up);
+    cv.addEventListener("lostpointercapture", up); // 그리다가 화면이 통째로 다시 그려지면 — 모은 점은 마저 보내고 그 획을 끝낸다
+    cv.addEventListener("contextmenu", (e) => { if (drawing()) e.preventDefault(); });
+
+    function undo() {
+      if (!drawing()) return;
+      if (active) up();
+      const s = mine.pop();
+      if (!s) return;
+      const qi = ops.indexOf(s);
+      const flying = inflight && qi === 0; // 이 획의 조각이 지금 날아가는 중
+      if (qi >= 0 && s.sent === 0 && !flying) ops.splice(qi, 1); // 아직 하나도 안 보낸 획 — 대기열에서 빼면 끝
+      else {
+        // 남은 점은 보내지 않는다. 날아가는 조각의 점은 남겨 둔다 — 응답이 끊겨도 같은 조각을 다시 보내 서버와 맞춘 뒤 되돌린다
+        if (qi >= 0) { s.p.length = Math.min(s.p.length, (s.sent + (flying ? s.flying || 0 : 0)) * 2); s.done = true; }
+        ops.push({ kind: "undo", s });
+      }
+      penLock = false;
+      drawMine();
+      sfx("tap");
+      syncTools(true);
+      emptyHint();
+      pump();
+    }
+    function clearAll() {
+      if (!drawing()) return;
+      if (active) up();
+      const anySent = (w && w.strokes.length > 0) || mine.some((s) => s.sent > 0) || inflight;
+      for (const s of mine) {
+        const qi = ops.indexOf(s);
+        if (qi < 0) continue;
+        if (s.sent === 0 && !(inflight && qi === 0)) ops.splice(qi, 1);
+        else { s.p.length = Math.min(s.p.length, s.sent * 2); s.done = true; }
+      }
+      mine = [];
+      ops = ops.filter((o) => o.kind !== "undo");
+      if (anySent) ops.push({ kind: "clear" });
+      clearArm = 0; penLock = false;
+      drawMine();
+      sfx("drop");
+      syncTools(true);
+      emptyHint();
+      pump();
+    }
+    async function pass() {
+      if (!drawing() || passBusy) return;
+      if (now() < w.passAt) { passShake = Date.now(); syncTools(true); return; }
+      passBusy = true;
+      try {
+        const next = await HKApi.coopAct(room.id, "pass", null);
+        ops = []; active = null;
+        accept(next);
+      } catch (e) {
+        if (e.code === "ESCAPE_TOO_FAST") { passShake = Date.now(); syncTools(true); }
+        else if (["SKETCH_NOT_DRAWER", "ESCAPE_NOT_PLAYING"].includes(e.code)) C.refresh();
+        else HKUI.toast(e.message || "넘기지 못했어요", "error");
+      } finally { passBusy = false; }
+    }
+    function pick(c) {
+      if (c === tool.c) return;
+      if (c === ERASER) { if (tool.c !== ERASER) tool.pw = tool.w; tool.w = 3; } // 지우개는 굵게
+      else if (tool.c === ERASER) tool.w = tool.pw != null ? tool.pw : 1;
+      tool.c = c;
+      store.set(TOOL_KEY, tool);
+      sfx("select");
+      syncTools(true);
+    }
+    function pickW(i) { tool.w = i; if (tool.c !== ERASER) tool.pw = i; wOpen = false; store.set(TOOL_KEY, tool); sfx("select"); syncTools(true); }
+
+    // ── 맞히는 사람 — 받은 획을 조금씩 이어 그린다 ─────────────────
+    const ink = { n: -1, ink: -1, ids: [], cnt: [], list: [], end: 0, raf: 0, penT: 0 };
+    function inkFull() {
+      if (!w || !cv.parentNode) return;
+      wipe(); setT();
+      for (const s of w.strokes) paintStroke(s, 0, cnt(s));
+      ink.n = w.n; ink.ink = w.ink; ink.list = w.strokes;
+      ink.ids = w.strokes.map((s) => s.i); ink.cnt = w.strokes.map(cnt);
+    }
+    function inkSync() {
+      if (!w || !cv.parentNode) return;
+      if (ink.n === w.n && ink.ink === w.ink) return; // 그림 버전이 같으면 다시 그리지 않는다
+      const list = w.strokes;
+      const prefix = ink.n === w.n && ink.ids.length <= list.length && ink.ids.every((id, i) => list[i].i === id && cnt(list[i]) >= ink.cnt[i]);
+      if (!prefix) { inkFull(); return; } // 되돌리기 · 지우기 — 처음부터
+      ink.ink = w.ink; ink.list = list;
+      while (ink.ids.length < list.length) { ink.ids.push(list[ink.ids.length].i); ink.cnt.push(0); }
+      ink.end = performance.now() + (reduce() ? 0 : 100); // 새로 온 선은 0.1초 동안 나눠 그려 「지금 그리는 중」처럼
+      if (!ink.raf) ink.raf = requestAnimationFrame(inkStep);
+    }
+    function inkStep() {
+      ink.raf = 0;
+      if (!cv.parentNode || !w || ink.n !== w.n) return;
+      const list = ink.list;
+      let pending = 0;
+      for (let i = 0; i < list.length; i++) pending += Math.max(0, cnt(list[i]) - ink.cnt[i]);
+      if (pending <= 0) return;
+      const left = ink.end - performance.now();
+      let budget = left <= 0 ? pending : Math.max(1, Math.ceil((pending * 16) / Math.max(16, left)));
+      setT();
+      let last = null;
+      for (let i = 0; i < list.length && budget > 0; i++) {
+        const have = cnt(list[i]), from = ink.cnt[i];
+        if (from >= have) continue;
+        const to = Math.min(have, from + budget);
+        paintStroke(list[i], from, to);
+        budget -= to - from;
+        ink.cnt[i] = to;
+        last = [list[i], to];
+      }
+      if (last) penAt(last[0], last[1]);
+      if (pending > 0 && ink.cnt.some((c, i) => c < cnt(list[i]))) ink.raf = requestAnimationFrame(inkStep);
+    }
+    function penAt(s, to) {
+      if (!w || w.role !== "guess" || !cw) return;
+      const x = (s.p[(to - 1) * 2] / 1000) * cw, y = (s.p[(to - 1) * 2 + 1] / 1000) * ch;
+      const c = pal()[s.c] || "#1f2937";
+      const eraser = s.c === ERASER;
+      penEl.innerHTML = eraser
+        ? `<svg viewBox="0 0 34 34"><rect x="4" y="12" width="22" height="14" rx="3" transform="rotate(-35 15 19)" fill="#e2e8f0" stroke="#64748b" stroke-width="1.5"/></svg>`
+        : `<svg viewBox="0 0 34 34"><path d="M5 31l2-7 17-17 5 5-17 17z" fill="${c}" stroke="#0f172a" stroke-width="1.2" stroke-linejoin="round"/><path d="M20 11l5 5" stroke="#fff" stroke-width="2" opacity=".6"/><path d="M5 31l2-7 5 5z" fill="#0f172a"/></svg>`;
+      penEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+      penEl.classList.add("is-on");
+      clearTimeout(ink.penT);
+      ink.penT = setTimeout(() => penEl.classList.remove("is-on"), 800);
+    }
+    function emptyHint() {
+      const el = document.getElementById("sk-emptyhint");
+      if (!el || !w) return;
+      const none = w.role === "draw" ? !mine.length : !w.strokes.length;
+      el.hidden = !none || !!(fx && performance.now() < fx.until);
+    }
+
+    // ── 낱말이 바뀔 때 — 정답 · 넘김 덮개 → 지우개로 쓱 → 역할 카드 ─────────────────
+    let fx = null; // { kind, word, pts, streak, until, start, wipeAt, flyDone }
+    let flipFor = null, scrolledFor = null;
+    function startFx(d, nw) {
+      const calm = reduce();
+      const show = calm ? 800 : 1200, wipeMs = calm ? 0 : 450;
+      fx = { kind: d.ok ? "ok" : "pass", word: d.word, pts: d.pts, streak: d.ok ? nw.streak : 0, start: performance.now(), show, wipeMs, until: performance.now() + show + wipeMs, fresh: true };
+      // 지난 그림을 유령 캔버스에 옮겨 두고(덮개 아래 보이게) 지우개가 쓸고 가면 사라진다
+      if (cv.width && cv.height && !calm) {
+        ghost.width = cv.width; ghost.height = cv.height;
+        ghost.getContext("2d").drawImage(cv, 0, 0);
+        ghost.hidden = false;
+      }
+    }
+    function fxRender() {
+      if (!fx || !fx.fresh) return;
+      fx.fresh = false;
+      const left = Math.max(0, fx.until - performance.now());
+      const colors = ["#facc15", "#f472b6", "#a78bfa", "#34d399", "#60a5fa", "#fb923c"];
+      const conf = fx.kind === "ok" && fx.streak >= 3 && !reduce() ? Array.from({ length: 12 }, (_, i) => {
+        const a = (i / 12) * Math.PI * 2, dd = 80 + (i % 3) * 30;
+        return `<i style="--c:${colors[i % colors.length]};--x:calc(-50% + ${Math.round(Math.cos(a) * dd)}px);--y:calc(-50% + ${Math.round(Math.sin(a) * dd * 0.7)}px);--r:${(i * 53) % 360}deg"></i>`;
+      }).join("") : "";
+      fxEl.className = `sk-fx is-${fx.kind}`;
+      fxEl.innerHTML = fx.kind === "ok"
+        ? `${conf}<b>정답!</b><span>「${esc(fx.word)}」 +${fx.pts}점</span>${fx.streak >= 3 ? `<em>🔥 ${fx.streak}연속!</em>` : ""}`
+        : `<b>넘겼어요</b><span>정답은 「${esc(fx.word)}」</span>`;
+      fxEl.style.setProperty("--fxs", `${fx.show}ms`);
+      void fxEl.offsetWidth;
+      fxEl.classList.add("is-on");
+      if (!ghost.hidden) {
+        ghost.style.setProperty("--wd", `${fx.show}ms`);
+        eraserEl.style.setProperty("--wd", `${fx.show}ms`);
+        ghost.classList.remove("is-wipe"); eraserEl.classList.remove("is-on");
+        void ghost.offsetWidth;
+        ghost.classList.add("is-wipe"); eraserEl.classList.add("is-on");
+      }
+      clearTimeout(fx.timer);
+      const mine2 = fx;
+      fx.timer = setTimeout(() => {
+        if (fx !== mine2) return;
+        fxEl.classList.remove("is-on"); fxEl.innerHTML = "";
+        ghost.hidden = true; ghost.classList.remove("is-wipe"); eraserEl.classList.remove("is-on");
+        fx = null;
+        emptyHint();
+        if (w && w.role === "draw" && drawing()) syncTools(true);
+      }, left + 30);
+      // 점수 칩으로 날아가는 +점
+      if (fx.kind === "ok" && !reduce()) setTimeout(() => flyPts(mine2), 450);
+    }
+    function flyPts(f) {
+      const from = fxEl.getBoundingClientRect(), chip = document.getElementById("sk-score");
+      if (!chip || !from.width) return;
+      const to = chip.getBoundingClientRect();
+      const el = document.createElement("div");
+      el.className = "sk-fly";
+      el.textContent = `+${f.pts}`;
+      el.style.left = `${from.left + from.width / 2 - 24}px`;
+      el.style.top = `${from.top + from.height / 2 + 30}px`;
+      document.body.appendChild(el);
+      const dx = to.left + to.width / 2 - (from.left + from.width / 2), dy = to.top + to.height / 2 - (from.top + from.height / 2 + 30);
+      const anim = el.animate ? el.animate([{ transform: "translate(0,0) scale(1)", opacity: 1 }, { transform: `translate(${dx}px, ${dy}px) scale(.6)`, opacity: 0.2 }], { duration: 650, easing: "cubic-bezier(.4,0,.2,1)", fill: "forwards" }) : null;
+      const done = () => { el.remove(); const c = document.getElementById("sk-score"); if (c) { c.classList.remove("is-bump"); void c.offsetWidth; c.classList.add("is-bump"); } };
+      if (anim) anim.onfinish = done; else setTimeout(done, 650);
+    }
+
+    // ── 화면 조각 ─────────────────────────────────────────────
+    // 역할 카드는 지우개가 쓸기 시작할 때 들어온다(그리는 사람이 제시어를 빨리 보게)
+    const fxDelay = () => (fx ? Math.max(0, Math.round(fx.until - fx.wipeMs - performance.now())) : 0);
+    function statusHtml() {
+      const role = w.role === "draw"
+        ? `<span class="sk-role is-draw"><i aria-hidden="true">✏️</i><b>내가 그릴 차례</b></span>`
+        : `<span class="sk-role is-guess"><i aria-hidden="true">🤔</i><b>내가 맞힐 차례</b></span>`;
+      const left = w.end - now();
+      return `<div class="sk-chips">
+          <span class="sk-chip is-clock ${left <= 30 ? "is-low" : ""}" id="sk-clock" role="timer" aria-label="남은 시간">⏱ <b>${clockText(left)}</b></span>
+          <span class="sk-chip is-score" id="sk-score">점수 <b>${w.score}</b></span>
+          <span class="sk-chip">맞힘 <b>${w.right}</b></span>
+          ${w.streak >= 2 ? `<span class="sk-chip is-fire">🔥 <b>${w.streak}</b>연속</span>` : ""}
+        </div>${role}`;
+    }
+    function clockText(left) { const s = Math.max(0, Math.round(left)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
+    function hintLeft() { return Math.max(0, Math.ceil(w.hintAt - now())); }
+    function peekHtml() {
+      if (w.hint) return `초성 힌트 열림 · <b>${esc(w.hint)}</b>`;
+      return `초성 힌트까지 <b id="sk-peek-left">${hintLeft()}</b>초`;
+    }
+    let tilesFor = null;
+    function tilesHtml() {
+      const reveal = w.hint && tilesFor !== `${w.n}:h` && !reduce();
+      tilesFor = `${w.n}:${w.hint ? "h" : "-"}`;
+      const letters = w.hint ? [...w.hint] : Array.from({ length: w.letters }, () => "");
+      return { reveal, html: letters.map((c, i) => `<span class="sk-tile ${c ? "" : "is-q"}" style="--i:${i}">${c ? esc(c) : "?"}</span>`).join("") };
+    }
+    function cardHtml() {
+      const anim = flipFor !== w.n;
+      const delay = anim ? `style="--fxd:${fxDelay()}ms"` : "";
+      if (w.role === "draw") {
+        return `<div class="sk-card is-draw ${anim ? "is-rise" : ""}" ${delay}>
+            <div class="sk-card__main"><small>제시어 · ${esc(w.cat)}</small>
+              <b class="sk-word ${hideWord ? "is-hidden" : ""}" id="sk-word" ${hideWord ? `title="누르고 있으면 보여요"` : ""}>${esc(w.word || "")}</b><span class="sk-cat-m">· ${esc(w.cat)}</span>
+              <p class="sk-foul"><span aria-hidden="true">🚫</span>글자·숫자를 쓰면 반칙이에요</p></div>
+            <div class="sk-card__side"><span class="sk-next" id="sk-next">다음 정답 +${w.nextPts}점</span>
+              <span class="sk-peek ${w.hint ? "is-open" : ""}" id="sk-peek" title="${esc(mate())}님에게 40초 뒤 초성 힌트가 보여요">${peekHtml()}</span>
+              <button type="button" class="sk-hide" data-hide aria-pressed="${hideWord}" title="옆자리에서 같이 할 때 제시어를 가려요">👀 <span>${hideWord ? "가림" : "가리기"}</span></button></div>
+          </div>`;
+      }
+      const t = tilesHtml();
+      const p = w.hint ? 1 : Math.max(0, Math.min(1, (now() - w.wordAt) / Math.max(1, w.hintAt - w.wordAt)));
+      return `<div class="sk-card is-guess ${anim ? "is-flip" : ""}" ${delay}>
+          <div class="sk-card__main"><small>${esc(mate())}님이 그리는 낱말 · ${esc(w.cat)}</small>
+            <div class="sk-tiles ${t.reveal ? "is-reveal" : ""}" id="sk-tiles" aria-label="${w.letters}글자 낱말${w.hint ? `, 초성 ${esc(w.hint)}` : ""}">${t.html}</div><span class="sk-cat-m">${esc(w.cat)}</span></div>
+          <div class="sk-hintbar ${w.hint ? "is-open" : ""}" id="sk-hintbar"><i><span id="sk-hint-bar" style="transform:scaleX(${p.toFixed(3)})"></span></i>
+            <small id="sk-hint-left">${w.hint ? "초성 힌트가 열렸어요" : `초성 힌트까지 ${hintLeft()}초`}</small></div>
+          <span class="sk-next" id="sk-next">다음 정답 +${w.nextPts}점</span>
+        </div>`;
+    }
+    // 받침대 위 마커(왼쪽이 촉) · 지우개
+    const markerSvg = (c, eraser) => (eraser
+      ? `<svg viewBox="0 0 50 18" aria-hidden="true"><rect x="4" y="1" width="42" height="16" rx="3" fill="#0f766e"/><rect x="4" y="1" width="15" height="16" rx="3" fill="#f1f5f9"/><rect x="23" y="6" width="19" height="3" rx="1.5" fill="#5eead4"/></svg>`
+      : `<svg viewBox="0 0 50 18" aria-hidden="true"><path d="M1 9l7-5h3v10H8z" fill="${c}"/><rect x="10" y="2" width="27" height="14" rx="3" fill="${c}"/><rect x="15" y="6" width="15" height="6" rx="1.5" fill="#fff" opacity=".9"/><rect x="36" y="1" width="12" height="16" rx="3.5" fill="${c}"/><rect x="36" y="1" width="12" height="16" rx="3.5" fill="#000" opacity=".18"/></svg>`);
+    const ICON_UNDO = `<svg class="sk-ico" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M7 4L3 8l4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 8H12a5 5 0 0 1 0 10H8" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>`;
+    const ICON_TRASH = `<svg class="sk-ico" viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 5h14M8 5V3h4v2M5 5l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+    function ledgeHtml() {
+      if (w.role !== "draw") {
+        return `<div class="sk-ledge is-deco" aria-hidden="true">${markerSvg("#2563eb")}${markerSvg("#dc2626")}${markerSvg("#1f2937")}</div>`;
+      }
+      const colors = pal(), names = palNames();
+      return `<div class="sk-ledge" role="group" aria-label="마커 고르기">${colors.map((c, i) => `<button type="button" class="sk-mk" data-color="${i}" aria-pressed="${tool.c === i}" aria-label="${esc(names[i] || "")}${i === ERASER ? "" : " 마커"}" title="${esc(names[i] || "")} (${i + 1})">${markerSvg(c, i === ERASER)}</button>`).join("")}</div>`;
+    }
+    function inkInfo() {
+      const used = Math.max(localPts(), w.pts || 0), max = w.ptsMax || 4000;
+      const strokes = Math.max(mine.length, w.strokes.length), smax = w.strokesMax || 200;
+      const r = Math.max(used / max, strokes / smax);
+      return { r, hot: r > 0.9 || penLock, show: r > 0.5 || penLock };
+    }
+    function inkBarHtml() {
+      const k = inkInfo();
+      if (!k.show) return "";
+      return `<div class="sk-ink ${k.hot ? "is-hot" : ""}" id="sk-ink"><span>${penLock ? "그림이 너무 복잡해요. 조금 지워 주세요" : k.hot ? "조금만 더 그릴 수 있어요" : "그림 칸 사용량"}</span><i><span style="width:${Math.round(Math.min(1, k.r) * 100)}%"></span></i></div>`;
+    }
+    function passP() { return Math.max(0, Math.min(1, (now() - w.wordAt) / Math.max(0.1, w.passAt - w.wordAt))); }
+    function toolsHtml() {
+      const ws = widths();
+      const maxW = ws[ws.length - 1] || 36;
+      const dot = (i) => { const d = Math.round(5 + (ws[i] / maxW) * 17); return `<i style="width:${d}px;height:${d}px;${tool.c !== ERASER ? `background:${pal()[tool.c]}` : ""}"></i>`; };
+      const canUndo = mine.length > 0;
+      const arm = clearArm > Date.now();
+      const ready = now() >= w.passAt;
+      const longWait = w.passAt - w.wordAt >= 4;
+      return `${ledgeHtml()}
+        <div class="sk-row">
+          <div class="sk-widths ${wOpen ? "is-open" : ""}">
+            <button type="button" class="sk-w sk-wcur" data-wtoggle aria-expanded="${wOpen}" aria-label="굵기 고르기 — 지금 ${W_NAMES[tool.w] || ""}">${dot(tool.w)}</button>
+            <div class="sk-wlist" role="group" aria-label="굵기">${ws.map((_, i) => `<button type="button" class="sk-w" data-width="${i}" aria-pressed="${tool.w === i}" aria-label="${W_NAMES[i] || ""}" title="${W_NAMES[i] || ""} ( [ · ] )">${dot(i)}</button>`).join("")}</div>
+          </div>
+          <button type="button" class="sk-tool" data-undo ${canUndo ? "" : "disabled"} aria-label="되돌리기" title="되돌리기 (Ctrl+Z)">${ICON_UNDO}<span class="sk-lab">되돌리기</span></button>
+          <button type="button" class="sk-tool ${arm ? "is-arm" : ""}" data-clear ${canUndo || (w.strokes && w.strokes.length) ? "" : "disabled"} aria-label="${arm ? "한 번 더 누르면 모두 지워요" : "모두 지우기"}">${ICON_TRASH}<span class="sk-lab">${arm ? "한 번 더 누르면 모두 지워요" : "모두 지우기"}</span>${arm ? `<span class="sk-lab-m">한 번 더!</span>` : ""}</button>
+          <button type="button" class="sk-tool sk-pass ${passShake > Date.now() - 500 ? "is-shake" : ""}" id="sk-pass" data-pass ${ready ? "" : "disabled"} style="--p:${passP().toFixed(3)}" aria-label="이 낱말 넘기기 (감점 없음)"><span class="sk-lab">넘기기</span><span aria-hidden="true">›</span></button>
+          ${longWait && !ready ? `<p class="sk-passnote" id="sk-passnote">연달아 넘기면 조금 더 그려 봐야 해요</p>` : ""}
+        </div>
+        ${inkBarHtml()}`;
+    }
+    let chipSeen = { n: -1, t: 0 };
+    function answersHtml() {
+      const list = w.guesses.slice().reverse(); // 새 답이 왼쪽
+      const seen = chipSeen.n === w.n ? chipSeen.t : -1;
+      const chips = list.map((g) => {
+        const cls = g.ok ? "is-ok" : g.near ? "is-near" : "";
+        const tag = g.near ? `<em>${w.role === "guess" ? "거의 맞았어요!" : "거의!"}</em>` : "";
+        return `<span class="sk-a ${cls} ${g.t > seen && seen >= 0 ? "is-new" : ""}">${esc(g.text)}${tag}</span>`;
+      }).join("");
+      chipSeen = { n: w.n, t: w.guesses.reduce((m, g) => Math.max(m, g.t), 0) };
+      let left;
+      if (w.role === "draw") {
+        left = w.triesLeft > 0 ? `동료 기회 ${w.triesLeft}번` : w.hint ? "기회를 다 썼어요 · 넘겨도 괜찮아요" : "초성이 나오면 다시 낼 수 있어요";
+        return `<small>${esc(mate())}님의 답</small>${chips || `<span class="sk-a" style="text-decoration:none;background:transparent;color:#64748b">아직 답이 없어요</span>`}<span class="sk-left">${left}</span>`;
+      }
+      return `<small>내 답</small>${chips || `<span class="sk-a" style="text-decoration:none;background:transparent;color:#64748b">틀려도 괜찮아요. 떠오르는 대로 적어 보세요</span>`}`;
+    }
+    let reactLock = 0;
+    function reactsHtml() {
+      return `<small>반응 보내기 — 대화창 대신 정해진 말로 알려요</small>${(w.reacts || []).map((t, i) => `<button type="button" class="sk-rx" data-react="${i}">${esc(t)}</button>`).join("")}`;
+    }
+    function reactBubble() {
+      const r = w.react;
+      if (!r || now() - r.t >= REACT_SEC) return "";
+      return `<small>${r.mine ? "나" : `${esc(mate())}님`}</small>${esc(r.text)}`;
+    }
+    // 답 칩 · 반응 단추 — 좁은 화면은 보드 아래, 넓은 화면은 옆 칸 맨 위(talkHtml)
+    function talkInner() {
+      return `<div class="sk-answers" id="sk-answers" aria-live="polite">${answersHtml()}</div>
+          <div class="sk-reacts ${reactLock > Date.now() ? "is-wait" : ""}" id="sk-reacts">${reactsHtml()}</div>`;
+    }
+    function playHtml() {
+      if (!w) return "";
+      const draw = w.role === "draw";
+      const r = w.react && now() - w.react.t < REACT_SEC ? w.react : null;
+      return `<section class="sk-stage ${draw ? "is-draw" : "is-guess sk-gs"} ${penLock ? "is-locked" : ""}" id="sk-stage" aria-label="화이트보드 그림 퀴즈">
+          <div class="sk-top" id="sk-status">${statusHtml()}</div>
+          <div class="sk-cardwrap">${cardHtml()}</div>
+          <div class="sk-boardwrap"><div class="sk-frame">
+            <div class="sk-board" id="sk-slot" tabindex="${draw ? 0 : -1}" role="group" aria-label="${draw ? "내 화이트보드 — 그림으로 제시어를 알려 주세요" : "화이트보드"}">
+              <div class="sk-empty-hint" id="sk-emptyhint" hidden>${draw ? `<span><b aria-hidden="true">✏️</b>여기에 그려 주세요<br><small>글자·숫자는 쓰면 안 돼요</small></span>` : `<span><b aria-hidden="true">👀</b>${esc(mate())}님이 그리기 시작하면<br>여기에 보여요</span>`}</div>
+              <div class="sk-react ${r && r.mine ? "is-mine" : ""}" id="sk-react" ${r ? "" : "hidden"} aria-live="polite">${reactBubble()}</div>
+            </div>
+          </div>${draw ? "" : ledgeHtml()}</div>
+          ${draw ? `<div class="sk-tools" id="sk-tools">${toolsHtml()}</div>` : `<div class="sk-gslot" id="sk-gslot"></div>`}
+          ${wide() ? "" : talkInner()}
+        </section>`;
+    }
+    function rulesHtml() {
+      return `<ul class="sk-rules">
+          <li><span class="sk-pts">+2</span>정답</li>
+          <li><span class="sk-pts">+1</span>넘기지 않고 이어 맞히면(2~3번째) 더</li>
+          <li><span class="sk-pts">+2</span>4번째부터 이어 맞히면 더</li>
+          <li><span class="sk-pts">0</span>넘기기 — 감점 없이 이어 맞히기만 끊겨요</li>
+        </ul>
+        <p class="sk-promise"><span aria-hidden="true">✋</span>약속 — 그림에 글자·숫자를 쓰면 반칙이에요</p>`;
+    }
+    const byText = (d) => (d.by === w.me ? "내 그림" : `${esc(mate())}님 그림`);
+    function pastItem(d) {
+      return `<li class="${d.ok ? "is-ok" : "is-pass"}"><span class="sk-mark">${d.ok ? "✓" : "–"}</span>
+          <span class="sk-list__txt"><b>${esc(d.word)}</b><small>${d.ok ? "정답" : "넘김"}${d.sec != null ? ` · ${Math.round(d.sec)}초` : ""} · ${byText(d)}</small></span>
+          <em class="sk-pts">${d.ok ? `+${d.pts}` : "0"}</em></li>`;
+    }
+    function sideHtml() {
+      if (!w || room.status !== "PLAYING") return "";
+      const items = w.done.slice().reverse().map(pastItem).join("");
+      const total = w.right + w.passed;
+      const open = pastOpen == null ? !phone() : pastOpen;
+      const talk = wide() ? `<div class="er-card sk-talk ${w.role === "guess" ? "sk-gs" : ""}">${talkInner()}</div>` : "";
+      return `${talk}<details class="er-card sk-past" ${open ? "open" : ""}><summary>${HKUI.icon("history", 16, "currentColor")} 지나간 낱말<small>${total}개</small></summary>
+          ${items ? `<ul class="sk-list">${items}</ul>` : `<div class="sk-nolist">첫 낱말을 맞혀 보세요</div>`}</details>
+        <div class="er-card"><h2>${HKUI.icon("trophy", 16, "currentColor")} 점수 규칙</h2>${rulesHtml()}</div>`;
+    }
+
+    // ── 바뀐 칸만 고치기(patch) ─────────────────
+    const sig = {};
+    function region(id, key, html, after) {
+      if (sig[id] === key) return false;
+      const el = document.getElementById(id);
+      if (!el) return false;
+      sig[id] = key;
+      el.innerHTML = html();
+      if (after) after(el);
+      return true;
+    }
+    // 도구 줄 안에서 초점을 가진 단추를 다시 찾을 선택자
+    function toolKey(el, box) {
+      if (!el || !el.dataset || !box.contains(el)) return null;
+      const d = el.dataset;
+      if (d.color != null) return `[data-color="${d.color}"]`;
+      if (d.width != null) return `[data-width="${d.width}"]`;
+      const k = ["wtoggle", "undo", "clear", "pass"].find((x) => x in d);
+      return k ? `[data-${k}]` : null;
+    }
+    function syncTools(force) {
+      if (!w || w.role !== "draw") return;
+      const el = document.getElementById("sk-tools");
+      if (!el) return;
+      const k = inkInfo();
+      const key = [tool.c, tool.w, wOpen, mine.length > 0, (w.strokes || []).length > 0, clearArm > Date.now(), now() >= w.passAt, penLock, k.show, k.hot, passShake > Date.now() - 500].join("|");
+      if (force || sig["sk-tools"] !== key) {
+        sig["sk-tools"] = key;
+        const fk = toolKey(document.activeElement, el);
+        el.innerHTML = toolsHtml();
+        if (fk) { // 누른 단추가 새로 만들어져도 초점을 그 자리에 — 키보드 · 단축키가 끊기지 않게
+          const t = el.querySelector(fk);
+          if (t && !t.disabled && t.offsetParent) t.focus({ preventScroll: true });
+          if (document.activeElement !== t) { const board = document.getElementById("sk-slot"); if (board) board.focus({ preventScroll: true }); }
+        }
+        const st = document.getElementById("sk-stage");
+        if (st) st.classList.toggle("is-locked", penLock);
+        return;
+      }
+      const bar = document.querySelector("#sk-ink i span"); // 칸 사용량은 막대 길이만 고친다
+      if (bar) bar.style.width = `${Math.round(Math.min(1, k.r) * 100)}%`;
+    }
+    const syncInkBar = () => syncTools();
+    function syncRegions() {
+      if (!w) return;
+      region("sk-status", [w.score, w.right, w.streak, w.role].join("|"), statusHtml);
+      if (w.role === "draw") {
+        region("sk-peek", `${w.hint}`, peekHtml, (el) => el.classList.toggle("is-open", !!w.hint));
+        syncTools();
+      } else {
+        const tl = document.getElementById("sk-tiles");
+        if (tl && tilesFor !== `${w.n}:${w.hint ? "h" : "-"}`) {
+          const t = tilesHtml();
+          tl.innerHTML = t.html;
+          tl.classList.toggle("is-reveal", t.reveal);
+          tl.setAttribute("aria-label", `${w.letters}글자 낱말${w.hint ? `, 초성 ${w.hint}` : ""}`);
+          const hb = document.getElementById("sk-hintbar");
+          if (hb) hb.classList.toggle("is-open", !!w.hint);
+          // 초성이 열리면 남은 초 글자 · 진행 막대도 같이(tick 은 열리기 전에만 고친다)
+          const hl = document.getElementById("sk-hint-left");
+          if (hl) hl.textContent = w.hint ? "초성 힌트가 열렸어요" : `초성 힌트까지 ${hintLeft()}초`;
+          const bar = document.getElementById("sk-hint-bar");
+          if (bar && w.hint) bar.style.transform = "scaleX(1)";
+        }
+        syncGuess();
+      }
+      const nx = document.getElementById("sk-next");
+      if (nx) nx.textContent = `다음 정답 +${w.nextPts}점`;
+      region("sk-answers", `${w.n}|${w.guesses.map((g) => g.t).join(",")}|${w.triesLeft}|${w.hint}`, answersHtml);
+      syncReact();
+      emptyHint();
+    }
+    let reactShown = null;
+    function syncReact() {
+      const el = document.getElementById("sk-react");
+      if (!el || !w) return;
+      const r = w.react;
+      const on = !!(r && now() - r.t < REACT_SEC);
+      const key = on ? `${r.t}|${r.text}` : "";
+      if (el.dataset.key === key) return;
+      el.dataset.key = key;
+      el.hidden = !on;
+      if (!on) return;
+      el.className = `sk-react ${r.mine ? "is-mine" : ""}`;
+      el.innerHTML = reactBubble();
+      if (reactShown !== key) { reactShown = key; void el.offsetWidth; el.classList.add("is-new"); }
+    }
+
+    // ── 답 입력(맞히는 사람) — 노드 하나를 계속 쓴다 ─────────────────
+    const gform = document.createElement("form");
+    gform.className = "sk-gform";
+    gform.id = "sk-gform";
+    gform.noValidate = true;
+    gform.setAttribute("autocomplete", "off");
+    gform.innerHTML = `<div class="sk-grow">
+        <input class="sk-gin" id="sk-gin" type="text" maxlength="20" enterkeyhint="send" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="정답을 적어 주세요" aria-label="정답 적기">
+        <button type="submit" class="sk-ggo">맞히기</button>
+      </div><div class="sk-gnote" aria-live="polite"><span id="sk-gnote">띄어쓰기는 상관없어요. 낱말마다 10번까지 낼 수 있어요.</span><span class="sk-tries" id="sk-tries"></span></div>`;
+    const gin = gform.querySelector(".sk-gin"), ggo = gform.querySelector(".sk-ggo");
+    const gnote = gform.querySelector("#sk-gnote"), gtries = gform.querySelector("#sk-tries");
+    ggo.addEventListener("mousedown", (e) => e.preventDefault()); // 단추를 눌러도 입력 칸 초점(휴대폰 자판)이 그대로
+    let composing = false, pendingSend = false, noteUntil = 0, noteKind = "", noteText = "", gN = null, outOfTries = false;
+    function flash(text, kind, ms) { noteText = text; noteKind = kind; noteUntil = Date.now() + ms; syncGuess(); }
+    function shakeForm() { gform.classList.remove("is-shake"); void gform.offsetWidth; gform.classList.add("is-shake"); }
+    function syncGuess() {
+      if (!w || w.role !== "guess") return;
+      if (gN !== w.n) { // 새 낱말 — 지난 낱말에 쓰던 글은 지운다
+        if (gN != null) gin.value = "";
+        gN = w.n;
+        outOfTries = false;
+      }
+      gin.maxLength = w.guessMax || 20;
+      const none = w.triesLeft <= 0;
+      gin.disabled = none;
+      ggo.disabled = none;
+      if (none) gin.placeholder = w.hint ? "기회를 다 썼어요. 그림을 더 보거나 「넘겨도 괜찮아요」를 눌러 주세요" : "기회를 다 썼어요. 초성 힌트가 나오면 10번 더 낼 수 있어요";
+      else gin.placeholder = "정답을 적어 주세요";
+      const max = w.triesMax || 10;
+      gtries.innerHTML = Array.from({ length: max }, (_, i) => `<i class="${i < w.triesLeft ? "" : "is-off"}"></i>`).join("");
+      gtries.classList.toggle("is-low", w.triesLeft <= 3);
+      gtries.setAttribute("aria-label", `남은 기회 ${w.triesLeft}번`);
+      let text, kind = "";
+      if (noteUntil > Date.now()) { text = noteText; kind = noteKind; }
+      else if (none) text = w.hint ? "기회를 다 썼어요" : `기회를 다 썼어요 · 초성까지 ${hintLeft()}초`;
+      else text = w.hint ? `초성 힌트 ${w.hint} — 띄어쓰기는 상관없어요` : "띄어쓰기는 상관없어요. 낱말마다 10번까지 낼 수 있어요.";
+      if (gnote.textContent !== text) gnote.textContent = text;
+      gform.classList.toggle("is-bad", kind === "bad");
+      gform.classList.toggle("is-good", kind === "good");
+    }
+    async function submitGuess() {
+      if (!w || !room || room.status !== "PLAYING" || w.role !== "guess") return;
+      const text = gin.value.trim();
+      if (!text) { shakeForm(); return; }
+      if (w.triesLeft <= 0) { shakeForm(); sfx("invalid"); return; }
+      gin.value = "";
+      try {
+        const next = await HKApi.coopAct(room.id, "guess", text);
+        accept(next);
+      } catch (e) {
+        if (!gin.value) gin.value = text; // 못 냈으면 적던 글을 돌려놓는다
+        const code = e && e.code;
+        if (code === "ESCAPE_TOO_FAST") { shakeForm(); flash("조금 천천히 내 주세요", "bad", 1500); }
+        else if (code === "ESCAPE_CHAT_EMPTY") shakeForm();
+        else if (code === "SKETCH_NO_TRIES") { shakeForm(); if (C) C.refresh(); }
+        else if (["WORDS_NOT_YOUR_TURN", "ESCAPE_NOT_PLAYING", "SKETCH_NOT_DRAWER"].includes(code)) { gin.value = ""; if (C) C.refresh(); }
+        else if (code === "KITCHEN_BAD_ACTION") HKUI.toast("지금은 할 수 없어요.", "error");
+        else HKUI.toast((e && e.message) || "답을 내지 못했어요", "error");
+      }
+    }
+    gform.addEventListener("submit", (e) => {
+      e.preventDefault();
+      if (composing) { pendingSend = true; return; } // 한글을 조합하는 중에 Enter — 조합이 끝난 뒤 보낸다
+      submitGuess();
+    });
+    gin.addEventListener("compositionstart", () => { composing = true; });
+    gin.addEventListener("compositionend", () => { composing = false; if (pendingSend) { pendingSend = false; setTimeout(submitGuess, 0); } });
+    // 휴대폰 — 자판이 올라와 입력 줄을 가리면 가린 만큼만 위로(이미 자판 위에 보이면 그대로 둔다)
+    if (window.visualViewport) {
+      const vv = window.visualViewport;
+      const onVV = () => {
+        const slot = document.getElementById("sk-gslot");
+        if (!slot) return;
+        slot.style.setProperty("--kb", "0px");
+        if (!phone() || document.activeElement !== gin || (vv.scale || 1) > 1.05) return; // 손가락으로 크게 본 화면은 건드리지 않는다
+        const hidden = slot.getBoundingClientRect().bottom - (vv.offsetTop + vv.height); // 보이는 영역 아래로 삐져나간 만큼
+        if (hidden > 2) slot.style.setProperty("--kb", `${Math.round(hidden)}px`);
+      };
+      vv.addEventListener("resize", onVV);
+      vv.addEventListener("scroll", onVV);
+      gin.addEventListener("blur", () => setTimeout(onVV, 50));
+      gin.addEventListener("focus", () => setTimeout(onVV, 300));
+    }
+
+    async function react(i) {
+      if (!w || !room || reactLock > Date.now()) return;
+      reactLock = Date.now() + 1000;
+      const box = document.getElementById("sk-reacts");
+      if (box) box.classList.add("is-wait");
+      setTimeout(() => { const b = document.getElementById("sk-reacts"); if (b && reactLock <= Date.now()) b.classList.remove("is-wait"); }, 1020);
+      try { accept(await HKApi.coopAct(room.id, "react", i)); }
+      catch (e) {
+        if (e.code === "ESCAPE_TOO_FAST") { if (box) { box.classList.remove("sk-shake"); void box.offsetWidth; box.classList.add("sk-shake"); } }
+        else if (["ESCAPE_NOT_PLAYING"].includes(e.code)) C.refresh();
+        else HKUI.toast(e.message || "보내지 못했어요", "error");
+      }
+    }
+
+    // ── 끝 화면 · 그림첩 ─────────────────
+    // 「수박」이었어요 · 「사과」였어요 — 마지막 글자에 받침이 있으면 '이었어요'
+    function wasJosa(word) {
+      const c = String(word || "").charCodeAt(String(word || "").length - 1) - 0xac00;
+      return c >= 0 && c < 11172 && c % 28 ? "이었어요" : "였어요";
+    }
+    function endMc(score, right) {
+      if (!right) return "괜찮아요, 처음엔 다들 동그라미부터 그려요.";
+      if (score >= GREAT) return `${right}개나 맞혔네요! 다음 회의 때 화이트보드는 두 분께 맡길게요.`;
+      return `그림만으로 ${right}개 통했어요. 고생 많았어요!`;
+    }
+    function artHtml() {
+      if (!w || !w.art || !w.art.length) return "";
+      const cards = w.art.map((a, i) => `<button type="button" class="sk-art" data-art="${i}" aria-label="${esc(a.word)} 그림 크게 보기">
+          <span class="sk-art__pic"><canvas data-art-cv="${i}"></canvas></span>
+          <b>${a.ok ? "✅" : "⏭️"} ${esc(a.word)}</b><small>${a.by === w.me ? "내 그림" : `${esc(mate())}님 그림`}</small></button>`).join("");
+      return `<section class="er-card sk-album"><h2>${HKUI.icon("image", 16, "currentColor")} 그림첩<small>${w.art.length}장</small></h2><div class="sk-album__grid">${cards}</div></section>`;
+    }
+    function logHtml() {
+      if (!w) return "";
+      const rows = w.done.map(pastItem);
+      if (w.reason === "time" && w.word) {
+        rows.push(`<li class="is-last"><span class="sk-mark">!</span><span class="sk-list__txt"><b>${esc(w.word)}</b><small>시간이 다 됐어요 · ${w.role === "draw" ? "내 그림" : `${esc(mate())}님 그림`}</small></span><em class="sk-pts">0</em></li>`);
+      }
+      return `<section class="er-card sk-album"><h2>${HKUI.icon("list-checks", 16, "currentColor")} 지나간 낱말<small>${w.right}개 맞힘 · ${w.score}점</small></h2>
+          ${rows.length ? `<ul class="sk-list">${rows.join("")}</ul>` : `<div class="sk-nolist">이번 판에는 기록이 없어요</div>`}</section>`;
+    }
+    function drawArt(canvas, a, minPx) {
+      const box = canvas.parentNode.getBoundingClientRect();
+      const width = Math.round(box.width);
+      if (!width) return;
+      const d = Math.min(window.devicePixelRatio || 1, 2.5);
+      canvas.width = Math.round(width * d); canvas.height = Math.round(width * 0.75 * d);
+      const ctx = canvas.getContext("2d");
+      wipe(ctx, canvas);
+      setT(ctx, width, d);
+      const scale = (w && w.artScale) || 4;
+      const minW = (minPx * 1000) / width; // 작은 칸에서도 선이 보이게
+      for (const [c, wi, pts] of a.s || []) paintStroke({ c, w: wi, p: pts.map((v) => v * scale) }, 0, pts.length / 2, ctx, minW);
+    }
+    function paintArt() {
+      if (!w || !w.art) return;
+      document.querySelectorAll("canvas[data-art-cv]").forEach((c) => { const a = w.art[Number(c.dataset.artCv)]; if (a) drawArt(c, a, 1.6); });
+    }
+    const lb = document.createElement("div");
+    lb.className = "sk-lb";
+    lb.hidden = true;
+    lb.setAttribute("role", "dialog");
+    lb.setAttribute("aria-modal", "true");
+    lb.innerHTML = `<div class="sk-lb__in"><div class="sk-lb__pic"><canvas></canvas></div><div class="sk-lb__cap"><span><b></b><small></small></span><button type="button" data-lb-close>닫기</button></div></div>`;
+    document.body.appendChild(lb);
+    function openArt(i) {
+      const a = w && w.art && w.art[i];
+      if (!a) return;
+      lb.hidden = false;
+      lb.querySelector("b").textContent = `${a.ok ? "✅" : "⏭️"} ${a.word}`;
+      lb.querySelector("small").textContent = a.by === w.me ? "내 그림" : `${mate()}님 그림`;
+      drawArt(lb.querySelector("canvas"), a, 2);
+      lb.querySelector("[data-lb-close]").focus();
+    }
+    const closeArt = () => { lb.hidden = true; };
+    lb.addEventListener("click", (e) => { if (e.target === lb || e.target.closest("[data-lb-close]")) closeArt(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !lb.hidden) closeArt(); });
+
+    // ── 단축키(그리는 사람) — Ctrl/Cmd+Z 되돌리기 · 1~7 색 · [ ] 굵기 ─────────────────
+    function shortcut(e) {
+      if (!drawing() || e.defaultPrevented) return;
+      if (e.target && e.target.closest && e.target.closest("input, textarea, select")) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === "z" || e.key === "Z")) { e.preventDefault(); undo(); return; }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (/^[1-7]$/.test(e.key)) { const i = Number(e.key) - 1; if (i < pal().length) { e.preventDefault(); pick(i); } return; }
+      if (e.key === "[") { e.preventDefault(); pickW(Math.max(0, tool.w - 1)); }
+      else if (e.key === "]") { e.preventDefault(); pickW(Math.min(widths().length - 1, tool.w + 1)); }
+    }
+    // 방 안(root)에서 누른 키는 coop.js 가 game.keydown 으로 넘긴다. 초점이 어디에도 없을 때(body)는 root 에 닿지 않으므로 여기서 받는다
+    document.addEventListener("keydown", (e) => {
+      if (e.target !== document.body && e.target !== document.documentElement) return;
+      if (!lb.hidden) return;
+      shortcut(e);
+    });
+
+    // ── 바뀐 것 알아채기 — 효과음 · 덮개 ─────────────────
+    function onNewWord(pw, nw) {
+      ops = []; active = null; mine = []; penLock = false; clearArm = 0; wOpen = false;
+      clearTimeout(pumpTimer); pumpTimer = 0;
+      const d = nw.done.length ? nw.done[nw.done.length - 1] : null;
+      if (d && d.word) {
+        startFx(d, nw);
+        if (d.ok) {
+          sfx("success");
+          if (nw.streak >= 3) setTimeout(() => sfx("combo"), 220);
+          try { if (navigator.vibrate) navigator.vibrate(30); } catch (_) { /* 진동은 부가 기능 */ }
+        } else sfx("swap");
+      }
+      if (nw.role === "draw") setTimeout(() => sfx("whoosh"), fx ? Math.max(200, fx.until - performance.now() - 200) : 0);
+    }
+    function onSameWord(pw, nw) {
+      // 답 — 새로 온 것만
+      const lastT = pw.guesses.reduce((m, g) => Math.max(m, g.t), 0);
+      const fresh = nw.guesses.filter((g) => g.t > lastT);
+      if (fresh.length) {
+        const g = fresh[fresh.length - 1];
+        if (nw.role === "guess") {
+          if (g.near) { sfx("select"); flash("거의 맞았어요! 조금만 바꿔 보세요", "good", 1800); }
+          else sfx("invalid");
+        } else sfx(g.near ? "select" : "tap");
+      }
+      // 초성 힌트 — 답 기회도 다시 10번
+      if (nw.hint && !pw.hint) {
+        sfx("powerup");
+        if (nw.role === "guess" && pw.triesLeft < nw.triesLeft) flash("기회가 다시 10번 생겼어요", "good", 1000);
+      } else if (nw.role === "guess" && nw.triesLeft <= 0 && pw.triesLeft > 0 && !outOfTries) { outOfTries = true; sfx("invalid"); }
+      // 상대 반응
+      if (nw.react && !nw.react.mine && (!pw.react || pw.react.t !== nw.react.t)) sfx("pop");
+    }
+
+    // 그리는 사람 — 대기열이 비어 있고 서버 획 목록이 내 모델과 다르면(다른 창 등) 서버 것으로 다시 그린다
+    function reconcile() {
+      if (!w || !room || room.status !== "PLAYING" || w.role !== "draw" || ops.length || inflight || active || awaitRoom) return;
+      const a = mine.map((s) => s.i).join(","), b = w.strokes.map((s) => s.i).join(",");
+      if (a !== b) fromServer();
+    }
+
+    // 크기가 바뀌면 지금 획으로 처음부터 다시 그린다
+    const ro = window.ResizeObserver ? new ResizeObserver(() => {
+      if (!w || !cv.parentNode) return;
+      if (fit()) { if (w.role === "draw") drawMine(); else inkFull(); }
+    }) : { observe() {}, disconnect() {} };
+    const coop = HKCoop.mount({
+      room: "sketch",
+      listName: "그림 퀴즈 목록",
+      heroClass: "is-sketch",
+      tickMs: 250,
+      // 그림 조각 여러 개를 view 한 번으로 묶어 받는다(상대 그림은 최대 0.2초 늦게). 내가 그리는 동안은 보낸 조각의 응답이
+      // 곧 새 방 정보(동료의 답 포함)라서 /wait 를 길게 미룬다 — 조각마다 /wait 를 끊고 다시 걸지 않게
+      waitDelay: () => (drawing() && ops.length > 0 ? 900 : 200),
+      chatWhilePlaying: false,
+      hero: {
+        facts: ["2인 협동", "3분", "번갈아 그리기 · 맞히기", "분야 고르기", "끝까지 하면 오늘 도장"],
+        note: "그림에 글자·숫자를 쓰면 반칙이에요. 옆자리에서 같이 해도 좋지만, 말로 알려 주기는 금지!",
+      },
+      rankTitle: "그림 퀴즈 점수 순위",
+      rankNote: "같은 두 사람은 가장 높은 한 판만 올라요.",
+      rankText: (x) => `${Number(x.score || 0)}점`,
+      recentText: (r) => (r.status === "CLEAR" ? [`${Number(r.score || 0)}점`, Number(r.score) > 0 ? "is-clear" : "is-fail"] : ["포기", "is-fail"]),
+      failTitle: "그만뒀어요",
+      quick: ["준비됐어요!", "그림 실력 기대해요", "천천히 해요", "한 판 더?"],
+      remain: () => null, // 위 막대 시계 대신 무대 안의 시계 칩(⏱)을 쓴다 — 보드와 한 화면에 보이게
+      timerNote: () => "남은 시간",
+      readyNote: (ctx) => (ctx.room.sideName === "먼저 그리기"
+        ? "첫 낱말은 <b>내가 그려요</b>. 제시어를 보고 화이트보드에 그림으로만 알려 주세요. 글자·숫자를 쓰면 반칙이에요."
+        : "첫 낱말은 <b>내가 맞혀요</b>. 동료의 그림을 보고 정답을 적어 주세요. 40초가 지나면 초성 힌트가 나와요."),
+      readyExtra: (ctx) => {
+        const cur = (ctx.room.opts && ctx.room.opts.category) || "all";
+        return `<div class="sk-pick">
+            <div class="sk-pick__head"><b>오늘의 분야</b><small>설정을 바꾸면 둘 다 다시 「준비」를 눌러야 해요.</small></div>
+            <div class="sk-pick__row" role="radiogroup" aria-label="분야 고르기">${CATS.map((c) => `<button type="button" class="sk-cat ${c.key === cur ? "is-on" : ""}" data-cat="${c.key}" role="radio" aria-checked="${c.key === cur}"><span aria-hidden="true">${c.ico}</span>${esc(c.name)}</button>`).join("")}</div>
+            <p class="sk-promise"><span aria-hidden="true">✋</span>약속 — 그림에 글자·숫자를 쓰면 반칙이에요</p>
+          </div>
+          <details class="sk-how" ${howOpen ? "open" : ""}><summary>${HKUI.icon("book-open", 17, "currentColor")} 이렇게 해요<small>규칙 · 점수</small></summary>
+            <div class="sk-how__in">
+              <ol>
+                <li>그리는 사람만 <em>제시어</em>를 봐요. 화이트보드에 <em>그림으로만</em> 알려 주세요.</li>
+                <li>맞히는 사람은 분야와 글자 수를 보고 답을 적어요. 40초가 지나면 <em>초성 힌트</em>가 나와요.</li>
+                <li>답은 낱말마다 10번까지(초성이 나오면 10번 더). 막히면 그리는 사람이 넘길 수 있어요.</li>
+                <li>맞히거나 넘기면 다음 낱말로 가고, <em>그리는 사람이 바뀌어요</em>. 게임 중엔 대화창 대신 반응 버튼으로 말해요.</li>
+              </ol>
+              <div class="sk-points"><span><b>+2</b>정답</span><span><b>+1</b>이어 맞히면</span><span><b>+2</b>4개째부터</span><span><b>0</b>넘겨도 감점 없음</span></div>
+            </div>
+          </details>`;
+      },
+      reset: () => {
+        tickFor = null; w = null; room = null; lastBeep = null; flipFor = null; tilesFor = null; gN = null; scrolledFor = null;
+        resetDraw(); nextId = 0; inflight = false; fx = null; ghost.hidden = true;
+        ink.n = -1; ink.ink = -1; ink.ids = []; ink.cnt = [];
+        gin.value = ""; chipSeen = { n: -1, t: 0 };
+        Object.keys(sig).forEach((k) => delete sig[k]);
+      },
+      changed: (prev, next, ctx) => {
+        C = ctx;
+        const pw = w;
+        room = next;
+        w = next.sketch || null;
+        awaitRoom = false;
+        if (!w) return;
+        offset = w.now * 1000 - Date.now();
+        syncId();
+        if (next.status === "PLAYING") store.set(PLAYED_KEY, 1);
+        if (!pw || !prev || prev.id !== next.id) { // 처음 들어옴(새로 고침 포함) — 서버 그림으로
+          resetDraw();
+          if (w.role === "draw") fromServer();
+          ink.n = -1;
+          return;
+        }
+        if (next.status !== "PLAYING") { resetDraw(); return; }
+        if (prev.status !== "PLAYING") { resetDraw(); ink.n = -1; return; }
+        if (w.n !== pw.n) { onNewWord(pw, w); ink.n = -1; return; }
+        onSameWord(pw, w);
+        reconcile();
+      },
+      // 같은 낱말 안의 소식 — 보드(새 획만) · 답 칩 · 반응 · 점수 · 도구 · 힌트만 고친다. 낱말이 바뀌면 통째로 다시 그린다
+      patch: (prev, next) => {
+        if (!w || !prev.sketch || !next.sketch || prev.sketch.n !== w.n || !document.getElementById("sk-stage")) return false;
+        if (!cv.parentNode || !document.getElementById("sk-slot")) return false;
+        if (w.role === "guess") inkSync();
+        syncRegions();
+        return true;
+      },
+      play: () => playHtml(),
+      side: () => sideHtml(),
+      painted: () => {
+        if (room && room.status === "READY") { // 대기실 — 고른 분야 칩이 보이게(폰 가로 스크롤)
+          const on = document.querySelector(".sk-cat.is-on"), row = on && on.parentNode;
+          if (row && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, on.offsetLeft - row.offsetLeft - (row.clientWidth - on.offsetWidth) / 2);
+        }
+        if (!w) return;
+        if (room.status === "PLAYING") {
+          const slot = document.getElementById("sk-slot");
+          if (slot) {
+            slot.insertBefore(cv, slot.firstChild);
+            slot.insertBefore(ghost, cv.nextSibling);
+            slot.append(eraserEl, penEl, fxEl);
+            cv.setAttribute("aria-label", w.role === "draw" ? "내가 그리는 그림" : `${mate()}님이 그린 그림`);
+            fit();
+            if (w.role === "draw") drawMine(); else inkFull();
+            ro.disconnect(); ro.observe(slot);
+          }
+          const gs = document.getElementById("sk-gslot");
+          if (gs) { gs.appendChild(gform); syncGuess(); }
+          // 처음 나타날 때 — 마우스를 쓰는 화면(PC)에서는 바로 적을 수 있게 입력 칸에 초점.
+          // coop.js 가 그린 뒤 전에 초점이 있던 칸(그리던 보드 등)으로 초점을 되돌리므로 그다음에 옮긴다
+          if (gs && w.role === "guess" && flipFor !== w.n && matchMedia("(pointer: fine)").matches) {
+            const n = w.n;
+            setTimeout(() => {
+              const ae = document.activeElement;
+              if (w && w.n === n && w.role === "guess" && gin.isConnected && (!ae || ae === document.body || ae.id === "sk-slot")) gin.focus({ preventScroll: true });
+            }, 0);
+          }
+          // 지금 그린 칸들의 기준을 적어 둔다(다음 patch 에서 바뀐 칸만 고치게)
+          sig["sk-status"] = [w.score, w.right, w.streak, w.role].join("|");
+          sig["sk-peek"] = `${w.hint}`;
+          sig["sk-answers"] = `${w.n}|${w.guesses.map((g) => g.t).join(",")}|${w.triesLeft}|${w.hint}`;
+          delete sig["sk-tools"]; syncTools();
+          const re = document.getElementById("sk-react");
+          if (re) re.dataset.key = w.react && now() - w.react.t < REACT_SEC ? `${w.react.t}|${w.react.text}` : "";
+          if (re && re.dataset.key) reactShown = re.dataset.key;
+          fxRender();
+          emptyHint();
+          if (scrolledFor !== room.id) {
+            scrolledFor = room.id;
+            const id = room.id;
+            // 무대를 화면 위로 — 웹폰트를 다 받은 뒤에 잰다(받기 전에는 위 칸들이 더 높아서 너무 많이 올라간다)
+            let waits = 0;
+            const go = () => requestAnimationFrame(() => {
+              const st = document.getElementById("sk-stage");
+              if (!st || !room || room.id !== id || room.status !== "PLAYING") return;
+              if (document.fonts && document.fonts.status === "loading" && waits++ < 3) { document.fonts.ready.then(go, go); return; } // 새 글꼴 굵기를 받는 중
+              const hdr = document.querySelector(".hk-site-header"); // 위에 붙은 사이트 머리 높이만큼 덜 올린다
+              const head = hdr && /sticky|fixed/.test(getComputedStyle(hdr).position) ? hdr.getBoundingClientRect().height : 0;
+              let y = 0; // 문서 안 위치 — 나타나는 움직임(.er-enter 의 translateY)에 흔들리지 않게 offsetTop 으로 잰다
+              for (let el = st; el; el = el.offsetParent) y += el.offsetTop;
+              const top = Math.round(y - head - 8);
+              // 위아래 모두 — 대기실에서 아래쪽 「준비」를 누르느라 내려가 있으면 시작 때 시계 · 제시어 쪽지가 화면 위로 잘려 있다
+              if (Math.abs(window.scrollY - top) > 4) window.scrollTo({ top, behavior: reduce() ? "auto" : "smooth" });
+            });
+            const fonts = document.fonts;
+            if (fonts && fonts.status !== "loaded" && fonts.ready) fonts.ready.then(go, go); else go();
+          }
+          flipFor = w.n;
+        } else {
+          ro.disconnect();
+          paintArt();
+        }
+      },
+      storyTier: (ctx) => {
+        const r = ctx.room;
+        if (!r) return null;
+        if (r.status !== "CLEAR") return "fail";
+        const score = w ? w.score : Number(r.score || 0);
+        const right = w ? w.right : score > 0 ? 1 : 0;
+        return score >= GREAT ? "great" : right > 0 ? "ok" : "fail";
+      },
+      stats: () => (w ? [
+        { label: "점수", value: `${w.score}점` },
+        { label: "맞힌 낱말", value: `${w.right}개` },
+        { label: "최고 연속", value: `${w.best}개` },
+        { label: "넘긴 낱말", value: `${w.passed}개` },
+      ] : []),
+      end: (ctx, again) => {
+        const score = w ? w.score : Number(ctx.room.score || 0);
+        const right = w ? w.right : 0;
+        const head = w && w.reason === "words" ? "낱말을 모두 썼어요!" : "시간 끝!";
+        const line = right > 0 ? ctx.room.outro || "" : "다음엔 꼭 통할 거예요!";
+        return `<div class="er-end sk-end ${score ? "" : "is-zero"}">
+            <span class="sk-end__ep">본관 소회의실 · 그림 퀴즈 결과</span>
+            <div class="sk-end__wb">
+              <h2>${head}</h2>
+              <p>${esc(line)}</p>
+              <div class="sk-end__score"><b>${score}</b><span>점</span><svg viewBox="0 0 160 14" aria-hidden="true"><path d="M4 9c30-6 60-7 90-4s46 3 62-1" stroke="#dc2626" stroke-width="4" fill="none" stroke-linecap="round"/></svg></div>
+              ${w ? `<p class="sk-end__sub">${w.right}개 맞힘 · 최고 ${w.best}연속 · 넘김 ${w.passed}개</p>` : ""}
+              ${w && w.reason === "time" && w.word ? `<p class="sk-end__last">마지막 낱말은 「${esc(w.word)}」${wasJosa(w.word)}</p>` : ""}
+            </div>
+            <div class="sk-end__mc">${face()}<p><b>${MA}</b>${esc(endMc(score, right))}</p></div>
+            <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">목록</a></div>
+          </div>`;
+      },
+      failEnd: (ctx, again) => `<div class="er-end sk-end is-zero">
+          <span class="sk-end__ep">본관 소회의실</span>
+          <div class="sk-end__wb"><h2>그만뒀어요</h2>
+            ${w && w.right > 0 ? `<div class="sk-end__score"><b>${w.score}</b><span>점</span></div><p class="sk-end__sub">그만둘 때까지 ${w.right}개를 맞혔어요</p>` : "<p>다음엔 끝까지 같이 그려 봐요.</p>"}</div>
+          <div class="sk-end__mc">${face()}<p><b>${MA}</b>괜찮아요! 보드마커는 그대로 둘게요. 다음에 또 와요.</p></div>
+          <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">목록</a></div>
+        </div>`,
+      after: () => (w ? artHtml() + logHtml() : ""),
+      tick: (ctx) => {
+        if (!room || room.status !== "PLAYING" || !w) return;
+        const t = now();
+        if (w.role === "guess") {
+          const hl = document.getElementById("sk-hint-left");
+          if (hl && !w.hint) hl.textContent = `초성 힌트까지 ${hintLeft()}초`;
+          const hb = document.getElementById("sk-hint-bar");
+          if (hb && !w.hint) hb.style.transform = `scaleX(${Math.max(0, Math.min(1, (t - w.wordAt) / Math.max(1, w.hintAt - w.wordAt))).toFixed(3)})`;
+          if (w.triesLeft <= 0 || noteUntil) { syncGuess(); if (noteUntil && noteUntil < Date.now()) noteUntil = 0; }
+        } else {
+          const pl = document.getElementById("sk-peek-left");
+          if (pl && !w.hint) pl.textContent = String(hintLeft());
+          const pb = document.getElementById("sk-pass");
+          if (pb) pb.style.setProperty("--p", passP().toFixed(3));
+          if (clearArm && clearArm <= Date.now()) { clearArm = 0; syncTools(true); }
+          syncTools(); // 넘기기가 켜지는 때 등
+        }
+        syncReact();
+        const left = w.end - t;
+        const ck = document.getElementById("sk-clock");
+        if (ck) { ck.querySelector("b").textContent = clockText(left); ck.classList.toggle("is-low", left <= 30); }
+        const s = Math.ceil(left);
+        if (s >= 1 && s <= 10 && s !== lastBeep) { lastBeep = s; ctx.sfx("tick"); }
+        if (w.nextAt && t >= w.nextAt + 0.05 && tickFor !== w.nextAt) {
+          tickFor = w.nextAt;
+          HKApi.coopTick(room.id).then((next) => accept(next)).catch(() => { tickFor = null; });
+        }
+      },
+      keydown: (e) => shortcut(e),
+      click: async (t, ctx) => {
+        const d = t.dataset;
+        if (d.cat) {
+          if (t.classList.contains("is-on") || !ctx.room || ctx.room.status !== "READY") return;
+          ctx.sfx("select");
+          return ctx.act(() => HKApi.coopOptions(ctx.room.id, { category: d.cat }));
+        }
+        if (d.art != null && d.art !== "") return openArt(Number(d.art));
+        if (!w || !room || room.status !== "PLAYING") return;
+        if (d.color != null) return pick(Number(d.color));
+        if (d.width != null) return pickW(Number(d.width));
+        if ("wtoggle" in d) { wOpen = !wOpen; syncTools(true); return; }
+        if ("undo" in d) return undo();
+        if ("clear" in d) {
+          if (clearArm > Date.now()) return clearAll();
+          clearArm = Date.now() + 2000;
+          syncTools(true);
+          return;
+        }
+        if ("pass" in d) return pass();
+        if (d.react != null) return react(Number(d.react));
+        if ("hide" in d) {
+          hideWord = !hideWord;
+          store.set(HIDE_KEY, hideWord ? 1 : 0);
+          const word = document.getElementById("sk-word");
+          if (word) { word.classList.toggle("is-hidden", hideWord); word.title = hideWord ? "누르고 있으면 보여요" : ""; }
+          t.setAttribute("aria-pressed", String(hideWord));
+          const lab = t.querySelector("span");
+          if (lab) lab.textContent = hideWord ? "가림" : "가리기";
+        }
+      },
+    });
+    C = coop;
+    // 창 너비가 옆 칸 기준을 넘나들면 답 · 반응 칸 자리가 바뀌므로 다시 그린다
+    if (wideMq) {
+      const onWide = () => { if (C && room && room.status === "PLAYING" && document.getElementById("sk-stage")) C.paint(); };
+      if (wideMq.addEventListener) wideMq.addEventListener("change", onWide); else if (wideMq.addListener) wideMq.addListener(onWide);
+    }
+    // 가린 제시어 — 누르고 있는 동안만 보인다
+    document.addEventListener("pointerdown", (e) => {
+      const el = e.target.closest && e.target.closest(".sk-word.is-hidden");
+      if (el) el.classList.add("is-peek");
+    });
+    const unpeek = () => document.querySelectorAll(".sk-word.is-peek").forEach((el) => el.classList.remove("is-peek"));
+    ["pointerup", "pointercancel"].forEach((ev) => document.addEventListener(ev, unpeek));
+    // 굵기 펼침 — 바깥을 누르면 접는다
+    document.addEventListener("pointerdown", (e) => {
+      if (wOpen && !(e.target.closest && e.target.closest(".sk-widths"))) { wOpen = false; syncTools(true); }
+    });
+  </script>
+</body>
+</html>

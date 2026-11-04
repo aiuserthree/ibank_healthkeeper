@@ -13,7 +13,7 @@
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/match-lobby.js"></script>
   <style>
-    .gk__board { display: block; width: 100%; max-width: 620px; margin: 0 auto; aspect-ratio: 1; touch-action: manipulation; cursor: pointer; border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, .18); }
+    .gk__board { display: block; width: 100%; max-width: min(620px, max(320px, calc(100vh - 290px))); margin: 0 auto; aspect-ratio: 1; touch-action: manipulation; cursor: pointer; border-radius: 6px; box-shadow: 0 8px 24px rgba(15, 23, 42, .18); }
   </style>
 </head>
 <body>
@@ -29,6 +29,9 @@
     async function showLobby() {
       stopPoll(); match = null; pick = null;
       open = await HKMatch.lobby(root, GAME, { title: "사내 오목", lead: "동료에게 도전장을 보내거나 컴퓨터와 두어요. 한 수를 24시간 안에 두지 않으면 시간 초과로 져요. 대국이 끝나면 오늘 도장을 받아요." });
+      if (match) return; // 그새 대국 화면으로 갔다
+      // 둘이서 하는 게임 모음(함께하기)으로 가는 길
+      root.querySelector(".gk__back")?.insertAdjacentHTML("afterend", `<a class="gk__back" href="/together" style="margin-left:14px">함께하기 ›</a>`);
     }
 
     // ---------- 판 ----------
@@ -97,10 +100,11 @@
       const b = document.getElementById("gk-place");
       if (b) { b.disabled = false; b.textContent = PLACE_TEXT; }
     }
-    // 상대 차례면 서버에서 판이 바뀔 때까지 기다린다 — 상대가 두는 즉시 돌아와 바로 그린다. 화면이 보일 때만
+    // 서버에서 판이 바뀔 때까지 기다린다 — 상대가 두는 즉시 돌아와 바로 그린다. 화면이 보일 때만.
+    // 내 차례에도 기다린다 — 그사이 상대가 기권하거나 시간이 끝나면 바로 끝난 판으로 바꾼다. 컴퓨터전은 내 요청 안에서 컴퓨터가 바로 두어 기다릴 일이 없다
     function schedulePoll(delay = 0) {
       stopPoll();
-      if (!match || ["DONE", "DECLINED", "EXPIRED"].includes(match.status) || match.myTurn) return;
+      if (!match || ["DONE", "DECLINED", "EXPIRED"].includes(match.status) || match.bot) return;
       timer = setTimeout(async () => {
         timer = 0;
         if (document.hidden || !match) return; // 다시 보이면 visibilitychange 에서 판을 새로 연다
@@ -134,7 +138,7 @@
       if (next.bot && next.moves.length === seen + 2) {
         match = { ...next, moves: next.moves.slice(0, seen + 1), status: "ACTIVE", myTurn: false, result: null, moveCount: seen + 1 };
         pick = null; paintMatch();
-        const msg = document.querySelector(".gk__msg");
+        const msg = document.querySelector(".gk__vs-mid small"); // 「나 vs 상대」 가운데 문구
         if (msg) msg.textContent = "컴퓨터가 생각 중…";
         await new Promise((f) => setTimeout(f, 650));
         if (!match || match.id !== next.id) return;
@@ -144,6 +148,7 @@
     }
     async function place() {
       if (!pick || sending) return;
+      stopPoll(); // 기다리던 응답이 내 수를 덮지 않게
       sending = true;
       try { afterMove(await HKApi.matchMove(match.id, { x: pick[0], y: pick[1] }, match.moves.length)); }
       catch (e) { fail(e); await showMatch(match.id); }
@@ -166,6 +171,7 @@
           if (t.id === "gk-place") return place();
           if (t.id === "gk-resign") {
             if (!(await HKUI.confirmDialog("기권할까요?", "이 판은 패배로 끝나요.", { confirmLabel: "기권" }))) return;
+            if (!match || match.status !== "ACTIVE") return; // 묻는 사이 상대가 먼저 끝냈다
             try { afterMove(await HKApi.matchResign(match.id)); } catch (err) { fail(err); }
             return;
           }

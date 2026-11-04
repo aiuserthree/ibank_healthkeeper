@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>업무 폭탄 피하기 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 업무 폭탄 피하기 전용 */
+    .gm-dg { display: flex; flex-direction: column; gap: 8px; margin-inline: auto; max-width: 100%; user-select: none; -webkit-user-select: none; }
+    .gm-dg-hud { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .gm-dg-chip { display: inline-flex; align-items: center; gap: 5px; min-width: 0; padding: 6px 11px; border-radius: 999px; background: #fff; border: 1px solid #e3e8ef; font-size: 13px; font-weight: 600; color: #1e293b; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .gm-dg-chip b { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
+    .gm-dg-chip svg { flex-shrink: 0; }
+    .gm-dg-chip--time { min-width: 96px; background: linear-gradient(135deg, #1e3a8a, #3b82f6); border-color: transparent; color: #fff; }
+    .gm-dg-chip--time small { margin-left: -4px; font-size: 12px; font-weight: 700; opacity: .75; }
+    .gm-dg-chip--time.is-night { background: linear-gradient(135deg, #312e81, #7c3aed); }
+    .gm-dg-chip--stage { flex: 0 1 auto; overflow: hidden; }
+    .gm-dg-chip--stage span { overflow: hidden; text-overflow: ellipsis; }
+    .gm-dg-chip--near { margin-left: auto; flex-shrink: 0; }
+    /* 안내 창은 판(touch-action:none) 밖 형제로 둔다 — 창 안 글자를 끌어 내리는 스크롤이 막히지 않게 */
+    .gm-dg-wrap { position: relative; flex-shrink: 0; align-self: center; border-radius: 14px; overflow: hidden; box-shadow: 0 1px 3px rgba(15, 23, 42, .12); }
+    .gm-dg-board { width: 100%; height: 100%; background: #2b3d68; touch-action: none; cursor: grab; }
+    .gm-dg-board.is-drag { cursor: grabbing; }
+    .gm-dg-board canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+    .gm-dg-over { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgba(15, 23, 42, .5); overflow-y: auto; cursor: default; }
+    .gm-dg-over[hidden] { display: none; }
+    .gm-dg-card { width: 100%; max-width: 340px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 18px 16px 16px; border-radius: 16px; background: #fff; text-align: center; box-shadow: 0 12px 32px rgba(15, 23, 42, .25); }
+    .gm-dg-card h2 { margin: 4px 0 6px; font-size: 21px; letter-spacing: -0.02em; color: #0f172a; }
+    .gm-dg-card p { margin: 0 0 6px; font-size: 13.5px; line-height: 1.55; color: #475569; word-break: keep-all; }
+    .gm-dg-card .hk-btn { width: 100%; margin-top: 10px; }
+    .gm-dg-card .hk-btn[hidden] { display: none; }
+    .gm-dg-card .hk-btn:disabled { opacity: .7; cursor: progress; }
+    .gm-dg-card .hk-btn:disabled svg { animation: gm-dg-spin .9s linear infinite; }
+    @keyframes gm-dg-spin { to { transform: rotate(360deg); } }
+    .gm-dg-badge { display: inline-flex; width: 48px; height: 48px; border-radius: 14px; align-items: center; justify-content: center; background: linear-gradient(135deg, #1e3a8a, #f59e0b); }
+    .gm-dg-badge.is-pause { background: linear-gradient(135deg, #334155, #64748b); }
+    .gm-dg-badge.is-hit { background: linear-gradient(135deg, #b91c1c, #f97316); }
+    .gm-dg-badge.is-win { background: linear-gradient(135deg, #15803d, #4ade80); }
+    .gm-dg-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin: 8px 0 6px; padding: 8px 10px; border-radius: 12px; background: #f1f5f9; text-align: left; }
+    .gm-dg-legend div { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: #334155; white-space: nowrap; }
+    .gm-dg-legend canvas { width: 24px; height: 24px; flex-shrink: 0; border-radius: 6px; background: #2b3d68; }
+    .gm-dg-keys { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; margin: 6px 0 0; padding: 8px 10px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: left; font-size: 12.5px; color: #334155; line-height: 1.45; }
+    .gm-dg-keys dt { font-weight: 700; color: #0f172a; }
+    .gm-dg-keys dd { margin: 0; word-break: keep-all; }
+    .gm-dg-best { margin-top: 6px; font-size: 12.5px; color: #64748b; }
+    .gm-dg-best b { color: #1e3a8a; }
+    .gm-dg-big { margin: 2px 0 2px; font-size: 42px; font-weight: 800; letter-spacing: -1px; color: #0f172a; font-variant-numeric: tabular-nums; }
+    .gm-dg-big.is-win { color: #15803d; }
+    .gm-dg-pad { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; border-radius: 16px; border: 2px dashed #cbd5e1; background: repeating-linear-gradient(45deg, #f8fafc 0 10px, #f1f5f9 10px 20px); color: #64748b; font-size: 13px; font-weight: 600; touch-action: none; }
+    .gm-dg-pad[hidden] { display: none; }
+    .gm-dg-pad.is-drag { border-color: #3b82f6; background: #eff6ff; color: #1d4ed8; }
+    .gm-dg-note { flex-shrink: 0; font-size: 12px; color: var(--text-muted, #64748b); text-align: center; word-break: keep-all; }
+    .gm-dg-note kbd { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #f8fafc; font: 600 11px/1.6 inherit; }
+    @media (max-width: 480px) {
+      .gm-dg-chip { padding: 5px 9px; font-size: 12.5px; }
+      .gm-dg-chip b { font-size: 15px; }
+      .gm-dg-chip--time { min-width: 86px; }
+      .gm-dg-card { padding: 14px 12px 12px; }
+      .gm-dg-card h2 { font-size: 18px; margin: 2px 0 4px; }
+      .gm-dg-card p { font-size: 12.5px; line-height: 1.5; }
+      .gm-dg-badge { width: 40px; height: 40px; border-radius: 12px; }
+      .gm-dg-legend { padding: 6px 8px; }
+      .gm-dg-legend div { font-size: 12px; }
+      .gm-dg-keys { font-size: 12px; padding: 7px 9px; }
+      .gm-dg-big { font-size: 36px; }
+    }
+    /* 좁은 휴대폰 — 시작 창이 판 안에 다 들어오게 머리 그림을 뺀다 */
+    @media (max-width: 400px) {
+      .gm-dg-over { padding: 8px; }
+      .gm-dg-card.is-ready .gm-dg-badge { display: none; }
+    }
+    /* 가로로 눕힌 휴대폰처럼 낮은 화면 — 그림 설명도 뺀다 */
+    @media (max-height: 520px) {
+      .gm-dg-card.is-ready .gm-dg-badge, .gm-dg-card.is-ready .gm-dg-legend { display: none; }
+      .gm-dg-card .gm-dg-badge { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  /* @art-begin — 그림. 판 규칙·화면과 떨어진 순수 그리기 함수 (모두 가운데가 원점, 판 단위로 그린다) */
+  const ART = (() => {
+    function rr(g, x, y, w, h, r) {
+      g.beginPath();
+      g.moveTo(x + r, y);
+      g.arcTo(x + w, y, x + w, y + h, r);
+      g.arcTo(x + w, y + h, x, y + h, r);
+      g.arcTo(x, y + h, x, y, r);
+      g.arcTo(x, y, x + w, y, r);
+      g.closePath();
+    }
+    const hex = (c) => [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)];
+    function mixColor(a, b, k) {
+      const A = hex(a), B = hex(b);
+      return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * k)).join(",")})`;
+    }
+    // 업무 메일 — 흰 봉투 + 안 읽음 빨간 점
+    function mail(g) {
+      g.fillStyle = "rgba(147,197,253,.28)";
+      g.beginPath(); g.arc(0, 0, 12.5, 0, Math.PI * 2); g.fill();
+      rr(g, -10, -7, 20, 14, 2.6);
+      g.fillStyle = "#ffffff"; g.fill();
+      g.strokeStyle = "#1e3a8a"; g.lineWidth = 1.1; g.stroke();
+      g.strokeStyle = "#60a5fa"; g.lineWidth = 1.6; g.lineJoin = "round";
+      g.beginPath(); g.moveTo(-8, -5); g.lineTo(0, 1.4); g.lineTo(8, -5); g.stroke();
+      g.fillStyle = "#ef4444";
+      g.beginPath(); g.arc(8.6, -6.4, 3.3, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = "#fff"; g.lineWidth = 1.1; g.stroke();
+    }
+    // 회의 초대 — 빨간 머리 달력 카드
+    function invite(g) {
+      g.fillStyle = "rgba(252,165,165,.28)";
+      g.beginPath(); g.arc(0, 0, 13, 0, Math.PI * 2); g.fill();
+      rr(g, -8.5, -8, 17, 17, 3.4);
+      g.fillStyle = "#ffffff"; g.fill();
+      g.save(); g.clip();
+      g.fillStyle = "#ef4444"; g.fillRect(-9, -9, 18, 6.5);
+      g.restore();
+      rr(g, -8.5, -8, 17, 17, 3.4);
+      g.strokeStyle = "#7f1d1d"; g.lineWidth = 1.1; g.stroke();
+      g.fillStyle = "#7f1d1d";
+      rr(g, -5.4, -10.2, 2.2, 4.6, 1.1); g.fill();
+      rr(g, 3.2, -10.2, 2.2, 4.6, 1.1); g.fill();
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 2; j++) {
+        g.fillStyle = i === 2 && j === 0 ? "#ef4444" : "#cbd5e1";
+        g.fillRect(-5.6 + i * 4.3, 0.2 + j * 3.9, 2.6, 2.6);
+      }
+    }
+    // 결재 서류 — 귀 접힌 종이 + 빨간 결재 도장
+    function doc(g) {
+      g.fillStyle = "rgba(253,230,138,.24)";
+      g.beginPath(); g.arc(0, 0, 17, 0, Math.PI * 2); g.fill();
+      g.beginPath();
+      g.moveTo(-11, -13.5); g.lineTo(5, -13.5); g.lineTo(11, -7.5); g.lineTo(11, 13.5); g.lineTo(-11, 13.5); g.closePath();
+      g.fillStyle = "#fffbeb"; g.fill();
+      g.strokeStyle = "#78350f"; g.lineWidth = 1.1; g.lineJoin = "round"; g.stroke();
+      g.beginPath(); g.moveTo(5, -13.5); g.lineTo(5, -7.5); g.lineTo(11, -7.5); g.closePath();
+      g.fillStyle = "#e7d3a1"; g.fill(); g.stroke();
+      g.strokeStyle = "#94a3b8"; g.lineWidth = 1.5; g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(-7, -8); g.lineTo(1.5, -8);
+      g.moveTo(-7, -3.5); g.lineTo(7, -3.5);
+      g.moveTo(-7, 1); g.lineTo(7, 1);
+      g.moveTo(-7, 5.5); g.lineTo(-1.5, 5.5);
+      g.stroke();
+      g.strokeStyle = "#dc2626"; g.lineWidth = 1.7;
+      g.beginPath(); g.arc(4.2, 7.6, 4.4, 0, Math.PI * 2); g.stroke();
+      g.fillStyle = "#dc2626";
+      g.font = `900 5.6px "Pretendard", "Apple SD Gothic Neo", sans-serif`;
+      g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText("결", 4.2, 7.9);
+    }
+    // 야근 알림 — 보라 말풍선 속 노란 달
+    function night(g) {
+      g.fillStyle = "rgba(196,181,253,.3)";
+      g.beginPath(); g.arc(0, 0, 11.5, 0, Math.PI * 2); g.fill();
+      rr(g, -8, -7, 16, 12.5, 4.2);
+      g.fillStyle = "#7c3aed"; g.fill();
+      g.beginPath(); g.moveTo(-3.5, 5); g.lineTo(-6, 9.2); g.lineTo(1, 5); g.closePath(); g.fill();
+      rr(g, -8, -7, 16, 12.5, 4.2);
+      g.strokeStyle = "#2e1065"; g.lineWidth = 1; g.stroke();
+      g.fillStyle = "#fde047";
+      g.beginPath(); g.arc(-0.6, -0.8, 4.1, 0, Math.PI * 2); g.fill();
+      g.fillStyle = "#7c3aed";
+      g.beginPath(); g.arc(1.4, -2.3, 3.4, 0, Math.PI * 2); g.fill();
+    }
+    // 동글이 직원 — 큰 머리 · 작은 몸, 가슴의 점(원점)이 맞는 곳
+    // o: { lx, ly 보는 쪽(-1~1), blink, hurt, bob }
+    function hero(g, o = {}) {
+      const lx = (o.lx || 0) * 1.3, ly = (o.ly || 0) * 0.9, bob = o.bob || 0;
+      g.fillStyle = "rgba(2,6,23,.32)";
+      g.beginPath(); g.ellipse(0, 8.6, 9.5, 3, 0, 0, Math.PI * 2); g.fill();
+      g.save();
+      g.translate(0, bob);
+      // 몸 (하늘색 셔츠) + 팔
+      g.fillStyle = "#60a5fa";
+      g.beginPath(); g.arc(-8.2, 1.5, 2.6, 0, Math.PI * 2); g.arc(8.2, 1.5, 2.6, 0, Math.PI * 2); g.fill();
+      rr(g, -7.6, -5.2, 15.2, 12.6, 6);
+      g.fill();
+      g.strokeStyle = "#1e3a8a"; g.lineWidth = 1; g.stroke();
+      // 사원증 줄
+      g.strokeStyle = "#1e3a8a"; g.lineWidth = 1.3; g.lineCap = "round";
+      g.beginPath(); g.moveTo(-3.6, -5); g.lineTo(0, -1.2); g.lineTo(3.6, -5); g.stroke();
+      // 머리
+      const hy = -13.2;
+      g.fillStyle = "#ffd9b8";
+      g.beginPath(); g.arc(0, hy, 9.6, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = "#c98a63"; g.lineWidth = 0.9; g.stroke();
+      g.fillStyle = "#3f2d25";
+      g.beginPath();
+      g.arc(0, hy, 10, Math.PI, Math.PI * 2);
+      g.quadraticCurveTo(8.4, hy - 2.4, 5.4, hy - 4.2);
+      g.quadraticCurveTo(1.6, hy - 2.6, -0.8, hy - 5.6);
+      g.quadraticCurveTo(-4, hy - 2.6, -8.4, hy - 3);
+      g.quadraticCurveTo(-10, hy - 1.4, -10, hy);
+      g.closePath();
+      g.fill();
+      // 볼
+      g.fillStyle = "rgba(244,114,182,.45)";
+      g.beginPath(); g.ellipse(-5.6, hy + 3.2, 2.1, 1.3, 0, 0, Math.PI * 2); g.ellipse(5.6, hy + 3.2, 2.1, 1.3, 0, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = "#1e293b"; g.fillStyle = "#1e293b"; g.lineWidth = 1.2; g.lineCap = "round";
+      if (o.hurt) {
+        // 맞으면 X 눈 · 동그란 입
+        for (const ex of [-3.6, 3.6]) {
+          g.beginPath();
+          g.moveTo(ex - 1.5, hy - 0.4); g.lineTo(ex + 1.5, hy + 2.6);
+          g.moveTo(ex + 1.5, hy - 0.4); g.lineTo(ex - 1.5, hy + 2.6);
+          g.stroke();
+        }
+        g.beginPath(); g.ellipse(0, hy + 5.2, 1.5, 1.8, 0, 0, Math.PI * 2); g.stroke();
+      } else {
+        if (o.blink) {
+          g.beginPath(); g.moveTo(-5 + lx, hy + 1.2 + ly); g.lineTo(-2.2 + lx, hy + 1.2 + ly); g.moveTo(2.2 + lx, hy + 1.2 + ly); g.lineTo(5 + lx, hy + 1.2 + ly); g.stroke();
+        } else {
+          g.beginPath(); g.arc(-3.6 + lx, hy + 1 + ly, 1.45, 0, Math.PI * 2); g.arc(3.6 + lx, hy + 1 + ly, 1.45, 0, Math.PI * 2); g.fill();
+          g.fillStyle = "#fff";
+          g.beginPath(); g.arc(-3.1 + lx, hy + 0.5 + ly, 0.5, 0, Math.PI * 2); g.arc(4.1 + lx, hy + 0.5 + ly, 0.5, 0, Math.PI * 2); g.fill();
+        }
+        g.beginPath(); g.arc(lx * 0.5, hy + 4.2 + ly * 0.5, 1.7, Math.PI * 0.15, Math.PI * 0.85); g.stroke();
+      }
+      g.restore();
+    }
+    // 맞는 곳 — 흰 점 + 빨간 테두리 (언제나 맨 위에 그린다)
+    function core(g, r, glow) {
+      if (glow) {
+        g.fillStyle = `rgba(255,255,255,${0.18 * glow})`;
+        g.beginPath(); g.arc(0, 0, r + 5, 0, Math.PI * 2); g.fill();
+      }
+      g.fillStyle = "#ffffff";
+      g.beginPath(); g.arc(0, 0, r, 0, Math.PI * 2); g.fill();
+      g.strokeStyle = "#ef4444"; g.lineWidth = 1.5;
+      g.beginPath(); g.arc(0, 0, r + 0.4, 0, Math.PI * 2); g.stroke();
+    }
+    // 사무실 바닥 — tone 0(아침) → 1(밤)
+    function floor(g, S, tone) {
+      g.fillStyle = mixColor("#2b3d68", "#1c1a3d", tone);
+      g.fillRect(0, 0, S, S);
+      const T = S / 10;
+      g.fillStyle = "rgba(255,255,255,.035)";
+      for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) if ((i + j) % 2) g.fillRect(i * T, j * T, T, T);
+      g.strokeStyle = "rgba(255,255,255,.05)"; g.lineWidth = 0.8;
+      g.beginPath();
+      for (let i = 1; i < 10; i++) { g.moveTo(i * T, 0); g.lineTo(i * T, S); g.moveTo(0, i * T); g.lineTo(S, i * T); }
+      g.stroke();
+      // 창가 빛 — 아침은 따뜻하게, 저녁은 보랏빛으로
+      const sun = g.createLinearGradient(0, 0, S * 0.55, S * 0.75);
+      sun.addColorStop(0, tone < 0.5 ? `rgba(253,224,171,${0.16 - tone * 0.12})` : `rgba(192,132,252,${0.05 + (tone - 0.5) * 0.12})`);
+      sun.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = sun; g.fillRect(0, 0, S, S);
+      const vg = g.createRadialGradient(S / 2, S / 2, S * 0.36, S / 2, S / 2, S * 0.74);
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,.32)");
+      g.fillStyle = vg; g.fillRect(0, 0, S, S);
+    }
+    // 가장자리 경고 화살표 — 오른쪽(+x)을 가리킨다
+    function arrow(g, color, big) {
+      const k = big ? 1.45 : 1;
+      g.lineJoin = "round";
+      g.beginPath();
+      g.moveTo(7 * k, 0); g.lineTo(-4 * k, -6.5 * k); g.lineTo(-1.2 * k, 0); g.lineTo(-4 * k, 6.5 * k); g.closePath();
+      g.fillStyle = color; g.fill();
+      g.strokeStyle = "rgba(2,6,23,.7)"; g.lineWidth = 1.2; g.stroke();
+    }
+    // 반짝 별 (네 갈래)
+    function star(g, r) {
+      g.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 - Math.PI / 2, d = i % 2 ? r * 0.32 : r;
+        g.lineTo(Math.cos(a) * d, Math.sin(a) * d);
+      }
+      g.closePath();
+      g.fill();
+    }
+    return { rr, mixColor, mail, invite, doc, night, hero, core, floor, arrow, star };
+  })();
+  /* @art-end */
+
+  /* @sim-begin — 판 규칙. 화면과 떨어진 순수 계산 (같은 수열이면 같은 판) */
+  const SIM = (() => {
+    const S = 360;       // 판 한 변 (논리 단위) — 화면 크기와 상관없이 이 크기로 계산
+    const CORE_R = 3.2;  // 맞는 곳 — 가슴의 작은 점 반지름
+    const SAFE = 2;      // 처음 2초는 판 안에 아무것도 들어오지 않는다
+    const NEAR = 9;      // 이만큼 안쪽으로 스치고 지나가면 '아슬'
+    const EDGE = 6;      // 직원이 판 끝에서 떨어져 있는 거리
+    const CLOCKOUT = 60; // 이만큼 버티면 칼퇴
+    // 날아오는 업무 — r: 맞는 반지름(그림보다 조금 작게), spd: 속도 배율
+    const KINDS = {
+      mail: { r: 6.6, spd: 1, name: "업무 메일" },
+      invite: { r: 7.4, spd: 0.92, name: "회의 초대" },
+      doc: { r: 10.4, spd: 0.62, name: "결재 서류" },
+      night: { r: 5.8, spd: 1.42, name: "야근 알림" },
+    };
+    // 단계 — 10초마다 올라가고, 마지막 '야근'에서 더 오르지 않는다
+    //   rate: 1초에 날아오는 수 · spd: 속도 범위 · aim: 내 쪽을 노리는 비율 · warn: 가장자리 경고 시간(초)
+    //   ring: 회의 소집(모여드는 고리) · stream: 메일 폭주(한 줄로 줄줄이) — gap: 무늬 사이 쉬는 시간
+    const STAGES = [
+      { at: 0, title: "출근", sub: "업무 메일이 날아와요 · 가슴의 점만 피하면 돼요", rate: 1.3, spd: [100, 125], mix: { mail: 1 }, aim: 0.5, warn: 0.75 },
+      { at: 10, title: "회의 초대", sub: "회의 초대는 메일보다 조금 커요", rate: 1.75, spd: [105, 135], mix: { mail: 0.65, invite: 0.35 }, aim: 0.5, warn: 0.7 },
+      { at: 20, title: "회의 소집", sub: "표시한 곳으로 초대가 모여요 · 얼른 벗어나요", rate: 2.0, spd: [110, 140], mix: { mail: 0.6, invite: 0.4 }, aim: 0.55, warn: 0.65,
+        ring: { n: 10, miss: 2, v: 100, gap: [5, 6.5] } },
+      { at: 30, title: "결재 몰림", sub: "결재 서류는 느리지만 넓어요", rate: 2.35, spd: [115, 148], mix: { mail: 0.5, invite: 0.25, doc: 0.25 }, aim: 0.55, warn: 0.6,
+        ring: { n: 11, miss: 2, v: 105, gap: [5, 6.5] } },
+      { at: 40, title: "메일 폭주", sub: "메일이 한 줄로 몰려와요 · 옆으로 비켜요", rate: 2.6, spd: [120, 155], mix: { mail: 0.5, invite: 0.25, doc: 0.25 }, aim: 0.6, warn: 0.55,
+        ring: { n: 12, miss: 2, v: 110, gap: [3.5, 5] }, stream: { n: 7, iv: 0.11, v: 150, fan: 0, gap: [3.5, 5] } },
+      { at: 50, title: "퇴근 직전", sub: "야근 알림은 아주 빨라요", rate: 3.4, spd: [130, 170], mix: { mail: 0.45, invite: 0.2, doc: 0.15, night: 0.2 }, aim: 0.6, warn: 0.5,
+        ring: { n: 12, miss: 2, v: 114, gap: [3, 4.5] }, stream: { n: 8, iv: 0.1, v: 160, fan: 0, gap: [3, 4.5] } },
+      { at: 60, title: "야근", sub: "칼퇴 성공! 지금부터는 야근 기록이에요", rate: 5.0, spd: [145, 190], mix: { mail: 0.42, invite: 0.2, doc: 0.13, night: 0.25 }, aim: 0.68, warn: 0.5,
+        ring: { n: 13, miss: 2, v: 122, gap: [2, 3] }, stream: { n: 10, iv: 0.09, v: 180, fan: 1, gap: [2, 3] } },
+    ];
+    const lerp = (a, b, k) => a + (b - a) * k;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    function stageAt(t) {
+      let i = 0;
+      while (i + 1 < STAGES.length && t >= STAGES[i + 1].at) i++;
+      return i;
+    }
+    // (x,y)에서 (ux,uy) 쪽으로 판 끝까지 거리
+    function rayExit(x, y, ux, uy) {
+      const tx = ux > 1e-9 ? (S - x) / ux : ux < -1e-9 ? -x / ux : Infinity;
+      const ty = uy > 1e-9 ? (S - y) / uy : uy < -1e-9 ? -y / uy : Infinity;
+      return Math.min(tx, ty);
+    }
+
+    function makeWorld(rand) {
+      const w = {
+        t: 0, x: S / 2, y: S / 2 + 24, ox: 0, oy: 0, vx: 0, vy: 0,
+        stage: 0, shots: [], warns: [], rings: [], streams: [], ev: [],
+        near: 0, dead: null,
+        spawnCd: 0, patT: Infinity, patNext: null, lastPat: null, calmUntil: 0, nextId: 1,
+      };
+      w.ox = w.x; w.oy = w.y;
+
+      function edgePoint() {
+        const p = rand() * 4 * S, side = Math.floor(p / S), o = p - side * S;
+        return side === 0 ? { x: o, y: 0 } : side === 1 ? { x: S, y: o } : side === 2 ? { x: S - o, y: S } : { x: 0, y: S - o };
+      }
+      // 노리는 곳에서 minD, 직원에게서 minP 넘게 떨어진 가장자리 한 점 — 너무 가까운 데서 튀어나오지 않게
+      // (못 찾으면 두 조건을 가장 잘 맞춘 점)
+      function entryAway(tx, ty, minD, minP = 0) {
+        let best = null, bk = -1;
+        for (let i = 0; i < 16; i++) {
+          const p = edgePoint();
+          const k = Math.min(Math.hypot(p.x - tx, p.y - ty) / minD, minP ? Math.hypot(p.x - w.x, p.y - w.y) / minP : Infinity);
+          if (k >= 1) return p;
+          if (k > bk) { bk = k; best = p; }
+        }
+        return best;
+      }
+      function pickKind(mix) {
+        let r = rand(), last = "mail";
+        for (const k in mix) { last = k; r -= mix[k]; if (r < 0) return k; }
+        return last;
+      }
+      // 경고를 걸어 두고 delay 초 뒤에 판 밖에서 출발
+      // until: 이 시각이 되면 판에서 사라진다 (회의 소집 초대는 가운데에 모이면 끝)
+      function warn(kind, ex, ey, dx, dy, v, delay, silent, until) {
+        w.warns.push({ kind, x: ex, y: ey, dx, dy, v, left: delay, total: delay, silent: !!silent, until: until == null ? null : until });
+      }
+      function launch(o) {
+        const r = KINDS[o.kind].r, sx = o.x - o.dx * (r + 4), sy = o.y - o.dy * (r + 4);
+        w.shots.push({ id: w.nextId++, kind: o.kind, r, x: sx, y: sy, ox: sx, oy: sy, vx: o.dx * o.v, vy: o.dy * o.v, near: 0, seed: rand(), until: o.until });
+      }
+      // 보통 탄 — 내 자리(경고가 뜬 순간)를 노리거나, 판 안 아무 곳을 향해 곧게
+      function regular() {
+        const st = STAGES[w.stage], kind = pickKind(st.mix);
+        const v = lerp(st.spd[0], st.spd[1], rand()) * KINDS[kind].spd;
+        let tx, ty, minD;
+        if (rand() < st.aim) { tx = w.x; ty = w.y; minD = S * 0.5; }
+        else { tx = S * (0.12 + 0.76 * rand()); ty = S * (0.12 + 0.76 * rand()); minD = S * 0.4; }
+        // 아무 곳을 노리는 것도 직원 바로 옆 가장자리에서는 들어오지 않게
+        const e = entryAway(tx, ty, minD, S * 0.3);
+        let dx = tx - e.x, dy = ty - e.y;
+        const l = Math.hypot(dx, dy) || 1;
+        dx /= l; dy /= l;
+        warn(kind, e.x, e.y, dx, dy, v, st.warn);
+      }
+      // 회의 소집 — 표시한 곳으로 회의 초대가 사방에서 동시에 모인다 (빈틈 몇 칸은 일부러 비운다)
+      //   모이면 회의 끝 — 초대는 가운데에서 사라지고 반대편으로 다시 퍼지지 않는다
+      //   deadline: 이때까지 모이지 못할 고리면 걸지 않고 0을 돌려준다
+      function ring(cfg, deadline) {
+        const cx = clamp(w.x, 50, S - 50), cy = clamp(w.y, 50, S - 50);
+        const WARN = 1.15, m = KINDS.invite.r + 4, a0 = rand() * Math.PI * 2, gapAt = Math.floor(rand() * cfg.n);
+        const list = [];
+        let dmax = 0;
+        for (let i = 0; i < cfg.n; i++) {
+          if ((i - gapAt + cfg.n) % cfg.n < cfg.miss) continue;
+          const a = a0 + (i / cfg.n) * Math.PI * 2, ux = Math.cos(a), uy = Math.sin(a);
+          const d = rayExit(cx, cy, ux, uy);
+          list.push({ ux, uy, d });
+          dmax = Math.max(dmax, d + m);
+        }
+        const arrive = w.t + WARN + dmax / cfg.v;
+        if (arrive > deadline) return 0;
+        // 멀리서 오는 것부터 먼저 출발 — 모두 같은 때 가운데에 닿는다
+        for (const o of list) warn("invite", cx + o.ux * o.d, cy + o.uy * o.d, -o.ux, -o.uy, cfg.v, WARN + (dmax - (o.d + m)) / cfg.v, true, arrive);
+        w.rings.push({ x: cx, y: cy, v: cfg.v, start: w.t, warnEnd: w.t + WARN, arrive, done: false });
+        w.ev.push({ type: "ring" });
+        return arrive - w.t;
+      }
+      // 메일 폭주 — 한 곳에서 내 쪽으로 메일이 줄지어 날아온다 (야근에는 세 줄)
+      function stream(cfg) {
+        const e = entryAway(w.x, w.y, S * 0.55);
+        const base = Math.atan2(w.y - e.y, w.x - e.x), WARN = 0.9;
+        const offs = cfg.fan ? [-0.21, 0, 0.21] : [0];
+        for (const off of offs) for (let j = 0; j < cfg.n; j++) {
+          warn("mail", e.x, e.y, Math.cos(base + off), Math.sin(base + off), cfg.v, WARN + j * cfg.iv, true);
+        }
+        const dur = WARN + cfg.n * cfg.iv;
+        w.streams.push({ x: e.x, y: e.y, a: base, offs, start: w.t, fireAt: w.t + WARN, until: w.t + dur });
+        w.ev.push({ type: "stream" });
+        return dur;
+      }
+
+      // 한 걸음 — mx, my: 이번 걸음에 직원이 움직일 거리 (속도 제한은 부르는 쪽에서)
+      w.step = function (dt, mx, my) {
+        if (w.dead) return;
+        w.t += dt;
+        w.ox = w.x; w.oy = w.y;
+        w.x = clamp(w.x + mx, EDGE, S - EDGE);
+        w.y = clamp(w.y + my, EDGE, S - EDGE);
+        w.vx = (w.x - w.ox) / dt; w.vy = (w.y - w.oy) / dt;
+
+        // 단계 — 새 무늬가 처음 나오는 단계는 1.6초 뒤에 바로 보여 준다
+        const si = stageAt(w.t);
+        if (si !== w.stage) {
+          const prev = STAGES[w.stage], st = STAGES[si];
+          w.stage = si;
+          w.ev.push({ type: "stage", stage: si });
+          if (st.stream && !prev.stream) { w.patT = Math.max(w.t + 1.6, w.calmUntil + 1); w.patNext = "stream"; }
+          else if (st.ring && !prev.ring) { w.patT = w.t + 1.6; w.patNext = "ring"; }
+        }
+        // 무늬 (회의 소집 · 메일 폭주) — 둘 다 있으면 번갈아
+        if (w.t >= w.patT) {
+          const st = STAGES[w.stage], nx = STAGES[w.stage + 1];
+          let kind = w.patNext;
+          if (!kind) kind = st.ring && st.stream ? (w.lastPat === "ring" ? "stream" : "ring") : st.ring ? "ring" : "stream";
+          w.patNext = null;
+          // 다음 단계에 새 무늬가 처음 나오면, 그 무늬가 알림 띠와 함께 나오게 지금 무늬는 그 전에 끝나는 것만 건다
+          const deadline = nx && ((nx.stream && !st.stream) || (nx.ring && !st.ring)) ? nx.at + 0.6 : Infinity;
+          const busy = kind === "ring" ? ring(st.ring, deadline) : stream(st.stream);
+          if (busy > 0) {
+            w.lastPat = kind;
+            w.calmUntil = w.t + busy;
+            const gap = st[kind].gap;
+            w.patT = w.t + busy + lerp(gap[0], gap[1], rand());
+          } else w.patT = Infinity; // 다음 단계가 되면 새 무늬부터 다시 건다
+        }
+        // 보통 탄 — 무늬가 도는 동안은 반으로 줄인다
+        if (w.t >= SAFE - STAGES[0].warn) {
+          w.spawnCd -= dt * (w.t < w.calmUntil ? 0.5 : 1);
+          while (w.spawnCd <= 0) {
+            regular();
+            w.spawnCd += (0.6 + 0.8 * rand()) / STAGES[w.stage].rate;
+          }
+        }
+        // 경고 → 출발
+        for (let i = w.warns.length - 1; i >= 0; i--) {
+          const o = w.warns[i];
+          o.left -= dt;
+          if (o.left <= 0) { launch(o); w.warns.splice(i, 1); }
+        }
+        // 이동 · 맞음 · 스침
+        const OUT = 40;
+        // 회의 소집 — 초대가 가운데에 다 모이면 회의 끝
+        for (const r of w.rings) if (!r.done && w.t >= r.arrive) { r.done = true; w.ev.push({ type: "ringEnd", x: r.x, y: r.y }); }
+        for (let i = w.shots.length - 1; i >= 0; i--) {
+          const s = w.shots[i];
+          if (s.until != null && w.t >= s.until) { w.shots.splice(i, 1); continue; }
+          s.ox = s.x; s.oy = s.y;
+          s.x += s.vx * dt; s.y += s.vy * dt;
+          const dx = s.x - w.x, dy = s.y - w.y, d2 = dx * dx + dy * dy, hr = s.r + CORE_R, nr = hr + NEAR;
+          if (d2 < hr * hr) {
+            w.dead = { kind: s.kind, x: s.x, y: s.y, id: s.id };
+            w.ev.push({ type: "hit", kind: s.kind });
+            return;
+          }
+          if (d2 < nr * nr) { if (!s.near) s.near = 1; }
+          else if (s.near === 1) { s.near = 2; w.near++; w.ev.push({ type: "near", x: s.x, y: s.y }); }
+          const gone = s.x < -OUT || s.x > S + OUT || s.y < -OUT || s.y > S + OUT;
+          if (gone && (s.x - S / 2) * s.vx + (s.y - S / 2) * s.vy > 0) w.shots.splice(i, 1);
+        }
+        for (let i = w.rings.length - 1; i >= 0; i--) if (w.t > w.rings[i].arrive + 0.6) w.rings.splice(i, 1);
+        for (let i = w.streams.length - 1; i >= 0; i--) if (w.t > w.streams[i].until + 0.2) w.streams.splice(i, 1);
+      };
+      return w;
+    }
+    return { S, CORE_R, SAFE, CLOCKOUT, KINDS, STAGES, stageAt, makeWorld };
+  })();
+  /* @sim-end */
+
+  HKPlay.mountGame({
+    key: "dodge",
+    setup(stage, ctx) {
+      const S = SIM.S;
+      const STEP = 1 / 120;  // 물리 한 걸음 (초) — 화면 주사율과 상관없이 같은 빠르기
+      const SPEED = 170;     // 직원 최고 속도 (판 단위/초) — 키보드·끌기 모두 같다
+      const SLOW = 0.5;      // Shift 를 누르고 있으면 이만큼 천천히
+      const DRAG_MAX = 80;   // 끌기로 밀린 거리 최대 — 빠르게 쓸어도 웬만큼은 따라가고, 손을 뗀 뒤 0.5초 넘게 미끄러지지는 않게
+      const coarse = window.matchMedia("(pointer: coarse)").matches;
+
+      // ───────── 화면 뼈대
+      stage.innerHTML = `<div class="gm-dg" id="gm-dg">
+        <div class="gm-dg-hud" id="gm-dg-hud">
+          <span class="gm-dg-chip gm-dg-chip--time" id="gm-dg-time-chip" title="버틴 시간">${HKUI.icon("timer", 15, "#fff")}<b id="gm-dg-time">0:00</b><small id="gm-dg-tenth">.0</small></span>
+          <span class="gm-dg-chip gm-dg-chip--stage">${HKUI.icon("briefcase-business", 15, "#475569")}<span id="gm-dg-stage">1단계 · 출근</span></span>
+          <span class="gm-dg-chip gm-dg-chip--near" title="아슬아슬하게 피한 수">${HKUI.icon("sparkles", 15, "#d97706")}<span>아슬 <b id="gm-dg-near">0</b></span></span>
+        </div>
+        <div class="gm-dg-wrap" id="gm-dg-wrap">
+          <div class="gm-dg-board" id="gm-dg-board"><canvas id="gm-dg-canvas" aria-label="업무 폭탄 피하기 게임 판"></canvas></div>
+          <div class="gm-dg-over" id="gm-dg-over" hidden></div>
+        </div>
+        <div class="gm-dg-pad" id="gm-dg-pad" hidden>${HKUI.icon("move", 24, "currentColor")}<span>여기를 끌면 끈 쪽으로 움직여요</span></div>
+        <div class="gm-dg-note" id="gm-dg-note">방향키·<kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 이동 · <kbd>Shift</kbd> 천천히 · 판을 끌어도 돼요 · <kbd>Esc</kbd> 일시정지</div>
+      </div>`;
+      HKUI.refreshIcons(stage);
+
+      const $ = (s) => stage.querySelector(s);
+      const root = $("#gm-dg"), hud = $("#gm-dg-hud"), wrap = $("#gm-dg-wrap"), board = $("#gm-dg-board"), canvas = $("#gm-dg-canvas");
+      const over = $("#gm-dg-over"), pad = $("#gm-dg-pad"), note = $("#gm-dg-note");
+      const elTime = $("#gm-dg-time"), elTenth = $("#gm-dg-tenth"), elTimeChip = $("#gm-dg-time-chip"), elStage = $("#gm-dg-stage"), elNear = $("#gm-dg-near");
+      const g = canvas.getContext("2d");
+      const FONT = getComputedStyle(document.body).fontFamily || "sans-serif";
+      if (coarse) note.hidden = true;
+
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+      const easeOut = (k) => 1 - (1 - k) * (1 - k);
+
+      // ───────── 상태
+      let state = "ready"; // ready | play | paused | count | dying | over
+      let world = null;
+      let acc = 0, last = performance.now();
+      let side = 360, dpr = 1, scale = 1; // scale: 캔버스 화소 / 판 단위
+      const keys = { left: false, right: false, up: false, down: false };
+      let slowKey = false;
+      let drag = null, pendX = 0, pendY = 0;
+      let banner = null, parts = [], shake = 0, flash = 0, countT = 0, deathT = 0, lastNearText = -9;
+
+      // ───────── 크기 — 판은 정사각형. 휴대폰은 판 아래에 끌기 칸을 둔다
+      const sprite = {};
+      let floorCache = null, floorTone = -1;
+      function layout() {
+        const cs = getComputedStyle(stage);
+        const availW = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        let availH = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+        // 가로로 눕힌 휴대폰처럼 낮은 화면은 게임 창이 화면보다 길 수 있다 — 스크롤하지 않아도 판이 다 보이는 높이까지만 쓴다
+        // (공통 틀은 게임을 창 안 세로 가운데에 두므로, 가운데 둔 채로 아래 끝이 화면 안에 들게 잰다)
+        const main = stage.closest("#hk-pf-main");
+        if (main) {
+          const mr = main.getBoundingClientRect(), sr = stage.getBoundingClientRect();
+          const visBottom = Math.min(window.innerHeight, mr.top + main.clientHeight) - 6;
+          const contentTop = sr.top + main.scrollTop + parseFloat(cs.paddingTop);
+          if (contentTop + availH > visBottom) availH = Math.max(0, Math.floor(2 * (visBottom - contentTop) - availH));
+        }
+        const GAP = 8, PAD_MIN = 110, PAD_MAX = 420;
+        const hudH = hud.offsetHeight || 34;
+        const belowMin = coarse ? PAD_MIN : note.offsetHeight || 18;
+        let s = Math.floor(Math.min(availW, availH - hudH - belowMin - GAP * 2));
+        if (coarse && s < 240) s = Math.floor(Math.min(availW, availH - hudH - GAP)); // 아주 낮은 화면은 끌기 칸 없이 판만
+        s = Math.max(160, s); // 가로로 눕힌 휴대폰은 판이 작아져도 잘리지 않는 쪽을 고른다
+        const padH = coarse ? Math.min(PAD_MAX, Math.floor(availH - hudH - s - GAP * 2)) : 0;
+        pad.hidden = !(coarse && padH >= 70);
+        if (!pad.hidden) pad.style.height = `${padH}px`;
+        // 판이 아주 작아도 위 점수 줄은 글자가 보이게 조금 넓게 (판은 가운데)
+        root.style.width = `${Math.max(s, Math.min(availW, 330))}px`;
+        wrap.style.width = wrap.style.height = `${s}px`;
+        const nd = Math.min(window.devicePixelRatio || 1, 2);
+        if (s !== side || nd !== dpr || !sprite.mail) {
+          side = s; dpr = nd;
+          canvas.width = Math.round(side * dpr);
+          canvas.height = Math.round(side * dpr);
+          scale = canvas.width / S;
+          buildSprites();
+          floorTone = -1;
+        }
+        draw(1);
+      }
+      // 날아오는 업무 그림을 지금 크기로 한 번만 그려 둔다
+      function buildSprites() {
+        const BOX = 40;
+        for (const k of ["mail", "invite", "doc", "night"]) {
+          const c = sprite[k] || document.createElement("canvas");
+          c.width = c.height = Math.ceil(BOX * scale);
+          const cg = c.getContext("2d");
+          cg.setTransform(scale, 0, 0, scale, c.width / 2, c.height / 2);
+          cg.clearRect(-BOX, -BOX, BOX * 2, BOX * 2);
+          ART[k](cg);
+          sprite[k] = c;
+        }
+        sprite.box = BOX;
+      }
+      function paintFloor(tone) {
+        if (floorCache && Math.abs(tone - floorTone) < 0.02) return;
+        floorCache = floorCache || document.createElement("canvas");
+        floorCache.width = canvas.width; floorCache.height = canvas.height;
+        const fg = floorCache.getContext("2d");
+        fg.setTransform(scale, 0, 0, scale, 0, 0);
+        ART.floor(fg, S, tone);
+        floorTone = tone;
+      }
+
+      // ───────── 입력 — 키보드
+      const DIRS = { ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down" };
+      const typing = (e) => {
+        const t = e.target;
+        return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable);
+      };
+      const dialogOpen = () => !!document.querySelector(".hk-dialog__overlay");
+      const goBtn = () => (over.hidden ? null : over.querySelector("[data-go]:not(:disabled)"));
+      window.addEventListener("keydown", (e) => {
+        if (typing(e) || dialogOpen()) return;
+        if (e.key === "Shift") slowKey = true;
+        const d = DIRS[e.code];
+        if (d) keys[d] = true;
+        if (e.code.startsWith("Arrow")) e.preventDefault(); // 화면이 굴러가지 않게
+        // 엔터 — 시작·계속하기·다시 하기 (스페이스는 공통 틀이 맡는다)
+        if (e.code === "Enter" && !e.repeat && goBtn()) { e.preventDefault(); goBtn().click(); }
+      });
+      window.addEventListener("keyup", (e) => {
+        if (e.key === "Shift") slowKey = false;
+        const d = DIRS[e.code];
+        if (d) keys[d] = false;
+      });
+      function clearInput() {
+        keys.left = keys.right = keys.up = keys.down = false;
+        slowKey = false;
+        endDrag();
+        pendX = pendY = 0;
+      }
+      window.addEventListener("blur", () => {
+        clearInput();
+        if (state === "play" || state === "count") pause();
+      });
+      document.addEventListener("visibilitychange", () => {
+        if (document.hidden && (state === "play" || state === "count")) pause();
+      });
+
+      // ───────── 입력 — 끌기 (누른 곳으로 순간이동하지 않고, 끈 만큼만 같은 방향으로 · 최고 속도는 키보드와 같다)
+      function endDrag() {
+        if (!drag) return;
+        drag = null;
+        board.classList.remove("is-drag");
+        pad.classList.remove("is-drag");
+      }
+      function bindDrag(el) {
+        el.addEventListener("pointerdown", (e) => {
+          if (!over.hidden || drag) return;
+          if (state !== "play" && state !== "count") return;
+          e.preventDefault();
+          drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
+          el.classList.add("is-drag");
+          try { el.setPointerCapture(e.pointerId); } catch (_) { /* 이미 놓음 */ }
+        });
+        el.addEventListener("pointermove", (e) => {
+          if (!drag || e.pointerId !== drag.id) return;
+          const k = S / side; // 화면 1px → 판 단위
+          if (state === "play") {
+            pendX += (e.clientX - drag.x) * k;
+            pendY += (e.clientY - drag.y) * k;
+            const l = Math.hypot(pendX, pendY);
+            if (l > DRAG_MAX) { pendX *= DRAG_MAX / l; pendY *= DRAG_MAX / l; }
+          }
+          drag.x = e.clientX; drag.y = e.clientY;
+        });
+        const up = (e) => { if (drag && e.pointerId === drag.id) endDrag(); };
+        el.addEventListener("pointerup", up);
+        el.addEventListener("pointercancel", up);
+        el.addEventListener("lostpointercapture", up);
+      }
+      bindDrag(board);
+      bindDrag(pad);
+      // 판 위 끌기가 화면 스크롤·당겨서 새로고침으로 새지 않게
+      for (const el of [board, pad]) {
+        el.addEventListener("touchmove", (e) => { if (state === "play" || state === "count") e.preventDefault(); }, { passive: false });
+      }
+      document.documentElement.style.overscrollBehaviorY = "contain";
+      document.body.style.overscrollBehaviorY = "contain";
+
+      // ───────── 겹침 창
+      function showOver(html) {
+        over.innerHTML = html;
+        over.hidden = false;
+        HKUI.refreshIcons(over);
+        over.querySelector("[data-go]")?.addEventListener("click", onGo);
+        over.querySelectorAll("canvas[data-ico]").forEach(paintIcon);
+      }
+      function hideOver() { over.hidden = true; over.innerHTML = ""; }
+      function onGo(e) {
+        const act = e.currentTarget.dataset.go;
+        if (act === "resume") resume();
+        else start();
+      }
+      // 시작 화면의 작은 그림 — 게임과 같은 그림
+      function paintIcon(c) {
+        const px = 24, d = Math.min(window.devicePixelRatio || 1, 2), k = (px * d) / 30;
+        c.width = c.height = px * d;
+        const cg = c.getContext("2d");
+        cg.setTransform(k, 0, 0, k, (px * d) / 2, (px * d) / 2);
+        ART[c.dataset.ico](cg);
+      }
+      const bestLine = () => {
+        const b = ctx.game && ctx.game.myBest;
+        return b != null ? `<div class="gm-dg-best">내 최고 기록 <b>${ctx.formatScore(b)}</b></div>` : "";
+      };
+
+      function showReady() {
+        state = "ready";
+        world = null;
+        updateHud(true);
+        draw(1);
+        showOver(`<div class="gm-dg-card is-ready">
+          <span class="gm-dg-badge">${HKUI.icon("mail-warning", 24, "#fff")}</span>
+          <h2>업무 폭탄 피하기</h2>
+          <p>사방에서 날아오는 업무를 피해 오래 버텨요. <b>1분</b>을 버티면 칼퇴, 그 뒤로는 야근 기록이에요.</p>
+          <div class="gm-dg-legend">
+            <div><canvas data-ico="mail"></canvas>업무 메일</div>
+            <div><canvas data-ico="invite"></canvas>회의 초대</div>
+            <div><canvas data-ico="doc"></canvas>결재 서류 · 넓어요</div>
+            <div><canvas data-ico="night"></canvas>야근 알림 · 빨라요</div>
+          </div>
+          <p style="font-size:12.5px">가슴의 <b>하얀 점</b>에 닿을 때만 맞아요 · 한 번 맞으면 끝</p>
+          <dl class="gm-dg-keys">
+            ${coarse
+              ? `<dt>조작</dt><dd>판이나 아래 칸을 끌면 끈 쪽으로 움직여요</dd>`
+              : `<dt>키보드</dt><dd>방향키 또는 W·A·S·D · Shift 누르면 천천히</dd><dt>마우스</dt><dd>판을 끌면 끈 쪽으로 움직여요</dd>`}
+          </dl>
+          ${bestLine()}
+          <button type="button" class="hk-btn hk-btn--primary" data-go="start">${HKUI.icon("play", 16, "#fff")} 시작</button>
+        </div>`);
+      }
+
+      function start() {
+        world = SIM.makeWorld(Math.random);
+        hideOver();
+        acc = 0;
+        last = performance.now();
+        pendX = pendY = 0;
+        parts = []; shake = 0; flash = 0; deathT = 0; lastNearText = -9;
+        banner = null;
+        showBanner(0);
+        state = "play";
+        updateHud(true);
+        ctx.sfx("go");
+      }
+
+      function pause() {
+        if (state !== "play" && state !== "count") return;
+        state = "paused";
+        endDrag();
+        pendX = pendY = 0;
+        draw(acc / STEP);
+        showOver(`<div class="gm-dg-card">
+          <span class="gm-dg-badge is-pause">${HKUI.icon("pause", 24, "#fff")}</span>
+          <h2>잠깐 멈췄어요</h2>
+          <p>지금까지 <b>${fmtTime(world.t)}</b> 버텼어요. 계속하면 3·2·1을 센 뒤 다시 시작해요.</p>
+          <button type="button" class="hk-btn hk-btn--primary" data-go="resume">${HKUI.icon("play", 16, "#fff")} 계속하기</button>
+        </div>`);
+      }
+      function resume() {
+        if (state !== "paused") return;
+        hideOver();
+        state = "count";
+        countT = 1.5;
+        last = performance.now();
+        ctx.sfx("countdown");
+      }
+
+      function die() {
+        state = "dying";
+        deathT = 0;
+        shake = 1;
+        flash = 1;
+        endDrag();
+        burst(world.x, world.y);
+        ctx.sfx("hurt");
+        setTimeout(() => ctx.sfx("explode"), 90);
+      }
+      function finish() {
+        state = "over";
+        const final = Math.floor(world.t);
+        const win = world.t >= SIM.CLOCKOUT;
+        const who = world.dead ? SIM.KINDS[world.dead.kind].name : "업무";
+        const st = SIM.STAGES[world.stage];
+        showOver(`<div class="gm-dg-card">
+          <span class="gm-dg-badge ${win ? "is-win" : "is-hit"}">${HKUI.icon(win ? "moon" : "mail-warning", 24, "#fff")}</span>
+          <div class="gm-dg-big${win ? " is-win" : ""}">${ctx.formatScore(final)}</div>
+          <h2>${win ? "칼퇴 성공!" : "업무에 깔렸어요"}</h2>
+          <p>${who}에 맞았어요 · ${world.stage + 1}단계 ${st.title}까지 왔어요</p>
+          <p>${win ? `정시 퇴근 뒤 야근 <b>${Math.floor(world.t - SIM.CLOCKOUT)}초</b>` : `칼퇴까지 <b>${Math.ceil(SIM.CLOCKOUT - world.t)}초</b> 남았어요`} · 아슬아슬 <b>${world.near}번</b></p>
+          <button type="button" class="hk-btn hk-btn--primary" data-go="again" disabled>${HKUI.icon("loader-circle", 16, "#fff")} 저장하는 중…</button>
+        </div>`);
+        // 기록 저장이 끝날 때까지 다시 하기를 막는다 — 저장 응답이 늦을 때 새 판 위로 순위표가 열리지 않게
+        const again = over.querySelector("[data-go=again]");
+        Promise.resolve(ctx.submit(final))
+          .catch(() => {})
+          .then(() => {
+            if (!again.isConnected) return;
+            again.disabled = false;
+            again.innerHTML = `${HKUI.icon("rotate-ccw", 16, "#fff")} 다시 하기`;
+            HKUI.refreshIcons(again);
+            // 저장이 오래 걸려 공통 틀이 판 아래에 '다시 하기·그만하기'를 따로 띄웠으면 겹치지 않게 내 버튼은 숨긴다
+            if (document.querySelector(".hk-endbar")) again.hidden = true;
+          });
+      }
+
+      // 게임 중 뒤로 가기 → '기록 남기고 나가기'에 쓰는 지금 점수
+      ctx.onScore && ctx.onScore(() => (world ? Math.floor(world.t) : 0));
+      ctx.onRestart(() => start());
+      ctx.onPause(() => (state === "play" || state === "count") && pause());
+
+      // ───────── 알림 띠 · 효과
+      function showBanner(si) {
+        const st = SIM.STAGES[si];
+        const clockout = si === SIM.STAGES.length - 1;
+        banner = {
+          t: 0,
+          dur: si === 0 ? 3.2 : 2.6,
+          title: clockout ? "18:00 칼퇴 성공!" : `${si + 1}단계 · ${st.title}`,
+          sub: clockout ? "이제 야근 시작 · 가장 바쁘지만 더 어려워지진 않아요" : st.sub,
+          night: clockout,
+        };
+      }
+      function burst(x, y) {
+        const COLS = ["#ffffff", "#93c5fd", "#fca5a5", "#fde68a", "#c4b5fd"];
+        for (let i = 0; i < 18; i++) {
+          const a = Math.random() * Math.PI * 2, v = 40 + Math.random() * 110;
+          parts.push({ kind: "paper", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 0.9 + Math.random() * 0.6, rot: Math.random() * 6, vr: (Math.random() - 0.5) * 14, c: COLS[i % COLS.length], w: 3 + Math.random() * 3, h: 2 + Math.random() * 2.5 });
+        }
+        parts.push({ kind: "ring", x, y, life: 0, max: 0.5 });
+      }
+      function sparkle(x, y) {
+        for (let i = 0; i < 4; i++) {
+          const a = Math.random() * Math.PI * 2, v = 18 + Math.random() * 30;
+          parts.push({ kind: "star", x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: 0.45 + Math.random() * 0.25, r: 2.2 + Math.random() * 1.8 });
+        }
+        if (world.t - lastNearText > 0.6) {
+          lastNearText = world.t;
+          parts.push({ kind: "text", x: world.x, y: world.y - 30, vx: 0, vy: -26, life: 0, max: 0.7, text: "아슬!" });
+        }
+      }
+      // 회의 소집이 끝나면 — 모인 자리에서 퐁 하고 사라진다
+      function meetingOver(x, y) {
+        parts.push({ kind: "ring", x, y, life: 0, max: 0.45 });
+        parts.push({ kind: "text", x, y: y - 6, vx: 0, vy: -22, life: 0, max: 0.8, text: "회의 끝!", c: "#fecaca" });
+      }
+      function updateParts(dt) {
+        for (let i = parts.length - 1; i >= 0; i--) {
+          const p = parts[i];
+          p.life += dt;
+          if (p.life >= p.max) { parts.splice(i, 1); continue; }
+          if (p.vx != null) {
+            p.x += p.vx * dt; p.y += p.vy * dt;
+            if (p.kind !== "text") { p.vx *= 1 - 2.2 * dt; p.vy *= 1 - 2.2 * dt; }
+          }
+          if (p.vr) p.rot += p.vr * dt;
+        }
+      }
+
+      // ───────── 한 걸음
+      function stepOnce() {
+        let mx = 0, my = 0;
+        const kx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0), ky = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+        if (kx || ky) {
+          const l = Math.hypot(kx, ky), sp = SPEED * (slowKey ? SLOW : 1) * STEP;
+          mx = (kx / l) * sp; my = (ky / l) * sp;
+        }
+        const pl = Math.hypot(pendX, pendY);
+        if (pl > 1e-6) {
+          const take = Math.min(pl, SPEED * STEP);
+          mx += (pendX / pl) * take; my += (pendY / pl) * take;
+          pendX -= (pendX / pl) * take; pendY -= (pendY / pl) * take;
+        }
+        const ml = Math.hypot(mx, my), cap = SPEED * STEP;
+        if (ml > cap) { mx *= cap / ml; my *= cap / ml; }
+        world.step(STEP, mx, my);
+        for (const ev of world.ev) {
+          if (ev.type === "stage") {
+            showBanner(ev.stage);
+            ctx.sfx(ev.stage === SIM.STAGES.length - 1 ? "win" : "powerup");
+            updateHud(true);
+          } else if (ev.type === "ring") ctx.sfx("whoosh");
+          else if (ev.type === "ringEnd") { meetingOver(ev.x, ev.y); ctx.sfx("pop"); }
+          else if (ev.type === "stream") ctx.sfx("laser");
+          else if (ev.type === "near") { sparkle((ev.x + world.x) / 2, (ev.y + world.y) / 2); ctx.sfx("tick"); }
+        }
+        world.ev.length = 0;
+        if (world.dead) die();
+      }
+
+      // ───────── 화면 위 글자
+      function fmtTime(t) {
+        const s = Math.floor(t);
+        return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      }
+      let hudShown = "";
+      function updateHud(force) {
+        const t = world ? world.t : 0;
+        const key = `${Math.floor(t * 10)}|${world ? world.near : 0}|${world ? world.stage : 0}`;
+        if (!force && key === hudShown) return;
+        hudShown = key;
+        elTime.textContent = fmtTime(t);
+        elTenth.textContent = `.${Math.floor(t * 10) % 10}`;
+        elNear.textContent = world ? world.near : 0;
+        const si = world ? world.stage : 0;
+        elStage.textContent = `${si + 1}단계 · ${SIM.STAGES[si].title}`;
+        elTimeChip.classList.toggle("is-night", !!world && world.t >= SIM.CLOCKOUT);
+      }
+
+      // ───────── 그리기
+      function spriteAngle(s, t) {
+        if (s.kind === "mail") {
+          const a = Math.atan2(s.vy, s.vx);
+          return Math.abs(a) > Math.PI / 2 ? a - Math.PI * Math.sign(a) : a;
+        }
+        if (s.kind === "invite") return t * 1.6 + s.seed * 6;
+        if (s.kind === "doc") return Math.sin(t * 3 + s.seed * 6) * 0.28;
+        return Math.sin(t * 9 + s.seed * 6) * 0.14;
+      }
+      const WARN_COL = { mail: "#bfdbfe", invite: "#fca5a5", doc: "#fde68a", night: "#c4b5fd" };
+      const TRAIL = { mail: "#93c5fd", invite: "#fca5a5", doc: "#fde68a", night: "#a78bfa" };
+
+      function draw(alpha) {
+        const t = world ? world.t : 0;
+        g.setTransform(1, 0, 0, 1, 0, 0);
+        paintFloor(clamp(t / SIM.CLOCKOUT, 0, 1));
+        g.drawImage(floorCache, 0, 0);
+        g.setTransform(scale, 0, 0, scale, 0, 0);
+        if (shake > 0) g.translate((Math.random() - 0.5) * 7 * shake, (Math.random() - 0.5) * 7 * shake);
+        drawBanner();
+        // 멈춤 창에서는 날아오는 것들을 숨긴다 — 멈춰 놓고 다음 수를 오래 궁리하지 못하게 (계속하면 3·2·1 동안 다시 보여 준다)
+        const field = world && state !== "paused";
+        if (field) {
+          drawRings(t);
+          drawStreams(t);
+          drawShots(alpha, t);
+        }
+        drawParts();
+        drawHero(alpha, t);
+        // 가장자리 경고는 직원 그림 위에 — 직원이 가장자리에 붙어 있어도 가려지지 않게. 맞는 점은 그보다 위
+        if (field) drawWarns(t);
+        drawCore(alpha, t);
+        if (flash > 0) {
+          g.fillStyle = `rgba(254,226,226,${0.45 * flash})`;
+          g.fillRect(-10, -10, S + 20, S + 20);
+        }
+        if (state === "count") drawCount(alpha, t);
+      }
+      function drawBanner() {
+        if (!banner) return;
+        const b = banner, inK = Math.min(1, b.t / 0.28), outK = b.t > b.dur - 0.45 ? Math.max(0, (b.dur - b.t) / 0.45) : 1;
+        const a = inK * outK;
+        if (a <= 0) return;
+        const y = 14 - (1 - easeOut(inK)) * 22;
+        g.save();
+        g.globalAlpha = a;
+        g.textAlign = "center"; g.textBaseline = "middle";
+        g.font = `800 15.5px ${FONT}`;
+        const tw = g.measureText(b.title).width;
+        g.font = `600 10.5px ${FONT}`;
+        const sw = g.measureText(b.sub).width;
+        const w = Math.min(S - 16, Math.max(tw, sw) + 26), h = 42;
+        ART.rr(g, S / 2 - w / 2, y, w, h, 12);
+        g.fillStyle = b.night ? "rgba(76,29,149,.78)" : "rgba(15,23,42,.66)";
+        g.fill();
+        g.strokeStyle = b.night ? "rgba(253,224,71,.6)" : "rgba(255,255,255,.18)";
+        g.lineWidth = 1; g.stroke();
+        g.fillStyle = b.night ? "#fde047" : "#ffffff";
+        g.font = `800 15.5px ${FONT}`;
+        g.fillText(b.title, S / 2, y + 14.5);
+        g.fillStyle = "#cbd5e1";
+        g.font = `600 10.5px ${FONT}`;
+        g.fillText(b.sub, S / 2, y + 30.5, S - 30);
+        g.restore();
+      }
+      function drawRings(t) {
+        for (const r of world.rings) {
+          if (t < r.warnEnd) {
+            // 모이는 곳 표시 — 빨간 점선 고리 + 달력
+            const k = (t - r.start) / (r.warnEnd - r.start), pulse = 0.5 + 0.5 * Math.sin(t * 16);
+            g.save();
+            g.translate(r.x, r.y);
+            g.globalAlpha = 0.55 + 0.45 * pulse;
+            g.rotate(t * 1.8);
+            g.setLineDash([5, 4]);
+            g.strokeStyle = "#f87171"; g.lineWidth = 2;
+            g.beginPath(); g.arc(0, 0, 26 - k * 6, 0, Math.PI * 2); g.stroke();
+            g.setLineDash([]);
+            g.restore();
+            g.save();
+            g.translate(r.x, r.y);
+            g.globalAlpha = 0.9;
+            g.scale(0.85, 0.85);
+            ART.invite(g);
+            g.restore();
+            g.save();
+            g.fillStyle = "#fecaca"; g.font = `800 10px ${FONT}`; g.textAlign = "center"; g.textBaseline = "bottom";
+            g.fillText("회의 소집", r.x, r.y - 30);
+            g.restore();
+          }
+          // 지금 고리 크기 — 흐린 점선으로
+          const rad = r.v * (r.arrive - t);
+          if (rad > 2) {
+            g.save();
+            g.globalAlpha = t < r.warnEnd ? 0.18 : 0.32;
+            g.setLineDash([3, 5]);
+            g.strokeStyle = "#fca5a5"; g.lineWidth = 1.2;
+            g.beginPath(); g.arc(r.x, r.y, rad, 0, Math.PI * 2); g.stroke();
+            g.restore();
+          }
+        }
+      }
+      function drawStreams(t) {
+        for (const s of world.streams) {
+          const pre = t < s.fireAt, pulse = 0.5 + 0.5 * Math.sin(t * 22);
+          const x = clamp(s.x, 11, S - 11), y = clamp(s.y, 11, S - 11);
+          g.save();
+          // 줄이 지나갈 길 — 경고 동안만 붉은 점선으로
+          if (pre) {
+            g.globalAlpha = 0.25 + 0.25 * pulse;
+            g.strokeStyle = "#f87171"; g.lineWidth = 2; g.setLineDash([6, 6]);
+            for (const off of s.offs) {
+              const a = s.a + off;
+              g.beginPath(); g.moveTo(s.x, s.y); g.lineTo(s.x + Math.cos(a) * 150, s.y + Math.sin(a) * 150); g.stroke();
+            }
+            g.setLineDash([]);
+          }
+          g.globalAlpha = pre ? 0.65 + 0.35 * pulse : 0.6;
+          g.translate(x, y);
+          g.rotate(s.a);
+          ART.arrow(g, "#ef4444", true);
+          g.translate(-9, 0);
+          ART.arrow(g, "#f87171", true);
+          g.restore();
+        }
+      }
+      // 가장자리 경고 — 들어올 곳에 번지는 빛 + 들어올 쪽을 가리키는 화살표 (들어올 때가 가까울수록 진하게)
+      function drawWarns(t) {
+        for (const o of world.warns) {
+          if (o.silent) continue;
+          const k = 1 - o.left / o.total, pulse = 0.5 + 0.5 * Math.sin(t * 20);
+          const ex = clamp(o.x, 0, S), ey = clamp(o.y, 0, S);
+          g.save();
+          g.globalAlpha = (0.25 + 0.35 * k) * (0.7 + 0.3 * pulse);
+          g.fillStyle = WARN_COL[o.kind];
+          g.beginPath(); g.arc(ex, ey, 9 + 7 * k, 0, Math.PI * 2); g.fill();
+          g.globalAlpha = 0.6 + 0.4 * k;
+          g.translate(clamp(o.x, 10, S - 10), clamp(o.y, 10, S - 10));
+          g.rotate(Math.atan2(o.dy, o.dx));
+          g.scale(1.15, 1.15);
+          ART.arrow(g, WARN_COL[o.kind], false);
+          g.restore();
+        }
+      }
+      function drawShots(alpha, t) {
+        const B = sprite.box;
+        for (const s of world.shots) {
+          const x = s.ox + (s.x - s.ox) * alpha, y = s.oy + (s.y - s.oy) * alpha;
+          if (x < -24 || x > S + 24 || y < -24 || y > S + 24) continue;
+          // 지나온 자리 — 뒤로 갈수록 작고 흐린 잔상 세 개 (어느 쪽으로 가는지 한눈에)
+          const sp = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / sp, uy = s.vy / sp, step = s.r * 0.95 + sp * 0.03;
+          g.fillStyle = TRAIL[s.kind];
+          for (let k = 1; k <= 3; k++) {
+            g.globalAlpha = 0.26 - k * 0.06;
+            g.beginPath(); g.arc(x - ux * step * k, y - uy * step * k, s.r * (0.95 - k * 0.2), 0, Math.PI * 2); g.fill();
+          }
+          g.globalAlpha = 1;
+          g.save();
+          g.translate(x, y);
+          g.rotate(spriteAngle(s, t));
+          g.drawImage(sprite[s.kind], -B / 2, -B / 2, B, B);
+          g.restore();
+        }
+      }
+      function drawParts() {
+        for (const p of parts) {
+          const k = p.life / p.max;
+          g.save();
+          g.globalAlpha = 1 - k;
+          if (p.kind === "paper") {
+            g.translate(p.x, p.y); g.rotate(p.rot);
+            g.fillStyle = p.c; g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          } else if (p.kind === "star") {
+            g.translate(p.x, p.y); g.rotate(k * 2);
+            g.fillStyle = "#fde68a"; ART.star(g, p.r * (1 - k * 0.4));
+          } else if (p.kind === "ring") {
+            g.strokeStyle = "#fecaca"; g.lineWidth = 3 * (1 - k);
+            g.beginPath(); g.arc(p.x, p.y, 8 + k * 46, 0, Math.PI * 2); g.stroke();
+          } else if (p.kind === "text") {
+            g.fillStyle = p.c || "#fde68a"; g.strokeStyle = "rgba(15,23,42,.8)"; g.lineWidth = 3;
+            g.font = `800 11px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
+            g.strokeText(p.text, p.x, p.y); g.fillText(p.text, p.x, p.y);
+          }
+          g.restore();
+        }
+      }
+      // 직원이 지금 그려질 자리 (걸음 사이는 부드럽게 이어 그린다)
+      function heroPos(alpha) {
+        return world ? [world.ox + (world.x - world.ox) * alpha, world.oy + (world.y - world.oy) * alpha] : [S / 2, S / 2 + 24];
+      }
+      function drawHero(alpha, t) {
+        const [px, py] = heroPos(alpha);
+        const vx = world ? world.vx : 0, vy = world ? world.vy : 0;
+        const moving = Math.hypot(vx, vy) > 8 && state === "play";
+        const hurt = state === "dying" || state === "over";
+        const tt = t;
+        g.save();
+        g.translate(px, py);
+        if (!hurt) g.rotate(clamp(vx / SPEED, -1, 1) * 0.13);
+        else g.rotate(Math.sin(deathT * 9) * 0.12 * Math.max(0, 1 - deathT));
+        ART.hero(g, {
+          lx: clamp(vx / SPEED, -1, 1), ly: clamp(vy / SPEED, -1, 1),
+          bob: moving ? Math.sin(tt * 20) * 0.9 : Math.sin(tt * 2.6) * 0.45,
+          blink: !hurt && (tt % 3.4) > 3.25,
+          hurt,
+        });
+        g.restore();
+      }
+      // 맞는 곳 — 언제나 맨 위에
+      function drawCore(alpha, t) {
+        const [px, py] = heroPos(alpha);
+        const hurt = state === "dying" || state === "over";
+        g.save();
+        g.translate(px, py);
+        // Shift(천천히)일 때는 맞는 곳을 더 또렷하게
+        if (slowKey && state === "play") {
+          g.strokeStyle = "rgba(255,255,255,.55)"; g.lineWidth = 1;
+          g.beginPath(); g.arc(0, 0, 9, 0, Math.PI * 2); g.stroke();
+        }
+        ART.core(g, SIM.CORE_R, hurt ? 0 : 0.6 + 0.4 * Math.sin(t * 6));
+        g.restore();
+      }
+      // 다시 시작 전 3·2·1 — 판을 살짝 어둡게 덮고 직원·가장자리 경고는 그 위에 다시 그린다.
+      // 숫자는 직원과 먼 위·아래 쪽에 (위쪽은 단계 알림 띠 아래)
+      function drawCount(alpha, t) {
+        const n = Math.ceil(countT / 0.5);
+        const [, py] = heroPos(alpha);
+        const cy = py > S / 2 ? 100 : S - 70;
+        g.save();
+        g.fillStyle = "rgba(15,23,42,.35)";
+        g.fillRect(0, 0, S, S);
+        g.restore();
+        drawHero(alpha, t);
+        if (world) drawWarns(t);
+        drawCore(alpha, t);
+        g.save();
+        g.fillStyle = "rgba(15,23,42,.72)";
+        g.beginPath(); g.arc(S / 2, cy, 30, 0, Math.PI * 2); g.fill();
+        g.fillStyle = "#fff"; g.font = `800 34px ${FONT}`; g.textAlign = "center"; g.textBaseline = "middle";
+        g.fillText(String(n), S / 2, cy + 2);
+        g.font = `700 11px ${FONT}`; g.fillStyle = "#e2e8f0";
+        g.strokeStyle = "rgba(15,23,42,.8)"; g.lineWidth = 3;
+        const ty = cy < S / 2 ? cy + 44 : cy - 44;
+        g.strokeText("곧 다시 시작해요", S / 2, ty);
+        g.fillText("곧 다시 시작해요", S / 2, ty);
+        g.restore();
+      }
+
+      // ───────── 루프 — 고정 걸음 물리 + 사이 위치는 부드럽게 이어 그린다
+      function frame(now) {
+        // 한 프레임이 길어도 0.25초까지는 따라잡는다 — 느린 화면에서 판이 슬로 모션이 되지 않게 (물리는 1/120초 걸음 그대로)
+        const dt = Math.min(0.25, Math.max(0, (now - last) / 1000));
+        last = now;
+        let dirty = false;
+        if (state === "play") {
+          acc += dt;
+          while (acc >= STEP && state === "play") { acc -= STEP; stepOnce(); }
+          if (banner) { banner.t += dt; if (banner.t > banner.dur) banner = null; }
+          updateHud(false);
+          dirty = true;
+        } else if (state === "count") {
+          const before = Math.ceil(countT / 0.5);
+          countT -= dt;
+          if (countT <= 0) { state = "play"; acc = 0; ctx.sfx("go"); }
+          else if (Math.ceil(countT / 0.5) !== before) ctx.sfx("countdown");
+          dirty = true;
+        } else if (state === "dying") {
+          deathT += dt;
+          if (deathT > 0.95) finish();
+          dirty = true;
+        } else if (state === "over") {
+          deathT += dt;
+          dirty = parts.length > 0 || shake > 0 || flash > 0;
+        }
+        if (state === "dying" || state === "over" || state === "play") updateParts(dt);
+        if (shake > 0) shake = Math.max(0, shake - dt * 2.2);
+        if (flash > 0) flash = Math.max(0, flash - dt * 3);
+        if (dirty) draw(state === "play" ? acc / STEP : 1);
+        requestAnimationFrame(frame);
+      }
+
+      if (window.ResizeObserver) new ResizeObserver(() => layout()).observe(stage);
+      window.addEventListener("resize", layout);
+      layout();
+      showReady();
+      requestAnimationFrame(frame);
+    },
+  });
+  </script>
+</body>
+</html>

@@ -1227,7 +1227,7 @@ async def send_test_chat_to_member(
 
 # ── 대전 게임(오목 · 체스) ─────────────────────────────────────────
 
-MATCH_GAME_NAME = {"gomoku": "오목", "chess": "체스"}
+MATCH_GAME_NAME = {"gomoku": "오목", "chess": "체스", "baseball": "숫자 야구", "boxes": "칸 따먹기", "quizduel": "1:1 퀴즈", "gostop": "고스톱", "memory": "도형 짝맞추기", "soccer": "헤딩 축구", "volley": "배구"}
 
 
 def match_page_url(game: str, match_id: Optional[int] = None) -> str:
@@ -1257,14 +1257,25 @@ def render_match_challenged_body(*, game: str, match_id: int, target: Member, ch
 def render_match_accepted_body(*, game: str, match_id: int, challenger: Member, opponent: Member, first: Member) -> str:
     name = MATCH_GAME_NAME.get(game, "대전")
     url = match_page_url(game, match_id)
-    side = "백" if game == "chess" else "흑"
     turn = "내 차례예요" if first.id == challenger.id else f"{html.escape(first.name)}님 차례예요"
     return (
         f"<p><strong>[헬스키퍼]</strong> {name} 대전 수락</p>"
         f"<p>{html.escape(challenger.name)}님, {_who(opponent)}이 {name} 대전 신청을 수락했어요.</p>"
-        f"<p>첫 수({side})는 {turn}.</p>"
+        f"<p>{_match_first_line(game, turn)}</p>"
         f'<p><a href="{url}">대전 화면 열기</a></p>'
     )
+
+
+def _match_first_line(game: str, turn: str) -> str:
+    """수락 알림의 「누가 먼저」 한 줄 — 게임마다 말이 다르다(둘이 따로 하는 게임은 차례가 없다)."""
+    if game == "quizduel":
+        return "이제 24시간 안에 각자 10문제를 풀어요."
+    if game in ("soccer", "volley"):
+        return "둘 다 대전 화면에 들어오면 바로 경기가 시작돼요."
+    if game == "baseball":
+        return f"숫자를 정한 뒤 첫 공격은 {turn}."
+    first = {"chess": "첫 수(백)는", "gomoku": "첫 수(흑)는", "boxes": "첫 선은", "gostop": "첫 패는", "memory": "첫 카드는"}
+    return f"{first.get(game, '첫 차례는')} {turn}."
 
 
 def render_match_declined_body(*, game: str, challenger: Member, opponent: Member) -> str:

@@ -38,6 +38,8 @@ class Game:
     daily_once: bool = False
     # 갈래 — 고를 수 있는 판 종류(상식 퀴즈 분야). 갈래마다 순위와 하루 첫 판을 따로 센다. 빈 값 = 기본 판
     variants: tuple[str, ...] = ()
+    # 받을 수 있는 가장 작은 점수 — 낮을수록 좋은 게임에서 말이 안 되게 작은 기록(0점 등)을 막는다
+    min_score: int = 0
 
 
 GAMES: dict[str, Game] = {
@@ -70,10 +72,22 @@ GAMES: dict[str, Game] = {
         Game("korean", "한국어 능력시험", "STUDY", "맞춤법·띄어쓰기·표준어 · 매일 새 20문제", "book-open-check", "점", 100000, daily_once=True),
         Game("gomoku", "사내 오목", "MINI", "동료에게 도전장 · 번갈아 두는 턴제 대전", "swords", "승", 1_000_000),
         Game("chess", "사내 체스", "MINI", "동료 또는 컴퓨터와 두는 턴제 체스", "crown", "승", 1_000_000),
+        Game("baseball", "숫자 야구", "MINI", "서로 숨긴 숫자를 스트라이크 · 볼 힌트로 먼저 맞히기 · 턴제 대전", "hash", "승", 1_000_000),
+        Game("boxes", "칸 따먹기", "MINI", "점 사이에 선을 번갈아 긋고 네 변을 닫으면 내 칸 · 턴제 대전", "grid-2x2", "승", 1_000_000),
+        Game("quizduel", "1:1 퀴즈 대결", "MINI", "동료와 같은 문제를 각자 풀고 더 많이 맞히면 승 · 대전", "brain", "승", 1_000_000),
+        Game("gostop", "고스톱", "MINI", "동료와 1:1 맞고 · 점수만으로 겨루는 턴제 대전", "layers", "승", 1_000_000),
+        Game("memory", "도형 짝맞추기", "MINI", "번갈아 카드 두 장을 뒤집어 같은 도형 짝을 더 많이 · 턴제 대전", "shapes", "승", 1_000_000),
+        Game("soccer", "헤딩 축구", "MINI", "동료와 실시간 1:1 · 2분 동안 머리로 골 넣기 대전", "goal", "승", 1_000_000),
+        Game("volley", "옥상 배구", "MINI", "동료와 실시간 1:1 · 먼저 7점 내면 승리하는 배구 대전", "volleyball", "승", 1_000_000),
         Game("escape", "야근 사무실 탈출", "MINI", "동료와 둘이 단서를 나눠 20분 안에 탈출하는 협동 방탈출", "door-open", "time", 3600, lower_better=True),
         Game("kitchen", "점심 분식집", "MINI", "동료와 홀·주방을 나눠 3분 동안 분식집 운영 · 협동", "chef-hat", "원", 10_000_000),
         Game("words", "말해 봐 맞혀 봐", "QUIZ", "동료와 번갈아 설명하고 맞히기 · 3분 동안 몇 개나 · 협동", "message-circle", "개", 1000),
         Game("maze", "깜깜한 주차장", "MINI", "한 명은 CCTV로 안내, 한 명은 손전등으로 걷기 · 3분 동안 몇 층이나 · 협동", "flashlight", "층", 100),
+        Game("sketch", "화이트보드 그림 퀴즈", "QUIZ", "한 명은 그리고 한 명은 맞히기 · 3분 동안 몇 점이나 · 협동", "pencil", "점", 1000),
+        Game("sync", "통하는 사이", "QUIZ", "같은 질문에 몰래 답하고 서로의 답 예상하기 · 10문제 · 협동", "heart-handshake", "점", 100),
+        Game("spotdiff", "틀린 그림 찾기", "MINI", "사진 한 장씩 나눠 보고 말로 맞춰 다른 곳 찾기 · 3분 · 협동", "scan-search", "곳", 1000),
+        Game("bounce", "통통 짐볼", "MINI", "저절로 튀는 짐볼을 좌우로만 굴려 헬스키퍼실까지 · 10스테이지 완주", "circle-dot", "점", 100_000, lower_better=True, min_score=100),
+        Game("dodge", "업무 폭탄 피하기", "MINI", "사방에서 날아오는 메일·회의 초대 피하기 · 1분 버티면 칼퇴", "mail-warning", "time", 3600),
         Game("typing", "영어 타자 레이스", "STUDY", "뜻을 보고 영어 단어 치기 · 첫 글자 힌트", "keyboard", "점", 1_000_000),
     )
 }
@@ -519,7 +533,7 @@ async def submit_score(
     game = get_game(key)
     variant = get_variant(game, variant)
     ensure_open(grace=True)
-    if not isinstance(score, int) or score < 0 or score > game.max_score:
+    if not isinstance(score, int) or score < game.min_score or score > game.max_score:
         raise_app_error("INVALID_SCORE", 400)
     rate_key = f"hk:game:rate:{member.id}"
     count = await redis.incr(rate_key)

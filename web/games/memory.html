@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 도형 짝맞추기</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 도형 짝맞추기 — 초록 펠트 탁자 위 카드. 내 색은 파랑, 상대 색은 장미(화면을 보는 사람 기준) */
+    :root { --mm-me: #2563eb; --mm-me-ink: #1e40af; --mm-rival: #e11d48; --mm-rival-ink: #9f1239; --mm-felt: #0f5f5c; --mm-felt-2: #0a4744; --mm-card: #fffdf7; }
+    /* --mm-bw: 판 폭 — PC 는 창 높이에 맞춰 판 · 버튼이 한 화면에 들어오게(폰은 화면 폭이 먼저 막는다) */
+    .mm { --mm-bw: clamp(400px, calc(120vh - 470px), 620px); --mm-gap: 10px; }
+    .mm.is-over { --mm-bw: clamp(380px, calc(120vh - 520px), 620px); } /* 끝난 판은 아래 결과 줄만큼 판을 줄인다 */
+    @media (min-width: 900px) { /* 세 칸(짝 · 판 · 짝)일 때는 창 폭도 본다 — 키 큰 900~950px 창에서 양옆 짝 칸이 탁자 밖으로 나가지 않게 */
+      .mm { --mm-bw: clamp(400px, min(calc(120vh - 470px), calc(100vw - 360px)), 620px); }
+      .mm.is-over { --mm-bw: clamp(380px, min(calc(120vh - 520px), calc(100vw - 360px)), 620px); }
+    }
+    .gk.mm { max-width: 1000px; }
+    .mm .gk__vs, .mm .gk__bar, .mm-say, .mm-result { max-width: 760px; margin-left: auto; margin-right: auto; }
+
+    /* 도형 — 모양은 <symbol>, 색은 변수(--c 칠 · --d 테두리) */
+    .mm-f { display: block; width: 100%; height: 100%; overflow: visible; }
+    .mm-c-red { --c: #e11d48; --d: #9f1239; }
+    .mm-c-orange { --c: #f97316; --d: #c2410c; }
+    .mm-c-yellow { --c: #facc15; --d: #a16207; }
+    .mm-c-green { --c: #22c55e; --d: #15803d; }
+    .mm-c-sky { --c: #38bdf8; --d: #0369a1; }
+    .mm-c-blue { --c: #2563eb; --d: #1e3a8a; }
+    .mm-c-purple { --c: #a855f7; --d: #6b21a8; }
+    .mm-c-navy { --c: #334155; --d: #0f172a; }
+
+    /* 목록 — 이렇게 해요 */
+    .mm-how { margin: 0 0 20px; border: 1px solid #cfe3df; border-radius: 14px; background: #f3faf8; overflow: hidden; }
+    .mm-how > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px; font-size: 15px; font-weight: 800; cursor: pointer; list-style: none; user-select: none; }
+    .mm-how > summary::-webkit-details-marker { display: none; }
+    .mm-how > summary::after { content: ""; width: 8px; height: 8px; margin-left: auto; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; transform: rotate(45deg); transition: transform .2s; }
+    .mm-how[open] > summary::after { transform: rotate(-135deg); }
+    .mm-how > summary small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .mm-how__body { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 18px; align-items: center; padding: 4px 18px 18px; }
+    .mm-how__pic { display: block; width: 100%; height: auto; border-radius: 12px; }
+    .mm-how ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.65; color: var(--color-midnight-navy); word-break: keep-all; }
+    .mm-how ol li + li { margin-top: 3px; }
+    .mm-how ol b { color: #0f766e; }
+    .mm-how__tip { margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: #fef9c3; font-size: 13px; line-height: 1.55; color: #713f12; word-break: keep-all; }
+    @media (max-width: 640px) {
+      .mm-how__body { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 14px 16px; }
+      .mm-how__pic { max-width: 240px; margin: 0 auto; }
+    }
+
+    /* 「나 vs 상대」 막대 — 각자 색 점 */
+    .mm .gk__side .gk__face::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 15px; height: 15px; border-radius: 50%; background: var(--mm-rival); box-shadow: 0 0 0 2px #fff; }
+    .mm .gk__side.is-me .gk__face::after { background: var(--mm-me); }
+    .mm .gk__side:not(.is-me).is-turn { border-color: var(--mm-rival); box-shadow: 0 0 0 3px rgba(225, 29, 72, .14); }
+    .mm .gk__side:not(.is-me) .gk__turn { background: #ffe4e6; color: var(--mm-rival-ink); }
+
+    /* 탁자 — 가운데 판, 양옆(폰은 아래)에 가져간 짝 */
+    .mm-table { position: relative; display: grid; grid-template-columns: 118px var(--mm-bw) 118px; justify-content: center; align-items: start; gap: 14px; padding: 16px 14px; border-radius: 22px;
+      background: radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, .13), transparent 60%), repeating-linear-gradient(45deg, rgba(255, 255, 255, .025) 0 2px, transparent 2px 5px), linear-gradient(170deg, var(--mm-felt), var(--mm-felt-2));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -10px 30px rgba(0, 0, 0, .18), 0 10px 28px rgba(15, 23, 42, .16); transition: box-shadow .3s; }
+    .mm-table.is-me { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -10px 30px rgba(0, 0, 0, .18), 0 0 0 3px rgba(37, 99, 235, .55), 0 10px 28px rgba(15, 23, 42, .16); }
+    .mm-table.is-rival { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08), inset 0 -10px 30px rgba(0, 0, 0, .18), 0 0 0 3px rgba(225, 29, 72, .45), 0 10px 28px rgba(15, 23, 42, .16); }
+    .mm-wrap { position: relative; }
+
+    /* 가져간 짝 */
+    .mm-tray { min-width: 0; padding: 10px 8px 12px; border-radius: 14px; background: rgba(0, 0, 0, .16); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); color: #e6fffb; }
+    .mm-tray__head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; padding: 0 4px 8px; }
+    .mm-tray__head b { font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mm-tray__head span { font-size: 22px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+    .mm-tray.is-me .mm-tray__head span { color: #bfdbfe; }
+    .mm-tray.is-rival .mm-tray__head span { color: #fecdd3; }
+    .mm-tray__cards { display: flex; flex-wrap: wrap; gap: 8px 6px; min-height: 40px; }
+    .mm-tray__empty { padding: 4px; font-size: 12px; font-weight: 600; color: rgba(230, 255, 251, .55); word-break: keep-all; }
+    .mm-mini { position: relative; display: inline-block; width: 46px; height: 40px; flex-shrink: 0; }
+    .mm-mini i { position: absolute; top: 0; width: 31px; height: 39px; padding: 4px; box-sizing: border-box; border-radius: 6px; background: var(--mm-card); box-shadow: 0 1px 2px rgba(0, 0, 0, .3); }
+    .mm-mini i:first-child { left: 0; transform: rotate(-6deg); }
+    .mm-mini i:last-child { left: 14px; transform: rotate(5deg); }
+    .mm-tray.is-me .mm-mini i { box-shadow: 0 1px 2px rgba(0, 0, 0, .3), inset 0 0 0 2px rgba(37, 99, 235, .55); }
+    .mm-tray.is-rival .mm-mini i { box-shadow: 0 1px 2px rgba(0, 0, 0, .3), inset 0 0 0 2px rgba(225, 29, 72, .5); }
+    .mm-mini.is-hold { visibility: hidden; }
+    .mm-mini.is-new { animation: mm-mini .38s cubic-bezier(.3, 1.6, .5, 1); }
+    @keyframes mm-mini { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    /* 판 */
+    .mm-board { display: grid; grid-template-columns: repeat(var(--cols, 6), minmax(0, 1fr)); gap: var(--mm-gap); width: 100%; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    .mm-card { position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; padding: 0; border: 0; background: transparent; perspective: 700px; cursor: default; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    .mm-card:focus { outline: none; }
+    .mm-card:focus-visible .mm-card__lift { outline: 3px solid #fde047; outline-offset: 3px; border-radius: 10px; }
+    .mm-card__slot { position: absolute; inset: 2px; border-radius: 9px; border: 2px dashed rgba(255, 255, 255, .16); opacity: 0; transition: opacity .3s; }
+    .mm-card__slot::after { content: ""; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px; border-radius: 50%; background: rgba(255, 255, 255, .2); }
+    .mm-card.is-gone .mm-card__slot { opacity: 1; }
+    .mm-card.is-by-me .mm-card__slot::after { background: rgba(147, 197, 253, .55); }
+    .mm-card.is-by-rival .mm-card__slot::after { background: rgba(253, 164, 175, .55); }
+    .mm-card__lift { position: absolute; inset: 0; transition: transform .16s ease; }
+    .mm-card.is-gone .mm-card__lift { visibility: hidden; }
+    .mm-card__in { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .46s cubic-bezier(.3, .7, .3, 1.12); transition-delay: var(--d, 0ms); }
+    .mm-card.is-up .mm-card__in { transform: rotateY(180deg); }
+    .mm-card__back, .mm-card__face { position: absolute; inset: 0; border-radius: 10px; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+    .mm-card__back { display: grid; place-items: center; overflow: hidden;
+      background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, .16) 0 22%, transparent 23%), repeating-linear-gradient(45deg, rgba(255, 255, 255, .07) 0 5px, transparent 5px 10px), repeating-linear-gradient(-45deg, rgba(255, 255, 255, .07) 0 5px, transparent 5px 10px), linear-gradient(160deg, #5b4ee0, #33288f);
+      box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .85), inset 0 0 0 5px #3b2fb0, 0 3px 0 #1e1760, 0 6px 12px rgba(0, 0, 0, .28); }
+    .mm-card__back svg { width: 46%; height: 46%; opacity: .92; }
+    .mm-card__face { transform: rotateY(180deg); display: grid; place-items: center; padding: 14%; box-sizing: border-box; background: linear-gradient(170deg, #fffefa, #f6f0df); box-shadow: inset 0 0 0 1px #e8dfc4, inset 0 0 0 4px #fffdf7, inset 0 0 0 5px #eee6cf, 0 3px 0 #cfc5a6, 0 6px 12px rgba(0, 0, 0, .22); }
+    .mm-card__face .mm-f { filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .12)); }
+    .mm-board.is-live .mm-card:not(.is-up):not(.is-gone) { cursor: pointer; }
+    @media (hover: hover) and (pointer: fine) {
+      .mm-board.is-live .mm-card:not(.is-up):not(.is-gone):hover .mm-card__lift { transform: translateY(-4px); }
+      .mm-board.is-live .mm-card:not(.is-up):not(.is-gone):hover .mm-card__back { box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 5px #3b2fb0, 0 0 0 3px rgba(253, 224, 71, .85), 0 8px 16px rgba(0, 0, 0, .3); }
+    }
+    .mm-card.is-lift .mm-card__lift { transform: translateY(-7px) scale(1.05); }
+    .mm-card.is-flip .mm-card__lift { animation: mm-lift .46s ease; }
+    @keyframes mm-lift { 45% { transform: translateY(-9px) scale(1.09); } }
+    .mm-card.is-match .mm-card__face { animation: mm-glow .55s ease both; }
+    .mm-card.is-match.by-me .mm-card__face { --g: rgba(59, 130, 246, .95); }
+    .mm-card.is-match.by-rival .mm-card__face { --g: rgba(244, 63, 94, .95); }
+    @keyframes mm-glow { 0% { box-shadow: inset 0 0 0 1px #e8dfc4, 0 0 0 0 var(--g); } 50% { box-shadow: inset 0 0 0 1px #e8dfc4, 0 0 0 5px var(--g), 0 0 22px 4px var(--g); transform: rotateY(180deg) scale(1.07); } 100% { box-shadow: inset 0 0 0 1px #e8dfc4, 0 0 0 4px var(--g), 0 0 14px 2px var(--g); transform: rotateY(180deg) scale(1); } }
+    .mm-card.is-miss .mm-card__lift { animation: mm-miss .42s ease; }
+    @keyframes mm-miss { 20% { transform: translateX(-4px) rotate(-2deg); } 50% { transform: translateX(4px) rotate(2deg); } 80% { transform: translateX(-2px); } }
+    .mm-card.is-fly { z-index: 6; }
+    .mm-card.is-fly .mm-card__lift { transition: transform .5s cubic-bezier(.5, 0, .3, 1); }
+    .mm-card.is-left .mm-card__face { background: linear-gradient(170deg, #f8f5ec, #ebe5d3); }
+    .mm.is-still .mm-card__in, .mm.is-still .mm-card__lift, .mm.is-fast .mm-card__in, .mm.is-fast .mm-card__lift { transition: none !important; animation: none !important; }
+    .mm.is-fast .mm-card .mm-card__face { animation: none !important; }
+    .mm-empty .mm-card__back { filter: saturate(.55) brightness(.92); }
+
+    /* 짝! · 다시 보기 띠 */
+    .mm-pop { position: absolute; z-index: 7; transform: translate(-50%, -50%); padding: 6px 14px; border-radius: 999px; font-size: 17px; font-weight: 900; color: #fff; white-space: nowrap; pointer-events: none; animation: mm-pop 1s ease-out forwards; box-shadow: 0 6px 16px rgba(0, 0, 0, .25); }
+    .mm-pop.by-me { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+    .mm-pop.by-rival { background: linear-gradient(135deg, #fb7185, #be123c); }
+    @keyframes mm-pop { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.6); } 18% { opacity: 1; transform: translate(-50%, -60%) scale(1.12); } 70% { opacity: 1; transform: translate(-50%, -90%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -130%) scale(1); } }
+    .mm-say__skip { display: inline-flex; align-items: center; min-height: 40px; margin: -8px 0; padding: 0 14px; border: 0; border-radius: 999px; background: var(--mm-rival-ink); color: #fff; font: inherit; font-size: 13px; font-weight: 800; vertical-align: middle; cursor: pointer; }
+
+    /* 아래 한 줄 · 버튼 */
+    .mm-say { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; min-height: 24px; padding: 12px 8px 0; text-align: center; font-size: 15px; font-weight: 700; color: #475569; word-break: keep-all; }
+    .mm-say.is-go { color: var(--mm-me-ink); }
+    .mm-say.is-rival { color: var(--mm-rival-ink); }
+    .mm .gk__bar { align-items: stretch; }
+    .mm .gk__bar .hk-btn { min-height: 46px; }
+    .mm .gk__bar .gk__place { min-width: 0; } /* 좁은 폰에서 넓은 버튼이 줄어들어 기권 · 소리 버튼이 화면 안에 남게 */
+    @media (max-width: 440px) { .mm-long { display: none; } } /* 「카드 다시 보기」로 줄인다 */
+    @media (max-width: 359px) { .mm .gk__bar .hk-btn { padding: 0 14px; } }
+    .mm-snd { display: inline-grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; padding: 0; border: 1px solid var(--border-default); border-radius: 12px; background: var(--surface-card, #fff); color: var(--color-midnight-navy); cursor: pointer; }
+    .mm-snd.is-off { color: var(--text-muted); background: var(--color-mist); }
+    .mm-snd svg { width: 20px; height: 20px; }
+
+    /* 끝 — 결과 줄과 도장 */
+    .mm-result { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 104px; margin-top: 14px; padding: 14px 128px 14px 20px; border-radius: 16px; background: var(--surface-card, #fff); border: 1.5px solid var(--border-default); box-sizing: border-box; }
+    .mm-result.is-win { border-color: #f59e0b; background: #fffbeb; }
+    .mm-result b { font-size: 19px; font-weight: 900; color: var(--color-midnight-navy); word-break: keep-all; }
+    .mm-result small { margin-top: 4px; font-size: 13.5px; font-weight: 700; color: #64748b; word-break: keep-all; }
+    .mm-result.is-fresh { animation: mm-rise .45s ease both; }
+    @keyframes mm-rise { from { opacity: 0; transform: translateY(10px); } }
+    .mm-stamp { position: absolute; top: 50%; right: 18px; display: grid; place-items: center; width: 92px; height: 92px; margin-top: -46px; border-radius: 50%; border: 4px double currentColor; color: #dc2626; background: rgba(255, 255, 255, .6); transform: rotate(-12deg); text-align: center; pointer-events: none; }
+    .mm-stamp b { display: block; font-size: 18px; font-weight: 900; line-height: 1.1; color: inherit; }
+    .mm-stamp small { display: block; margin-top: 3px; font-size: 13px; font-weight: 800; color: inherit; font-variant-numeric: tabular-nums; }
+    .mm-stamp.is-lose { color: #64748b; }
+    .mm-stamp.is-draw { color: #7c3aed; }
+    .mm-stamp.is-fresh { animation: mm-stamp .42s cubic-bezier(.2, .9, .3, 1.25) .25s both; }
+    @keyframes mm-stamp { from { opacity: 0; transform: rotate(-12deg) scale(2.1); } to { opacity: 1; transform: rotate(-12deg) scale(1); } }
+    .mm-confetti { position: absolute; inset: 0; z-index: 9; overflow: hidden; pointer-events: none; border-radius: 22px; }
+    .mm-confetti i { position: absolute; top: -24px; width: 14px; height: 14px; animation: mm-fall var(--t, 1.8s) cubic-bezier(.3, .2, .6, 1) var(--d, 0s) forwards; opacity: 0; }
+    @keyframes mm-fall { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(var(--y, 520px)) rotate(var(--r, 360deg)); } }
+
+    /* 탁자 아래로 — 좁은 화면은 판을 위에, 가져간 짝을 아래 두 칸에 */
+    @media (max-width: 899px) {
+      .mm-table { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+      .mm-wrap { grid-column: 1 / -1; order: -1; width: 100%; max-width: var(--mm-bw); justify-self: center; }
+      .mm-tray__cards { flex-wrap: nowrap; gap: 0; min-height: 34px; }
+      .mm-tray__cards .mm-mini + .mm-mini { margin-left: -12px; }
+      /* 짝이 많아 칸이 모자라면 더미가 더 겹친다 — 둘째 카드를 오른쪽에 붙여 줄어든 칸 안에 머물게 */
+      .mm-tray__cards .mm-mini { flex-shrink: 1; min-width: 0; }
+      .mm-tray__cards .mm-mini i:last-child { left: auto; right: 0; }
+    }
+    @media (max-width: 640px) {
+      .mm, .mm.is-over { --mm-bw: 100%; --mm-gap: 6px; }
+      .mm-table { padding: 10px 8px; border-radius: 18px; gap: 8px; }
+      .mm-card__back, .mm-card__face { border-radius: 7px; }
+      .mm-card__back { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .85), inset 0 0 0 3.5px #3b2fb0, 0 2px 0 #1e1760, 0 4px 8px rgba(0, 0, 0, .28); }
+      .mm-card__face { padding: 12%; box-shadow: inset 0 0 0 1px #e8dfc4, inset 0 0 0 3px #fffdf7, inset 0 0 0 4px #eee6cf, 0 2px 0 #cfc5a6, 0 4px 8px rgba(0, 0, 0, .22); }
+      .mm-card__slot { border-radius: 7px; }
+      .mm-tray { padding: 8px 6px 9px; }
+      .mm-tray__head { padding-bottom: 6px; }
+      .mm-tray__head span { font-size: 19px; }
+      .mm-mini { width: 36px; height: 32px; }
+      .mm-mini i { width: 24px; height: 31px; padding: 3px; border-radius: 5px; }
+      .mm-mini i:last-child { left: 11px; }
+      .mm-tray__cards .mm-mini + .mm-mini { margin-left: -14px; }
+      .mm-say { font-size: 14px; padding-top: 10px; }
+      .mm-result { min-height: 96px; padding: 12px 108px 12px 16px; }
+      .mm-result b { font-size: 17px; }
+      .mm-stamp { right: 12px; width: 80px; height: 80px; margin-top: -40px; }
+      .mm-stamp b { font-size: 16px; }
+      .mm-pop { font-size: 15px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .mm-card__in, .mm-card__lift { transition-duration: 1ms !important; }
+      .mm-card.is-flip .mm-card__lift, .mm-card.is-miss .mm-card__lift, .mm-card.is-match .mm-card__face, .mm-mini.is-new, .mm-pop, .mm-result.is-fresh, .mm-stamp.is-fresh { animation-duration: 1ms !important; }
+      .mm-confetti { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 도형 짝맞추기 — 도전 → 수락 → 번갈아 카드 두 장씩 뒤집기. 짝이면 내 것 + 한 번 더, 아니면 차례가 넘어간다. 7쌍 먼저면 승
+    // 카드 번호 · 도형 이름은 서버(backend/app/services/versus_memory.py)와 같다 — 0~23, 왼쪽 위부터 한 줄에 6장
+    // 엎어 둔 카드의 모양은 서버가 보내지 않는다. 화면은 「지금 보이는 판(disp)」을 들고, 서버가 준 판과의 차이만 움직여 보여 준다
+    const { esc, closedNote, due, fail } = HKMatch;
+    const GAME = "memory";
+    const HOW_KEY = "hk-memory-how"; // 「이렇게 해요」를 처음 한 번은 펼쳐 둔다
+    const BOT_LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    const SHAPE_KO = { circle: "동그라미", triangle: "세모", square: "네모", star: "별", hexagon: "육각형", heart: "하트", diamond: "마름모", cross: "십자", moon: "달", drop: "물방울", arrow: "화살표", spiral: "소용돌이" };
+    const COLOR_KO = { red: "빨강", orange: "주황", yellow: "노랑", green: "초록", sky: "하늘색", blue: "파랑", purple: "보라", navy: "남색" };
+    // 시간(ms) — 내가 뒤집은 카드는 바로, 상대 카드는 기억할 틈을 두고 천천히
+    const T = { flip: 460, think: 520, between: 620, holdMine: 1000, holdRival: 1600, match: 560, fly: 520 };
+    const STOP = { stop: true };
+    const sfx = (name, arg) => { try { if (window.HKSound) HKSound.play(name, arg); } catch (_) { /* 소리는 부가 기능 */ } };
+    const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
+
+    let root = null, open = { open: true, opensAt: null }, match = null, timer = 0;
+    let waiter = null; // 서버에서 상대 카드를 기다리는 요청
+    let disp = null; // 지금 화면에 보이는 판 — faces · up · gone · left · pile · t · cur · open
+    let token = 0; // 판을 새로 열 때마다 오른다 — 진행 중인 연출을 멈춘다
+    let running = false, phase = null, replaying = false, fast = false; // 연출 중 · 연출에서 누구 차례로 보일지 · 다시 보기 중 · 건너뛰기
+    let sending = false, queued = null; // 보내는 중 · 그 사이 누른 카드(첫 장을 보내는 동안 둘째 장)
+    let second = false; // 둘째 장을 보내고 결과를 보여 주는 중 — 이때 누른 카드는 받아 두지 않는다(짝 결과 · 다음 차례를 보기 전)
+    let chain = Promise.resolve(); // 서버가 준 판을 하나씩 차례로 보여 준다
+    let endFx = false; // 방금 끝난 판 — 남은 카드 공개 · 도장 · 소리
+    let judging = null; // 내 둘째 장을 보여 주는 중 — "ok" | "miss". 그동안 한 줄 안내는 서버 판(이미 상대 차례일 수 있다) 대신 이것으로
+    const wakers = new Set(); // 기다리는 중인 연출 — 건너뛰면 바로 깨운다
+
+    function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
+    function guard(tk) { if (tk !== token) throw STOP; }
+    function wait(ms, tk) {
+      if (fast || !ms) return Promise.resolve().then(() => guard(tk));
+      return new Promise((res) => {
+        const done = () => { clearTimeout(t); wakers.delete(done); res(); };
+        const t = setTimeout(done, ms);
+        wakers.add(done);
+      }).then(() => guard(tk));
+    }
+    function wakeAll() { [...wakers].forEach((f) => f()); }
+
+    // ---------- 도형 ----------
+    const shapeOf = (f) => String(f || "").split("-")[0];
+    const colorOf = (f) => String(f || "").split("-")[1] || "navy";
+    const faceSvg = (f) => (SHAPE_KO[shapeOf(f)] ? `<svg class="mm-f mm-c-${esc(colorOf(f))}" viewBox="0 0 100 100" aria-hidden="true"><use href="#mm-s-${esc(shapeOf(f))}"/></svg>` : "");
+    const faceName = (f) => `${COLOR_KO[colorOf(f)] || ""} ${SHAPE_KO[shapeOf(f)] || "카드"}`.trim();
+    function sprite() {
+      if (document.getElementById("mm-sprite")) return;
+      const st = `style="fill:var(--c);stroke:var(--d);stroke-width:4.5;stroke-linejoin:round"`;
+      const S = {
+        circle: `<circle cx="50" cy="50" r="38" ${st}/>`,
+        triangle: `<path d="M50 12 L90 84 H10 Z" ${st}/>`,
+        square: `<rect x="15" y="15" width="70" height="70" rx="9" ${st}/>`,
+        star: `<path d="M50 9 L60.6 37.4 L90 39 L67.1 57.6 L74.7 86 L50 70 L25.3 86 L32.9 57.6 L10 39 L39.4 37.4 Z" ${st}/>`,
+        hexagon: `<path d="M50 9 L85.5 29.5 V70.5 L50 91 L14.5 70.5 V29.5 Z" ${st}/>`,
+        heart: `<path d="M50 87 C22 67 9 51 11 35 C13 20 25 12 36.5 12 C44 12 48 16.5 50 22.5 C52 16.5 56 12 63.5 12 C75 12 87 20 89 35 C91 51 78 67 50 87 Z" ${st}/>`,
+        diamond: `<path d="M50 7 L88 50 L50 93 L12 50 Z" ${st}/>`,
+        cross: `<path d="M37 11 H63 V37 H89 V63 H63 V89 H37 V63 H11 V37 H37 Z" ${st}/>`,
+        moon: `<path d="M50.5 12 A38 38 0 1 0 84.4 66.2 A32 32 0 1 1 50.5 12 Z" ${st}/>`,
+        drop: `<path d="M50 8 C58 25 80 43 80 62 A30 30 0 0 1 20 62 C20 43 42 25 50 8 Z" ${st}/>`,
+        arrow: `<path d="M10 37 H50 V16 L91 50 L50 84 V63 H10 Z" ${st}/>`,
+        spiral: `<path d="M56 47 a6 6 0 0 1 -12 0 a12 12 0 0 1 24 0 a18 18 0 0 1 -36 0 a24 24 0 0 1 48 0 a30 30 0 0 1 -60 0" style="fill:none;stroke:var(--d);stroke-width:11;stroke-linecap:round"/><path d="M56 47 a6 6 0 0 1 -12 0 a12 12 0 0 1 24 0 a18 18 0 0 1 -36 0 a24 24 0 0 1 48 0 a30 30 0 0 1 -60 0" style="fill:none;stroke:var(--c);stroke-width:6.5;stroke-linecap:round"/>`,
+      };
+      const emblem = `<symbol id="mm-emblem" viewBox="0 0 100 100"><g fill="#fff"><circle cx="31" cy="66" r="15"/><path d="M50 13 L68 44 H32 Z"/><rect x="55" y="53" width="27" height="27" rx="4"/></g></symbol>`;
+      document.body.insertAdjacentHTML("afterbegin", `<svg id="mm-sprite" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true"><defs>${emblem}${Object.entries(S).map(([k, v]) => `<symbol id="mm-s-${k}" viewBox="0 0 100 100">${v}</symbol>`).join("")}</defs></svg>`);
+    }
+
+    // ---------- 보이는 판 ----------
+    const rivalWord = () => (match && match.bot ? "컴퓨터" : "상대");
+    const fresh = (v) => v && v.open == null && !(v.cur || []).length; // 이번 차례에 아직 아무것도 안 뒤집었다
+    const mover = (v) => (v.myTurn ? "me" : "rival");
+    const N = (v) => ((v && v.cols) || 6) * ((v && v.rows) || 4);
+    function dispFrom(v) {
+      const n = N(v), cards = v.cards || [];
+      const d = { id: v.id, faces: new Array(n).fill(null), up: new Array(n).fill(false), gone: new Array(n).fill(null), left: new Array(n).fill(false),
+        pile: { me: [...(v.myPile || [])], rival: [...(v.rivalPile || [])] }, t: v.turnNo || 0, cur: (v.cur || []).length, open: v.open == null ? null : v.open };
+      cards.forEach((c, i) => {
+        if (!c) return;
+        d.faces[i] = c.f;
+        if (c.by) d.gone[i] = c.by;
+        else if (c.left) d.left[i] = true;
+        else if (c.up) d.up[i] = true;
+      });
+      return d;
+    }
+    // 한 차례를 되감는다 — 그 차례에 가져간 짝을 판으로 돌려놓는다(다시 보여 주기 전)
+    function rewind(d, rec) {
+      [...rec.steps].reverse().forEach(([a, b, , , ok]) => {
+        if (!ok) return;
+        d.gone[a] = d.gone[b] = null; d.faces[a] = d.faces[b] = null; d.up[a] = d.up[b] = false;
+        d.pile[rec.by].pop();
+      });
+      d.t = rec.t; d.cur = 0; d.open = null;
+    }
+    // 보이는 판(d)에서 서버 판(v)까지 무엇을 움직여 보여 줄지 — 이어 볼 수 없으면 null(그냥 새로 그린다)
+    function planFrom(d, v) {
+      if (!d || d.id !== v.id || v.turnNo == null || v.turnNo < d.t) return null;
+      const steps = [];
+      let skip = d.cur, first = d.open;
+      for (let tt = d.t; tt < v.turnNo; tt++) {
+        const rec = [v.prev, v.last].find((r) => r && r.t === tt);
+        if (!rec) return null;
+        const ss = rec.steps.map(([a, b, fa, fb, ok]) => ({ by: rec.by, a, b, fa, fb, ok }));
+        if (skip > ss.length) return null;
+        ss.splice(0, skip);
+        if (first != null) { if (!ss.length || ss[0].a !== first) return null; ss[0].skipFirst = true; }
+        steps.push(...ss);
+        skip = 0; first = null;
+      }
+      const by = v.status === "ACTIVE" ? mover(v) : "rival";
+      const cur = (v.cur || []).map(([a, b, f]) => ({ by, a, b, fa: f, fb: f, ok: true }));
+      if (skip > cur.length) return null;
+      cur.splice(0, skip);
+      if (first != null && cur.length) { if (cur[0].a !== first) return null; cur[0].skipFirst = true; first = null; }
+      steps.push(...cur);
+      let openNew = null;
+      if (v.open != null) {
+        if (first == null) openNew = v.open;
+        else if (first !== v.open) return null;
+      } else if (first != null) return null;
+      return { steps, openNew, openFace: openNew != null && v.cards && v.cards[openNew] ? v.cards[openNew].f : null };
+    }
+
+    // ---------- 그리기 ----------
+    function cardHtml(i) {
+      const d = disp, f = d.faces[i], gone = d.gone[i], up = d.up[i] || d.left[i];
+      const cls = `mm-card${up ? " is-up" : ""}${gone ? ` is-gone is-by-${gone}` : ""}${d.left[i] ? " is-left" : ""}`;
+      const label = gone ? `${faceName(f)} — ${gone === "me" ? "내가" : `${rivalWord()}가`} 가져감` : up ? faceName(f) : `카드 ${i + 1}`;
+      return `<button type="button" class="${cls}" data-i="${i}" aria-label="${esc(label)}"${gone ? ` tabindex="-1"` : ""}>
+          <span class="mm-card__slot"></span>
+          <span class="mm-card__lift"><span class="mm-card__in">
+            <span class="mm-card__back"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#mm-emblem"/></svg></span>
+            <span class="mm-card__face">${f && (up || gone) ? faceSvg(f) : ""}</span>
+          </span></span>
+        </button>`;
+    }
+    const miniHtml = (f, cls = "") => `<span class="mm-mini ${cls}" title="${esc(faceName(f))}"><i>${faceSvg(f)}</i><i>${faceSvg(f)}</i></span>`;
+    function trayHtml(who) {
+      const list = disp.pile[who], name = who === "me" ? "내 짝" : `${rivalWord()} 짝`;
+      return `<div class="mm-tray is-${who}" id="mm-tray-${who}" aria-label="${esc(name)} ${list.length}쌍">
+          <div class="mm-tray__head"><b>${esc(name)}</b><span data-count="${who}">${list.length}</span></div>
+          <div class="mm-tray__cards">${list.map((f) => miniHtml(f)).join("") || `<span class="mm-tray__empty">${who === "me" ? "짝을 찾으면 여기 모여요" : "아직 없어요"}</span>`}</div>
+        </div>`;
+    }
+    // 연출 중에는 연출 속 차례로 보여 준다(서버 판은 이미 끝났거나 차례가 넘어갔어도)
+    function vsMatch() {
+      if (!running || !phase) return match;
+      return { ...match, status: "ACTIVE", result: null, myTurn: phase === "me", rivalTurn: phase === "rival" };
+    }
+    function statusText() {
+      const m = vsMatch();
+      if (m.status === "DONE") return { win: "이겼어요", lose: "졌어요", draw: "비겼어요" }[m.result] || "끝났어요";
+      if (m.status === "ACTIVE") { // 첫 장을 펼쳐 뒀으면 「한 장 더」, 짝을 찾고 다시 두 장을 뒤집을 때는 「한 번 더」
+        if (!m.myTurn) return `${rivalWord()} 차례`;
+        if (running) return "내 차례";
+        return match.open != null ? "한 장 더" : (match.cur || []).length ? "한 번 더" : "내 차례";
+      }
+      if (m.status === "PENDING") return m.incoming ? "받은 도전" : "수락 기다리는 중";
+      return m.status === "DECLINED" ? "취소된 도전" : "만료된 도전";
+    }
+    const canPlay = () => !!(match && match.status === "ACTIVE" && match.myTurn && open.open);
+    const canReplay = () => !!(match && match.status === "ACTIVE" && match.myTurn && fresh(match) && match.last && match.last.by === "rival" && !running && !sending);
+    function sayText() {
+      const m = match;
+      if (m.status === "DONE") return "";
+      if (m.status === "PENDING") return m.incoming ? "수락하면 바로 시작해요. 먼저 뒤집는 사람은 무작위로 정해요." : "상대가 수락하면 바로 시작해요.";
+      if (m.status !== "ACTIVE") return "이 도전은 끝났어요.";
+      if (replaying) return `${rivalWord()}가 지난 차례에 뒤집은 카드예요`;
+      if (running && phase === "rival") return m.bot ? "컴퓨터 차례 — 카드를 뒤집어요…" : "상대가 카드를 뒤집었어요.";
+      if (running && judging) return judging === "ok" ? "짝이에요!" : "짝이 아니에요. 다시 엎어요.";
+      if (!open.open) return `${open.opensAt || ""}부터 뒤집을 수 있어요.`;
+      if (!m.myTurn) return m.bot ? "컴퓨터가 생각 중…" : disp && disp.open != null ? "상대가 한 장을 뒤집었어요. 다음 장을 기다려요." : "상대가 뒤집으면 바로 보여요.";
+      if (sending && disp.open == null) return "뒤집는 중…";
+      if (disp && disp.open != null) return "한 장 더 뒤집어 같은 짝을 찾아요.";
+      if ((m.cur || []).length) return "짝을 찾았어요! 한 번 더 뒤집어요.";
+      return "카드 두 장을 뒤집어 같은 짝을 찾아요.";
+    }
+    function sayClass() {
+      if (!match || match.status !== "ACTIVE") return "";
+      if (replaying || (running && phase === "rival") || !match.myTurn) return "is-rival";
+      return open.open ? "is-go" : "";
+    }
+    const SND_ON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
+    const SND_OFF = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6"/><path d="m22 9-6 6"/></svg>`;
+    function soundBtn() {
+      if (!window.HKSound) return "";
+      const off = HKSound.isMuted();
+      return `<button type="button" class="mm-snd ${off ? "is-off" : ""}" id="mm-snd" aria-pressed="${off ? "false" : "true"}" aria-label="${off ? "소리 켜기" : "소리 끄기"}" title="${off ? "소리 켜기" : "소리 끄기"}">${off ? SND_OFF : SND_ON}</button>`;
+    }
+    function barHtml() {
+      const s = match.status;
+      if (s === "ACTIVE") {
+        const label = replaying ? "다시 보는 중…" : `<span class="mm-long">${esc(rivalWord())}가 뒤집은 </span>카드 다시 보기`;
+        return `<button type="button" class="hk-btn hk-btn--secondary gk__place" id="mm-replay" ${canReplay() ? "" : "disabled"}><span>${label}</span></button>
+          <button type="button" class="hk-btn hk-btn--secondary" id="mm-resign" ${open.open ? "" : "disabled"}>기권</button>${soundBtn()}`;
+      }
+      const list = `<a class="hk-btn hk-btn--secondary gk__place" href="#" style="text-align:center;text-decoration:none">대국 목록</a>`;
+      if (s === "DONE") {
+        const again = match.bot ? "한 판 더" : match.opponent && match.opponent.id ? "다시 도전" : "";
+        return `${list}${again ? `<button type="button" class="hk-btn hk-btn--primary gk__place" id="mm-again" ${open.open ? "" : "disabled"}>${again}</button>` : ""}${soundBtn()}`;
+      }
+      if (s === "PENDING" && match.incoming) {
+        return `<button type="button" class="hk-btn hk-btn--primary gk__place" id="mm-accept" ${open.open ? "" : "disabled"}>수락하고 시작</button>
+          <button type="button" class="hk-btn hk-btn--secondary" id="mm-decline">거절</button>`;
+      }
+      if (s === "PENDING") return `${list}<button type="button" class="hk-btn hk-btn--secondary" id="mm-decline">도전 취소</button>`;
+      return list;
+    }
+    function dueText() {
+      if (match.status === "ACTIVE") return `카드 ${match.flips || 0}장 뒤집음 · 한 장마다 24시간까지 · 이번 차례 ${due(match.deadlineAt)}`;
+      if (match.status === "PENDING") return `도전장 · ${due(match.deadlineAt)}`;
+      return "";
+    }
+    function doneTitle() {
+      const me = (match.myPile || []).length, rv = (match.rivalPile || []).length, r = match.result;
+      if (match.endReason === "RESIGN") return r === "win" ? `${rivalWord()}가 기권했어요` : "기권했어요";
+      if (match.endReason === "TIMEOUT") return r === "win" ? `${rivalWord()}의 시간이 다 됐어요` : "시간이 다 됐어요";
+      if (r === "draw") return `${me} : ${rv}, 비겼어요`;
+      return r === "win" ? `${me}쌍을 모아 이겼어요!` : `${rivalWord()}가 ${rv}쌍을 먼저 모았어요`;
+    }
+    function resultHtml() {
+      if (match.status !== "DONE") return "";
+      const me = (match.myPile || []).length, rv = (match.rivalPile || []).length, r = match.result || "draw";
+      const left = (match.cards || []).filter((c) => c && c.left).length;
+      const note = [`카드 ${match.flips || 0}장 뒤집음`, r === "draw" && match.endReason === "DRAW" ? "" : `짝 ${me} : ${rv}`, left ? `남은 카드 ${left}장 공개` : ""].filter(Boolean).join(" · ");
+      const stamp = { win: "이겼어요", lose: "아쉬워요", draw: "비겼어요" }[r];
+      return `<div class="mm-result ${r === "win" ? "is-win" : ""} ${endFx ? "is-fresh" : ""}" id="mm-result">
+          <b>${esc(doneTitle())}</b><small>${esc(note)}</small>
+          <div class="mm-stamp is-${esc(r)} ${endFx ? "is-fresh" : ""}" aria-hidden="true"><div><b>${stamp}</b><small>${me} : ${rv}</small></div></div>
+        </div>`;
+    }
+    function tableClass() {
+      const m = vsMatch();
+      if (m.status !== "ACTIVE") return "";
+      return m.myTurn ? "is-me" : "is-rival";
+    }
+    function boardHtml() {
+      const n = disp.faces.length, live = canPlay() && !running;
+      return `<div class="mm-board ${live ? "is-live" : ""} ${["ACTIVE", "DONE"].includes(match.status) ? "" : "mm-empty"}" id="mm-board" style="--cols:${match.cols || 6}" role="group" aria-label="카드 ${n}장">
+          ${disp.faces.map((_, i) => cardHtml(i)).join("")}
+        </div>`;
+    }
+    function paintMatch() {
+      const over = match.status === "DONE";
+      root.innerHTML = `<div class="gk mm is-still ${over ? "is-over" : ""}">
+          <a class="gk__back" href="#">‹ 대국 목록</a>
+          ${closedNote(open)}
+          <div id="mm-vs"></div>
+          <div class="mm-table ${tableClass()}" id="mm-table">
+            ${trayHtml("me")}
+            <div class="mm-wrap" id="mm-wrap">${boardHtml()}</div>
+            ${trayHtml("rival")}
+          </div>
+          ${over ? resultHtml() : `<div class="mm-say" id="mm-say" aria-live="polite"></div>`}
+          <div class="gk__bar" id="mm-bar"></div>
+          <div class="gk__due" id="mm-due"></div>
+        </div>`;
+      chrome();
+      const g = root.querySelector(".mm");
+      requestAnimationFrame(() => requestAnimationFrame(() => { if (g) g.classList.remove("is-still"); }));
+    }
+    // 판은 그대로 두고 둘레(나 vs 상대 · 한 줄 · 버튼 · 기한)만 다시 쓴다 — 연출을 끊지 않게
+    function chrome() {
+      if (!match || !disp) return;
+      const vs = document.getElementById("mm-vs");
+      if (vs) vs.innerHTML = HKMatch.versus(vsMatch(), statusText(), ["ACTIVE", "DONE"].includes(match.status) ? { me: `짝 ${disp.pile.me.length}쌍`, rival: `짝 ${disp.pile.rival.length}쌍` } : {});
+      const say = document.getElementById("mm-say");
+      if (say) {
+        const skippable = running && match.myTurn && (replaying || phase === "rival") && !fast;
+        say.innerHTML = `${esc(sayText())}${skippable ? `<button type="button" class="mm-say__skip" id="mm-skip">건너뛰기</button>` : ""}`;
+        say.className = `mm-say ${sayClass()}`;
+      }
+      const bar = document.getElementById("mm-bar");
+      if (bar) bar.innerHTML = barHtml();
+      const dueEl = document.getElementById("mm-due");
+      if (dueEl) dueEl.textContent = dueText();
+      const table = document.getElementById("mm-table");
+      if (table) table.className = `mm-table ${tableClass()}`;
+      const board = document.getElementById("mm-board");
+      if (board) board.classList.toggle("is-live", canPlay() && !running);
+      ["me", "rival"].forEach((w) => { const c = root.querySelector(`[data-count="${w}"]`); if (c) c.textContent = disp.pile[w].length; });
+    }
+    // ---------- 움직이기 ----------
+    const cardEl = (i) => root.querySelector(`.mm-card[data-i="${i}"]`);
+    async function flipUp(i, f, tk) {
+      const el = cardEl(i);
+      disp.faces[i] = f; disp.up[i] = true;
+      if (!el) return;
+      el.querySelector(".mm-card__face").innerHTML = faceSvg(f);
+      el.classList.remove("is-lift");
+      el.classList.add("is-up", "is-flip");
+      el.setAttribute("aria-label", faceName(f));
+      sfx("tap");
+      await wait(T.flip, tk);
+      el.classList.remove("is-flip");
+    }
+    async function flipDown(list, tk) {
+      list.forEach((i) => {
+        disp.up[i] = false;
+        const el = cardEl(i);
+        if (el) { el.classList.remove("is-up", "is-miss"); el.setAttribute("aria-label", `카드 ${i + 1}`); }
+      });
+      sfx("swap");
+      await wait(T.flip, tk);
+      list.forEach((i) => { if (!disp.up[i]) { disp.faces[i] = null; const el = cardEl(i); if (el) el.querySelector(".mm-card__face").innerHTML = ""; } });
+    }
+    function pop(a, b, by) {
+      const wrap = document.getElementById("mm-wrap"), ea = cardEl(a), eb = cardEl(b);
+      if (!wrap || !ea || !eb || fast) return;
+      const w = wrap.getBoundingClientRect(), ra = ea.getBoundingClientRect(), rb = eb.getBoundingClientRect();
+      const x = (ra.left + ra.width / 2 + rb.left + rb.width / 2) / 2 - w.left, y = Math.min(ra.top, rb.top) - w.top - 6;
+      wrap.insertAdjacentHTML("beforeend", `<span class="mm-pop by-${by}" style="left:${x}px;top:${y}px">짝!</span>`);
+      const el = wrap.lastElementChild;
+      setTimeout(() => el && el.remove(), 1100);
+    }
+    async function collect(a, b, f, by, tk) {
+      const ea = cardEl(a), eb = cardEl(b);
+      [ea, eb].forEach((el) => el && el.classList.add("is-match", `by-${by}`));
+      pop(a, b, by);
+      sfx(by === "me" ? "coin" : "pop");
+      await wait(T.match, tk);
+      // 가져간 짝 칸에 자리를 먼저 만들고 그리로 날린다
+      const tray = root.querySelector(`#mm-tray-${by} .mm-tray__cards`);
+      tray && tray.querySelector(".mm-tray__empty")?.remove();
+      tray && tray.insertAdjacentHTML("beforeend", miniHtml(f, "is-hold"));
+      const slot = tray && tray.lastElementChild;
+      if (slot && !fast) {
+        [ea, eb].forEach((el, k) => {
+          if (!el) return;
+          const lift = el.querySelector(".mm-card__lift"), r = el.getBoundingClientRect(), t = slot.children[k].getBoundingClientRect();
+          el.classList.add("is-fly");
+          lift.style.transform = `translate(${t.left + t.width / 2 - (r.left + r.width / 2)}px, ${t.top + t.height / 2 - (r.top + r.height / 2)}px) scale(${(t.width / r.width).toFixed(3)}) rotate(${k ? 5 : -6}deg)`;
+        });
+        await wait(T.fly, tk);
+      }
+      [a, b].forEach((i) => { disp.up[i] = false; disp.gone[i] = by; });
+      [ea, eb].forEach((el) => {
+        if (!el) return;
+        el.classList.remove("is-fly", "is-match", "is-up", "by-me", "by-rival");
+        el.classList.add("is-gone", `is-by-${by}`);
+        el.setAttribute("tabindex", "-1");
+        el.setAttribute("aria-label", `${faceName(f)} — ${by === "me" ? "내가" : `${rivalWord()}가`} 가져감`);
+        el.querySelector(".mm-card__lift").style.transform = "";
+      });
+      disp.pile[by].push(f);
+      if (slot) { slot.classList.remove("is-hold"); slot.classList.add("is-new"); }
+      chrome();
+    }
+    async function step(s, tk) {
+      const rival = s.by === "rival";
+      if (!s.skipFirst) {
+        if (rival) await wait(T.think, tk);
+        await flipUp(s.a, s.fa, tk);
+        if (rival) await wait(T.between - T.flip, tk);
+      }
+      if (!rival) { judging = s.ok ? "ok" : "miss"; chrome(); }
+      await flipUp(s.b, s.fb, tk);
+      disp.open = null;
+      if (s.ok) { await wait(160, tk); await collect(s.a, s.b, s.fa, s.by, tk); judging = null; return; }
+      [s.a, s.b].forEach((i) => cardEl(i)?.classList.add("is-miss"));
+      await wait(rival ? T.holdRival : T.holdMine, tk);
+      await flipDown([s.a, s.b], tk);
+      judging = null;
+    }
+    // 연출 하나를 돌린다 — 끝나면(또는 건너뛰면) 서버 판과 똑같이 맞춘다
+    async function run(fn) {
+      const tk = token;
+      running = true;
+      chrome();
+      try { await fn(tk); }
+      catch (e) { if (e !== STOP) console.error(e); }
+      if (tk !== token) return;
+      running = false; replaying = false; phase = null; judging = null;
+      sync();
+      fast = false;
+      root.querySelector(".mm")?.classList.remove("is-fast");
+    }
+    async function animate(plan, tk) {
+      let lastBy = null;
+      for (const s of plan.steps) {
+        if (s.by !== lastBy) {
+          phase = s.by; lastBy = s.by;
+          chrome();
+        }
+        await step(s, tk);
+      }
+      if (plan.openNew != null) {
+        phase = match.status === "ACTIVE" ? mover(match) : phase;
+        chrome();
+        if (phase === "rival" && match.bot) await wait(T.think, tk);
+        disp.open = plan.openNew; // 뒤집는 동안 누른 둘째 장도 받아 둔다
+        await flipUp(plan.openNew, plan.openFace, tk);
+      }
+    }
+    // 보이는 판을 서버 판으로 맞춘다 — 다르면 판을 새로 그리고, 같으면 둘레만
+    function sync() {
+      if (!match) return;
+      const want = dispFrom(match), d = disp;
+      const same = d && d.id === want.id && d.faces.length === want.faces.length && ["faces", "up", "gone", "left"].every((k) => want[k].every((x, i) => x === d[k][i]))
+        && d.pile.me.length === want.pile.me.length && d.pile.rival.length === want.pile.rival.length;
+      disp = want;
+      if (!same || match.status === "DONE") paintMatch(); else chrome();
+      if (match.status === "DONE" && endFx) finale();
+      endFx = false;
+    }
+    // 끝난 판 — 남은 카드를 차례로 뒤집어 보여 주고, 도장 · 소리 · 이겼으면 꽃가루
+    function finale() {
+      const left = [...root.querySelectorAll(".mm-card.is-left")];
+      left.forEach((el, k) => { el.classList.remove("is-up"); el.style.setProperty("--d", `${200 + k * 60}ms`); });
+      requestAnimationFrame(() => requestAnimationFrame(() => left.forEach((el) => el.classList.add("is-up"))));
+      sfx({ win: "win", lose: "lose" }[match.result] || "success");
+      if (match.result === "win") {
+        const table = document.getElementById("mm-table");
+        if (!table) return;
+        const colors = ["#f43f5e", "#f59e0b", "#22c55e", "#3b82f6", "#a855f7", "#facc15"], shapes = ["50%", "0", "2px"];
+        const bits = Array.from({ length: 36 }, (_, k) => `<i style="left:${(k * 97) % 100}%;background:${colors[k % colors.length]};border-radius:${shapes[k % 3]};--d:${(k % 12) * 0.07}s;--t:${1.5 + (k % 5) * 0.18}s;--r:${(k % 2 ? 1 : -1) * (240 + k * 13)}deg;--y:${table.offsetHeight + 40}px"></i>`).join("");
+        table.insertAdjacentHTML("beforeend", `<div class="mm-confetti" aria-hidden="true">${bits}</div>`);
+        setTimeout(() => table.querySelector(".mm-confetti")?.remove(), 3200);
+      }
+    }
+    function skip() {
+      if (!running || fast) return;
+      fast = true;
+      root.querySelector(".mm")?.classList.add("is-fast");
+      wakeAll();
+    }
+
+    // ---------- 서버 판 받기 ----------
+    function applyNext(next) {
+      chain = chain.then(() => applyNow(next)).catch((e) => { if (e !== STOP) console.error(e); });
+      return chain;
+    }
+    async function applyNow(next) {
+      const tk = token;
+      if (!match || next.id !== match.id) return;
+      const before = match.status;
+      if (before === "ACTIVE" && next.status === "DONE") endFx = true;
+      if (before === "PENDING" && next.status === "ACTIVE") sfx("go");
+      const wasMine = before === "ACTIVE" && match.myTurn;
+      match = next;
+      const plan = ["ACTIVE", "DONE"].includes(before) ? planFrom(disp, next) : null;
+      if (!plan) { await freshPaint(); if (tk === token) schedulePoll(); return; }
+      if (plan.steps.length || plan.openNew != null) await run((k) => animate(plan, k));
+      else sync();
+      if (tk !== token) return; // 그새 다른 판을 열었다
+      if (match && match.id === next.id && match.status === "ACTIVE" && match.myTurn && !wasMine && plan.steps.some((s) => s.by === "rival")) sfx("select"); // 내 차례가 왔다
+      schedulePoll();
+    }
+    // 판을 처음 열 때 — 내 차례가 막 왔으면 상대가 지난 차례에 뒤집은 카드를 다시 보여 준다
+    async function freshPaint() {
+      const m = match;
+      disp = dispFrom(m);
+      const replay = m.status === "ACTIVE" && m.myTurn && fresh(m) && m.last && m.last.by === "rival";
+      if (!replay) { paintMatch(); if (m.status === "DONE" && endFx) finale(); endFx = false; return; }
+      await replayLast(true);
+    }
+    async function replayLast(auto) {
+      if (!match || !match.last) return;
+      const rec = match.last, tk0 = token;
+      stopPoll(); // 다시 보는 동안 판이 바뀌면(상대 기권 등) 다 본 뒤에 받는다 — 되감은 판 위에 새 판을 덮지 않게
+      disp = dispFrom(match);
+      rewind(disp, rec);
+      paintMatch();
+      replaying = true;
+      await run(async (tk) => {
+        phase = "rival";
+        chrome();
+        await wait(auto ? 450 : 250, tk);
+        await animate({ steps: rec.steps.map(([a, b, fa, fb, ok]) => ({ by: "rival", a, b, fa, fb, ok })), openNew: null }, tk);
+      });
+      if (tk0 !== token) return;
+      if (match && match.myTurn) sfx("select");
+      schedulePoll();
+    }
+
+    // ---------- 뒤집기 ----------
+    function onTap(i) {
+      if (!match || match.status !== "ACTIVE") return;
+      if (running && (replaying || phase === "rival")) { if (match.myTurn) skip(); return; } // 다시 보기 · 컴퓨터 차례는 누르면 건너뛴다
+      if (!canPlay() || disp.gone[i] || disp.up[i]) return;
+      if (sending || running) { // 첫 장을 보내는 · 뒤집는 중에 누른 둘째 장 — 끝나면 바로 뒤집는다. 둘째 장을 보내는 중에 누른 카드는 무시
+        if (!second && queued == null && (disp.open != null || sending) && (disp.open !== i)) { queued = i; cardEl(i)?.classList.add("is-lift"); sfx("select"); }
+        return;
+      }
+      commit(i);
+    }
+    async function commit(i) {
+      const id = match.id, seq = match.seq, turnNo = match.turnNo;
+      const isSecond = disp.open != null; // 펼쳐 둔 첫 장이 있으면 이건 둘째 장
+      sending = true;
+      if (isSecond) second = true;
+      cardEl(i)?.classList.add("is-lift");
+      stopPoll();
+      chrome();
+      let next;
+      try { next = await HKApi.matchMove(id, { data: { flip: i } }, seq); }
+      catch (err) {
+        sending = false;
+        if (isSecond) second = false;
+        cardEl(i)?.classList.remove("is-lift");
+        if (queued != null) { cardEl(queued)?.classList.remove("is-lift"); queued = null; }
+        sfx("invalid");
+        fail(err);
+        if (match && match.id === id) showMatch(id);
+        return;
+      }
+      sending = false;
+      if (!match || match.id !== id) { if (isSecond) second = false; return; }
+      await applyNext(next);
+      if (isSecond) second = false;
+      if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+      const q = queued;
+      queued = null;
+      if (q != null) {
+        cardEl(q)?.classList.remove("is-lift");
+        // 받아 둔 카드는 방금 보낸 첫 장의 짝 찾기(둘째 장)로만 보낸다 — 같은 차례 · 그 첫 장이 아직 펼쳐져 있을 때
+        if (!isSecond && match && match.id === id && match.turnNo === turnNo && match.open === i && disp.open === i
+          && canPlay() && !running && !sending && !disp.up[q] && !disp.gone[q]) commit(q);
+      }
+    }
+    // 방향키로 카드 사이 옮기기(PC)
+    function moveFocus(dx, dy) {
+      const cols = match.cols || 6, n = disp.faces.length, cur = document.activeElement && document.activeElement.closest ? document.activeElement.closest(".mm-card") : null;
+      let i = cur ? Number(cur.dataset.i) : -1;
+      if (i < 0) { cardEl(disp.gone.findIndex((g) => !g))?.focus(); return; }
+      for (let k = 0; k < n; k++) {
+        let r = Math.floor(i / cols) + dy, c = (i % cols) + dx;
+        if (r < 0 || c < 0 || c >= cols || r * cols + c >= n) return;
+        i = r * cols + c;
+        if (!disp.gone[i]) { cardEl(i)?.focus(); return; }
+      }
+    }
+
+    // ---------- 기다리기 · 열기 ----------
+    // 서버에서 판이 바뀔 때까지 기다린다 — 상대가 한 장 뒤집는 즉시 돌아와 바로 보여 준다. 화면이 보일 때만.
+    // 내 차례에도 기다린다 — 그사이 상대가 기권하거나 기한이 지나 판이 끝나면 바로 보이게(뒤집을 때는 commit 이 먼저 멈춘다)
+    function schedulePoll(delay = 0) {
+      stopPoll();
+      if (!match || ["DONE", "DECLINED", "EXPIRED"].includes(match.status) || match.bot || sending) return; // 컴퓨터전은 내 요청 안에서 컴퓨터가 함께 둔다
+      timer = setTimeout(async () => {
+        timer = 0;
+        if (document.hidden || !match) return; // 다시 보이면 visibilitychange 에서 판을 새로 받는다
+        const id = match.id, ctl = new AbortController();
+        waiter = ctl;
+        let next;
+        try { next = await HKApi.matchWait(id, match.seq, match.status, ctl.signal); }
+        catch (_) {
+          if (waiter === ctl) { waiter = null; schedulePoll(3000); } // 잠깐 끊기면 3초 뒤 다시
+          return;
+        }
+        if (waiter !== ctl || !match || match.id !== id) return; // 그새 내가 뒤집었거나 다른 판으로 감
+        waiter = null;
+        if (next.seq !== match.seq || next.status !== match.status) applyNext(next);
+        else { match = next; schedulePoll(); }
+      }, delay);
+    }
+    function reset() { stopPoll(); token++; wakeAll(); running = false; replaying = false; phase = null; judging = null; fast = false; sending = false; second = false; queued = null; chain = Promise.resolve(); }
+    async function showMatch(id) {
+      reset();
+      const tk = token;
+      let next;
+      try { [next, open] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
+      catch (e) { fail(e); location.hash = ""; return; }
+      if (tk !== token) return;
+      if (next.game !== GAME) { location.href = `/games/${next.game}#m${id}`; return; }
+      try { localStorage.setItem(HOW_KEY, "1"); } catch (_) { /* 저장 못 해도 그만 */ }
+      endFx = false;
+      match = next;
+      await freshPaint();
+      if (tk === token) schedulePoll();
+    }
+    // 다른 창에 다녀왔을 때 — 그 사이 바뀐 것만 움직여 보여 준다
+    async function refresh() {
+      if (!match || sending) return;
+      const id = match.id;
+      try {
+        const [next, st] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => open)]);
+        open = st;
+        if (match && match.id === id && (next.seq !== match.seq || next.status !== match.status)) applyNext(next);
+        else if (match && match.id === id) { match = next; chrome(); schedulePoll(); }
+      } catch (_) { /* 다음에 다시 */ }
+    }
+    async function showLobby() {
+      reset(); match = null; disp = null;
+      open = await HKMatch.lobby(root, GAME, {
+        title: "도형 짝맞추기",
+        lead: "엎어 둔 도형 카드를 번갈아 두 장씩 뒤집어 같은 짝을 더 많이 모으면 이겨요. 동료에게 도전장을 보내거나 컴퓨터와 해 봐요. 끝까지 마친 판은 오늘 도장을 받아요.",
+        intro: howHtml(),
+        bot: BOT_LEVELS,
+        labels: { bot: "컴퓨터와 하기" },
+        botNote: "바로 시작해요. 컴퓨터도 뒤집힌 카드를 기억해요 — 어려울수록 잘 안 잊어요. 컴퓨터전은 순위에 넣지 않아요.",
+        rankNote: "기권·시간 초과는 짝을 6쌍 이상 찾은 판만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요",
+        rowNote: (m) => `짝 ${m.myPairs || 0} : ${m.rivalPairs || 0} · ${due(m.deadlineAt)}`,
+        resultNote: (m) => `${HKMatch.reason(m)}${m.myPairs != null && m.endReason !== "DRAW" ? ` · ${m.myPairs} : ${m.rivalPairs}` : ""}`,
+      });
+      if (match) return; // 그새 대국 화면으로 갔다
+      root.querySelector(".gk__back")?.insertAdjacentHTML("afterend", `<a class="gk__back" href="/together" style="margin-left:14px">함께하기 ›</a>`);
+      const how = root.querySelector(".mm-how");
+      if (how) how.addEventListener("toggle", () => { if (!how.open) try { localStorage.setItem(HOW_KEY, "1"); } catch (_) { /* 그만 */ } });
+    }
+    // 「이렇게 해요」 — 처음 온 사람에게는 펼쳐 둔다
+    function howHtml() {
+      let first = true;
+      try { first = !localStorage.getItem(HOW_KEY); } catch (_) { /* 그대로 */ }
+      const card = (x, y, inner, rot = 0, ring = "") => `<g transform="translate(${x} ${y}) rotate(${rot} 26 32)">
+          <rect width="52" height="64" rx="7" fill="${inner ? "#fffdf7" : "#4a3fcf"}" stroke="${ring || (inner ? "#e8dfc4" : "#fff")}" stroke-width="${ring ? 3.5 : 2.5}"/>
+          ${inner ? `<svg x="9" y="13" width="34" height="38" viewBox="0 0 100 100" class="mm-f ${inner}"><use href="#mm-s-star"/></svg>` : `<svg x="14" y="20" width="24" height="24" viewBox="0 0 100 100"><use href="#mm-emblem"/></svg>`}
+        </g>`;
+      const pic = `<svg class="mm-how__pic" viewBox="0 0 240 150" aria-hidden="true">
+          <rect width="240" height="150" rx="14" fill="#0f5f5c"/>
+          ${card(14, 14, "")}${card(72, 14, "mm-c-yellow", -4, "#3b82f6")}${card(130, 14, "mm-c-yellow", 4, "#3b82f6")}${card(188, 14, "")}
+          ${card(14, 82, "")}${card(72, 82, "")}${card(130, 82, "mm-c-purple")}${card(188, 82, "")}
+          <g font-size="13" font-weight="900" text-anchor="middle"><rect x="98" y="0" width="58" height="22" rx="11" fill="#2563eb"/><text x="127" y="15.5" fill="#fff">짝!</text></g>
+          <g transform="translate(176 120)"><circle r="11" fill="#fff"/><path d="M-5 -5 L5 5 M5 -5 L-5 5" stroke="#e11d48" stroke-width="3" stroke-linecap="round"/></g>
+        </svg>`;
+      return `<details class="mm-how" ${first ? "open" : ""}><summary>이렇게 해요 <small>1분이면 알아요</small></summary>
+          <div class="mm-how__body">${pic}
+            <div>
+              <ol>
+                <li>카드 24장이 엎어져 있어요. <b>모양과 색이 모두 같은</b> 두 장이 한 짝이에요.</li>
+                <li>내 차례에 카드를 한 장씩 두 장 뒤집어요. <b>짝이면 내 것</b>이 되고 한 번 더 해요.</li>
+                <li>짝이 아니면 두 장을 다시 엎고 차례가 넘어가요.</li>
+                <li>12쌍 중 <b>7쌍</b>을 먼저 모으면 이겨요. 6 : 6이면 비겨요.</li>
+                <li>한 장 뒤집는 데 24시간까지 기다려요. 넘기면 시간 초과로 져요.</li>
+              </ol>
+              <div class="mm-how__tip">모양만 같고 색이 다른 카드가 섞여 있어요. 내 차례가 오면 상대가 지난 차례에 뒤집은 카드를 한 번 더 보여 줘요. 그 밖에는 기억만으로 겨뤄요!</div>
+            </div>
+          </div>
+        </details>`;
+    }
+
+    function route() {
+      const m = /^#m(\d+)$/.exec(location.hash);
+      if (m) showMatch(Number(m[1])); else showLobby();
+    }
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div id="gk-root"></div>`,
+      afterMount: () => {
+        root = document.getElementById("gk-root");
+        sprite();
+        if (window.HKSound && HKSound.onChange) HKSound.onChange(() => { const b = document.getElementById("mm-snd"); if (b) b.outerHTML = soundBtn(); });
+        root.addEventListener("click", async (e) => {
+          const card = e.target.closest(".mm-card");
+          if (card && match) { onTap(Number(card.dataset.i)); return; }
+          const t = e.target.closest("button, a");
+          if (!t) { if (running && match && match.myTurn && e.target.closest("#mm-wrap")) skip(); return; }
+          if (t.id === "mm-skip") { skip(); return; }
+          if (t.id === "mm-replay") { if (canReplay()) replayLast(false); return; }
+          if (t.id === "mm-snd") { HKSound.toggle(); if (!HKSound.isMuted()) sfx("select"); return; }
+          if (t.id === "mm-resign") {
+            if (!match || match.status !== "ACTIVE") return; // 판은 이미 끝났다 — 결과가 곧 보인다
+            if (!(await HKUI.confirmDialog("기권할까요?", "이 판은 패배로 끝나요.", { confirmLabel: "기권" }))) return;
+            if (!match || match.status !== "ACTIVE") return; // 묻는 사이 상대가 먼저 끝냈다
+            const id = match.id;
+            try {
+              const r = await HKApi.matchResign(id);
+              if (match && match.id === id) { reset(); endFx = true; match = r; disp = dispFrom(r); sync(); }
+            } catch (err) { fail(err); }
+            return;
+          }
+          if (t.id === "mm-accept" || t.id === "mm-decline") {
+            const id = match.id;
+            t.disabled = true;
+            try {
+              const r = await (t.id === "mm-accept" ? HKApi.matchAccept(id) : HKApi.matchDecline(id));
+              if (match && match.id === id) applyNext(r);
+            } catch (err) { fail(err); if (match && match.id === id) showMatch(id); }
+            return;
+          }
+          if (t.id === "mm-again") {
+            t.disabled = true;
+            try {
+              if (match.bot) { const m = await HKApi.matchBot(match.bot, GAME); location.hash = `m${m.id}`; }
+              else { await HKApi.matchCreate(match.opponent.id, GAME); HKUI.toast("도전장을 보냈어요"); location.hash = ""; }
+            } catch (err) { fail(err); t.disabled = false; }
+            return;
+          }
+          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
+          await HKMatch.act(t, GAME, showLobby);
+        });
+        window.addEventListener("hashchange", route);
+        window.addEventListener("keydown", (e) => {
+          if (!match || !disp || document.querySelector(".hk-dialog__overlay")) return;
+          if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+          const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+          if (arrows[e.key] && match.status === "ACTIVE") { e.preventDefault(); moveFocus(...arrows[e.key]); }
+          else if (e.key === "Escape" && running) skip();
+        });
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+        route();
+      },
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 사내 고스톱</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 사내 고스톱 — 판(초록 담요) · 패 · 안내. 목록 화면은 공용 .gk(match-lobby) */
+    .gs { --fw: 56px; --hw: 66px; --pw: 30px; --bw: 26px; --off: .42; max-width: 1000px; margin: 0 auto; padding: 16px 20px 56px; color: var(--color-midnight-navy); }
+    .gs__top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .gs__top .gk__back { margin: 0 auto 0 0; }
+    .gs__tool { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; min-width: 40px; padding: 7px 12px; border: 1px solid var(--border-default); border-radius: 999px; background: var(--surface-card, #fff); color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+    .gs__tool svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .gs .gk__vs { margin-bottom: 10px; }
+    .gs .gk__side { padding: 8px 12px; }
+
+    .gs-felt { position: relative; border-radius: 22px; padding: 12px; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+      background: radial-gradient(ellipse at 50% 42%, #2f7d4d 0%, #215f3a 58%, #194b2e 100%); box-shadow: inset 0 0 0 3px rgba(255,255,255,.06), inset 0 10px 40px rgba(0,0,0,.25), 0 10px 30px rgba(15,23,42,.18); }
+    .gs-felt::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .16; background-image: repeating-linear-gradient(45deg, rgba(255,255,255,.07) 0 2px, transparent 2px 6px); }
+    .gs-board { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "rival" "floor" "me" "ask" "hand"; gap: 8px; }
+    .gs-board > .is-rival { grid-area: rival; } .gs-board > .gs-floor { grid-area: floor; } .gs-board > .is-me { grid-area: me; }
+    .gs-board > .gs-ask { grid-area: ask; } .gs-board > .gs-hand { grid-area: hand; }
+
+    /* 패 한 장 */
+    .hw { position: relative; display: block; flex-shrink: 0; width: var(--w, var(--fw)); height: calc(var(--w, var(--fw)) * 1.6); border-radius: calc(var(--w, var(--fw)) * .1); will-change: transform; }
+    .hw svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 2px 2px rgba(0,0,0,.28)); transition: transform .16s ease; }
+    .hw.is-flipin svg { animation: hw-flip .42s ease-out; }
+    @keyframes hw-flip { 0% { transform: rotateY(90deg) scale(.9); } 100% { transform: none; } }
+    .hw.is-moving { z-index: 30; }
+
+    /* 위아래 자리 — 손패 뒷면 · 먹은 패 · 점수 */
+    .gs-zone { display: flex; align-items: center; gap: 12px; min-height: calc(var(--pw) * 1.6 + 14px); padding: 6px 10px; border-radius: 14px; background: rgba(0,0,0,.16); }
+    .gs-zone.is-turn { box-shadow: inset 0 0 0 2px rgba(255, 216, 77, .7); }
+    .gs-backs { display: flex; flex-shrink: 0; min-width: calc(var(--bw) * 1.6); }
+    .gs-backs .hw { --w: var(--bw); }
+    .gs-backs .hw + .hw { margin-left: calc(var(--bw) * -.62); }
+    .gs-backs.is-open .hw { --w: var(--pw); }
+    .gs-backs.is-open .hw + .hw { margin-left: calc(var(--pw) * -.45); }
+    .gs-pile { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 5px 12px; align-items: flex-end; }
+    .gs-grp { display: flex; align-items: flex-end; gap: 5px; }
+    .gs-grp__cards { display: flex; }
+    .gs-grp .hw { --w: var(--pw); }
+    .gs-grp .hw + .hw { margin-left: calc(var(--pw) * -.6); }
+    .gs-grp[data-g="p"] .hw + .hw { margin-left: calc(var(--pw) * -.7); }
+    .gs-grp__n { min-width: 30px; padding: 2px 5px; border-radius: 8px; background: rgba(0,0,0,.28); color: #f8fafc; font-size: 11px; font-weight: 800; text-align: center; line-height: 1.25; white-space: nowrap; }
+    .gs-grp__n b { display: block; font-size: 14px; }
+    .gs-grp__n b i { font-style: normal; font-size: 10px; opacity: .6; }
+    .gs-grp__n.is-on { background: #ffd84d; color: #3b2f00; }
+    .gs-chips { display: flex; flex-wrap: wrap; gap: 4px; align-self: center; }
+    .gs-chip { padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,.14); color: #fff; font-size: 11px; font-weight: 800; white-space: nowrap; }
+    .gs-chip.is-done { background: #ffd84d; color: #3b2f00; }
+    .gs-pile__empty { color: rgba(255,255,255,.5); font-size: 13px; font-weight: 700; }
+    .gs-pts { flex-shrink: 0; min-width: 66px; text-align: center; color: #fff; }
+    .gs-pts b { display: block; font-size: 26px; font-weight: 900; line-height: 1; text-shadow: 0 2px 0 rgba(0,0,0,.25); }
+    .gs-pts small { display: block; margin-top: 2px; font-size: 11px; font-weight: 700; opacity: .8; white-space: nowrap; }
+    .gs-pts.is-hot b { color: #ffd84d; }
+    .gs-badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin-top: 3px; }
+    .gs-badge { padding: 1px 6px; border-radius: 999px; background: #ffd84d; color: #3b2f00; font-size: 11px; font-weight: 900; }
+    .gs-badge.is-red { background: #ef4444; color: #fff; }
+
+    /* 바닥 — 달마다 자리가 정해져 있다(PC 1~6 위 · 7~12 아래, 가운데 더미) */
+    .gs-floor { position: relative; display: grid; justify-content: center; align-items: center; gap: 6px 10px; padding: 2px 0 14px;
+      --slotw: calc(var(--fw) * (1 + 2 * var(--off))); --sloth: calc(var(--fw) * 1.6 + 6px);
+      grid-template-columns: repeat(3, var(--slotw)) calc(var(--fw) * 1.35) repeat(3, var(--slotw)); grid-template-rows: repeat(2, var(--sloth)); }
+    .gs-slot { position: relative; width: var(--slotw); height: var(--sloth); border-radius: 10px; }
+    .gs-slot .hw { position: absolute; top: 0; }
+    .gs-slot.is-stack::after { content: "뻑"; position: absolute; right: -2px; bottom: -6px; padding: 1px 7px; border-radius: 999px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 900; z-index: 6; }
+    .gs-slot.is-stack.is-mine::after { content: "내 뻑"; }
+    .gs-slot[data-m="1"] { grid-area: 1 / 1; } .gs-slot[data-m="2"] { grid-area: 1 / 2; } .gs-slot[data-m="3"] { grid-area: 1 / 3; }
+    .gs-slot[data-m="4"] { grid-area: 1 / 5; } .gs-slot[data-m="5"] { grid-area: 1 / 6; } .gs-slot[data-m="6"] { grid-area: 1 / 7; }
+    .gs-slot[data-m="7"] { grid-area: 2 / 1; } .gs-slot[data-m="8"] { grid-area: 2 / 2; } .gs-slot[data-m="9"] { grid-area: 2 / 3; }
+    .gs-slot[data-m="10"] { grid-area: 2 / 5; } .gs-slot[data-m="11"] { grid-area: 2 / 6; } .gs-slot[data-m="12"] { grid-area: 2 / 7; }
+    .gs-deck { grid-area: 1 / 4 / 3 / 5; position: relative; justify-self: center; width: var(--fw); min-width: 40px; height: calc(var(--fw) * 1.6 + 6px); border: 0; padding: 0; background: none; cursor: default; }
+    .gs-deck .hw { position: absolute; left: 0; }
+    .gs-deck .hw:nth-child(1) { top: 6px; } .gs-deck .hw:nth-child(2) { top: 3px; } .gs-deck .hw:nth-child(3) { top: 0; }
+    .gs-deck__n { position: absolute; left: 50%; bottom: -20px; transform: translateX(-50%); padding: 1px 8px; border-radius: 999px; background: rgba(0,0,0,.35); color: #fff; font-size: 12px; font-weight: 800; white-space: nowrap; }
+    .gs-deck__n i { font-style: normal; }
+    .gs-deck.is-go { cursor: pointer; }
+    .gs-deck.is-go::before { content: ""; position: absolute; inset: -6px; border-radius: 12px; box-shadow: 0 0 0 3px #ffd84d, 0 0 18px rgba(255,216,77,.7); animation: gs-pulse 1.1s ease-in-out infinite; }
+
+    /* 안내 줄 · 내 손패 */
+    .gs-ask { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 6px 10px; min-height: 44px; color: #fff; text-align: center; }
+    .gs-ask__msg { font-size: 15px; font-weight: 800; text-shadow: 0 1px 0 rgba(0,0,0,.3); word-break: keep-all; }
+    .gs-ask__msg small { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 600; opacity: .8; }
+    .gs-btn { min-height: 44px; padding: 8px 18px; border: 0; border-radius: 12px; font: inherit; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+    .gs-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
+    .gs-btn--go { background: #ffd84d; color: #3b2f00; }
+    .gs-btn--alt { background: #fff; color: #1f2937; }
+    .gs-btn--red { background: #ef4444; color: #fff; }
+    .gs-btn--ghost { min-height: 40px; padding: 6px 12px; background: rgba(255,255,255,.14); color: #fff; font-size: 13px; font-weight: 800; box-shadow: none; }
+    .gs-btn:disabled { opacity: .5; cursor: default; }
+    .gs-opts { display: flex; gap: 10px; }
+    .gs-opt { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 4px 14px 4px 5px; border: 0; border-radius: 12px; background: #fff8d6; color: #3b2f00; font: inherit; font-size: 15px; font-weight: 900; cursor: pointer; box-shadow: 0 0 0 3px #ffd84d, 0 4px 0 rgba(0,0,0,.25); }
+    .gs-opt .hw { --w: 30px; pointer-events: none; }
+    .gs-opt:active { transform: translateY(2px); }
+    .gs-hand { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; min-height: calc(var(--hw) * 1.6 + 18px); padding: 12px 6px 6px; border-radius: 16px; background: rgba(0,0,0,.18); }
+    .gs-hand .hw { --w: var(--hw); cursor: pointer; }
+    .gs-hand.is-idle .hw { cursor: default; }
+    .gs-hand .hw.is-dim svg { filter: drop-shadow(0 2px 2px rgba(0,0,0,.28)) brightness(.78); }
+    .hw.is-match::after, .hw.is-choice::after, .hw.is-hint::after, .hw.is-flipped::after, .hw.is-peek::after { content: ""; position: absolute; inset: -3px; border-radius: calc(var(--w, var(--fw)) * .14); pointer-events: none; }
+    .hw.is-match::after { box-shadow: 0 0 0 2.5px rgba(255, 216, 77, .95); }
+    .hw.is-sel svg { transform: translateY(-12px); }
+    .hw.is-sel::after { inset: -15px -3px 9px; box-shadow: 0 0 0 3px #fff, 0 0 18px rgba(255,255,255,.7); }
+    .hw.is-hint::after, .hw.is-peek::after { box-shadow: 0 0 0 3px #ffd84d; }
+    .hw.is-choice { cursor: pointer; z-index: 4; }
+    .hw.is-choice::after { box-shadow: 0 0 0 3px #ffd84d, 0 0 16px rgba(255,216,77,.85); animation: gs-pulse 1s ease-in-out infinite; }
+    .hw.is-flipped::after { box-shadow: 0 0 0 3px #93c5fd; }
+    @keyframes gs-pulse { 50% { opacity: .45; } }
+
+    /* 쪽 · 뻑 · 고 같은 큰 글씨 */
+    .gs-banner { position: absolute; left: 50%; top: 44%; z-index: 40; transform: translate(-50%, -50%); pointer-events: none; text-align: center; }
+    .gs-banner__t { display: inline-block; padding: 10px 26px; border-radius: 18px; background: rgba(15,23,42,.84); color: #ffd84d; font-size: 40px; font-weight: 900; letter-spacing: .02em; white-space: nowrap; box-shadow: 0 10px 30px rgba(0,0,0,.35); animation: gs-pop .7s cubic-bezier(.2,1.4,.4,1) both; }
+    .gs-banner__t.is-bad { color: #fca5a5; }
+    .gs-banner__t small { display: block; font-size: 14px; color: #e2e8f0; font-weight: 700; letter-spacing: 0; }
+    .gs-banner__cards { display: flex; justify-content: center; gap: 6px; margin-top: 8px; }
+    .gs-banner__cards .hw { --w: 46px; }
+    @keyframes gs-pop { 0% { transform: scale(.4); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+    /* 고 · 스톱 · 결과 */
+    .gs-modal { position: absolute; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; padding: 14px; background: rgba(8, 20, 12, .55); }
+    .gs-modal.is-open { display: flex; }
+    .gs-card { width: min(430px, 100%); max-height: 100%; overflow-y: auto; padding: 20px 20px 16px; border-radius: 20px; background: #fff; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,.35); animation: gs-pop .35s ease-out both; }
+    .gs-card h2 { margin: 0 0 2px; font-size: 24px; font-weight: 900; }
+    .gs-card .gs-big { margin: 4px 0 2px; font-size: 42px; font-weight: 900; color: #b45309; line-height: 1.1; }
+    .gs-card p { margin: 6px 0 0; color: var(--text-secondary); font-size: 14px; line-height: 1.55; word-break: keep-all; }
+    .gs-rows { margin: 12px 0 0; padding: 8px 12px; border-radius: 12px; background: #f8fafc; text-align: left; font-size: 14px; }
+    .gs-rows div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+    .gs-rows div + div { border-top: 1px dashed #e2e8f0; }
+    .gs-rows b { white-space: nowrap; }
+    .gs-rows .is-mult b { color: #dc2626; }
+    .gs-rows .is-sum { font-weight: 900; color: #b45309; }
+    .gs-formula { margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+    .gs-card__btns { display: flex; gap: 8px; margin-top: 14px; }
+    .gs-card__btns .gs-btn { flex: 1; }
+    .gs-card__btns .gs-btn--alt { background: #eef2f7; }
+    .gs-card.is-win h2 { color: #b45309; }
+    .gs-card.is-lose h2 { color: #475569; }
+    .gs-card .gs-odds { display: flex; justify-content: center; gap: 8px; margin-top: 10px; }
+    .gs-card .gs-odds span { padding: 4px 10px; border-radius: 999px; background: #f1f5f9; font-size: 12.5px; font-weight: 800; color: #334155; }
+
+    .gs__bar { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 10px; }
+    .gs__note { font-size: 13px; color: var(--text-muted); word-break: keep-all; }
+    .gs__keys { font-size: 12.5px; color: var(--text-muted); }
+    .gs-pending { padding: 26px 18px; border-radius: 18px; background: var(--surface-card, #fff); border: 1px solid var(--border-default); text-align: center; }
+    .gs-pending p { margin: 0 0 14px; font-size: 15px; font-weight: 700; color: var(--text-secondary); }
+
+    /* 목록 위 — 이렇게 해요 */
+    .gs-hero { display: flex; justify-content: center; margin: 4px 0 14px; padding: 18px 0 12px; border-radius: 18px; background: radial-gradient(ellipse at 50% 40%, #2f7d4d, #194b2e); }
+    .gs-hero .hw { --w: 58px; margin: 0 -6px; }
+    .gs-hero .hw:nth-child(1) { transform: rotate(-16deg) translateY(10px); } .gs-hero .hw:nth-child(2) { transform: rotate(-8deg) translateY(2px); }
+    .gs-hero .hw:nth-child(4) { transform: rotate(8deg) translateY(2px); } .gs-hero .hw:nth-child(5) { transform: rotate(16deg) translateY(10px); }
+    .gs-how { margin: 0 0 6px; border: 1px solid var(--border-default); border-radius: 14px; background: var(--surface-card, #fff); }
+    .gs-how summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 10px 14px; font-size: 15px; font-weight: 800; cursor: pointer; }
+    .gs-how summary small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .gs-how__in { padding: 0 14px 14px; }
+    .gs-how ol { margin: 0; padding: 0; list-style: none; counter-reset: st; display: grid; gap: 10px; }
+    .gs-how li { position: relative; padding-left: 34px; font-size: 14px; line-height: 1.6; color: var(--text-secondary); word-break: keep-all; counter-increment: st; }
+    .gs-how li::before { content: counter(st); position: absolute; left: 0; top: 1px; width: 24px; height: 24px; border-radius: 50%; background: #215f3a; color: #fff; font-size: 13px; font-weight: 900; line-height: 24px; text-align: center; }
+    .gs-how li b { color: var(--color-midnight-navy); }
+    .gs-how__demo { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+    .gs-how__demo .hw { --w: 34px; }
+    .gs-how__demo span { font-size: 13px; font-weight: 800; color: #215f3a; }
+    .gs-how__more { margin-top: 12px; min-height: 40px; }
+
+    /* 규칙 보기(창) */
+    .gs-rule { color: var(--text-secondary); font-size: 14px; line-height: 1.6; word-break: keep-all; }
+    .gs-rule h3 { margin: 16px 0 6px; font-size: 15px; font-weight: 900; color: var(--color-midnight-navy); }
+    .gs-rule h3:first-child { margin-top: 0; }
+    .gs-rule ul { margin: 0; padding-left: 18px; }
+    .gs-rule li + li { margin-top: 4px; }
+    .gs-rule b { color: var(--color-midnight-navy); }
+    .gs-rule .hw { --w: 30px; }
+    .gs-rule__cards { display: inline-flex; gap: 3px; vertical-align: middle; margin: 2px 4px 2px 0; }
+    .gs-deckmap { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 14px; margin-top: 6px; }
+    .gs-deckmap div { display: flex; align-items: center; gap: 6px; }
+    .gs-deckmap em { width: 58px; flex-shrink: 0; font-style: normal; font-size: 12.5px; font-weight: 800; color: var(--color-midnight-navy); }
+    .gs-deckmap .hw { --w: 28px; }
+
+    @media (hover: hover) and (pointer: fine) {
+      .gs-hand:not(.is-idle) .hw:hover svg { transform: translateY(-6px); }
+      .gs-hand:not(.is-idle) .hw.is-sel:hover svg { transform: translateY(-12px); }
+    }
+    /* 휴대폰 — 바닥은 다섯 칸(가운데 더미) · 세 줄, 손패는 한 줄(겹쳐 놓기) */
+    @media (max-width: 640px) {
+      .gs { --fw: 40px; --hw: 58px; --pw: 22px; --bw: 20px; padding: 8px 8px 36px; }
+      .gs__top { margin-bottom: 8px; }
+      .gs__tool { padding: 7px 10px; }
+      .gs__tool span { display: none; }
+      .gs-felt { padding: 8px; border-radius: 18px; }
+      .gs-board { gap: 6px; }
+      .gs-zone { gap: 8px; padding: 5px 7px; }
+      .gs-pile { gap: 4px 7px; }
+      .gs-pts { min-width: 48px; }
+      .gs-pts b { font-size: 22px; }
+      .gs-pts small { font-size: 10px; }
+      .gs-grp { gap: 3px; }
+      .gs-grp__n { min-width: 22px; padding: 1px 3px; font-size: 10px; }
+      .gs-grp__n b { font-size: 12px; }
+      .gs-chip { padding: 1px 5px; font-size: 10px; }
+      .gs-floor { --off: .27; display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 8px 6px; padding: 2px 0 16px; min-height: calc(var(--sloth) * 2 + 26px); }
+      .gs-slot { flex: 0 0 var(--slotw); }
+      .gs-deck { order: -1; flex: 0 0 auto; margin: 0 4px; }
+      /* 장수는 더미 그림 안쪽에 두 줄로 — 아래로 삐져나가 다음 줄 바닥 패에 가리지 않게 */
+      .gs-deck__n { bottom: 7px; padding: 2px 5px 3px; border-radius: 8px; background: rgba(0,0,0,.62); font-size: 11px; line-height: 1.15; text-align: center; z-index: 2; }
+      .gs-deck__n i { display: block; font-size: 10px; font-weight: 700; opacity: .85; }
+      .gs-hand { gap: 12px 7px; padding: 14px 4px 8px; }
+      .gs .gk__vs { gap: 6px; margin-bottom: 8px; }
+      .gs .gk__side, .gs .gk__side:not(.is-me) { flex-direction: row; justify-content: flex-start; gap: 6px; padding: 6px 8px; text-align: left; }
+      .gs .gk__side:not(.is-me) { flex-direction: row-reverse; text-align: right; }
+      .gs .gk__face img, .gs .gk__face .gk__ava { width: 30px; height: 30px; }
+      .gs .gk__side .gk__who b { white-space: nowrap; font-size: 13px; }
+      .gs .gk__side .gk__who b em { display: none; }
+      .gs .gk__side .gk__who small { font-size: 11.5px; }
+      .gs .gk__res, .gs .gk__turn { padding: 2px 7px; font-size: 11px; }
+      .gs .gk__vs-mid { min-width: 40px; }
+      .gs .gk__vs-mid small { font-size: 11px; }
+      .gs-ask { min-height: 40px; }
+      .gs-ask__msg { font-size: 14px; }
+      .gs-btn { padding: 8px 14px; font-size: 14px; }
+      .gs-banner__t { font-size: 30px; padding: 8px 18px; }
+      .gs__keys { display: none; }
+      .gs-deckmap { grid-template-columns: minmax(0, 1fr); }
+    }
+    /* 가로로 든 휴대폰 · 낮은 창 — 왼쪽은 상대 · 바닥 · 내 패, 오른쪽은 안내 · 손패(두 줄) */
+    @media (max-height: 520px) and (min-width: 641px) {
+      .gs { --fw: min(40px, 9.6vh); --hw: max(42px, min(48px, 12vh)); --pw: min(20px, 5vh); --bw: min(18px, 4.6vh); --off: .32; padding: 6px 12px 24px; }
+      .gs__top { margin-bottom: 6px; }
+      .gs .gk__vs { display: none; }
+      .gs-felt { padding: 8px; }
+      .gs-board { grid-template-columns: minmax(0, 1fr) calc(var(--hw) * 5 + 40px); grid-template-rows: auto 1fr auto; grid-template-areas: "rival hand" "floor hand" "me ask"; gap: 6px 10px; align-items: start; }
+      .gs-board > .gs-ask { align-self: center; min-height: 0; gap: 4px 6px; }
+      .gs-board > .gs-hand { align-self: stretch; }
+      .gs-hand { flex-wrap: wrap; gap: 8px 6px; align-content: center; min-height: 0; padding: 10px 6px 6px; }
+      .gs-ask__msg small { display: none; }
+      .gs-btn--ghost { min-height: 40px; padding: 4px 10px; font-size: 12px; }
+      .gs-opt { min-height: 40px; padding: 2px 10px 2px 4px; font-size: 13px; }
+      .gs-opt .hw { --w: 22px; }
+      .gs-zone { min-height: calc(var(--pw) * 1.6 + 10px); padding: 4px 8px; gap: 8px; }
+      .gs-pts { min-width: 44px; } .gs-pts b { font-size: 18px; } .gs-pts small { font-size: 10px; }
+      .gs-grp__n { min-width: 20px; padding: 1px 3px; font-size: 9.5px; } .gs-grp__n b { font-size: 11px; }
+      .gs-floor { gap: 4px 6px; padding-bottom: 12px; }
+      .gs-ask__msg { font-size: 13.5px; } .gs-ask__msg small { font-size: 11.5px; }
+      .gs-btn { min-height: 40px; padding: 6px 12px; font-size: 13.5px; }
+      .gs-banner__t { font-size: 28px; }
+      .gs__keys { display: none; }
+    }
+    @media (min-width: 641px) and (min-height: 521px) and (max-height: 820px) {
+      .gs { --fw: 52px; --hw: 60px; --pw: 28px; padding-top: 8px; }
+      .gs__top { margin-bottom: 6px; }
+      .gs .gk__vs { margin-bottom: 6px; }
+      .gs .gk__side { padding: 5px 10px; }
+      .gs-felt { padding: 10px; }
+      .gs-board { gap: 6px; }
+      .gs-floor { padding-bottom: 12px; }
+      .gs-hand { padding: 10px 6px 4px; min-height: calc(var(--hw) * 1.6 + 14px); }
+      .gs-ask { min-height: 40px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hw.is-flipin svg, .gs-banner__t, .gs-card, .hw.is-choice::after, .gs-deck.is-go::before { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 화투 패 — 번호 · 종류 · 점수(화면용) · 그림. 패 번호 0~47, 달 = 번호 / 4 + 1.
+    // 종류 · 묶음은 서버 엔진 backend/app/services/versus_gostop.py 의 KINDS 와 같다(판정은 늘 서버).
+    // 그림은 이 파일이 직접 그린 단순한 평면 그림(SVG) — 왼쪽 위 숫자는 달, 오른쪽 위 「광」 · 「열」 도장,
+    // 띠에는 홍단 · 청단 · 초단 글씨, 쌍피에는 「쌍피」 꼬리표.
+    const H = (function () {
+      const KINDS = [
+        "g", "t", "p", "p", "y", "t", "p", "p", "g", "t", "p", "p", "y", "t", "p", "p",
+        "y", "t", "p", "p", "y", "t", "p", "p", "y", "t", "p", "p", "g", "y", "p", "p",
+        "y", "t", "p", "p", "y", "t", "p", "p", "g", "pp", "p", "p", "g", "y", "t", "pp",
+      ];
+      const BIRDS = [4, 12, 29], KOOKJIN = 32, RAIN = 44;
+      const HONG = [1, 5, 9], CHUNG = [21, 33, 37], CHO = [13, 17, 25];
+      const SETS = [["고도리", BIRDS], ["홍단", HONG], ["청단", CHUNG], ["초단", CHO]];
+      const MONTHS = ["송학", "매조", "벚꽃", "흑싸리", "난초", "모란", "홍싸리", "공산", "국진", "단풍", "오동", "비"];
+      const KIND_NAME = { g: "광", y: "열끗", t: "띠", p: "피", pp: "쌍피" };
+      const GOAL = 7;
+      const mon = (c) => (c >> 2) + 1;
+      const kind = (c) => KINDS[c];
+      const group = (c) => (KINDS[c] === "pp" ? "p" : KINDS[c]); // 먹은 패 칸 — 광 · 열끗 · 띠 · 피(쌍피 포함)
+      const name = (c) => `${mon(c)}월 ${MONTHS[mon(c) - 1]} ${KIND_NAME[KINDS[c]]}`;
+
+      // ── 점수(서버 score · _settle 과 같은 계산 — 화면 표시 · 미리 보기용) ──
+      function parts(pile, kookPi) {
+        const g = pile.filter((c) => KINDS[c] === "g");
+        const y = pile.filter((c) => KINDS[c] === "y" && !(kookPi && c === KOOKJIN));
+        const t = pile.filter((c) => KINDS[c] === "t");
+        let pi = 0;
+        for (const c of pile) {
+          if (KINDS[c] === "p") pi += 1;
+          else if (KINDS[c] === "pp" || (kookPi && c === KOOKJIN)) pi += 2;
+        }
+        const has = (arr, set) => set.every((x) => arr.includes(x));
+        const ng = g.length;
+        const gp = ng >= 5 ? 15 : ng === 4 ? 4 : ng === 3 ? (g.includes(RAIN) ? 2 : 3) : 0;
+        const yp = Math.max(0, y.length - 4) + (has(y, BIRDS) ? 5 : 0);
+        const tp = Math.max(0, t.length - 4) + [HONG, CHUNG, CHO].filter((s) => has(t, s)).length * 3;
+        const pp = Math.max(0, pi - 9);
+        return { g: gp, y: yp, t: tp, p: pp, total: gp + yp + tp + pp, n: { g: ng, y: y.length, t: t.length, p: pi }, kookPi };
+      }
+      function score(pile) {
+        const a = parts(pile, false);
+        if (!pile.includes(KOOKJIN)) return a;
+        const b = parts(pile, true);
+        return b.total > a.total ? b : a;
+      }
+      const piCount = (pile) => parts(pile, pile.includes(KOOKJIN)).n.p; // 피박을 볼 때 — 진 쪽은 국진을 피로
+      // 스톱하면 받을 점수 — 국진은 7점 이상인 셈법 가운데 최종 점수가 큰 쪽
+      function settle(pile, rivalPile, go, rivalGo, shakes) {
+        const variant = (kp) => {
+          const s = parts(pile, kp);
+          let pts = s.total + Math.min(go, 2);
+          if (go >= 3) pts *= 2 ** (go - 2);
+          const mults = [...shakes];
+          if (s.p > 0 && piCount(rivalPile) <= 5) mults.push("피박");
+          if (s.g > 0 && !rivalPile.some((c) => KINDS[c] === "g")) mults.push("광박");
+          if (s.n.y >= 7) mults.push("멍박");
+          if (rivalGo > 0) mults.push("고박");
+          return { base: s.total, parts: { g: s.g, y: s.y, t: s.t, p: s.p }, n: s.n, go, mults, points: pts * 2 ** mults.length };
+        };
+        const opts = [variant(false)];
+        if (pile.includes(KOOKJIN)) opts.push(variant(true));
+        const ok = opts.filter((o) => o.base >= GOAL);
+        return (ok.length ? ok : opts).reduce((a, b) => (b.points > a.points ? b : a));
+      }
+      // 모으는 중인 묶음(고도리 · 홍단 · 청단 · 초단) — 상대가 한 장이라도 가진 묶음은 뺀다
+      const sets = (pile, theirs = []) => SETS.map(([n, s]) => ({ name: n, have: s.filter((x) => pile.includes(x)).length, dead: s.some((x) => theirs.includes(x)) }));
+
+      // ── 그림 ──
+      const C = {
+        ink: "#1f1a17", red: "#d7263d", red2: "#a3162a", pink: "#f4869f", pink2: "#fcd0dc", green: "#2f8f57", green2: "#1c5c37",
+        leaf: "#46a86c", blue: "#2c5ad6", purple: "#7048c4", yellow: "#f7c531", orange: "#ef7d22", brown: "#7a4b2a",
+        cream: "#fffaf0", sky: "#fbf1dc", white: "#ffffff", gold: "#e9b423",
+      };
+      const ell = (cx, cy, rx, ry, fill, extra = "") => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${fill}" ${extra}/>`;
+      const circ = (cx, cy, r, fill, extra = "") => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" ${extra}/>`;
+      const path = (d, fill, extra = "") => `<path d="${d}" fill="${fill}" ${extra}/>`;
+      const line = (d, stroke, w, extra = "") => `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" ${extra}/>`;
+      function flower(cx, cy, r, n, petal, center, rot = 0) { // 꽃 — 꽃잎 n 장
+        let s = "";
+        for (let i = 0; i < n; i++) {
+          const a = (Math.PI * 2 * i) / n + rot;
+          s += circ((cx + Math.cos(a) * r * 0.62).toFixed(1), (cy + Math.sin(a) * r * 0.62).toFixed(1), (r * 0.5).toFixed(1), petal);
+        }
+        return s + circ(cx, cy, (r * 0.32).toFixed(1), center);
+      }
+      function mum(cx, cy, r, petal, inner) { // 국화 — 가는 꽃잎을 빙 둘러
+        let s = "";
+        for (let i = 0; i < 14; i++) s += `<ellipse cx="${cx}" cy="${cy - r * 0.55}" rx="${(r * 0.2).toFixed(1)}" ry="${(r * 0.5).toFixed(1)}" fill="${petal}" transform="rotate(${(360 * i) / 14} ${cx} ${cy})"/>`;
+        return s + circ(cx, cy, (r * 0.42).toFixed(1), inner) + circ(cx, cy, (r * 0.2).toFixed(1), C.orange);
+      }
+      function maple(cx, cy, r, fill, rot = 0) { // 단풍잎
+        const pts = [];
+        for (let i = 0; i < 10; i++) {
+          const a = (Math.PI * 2 * i) / 10 - Math.PI / 2, rr = i % 2 === 0 ? r : r * 0.45;
+          pts.push(`${(cx + Math.cos(a) * rr).toFixed(1)},${(cy + Math.sin(a) * rr).toFixed(1)}`);
+        }
+        return `<g transform="rotate(${rot} ${cx} ${cy})"><polygon points="${pts.join(" ")}" fill="${fill}"/>${line(`M${cx} ${cy} L${cx} ${cy + r * 1.1}`, C.red2, 1.6)}</g>`;
+      }
+      function ribbon(x, y, fill, text, rot = -7) { // 띠 — 세로 끈, 글씨는 두 글자를 위아래로
+        const w = 20, h = 78;
+        const words = text ? [...text].map((ch, i) => `<text x="${x + w / 2}" y="${y + 30 + i * 17}" text-anchor="middle" font-size="14" font-weight="800" fill="#fff">${ch}</text>`).join("") : "";
+        return `<g transform="rotate(${rot} ${x + w / 2} ${y + h / 2})">
+          ${path(`M${x} ${y} H${x + w} V${y + h} L${x + w / 2} ${y + h - 9} L${x} ${y + h} Z`, fill, `stroke="${C.ink}" stroke-width="1.6"`)}
+          ${circ(x + w / 2, y + 2, 6, fill, `stroke="${C.ink}" stroke-width="1.6"`)}
+          ${line(`M${x + 3} ${y + 12} H${x + w - 3}`, "rgba(255,255,255,.55)", 1.5)}${words}</g>`;
+      }
+      // 오른쪽 위 도장 — 광(빨강) · 열끗(금색)
+      const seal = (fill, text, color = "#fff") => `${circ(83, 21, 12.5, fill, `stroke="#fff" stroke-width="2.5"`)}<text x="83" y="26.5" text-anchor="middle" font-size="14" font-weight="900" fill="${color}">${text}</text>`;
+      const doubleTag = () => `<rect x="27" y="132" width="46" height="18" rx="9" fill="${C.ink}"/><text x="50" y="145.5" text-anchor="middle" font-size="12" font-weight="800" fill="#fff">쌍피</text>`;
+      const index = (m) => `<rect x="7" y="7" width="${m >= 10 ? 27 : 20}" height="21" rx="7" fill="rgba(255,255,255,.88)"/><text x="${m >= 10 ? 20.5 : 17}" y="23.5" text-anchor="middle" font-size="16" font-weight="900" fill="${C.ink}">${m}</text>`;
+      function bird(x, y, s, body, wing, dir = 1, fly = false) { // 새 — 몸통 · 날개 · 부리. dir -1 이면 왼쪽을 본다
+        const t = `translate(${x} ${y}) scale(${dir * s} ${s})`;
+        const wings = fly
+          ? path("M-4 -2 C-14 -22 -26 -24 -34 -20 C-24 -14 -14 -6 -6 4 Z", wing) + path("M2 -2 C10 -24 22 -28 30 -26 C22 -16 12 -6 4 4 Z", wing)
+          : path("M-14 -2 C-6 -10 8 -8 12 2 C2 4 -8 4 -14 -2 Z", wing);
+        return `<g transform="${t}">${path("M-22 6 L-34 0 L-30 12 Z", wing)}${ell(0, 4, 20, 11, body)}${wings}${circ(16, -6, 8, body)}${path("M23 -7 L31 -4 L23 -2 Z", C.orange)}${circ(18, -8, 1.8, C.ink)}</g>`;
+      }
+      // 달마다 바탕 그림 — v 는 피 두 장을 조금 다르게(0 · 1)
+      const PLANT = {
+        1: (v) => // 소나무
+          path("M6 154 C20 130 18 112 26 96 C34 80 38 70 44 52", "none", `stroke="${C.brown}" stroke-width="7" stroke-linecap="round"`) +
+          [[34, 58, 24, 11], [62, 42, 22, 10], [24, 92, 22, 10], [60, 84, 24, 11], v ? [70, 118, 18, 9] : [44, 122, 18, 9]]
+            .map(([x, y, rx, ry]) => ell(x, y, rx, ry, C.green2) + ell(x, y - 3, rx - 5, ry - 4, C.green)).join("") +
+          path("M6 140 C30 128 60 132 94 122 V154 H6 Z", C.red, `opacity=".9"`),
+        2: (v) => // 매화
+          line(v ? "M6 150 C30 120 40 96 60 80 C72 70 84 56 94 40" : "M94 150 C70 124 60 100 44 84 C32 72 20 60 8 44", C.brown, 6) +
+          line(v ? "M44 104 C56 102 66 110 74 118" : "M58 104 C46 104 36 112 28 120", C.brown, 3.5) +
+          (v ? [[34, 112], [62, 78], [86, 50], [76, 118], [50, 92]] : [[64, 112], [40, 80], [16, 52], [26, 120], [52, 94]])
+            .map(([x, y]) => flower(x, y, 10, 5, C.red, C.yellow)).join(""),
+        3: (v) => // 벚꽃
+          line("M10 40 C30 50 50 46 70 60 C80 66 88 74 94 86", C.brown, 4) +
+          [[22, 34], [44, 50], [66, 42], [30, 70], [56, 72], [80, 66], [16, 96], v ? [74, 96] : [44, 98]]
+            .map(([x, y], i) => flower(x, y, i % 2 ? 11 : 9, 5, i % 3 ? C.pink : C.pink2, C.red, i)).join(""),
+        4: (v) => { // 흑싸리 — 검은 잎이 늘어진다
+          let s = "";
+          [22, 44, 66, 86].forEach((x, i) => {
+            const len = 70 + ((i + v) % 2) * 34;
+            s += line(`M${x} 6 C${x + 6} ${len * 0.4} ${x - 6} ${len * 0.7} ${x + 2} ${len}`, C.ink, 2.4);
+            for (let j = 18; j < len; j += 14) s += ell(x + (j % 28 ? 5 : -5), j, 6, 3, C.ink, `transform="rotate(${j % 28 ? 30 : -30} ${x} ${j})"`);
+            s += circ(x + 2, len + 4, 3.5, C.red);
+          });
+          return s;
+        },
+        5: (v) => { // 난초(붓꽃)
+          let s = "";
+          [[16, -8], [30, 4], [44, -3], [58, 6], [72, -5], [86, 3]].forEach(([x, k]) => { s += path(`M${x} 156 C${x + k} 120 ${x + k * 2} 90 ${x + k * 1.5} 60 C${x + 4} 92 ${x + 4} 124 ${x + 6} 156 Z`, C.leaf); });
+          (v ? [[32, 52], [66, 40]] : [[30, 40], [68, 54]]).forEach(([x, y]) => {
+            s += line(`M${x} ${y + 8} V${y + 40}`, C.green2, 2.5);
+            s += path(`M${x} ${y + 8} C${x - 18} ${y + 4} ${x - 16} ${y - 14} ${x} ${y - 8} C${x + 16} ${y - 14} ${x + 18} ${y + 4} ${x} ${y + 8} Z`, C.purple);
+            s += path(`M${x} ${y - 6} C${x - 6} ${y - 22} ${x + 6} ${y - 22} ${x} ${y - 6} Z`, "#9a7ae0");
+            s += circ(x, y, 3, C.yellow);
+          });
+          return s;
+        },
+        6: (v) => { // 모란
+          let s = [[18, 120, -30], [80, 112, 30], [30, 76, -50], [72, 70, 50]].map(([x, y, r]) => ell(x, y, 16, 8, C.leaf, `transform="rotate(${r} ${x} ${y})"`)).join("");
+          const big = (x, y, r) => circ(x, y, r, C.red2) + flower(x, y, r * 0.95, 7, C.red, "#f15d72") + circ(x, y, r * 0.3, C.yellow);
+          return s + (v ? big(50, 70, 22) + big(28, 116, 14) : big(50, 96, 22) + big(72, 46, 14));
+        },
+        7: (v) => { // 홍싸리 — 붉은 잎이 늘어진다
+          let s = "";
+          [20, 42, 64, 86].forEach((x, i) => {
+            const len = 64 + ((i + v + 1) % 2) * 36;
+            s += line(`M${x} 6 C${x - 6} ${len * 0.4} ${x + 6} ${len * 0.7} ${x - 2} ${len}`, C.red2, 2.4);
+            for (let j = 16; j < len; j += 13) s += ell(x + (j % 26 ? 5 : -5), j, 6, 3.2, C.red, `transform="rotate(${j % 26 ? 30 : -30} ${x} ${j})"`);
+          });
+          return s;
+        },
+        8: () => // 공산 — 검은 언덕과 억새
+          path("M6 98 C26 78 50 74 70 82 C80 86 88 90 94 88 V154 H6 Z", C.ink) +
+          [14, 26, 40, 54, 68, 82].map((x, i) => line(`M${x} ${86 - (i % 2) * 6} C${x + 3} 76 ${x + 8} 70 ${x + 12} ${66 - (i % 3) * 4}`, "#fff", 1.6)).join(""),
+        9: (v) => // 국화
+          [[24, 130, -40], [76, 126, 40], [50, 112, 0]].map(([x, y, r]) => ell(x, y, 14, 7, C.leaf, `transform="rotate(${r} ${x} ${y})"`)).join("") +
+          line("M50 150 V100", C.green2, 3) +
+          (v ? mum(50, 64, 26, C.yellow, "#fde68a") + mum(22, 30, 14, C.orange, C.yellow) : mum(50, 70, 26, C.orange, C.yellow) + mum(78, 32, 14, C.yellow, "#fde68a")),
+        10: (v) => // 단풍
+          line(v ? "M94 30 C70 44 50 60 30 90 C20 106 14 124 10 150" : "M6 30 C30 44 50 60 70 90 C80 106 86 124 90 150", C.brown, 4) +
+          (v ? [[70, 44, 13, 10], [44, 66, 15, -20], [24, 102, 12, 15], [62, 96, 11, 30], [36, 132, 10, 0]]
+            : [[30, 44, 13, -10], [56, 66, 15, 20], [76, 102, 12, -15], [38, 96, 11, -30], [64, 132, 10, 0]])
+            .map(([x, y, r, rot], i) => maple(x, y, r, i % 2 ? C.orange : C.red, rot)).join(""),
+        11: (v) => // 오동 — 검은 넓은 잎과 꽃대
+          line("M50 10 V36", C.green2, 3) +
+          [[44, 14], [56, 20], [46, 28], [56, 34]].map(([x, y]) => ell(x, y, 5, 4, C.purple)).join("") +
+          (v ? [[26, 120, -20], [74, 126, 20], [50, 102, 0]] : [[22, 112, -25], [76, 112, 25], [48, 128, 0]])
+            .map(([x, y, r]) => `<g transform="rotate(${r} ${x} ${y})">${path(`M${x} ${y + 26} C${x - 28} ${y + 14} ${x - 26} ${y - 22} ${x} ${y - 24} C${x + 26} ${y - 22} ${x + 28} ${y + 14} ${x} ${y + 26} Z`, C.ink)}${line(`M${x} ${y + 22} V${y - 16}`, "#4b5563", 1.6)}</g>`).join(""),
+        12: () => // 비 — 버들과 빗줄기
+          [12, 30, 48, 66, 84].map((x, i) => line(`M${x + 6} 6 C${x - 4} 40 ${x + 8} 70 ${x} ${88 + (i % 2) * 22}`, C.green, 2.2) +
+            [24, 44, 64].map((y) => ell(x + (y % 40 ? 3 : -2), y + (i % 2) * 6, 3, 7, C.leaf, `transform="rotate(${y % 40 ? 25 : -25} ${x} ${y})"`)).join("")).join("") +
+          [[18, 100], [40, 120], [62, 98], [80, 128], [28, 138]].map(([x, y]) => line(`M${x} ${y} l-6 14`, "#7d8ea3", 1.6)).join(""),
+      };
+      const BG = { 1: C.sky, 2: "#fdf2e4", 3: "#fff3f6", 4: C.sky, 5: "#eef4ff", 6: "#fff4ea", 7: C.sky, 8: "#fde9c8", 9: "#fff8df", 10: "#fff1e4", 11: C.sky, 12: "#d8e0ea" };
+      // 패마다 특별한 그림(광 · 열끗 · 띠 · 쌍피)
+      const SPECIAL = {
+        0: () => circ(66, 50, 19, "#e23b3b") + // 송학 광 — 붉은 해와 학
+          `<g transform="translate(48 112)">${path("M-30 6 C-24 -8 0 -12 18 -2 C10 8 -10 14 -30 6 Z", "#fff", `stroke="${C.ink}" stroke-width="1.6"`)}${path("M-30 6 L-42 0 L-36 12 Z", C.ink)}${line("M14 -2 C20 -14 18 -26 26 -36", "#fff", 5)}${line("M14 -2 C20 -14 18 -26 26 -36", C.ink, 1.2, `opacity=".4"`)}${circ(27, -38, 5, "#fff", `stroke="${C.ink}" stroke-width="1.4"`)}${circ(28, -42, 2.6, C.red)}${path("M31 -38 L40 -35 L31 -34 Z", C.ink)}${line("M-8 12 L-10 30 M2 12 L4 30", C.ink, 1.8)}</g>`,
+        1: () => ribbon(56, 46, C.red, "홍단"),
+        4: () => bird(54, 62, 0.95, "#c9d64a", "#8aa12c", -1), // 매조 열끗 — 꾀꼬리(고도리)
+        5: () => ribbon(64, 30, C.red, "홍단", 6),
+        8: () => { // 벚꽃 광 — 붉은 휘장
+          let s = path("M6 92 C20 100 34 100 50 92 C66 100 80 100 94 92 V154 H6 Z", C.red);
+          for (let x = 12; x < 94; x += 16) s += path(`M${x} 100 V154 H${x + 7} V102 Z`, "#fff", `opacity=".9"`);
+          return s + line("M6 92 C20 100 34 100 50 92 C66 100 80 100 94 92", C.gold, 3) + circ(50, 92, 5, C.gold);
+        },
+        9: () => ribbon(40, 74, C.red, "홍단", -4),
+        12: () => bird(52, 84, 0.9, "#3a3a46", "#1f1a17", -1, true), // 흑싸리 열끗 — 두견새(고도리)
+        13: () => ribbon(54, 56, C.red, "초단"),
+        16: () => { // 난초 열끗 — 나무다리
+          let s = path("M6 128 L40 112 L94 126 V140 L40 126 L6 142 Z", C.brown);
+          for (let x = 12; x < 92; x += 9) s += line(`M${x} ${x < 40 ? 140 - (x - 6) * 0.47 : 126 + (x - 40) * 0.26} V${x < 40 ? 126 - (x - 6) * 0.47 : 112 + (x - 40) * 0.26}`, "#4a2c17", 1.4);
+          return s;
+        },
+        17: () => ribbon(58, 70, C.red, "초단", 5),
+        20: () => // 모란 열끗 — 나비 두 마리
+          [[30, 46, C.yellow, "#d6a516"], [70, 120, "#b48ef0", C.purple]].map(([x, y, a, b]) =>
+            `<g transform="translate(${x} ${y})">${ell(-9, -6, 10, 8, a, `stroke="${b}" stroke-width="1.6"`)}${ell(9, -6, 10, 8, a, `stroke="${b}" stroke-width="1.6"`)}${ell(-7, 7, 7, 6, a, `stroke="${b}" stroke-width="1.6"`)}${ell(7, 7, 7, 6, a, `stroke="${b}" stroke-width="1.6"`)}${ell(0, 0, 2.6, 11, C.ink)}${line("M-1 -10 L-6 -18 M1 -10 L6 -18", C.ink, 1.2)}</g>`).join(""),
+        21: () => ribbon(62, 30, C.blue, "청단", 6),
+        24: () => `<g transform="translate(50 122)">${ell(0, 0, 30, 15, "#5a3a26")}${path("M24 -10 C36 -10 42 -2 40 6 L28 8 Z", "#5a3a26")}${path("M38 2 L44 0 L42 6 Z", "#fff")}${circ(30, -4, 2, "#fff")}${line("M-18 10 L-20 24 M-6 12 L-6 25 M10 12 L12 25 M20 10 L24 23", "#3c2617", 4)}${path("M-28 -6 L-36 -14 L-30 -2 Z", "#5a3a26")}${line("M-20 -12 C-6 -18 8 -18 20 -12", "#7b5236", 3)}</g>`, // 홍싸리 열끗 — 멧돼지
+        25: () => ribbon(56, 60, C.red, "초단"),
+        28: () => path("M6 6 H94 V98 C80 90 70 82 50 76 C30 76 18 84 6 96 Z", C.red) + circ(46, 48, 25, "#fff4d6") + circ(54, 42, 4, "#f6e3b0"), // 공산 광 — 보름달
+        29: () => path("M6 6 H94 V90 C70 80 40 74 6 92 Z", "#f6b36a") + // 공산 열끗 — 기러기 세 마리(고도리)
+          [[24, 34], [46, 50], [68, 62]].map(([x, y]) => line(`M${x - 12} ${y - 5} Q${x - 6} ${y - 8} ${x} ${y} Q${x + 6} ${y - 8} ${x + 12} ${y - 5}`, C.ink, 3.4)).join(""),
+        32: () => `<g transform="translate(50 120)">${path("M-26 -16 H26 L18 8 C14 14 -14 14 -18 8 Z", C.red, `stroke="${C.ink}" stroke-width="1.8"`)}${ell(0, -16, 26, 5, "#f04b5c", `stroke="${C.ink}" stroke-width="1.8"`)}${path("M-8 12 H8 L12 22 H-12 Z", C.red2)}${flower(0, -2, 7, 5, C.gold, C.yellow)}</g>`, // 국진 — 술잔
+        33: () => ribbon(60, 18, C.blue, "청단", 6),
+        36: () => `<g transform="translate(48 116)">${ell(0, 0, 24, 13, "#b06a32")}${[-12, 0, 10].map((x) => circ(x, -3, 2.2, "#fff")).join("")}${path("M18 -6 C24 -20 30 -24 36 -22 L34 -12 Z", "#b06a32")}${circ(34, -20, 7, "#b06a32")}${circ(37, -21, 1.6, C.ink)}${line("M30 -26 L26 -40 L20 -46 M27 -38 L33 -46 M36 -26 L40 -40 L46 -44 M40 -38 L36 -48", "#6b3e1d", 2.4)}${line("M-16 10 L-18 28 M-6 12 L-6 29 M8 12 L10 29 M18 9 L22 27", "#7a4b2a", 3.6)}</g>`, // 단풍 열끗 — 사슴
+        37: () => ribbon(18, 22, C.blue, "청단", -8),
+        40: () => `<g transform="translate(50 62)">${path("M-6 10 C-30 30 -40 50 -42 74 C-28 56 -18 44 -4 26 Z", "#2a9d8f")}${path("M0 12 C-8 38 -6 56 2 80 C8 56 10 38 6 12 Z", C.yellow)}${path("M6 10 C26 26 36 44 40 66 C24 52 16 40 4 26 Z", C.red)}${ell(0, 0, 18, 13, C.red)}${path("M-12 -4 C-26 -26 -10 -32 -2 -14 Z", "#2a9d8f")}${path("M10 -6 C24 -26 34 -16 16 -2 Z", C.yellow)}${circ(2, -16, 8, C.red)}${path("M9 -18 L18 -14 L9 -12 Z", C.orange)}${circ(4, -18, 1.8, C.ink)}${line("M-2 -24 C-6 -32 0 -36 4 -30", C.gold, 2.4)}</g>`, // 오동 광 — 봉황
+        41: () => "", // 오동 쌍피 — 바탕을 노랗게(BG_OVERRIDE)
+        44: () => `<g transform="translate(46 104)">${path("M-30 -26 C-24 -48 20 -50 30 -28 Z", C.red, `stroke="${C.ink}" stroke-width="1.8"`)}${line("M0 -40 V20", C.ink, 2.2)}${ell(-4, 4, 11, 20, "#3b4a6b")}${circ(-4, -20, 8, "#f2c9a0")}${path("M-16 -24 H8 L4 -30 H-12 Z", C.ink)}${line("M-10 22 L-12 40 M2 22 L4 40", C.ink, 3)}</g>` + // 비광 — 우산 든 사람과 개구리
+          `<g transform="translate(78 140)">${ell(0, 0, 9, 6, "#7dbb47")}${circ(-4, -5, 2.6, "#7dbb47")}${circ(4, -5, 2.6, "#7dbb47")}${circ(-4, -5, 1, C.ink)}${circ(4, -5, 1, C.ink)}</g>`,
+        45: () => `<g transform="translate(52 96) scale(-1 1)">${path("M-30 10 L-46 -4 L-40 12 L-46 24 Z", C.ink)}${ell(0, 4, 22, 9, C.ink)}${ell(4, 8, 14, 5, "#fff")}${path("M-6 0 C2 -26 18 -30 30 -28 C18 -18 10 -6 2 4 Z", C.ink)}${circ(18, 0, 7, C.ink)}${circ(22, 4, 3, C.red)}${path("M24 -2 L32 0 L24 2 Z", C.orange)}</g>`, // 비 열끗 — 제비
+        46: () => ribbon(56, 40, C.red, ""),
+        47: () => path("M6 6 H94 V70 C80 76 70 64 56 70 C44 78 30 66 6 74 Z", "#2b2f3a") + // 비 쌍피 — 먹구름 · 번개 · 북
+          path("M56 26 L40 58 H52 L42 88 L68 50 H56 L66 26 Z", C.yellow) + circ(28, 112, 15, C.red, `stroke="${C.ink}" stroke-width="2"`) + circ(28, 112, 6, C.gold),
+      };
+      const BG_OVERRIDE = { 41: "#f8de6e", 47: "#d8e0ea" };
+      const NO_PLANT = { 47: true };
+      function art(c) {
+        const m = mon(c), k = KINDS[c];
+        const special = SPECIAL[c] ? SPECIAL[c]() : "";
+        const plant = NO_PLANT[c] ? "" : PLANT[m](c % 2);
+        return `<rect x="1.5" y="1.5" width="97" height="157" rx="10" fill="${C.cream}" stroke="#cdbf9f" stroke-width="2"/>
+          <g clip-path="url(#hw-clip)"><rect x="6" y="6" width="88" height="148" fill="${BG_OVERRIDE[c] || BG[m]}"/>
+          ${c === 28 || c === 29 || c === 47 ? special + plant : plant + special}</g>
+          <rect x="6" y="6" width="88" height="148" rx="6" fill="none" stroke="rgba(31,26,23,.18)" stroke-width="1.2"/>
+          ${index(m)}${k === "g" ? seal(C.red, "광") : k === "y" ? seal(C.gold, "열", C.ink) : ""}${k === "pp" ? doubleTag() : ""}`;
+      }
+      function backArt() {
+        let lattice = "";
+        for (let i = -160; i < 160; i += 14) lattice += line(`M${i} 0 L${i + 160} 160 M${i + 160} 0 L${i} 160`, "rgba(255,255,255,.09)", 2);
+        return `<rect x="1.5" y="1.5" width="97" height="157" rx="10" fill="#b81f2b" stroke="#7d121b" stroke-width="2"/>
+          <g clip-path="url(#hw-clip)">${lattice}</g>
+          <rect x="9" y="9" width="82" height="142" rx="7" fill="none" stroke="rgba(255,236,200,.55)" stroke-width="2"/>
+          ${circ(50, 80, 18, "rgba(255,236,200,.18)", `stroke="rgba(255,236,200,.6)" stroke-width="2"`)}${flower(50, 80, 11, 5, "rgba(255,236,200,.85)", "#b81f2b")}`;
+      }
+      let mounted = false;
+      function mount() { // 그림 묶음(<svg> symbol)을 문서에 한 번 넣는다
+        if (mounted || document.getElementById("hw-sprite")) { mounted = true; return; }
+        let defs = `<clipPath id="hw-clip"><rect x="6" y="6" width="88" height="148" rx="6"/></clipPath>`;
+        for (let c = 0; c < 48; c++) defs += `<symbol id="hw-${c}" viewBox="0 0 100 160">${art(c)}</symbol>`;
+        defs += `<symbol id="hw-back" viewBox="0 0 100 160">${backArt()}</symbol>`;
+        const holder = document.createElement("div");
+        holder.innerHTML = `<svg id="hw-sprite" xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" font-family="Pretendard, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif"><defs>${defs}</defs></svg>`;
+        document.body.prepend(holder.firstChild);
+        mounted = true;
+      }
+      // 패 한 장 — data-c 는 패 번호(움직임을 따라가는 이름). 뒷면은 key 로 이름을 붙인다
+      const card = (c, cls = "", style = "") => `<span class="hw ${cls}" data-c="${c}" role="img" aria-label="${name(c)}"${style ? ` style="${style}"` : ""}><svg viewBox="0 0 100 160"><use href="#hw-${c}"/></svg></span>`;
+      const back = (key, cls = "") => `<span class="hw is-back ${cls}" data-c="${key}" aria-hidden="true"><svg viewBox="0 0 100 160"><use href="#hw-back"/></svg></span>`;
+      return { KINDS, BIRDS, KOOKJIN, RAIN, HONG, CHUNG, CHO, MONTHS, GOAL, mon, kind, group, name, score, settle, sets, mount, card, back };
+    })();
+
+    // 사내 고스톱 — 둘이 치는 맞고. 동료에게 도전 → 수락 → 번갈아 치기, 또는 컴퓨터와. 점수는 판의 결과일 뿐(돈 · 내기 없음).
+    // 규칙 · 판정은 서버 엔진(backend/app/services/versus_gostop.py). 이 화면은 서버가 보낸 판(gs)을 그리고,
+    // 판에 실린 최근 행동(gs.log)을 한 단계씩 다시 보여 준다(낸 패 → 뒤집은 패 → 먹은 패 → 가져온 피).
+    // 상대 차례는 gs.replay(그 차례가 시작될 때의 판)에서 다시 볼 수 있다. 한 번 낼 때마다 기한은 24시간.
+    const GAME = "gostop";
+    const { esc, closedNote, due, fail } = HKMatch;
+    const PC_KEYS = matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const HOW_KEY = "hk-gostop-how"; // 「이렇게 해요」를 본 적 있으면 접어 둔다
+    const SEEN_KEY = "hk-gostop-seen"; // 판마다 마지막으로 본 seq — 상대가 둔 것을 처음 열 때 다시 보여 준다
+    const store = { get: (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* 저장 못 해도 그만 */ } } };
+    const sfx = (name, arg) => { try { HKSound.play(name, arg); } catch (_) { /* 소리는 부가 기능 */ } };
+    const clone = (o) => JSON.parse(JSON.stringify(o));
+    // 다시 보기 중에 판을 누르면 남은 움직임을 빨리 넘긴다
+    let skip = false, wake = null;
+    const pause = (ms) => new Promise((f) => { if (skip) return f(); const t = setTimeout(() => { wake = null; f(); }, ms); wake = () => { clearTimeout(t); wake = null; f(); }; });
+
+    let root = null, open = { open: true, opensAt: null }, match = null, view = null;
+    let sel = null, busy = false, pending = null, sending = false, timer = 0, waiter = null, modalOff = false, lastLevel = "normal";
+    // 화면 세대 — 목록 · 판을 새로 열 때마다 1씩 는다. 기다리던 응답 · 움직임은 시작할 때의 세대와 다르면 바로 손을 뗀다
+    // (움직임 도중 목록으로 나가거나 같은 판을 다시 열어도 옛 움직임이 새 화면을 건드리지 않게)
+    let gen = 0;
+    function fresh() { gen++; busy = false; pending = null; sending = false; skip = false; if (wake) wake(); }
+
+    // ---------- 규칙 ----------
+    const ICON = {
+      help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>`,
+      mute: (m) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4V5z"/>${m ? `<path d="m23 9-6 6M17 9l6 6"/>` : `<path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>`}</svg>`,
+    };
+    const cards = (list) => `<span class="gs-rule__cards">${list.map((c) => H.card(c)).join("")}</span>`;
+    function howHtml() {
+      const seen = store.get(HOW_KEY) === "1";
+      return `<details class="gs-how" id="gs-how" ${seen ? "" : "open"}><summary>${ICON.help.replace("<svg", `<svg width="18" height="18"`)} 이렇게 해요 <small>처음이면 1분만</small></summary><div class="gs-how__in"><ol>
+          <li><b>손패 1장을 내요.</b> 바닥에 <b>같은 달</b>(왼쪽 위 숫자) 패가 있으면 짝을 지어 가져와요. 없으면 바닥에 놓여요.
+            <div class="gs-how__demo">${H.card(8)}<span>+</span>${H.card(10)}<span>→ 내 것!</span></div></li>
+          <li>이어서 <b>더미 1장이 저절로 뒤집혀요.</b> 같은 달이 바닥에 있으면 그것도 가져와요.</li>
+          <li>가져온 패로 점수를 모아요 — <b>광</b>(빨간 도장) · <b>열끗</b>(금색 도장) · <b>띠</b> · <b>피</b>. 노란 테두리는 바닥에 짝이 있는 패예요.</li>
+          <li><b>7점</b>이 나면 <b>고</b>(계속 쳐서 더 크게) 또는 <b>스톱</b>(바로 이기기)을 골라요. 점수는 판의 결과일 뿐이에요.</li>
+        </ol><button type="button" class="hk-btn hk-btn--secondary gs-how__more" data-act="rules">규칙 자세히 보기</button></div></details>`;
+    }
+    function rulesHtml() {
+      const map = H.MONTHS.map((n, i) => `<div><em>${i + 1}월 ${n}</em>${[0, 1, 2, 3].map((k) => H.card(i * 4 + k)).join("")}</div>`).join("");
+      return `<div class="gs-rule">
+        <h3>패 48장</h3>
+        <ul>
+          <li>1월부터 12월까지 달마다 4장이에요. 왼쪽 위 숫자가 달이에요.</li>
+          <li>종류 — <b>광</b> 5장(빨간 「광」 도장) · <b>열끗</b> 9장(금색 「열」 도장) · <b>띠</b> 10장 · <b>피</b> 22장 · <b>쌍피</b> 2장(「쌍피」 꼬리표). 조커 · 보너스피는 없어요.</li>
+        </ul>
+        <div class="gs-deckmap">${map}</div>
+        <h3>패 나누기</h3>
+        <ul>
+          <li>손패 10장씩, 바닥 8장, 나머지 20장은 더미예요.</li>
+          <li>같은 달 4장이 한 사람 손이나 바닥에 모이면 다시 나눠요(총통은 없어요).</li>
+          <li>먼저 칠 사람은 무작위로 정해요. 한 번 낼 때마다 24시간 안에 내야 해요.</li>
+        </ul>
+        <h3>내 차례</h3>
+        <ul>
+          <li>손패 1장을 내요. 바닥에 같은 달이 1장이면 짝을 지어 가져오고, <b>2장이면 1장을 골라요</b>(종류가 같으면 저절로). 3장이면 4장을 다 가져와요. 없으면 바닥에 놓여요.</li>
+          <li>이어서 더미 맨 위 1장이 뒤집혀요. 뒤집은 패도 똑같이 짝을 지어요 — 바닥에 종류가 다른 2장이 있으면 고르라고 물어요.</li>
+        </ul>
+        <h3>특별한 일</h3>
+        <ul>
+          <li><b>쪽</b> — 짝 없이 낸 패에 뒤집은 패가 같은 달이면 두 장 다 가져와요. 상대 피 1장도.</li>
+          <li><b>뻑</b>(설사) — 낸 패로 짝을 지었는데 뒤집은 패도 같은 달이면 3장이 바닥에 그대로 남아요.</li>
+          <li><b>뻑 먹기</b> — 뻑으로 쌓인 3장을 나머지 1장으로 가져오면 4장 다 + 상대 피 1장. 내가 싼 뻑을 내가 가져오면 <b>자뻑</b>, 피 2장이에요.</li>
+          <li><b>따닥</b> — 바닥 같은 달 2장에 낸 패와 뒤집은 패까지 같은 달이면 4장 다 + 상대 피 1장.</li>
+          <li><b>쓸</b>(싹쓸이) — 내 차례가 끝났을 때 바닥이 비면 상대 피 1장.</li>
+          <li><b>흔들기</b> — 같은 달 3장을 들고 있고 바닥에 그 달이 없으면, 3장을 보여 주고 1장을 내요. 이기면 점수 ×2.</li>
+          <li><b>폭탄</b> — 같은 달 3장을 들고 바닥에 나머지 1장이 있으면 3장을 한꺼번에 내 4장 다 가져와요. 상대 피 1장 + 이기면 ×2. 손패가 2장 줄어든 만큼 두 번은 손패 없이 <b>더미만 뒤집을</b> 수 있어요.</li>
+          <li>가져오는 피는 1장짜리 피부터, 없으면 쌍피예요.</li>
+        </ul>
+        <h3>점수</h3>
+        <ul>
+          <li><b>광</b> ${cards([0, 8, 28, 40, 44])} 3장 3점(비광이 끼면 2점) · 4장 4점 · 5장 15점</li>
+          <li><b>열끗</b> 5장 1점, 1장마다 +1 · <b>고도리</b> ${cards(H.BIRDS)} 5점</li>
+          <li><b>띠</b> 5장 1점, 1장마다 +1 · <b>홍단</b> ${cards(H.HONG)} · <b>청단</b> ${cards(H.CHUNG)} · <b>초단</b> ${cards(H.CHO)} 각 3점</li>
+          <li><b>피</b> 10장 1점, 1장마다 +1 · <b>쌍피</b> ${cards([41, 47])}는 2장으로 세요</li>
+          <li><b>국진</b> ${cards([H.KOOKJIN])}(9월 열끗)은 열끗이나 쌍피 가운데 점수가 더 나는 쪽으로 저절로 세요.</li>
+        </ul>
+        <h3>고 · 스톱</h3>
+        <ul>
+          <li>내 점수가 <b>7점</b>이 되면 고 또는 스톱을 골라요. <b>스톱</b>하면 그 자리에서 이겨요.</li>
+          <li><b>고</b>하면 계속 쳐요 — 1고 +1점, 2고 +2점, 3고부터는 ×2, ×4…로 커져요. 고 한 뒤에는 그때보다 점수가 더 나야 다시 물어요.</li>
+          <li>마지막 손패를 내서 더 칠 차례가 없을 때 점수가 나면, 고를 묻지 않고 바로 스톱이에요(먼저 친 사람의 마지막 차례도 같아요).</li>
+        </ul>
+        <h3>박 · 곱하기 — 이긴 사람 점수에 하나마다 ×2</h3>
+        <ul>
+          <li><b>피박</b> — 피로 점수를 냈는데 상대 피가 5장 이하</li>
+          <li><b>광박</b> — 광으로 점수를 냈는데 상대 광이 0장</li>
+          <li><b>멍박</b>(멍따) — 내 열끗이 7장 이상</li>
+          <li><b>고박</b> — 상대가 고를 했는데 내가 스톱</li>
+          <li><b>흔들기 · 폭탄</b> — 한 번마다</li>
+        </ul>
+        <h3>나가리</h3>
+        <ul><li>더미가 다 떨어질 때까지 아무도 스톱하지 못하면 무승부예요. 첫뻑 · 연뻑 같은 보너스는 없어요.</li></ul>
+      </div>`;
+    }
+    function showRules() {
+      H.mount();
+      HKUI.layerModal("고스톱 규칙", (body, foot, close) => {
+        body.innerHTML = rulesHtml();
+        foot.innerHTML = `<button type="button" class="hk-btn hk-btn--primary" style="width:100%">알겠어요</button>`;
+        foot.querySelector("button").onclick = close;
+      });
+    }
+
+    // ---------- 목록 ----------
+    function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
+    async function showLobby() {
+      stopPoll(); fresh(); match = null; view = null; sel = null;
+      const g = gen;
+      H.mount();
+      const hero = `<div class="gs-hero" aria-hidden="true">${[0, 8, 28, 40, 44].map((c) => H.card(c)).join("")}</div>`;
+      const o = await HKMatch.lobby(root, GAME, {
+        title: "사내 고스톱",
+        lead: "둘이 치는 맞고예요. 동료에게 도전장을 보내거나 컴퓨터와 쳐요. 점수는 판의 결과일 뿐이고, 판이 끝나면 오늘 도장을 받아요.",
+        intro: hero + howHtml(),
+        labels: { bot: "컴퓨터와 치기" },
+        botNote: "바로 시작해요. 처음이면 「쉬움」부터 쳐 보세요. 컴퓨터전은 순위에 넣지 않아요.",
+        rankNote: "기권·시간 초과는 둘이 합쳐 10차례 이상 친 판만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요. 나가리는 무승부예요.",
+        rankEmpty: "아직 끝난 판이 없어요",
+        rowNote: (m) => `${m.gs ? `나 ${m.gs.score[0]}점 · 상대 ${m.gs.score[1]}점 · ` : ""}${due(m.deadlineAt)}`,
+        resultNote: (m) => `${HKMatch.reason(m)}${m.gs && m.gs.points ? ` · ${m.gs.points}점` : ""}`,
+      });
+      if (g !== gen) return; // 기다리는 사이 판을 열었다
+      open = o;
+      root.querySelector(".gk__back")?.insertAdjacentHTML("afterend", `<a class="gk__back" href="/together" style="margin-left:14px">함께하기 ›</a>`);
+      const how = document.getElementById("gs-how");
+      if (how) how.addEventListener("toggle", () => store.set(HOW_KEY, "1"));
+    }
+
+    // ---------- 판 그리기 ----------
+    const myTurnNow = () => !!(match && match.status === "ACTIVE" && match.myTurn && open.open && !busy && !sending);
+    const floorOf = (v, m) => v.floor.filter((c) => H.mon(c) === m);
+    const handOf = (v, m) => v.hand.filter((c) => H.mon(c) === m);
+    const rivalWho = () => (match && match.bot ? "컴퓨터" : "상대");
+    // 고른 손패로 무엇을 할 수 있는지 — 바닥 2장의 종류가 다르면 먹을 패를 골라야 한다
+    function plan(v, c) {
+      const m = H.mon(c), before = floorOf(v, m), mine = handOf(v, m);
+      return {
+        before,
+        choose: before.length === 2 && H.kind(before[0]) !== H.kind(before[1]),
+        bomb: mine.length === 3 && before.length === 1,
+        shake: mine.length === 3 && before.length === 0 && !(v.shook || []).includes(m),
+      };
+    }
+    const GOALS = { g: 3, y: 5, t: 5, p: 10 };
+    const KIND_LABEL = { g: "광", y: "열끗", t: "띠", p: "피", pp: "쌍피" };
+    function pileHtml(pile, theirs) {
+      if (!pile.length) return `<span class="gs-pile__empty">먹은 패 없음</span>`;
+      const groups = { g: [], y: [], t: [], p: [] };
+      pile.forEach((c) => groups[H.group(c)].push(c));
+      const label = { g: "광", y: "열끗", t: "띠", p: "피" };
+      const s = H.score(pile);
+      const html = ["g", "y", "t", "p"].filter((k) => groups[k].length).map((k) => {
+        const on = s[k] > 0;
+        return `<div class="gs-grp" data-g="${k}"><div class="gs-grp__cards">${groups[k].map((c) => H.card(c)).join("")}</div><span class="gs-grp__n ${on ? "is-on" : ""}">${label[k]}<b>${s.n[k]}${on ? "" : `<i>/${GOALS[k]}</i>`}</b></span></div>`;
+      }).join("");
+      // 묶음 — 2장 모은 것(상대가 한 장도 없을 때)과 다 모은 것
+      const chips = H.sets(pile, theirs).filter((x) => x.have === 3 || (x.have === 2 && !x.dead))
+        .map((x) => `<span class="gs-chip ${x.have === 3 ? "is-done" : ""}">${x.name} ${x.have === 3 ? "완성" : "2/3"}</span>`).join("");
+      return html + (chips ? `<div class="gs-chips">${chips}</div>` : "");
+    }
+    function ptsHtml(pile, side) {
+      const s = H.score(pile).total;
+      const badges = [];
+      if (side.go) badges.push(`<span class="gs-badge">${side.go}고</span>`);
+      (side.shake || []).forEach((x) => badges.push(`<span class="gs-badge is-red">${esc(x)}</span>`));
+      const sub = s >= H.GOAL ? "" : `<small>${H.GOAL - s}점 더</small>`;
+      return `<div class="gs-pts ${s >= H.GOAL ? "is-hot" : ""}"><b>${s}<span style="font-size:.5em">점</span></b>${sub}${badges.length ? `<div class="gs-badges">${badges.join("")}</div>` : ""}</div>`;
+    }
+    function boardHtml(v, say) {
+      const live = !say && match.status === "ACTIVE";
+      const mine = live && match.myTurn && open.open;
+      const playing = mine && v.phase === "play";
+      const p = playing && sel != null ? plan(v, sel) : null;
+      const pick = mine && v.phase === "pick" && v.pick ? v.pick : null;
+      const rivalPick = live && !match.myTurn && v.phase === "pick" && v.pick ? v.pick : null;
+      let slots = "";
+      for (let m = 1; m <= 12; m++) {
+        const cs = floorOf(v, m);
+        if (!cs.length) continue;
+        const st = v.stack && v.stack[String(m)];
+        const step = cs.length > 3 ? `(var(--off) * 2 / ${cs.length - 1})` : "var(--off)";
+        slots += `<div class="gs-slot ${cs.length >= 3 && st ? `is-stack ${st === "me" ? "is-mine" : ""}` : ""}" data-m="${m}">${cs.map((c, i) => {
+          let cls = "";
+          if (p && H.mon(c) === H.mon(sel)) cls = p.choose ? "is-choice" : "is-hint";
+          if (pick && pick.opts.includes(c)) cls = "is-choice";
+          if ((pick && pick.card === c) || (rivalPick && rivalPick.card === c)) cls = "is-flipped";
+          return H.card(c, cls, `left:calc(var(--fw) * ${step} * ${i});top:${i * 3}px`);
+        }).join("")}</div>`;
+      }
+      const nDeck = Math.min(3, v.deck);
+      const deckBacks = Array.from({ length: nDeck }, (_, i) => H.back(i === nDeck - 1 ? "deck" : `deck${i}`)).join("");
+      const canFlip = playing && v.mine.bombs > 0;
+      // 끝난 판은 상대가 들고 있던 패를 펼쳐 보여 준다
+      const shown = match.status === "DONE" && v.rivalHandCards;
+      const backs = shown ? v.rivalHandCards.map((c) => H.card(c)).join("") : Array.from({ length: v.rivalHand }, (_, i) => H.back(`rb${i}`)).join("");
+      const hand = v.hand.map((c) => {
+        let cls = "";
+        if (playing) { cls = floorOf(v, H.mon(c)).length ? "is-match" : ""; if (sel === c) cls += " is-sel"; }
+        else if (live || say) cls = "is-dim";
+        return H.card(c, cls);
+      }).join("");
+      const turn = say ? v.turn : match.status === "ACTIVE" ? v.turn : null;
+      return `<div class="gs-zone is-rival ${turn === "rival" ? "is-turn" : ""}">
+          <div class="gs-backs ${shown ? "is-open" : ""}" aria-label="${shown ? "상대가 들고 있던 패" : `상대 손패 ${v.rivalHand}장`}">${backs}</div>
+          <div class="gs-pile" aria-label="상대가 먹은 패">${pileHtml(v.rivalPile, v.pile)}</div>
+          ${ptsHtml(v.rivalPile, v.rival)}
+        </div>
+        <div class="gs-floor" aria-label="바닥">${slots}
+          <button type="button" class="gs-deck ${canFlip ? "is-go" : ""}" data-act="${canFlip ? "flip" : ""}" aria-label="더미 ${v.deck}장${canFlip ? " — 눌러서 더미만 뒤집기" : ""}">${deckBacks}<span class="gs-deck__n"><i>더미</i> ${v.deck}</span></button>
+        </div>
+        <div class="gs-zone is-me ${turn === "me" ? "is-turn" : ""}">
+          <div class="gs-pile" aria-label="내가 먹은 패">${pileHtml(v.pile, v.rivalPile)}</div>
+          ${ptsHtml(v.pile, v.mine)}
+        </div>
+        <div class="gs-ask" id="gs-ask">${askHtml(v, say, p, pick)}</div>
+        <div class="gs-hand ${playing ? "" : "is-idle"}" aria-label="내 손패">${hand || `<span class="gs-pile__empty">손패를 다 냈어요</span>`}</div>`;
+    }
+    function askHtml(v, say, p, pick) {
+      const msg = (t, s) => `<div class="gs-ask__msg">${t}${s ? `<small>${s}</small>` : ""}</div>`;
+      if (say) return msg(esc(say)) + (busy ? `<button type="button" class="gs-btn gs-btn--ghost" data-act="skip">빨리 넘기기 »</button>` : "");
+      const again = v.replay ? `<button type="button" class="gs-btn gs-btn--ghost" data-act="again-turn">↻ ${rivalWho()} 차례 다시 보기</button>` : "";
+      if (match.status === "DONE") return msg(match.result === "win" ? "이겼어요!" : match.result === "lose" ? "졌어요" : "비겼어요") + `<button type="button" class="gs-btn gs-btn--ghost" data-act="result">결과 보기</button>` + again;
+      if (match.status !== "ACTIVE") return msg("");
+      if (!open.open) return msg(`${esc(open.opensAt || "")}부터 낼 수 있어요`) + again;
+      if (!match.myTurn) {
+        const who = rivalWho();
+        return msg(v.phase === "gostop" ? `${who}가 고·스톱을 고르는 중…` : v.phase === "pick" ? `${who}가 먹을 패를 고르는 중…` : `${who} 차례예요`, match.bot ? "" : "내면 바로 보여 드려요");
+      }
+      if (v.phase === "gostop") return msg("고? 스톱?") + `<button type="button" class="gs-btn gs-btn--go" data-act="ask-go">고르기</button>`;
+      const opts = (list, key) => `<div class="gs-opts">${list.map((c) => `<button type="button" class="gs-opt" data-${key}="${c}" aria-label="${H.name(c)} 먹기">${H.card(c)}${KIND_LABEL[H.kind(c)]}</button>`).join("")}</div>`;
+      if (pick) return msg("뒤집은 패로 무엇을 먹을까요?", "바닥의 같은 달 두 장 가운데 하나") + opts(pick.opts, "pick");
+      const flipBtn = v.mine.bombs > 0 ? `<button type="button" class="gs-btn gs-btn--alt" data-act="flip">더미만 뒤집기 (${v.mine.bombs}번 남음)</button>` : "";
+      if (sel == null) return msg("낼 패를 골라요", PC_KEYS ? "패를 누르거나 숫자 키 1~0 · 노란 테두리는 바닥에 짝이 있는 패" : "노란 표시는 바닥에 짝이 있는 패") + flipBtn + again;
+      if (p.choose) return msg("무엇을 먹을까요?", "바닥의 같은 달 두 장 가운데 하나") + opts(p.before, "take") + `<button type="button" class="gs-btn gs-btn--alt" data-act="unsel">다른 패</button>`;
+      const what = p.before.length === 0 ? "짝이 없어 바닥에 놓여요" : p.before.length === 3 ? "4장을 다 가져와요!" : "바닥 패와 짝을 지어요";
+      return msg(what) +
+        (p.bomb ? `<button type="button" class="gs-btn gs-btn--red" data-act="bomb">폭탄! 3장 한꺼번에</button>` : "") +
+        (p.shake ? `<button type="button" class="gs-btn gs-btn--red" data-act="shake">흔들고 내요 (이기면 ×2)</button>` : "") +
+        `<button type="button" class="gs-btn gs-btn--go" data-act="play">${p.bomb || p.shake ? "1장만 내요" : "이 패 내요"}</button>`;
+    }
+
+    // ---------- 움직임 — 바뀌기 전 자리에서 새 자리로 미끄러지게(FLIP) ----------
+    function rects() {
+      const map = new Map();
+      const b = document.getElementById("gs-board");
+      if (b) b.querySelectorAll("[data-c]").forEach((el) => map.set(el.dataset.c, el.getBoundingClientRect()));
+      return map;
+    }
+    function animateFrom(before, hints = {}, flipIn = []) {
+      const b = document.getElementById("gs-board");
+      if (!b || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      b.querySelectorAll("[data-c]").forEach((el) => {
+        const key = el.dataset.c;
+        const r0 = before.get(key) || hints[key];
+        if (flipIn.includes(Number(key)) && /^\d+$/.test(key)) el.classList.add("is-flipin");
+        if (!r0) return;
+        const r1 = el.getBoundingClientRect();
+        const dx = r0.left - r1.left, dy = r0.top - r1.top, s = r0.width / (r1.width || 1);
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && Math.abs(s - 1) < 0.02) return;
+        el.style.transition = "none";
+        el.style.transformOrigin = "0 0";
+        el.style.transform = `translate(${dx}px, ${dy}px) scale(${s})`;
+        el.classList.add("is-moving");
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          el.style.transition = "transform .36s cubic-bezier(.22,.8,.26,1)";
+          el.style.transform = "";
+          setTimeout(() => el.classList.remove("is-moving"), 380);
+        }));
+      });
+    }
+    function renderBoard(say = "", hints, flipIn) {
+      const b = document.getElementById("gs-board");
+      if (!b || !view) return;
+      const before = hints ? rects() : null;
+      b.innerHTML = boardHtml(view, say);
+      if (before) animateFrom(before, hints(before), flipIn);
+      paintHead();
+    }
+    function banner(text, opts = {}) {
+      const el = document.getElementById("gs-banner");
+      if (!el) return;
+      el.innerHTML = `<div class="gs-banner__t ${opts.bad ? "is-bad" : ""}">${esc(text)}${opts.sub ? `<small>${esc(opts.sub)}</small>` : ""}${opts.cards ? `<div class="gs-banner__cards">${opts.cards.map((c) => H.card(c)).join("")}</div>` : ""}</div>`;
+      const ms = skip ? 300 : opts.ms || 900;
+      clearTimeout(banner.t);
+      banner.until = Date.now() + ms;
+      banner.t = setTimeout(() => { el.innerHTML = ""; }, ms);
+    }
+    function clearBanner() {
+      clearTimeout(banner.t);
+      banner.until = 0;
+      const el = document.getElementById("gs-banner");
+      if (el) el.innerHTML = "";
+    }
+    const EVENT_SOUND = { 쪽: "combo", 따닥: "combo", 쓸: "line", 폭탄: "explode", 흔들기: "powerup", 뻑: "fail", "뻑 먹기": "coin", 자뻑: "coin", 나가리: "lose" };
+    const EVENT_LABEL = { 쓸: "싹쓸이" };
+    const EVENT_SUB = { 쪽: "상대 피 1장", 따닥: "4장 다 + 상대 피 1장", 쓸: "바닥을 다 비웠어요", "뻑 먹기": "4장 다 + 상대 피 1장", 자뻑: "4장 다 + 상대 피 2장", 뻑: "3장이 바닥에 남아요", 폭탄: "4장 다 + 피 1장 · ×2", 나가리: "아무도 나지 못했어요" };
+    // 최근 행동 한 개(e)를 단계별로 보여 준다 — view 를 한 단계씩 바꾸고 그린다.
+    // g = 시작할 때의 화면 세대. 기다린 뒤 세대가 바뀌었으면(화면을 떠남 · 새로 엶) false 를 돌려주고 멈춘다
+    async function replay(e, g) {
+      const step = async (ms) => { await pause(ms); return g === gen; };
+      const who = e.me ? "나" : rivalWho();
+      const say = e.me ? "짝을 맞춰 보는 중…" : `${who} 차례`;
+      const side = e.me ? view.mine : view.rival;
+      view.turn = e.me ? "me" : "rival";
+      if (!e.me && e.s.some((x) => x[0] === "hand" || x[0] === "bomb" || x[0] === "flip")) { renderBoard(`${who} 차례예요`); if (!(await step(360))) return false; }
+      for (const x of e.s) {
+        const k = x[0];
+        if (k === "ev") {
+          const [, name, m] = x;
+          if (name === "뻑" && m) view.stack[String(m)] = e.me ? "me" : "rival";
+          if ((name === "뻑 먹기" || name === "자뻑") && m) delete view.stack[String(m)];
+          if (name === "흔들기" || name === "폭탄") side.shake = [...(side.shake || []), name];
+          if (name === "폭탄") side.bombs = (side.bombs || 0) + 2;
+          if (name === "흔들기") { renderBoard(say); if (!(await step(260))) return false; continue; } // 큰 글씨는 바로 앞 shake 단계에서 한 번만
+          const good = ["쪽", "따닥", "쓸", "뻑 먹기", "자뻑", "폭탄"].includes(name);
+          banner(`${EVENT_LABEL[name] || name}!`, { bad: (name === "뻑" && e.me) || name === "나가리" || (good && !e.me), sub: EVENT_SUB[name] });
+          sfx(EVENT_SOUND[name] || "pop", 3);
+          renderBoard(say);
+          if (!(await step(760))) return false;
+          continue;
+        }
+        if (k === "shake") {
+          banner(e.me ? "흔들었어요!" : `${who}가 흔들었어요!`, { sub: e.me ? "이기면 점수 ×2" : "같은 달 3장을 보여 줬어요", cards: x[1], ms: 1300 });
+          sfx("powerup");
+          if (!(await step(1200))) return false;
+          continue;
+        }
+        if (k === "go") { side.go = x[1]; banner(`${x[1]}고!`, { sub: e.me ? "계속 쳐요" : `${who}가 계속 쳐요` }); sfx("go"); renderBoard(say); if (!(await step(900))) return false; continue; }
+        if (k === "stop") {
+          // 패를 내거나 고른 행동 끝에 바로 스톱 — 더 칠 차례가 없어 고를 묻지 않았다(고 · 스톱 창에서 고른 스톱은 단계가 하나뿐)
+          const auto = e.s.some((y) => y[0] !== "stop");
+          banner("스톱!", { sub: auto ? `${x[1]}점 · 더 칠 차례가 없어 바로 스톱` : `${x[1]}점` });
+          sfx("success");
+          if (!(await step(900))) return false;
+          continue;
+        }
+        let flipIn = [];
+        let hint = () => ({});
+        if (k === "hand" || k === "bomb") {
+          const cs = k === "hand" ? [x[1]] : x[1];
+          if (e.me) view.hand = view.hand.filter((c) => !cs.includes(c));
+          else {
+            const n = view.rivalHand;
+            view.rivalHand = Math.max(0, n - cs.length);
+            hint = (before) => Object.fromEntries(cs.map((c, i) => [c, before.get(`rb${Math.max(0, n - 1 - i)}`)]));
+            flipIn = cs;
+          }
+          view.floor.push(...cs);
+          sfx("drop");
+        } else if (k === "flip") {
+          if (!e.s.some((y) => y[0] === "hand" || y[0] === "bomb")) side.bombs = Math.max(0, (side.bombs || 0) - 1); // 더미만 뒤집기
+          view.deck = Math.max(0, view.deck - 1);
+          view.floor.push(x[1]);
+          hint = (before) => ({ [x[1]]: before.get("deck") });
+          flipIn = [x[1]];
+          sfx("swap");
+        } else if (k === "take") {
+          view.floor = view.floor.filter((c) => !x[1].includes(c));
+          (e.me ? view.pile : view.rivalPile).push(...x[1]);
+          sfx("pop");
+        } else if (k === "steal") {
+          const from = e.me ? "rivalPile" : "pile", to = e.me ? "pile" : "rivalPile";
+          view[from] = view[from].filter((c) => !x[1].includes(c));
+          view[to].push(...x[1]);
+          banner(e.me ? `피 ${x[1].length}장 가져와요` : `피 ${x[1].length}장 뺏겼어요`, { bad: !e.me, ms: 700 });
+          sfx("coin");
+        } else continue;
+        renderBoard(say, hint, flipIn);
+        if (!(await step(k === "take" || k === "steal" ? 470 : 430))) return false;
+      }
+      return true;
+    }
+    // 여러 행동을 차례로 보여 준다 — 화면을 떠나면 false(새 화면이 이어받는다)
+    async function play(entries, g, keepSkip = false) {
+      busy = true;
+      if (!keepSkip) skip = false;
+      for (const e of entries) {
+        if (!(await replay(e, g))) return false;
+      }
+      // 마지막 큰 글씨(피 가져오기 등)가 다 보일 때까지 기다렸다가 지운다 — 내 차례 판 · 고 · 스톱 창 위에 남지 않게
+      const left = (banner.until || 0) - Date.now();
+      if (left > 0 && !skip) { await pause(left); if (g !== gen) return false; }
+      clearBanner();
+      busy = false; skip = false;
+      return true;
+    }
+    // 서버가 돌려준 새 판 — 내가 본 판 다음 행동들이 이어져 있으면 하나씩 보여 주고, 아니면 바로 그린다.
+    // g = 이 응답을 기다리기 시작한 화면 세대 — 그새 화면을 떠났으면 아무것도 하지 않는다
+    async function absorb(next, g = gen) {
+      if (g !== gen || !match) return;
+      if (busy) { pending = next; return; }
+      const prev = match;
+      const same = prev.id === next.id && view && next.gs;
+      const entries = same ? (next.gs.log || []).filter((e) => e.v > prev.seq) : [];
+      const linked = entries.length && entries[0].v === prev.seq + 1;
+      match = next;
+      sel = null;
+      if (linked && !(await play(entries, g))) return;
+      if (g !== gen) return;
+      settleView(prev);
+      if (pending) { const p = pending; pending = null; absorb(p, g); return; }
+      schedulePoll();
+    }
+    // 그린 판을 서버 판으로 맞춘다
+    function settleView(prev) {
+      view = match.gs ? clone(match.gs) : null;
+      if (!prev || prev.status !== match.status) paintMatch(prev);
+      else { renderBoard(); afterPaint(prev); }
+    }
+    // 상대 차례를 처음부터 다시 — 그 차례가 시작될 때의 판(gs.replay)에서 log 를 차례로 보여 준다
+    async function replayTurn() {
+      const g0 = gen;
+      const g = match && match.gs;
+      if (!g || !g.replay || busy || sending) return;
+      const r = g.replay;
+      const entries = (g.log || []).filter((e) => e.v > r.v);
+      if (!entries.length) return;
+      // 그 뒤에 내가 낸 패는 내 손으로 되돌린다(손패는 늘 번호 순)
+      const played = entries.filter((e) => e.me).flatMap((e) => e.s.filter((x) => x[0] === "hand" || x[0] === "bomb").flatMap((x) => (x[0] === "hand" ? [x[1]] : x[1])));
+      document.getElementById("gs-modal")?.classList.remove("is-open");
+      view = { ...clone(g), floor: [...r.floor], pile: [...r.pile], rivalPile: [...r.rivalPile], rivalHand: r.rivalHand, deck: r.deck,
+        mine: clone(r.mine), rival: clone(r.rival), stack: { ...r.stack }, hand: [...g.hand, ...played].sort((a, b) => a - b), phase: "play", pick: null, turn: "rival", rivalHandCards: null };
+      sel = null;
+      busy = true; skip = false;
+      renderBoard(`${rivalWho()} 차례를 다시 보여 드려요`);
+      await pause(650);
+      if (g0 !== gen || !(await play(entries, g0, true)) || g0 !== gen) return;
+      settleView(match);
+      if (pending) { const p = pending; pending = null; absorb(p, g0); return; } // 다시 보는 사이 받은 판(상대 기권 등)
+      schedulePoll();
+    }
+    // 그린 뒤 — 고 · 스톱 물어보기, 결과, 소리, 본 seq 남기기
+    function afterPaint(prev) {
+      const modal = document.getElementById("gs-modal");
+      if (!modal) return;
+      markSeen();
+      const g = match.gs;
+      if (match.status === "DONE") {
+        if (!modalOff) openResult();
+        if (prev && prev.status === "ACTIVE") sfx(match.result === "win" ? "win" : match.result === "lose" ? "lose" : "fail");
+        // 도장 알림은 한 번만 — 다시 보기 뒤에 판을 새로 그려도 또 띄우지 않는다
+        if (match.stamp && match.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${match.stamp.count}/${match.stamp.goal})`);
+        match.stamp = null;
+      } else if (g && match.myTurn && g.phase === "gostop" && open.open) openGoStop();
+      else modal.classList.remove("is-open");
+    }
+    function seenMap() { try { return JSON.parse(store.get(SEEN_KEY) || "{}") || {}; } catch (_) { return {}; } }
+    function markSeen() {
+      if (!match || !match.gs || busy) return;
+      const map = seenMap();
+      map[match.id] = match.seq;
+      const keys = Object.keys(map);
+      if (keys.length > 30) keys.sort((a, b) => Number(a) - Number(b)).slice(0, keys.length - 30).forEach((k) => delete map[k]);
+      store.set(SEEN_KEY, JSON.stringify(map));
+    }
+
+    // ---------- 고 · 스톱 · 결과 창 ----------
+    function openGoStop() {
+      const g = view;
+      const pv = H.settle(g.pile, g.rivalPile, g.mine.go, g.rival.go, g.mine.shake || []);
+      const modal = document.getElementById("gs-modal");
+      const next = g.mine.go + 1;
+      const rs = H.score(g.rivalPile).total;
+      modal.innerHTML = `<div class="gs-card" role="dialog" aria-label="고 또는 스톱">
+          <h2>${H.score(g.pile).total}점 났어요!</h2>
+          <div class="gs-big">고? 스톱?</div>
+          <p><b>스톱</b>하면 지금 이겨요 — <b>${pv.points}점</b>${pv.mults.length ? ` (${esc(pv.mults.join(" · "))} ×${2 ** pv.mults.length})` : ""}.<br>
+            <b>고</b>하면 계속 쳐요(${next}고 ${next <= 2 ? `+${next}점` : `×${2 ** (next - 2)}`}). 그사이 ${rivalWho()}가 먼저 7점을 내 스톱하면 고박으로 져요.</p>
+          <div class="gs-odds"><span>${rivalWho()} ${rs}점</span><span>더미 ${g.deck}장 남음</span></div>
+          <div class="gs-card__btns">
+            <button type="button" class="gs-btn gs-btn--alt" data-act="stop">스톱${PC_KEYS ? " (S)" : ""}</button>
+            <button type="button" class="gs-btn gs-btn--go" data-act="go">${next}고!${PC_KEYS ? " (G)" : ""}</button>
+          </div></div>`;
+      modal.classList.add("is-open");
+    }
+    // 점수 풀이 — 종류별 점수 · 고 · 박을 줄마다
+    function breakdown(e, pile) {
+      const p = e.parts || {}, n = e.n || {};
+      const done = H.sets(pile).filter((x) => x.have === 3).map((x) => x.name);
+      const rows = [];
+      if (p.g) rows.push([`광 ${n.g}장${n.g === 3 && pile.includes(H.RAIN) ? " (비광)" : ""}`, `${p.g}점`]);
+      if (p.y) rows.push([`열끗 ${n.y}장${done.includes("고도리") ? " · 고도리" : ""}`, `${p.y}점`]);
+      if (p.t) rows.push([`띠 ${n.t}장${done.filter((x) => x !== "고도리").map((x) => ` · ${x}`).join("")}`, `${p.t}점`]);
+      if (p.p) rows.push([`피 ${n.p}장`, `${p.p}점`]);
+      let html = rows.map(([a, b]) => `<div><span>${esc(a)}</span><b>${esc(b)}</b></div>`).join("");
+      html += `<div class="is-sum"><span>점수</span><b>${e.base}점</b></div>`;
+      if (e.go) html += `<div><span>${e.go}고</span><b>+${Math.min(e.go, 2)}점${e.go >= 3 ? ` · ×${2 ** (e.go - 2)}` : ""}</b></div>`;
+      (e.mults || []).forEach((x) => { html += `<div class="is-mult"><span>${esc(x)}</span><b>×2</b></div>`; });
+      // 계산식 — 고 점수를 더한 뒤 곱하므로, 곱하기가 있으면 덧셈을 괄호로 묶는다. 예: (9 + 1) × 2 = 20점
+      const muls = [...(e.go >= 3 ? [2 ** (e.go - 2)] : []), ...(e.mults || []).map(() => 2)];
+      const sum = e.go ? `${e.base} + ${Math.min(e.go, 2)}` : `${e.base}`;
+      const formula = `${e.go && muls.length ? `(${sum})` : sum}${muls.map((x) => ` × ${x}`).join("")} = ${e.points}점`;
+      return `<div class="gs-rows">${html}</div>${e.go || (e.mults || []).length ? `<div class="gs-formula">${esc(formula)}</div>` : ""}`;
+    }
+    function openResult() {
+      const modal = document.getElementById("gs-modal");
+      const g = match.gs || {};
+      const e = g.end;
+      const r = match.result;
+      const title = r === "win" ? "이겼어요!" : r === "lose" ? "졌어요" : "비겼어요";
+      let body;
+      if (e && e.nagari) body = `<p>더미가 다 떨어질 때까지 아무도 스톱하지 못했어요 — <b>나가리</b>(무승부)예요.</p>`;
+      else if (e && e.points) {
+        const mine = e.winner === "me";
+        body = `<div class="gs-big">${e.points}점</div><p>${mine ? "내가" : `${rivalWho()}가`} 스톱했어요</p>${breakdown(e, mine ? g.pile : g.rivalPile)}`;
+      } else if (match.endReason === "RESIGN") body = `<p>${r === "win" ? `${rivalWho()}가 기권했어요.` : "기권했어요."}</p>`;
+      else if (match.endReason === "TIMEOUT") body = `<p>${r === "win" ? `${rivalWho()}의 시간이 다 됐어요.` : "낼 시간이 다 됐어요."}</p>`;
+      else body = `<p>${HKMatch.reason(match) ? `${esc(HKMatch.reason(match))} — ` : ""}판이 끝났어요.</p>`;
+      const next = match.bot ? `<button type="button" class="gs-btn gs-btn--go" data-act="again">한 판 더</button>`
+        : match.opponent && match.opponent.id ? `<button type="button" class="gs-btn gs-btn--go" data-act="rematch">다시 도전</button>`
+        : `<button type="button" class="gs-btn gs-btn--go" data-act="list">대국 목록</button>`;
+      modal.innerHTML = `<div class="gs-card is-${r}" role="dialog" aria-label="결과">
+          <h2>${title}</h2>${body}
+          <div class="gs-card__btns"><button type="button" class="gs-btn gs-btn--alt" data-act="look">판 보기</button>${next}</div></div>`;
+      modal.classList.add("is-open");
+    }
+
+    // ---------- 판 화면 ----------
+    function statusText() {
+      if (busy && view) return view.turn === "me" ? "내 차례" : `${rivalWho()} 차례`;
+      if (match.status === "DONE") return { win: "이겼어요", lose: "졌어요", draw: "비겼어요" }[match.result];
+      if (match.status === "ACTIVE") {
+        if (!match.myTurn) return `${rivalWho()} 차례`;
+        return match.gs && match.gs.phase === "gostop" ? "고? 스톱?" : "내 차례";
+      }
+      if (match.status === "PENDING") return match.incoming ? "받은 도전" : "수락 기다리는 중";
+      return match.status === "DECLINED" ? "취소된 도전" : "만료된 도전";
+    }
+    function paintHead() {
+      const head = document.getElementById("gs-head");
+      if (!head || !match) return;
+      const g = view || match.gs;
+      const sub = (pile, side) => (pile ? `${H.score(pile).total}점${side && side.go ? ` · ${side.go}고` : ""}` : "");
+      const m = busy && view && match.status === "ACTIVE" ? { ...match, myTurn: view.turn === "me", rivalTurn: view.turn === "rival" } : match;
+      head.innerHTML = HKMatch.versus(m, statusText(), g ? { me: sub(g.pile, g.mine), rival: sub(g.rivalPile, g.rival) } : {});
+    }
+    const muteBtn = () => { const m = HKSound.isMuted(); return `${ICON.mute(m)}<span>${m ? "소리 꺼짐" : "소리 켜짐"}</span>`; };
+    function paintMatch(prev = null) {
+      H.mount();
+      const muted = HKSound.isMuted();
+      const active = match.status === "ACTIVE";
+      const note = active ? `이번 차례 ${due(match.deadlineAt)}` : "";
+      const pendingBox = match.status === "PENDING"
+        ? `<div class="gs-pending"><p>${match.incoming ? "도전장을 받았어요. 수락하면 바로 시작해요." : "상대가 수락하기를 기다리고 있어요."}</p>
+            ${match.incoming ? `<button type="button" class="gs-btn gs-btn--go" data-act="accept" ${open.open ? "" : "disabled"}>수락</button> <button type="button" class="gs-btn gs-btn--alt" data-act="decline">거절</button>`
+              : `<button type="button" class="gs-btn gs-btn--alt" data-act="decline">도전 취소</button>`}</div>`
+        : !active && match.status !== "DONE" ? `<div class="gs-pending"><p>${esc(statusText())}이에요.</p><button type="button" class="gs-btn gs-btn--alt" data-act="list">대국 목록</button></div>` : "";
+      root.innerHTML = `<div class="gs">
+          <div class="gs__top"><a class="gk__back" href="#">‹ 대국 목록</a>
+            <button type="button" class="gs__tool" data-act="rules" aria-label="규칙 보기">${ICON.help}<span>규칙</span></button>
+            <button type="button" class="gs__tool gs__mute" data-act="mute" aria-label="소리 ${muted ? "켜기" : "끄기"}">${muteBtn()}</button></div>
+          ${closedNote(open)}
+          <div id="gs-head"></div>
+          ${pendingBox || `<div class="gs-felt"><div class="gs-board" id="gs-board"></div><div class="gs-banner" id="gs-banner" aria-live="polite"></div><div class="gs-modal" id="gs-modal"></div></div>
+            <div class="gs__bar"><span class="gs__note">${esc(note)}${PC_KEYS && active ? ` <span class="gs__keys">· 숫자 1~0 패 고르기 · Enter 내요 · G 고 · S 스톱</span>` : ""}</span>
+              ${active ? `<button type="button" class="hk-btn hk-btn--secondary" data-act="resign" ${open.open ? "" : "disabled"}>기권</button>` : ""}</div>`}
+        </div>`;
+      paintHead();
+      renderBoard();
+      afterPaint(prev);
+    }
+    // 서버에서 판이 바뀔 때까지 기다린다 — 상대가 내는 즉시 깨어나 움직임을 보여 준다. 화면이 보일 때만.
+    // 내 차례에도 기다린다 — 그사이 상대가 기권하거나 기한이 지나 판이 끝나면 바로 보이게(낼 때는 send 가 먼저 멈춘다)
+    function schedulePoll(delay = 0) {
+      stopPoll();
+      if (!match || match.status === "DONE" || match.status === "DECLINED" || match.status === "EXPIRED" || match.bot) return; // 컴퓨터전은 내 요청 안에서 컴퓨터가 함께 둔다 — 기다릴 것이 없다
+      const g = gen;
+      timer = setTimeout(async () => {
+        timer = 0;
+        if (document.hidden || !match || g !== gen) return;
+        const id = match.id, ctl = new AbortController();
+        waiter = ctl;
+        let next;
+        try { next = await HKApi.matchWait(id, match.seq, match.status, ctl.signal); }
+        catch (_) { if (waiter === ctl) { waiter = null; schedulePoll(3000); } return; }
+        if (waiter !== ctl || g !== gen || !match || match.id !== id) return;
+        waiter = null;
+        if (next.seq !== match.seq || next.status !== match.status) {
+          if (next.status !== match.status && (match.status === "PENDING" || !next.gs)) { match = next; view = next.gs ? clone(next.gs) : null; paintMatch(); schedulePoll(); return; }
+          absorb(next, g);
+        } else { match = next; schedulePoll(); }
+      }, delay);
+    }
+    async function showMatch(id) {
+      stopPoll(); fresh(); sel = null; modalOff = false;
+      const g0 = gen;
+      store.set(HOW_KEY, "1"); // 한 판을 열어 봤으면 「이렇게 해요」는 접어 둔다
+      let m, o;
+      try { [m, o] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
+      catch (e) { if (g0 === gen) { fail(e); location.hash = ""; } return; }
+      if (g0 !== gen) return; // 기다리는 사이 다른 화면을 열었다
+      match = m; open = o;
+      if (match.game !== GAME) { location.href = `/games/${match.game}#m${id}`; return; }
+      if (match.bot) lastLevel = match.bot;
+      const seen = seenMap()[match.id];
+      view = match.gs ? clone(match.gs) : null;
+      paintMatch();
+      fitFelt();
+      // 처음 여는 판이거나 그사이 상대가 둔 판 — 상대 차례를 다시 보여 준다
+      const g = match.gs;
+      if (g && g.replay && match.status !== "PENDING" && (seen == null || seen < match.seq) && (g.log || []).some((e) => !e.me && e.v > (seen == null ? -1 : seen))) {
+        await replayTurn();
+        if (g0 === gen && !busy && !timer && !waiter) schedulePoll();
+        return;
+      }
+      schedulePoll();
+    }
+    // 판 아래가 화면 밖이면(낮은 화면 · 가로로 든 휴대폰) 판이 다 보이게 조금 내려 준다 — 위 머리 띠에 가리지 않을 만큼만
+    function fitFelt() {
+      const felt = document.querySelector(".gs-felt");
+      if (!felt) return;
+      requestAnimationFrame(() => {
+        const r = felt.getBoundingClientRect();
+        const over = Math.min(r.bottom + 8 - innerHeight, r.top - 76);
+        if (over > 0) window.scrollBy(0, over);
+      });
+    }
+    async function send(data) {
+      if (!match || sending || busy) return;
+      const g = gen, id = match.id;
+      stopPoll(); // 내 차례에 걸어 둔 기다리기가 내가 낸 판으로 먼저 깨지 않게
+      sending = true;
+      renderBoard();
+      let next;
+      try { next = await HKApi.matchMove(id, { data }, match.seq); }
+      catch (e) {
+        if (g !== gen) return;
+        sfx("invalid"); fail(e); sending = false; await showMatch(id); return;
+      }
+      if (g !== gen) return; // 기다리는 사이 화면을 떠났다 — 새 화면이 서버 판을 다시 받는다
+      sending = false;
+      await absorb(next, g);
+    }
+    function choose(c) {
+      if (!myTurnNow() || view.phase !== "play") return;
+      if (sel === c) { playSel(); return; }
+      sel = c;
+      sfx("select");
+      renderBoard();
+    }
+    function playSel(extra = {}) {
+      if (sel == null || !myTurnNow()) return;
+      const p = plan(view, sel);
+      if (p.choose && extra.take == null) { HKUI.toast("먹을 바닥 패를 골라 주세요", "info"); return; }
+      send({ card: sel, ...extra });
+    }
+
+    function route() {
+      const m = /^#m(\d+)$/.exec(location.hash);
+      window.scrollTo(0, 0); // 목록 ↔ 판 — 새 화면은 맨 위부터
+      if (m) showMatch(Number(m[1])); else showLobby();
+    }
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div id="gs-root"></div>`,
+      afterMount: () => {
+        root = document.getElementById("gs-root");
+        HKSound.onChange(() => { const b = root.querySelector(".gs__mute"); if (b) { b.innerHTML = muteBtn(); b.setAttribute("aria-label", `소리 ${HKSound.isMuted() ? "켜기" : "끄기"}`); } });
+        // PC — 손패에 마우스를 올리면 짝이 되는 바닥 패를 비춘다
+        root.addEventListener("mouseover", (e) => {
+          const el = e.target.closest(".gs-hand .hw[data-c]");
+          root.querySelectorAll(".hw.is-peek").forEach((x) => x.classList.remove("is-peek"));
+          if (!PC_KEYS || !el || !myTurnNow() || !view || view.phase !== "play" || sel != null) return;
+          const m = H.mon(Number(el.dataset.c));
+          root.querySelectorAll(`.gs-slot[data-m="${m}"] .hw`).forEach((x) => x.classList.add("is-peek"));
+        });
+        root.addEventListener("click", async (e) => {
+          if (busy && e.target.closest(".gs-felt")) { skip = true; if (wake) wake(); return; } // 다시 보기 빨리 넘기기
+          const cardEl = e.target.closest(".hw[data-c]");
+          const t = e.target.closest("button, a");
+          if (cardEl && !t && match && view) {
+            const c = Number(cardEl.dataset.c);
+            if (cardEl.closest(".gs-hand")) return choose(c);
+            if (cardEl.closest(".gs-slot") && cardEl.classList.contains("is-choice") && myTurnNow()) {
+              if (view.phase === "pick") return send({ pick: c });
+              if (sel != null) return playSel({ take: c });
+            }
+            return;
+          }
+          if (!t) return;
+          if (t.dataset.take != null && myTurnNow() && sel != null) return playSel({ take: Number(t.dataset.take) });
+          if (t.dataset.pick != null && myTurnNow() && view.phase === "pick") return send({ pick: Number(t.dataset.pick) });
+          const act = t.dataset.act;
+          if (act) {
+            e.preventDefault();
+            if (act === "mute") return HKSound.toggle();
+            if (act === "rules") return showRules();
+            if (act === "play") return playSel();
+            if (act === "bomb") return playSel({ bomb: true });
+            if (act === "shake") return playSel({ shake: true });
+            if (act === "unsel") { sel = null; return renderBoard(); }
+            if (act === "again-turn") return replayTurn();
+            if (act === "ask-go") return openGoStop();
+            if (act === "result") { modalOff = false; return openResult(); }
+            if (act === "flip") return myTurnNow() && view.phase === "play" && view.mine.bombs > 0 && send({ flip: true });
+            if (act === "go" || act === "stop") { document.getElementById("gs-modal").classList.remove("is-open"); return send({ [act]: true }); }
+            if (act === "look") { modalOff = true; document.getElementById("gs-modal").classList.remove("is-open"); return; }
+            if (act === "list") { location.hash = ""; return; }
+            if (act === "again") {
+              try { const m = await HKApi.matchBot(match.bot || lastLevel, GAME); location.hash = `m${m.id}`; } catch (err) { fail(err); }
+              return;
+            }
+            if (act === "rematch") {
+              try { await HKApi.matchCreate(match.opponent.id, GAME); HKUI.toast("도전장을 보냈어요"); location.hash = ""; } catch (err) { fail(err); }
+              return;
+            }
+            if (act === "accept" || act === "decline") {
+              const g = gen, id = match.id;
+              try { if (act === "accept") await HKApi.matchAccept(id); else await HKApi.matchDecline(id); } catch (err) { fail(err); }
+              return g === gen && showMatch(id);
+            }
+            if (act === "resign") {
+              // 판은 이미 끝났는데 마지막 움직임을 보여 주는 중(버튼이 아직 남아 있다) — 결과 창이 곧 뜬다
+              if (!match || match.status !== "ACTIVE") return;
+              const g = gen, id = match.id;
+              if (!(await HKUI.confirmDialog("기권할까요?", "이 판은 패배로 끝나요.", { confirmLabel: "기권" })) || g !== gen || match.status !== "ACTIVE") return;
+              try {
+                stopPoll();
+                const next = await HKApi.matchResign(id);
+                if (g !== gen) return;
+                fresh(); // 돌던 움직임은 멈추고 끝난 판을 새로 그린다
+                match = next; view = next.gs ? clone(next.gs) : view; sel = null; paintMatch();
+              } catch (err) { fail(err); }
+              return;
+            }
+            return;
+          }
+          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
+          if (t.dataset.bot) lastLevel = t.dataset.bot;
+          await HKMatch.act(t, GAME, showLobby);
+        });
+        window.addEventListener("hashchange", route);
+        // PC 키 — 숫자로 손패 고르기 · Enter/Space 고른 패 내기 · G 고 · S 스톱 · Esc 취소
+        window.addEventListener("keydown", (e) => {
+          if (!match || !view || document.querySelector(".hk-dialog__overlay") || e.target.closest("input, textarea")) return;
+          if (busy && (e.key === "Escape" || e.code === "Space")) { e.preventDefault(); skip = true; if (wake) wake(); return; }
+          const modalOpen = document.getElementById("gs-modal")?.classList.contains("is-open");
+          if (view.phase === "gostop" && myTurnNow() && modalOpen && /^[gGsS]$/.test(e.key)) {
+            e.preventDefault();
+            document.getElementById("gs-modal").classList.remove("is-open");
+            return send({ [e.key.toLowerCase() === "g" ? "go" : "stop"]: true });
+          }
+          if (!myTurnNow() || view.phase !== "play") return;
+          const n = "1234567890".indexOf(e.key);
+          if (n >= 0 && view.hand[n] != null) { e.preventDefault(); choose(view.hand[n]); return; }
+          if ((e.key === "Enter" || e.code === "Space") && sel != null && !e.repeat) { e.preventDefault(); playSel(); return; }
+          if (e.key === "Escape" && sel != null) { sel = null; renderBoard(); }
+        });
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && match && !busy && !sending) showMatch(match.id); });
+        route();
+      },
+    });
+  </script>
+</body>
+</html>

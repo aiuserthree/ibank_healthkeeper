@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 칸 따먹기</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 칸 따먹기 — 모눈 공책 위에 연필로 긋는 느낌. 내 색은 파랑, 상대 색은 빨강(화면을 보는 사람 기준) */
+    :root { --bx-me: #2563eb; --bx-me-ink: #1e40af; --bx-rival: #e11d48; --bx-rival-ink: #9f1239; --bx-lead: #2f343b; --bx-paper: #fffdf6; }
+    /* --bx-w: 판 폭 — PC 는 창 높이에 맞춰 판 · 버튼이 한 화면에 들어오게(폰은 화면 폭이 먼저 막는다) */
+    .bx { --bx-w: clamp(380px, calc(100vh - 450px), 620px); }
+    .bx.is-over { --bx-w: clamp(320px, calc(100vh - 510px), 620px); } /* 끝난 판은 아래 결과 줄만큼 판을 줄인다 */
+
+    /* 목록 — 이렇게 해요 */
+    .bx-how { margin: 0 0 20px; border: 1px solid #e8dfc4; border-radius: 14px; background: var(--bx-paper); overflow: hidden; }
+    .bx-how > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px; font-size: 15px; font-weight: 800; cursor: pointer; list-style: none; user-select: none; }
+    .bx-how > summary::-webkit-details-marker { display: none; }
+    .bx-how > summary::after { content: ""; width: 8px; height: 8px; margin-left: auto; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; transform: rotate(45deg); transition: transform .2s; }
+    .bx-how[open] > summary::after { transform: rotate(-135deg); }
+    .bx-how > summary small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .bx-how__body { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 18px; align-items: center; padding: 4px 18px 18px; }
+    .bx-how__pic { display: block; width: 100%; height: auto; border-radius: 10px; }
+    .bx-how ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.65; color: var(--color-midnight-navy); word-break: keep-all; }
+    .bx-how ol li + li { margin-top: 3px; }
+    .bx-how ol b { color: var(--bx-me-ink); }
+    .bx-how__tip { margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: #fef9c3; font-size: 13px; line-height: 1.55; color: #713f12; word-break: keep-all; }
+    @media (max-width: 640px) {
+      .bx-how__body { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 14px 16px; }
+      .bx-how__pic { max-width: 220px; margin: 0 auto; }
+    }
+
+    /* 대국 화면 — 「나 vs 상대」 막대에 각자 색연필 점 */
+    .bx .gk__side .gk__face::after { content: ""; position: absolute; right: -3px; bottom: -3px; width: 15px; height: 15px; border-radius: 50%; background: var(--bx-rival); box-shadow: 0 0 0 2px #fff; }
+    .bx .gk__side.is-me .gk__face::after { background: var(--bx-me); }
+
+    /* 공책 한 장 */
+    .bx-paper { position: relative; max-width: var(--bx-w); margin: 0 auto; border-radius: 4px 4px 12px 12px; background: var(--bx-paper); box-shadow: 0 1px 0 #ebe3cb, 0 12px 30px rgba(15, 23, 42, .14); overflow: hidden; }
+    .bx-paper::before { content: ""; display: block; height: 20px; background: radial-gradient(circle at 50% 55%, #d8d2c1 0 4px, #f3eedf 4.5px 6px, transparent 6.5px) 0 0 / 30px 20px space no-repeat, linear-gradient(#f6f1e2, var(--bx-paper)); border-bottom: 1px dashed #e4dcc3; }
+    .bx-race { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 16px 6px; }
+    .bx-race__n { display: flex; align-items: baseline; gap: 5px; min-width: 64px; }
+    .bx-race__n.is-rival { flex-direction: row-reverse; text-align: right; }
+    .bx-race__n b { font-size: 30px; font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; }
+    .bx-race__n.is-me b { color: var(--bx-me); }
+    .bx-race__n.is-rival b { color: var(--bx-rival); }
+    .bx-race__n small { font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+    .bx-race__bar { position: relative; display: flex; height: 12px; border-radius: 999px; background: repeating-linear-gradient(90deg, #ece6d3 0 calc(4% - 2px), transparent calc(4% - 2px) 4%); overflow: hidden; }
+    .bx-race__bar span { height: 100%; transition: width .45s ease; }
+    .bx-race__bar .is-me { background: var(--bx-me); border-radius: 999px 0 0 999px; }
+    .bx-race__bar .is-rival { margin-left: auto; background: var(--bx-rival); border-radius: 0 999px 999px 0; }
+    .bx-race__bar i { position: absolute; left: calc(50% - 1px); top: -2px; bottom: -2px; width: 2px; background: #7c6f4f; opacity: .55; }
+    .bx-race__note { padding: 0 16px 4px; text-align: center; font-size: 12.5px; font-weight: 700; color: #8a7d5c; word-break: keep-all; }
+
+    /* 판 */
+    .bx-board { display: block; width: 100%; height: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+    .bx-board.is-live { cursor: pointer; }
+    .bx-dot { fill: #1f2937; }
+    .bx-ln path { fill: none; stroke-linecap: round; }
+    .bx-ln__main { stroke: var(--bx-lead); stroke-width: 7; opacity: .92; }
+    .bx-ln__grain { stroke: #8b929c; stroke-width: 2; opacity: .55; }
+    .bx-ln__halo { stroke: transparent; stroke-width: 22; }
+    .bx-ln.is-last.is-me .bx-ln__main { stroke: var(--bx-me); }
+    .bx-ln.is-last.is-rival .bx-ln__main { stroke: var(--bx-rival); }
+    .bx-ln.is-last .bx-ln__grain { stroke: #fff; opacity: .35; }
+    .bx-ln.is-final.is-me .bx-ln__halo { stroke: rgba(37, 99, 235, .16); }
+    .bx-ln.is-final.is-rival .bx-ln__halo { stroke: rgba(225, 29, 72, .15); }
+    .bx-ln.is-new .bx-ln__main, .bx-ln.is-new .bx-ln__grain { stroke-dasharray: 1 2; stroke-dashoffset: 1; animation: bx-draw .3s cubic-bezier(.35, .1, .3, 1) var(--d, 0ms) forwards; }
+    .bx-ln.is-new .bx-ln__halo { opacity: 0; animation: bx-in .3s ease var(--d, 0ms) forwards; }
+    @keyframes bx-draw { to { stroke-dashoffset: 0; } }
+    @keyframes bx-in { to { opacity: 1; } }
+    .bx-box__fill { transform-box: fill-box; transform-origin: 0 50%; }
+    .bx-box.is-new .bx-box__fill { transform: scaleX(0); animation: bx-shade .42s steps(7, end) calc(var(--d, 0ms) + 200ms) forwards; }
+    @keyframes bx-shade { to { transform: scaleX(1); } }
+    .bx-box text { font-size: 44px; font-weight: 900; text-anchor: middle; dominant-baseline: central; }
+    .bx-box.is-me text { fill: var(--bx-me-ink); }
+    .bx-box.is-rival text { fill: var(--bx-rival-ink); }
+    .bx-box__mark { transform-box: fill-box; transform-origin: 50% 50%; }
+    .bx-box.is-new .bx-box__mark { opacity: 0; animation: bx-pop .38s cubic-bezier(.3, 1.6, .5, 1) calc(var(--d, 0ms) + 420ms) forwards; }
+    @keyframes bx-pop { from { opacity: 0; transform: scale(.2); } to { opacity: 1; transform: scale(1); } }
+    .bx-cue { fill: rgba(250, 204, 21, .42); opacity: 0; animation: bx-cue 1.6s ease-in-out var(--d, 0ms) infinite; pointer-events: none; }
+    @keyframes bx-cue { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+    .bx-sel { fill: none; stroke: var(--bx-me); stroke-width: 8; stroke-linecap: round; stroke-dasharray: 3 15; animation: bx-march .8s linear infinite; pointer-events: none; }
+    @keyframes bx-march { to { stroke-dashoffset: -36; } }
+    .bx-hov { fill: none; stroke: var(--bx-me); stroke-width: 7; stroke-linecap: round; opacity: .28; pointer-events: none; }
+    .bx-hov.is-cap { opacity: .5; }
+    .bx-empty .bx-dot { fill: #9ca3af; }
+
+    /* 끝 — 공책에 찍는 도장 */
+    .bx-stamp { position: absolute; bottom: 10px; right: 14px; z-index: 2; display: grid; place-items: center; width: 100px; height: 100px; border-radius: 50%; border: 4px double currentColor; color: #dc2626; background: rgba(255, 253, 246, .6); transform: rotate(-13deg); text-align: center; pointer-events: none; }
+    .bx-stamp b { display: block; font-size: 19px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+    .bx-stamp small { display: block; margin-top: 3px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .bx-stamp.is-lose { color: #64748b; }
+    .bx-stamp.is-draw { color: #7c3aed; }
+    .bx-stamp.is-fresh { animation: bx-stamp .42s cubic-bezier(.2, .9, .3, 1.25) var(--d, 0ms) both; }
+    @keyframes bx-stamp { from { opacity: 0; transform: rotate(-13deg) scale(2.1); } to { opacity: 1; transform: rotate(-13deg) scale(1); } }
+
+    .bx-say { min-height: 22px; padding: 2px 16px 14px; text-align: center; font-size: 14px; font-weight: 700; color: #57534e; word-break: keep-all; }
+    .bx-say.is-go { color: var(--bx-me-ink); }
+    /* 끝난 판 — 왼쪽에 이유 · 점수, 오른쪽에 도장 */
+    .bx-say.is-done { display: flex; flex-direction: column; justify-content: center; min-height: 112px; padding: 6px 132px 12px 22px; text-align: left; }
+    .bx-say.is-done b { font-size: 18px; font-weight: 900; color: var(--color-midnight-navy); }
+    .bx-say.is-done small { margin-top: 3px; font-size: 13px; font-weight: 700; color: #8a7d5c; }
+    .bx .gk__bar { max-width: var(--bx-w); align-items: stretch; }
+    .bx .gk__bar .hk-btn { min-height: 46px; }
+    .bx-snd { display: inline-grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; padding: 0; border: 1px solid var(--border-default); border-radius: 12px; background: var(--surface-card, #fff); color: var(--color-midnight-navy); cursor: pointer; }
+    .bx-snd.is-off { color: var(--text-muted); background: var(--color-mist); }
+    .bx-snd svg { width: 20px; height: 20px; }
+    @media (max-width: 640px) {
+      .bx, .bx.is-over { --bx-w: 620px; }
+      .bx-race { gap: 8px; padding: 10px 12px 4px; }
+      .bx-race__n { min-width: 0; }
+      .bx-race__n b { font-size: 26px; }
+      .bx-stamp { bottom: 8px; right: 10px; width: 84px; height: 84px; }
+      .bx-say.is-done { min-height: 100px; padding: 6px 104px 12px 16px; }
+      .bx-say.is-done b { font-size: 16px; }
+      .bx-stamp b { font-size: 16px; }
+      .bx-say { padding: 0 10px 12px; font-size: 13.5px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bx-ln.is-new .bx-ln__main, .bx-ln.is-new .bx-ln__grain, .bx-ln.is-new .bx-ln__halo, .bx-box.is-new .bx-box__fill, .bx-box.is-new .bx-box__mark, .bx-stamp.is-fresh { animation-duration: 1ms; }
+      .bx-sel, .bx-cue { animation: none; opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 칸 따먹기 — 도전 → 수락 → 번갈아 선 긋기. 네 변을 닫으면 그 칸을 갖고 한 번 더. 13칸을 먼저 차지하면 승
+    // 선 · 칸 번호는 서버(backend/app/services/versus_boxes.py)와 같다:
+    //   가로선 h(r, c) = r*n + c · 세로선 v(r, c) = (n+1)*n + r*(n+1) + c · 칸 b = r*n + c (위 · 아래 · 왼 · 오른 변)
+    const { esc, closedNote, due, fail } = HKMatch;
+    const GAME = "boxes";
+    const CELL = 100, MARGIN = 40; // 판 그림 단위 — 점 사이 100, 가장자리 40(모눈 20칸에 맞춤)
+    const STEP = 380; // 상대가 그은 선을 하나씩 다시 보여 주는 간격(ms)
+    const FINE = matchMedia("(hover: hover) and (pointer: fine)").matches; // 마우스 — 미리 보기 · 스페이스로 긋기
+    const HOW_KEY = "hk-boxes-how"; // 「이렇게 해요」를 처음 한 번은 펼쳐 둔다
+    const BOT_LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    const sfx = (name, arg) => { try { if (window.HKSound) HKSound.play(name, arg); } catch (_) { /* 소리는 부가 기능 */ } };
+
+    let root = null, open = { open: true, opensAt: null }, match = null, timer = 0, sending = false;
+    let waiter = null; // 서버에서 상대 선을 기다리는 요청
+    let sel = null, hov = null; // 고른 선 · 마우스가 가리키는 선
+    let shown = 0; // 이미 그려 보여 준 기록 수 — 그 뒤부터 하나씩 움직여 보여 준다
+    let busyUntil = 0; // 이 시각까지는 그리는 중이라 누르지 않는다
+    let endFx = false; // 방금 끝난 판 — 도장 · 소리
+    let replaying = false; // 상대(컴퓨터)가 그은 선을 다시 보여 주는 중
+    let fx = []; // 예약한 소리
+    const seen = {}; // 판마다 이 화면에서 본 기록 수(다시 열었을 때 같은 선을 또 움직이지 않게)
+    const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
+
+    function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
+
+    // ---------- 판 모양 ----------
+    const GEO = {};
+    function geo(n) {
+      if (GEO[n]) return GEO[n];
+      const H = (n + 1) * n, total = 2 * n * (n + 1), at = (i) => MARGIN + i * CELL;
+      const lines = new Array(total);
+      for (let r = 0; r <= n; r++) for (let c = 0; c < n; c++) lines[r * n + c] = { x1: at(c), y1: at(r), x2: at(c + 1), y2: at(r), h: true };
+      for (let r = 0; r < n; r++) for (let c = 0; c <= n; c++) lines[H + r * (n + 1) + c] = { x1: at(c), y1: at(r), x2: at(c), y2: at(r + 1), h: false };
+      const boxLines = [];
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) boxLines.push([r * n + c, (r + 1) * n + c, H + r * (n + 1) + c, H + r * (n + 1) + c + 1]);
+      lines.forEach((l) => { l.mx = (l.x1 + l.x2) / 2; l.my = (l.y1 + l.y2) / 2; l.boxes = []; });
+      boxLines.forEach((ls, b) => ls.forEach((i) => lines[i].boxes.push(b)));
+      return (GEO[n] = { n, total, at, lines, boxLines, W: 2 * MARGIN + n * CELL });
+    }
+    // 기록에서 판을 다시 세운다 — 선마다 그은 쪽(me · rival), 칸마다 가진 쪽
+    function boardOf(m) {
+      const G = geo(m.size || 5), drawn = new Array(G.total).fill(null), owner = new Array(G.n * G.n).fill(null);
+      (m.log || []).forEach(([by, ln, got]) => { drawn[ln] = by; (got || []).forEach((b) => { owner[b] = by; }); });
+      const sides = (b) => G.boxLines[b].reduce((k, i) => k + (drawn[i] ? 1 : 0), 0);
+      return { G, drawn, owner, sides };
+    }
+    const closes = (B, ln) => B.G.lines[ln].boxes.filter((b) => !B.owner[b] && B.sides(b) === 3); // 이 선으로 닫히는 칸
+    // 연필로 그은 듯 살짝 휜 선 — 선마다 휘는 정도가 늘 같다
+    function pencil(l, i, shift = 0) {
+      const j = (((i * 7919) % 11) - 5) * 0.5 + shift;
+      return `M${l.x1} ${l.y1}Q${l.mx + (l.h ? 0 : j)} ${l.my + (l.h ? j : 0)} ${l.x2} ${l.y2}`;
+    }
+    const initial = (who) => (who === "me" ? "나" : match.bot ? "컴" : ((match.opponent && match.opponent.name) || "상").trim().charAt(0) || "상");
+    const rivalWord = () => (match.bot ? "컴퓨터" : "상대");
+    const counts = () => ({ me: match.myBoxes || 0, rival: match.rivalBoxes || 0 });
+
+    // ---------- 그리기 ----------
+    // 새로 보여 줄 기록마다 언제 그릴지 — 컴퓨터가 이어 그은 선은 잠깐 생각한 뒤 하나씩
+    function plan(log, from, lead) {
+      const at = [];
+      let t = lead;
+      for (let i = from; i < log.length; i++) {
+        at.push(t);
+        t += log[i][2] && log[i][2].length ? STEP + 260 : STEP;
+      }
+      const total = log.length > from ? t - STEP + 520 : 0;
+      return { from, at, total };
+    }
+    function lastRun(log) {
+      const set = new Set();
+      for (let i = log.length - 1; i >= 0 && log[i][0] === log[log.length - 1][0]; i--) set.add(i);
+      return set;
+    }
+    function svgHtml(p, cue) {
+      const B = boardOf(match), { G } = B, W = G.W, log = match.log || [], last = lastRun(log);
+      const delay = (i) => (i >= p.from ? p.at[i - p.from] : null);
+      const boxes = [], lines = [];
+      log.forEach(([by, ln, got], i) => {
+        const d = delay(i), l = G.lines[ln], path = pencil(l, ln);
+        const cls = `bx-ln is-${by}${last.has(i) ? " is-last" : ""}${i === log.length - 1 ? " is-final" : ""}${d != null ? " is-new" : ""}`;
+        lines.push(`<g class="${cls}"${d != null ? ` style="--d:${d}ms"` : ""}><path class="bx-ln__halo" d="${path}"/><path class="bx-ln__main" d="${path}" pathLength="1"/><path class="bx-ln__grain" d="${pencil(l, ln, 1.8)}" pathLength="1"/></g>`);
+        (got || []).forEach((b) => {
+          const x = G.at(b % G.n), y = G.at(Math.floor(b / G.n));
+          boxes.push(`<g class="bx-box is-${by}${d != null ? " is-new" : ""}"${d != null ? ` style="--d:${d}ms"` : ""}>
+              <rect class="bx-box__fill" x="${x + 9}" y="${y + 9}" width="${CELL - 18}" height="${CELL - 18}" rx="6" fill="url(#bx-hatch-${by})"/>
+              <g transform="rotate(${by === "me" ? -7 : 6} ${x + CELL / 2} ${y + CELL / 2})"><text class="bx-box__mark" x="${x + CELL / 2}" y="${y + CELL / 2 + 2}">${esc(initial(by))}</text></g>
+            </g>`);
+        });
+      });
+      // 내 차례면 세 변이 그어진 칸에 형광펜 — 다시 보여 주기가 끝난 뒤에
+      const cues = cue ? B.owner.map((o, b) => (!o && B.sides(b) === 3 ? b : -1)).filter((b) => b >= 0).map((b) => {
+        const x = G.at(b % G.n), y = G.at(Math.floor(b / G.n));
+        return `<rect class="bx-cue" style="--d:${p.total}ms" x="${x + 12}" y="${y + 12}" width="${CELL - 24}" height="${CELL - 24}" rx="8"/>`;
+      }).join("") : "";
+      const dots = [];
+      for (let r = 0; r <= G.n; r++) for (let c = 0; c <= G.n; c++) dots.push(`<circle class="bx-dot" cx="${G.at(c)}" cy="${G.at(r)}" r="7.5"/>`);
+      const { me, rival } = counts();
+      const label = match.status === "ACTIVE" || match.status === "DONE" ? `칸 따먹기 판 — 내 칸 ${me}, ${rivalWord()} 칸 ${rival}` : "칸 따먹기 판";
+      return `<svg class="bx-board ${match.status === "ACTIVE" && match.myTurn && open.open ? "is-live" : ""} ${match.status === "ACTIVE" || match.status === "DONE" ? "" : "bx-empty"}" id="bx-board" viewBox="0 0 ${W} ${W}" role="img" aria-label="${esc(label)}">
+          <defs>
+            <pattern id="bx-grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0H0V20" fill="none" stroke="#dce9f5" stroke-width="1.3"/></pattern>
+            <pattern id="bx-grid5" width="${CELL}" height="${CELL}" patternUnits="userSpaceOnUse" x="${MARGIN}" y="${MARGIN}"><path d="M${CELL} 0H0V${CELL}" fill="none" stroke="#c4daef" stroke-width="1.8"/></pattern>
+            <pattern id="bx-hatch-me" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(-38)"><rect width="12" height="12" fill="rgba(37,99,235,.07)"/><line x1="3" y1="0" x2="3" y2="12" stroke="#2563eb" stroke-width="4.5" stroke-opacity=".3"/></pattern>
+            <pattern id="bx-hatch-rival" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(38)"><rect width="12" height="12" fill="rgba(225,29,72,.06)"/><line x1="3" y1="0" x2="3" y2="12" stroke="#e11d48" stroke-width="4.5" stroke-opacity=".26"/></pattern>
+          </defs>
+          <rect width="${W}" height="${W}" fill="var(--bx-paper)"/>
+          <rect width="${W}" height="${W}" fill="url(#bx-grid)"/>
+          <rect width="${W}" height="${W}" fill="url(#bx-grid5)"/>
+          <g>${boxes.join("")}</g>
+          <g>${cues}</g>
+          <g>${lines.join("")}</g>
+          <path class="bx-hov" id="bx-hov" d="" style="display:none"/>
+          <path class="bx-sel" id="bx-sel" d="" style="display:none"/>
+          <g>${dots.join("")}</g>
+        </svg>`;
+    }
+    function statusText() {
+      if (match.status === "DONE") return { win: "이겼어요", lose: "졌어요", draw: "비겼어요" }[match.result] || "끝났어요";
+      if (match.status === "ACTIVE") return match.myTurn ? (extraTurn() ? "한 번 더!" : "내 차례") : `${rivalWord()} 차례`;
+      if (match.status === "PENDING") return match.incoming ? "받은 도전" : "수락 기다리는 중";
+      return match.status === "DECLINED" ? "취소된 도전" : "만료된 도전";
+    }
+    function extraTurn() {
+      const log = match.log || [], last = log[log.length - 1];
+      return !!(match.myTurn && last && last[0] === "me" && last[2] && last[2].length);
+    }
+    const canPlay = () => !!(match && match.status === "ACTIVE" && match.myTurn && open.open);
+    function sayText() {
+      const { me, rival } = counts();
+      if (match.status === "DONE") {
+        const why = ["RESIGN", "TIMEOUT"].includes(match.endReason) ? "" : `${HKMatch.reason(match)} · `; // 기권 · 시간 초과는 위 줄에 이미
+        return `${why}선 ${match.moveCount}개 · ${me} : ${rival}`;
+      }
+      if (match.status === "PENDING") return match.incoming ? "수락하면 바로 시작해요. 먼저 긋는 사람은 무작위로 정해요." : "상대가 수락하면 바로 시작해요.";
+      if (match.status !== "ACTIVE") return "이 도전은 끝났어요.";
+      if (!open.open) return `${open.opensAt || ""}부터 그을 수 있어요.`;
+      if (replaying) return match.bot ? "컴퓨터가 그었어요." : "상대가 그은 선이에요.";
+      if (!match.myTurn) return match.bot ? "컴퓨터가 생각 중…" : "상대가 그으면 바로 보여요.";
+      if (sending) return "긋는 중…";
+      if (sel != null) return FINE ? "한 번 더 누르거나 Space 키로 그어요." : "한 번 더 누르면 그어져요.";
+      if (extraTurn()) return "칸을 닫았어요! 한 번 더 그어요.";
+      const B = boardOf(match), free = B.G.lines.map((l, i) => i).filter((i) => !B.drawn[i]);
+      if (!free.some((i) => closes(B, i).length) && !free.some((i) => B.G.lines[i].boxes.every((b) => B.sides(b) <= 1)))
+        return "이제 어디에 그어도 칸을 내줘요. 가장 적게 내주는 곳을 골라요."; // 안전한 선이 다 떨어졌다
+      return "그을 선을 눌러요. 칸을 닫는 선은 바로 그어져요.";
+    }
+    function doneTitle() {
+      const { me, rival } = counts(), r = match.result;
+      if (match.endReason === "RESIGN") return r === "win" ? `${rivalWord()}가 기권했어요` : "기권했어요";
+      if (match.endReason === "TIMEOUT") return r === "win" ? `${rivalWord()}의 시간이 다 됐어요` : "시간이 다 됐어요";
+      if (r === "draw") return `${me} : ${rival}, 비겼어요`;
+      return r === "win" ? `${me}칸을 차지해 이겼어요` : `${rivalWord()}가 ${rival}칸을 차지했어요`;
+    }
+    function goLabel() {
+      if (!open.open) return `${open.opensAt || ""}부터 그을 수 있어요`;
+      if (!match.myTurn) return `${rivalWord()} 차례예요`;
+      if (sel != null) return FINE ? "이 선 긋기 (Space)" : "이 선 긋기";
+      return "그을 선을 골라 주세요";
+    }
+    const SND_ON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
+    const SND_OFF = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6"/><path d="m22 9-6 6"/></svg>`;
+    function soundBtn() {
+      if (!window.HKSound) return "";
+      const off = HKSound.isMuted();
+      return `<button type="button" class="bx-snd ${off ? "is-off" : ""}" id="bx-snd" aria-pressed="${off ? "false" : "true"}" aria-label="${off ? "소리 켜기" : "소리 끄기"}" title="${off ? "소리 켜기" : "소리 끄기"}">${off ? SND_OFF : SND_ON}</button>`;
+    }
+    function barHtml() {
+      const s = match.status;
+      if (s === "ACTIVE") {
+        return `<button type="button" class="hk-btn hk-btn--primary gk__place" id="bx-go" ${canPlay() && sel != null && !sending ? "" : "disabled"}>${esc(goLabel())}</button>
+          <button type="button" class="hk-btn hk-btn--secondary" id="bx-resign" ${open.open ? "" : "disabled"}>기권</button>${soundBtn()}`;
+      }
+      const list = `<a class="hk-btn hk-btn--secondary gk__place" href="#" style="text-align:center;text-decoration:none">대국 목록</a>`;
+      if (s === "DONE") {
+        const again = match.bot ? "한 판 더" : match.opponent && match.opponent.id ? "다시 도전" : "";
+        return `${list}${again ? `<button type="button" class="hk-btn hk-btn--primary gk__place" id="bx-again" ${open.open ? "" : "disabled"}>${again}</button>` : ""}${soundBtn()}`;
+      }
+      if (s === "PENDING" && match.incoming) {
+        return `<button type="button" class="hk-btn hk-btn--primary gk__place" id="bx-accept" ${open.open ? "" : "disabled"}>수락하고 시작</button>
+          <button type="button" class="hk-btn hk-btn--secondary" id="bx-decline">거절</button>`;
+      }
+      if (s === "PENDING") return `${list}<button type="button" class="hk-btn hk-btn--secondary" id="bx-decline">도전 취소</button>`;
+      return list;
+    }
+    // 점수 줄 — 다시 보여 주는 동안은 칸이 칠해질 때마다 하나씩 올라간다(tally)
+    function tally(upto) {
+      const t = { me: 0, rival: 0 };
+      (match.log || []).slice(0, upto).forEach(([by, , got]) => { t[by] += (got || []).length; });
+      return t;
+    }
+    function raceHtml(t) {
+      const total = Math.pow((match.size || 5), 2), goal = Number(match.goal) || Math.floor(total / 2) + 1, { me, rival } = t;
+      const note = match.status === "ACTIVE" ? `${goal}칸을 먼저 차지하면 이겨요 · 남은 칸 <span data-left>${total - me - rival}</span>` : ""; // 끝난 판은 아래 줄에 이유 · 점수
+      return `<div class="bx-race">
+          <div class="bx-race__n is-me"><b data-n="me">${me}</b><small>내 칸</small></div>
+          <div class="bx-race__bar" aria-hidden="true"><span class="is-me" data-bar="me" style="width:${(me / total) * 100}%"></span><span class="is-rival" data-bar="rival" style="width:${(rival / total) * 100}%"></span><i></i></div>
+          <div class="bx-race__n is-rival"><b data-n="rival">${rival}</b><small>${esc(rivalWord())} 칸</small></div>
+        </div>
+        ${note ? `<div class="bx-race__note">${note}</div>` : ""}`;
+    }
+    function setRace(t) {
+      const total = Math.pow((match.size || 5), 2);
+      ["me", "rival"].forEach((k) => {
+        const n = root.querySelector(`[data-n="${k}"]`), bar = root.querySelector(`[data-bar="${k}"]`);
+        if (n) n.textContent = t[k];
+        if (bar) bar.style.width = `${(t[k] / total) * 100}%`;
+      });
+      const left = root.querySelector("[data-left]");
+      if (left) left.textContent = total - t.me - t.rival;
+    }
+    function stampHtml(p) {
+      if (match.status !== "DONE") return "";
+      const { me, rival } = counts(), text = { win: "이겼어요", lose: "아쉬워요", draw: "비겼어요" }[match.result] || "끝";
+      return `<div class="bx-stamp is-${esc(match.result || "draw")} ${endFx ? "is-fresh" : ""}" style="--d:${endFx ? p.total : 0}ms" aria-hidden="true"><div><b>${text}</b><small>${me} : ${rival}</small></div></div>`;
+    }
+
+    function paintMatch(lead = 0) {
+      fx.forEach(clearTimeout); fx = [];
+      const log = match.log || [];
+      if (shown > log.length) shown = log.length;
+      const p = plan(log, shown, lead);
+      busyUntil = performance.now() + p.total;
+      replaying = log.slice(p.from).some((x) => x[0] === "rival");
+      const note = match.status === "ACTIVE" ? `선 ${match.moveCount}개 · 이번 차례 ${due(match.deadlineAt)}`
+        : match.status === "PENDING" ? `도전장 · ${due(match.deadlineAt)}` : "";
+      root.innerHTML = `<div class="gk bx ${match.status === "DONE" ? "is-over" : ""}">
+          <a class="gk__back" href="#">‹ 대국 목록</a>
+          ${closedNote(open)}
+          ${HKMatch.versus(match, statusText())}
+          <div class="bx-paper">
+            ${match.status === "ACTIVE" || match.status === "DONE" ? raceHtml(tally(p.from)) : ""}
+            ${svgHtml(p, canPlay())}
+            ${match.status === "DONE" ? `<div class="bx-say is-done" id="bx-say"><b>${esc(doneTitle())}</b><small>${esc(sayText())}</small></div>${stampHtml(p)}`
+              : `<div class="bx-say ${canPlay() && !replaying ? "is-go" : ""}" id="bx-say" aria-live="polite">${esc(sayText())}</div>`}
+          </div>
+          <div class="gk__bar" id="bx-bar">${barHtml()}</div>
+          ${note ? `<div class="gk__due">${esc(note)}</div>` : ""}
+        </div>`;
+      shown = log.length;
+      seen[match.id] = log.length;
+      // 소리 — 선을 그을 때 · 칸을 닫을 때 · 내 차례가 왔을 때 · 끝났을 때
+      log.slice(p.from).forEach(([by, , got], k) => {
+        fx.push(setTimeout(() => sfx("tap"), p.at[k]));
+        if (got && got.length) {
+          const t = tally(p.from + k + 1);
+          fx.push(setTimeout(() => { sfx(by === "me" ? "coin" : "pop"); setRace(t); }, p.at[k] + 260));
+        }
+      });
+      const tail = log[log.length - 1];
+      if (endFx) fx.push(setTimeout(() => sfx({ win: "win", lose: "lose" }[match.result] || "success"), p.total));
+      else if (p.total && tail && tail[0] === "rival" && match.myTurn) fx.push(setTimeout(() => sfx("select"), p.total));
+      if (replaying) fx.push(setTimeout(() => { replaying = false; setSel(sel); }, p.total));
+      endFx = false;
+      const svg = document.getElementById("bx-board");
+      svg.addEventListener("click", onTap);
+      if (FINE) { svg.addEventListener("pointermove", onHover); svg.addEventListener("pointerleave", () => setHover(null)); }
+      if (sel != null) setSel(sel);
+    }
+
+    // ---------- 고르기 · 긋기 ----------
+    function pickLine(e) {
+      const svg = document.getElementById("bx-board");
+      if (!svg) return null;
+      const B = boardOf(match), r = svg.getBoundingClientRect(), k = B.G.W / r.width;
+      const x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k;
+      let best = null, bd = Infinity;
+      B.G.lines.forEach((l, i) => {
+        if (B.drawn[i]) return;
+        const d = Math.hypot(l.mx - x, l.my - y);
+        if (d < bd) { bd = d; best = i; }
+      });
+      return bd <= CELL * 0.62 ? best : null; // 선 가운데에서 가까운 쪽 — 손가락으로 눌러도 넉넉하게
+    }
+    const ready = () => canPlay() && !sending && performance.now() >= busyUntil;
+    function setSel(ln) {
+      sel = ln;
+      const el = document.getElementById("bx-sel");
+      if (el) {
+        if (ln == null) el.style.display = "none";
+        else { const l = boardOf(match).G.lines[ln]; el.setAttribute("d", `M${l.x1} ${l.y1}L${l.x2} ${l.y2}`); el.style.display = ""; }
+      }
+      const go = document.getElementById("bx-go");
+      if (go) { go.disabled = !(canPlay() && ln != null && !sending); go.textContent = goLabel(); }
+      const say = document.getElementById("bx-say");
+      if (say && match.status !== "DONE") { say.textContent = sayText(); say.classList.toggle("is-go", canPlay() && !replaying); }
+    }
+    function setHover(ln) {
+      hov = ln;
+      const el = document.getElementById("bx-hov");
+      if (!el) return;
+      if (ln == null || ln === sel) { el.style.display = "none"; return; }
+      const B = boardOf(match), l = B.G.lines[ln];
+      el.setAttribute("d", `M${l.x1} ${l.y1}L${l.x2} ${l.y2}`);
+      el.classList.toggle("is-cap", closes(B, ln).length > 0);
+      el.style.display = "";
+    }
+    function onHover(e) {
+      if (!ready()) { if (hov != null) setHover(null); return; }
+      const ln = pickLine(e);
+      if (ln !== hov) setHover(ln);
+    }
+    function onTap(e) {
+      if (!ready()) return;
+      const ln = pickLine(e);
+      if (ln == null) { if (sel != null) setSel(null); return; }
+      if (sel === ln || closes(boardOf(match), ln).length) { commit(ln); return; } // 칸을 닫는 선은 바로 긋는다
+      setSel(ln);
+      setHover(null);
+      sfx("select");
+    }
+    // 방향키로 선 옮기기(PC) — 지금 고른 선에서 그 방향으로 가장 가까운 빈 선
+    function moveSel(dx, dy) {
+      const B = boardOf(match), G = B.G;
+      const from = sel != null ? G.lines[sel] : { mx: G.W / 2, my: G.W / 2 };
+      let best = null, score = Infinity;
+      G.lines.forEach((l, i) => {
+        if (B.drawn[i] || i === sel) return;
+        const ax = (l.mx - from.mx) * dx + (l.my - from.my) * dy, off = Math.abs(dx ? l.my - from.my : l.mx - from.mx);
+        if (sel != null && ax <= 1) return;
+        const s = Math.abs(ax) + off * 2;
+        if (s < score) { score = s; best = i; }
+      });
+      if (best != null) { setSel(best); sfx("tap"); }
+    }
+    async function commit(ln) {
+      if (!ready()) return;
+      const B = boardOf(match);
+      if (B.drawn[ln]) return;
+      const got = closes(B, ln), id = match.id, seq = match.seq;
+      sending = true; sel = null; setHover(null);
+      stopPoll();
+      // 서버 답을 기다리지 않고 바로 긋는다 — 답이 오면 맞춰 보고, 컴퓨터가 이어 그은 선을 보여 준다
+      match = { ...match, log: [...(match.log || []), ["me", ln, got]], myBoxes: (match.myBoxes || 0) + got.length, myTurn: got.length > 0, rivalTurn: got.length === 0 };
+      paintMatch();
+      let next;
+      try { next = await HKApi.matchMove(id, { data: { line: ln } }, seq); }
+      catch (err) {
+        sending = false;
+        sfx("invalid");
+        fail(err);
+        if (match && match.id === id) showMatch(id);
+        return;
+      }
+      await sleep(Math.max(0, busyUntil - performance.now()));
+      sending = false;
+      if (!match || match.id !== id) return;
+      applyNext(next, next.bot ? 420 : 0);
+      if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+    }
+    // 서버가 준 판으로 바꾼다 — 이미 보여 준 기록은 그대로 두고 그 뒤만 움직인다
+    function applyNext(next, lead = 0) {
+      const mine = match.log || [], theirs = next.log || [];
+      let same = 0;
+      while (same < Math.min(shown, theirs.length) && mine[same] && mine[same][1] === theirs[same][1]) same++;
+      shown = same;
+      endFx = endFx || (match.status === "ACTIVE" && next.status === "DONE");
+      if (match.status === "PENDING" && next.status === "ACTIVE") sfx("go"); // 도전을 받아 줬다 — 바로 시작
+      if (match.status !== next.status || next.status !== "ACTIVE") sel = null;
+      if (sel != null && theirs.some((x) => x[1] === sel)) sel = null;
+      match = next;
+      paintMatch(lead);
+      schedulePoll();
+    }
+
+    // ---------- 기다리기 · 열기 ----------
+    // 서버에서 판이 바뀔 때까지 기다린다 — 상대가 긋는 즉시 돌아와 바로 그린다. 화면이 보일 때만.
+    // 내 차례에도 기다린다 — 그사이 상대가 기권하면 바로 끝난 판으로 바꾼다. 컴퓨터전은 내 요청 안에서 컴퓨터가 바로 그어 기다릴 일이 없다
+    function schedulePoll(delay = 0) {
+      stopPoll();
+      if (!match || ["DONE", "DECLINED", "EXPIRED"].includes(match.status) || match.bot || sending) return;
+      timer = setTimeout(async () => {
+        timer = 0;
+        if (document.hidden || !match) return; // 다시 보이면 visibilitychange 에서 판을 새로 연다
+        const id = match.id, ctl = new AbortController();
+        waiter = ctl;
+        let next;
+        try { next = await HKApi.matchWait(id, match.seq, match.status, ctl.signal); }
+        catch (_) {
+          if (waiter === ctl) { waiter = null; schedulePoll(3000); } // 잠깐 끊기면 3초 뒤 다시
+          return;
+        }
+        if (waiter !== ctl || !match || match.id !== id) return; // 그새 내가 그었거나 다른 판으로 감
+        waiter = null;
+        if (next.seq !== match.seq || next.status !== match.status) applyNext(next);
+        else { match = next; schedulePoll(1000); } // 그대로 돌아왔으면 잠깐 쉬고 다시 — 바로 다시 묻다 헛돌지 않게
+      }, delay);
+    }
+    async function showMatch(id) {
+      stopPoll(); sel = null; hov = null;
+      let next;
+      try { [next, open] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
+      catch (e) { fail(e); location.hash = ""; return; }
+      if (next.game !== GAME) { location.href = `/games/${next.game}#m${id}`; return; }
+      try { localStorage.setItem(HOW_KEY, "1"); } catch (_) { /* 저장 못 해도 그만 */ }
+      const log = next.log || [];
+      let lead = 0;
+      if (seen[id] != null) shown = Math.min(seen[id], log.length);
+      else if (next.status === "ACTIVE" && next.myTurn && log.length && log[log.length - 1][0] === "rival") {
+        shown = log.length - lastRun(log).size; // 처음 열었으면 상대가 마지막에 그은 선을 다시 보여 준다
+        lead = 350;
+      } else shown = log.length;
+      endFx = false;
+      match = next;
+      paintMatch(lead);
+      schedulePoll();
+    }
+    async function showLobby() {
+      stopPoll(); match = null; sel = null;
+      fx.forEach(clearTimeout); fx = [];
+      open = await HKMatch.lobby(root, GAME, {
+        title: "칸 따먹기",
+        lead: "점 사이에 선을 번갈아 긋고, 네 변을 닫으면 그 칸을 가져요. 동료에게 도전장을 보내거나 컴퓨터와 해 봐요. 끝나면 오늘 도장을 받아요.",
+        intro: howHtml(),
+        bot: BOT_LEVELS,
+        labels: { bot: "컴퓨터와 하기" },
+        rankNote: "기권·시간 초과는 선을 10번 이상 그은 판만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요",
+        rowNote: (m) => `칸 ${m.myBoxes || 0} : ${m.rivalBoxes || 0} · ${due(m.deadlineAt)}`,
+        resultNote: (m) => `${HKMatch.reason(m)}${m.myBoxes != null ? ` · ${m.myBoxes} : ${m.rivalBoxes}` : ""}`,
+      });
+      if (match) return; // 그새 대국 화면으로 갔다
+      // 둘이서 하는 게임 모음(함께하기)으로 가는 길
+      root.querySelector(".gk__back")?.insertAdjacentHTML("afterend", `<a class="gk__back" href="/together" style="margin-left:14px">함께하기 ›</a>`);
+      const how = root.querySelector(".bx-how");
+      if (how) how.addEventListener("toggle", () => { if (!how.open) try { localStorage.setItem(HOW_KEY, "1"); } catch (_) { /* 그만 */ } });
+    }
+    // 「이렇게 해요」 — 처음 온 사람에게는 펼쳐 둔다
+    function howHtml() {
+      let first = true;
+      try { first = !localStorage.getItem(HOW_KEY); } catch (_) { /* 그대로 */ }
+      // 그림: 세 변이 그어진 칸에 마지막 변을 그어 내 칸이 되는 모습
+      const pic = `<svg class="bx-how__pic" viewBox="0 0 240 140" aria-hidden="true">
+          <defs>
+            <pattern id="bxh-grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#dce9f5" stroke-width="1"/></pattern>
+            <pattern id="bxh-hatch" width="9" height="9" patternUnits="userSpaceOnUse" patternTransform="rotate(-38)"><line x1="2" y1="0" x2="2" y2="9" stroke="#2563eb" stroke-width="3.5" stroke-opacity=".3"/></pattern>
+          </defs>
+          <rect width="240" height="140" fill="#fffdf6"/><rect width="240" height="140" fill="url(#bxh-grid)"/>
+          <rect x="26" y="26" width="88" height="88" rx="4" fill="url(#bxh-hatch)"/>
+          <text x="70" y="72" font-size="34" font-weight="900" fill="#1e40af" text-anchor="middle" dominant-baseline="central" transform="rotate(-7 70 70)">나</text>
+          <g fill="none" stroke-linecap="round" stroke-width="5">
+            <path d="M20 20Q65 18 120 20M20 20Q22 70 20 120M20 120Q70 122 120 120" stroke="#2f343b"/>
+            <path d="M120 20Q118 70 120 120" stroke="#2563eb"/>
+            <path d="M120 20Q170 22 220 20" stroke="#2f343b"/>
+            <path d="M220 20Q222 70 220 120" stroke="#2f343b" stroke-dasharray="4 9" opacity=".45"/>
+          </g>
+          <g fill="#1f2937"><circle cx="20" cy="20" r="5"/><circle cx="120" cy="20" r="5"/><circle cx="220" cy="20" r="5"/><circle cx="20" cy="120" r="5"/><circle cx="120" cy="120" r="5"/><circle cx="220" cy="120" r="5"/></g>
+        </svg>`;
+      return `<details class="bx-how" ${first ? "open" : ""}><summary>이렇게 해요 <small>1분이면 알아요</small></summary>
+          <div class="bx-how__body">${pic}
+            <div>
+              <ol>
+                <li>이웃한 두 점 사이에 선을 하나씩 번갈아 그어요.</li>
+                <li>선을 그어 칸의 네 변을 닫으면 <b>그 칸은 내 것</b>이고, 한 번 더 그어요.</li>
+                <li>25칸 중 <b>13칸</b>을 먼저 차지하면 이겨요.</li>
+                <li>한 번 긋는 데 24시간까지 기다려요. 넘기면 시간 초과로 져요.</li>
+              </ol>
+              <div class="bx-how__tip">세 변을 그어 둔 칸은 상대가 가져가요. 안전한 선이 다 떨어지면 누군가는 칸을 내줘야 하니, 그때를 미리 따져 봐요.</div>
+            </div>
+          </div>
+        </details>`;
+    }
+
+    function route() {
+      const m = /^#m(\d+)$/.exec(location.hash);
+      if (m) showMatch(Number(m[1])); else showLobby();
+    }
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div id="gk-root"></div>`,
+      afterMount: () => {
+        root = document.getElementById("gk-root");
+        if (window.HKSound && HKSound.onChange) HKSound.onChange(() => { const b = document.getElementById("bx-snd"); if (b) b.outerHTML = soundBtn(); });
+        root.addEventListener("click", async (e) => {
+          const t = e.target.closest("button, a");
+          if (!t) return;
+          if (t.id === "bx-go") { if (sel != null) commit(sel); return; }
+          if (t.id === "bx-snd") { HKSound.toggle(); if (!HKSound.isMuted()) sfx("select"); return; }
+          if (t.id === "bx-resign") {
+            if (!(await HKUI.confirmDialog("기권할까요?", "이 판은 패배로 끝나요.", { confirmLabel: "기권" }))) return;
+            const id = match && match.id;
+            try { const r = await HKApi.matchResign(id); if (match && match.id === id) applyNext(r); } catch (err) { fail(err); }
+            return;
+          }
+          if (t.id === "bx-accept" || t.id === "bx-decline") {
+            const id = match.id;
+            t.disabled = true;
+            try {
+              const r = await (t.id === "bx-accept" ? HKApi.matchAccept(id) : HKApi.matchDecline(id));
+              if (match && match.id === id) { shown = 0; applyNext(r); }
+            } catch (err) { fail(err); if (match && match.id === id) showMatch(id); }
+            return;
+          }
+          if (t.id === "bx-again") {
+            t.disabled = true;
+            try {
+              if (match.bot) { const m = await HKApi.matchBot(match.bot, GAME); location.hash = `m${m.id}`; }
+              else { await HKApi.matchCreate(match.opponent.id, GAME); HKUI.toast("도전장을 보냈어요"); location.hash = ""; }
+            } catch (err) { fail(err); t.disabled = false; }
+            return;
+          }
+          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
+          await HKMatch.act(t, GAME, showLobby);
+        });
+        window.addEventListener("hashchange", route);
+        window.addEventListener("keydown", (e) => {
+          if (!match || match.status !== "ACTIVE" || document.querySelector(".hk-dialog__overlay")) return;
+          if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+          const arrows = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+          if (e.code === "Space" || e.key === "Enter") {
+            if (e.target && e.target.closest && e.target.closest("button, a")) return; // 버튼 위에서는 버튼이 받는다
+            e.preventDefault(); // 판을 보는 동안 스페이스로 화면이 내려가지 않게
+            if (sel != null && !e.repeat && ready()) commit(sel);
+          } else if (arrows[e.key] && ready()) {
+            e.preventDefault();
+            moveSel(...arrows[e.key]);
+          } else if (e.key === "Escape" && sel != null) setSel(null);
+        });
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && match && !sending) showMatch(match.id); });
+        route();
+      },
+    });
+  </script>
+</body>
+</html>

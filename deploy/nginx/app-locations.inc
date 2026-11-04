@@ -14,6 +14,27 @@ location /api/ {
     proxy_read_timeout 120s;
 }
 
+# 1:1 실시간 연결(웹소켓) — /api/ 보다 긴 접두어라 이쪽이 먼저 잡는다. 판이 이어지는 동안 오래 열려 있어 읽기 시간을 길게 둔다
+# (서버가 20초마다 ping 을 보내므로 살아 있는 연결은 끊기지 않는다)
+# - 압축(permessage-deflate) 요청을 넘기지 않는다: 작은 압축 프레임이 서버에서 크게 풀려 메모리를 먹는 것을 막는다(메시지는 4KB 이하라 압축이 필요 없다)
+# - Host 는 포트까지 그대로 넘긴다: 서버가 Origin 전체(scheme · host · port)를 이 사이트 주소와 맞춰 본다
+# - 거절 이유 묻기(/api/play/rt-check/)는 접두어가 달라 위의 /api/ 가 맡는다
+location /api/play/rt/ {
+    proxy_pass http://127.0.0.1:8100;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Sec-WebSocket-Extensions "";
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_buffering off;
+    proxy_connect_timeout 30s;
+    proxy_send_timeout 3600s;
+    proxy_read_timeout 3600s;
+}
+
 location = /favicon.ico {
     alias /opt/healthkeeper/app/web/assets/logo-mark.svg;
     default_type image/svg+xml;

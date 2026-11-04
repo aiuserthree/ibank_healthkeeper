@@ -14,7 +14,8 @@ window.HKApi = (function () {
     }
     if (!res.ok) {
       const apiErr = body.error || body.detail?.error || {};
-      const err = new Error(apiErr.message || res.statusText || "요청 실패");
+      // FastAPI 기본 422 는 detail 이 배열이라 메시지가 없다 — 영어 상태 글 대신 한국어로
+      const err = new Error(apiErr.message || (res.status === 422 ? "보낼 수 없는 요청이에요. 화면을 새로 불러 주세요." : res.statusText) || "요청 실패");
       err.code = apiErr.code;
       err.status = res.status;
       throw err;
@@ -54,17 +55,22 @@ window.HKApi = (function () {
     // 2인 협동 방 — 방탈출(overtime) · 점심 분식집(lunch)
     coopOverview: (room) => request(`/play/coop?room=${encodeURIComponent(room)}`),
     coopInbox: () => request("/play/coop/inbox"),
+    coopSeries: () => request("/play/coop/series"), // 협동 시리즈 화마다 내 기록 [{ key, no, title, page, game, bestKind, played, cleared(성공한 판), best, partners, incoming, ready }]
     coopInvite: (partnerId, room) => request("/play/coop", { method: "POST", body: JSON.stringify({ partnerId, room }) }),
     coopDetail: (id) => request(`/play/coop/${id}`),
     coopWait: (id, seq, here, signal) => request(`/play/coop/${id}/wait?seq=${seq}&here=${here ? "true" : "false"}`, { signal }),
     coopAccept: (id) => request(`/play/coop/${id}/accept`, { method: "POST" }),
     coopLeave: (id) => request(`/play/coop/${id}/leave`, { method: "POST" }),
     coopCall: (id) => request(`/play/coop/${id}/call`, { method: "POST" }),
+    coopOptions: (id, opts) => request(`/play/coop/${id}/options`, { method: "POST", body: JSON.stringify({ opts }) }),
     coopReady: (id, on) => request(`/play/coop/${id}/ready`, { method: "POST", body: JSON.stringify({ on }) }),
     coopSay: (id, text) => request(`/play/coop/${id}/say`, { method: "POST", body: JSON.stringify({ text }) }),
     coopSolve: (id, puzzle, answer) => request(`/play/coop/${id}/solve`, { method: "POST", body: JSON.stringify({ puzzle, answer }) }),
     coopHint: (id, puzzle) => request(`/play/coop/${id}/hint`, { method: "POST", body: JSON.stringify({ puzzle }) }),
     coopCard: (id) => request(`/play/coop/${id}/card`, { method: "POST" }),
+    // 방탈출 — 힌트 한 단계(1 살짝 · 2 확실하게, 이미 본 단계면 그대로) · 물건(send 투입구로 넘기기 · use 쓰기 · eat 먹기)
+    coopHintStep: (id, puzzle, level) => request(`/play/coop/${id}/hint/${Number(level) || 1}`, { method: "POST", body: JSON.stringify({ puzzle }) }),
+    coopItem: (id, item, action) => request(`/play/coop/${id}/item`, { method: "POST", body: JSON.stringify({ item, action }) }),
     coopAct: (id, action, arg) => request(`/play/coop/${id}/act`, { method: "POST", body: JSON.stringify({ action, arg }) }),
     coopTick: (id) => request(`/play/coop/${id}/tick`, { method: "POST" }),
     matchMembers: (q) => request(`/play/match/members?q=${encodeURIComponent(q || "")}`),
