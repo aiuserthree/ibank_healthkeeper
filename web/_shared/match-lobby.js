@@ -18,6 +18,22 @@ window.HKMatch = (function () {
     const tag = { win: "승", lose: "패", draw: "무" }[m.result];
     return `<a class="gk__row" href="#m${m.id}">${person(m.opponent, `${REASON[m.endReason] || ""} · ${m.moveCount}수`)}<span class="gk__tag is-${m.result}">${tag}</span></a>`;
   }
+  // 대국 화면 위 — 나 vs 상대. 누구 차례인지, 돌(기물) 색, 끝나면 각자 승 · 패 · 무
+  function versus(m, msg) {
+    const res = m.status === "DONE" ? m.result : null; // 내 기준 win · lose · draw
+    const rivalColor = m.myColor ? (m.myColor === "black" ? "white" : "black") : null;
+    const turn = (mine) => m.status === "ACTIVE" && m.myTurn === mine;
+    const won = (mine) => res && res !== "draw" && (res === "win") === mine;
+    const mark = (mine) => (!res ? "" : res === "draw" ? `<span class="gk__res is-draw">무</span>`
+      : won(mine) ? `<span class="gk__res is-win">🏆 승</span>` : `<span class="gk__res is-lose">패</span>`);
+    const side = (p, mine, color) => `<div class="gk__side ${mine ? "is-me" : ""} ${turn(mine) ? "is-turn" : ""} ${res ? (res === "draw" ? "is-draw" : won(mine) ? "is-win" : "is-lose") : ""}">
+        <span class="gk__face">${ava(p)}${color ? `<span class="gk__stone is-${color}" title="${mine ? "내" : "상대"} 색"></span>` : ""}</span>
+        <span class="gk__who"><b>${esc(p.name)}${mine ? " <em>나</em>" : ""}</b><small>${esc(p.department || "")}</small></span>
+        ${mark(mine)}${turn(mine) ? `<span class="gk__turn">차례</span>` : ""}
+      </div>`;
+    const me = m.me || { name: "나", department: "", avatarUrl: null };
+    return `<div class="gk__vs ${res ? `is-${res}` : ""}">${side(me, true, m.myColor)}<div class="gk__vs-mid"><b>VS</b><small>${esc(msg)}</small></div>${side(m.opponent, false, rivalColor)}</div>`;
+  }
   const section = (title, body) => (body ? `<section class="gk__sec"><h2>${title}</h2>${body}</section>` : "");
 
   // 목록을 그리고 지금 게임 시간 정보를 돌려준다
@@ -79,5 +95,5 @@ window.HKMatch = (function () {
       else if (challenge) { await HKApi.matchCreate(Number(challenge), game); HKUI.toast("도전장을 보냈어요"); refresh(); }
     } catch (e) { fail(e); }
   }
-  return { esc, REASON, ava, closedNote, due, fail, lobby, act };
+  return { esc, REASON, ava, closedNote, due, fail, lobby, act, versus };
 })();

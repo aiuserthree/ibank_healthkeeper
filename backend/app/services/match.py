@@ -199,6 +199,7 @@ def _payload(m: GameMatch, member_id: int, people: dict, board: bool = False) ->
         "finishedAt": m.finished_at.astimezone(KST).isoformat() if m.finished_at else None,
     }
     if board:
+        out["me"] = _person(people.get(member_id))  # 대국 화면 위 「나 vs 상대」
         out["moves"] = m.moves
         if m.game == CHESS:
             b = chess_game.board_of(m.moves)
