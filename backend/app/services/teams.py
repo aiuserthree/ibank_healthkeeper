@@ -47,6 +47,11 @@ _TRANSFER_NOTIFY_TYPES = frozenset({
     TeamsMessageType.MATCH_ACCEPTED,
     TeamsMessageType.MATCH_DECLINED,
     TeamsMessageType.MATCH_CANCELLED,
+    TeamsMessageType.ESCAPE_INVITED,
+    TeamsMessageType.ESCAPE_ACCEPTED,
+    TeamsMessageType.ESCAPE_DECLINED,
+    TeamsMessageType.ESCAPE_CANCELLED,
+    TeamsMessageType.ESCAPE_CALL,
 })
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
@@ -1307,3 +1312,67 @@ async def enqueue_match_declined_notice(db: AsyncSession, *, game: str, match_id
 async def enqueue_match_cancelled_notice(db: AsyncSession, *, game: str, match_id: int, challenger: Member, opponent: Member) -> list[int]:
     body = render_match_cancelled_body(game=game, opponent=opponent, challenger=challenger)
     return await _enqueue_match_notice(db, kind=TeamsMessageType.MATCH_CANCELLED, to=opponent, body=body, key=f"match-cancelled:{match_id}")
+
+
+
+# ── 2인 협동 방탈출 ─────────────────────────────────────────────
+
+def escape_page_url(room_id: Optional[int] = None) -> str:
+    url = f"{get_settings().app_base_url.rstrip('/')}/games/escape"
+    return f"{url}#r{room_id}" if room_id else url
+
+
+def render_escape_invited_body(*, room_title: str, room_id: int, guest: Member, host: Member, deadline_at: Optional[datetime]) -> str:
+    url = escape_page_url(room_id)
+    due = f"{_datetime_label(deadline_at)}까지 수락하지 않으면 초대가 사라져요. " if deadline_at else ""
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 방탈출 같이 해요</p>"
+        f"<p>{html.escape(guest.name)}님, {_who(host)}이 방탈출 「{html.escape(room_title)}」에 초대했어요. "
+        f"둘이 단서를 나눠 20분 안에 탈출하는 협동 게임이에요.</p>"
+        f"<p>{due}수락은 아케이드가 열린 시간에만 할 수 있어요.</p>"
+        f'<p><a href="{url}">방탈출 열기</a>에서 수락하거나 거절해 주세요.</p>'
+    )
+
+
+def render_escape_accepted_body(*, room_title: str, room_id: int, host: Member, guest: Member) -> str:
+    url = escape_page_url(room_id)
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 방탈출 초대 수락</p>"
+        f"<p>{html.escape(host.name)}님, {_who(guest)}이 「{html.escape(room_title)}」 초대를 수락했어요.</p>"
+        f"<p>둘 다 방에 들어와 「준비」를 누르면 20분 타이머가 시작돼요.</p>"
+        f'<p><a href="{url}">방에 들어가기</a></p>'
+    )
+
+
+def render_escape_declined_body(*, room_title: str, host: Member, guest: Member) -> str:
+    url = escape_page_url()
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 방탈출 초대 거절</p>"
+        f"<p>{html.escape(host.name)}님, {_who(guest)}이 「{html.escape(room_title)}」 초대를 거절했어요.</p>"
+        f'<p><a href="{url}">방탈출 열기</a>에서 다른 동료를 초대할 수 있어요.</p>'
+    )
+
+
+def render_escape_cancelled_body(*, room_title: str, to: Member, by: Member) -> str:
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 방탈출 취소</p>"
+        f"<p>{html.escape(to.name)}님, {_who(by)}이 「{html.escape(room_title)}」 방을 취소했어요.</p>"
+    )
+
+
+def render_escape_call_body(*, room_title: str, room_id: int, to: Member, by: Member) -> str:
+    url = escape_page_url(room_id)
+    return (
+        f"<p><strong>[헬스키퍼]</strong> 방탈출 — 같이 들어와요</p>"
+        f"<p>{html.escape(to.name)}님, {_who(by)}이 「{html.escape(room_title)}」 방에서 기다리고 있어요.</p>"
+        f'<p><a href="{url}">지금 방에 들어가기</a></p>'
+    )
+
+
+async def enqueue_escape_notice(db: AsyncSession, *, kind: TeamsMessageType, to: Member, body: str, key: str) -> list[int]:
+    if not to.entra_oid:
+        return []
+    msg = await enqueue_teams_message(
+        db, message_type=kind, to_member_id=to.id, to_entra_oid=to.entra_oid, body=body, dedupe_key=key,
+    )
+    return [msg.id] if msg else []

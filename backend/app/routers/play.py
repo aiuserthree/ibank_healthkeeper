@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from pydantic import BaseModel
@@ -11,6 +11,7 @@ from app.core.deps import get_current_active_member, get_redis_client
 from app.database import get_db
 from app.models import Member
 from app.services import game as game_service
+from app.services import escape as escape_service
 from app.services import match as match_service
 
 router = APIRouter(prefix="/play", tags=["play"])
@@ -212,6 +213,132 @@ async def match_resign(
     member: Member = Depends(get_current_active_member),
 ):
     return {"data": await match_service.resign(db, member, match_id)}
+
+
+# ── 2인 협동 방탈출 ──
+
+class EscapeInvite(BaseModel):
+    partnerId: int
+    room: str = "overtime"
+
+
+class EscapeReady(BaseModel):
+    on: bool = True
+
+
+class EscapeSolve(BaseModel):
+    puzzle: str
+    answer: Union[str, list, None] = None
+
+
+class EscapeHint(BaseModel):
+    puzzle: str
+
+
+class EscapeSay(BaseModel):
+    text: str
+
+
+@router.get("/escape")
+async def escape_overview(db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    return {"data": await escape_service.overview(db, member)}
+
+
+@router.get("/escape/inbox")
+async def escape_inbox(db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    return {"data": await escape_service.inbox(db, member)}
+
+
+@router.post("/escape")
+async def escape_invite(
+    body: EscapeInvite, background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    data, notify = await escape_service.invite(db, member, body.partnerId, body.room)
+    _deliver(background_tasks, notify)
+    return {"data": data}
+
+
+@router.get("/escape/{room_id}")
+async def escape_detail(room_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    return {"data": await escape_service.detail(db, member, room_id)}
+
+
+@router.get("/escape/{room_id}/wait")
+async def escape_wait(
+    room_id: int, seq: int = Query(..., ge=0), here: bool = Query(False),
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    """방 화면이 거는 요청 — 방이 바뀌거나 상대가 들어오고 나가면 그 즉시, 아니면 20초 뒤에 돌려준다."""
+    return {"data": await escape_service.wait(db, member, room_id, seq, here)}
+
+
+@router.post("/escape/{room_id}/accept")
+async def escape_accept(
+    room_id: int, background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    data, notify = await escape_service.accept(db, member, room_id)
+    _deliver(background_tasks, notify)
+    return {"data": data}
+
+
+@router.post("/escape/{room_id}/leave")
+async def escape_leave(
+    room_id: int, background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    """초대 거절 · 보낸 초대 취소 · 시작 전 나가기 · 진행 중 포기 — 업무 시간에도 할 수 있다."""
+    data, notify = await escape_service.leave(db, member, room_id)
+    _deliver(background_tasks, notify)
+    return {"data": data}
+
+
+@router.post("/escape/{room_id}/call")
+async def escape_call(
+    room_id: int, background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    data, notify = await escape_service.call(db, member, room_id)
+    _deliver(background_tasks, notify)
+    return {"data": data}
+
+
+@router.post("/escape/{room_id}/ready")
+async def escape_ready(
+    room_id: int, body: EscapeReady,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    return {"data": await escape_service.ready(db, member, room_id, body.on)}
+
+
+@router.post("/escape/{room_id}/solve")
+async def escape_solve(
+    room_id: int, body: EscapeSolve,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    return {"data": await escape_service.solve(db, member, room_id, body.puzzle, body.answer)}
+
+
+@router.post("/escape/{room_id}/hint")
+async def escape_hint(
+    room_id: int, body: EscapeHint,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    return {"data": await escape_service.hint(db, member, room_id, body.puzzle)}
+
+
+@router.post("/escape/{room_id}/card")
+async def escape_card(room_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    return {"data": await escape_service.card(db, member, room_id)}
+
+
+@router.post("/escape/{room_id}/say")
+async def escape_say(
+    room_id: int, body: EscapeSay,
+    db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
+):
+    return {"data": await escape_service.say(db, member, room_id, body.text)}
 
 
 @router.post("/{game}/run")

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Optional
 
-from sqlalchemy import JSON, BigInteger, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, BigInteger, Boolean, Date, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -105,3 +105,39 @@ class GameRequest(Base):
     )
 
     __table_args__ = (Index("ix_game_request_created", "created_at"),)
+
+
+class EscapeRoom(Base):
+    """2인 협동 방탈출 한 판 — 초대 → 수락 → 둘 다 준비 → 20분 안에 탈출.
+
+    두 사람은 서로 다른 쪽(사무실 · 탕비실)을 보고, 단서를 말로 주고받아 자물쇠를 푼다.
+    정답과 단서는 서버에만 있고, 화면에는 내 쪽에서 보이는 것만 보낸다.
+    """
+
+    __tablename__ = "escape_room"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    room: Mapped[str] = mapped_column(String(20), nullable=False)  # 방 종류 — overtime(야근 사무실)
+    host_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False)
+    guest_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False)
+    # PENDING(초대) · READY(수락, 둘 다 준비 기다림) · PLAYING · CLEAR · FAILED(시간 초과) · DECLINED · EXPIRED
+    status: Mapped[str] = mapped_column(String(12), nullable=False)
+    # 역할 · 준비 · 푼 자물쇠 · 쓴 힌트 · 틀린 횟수 · 사원증 · 대화 · 진행 기록
+    state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    # 바뀔 때마다 1씩 — 화면은 이 값이 달라지면 다시 그린다
+    seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # 초대·대기 기한, 진행 중이면 제한 시간 끝
+    deadline_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    # 탈출 기록(초) — 걸린 시간 + 힌트·오답 벌점
+    record_sec: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # 두 사람 모두 이 방을 처음 탈출한 판만 순위에 — 답을 알고 다시 하는 판은 빼려고
+    ranked: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        Index("ix_escape_room_host", "host_id", "status"),
+        Index("ix_escape_room_guest", "guest_id", "status"),
+        Index("ix_escape_room_status", "status"),
+    )
