@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 말해 봐 맞혀 봐</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/coop.js"></script>
+  <style>
+    .er-hero.is-words { background: radial-gradient(120% 90% at 85% 0%, #a855f7 0%, rgba(168, 85, 247, 0) 55%), linear-gradient(160deg, #1e1b4b, #4338ca); }
+    .wd-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .wd-stat { display: flex; align-items: baseline; gap: 6px; padding: 8px 12px; border-radius: 12px; background: #eef2ff; font-size: 13px; font-weight: 700; color: #4338ca; }
+    .wd-stat b { font-size: 20px; color: #1e1b4b; font-variant-numeric: tabular-nums; }
+    .wd-role { margin-left: auto; padding: 8px 12px; border-radius: 12px; font-size: 13.5px; font-weight: 800; }
+    .wd-role.is-explain { background: #fef3c7; color: #92400e; }
+    .wd-role.is-guess { background: #dcfce7; color: #166534; }
+    .wd-card { padding: 22px 18px; border-radius: 18px; text-align: center; background: linear-gradient(160deg, #312e81, #6d28d9); color: #fff; }
+    .wd-card small { display: block; font-size: 13px; font-weight: 700; color: #c4b5fd; }
+    .wd-word { margin: 6px 0 12px; font-size: 40px; font-weight: 900; letter-spacing: .04em; word-break: keep-all; }
+    .wd-banned { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+    .wd-banned span { padding: 5px 12px 5px 9px; border-radius: 999px; background: #fff; color: #b91c1c; font-size: 14px; font-weight: 800; }
+    .wd-banned span::before { content: "🚫 "; font-size: 12px; }
+    .wd-blanks { display: flex; justify-content: center; gap: 8px; margin: 10px 0 4px; }
+    .wd-blanks span { width: 44px; height: 52px; border-radius: 10px; background: rgba(255, 255, 255, .16); border: 2px dashed rgba(255, 255, 255, .45); }
+    .wd-form { display: flex; gap: 8px; margin-top: 14px; }
+    .wd-form input { flex: 1; min-width: 0; padding: 13px 14px; border: 1.5px solid #c7d2fe; border-radius: 12px; font: inherit; font-size: 17px; }
+    .wd-form input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, .18); }
+    .wd-form .hk-btn { flex-shrink: 0; min-width: 92px; }
+    .wd-sub { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12.5px; color: var(--text-muted); }
+    .wd-feed { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+    .wd-feed h3 { margin: 0; font-size: 14px; font-weight: 800; color: #475569; }
+    .wd-clue { align-self: flex-start; max-width: 92%; padding: 10px 14px; border-radius: 14px 14px 14px 4px; background: #eef2ff; font-size: 17px; font-weight: 700; color: #1e1b4b; word-break: keep-all; }
+    .wd-guesses { display: flex; flex-wrap: wrap; gap: 6px; }
+    .wd-guess { padding: 5px 11px; border-radius: 999px; background: #fee2e2; color: #991b1b; font-size: 13.5px; font-weight: 700; }
+    .wd-guess.is-ok { background: #dcfce7; color: #166534; }
+    .wd-empty { padding: 14px; border-radius: 12px; background: #f8fafc; text-align: center; font-size: 13.5px; color: var(--text-muted); }
+    .wd-done { margin: 0; padding: 0; list-style: none; }
+    .wd-done li { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+    .wd-done li:last-child { border-bottom: 0; }
+    .wd-done small { margin-left: auto; font-size: 12px; color: var(--text-muted); }
+    .er-end.is-words { background: linear-gradient(160deg, #312e81, #7c3aed); }
+    @media (max-width: 640px) {
+      .wd-word { font-size: 32px; }
+      .wd-blanks span { width: 34px; height: 42px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 말해 봐 맞혀 봐 — 2인 협동. 한 사람이 제시어를 설명(금지어 X)하고 다른 사람이 맞힌다. 낱말마다 역할이 바뀐다 (방 공용은 /_shared/coop.js)
+    const { esc } = HKMatch;
+    let room = null, w = null, offset = 0, tickFor = null, lastRole = null;
+    const draft = { clue: "", guess: "" };
+    const now = () => (Date.now() + offset) / 1000;
+
+    function statsHtml() {
+      return `<div class="wd-stats">
+          <div class="wd-stat">맞힘 <b>${w.score}</b>개</div>
+          <div class="wd-stat">넘김 <b>${w.passed}</b>개</div>
+          <span class="wd-role ${w.role === "explain" ? "is-explain" : "is-guess"}">${w.role === "explain" ? "🗣️ 내가 설명할 차례" : "🤔 내가 맞힐 차례"}</span>
+        </div>`;
+    }
+    function feedHtml() {
+      const clues = w.clues.map((c) => `<div class="wd-clue">${esc(c.text)}</div>`).join("");
+      const guesses = w.guesses.map((g) => `<span class="wd-guess ${g.ok ? "is-ok" : ""}">${esc(g.text)}</span>`).join("");
+      return `<div class="wd-feed"><h3>${w.role === "explain" ? "내가 보낸 설명" : `${esc(room.partner.name)}님의 설명`}</h3>${clues || `<div class="wd-empty">${w.role === "explain" ? "제시어를 설명해 보세요" : "설명을 기다리는 중…"}</div>`}
+          ${guesses ? `<h3 style="margin-top:6px">${w.role === "explain" ? `${esc(room.partner.name)}님의 답` : "내가 낸 답"}</h3><div class="wd-guesses">${guesses}</div>` : ""}</div>`;
+    }
+    function playHtml() {
+      if (!w) return "";
+      if (w.role === "explain") {
+        return `<div class="er-card">${statsHtml()}
+            <div class="wd-card"><small>제시어</small><div class="wd-word">${esc(w.word)}</div><small style="margin-bottom:6px">금지어 — 설명에 쓰면 안 돼요</small><div class="wd-banned">${w.banned.map((b) => `<span>${esc(b)}</span>`).join("")}</div></div>
+            <form class="wd-form" id="wd-clue-form"><input id="wd-clue" maxlength="${w.clueMax}" placeholder="제시어를 설명해 주세요" autocomplete="off" value="${esc(draft.clue)}"><button class="hk-btn hk-btn--primary" type="submit">보내기</button></form>
+            <div class="wd-sub"><span>제시어·금지어가 들어간 설명은 보낼 수 없어요</span><button type="button" class="er-linkbtn" data-pass>넘기기 ›</button></div>
+            ${feedHtml()}</div>`;
+      }
+      return `<div class="er-card">${statsHtml()}
+          <div class="wd-card"><small>${esc(room.partner.name)}님이 설명하는 낱말</small><div class="wd-blanks">${Array.from({ length: w.letters }, () => "<span></span>").join("")}</div><small>${w.letters}글자</small></div>
+          <form class="wd-form" id="wd-guess-form"><input id="wd-guess" maxlength="20" placeholder="정답을 적어 주세요" autocomplete="off" value="${esc(draft.guess)}"><button class="hk-btn hk-btn--primary" type="submit">맞히기</button></form>
+          <div class="wd-sub"><span>띄어쓰기는 상관없어요. 틀려도 계속 낼 수 있어요</span></div>
+          ${feedHtml()}</div>`;
+    }
+    function doneHtml() {
+      const items = (w ? w.done : []).slice().reverse().map((d) => `<li>${d.ok ? "✅" : "⏭️"} <b>${esc(d.word)}</b><small>${d.ok ? "맞힘" : "넘김"}</small></li>`).join("");
+      return `<div class="er-card"><h2>지나간 낱말</h2>${items ? `<ul class="wd-done">${items}</ul>` : `<div style="font-size:13px;color:var(--text-muted)">아직 없어요</div>`}</div>`;
+    }
+
+    async function send(ctx, action, arg) {
+      try {
+        const next = await HKApi.coopAct(room.id, action, arg);
+        if (action === "clue") draft.clue = "";
+        if (action === "guess") {
+          draft.guess = "";
+          const last = next.words && next.words.done[next.words.done.length - 1];
+          if (last && last.ok && next.words.score > w.score) HKUI.toast(`정답! 「${last.word}」`);
+          else HKUI.toast("아니에요, 다시 맞혀 보세요", "error");
+        }
+        ctx.set(next);
+        if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+        document.getElementById(action === "clue" ? "wd-clue" : "wd-guess")?.focus();
+      } catch (e) { HKUI.toast(e.message || "보낼 수 없어요", "error"); }
+    }
+
+    const coop = HKCoop.mount({
+      room: "words",
+      listName: "말해 봐 맞혀 봐 목록",
+      heroClass: "is-words",
+      tickMs: 250,
+      chatWhilePlaying: false,
+      hero: { facts: ["2인 협동", "3분", "번갈아 설명 · 맞히기", "끝까지 하면 오늘 도장"], note: "설명은 글로 보내고, 금지어가 들어가면 보낼 수 없어요. 옆자리에서 하거나 Teams 통화를 켜고 해도 좋아요 — 다만 금지어는 말하지 않기!" },
+      rankTitle: "맞힌 낱말 순위",
+      rankNote: "같은 두 사람은 가장 많이 맞힌 한 판만 올라요.",
+      rankText: (x) => `${x.score}개`,
+      recentText: (r) => (r.status === "CLEAR" ? [`${r.score}개 맞힘`, "is-clear"] : ["포기", "is-fail"]),
+      failTitle: "그만뒀어요",
+      quick: ["준비됐어요!", "천천히 해요", "좋아요!", "한 판 더?"],
+      remain: () => (w ? w.end - now() : null),
+      timerNote: () => "남은 시간",
+      readyNote: (ctx) => (ctx.room.sideName === "먼저 설명"
+        ? "첫 낱말은 <b>내가 설명</b>해요. 제시어와 금지어가 보이면 금지어를 피해서 글로 설명해 주세요. 낱말이 끝나면 역할이 바뀌어요."
+        : "첫 낱말은 <b>내가 맞혀요</b>. 동료가 보낸 설명을 보고 정답을 적어 주세요. 낱말이 끝나면 역할이 바뀌어요."),
+      reset: () => { tickFor = null; lastRole = null; draft.clue = ""; draft.guess = ""; },
+      changed: (prev, next) => {
+        room = next;
+        w = next.words || null;
+        if (w) {
+          offset = w.now * 1000 - Date.now();
+          const key = `${w.role}:${(w.done || []).length}`;
+          if (lastRole && lastRole !== key) { draft.clue = ""; draft.guess = ""; }
+          lastRole = key;
+        }
+      },
+      play: () => playHtml(),
+      side: () => (w ? doneHtml() : ""),
+      painted: () => {
+        if (!room || room.status !== "PLAYING" || !w) return;
+        const el = document.getElementById(w.role === "explain" ? "wd-clue" : "wd-guess");
+        if (el && !document.activeElement?.matches("input")) el.focus();
+      },
+      end: (ctx, again) => `<div class="er-end is-words"><h2>시간 끝!</h2><p>${esc(room.outro)}</p>
+          <div class="er-end__time">${room.score ?? 0}개</div>
+          <p>${w ? `넘긴 낱말 ${w.passed}개` : ""}</p>
+          <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">목록</a></div></div>`,
+      after: () => (w ? `<div style="margin-top:14px">${doneHtml()}</div>` : ""),
+      tick: (ctx) => {
+        if (!room || room.status !== "PLAYING" || !w) return;
+        if (w.nextAt && now() >= w.nextAt + 0.05 && tickFor !== w.nextAt) {
+          tickFor = w.nextAt;
+          HKApi.coopTick(room.id).then((next) => ctx.set(next)).catch(() => { tickFor = null; });
+        }
+      },
+      click: async (t, ctx) => {
+        if ("pass" in t.dataset) return send(ctx, "pass", null);
+      },
+      input: (el) => {
+        if (el.id === "wd-clue") draft.clue = el.value;
+        if (el.id === "wd-guess") draft.guess = el.value;
+      },
+    });
+    // 설명 · 답 보내기 (공용 모듈의 대화 보내기와 따로)
+    document.addEventListener("submit", (e) => {
+      if (!["wd-clue-form", "wd-guess-form"].includes(e.target.id)) return;
+      e.preventDefault();
+      const clue = e.target.id === "wd-clue-form";
+      const text = (clue ? draft.clue : draft.guess).trim();
+      if (!text || !room) return;
+      send(coop, clue ? "clue" : "guess", text);
+    });
+  </script>
+</body>
+</html>

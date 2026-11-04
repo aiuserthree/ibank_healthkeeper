@@ -343,3 +343,22 @@ def view(st: dict, side: Optional[str], now: float) -> dict:
         base["gimbap"] = {"step": k["gimbap"], "steps": list(GIMBAP_STEPS)}
         base["waiting"] = len(k["queue"]) + sum(1 for tb in k["tables"] if tb["s"] == "wait" and not tb["c"]["sent"])
     return base
+
+
+# ── 협동 방 공용 코드가 부르는 결과 ─────────────────────────────
+
+START_TEXT = f"영업 시작! {SHIFT_SEC // 60}분 동안 손님을 받아요."
+
+
+def score(st: dict) -> int:
+    return st["k"]["money"]
+
+
+def end_code(st: dict) -> str:
+    return "SHIFT" if st["k"]["reason"] == "time" else "HEARTS"
+
+
+def summary(st: dict) -> str:
+    k = st["k"]
+    head = "영업 끝!" if k["reason"] == "time" else "손님을 너무 많이 놓쳐 가게 문을 일찍 닫았어요."
+    return f"{head} 매출 {k['money']:,}원 · 손님 {k['served']}명"

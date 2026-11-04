@@ -241,8 +241,8 @@ class EscapeSay(BaseModel):
 
 
 class KitchenAct(BaseModel):
-    action: str  # seat · send · serve · clean · cook · take · roll · toss
-    arg: Union[int, dict, None] = None
+    action: str  # 분식집: seat · send · serve · clean · cook · take · roll · toss / 낱말: clue · guess · pass
+    arg: Union[int, dict, str, None] = None
 
 
 @router.get("/coop")
@@ -368,14 +368,14 @@ async def coop_act(
     room_id: int, body: KitchenAct,
     db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member),
 ):
-    """점심 분식집 — 홀·주방 동작 하나."""
-    return {"data": await escape_service.kitchen_act(db, member, room_id, body.action, body.arg)}
+    """시간제 협동 게임(점심 분식집 · 말해 봐 맞혀 봐) — 동작 하나."""
+    return {"data": await escape_service.engine_act(db, member, room_id, body.action, body.arg)}
 
 
 @router.post("/coop/{room_id}/tick")
 async def coop_tick(room_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
-    """점심 분식집 — 손님 도착·떠남·결제·영업 끝 같은 시간 일을 맞춘다."""
-    return {"data": await escape_service.kitchen_tick(db, member, room_id)}
+    """시간제 협동 게임 — 손님 도착·떠남·결제·끝 같은 시간 일을 맞춘다."""
+    return {"data": await escape_service.engine_tick(db, member, room_id)}
 
 
 @router.post("/{game}/run")

@@ -1,7 +1,7 @@
-"""2인 협동 방 — 초대 → 수락 → 둘 다 준비 → 시작. 방탈출(escape)과 점심 분식집(kitchen)이 함께 쓴다.
+"""2인 협동 방 — 초대 → 수락 → 둘 다 준비 → 시작. 방탈출(escape) · 점심 분식집(kitchen) · 말해 봐 맞혀 봐(words)가 함께 쓴다.
 
 방탈출: 두 사람은 서로 다른 쪽을 보고, 자물쇠의 단서는 늘 반대쪽에 있다. 정답은 서버에서만 맞춰 보고,
-화면에는 내 쪽에서 보이는 것만 보낸다. 분식집: 홀과 주방이 3분 동안 가게를 운영한다(kitchen_game).
+화면에는 내 쪽에서 보이는 것만 보낸다. 분식집(kitchen_game) · 낱말(word_game)은 시간제 게임 엔진으로 돌아간다.
 바뀔 때마다 seq 를 올리고 알려서 상대 화면이 바로 바뀐다.
 """
 
@@ -21,12 +21,18 @@ from app.config import get_settings
 from app.core.errors import raise_app_error
 from app.core.time import KST, now_kst, today_kst
 from app.models import EscapeRoom, Member, MemberStatus, TeamsMessageType
-from app.services import kitchen_game, realtime
+from app.services import kitchen_game, realtime, word_game
 from app.services import teams as teams_service
 from app.services.escape_rooms import DEFAULT_ROOM, ROOMS, Puzzle, Room
 
 # 협동 방 종류 — 방탈출 방들 + 점심 분식집
-ALL_ROOMS = {**ROOMS, kitchen_game.ROOM.key: kitchen_game.ROOM}
+ALL_ROOMS = {**ROOMS, kitchen_game.ROOM.key: kitchen_game.ROOM, word_game.ROOM.key: word_game.ROOM}
+# 시간제 게임 엔진 — start · advance · act · view · score · end_code · summary · START_TEXT 를 갖춘다
+ENGINES = {"kitchen": kitchen_game, "words": word_game}
+
+
+def _engine(room):
+    return ENGINES.get(room.game)
 from app.services.game import CLOSED_WINDOWS, _give_stamp, ensure_open, is_public_holiday
 from app.services.match import _person, _real_person
 
@@ -65,17 +71,15 @@ def _escape_room(r: EscapeRoom) -> Room:
     return room
 
 
-def _finish_kitchen(r: EscapeRoom, st: dict) -> None:
-    """분식집 영업 끝 — 매출이 기록이 되고, 끝까지 한 판은 모두 순위에 든다."""
-    k = st["k"]
+def _finish_engine(r: EscapeRoom, st: dict, eng) -> None:
+    """시간제 게임 끝 — 점수(분식집 매출 · 맞힌 낱말 수)가 기록이 되고, 끝까지 한 판은 모두 순위에 든다."""
     r.status = "CLEAR"
-    r.score = k["money"]
+    r.score = eng.score(st)
     r.ranked = True
     r.finished_at = now_kst()
     r.deadline_at = None
-    st["end"] = "SHIFT" if k["reason"] == "time" else "HEARTS"
-    head = "영업 끝!" if k["reason"] == "time" else "손님을 너무 많이 놓쳐 가게 문을 일찍 닫았어요."
-    _log(st, f"{head} 매출 {k['money']:,}원 · 손님 {k['served']}명")
+    st["end"] = eng.end_code(st)
+    _log(st, eng.summary(st))
 
 
 def _iso(dt: Optional[datetime]) -> Optional[str]:
@@ -166,9 +170,10 @@ async def _sweep(db: AsyncSession, member_id: Optional[int] = None) -> None:
     failed = []
     for r in rows:
         st = _state(r)
-        if r.status == "PLAYING" and _room(r).game == "kitchen" and "k" in st:
-            kitchen_game.advance(st, time.time())
-            _finish_kitchen(r, st)
+        eng = _engine(_room(r))
+        if r.status == "PLAYING" and eng and "k" in st:
+            eng.advance(st, time.time())
+            _finish_engine(r, st, eng)
             failed.append(r)
             _save(r, st)
             continue
@@ -299,8 +304,9 @@ async def _view(db: AsyncSession, r: EscapeRoom, member: Member, full: bool = Tr
         "chat": [{"me": c["by"] == member.id, "name": names.get(c["by"], ""), "text": c["text"], "t": c["t"]} for c in chat[-40:]],
         "log": st.get("log", [])[-20:],
     })
-    if room.game == "kitchen":
-        out["kitchen"] = kitchen_game.view(st, side, time.time()) if "k" in st else None
+    eng = _engine(room)
+    if eng:
+        out[room.game] = eng.view(st, side, time.time()) if "k" in st else None
         return out
     out.update({
         "things": _things(room, side, st) if side and r.status in ("PLAYING", *ENDED) else [],
@@ -319,8 +325,8 @@ async def _view(db: AsyncSession, r: EscapeRoom, member: Member, full: bool = Tr
 
 async def _ranking(db: AsyncSession, member: Member, room_key: str) -> dict:
     """방탈출은 빠른 기록 순, 분식집은 매출이 많은 순 — 같은 두 사람은 가장 좋은 판 하나만."""
-    kitchen = ALL_ROOMS[room_key].game == "kitchen"
-    order = (EscapeRoom.score.desc(), EscapeRoom.finished_at) if kitchen else (EscapeRoom.record_sec, EscapeRoom.finished_at)
+    by_score = ALL_ROOMS[room_key].game in ENGINES
+    order = (EscapeRoom.score.desc(), EscapeRoom.finished_at) if by_score else (EscapeRoom.record_sec, EscapeRoom.finished_at)
     rows = (
         await db.execute(
             select(EscapeRoom)
@@ -524,10 +530,11 @@ async def ready(db: AsyncSession, member: Member, room_id: int, on: bool = True)
             raise_app_error("ESCAPE_CLOSING_SOON")
         r.status = "PLAYING"
         r.started_at = now
-        if room.game == "kitchen":
-            kitchen_game.start(st, time.time())
+        eng = _engine(room)
+        if eng:
+            eng.start(st, time.time())
             r.deadline_at = now + timedelta(seconds=room.limit_sec + 5)  # 끝은 advance 가 정한다 — 정리는 조금 뒤에
-            _log(st, f"영업 시작! {room.limit_sec // 60}분 동안 손님을 받아요.")
+            _log(st, eng.START_TEXT)
         else:
             r.deadline_at = now + timedelta(seconds=room.limit_sec)
             _log(st, f"탈출 시작! {room.limit_sec // 60}분 안에 출입문을 열어요.")
@@ -642,6 +649,8 @@ async def say(db: AsyncSession, member: Member, room_id: int, text: str) -> dict
     r = await _get(db, member, room_id, lock=True)
     if r.status not in ("READY", "PLAYING", *ENDED):
         raise_app_error("ESCAPE_NOT_READY")
+    if r.status == "PLAYING" and _room(r).game == "words":
+        raise_app_error("WORDS_CHAT_OFF")  # 대화창에 제시어를 적지 못하게 — 설명은 금지어를 거르는 설명 칸으로
     text = re.sub(r"\s+", " ", (text or "")).strip()[:CHAT_MAX]
     if not text:
         raise_app_error("ESCAPE_CHAT_EMPTY")
@@ -657,37 +666,39 @@ async def say(db: AsyncSession, member: Member, room_id: int, text: str) -> dict
     return await _view(db, r, member)
 
 
-# ── 점심 분식집 ───────────────────────────────────────────────
+# ── 시간제 게임(점심 분식집 · 말해 봐 맞혀 봐) ──────────────────────
 
-async def kitchen_act(db: AsyncSession, member: Member, room_id: int, action: str, arg) -> dict:
-    """홀·주방의 동작 하나 — 먼저 지금까지의 흐름(손님 도착 등)을 맞추고 나서 한다."""
+async def engine_act(db: AsyncSession, member: Member, room_id: int, action: str, arg) -> dict:
+    """시간제 게임(분식집 · 낱말)의 동작 하나 — 먼저 지금까지의 흐름을 맞추고 나서 한다."""
     r = await _playing(db, member, room_id)
-    if _room(r).game != "kitchen":
+    eng = _engine(_room(r))
+    if eng is None:
         raise_app_error("KITCHEN_BAD_ACTION")
     st = _state(r)
     now = time.time()
-    kitchen_game.advance(st, now)
+    eng.advance(st, now)
     if not st["k"]["over"]:
         side = st.get("roles", {}).get(str(member.id))
-        kitchen_game.act(st, side, member.id, action, arg, now)
+        eng.act(st, side, member.id, action, arg, now)
     if st["k"]["over"]:
-        _finish_kitchen(r, st)
+        _finish_engine(r, st, eng)
     _save(r, st)
     await _commit(db, r)
     stamp = await _stamp_pair(db, r, member.id) if r.status == "CLEAR" else None
     return {**(await _view(db, r, member)), "stamp": stamp}
 
 
-async def kitchen_tick(db: AsyncSession, member: Member, room_id: int) -> dict:
-    """정해 둔 시각(손님 도착 · 떠남 · 결제 · 영업 끝)이 되면 화면이 부른다. 바뀐 게 있으면 저장하고 알린다."""
+async def engine_tick(db: AsyncSession, member: Member, room_id: int) -> dict:
+    """정해 둔 시각(손님 도착 · 떠남 · 결제 · 끝)이 되면 화면이 부른다. 바뀐 게 있으면 저장하고 알린다."""
     await _sweep(db, member.id)
     r = await _get(db, member, room_id, lock=True)
     stamp = None
-    if r.status == "PLAYING" and _room(r).game == "kitchen":
+    eng = _engine(_room(r))
+    if r.status == "PLAYING" and eng:
         st = _state(r)
-        if kitchen_game.advance(st, time.time()):
+        if eng.advance(st, time.time()):
             if st["k"]["over"]:
-                _finish_kitchen(r, st)
+                _finish_engine(r, st, eng)
             _save(r, st)
             await _commit(db, r)
             if r.status == "CLEAR":
@@ -695,6 +706,9 @@ async def kitchen_tick(db: AsyncSession, member: Member, room_id: int) -> dict:
         else:
             await db.commit()
     return {**(await _view(db, r, member)), "stamp": stamp}
+
+
+kitchen_act, kitchen_tick = engine_act, engine_tick  # 예전 이름
 
 
 # ── 보기 · 기다리기 ────────────────────────────────────────────

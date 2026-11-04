@@ -72,6 +72,7 @@ GAMES: dict[str, Game] = {
         Game("chess", "사내 체스", "MINI", "동료 또는 컴퓨터와 두는 턴제 체스", "crown", "승", 1_000_000),
         Game("escape", "야근 사무실 탈출", "MINI", "동료와 둘이 단서를 나눠 20분 안에 탈출하는 협동 방탈출", "door-open", "time", 3600, lower_better=True),
         Game("kitchen", "점심 분식집", "MINI", "동료와 홀·주방을 나눠 3분 동안 분식집 운영 · 협동", "chef-hat", "원", 10_000_000),
+        Game("words", "말해 봐 맞혀 봐", "QUIZ", "동료와 번갈아 설명하고 맞히기 · 3분 동안 몇 개나 · 협동", "message-circle", "개", 1000),
         Game("typing", "영어 타자 레이스", "STUDY", "뜻을 보고 영어 단어 치기 · 첫 글자 힌트", "keyboard", "점", 1_000_000),
     )
 }

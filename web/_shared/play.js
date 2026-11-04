@@ -270,6 +270,7 @@ window.HKPlay = (function () {
     chess: ["#334155", "#64748b"],
     escape: ["#0f172a", "#1e3a8a"],
     kitchen: ["#c2410c", "#f59e0b"],
+    words: ["#312e81", "#7c3aed"],
     pairs: ["#0f8b8d", "#57cc99"],
     shooter: ["#2b1055", "#d53369"],
     bricks: ["#c2410c", "#fb923c"],

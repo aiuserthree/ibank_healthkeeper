@@ -145,7 +145,8 @@ window.HKCoop = (function () {
       else if (room.status === "PLAYING") main = game.play(ctx);
       else main = closedHtml() + (game.after ? game.after(ctx) : "");
       const sideOk = ["READY", "PLAYING", "CLEAR", "FAILED"].includes(room.status);
-      const side = sideOk ? `${room.status !== "READY" && game.side ? game.side(ctx) : ""}${chatHtml()}` : "";
+      const chatOk = !(room.status === "PLAYING" && game.chatWhilePlaying === false); // 낱말 게임은 진행 중 대화창을 닫는다
+      const side = sideOk ? `${room.status !== "READY" && game.side ? game.side(ctx) : ""}${chatOk ? chatHtml() : ""}` : "";
       root.innerHTML = `<div class="er ${game.wide ? "er-wide" : ""}">
           <a class="gk__back" href="#">‹ ${esc(game.listName || "목록")}</a>
           ${closedNote(open)}
