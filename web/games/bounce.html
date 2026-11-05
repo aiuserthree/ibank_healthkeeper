@@ -1286,8 +1286,14 @@
         if (run) for (const s of run.stages) { b += s.b; f += s.f; t += s.t; }
         return { b, f, t };
       }
+      // 몇 번째 스테이지인지 — 정식 도전은 고른 코스 안에서(1코스 · 3/10), 연습은 전체 번호(13/30)
+      function stageCount(i) {
+        if (mode === "run" && run) return { at: i - run.course.from + 1, of: run.course.to - run.course.from + 1, pre: COURSES.length > 1 ? `${run.course.no}코스 · ` : "" };
+        return { at: i + 1, of: N, pre: "" };
+      }
       function updateHud() {
-        hud.no.textContent = `${si + 1}/${N}`;
+        const sc = stageCount(si);
+        hud.no.textContent = `${sc.at}/${sc.of}`;
         hud.name.textContent = STAGES[si].name;
         let b = world.bounces, f = world.falls, t = stageTime;
         if (mode === "run") { const r = runTotals(); b += r.b; f += r.f; t += r.t; }
@@ -1557,7 +1563,7 @@
         const first = mode === "run" && run && i === run.course.from;
         showOver(`<div class="bb-card">
           ${passed ? `<div class="bb-pass">${HKUI.icon("check", 16, "currentColor")} ${passed}</div>` : ""}
-          <span class="bb-no">${mode === "practice" ? "연습 · " : COURSES.length > 1 && run ? `${run.course.no}코스 · ` : ""}${i + 1} / ${N} 스테이지</span>
+          <span class="bb-no">${mode === "practice" ? "연습 · " : stageCount(i).pre}${stageCount(i).at} / ${stageCount(i).of} 스테이지</span>
           <h2>${HKUI.escapeHtml(s.name)}</h2>
           <p>${HKUI.escapeHtml(s.intro)}</p>
           <div data-items></div>
@@ -1616,7 +1622,7 @@
         state = "paused";
         held.clear();
         showOver(`<div class="bb-card">
-          <span class="bb-no">${si + 1} / ${N} 스테이지</span>
+          <span class="bb-no">${stageCount(si).pre}${stageCount(si).at} / ${stageCount(si).of} 스테이지</span>
           <h2>잠시 멈췄어요</h2>
           <p>${mode === "run" ? "정식 도전 중이에요. 시간도 함께 멈춰 있어요." : "연습 중이에요."}</p>
           ${btn("hk-btn--primary", "resume", "play", "계속하기")}
