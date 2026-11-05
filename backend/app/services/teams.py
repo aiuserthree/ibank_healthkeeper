@@ -28,6 +28,7 @@ from app.models import (
     TeamsMessageType,
     TransferRequest,
 )
+from app.services.notice import display_title
 from app.services.sso import _microsoft_post
 from app.services.stretch_tips import stretch_tip_for
 
@@ -279,7 +280,7 @@ def render_open_notice_body(
         notice_url = notice_page_url(notice.id)
         notice_html = (
             f"<p>&nbsp;</p>"
-            f"<p><strong>📢 새 공지 · {html.escape(notice.title)}</strong><br>"
+            f"<p><strong>📢 새 공지 · {html.escape(display_title(notice))}</strong><br>"
             f"{_notice_intro_html(notice.body)}<br>"
             f'<a href="{notice_url}">{notice_url}</a></p>'
         )

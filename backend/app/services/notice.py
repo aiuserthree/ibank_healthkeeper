@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import calendar
+import re
 from datetime import datetime
 
 from sqlalchemy import select
@@ -13,11 +15,30 @@ from app.models import Notice
 
 CATEGORIES = ("NOTICE", "HEALTH")
 
+# 제목 머리말 「[새 기능]」(띄어 쓰든 붙여 쓰든) — 게시하고 한 달이 지나면 직원 화면 · 팀즈 알림에서 이 문구만 뺀다.
+# 저장된 제목은 바꾸지 않는다(관리자 화면은 원래 제목 그대로).
+NEW_FEATURE_TAG = re.compile(r"^\s*\[\s*새\s*기능\s*\]\s*")
 
-def _payload(notice: Notice, *, with_body: bool = True) -> dict:
+
+def _one_month_later(at: datetime) -> datetime:
+    """게시 시각에서 한 달 뒤(한국 시간 기준, 다음 달 같은 날 · 그 달에 없는 날이면 그 달 마지막 날)."""
+    at = at.astimezone(KST)
+    y, m = (at.year + 1, 1) if at.month == 12 else (at.year, at.month + 1)
+    return at.replace(year=y, month=m, day=min(at.day, calendar.monthrange(y, m)[1]))
+
+
+def display_title(notice: Notice, now: datetime | None = None) -> str:
+    """직원에게 보이는 제목 — 「[새 기능]」은 게시 한 달이 지나면 뺀다."""
+    title = notice.title
+    if NEW_FEATURE_TAG.match(title) and (now or now_kst()) >= _one_month_later(notice.published_at):
+        return NEW_FEATURE_TAG.sub("", title, count=1) or title
+    return title
+
+
+def _payload(notice: Notice, *, with_body: bool = True, public: bool = False) -> dict:
     data = {
         "id": notice.id,
-        "title": notice.title,
+        "title": display_title(notice) if public else notice.title,
         "category": notice.category,
         "pinned": notice.pinned,
         "published": notice.published,
@@ -50,7 +71,7 @@ async def list_notices(
         stmt = stmt.where(Notice.published.is_(True)).where(Notice.published_at <= now_kst())
     if category in CATEGORIES:
         stmt = stmt.where(Notice.category == category)
-    return [_payload(n) for n in (await db.execute(stmt)).scalars().all()]
+    return [_payload(n, public=not include_unpublished) for n in (await db.execute(stmt)).scalars().all()]
 
 
 async def get_notice(db: AsyncSession, notice_id: int, *, include_unpublished: bool = False) -> dict:
@@ -59,7 +80,7 @@ async def get_notice(db: AsyncSession, notice_id: int, *, include_unpublished: b
         not include_unpublished and (not notice.published or notice.published_at > now_kst())
     ):
         raise_app_error("NOT_FOUND", 404)
-    return _payload(notice)
+    return _payload(notice, public=not include_unpublished)
 
 
 async def save_notice(
