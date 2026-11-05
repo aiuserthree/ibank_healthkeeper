@@ -40,6 +40,8 @@ class Game:
     variants: tuple[str, ...] = ()
     # 받을 수 있는 가장 작은 점수 — 낮을수록 좋은 게임에서 말이 안 되게 작은 기록(0점 등)을 막는다
     min_score: int = 0
+    # 명예의 전당에서 갈래 기록을 함께 겨룰지 — 코스마다 길이 · 난이도가 다른 게임(통통 짐볼)은 기본 판(1코스)만 센다
+    hall_mix_variants: bool = True
 
 
 GAMES: dict[str, Game] = {
@@ -86,7 +88,7 @@ GAMES: dict[str, Game] = {
         Game("sketch", "화이트보드 그림 퀴즈", "QUIZ", "한 명은 그리고 한 명은 맞히기 · 3분 동안 몇 점이나 · 협동", "pencil", "점", 1000),
         Game("sync", "통하는 사이", "QUIZ", "같은 질문에 몰래 답하고 서로의 답 예상하기 · 10문제 · 협동", "heart-handshake", "점", 100),
         Game("spotdiff", "틀린 그림 찾기", "MINI", "사진 한 장씩 나눠 보고 말로 맞춰 다른 곳 찾기 · 3분 · 협동", "scan-search", "곳", 1000),
-        Game("bounce", "통통 짐볼", "MINI", "저절로 튀는 짐볼을 좌우로만 굴려 헬스키퍼실까지 · 10스테이지 완주", "circle-dot", "점", 100_000, lower_better=True, min_score=100),
+        Game("bounce", "통통 짐볼", "MINI", "저절로 튀는 짐볼을 좌우로만 굴려 헬스키퍼실까지 · 3코스 30스테이지", "circle-dot", "점", 100_000, lower_better=True, min_score=100, variants=("c2", "c3"), hall_mix_variants=False),
         Game("dodge", "업무 폭탄 피하기", "MINI", "사방에서 날아오는 메일·회의 초대 피하기 · 1분 버티면 칼퇴", "mail-warning", "time", 3600),
         Game("typing", "영어 타자 레이스", "STUDY", "뜻을 보고 영어 단어 치기 · 첫 글자 힌트", "keyboard", "점", 1_000_000),
     )
@@ -336,8 +338,8 @@ async def leaderboard(db: AsyncSession, member: Member, key: str, period: str, v
 
 
 async def _week_bests(db: AsyncSession, game: Game, start: date, end: date) -> tuple[list[tuple[int, int]], dict[int, str]]:
-    """명예의 전당용 회원별 최고 기록 — 갈래가 있는 게임은 전체·갈래를 통틀어 가장 좋은 기록과 그 갈래."""
-    if not game.variants:
+    """명예의 전당용 회원별 최고 기록 — 갈래가 있는 게임은 전체·갈래를 통틀어 가장 좋은 기록과 그 갈래(hall_mix_variants=False 면 기본 판만)."""
+    if not game.variants or not game.hall_mix_variants:
         return await _bests(db, game, start, "", end), {}
     best: dict[int, int] = {}
     where: dict[int, str] = {}
