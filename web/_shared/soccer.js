@@ -12,7 +12,7 @@
 //   opts.restore   exportState() 로 받아 둔 판 — host 가 새로고침한 뒤 이어 하기
 //   opts.touch     휴대폰(화면 단추) — 키 안내 대신 단추를 쓴다
 //   opts.onEnd(result)  끝나면 한 번 — { left, right, me, rival, win, draw, side, sec, kicks, heads }
-//   opts.onEvent(e)     { type: "start" | "goal" | "out" | "over" | "hold" | "stall", … } — 화면이 알림 · 덮개를 고칠 때
+//   opts.onEvent(e)     { type: "start" | "goal" | "over" | "hold" | "stall", … } — 화면이 알림 · 덮개를 고칠 때
 // engine
 //   start() · destroy() · pause() → bool · resume() · score() · isOver() · phase() · setQuality(q) → bool · quality()
 //   begin()             host — 둘 다 들어오면 3 · 2 · 1 로 경기 시작 (cpu · local · demo 는 start 가 바로 시작)
@@ -25,10 +25,11 @@
 //   exportState()       host — 판 전체(JSON). 새로고침 뒤 opts.restore 로 이어 한다
 //
 // 실시간 메시지 (모두 4KB 이하 JSON 객체 — rt.js 가 실어 나른다)
-//   host → guest  {t:"s", f, ph, pt, cd, c, sc, b, p, a, fz, e, h, o}  초당 30번. f: host 프레임 · a: 이 판에 반영된 guest 입력 프레임 · o: 아웃 중이면 막던 쪽 + 1 ·
+//   host → guest  {t:"s", f, ph, pt, cd, c, sc, b, p, a, fz, e, h}  초당 30번. f: host 프레임 · a: 이 판에 반영된 guest 입력 프레임 ·
 //                                                                 fz: 멈춤 비트(1 host 자리 비움 · 2 상대 없음 · 4 guest 자리 비움 · 8 멈춤 · 16 guest 소식 끊김) ·
-//                                                                 e: 최근 일(득점 · 휘슬 · 킥 · 아웃 · 끝) — 1.5초(득점은 10초) 동안 거듭 실어 한 번 놓쳐도 받는다 ·
+//                                                                 e: 최근 일(득점 · 휘슬 · 킥 · 끝) — 1.5초(득점은 10초) 동안 거듭 실어 한 번 놓쳐도 받는다 ·
 //                                                                 h: host 화면 번호(새로고침하면 바뀐다)
+//                 아웃 규칙이 있던 옛 host 는 o(아웃 중) · 「out」 일도 보냈다 — 받아도 쓰지 않는다(배포하는 동안 옛 화면과 섞여도 그냥 「준비」로 보인다)
 //                 {t:"full", …s 와 같음, mi, ev, st}              전체 판 — 다시 들어왔을 때 · 달라고 했을 때
 //   guest → host  {t:"i", s, n, m, j, k, w, q}   입력이 바뀔 때 + 0.2초마다 다시 (n: guest 프레임, m: 1 왼쪽 · 2 오른쪽, j · k: 점프 · 킥 누른 횟수,
 //                                                w: 1 이면 guest 화면이 숨겨짐, q: guest 가 host 판을 마지막으로 받은 지 ms · 아직 못 받았으면 -1)
@@ -75,12 +76,15 @@ window.HKSoccer = (function () {
   const CHIP_V = 12, CHIP_VK = 2.5, CHIP_X = 2.6;
   // 골대 앞(크로스바 끝 아래까지) — 여기서 빼내는 공은 경기장 쪽으로 보낸다(크로스바에 막히거나 골키퍼를 뚫고 골망으로 가지 않게)
   const GOAL_ZONE = GOAL_W + BALL_R + BAR_R + 12;
+  // 골대 위 · 뒤 — 아웃 없이 경기를 이어 가니 공이 골라인 밖 지붕 위(크로스바 위로 넘어간 곳)에 가도 멈추지 않는다. 대개는 뒤 벽 · 기운 지붕에 맞고
+  // 곧 경기장으로 돌아오지만, 지붕 위에서 머리로 계속 받아 올리면 오래 머물렀다(멈추지 않아도 4초 넘게). 그곳에 ROOF_WAIT 프레임(0.5초) 넘게 있으면
+  // 그때부터 ROOF_RAMP 프레임 동안 경기장 쪽으로 미는 힘을 ROOF_PUSH(프레임마다 빠르기)까지 천천히 키운다 — 잠깐 넘어갔다 오는 공은 그대로 둔다
+  const ROOF_WAIT = 30, ROOF_RAMP = 30, ROOF_PUSH = 0.2;
   const STEP_MS = 1000 / 60;
-  const SAVE_VER = 4; // 판 형식 — 2: 큰 공(BALL_R 26) · 낀 공 빼내기 · 3: 머리만 한 공(BALL_R 32) · 깊어진 골대(GOAL_W 108) · 4: 낮은 머리 · 높아진 크로스바 · 아웃
+  // 판 형식 — 2: 큰 공(BALL_R 26) · 낀 공 빼내기 · 3: 머리만 한 공(BALL_R 32) · 깊어진 골대(GOAL_W 108) · 4: 낮은 머리 · 높아진 크로스바.
+  // 아웃 규칙을 뺄 때는 물리가 그대로라 4 를 그대로 둔다 — 그때 저장한 판(아웃 중이던 판 포함)은 이어 할 때 아웃만 걷어 낸다(아래 「이어 하기」)
+  const SAVE_VER = 4;
   const GOAL_PT = 120, READY_PT = 60, OVER_PT = 80, COUNT_CD = 180, RESUME_CD = 180, SHORT_CD = 60, LOCAL_RESUME_CD = 90;
-  // 아웃 — 레퍼런스처럼 공이 크로스바 위로 골라인을 다 넘어가면(골대 지붕 위 · 뒤) 「아웃!」을 OUT_PT(2초) 동안 보이고(그동안에도 시계는 간다),
-  // 막던 쪽 골대 앞(페널티 줄 끝 — 골라인에서 OUT_X)에 공을 떨어뜨려 다시 한다. 공격하던 쪽은 제 킥오프 자리로 물러나고(공에서 공 지름 7배쯤), 막던 쪽은 그 자리에 선다
-  const OUT_PT = 120, OUT_X = 112;
   const SHORT_FREEZE_MS = 2500; // 이보다 짧게 멈췄다 풀리면 3 · 2 · 1 대신 1 만 세고 이어 간다
   const PH = ["wait", "ready", "play", "goal", "over"]; // 판 단계 — 메시지에는 번호로
   const INTERP = 6; // guest 가 그릴 때 늦춰 보는 프레임(100ms) — 그 사이 판 두 장을 이어 그린다
@@ -143,8 +147,8 @@ window.HKSoccer = (function () {
       pl: [newPlayer(0), newPlayer(1)],
       ev: 0, stats: { kicks: [0, 0], heads: [0, 0] }, played: 0, stuck: 0, conceded: -1,
       ver: SAVE_VER, wedge: 0, wx: 0, wy: 0, wya: 0, ghost: 0, gx: 0, pops: 0, // 판 형식 번호(저장한 판 이어 하기) · 낀 공 — 낀 프레임 · 낀 자리 · 선수를 뚫고 빠져나가는 남은 프레임 · 그 연장 · 빼낸 횟수(좌우 번갈아)
-      out: 0, outs: [0, 0], // 아웃 중이면 막던 쪽 + 1(「아웃!」 · 시계는 간다) · 쪽마다 아웃이 난 횟수(그 쪽 골대 위로 넘어감)
       ties: Math.random() < 0.5 ? 0 : 1, // 공에 두 선수가 똑같이 닿을 때 누구를 나중에 볼지 — 번갈아(첫 번은 무작위)
+      roof: 0, // 공이 골대 위 · 뒤(roofSide)에 이어 머문 프레임 — ROOF_WAIT 를 넘으면 경기장 쪽으로 민다
     };
   }
   // 킥오프 자리 — 선수는 제자리, 공은 가운데 위에서 떨어진다(먹힌 쪽으로 살짝)
@@ -154,18 +158,7 @@ window.HKSoccer = (function () {
       Object.assign(p, fresh, { spd: p.spd });
     }
     Object.assign(S.ball, { x: W / 2, y: DROP_Y, vx: toward ? toward * 0.9 : 0, vy: 0 });
-    S.stuck = 0; S.wedge = 0; S.ghost = 0; S.gx = 0; S.out = 0;
-  }
-  // 아웃 뒤 자리 — d: 막던 쪽(그 쪽 골대 위로 넘어감). 공은 d 쪽 골대 앞에서 떨어지고, 공격하던 쪽은 제 킥오프 자리로 물러나며(막던 선수와 겹치면 더 뒤로),
-  // 막던 쪽은 그 자리 땅에 선다(뛰던 중이면 내려선다 — 「아웃!」 동안 판이 멈춰 있으니 공중에 떠 있지 않게)
-  function placeOut(S, d) {
-    const att = S.pl[1 - d], def = S.pl[d];
-    Object.assign(att, newPlayer(att.side), { spd: att.spd });
-    if (Math.abs(att.x - def.x) < HEAD_R * 2.2) att.x = clamp(def.x + (att.side ? 1 : -1) * HEAD_R * 2.2, HEAD_R, W - HEAD_R);
-    if (Math.abs(att.x - def.x) < HEAD_R * 2.2) att.x = clamp(def.x - (att.side ? 1 : -1) * HEAD_R * 2.2, HEAD_R, W - HEAD_R);
-    Object.assign(def, { y: GROUND, vx: 0, vy: 0, ground: true, kick: 0, hit: false, jb: 0, kb: 0 });
-    Object.assign(S.ball, { x: d === 0 ? GOAL_W + OUT_X : W - GOAL_W - OUT_X, y: DROP_Y, vx: 0, vy: 0 });
-    S.stuck = 0; S.wedge = 0; S.ghost = 0; S.gx = 0;
+    S.stuck = 0; S.wedge = 0; S.ghost = 0; S.gx = 0; S.roof = 0;
   }
 
   // 차는 다리 각도 — 0 은 곧게 아래, + 는 앞으로. 뒤로 뺐다(준비) → 앞으로 휘두름(때림) → 돌아옴
@@ -386,6 +379,7 @@ window.HKSoccer = (function () {
     for (let k = 0; k < SUB; k++) {
       b.vy += G_BALL * h;
       b.vx *= airX; b.vy *= air;
+      if (S.roof > ROOF_WAIT) { const rs = roofSide(b); if (rs) b.vx += rs * ROOF_PUSH * Math.min(1, (S.roof - ROOF_WAIT) / ROOF_RAMP) * h; } // 골대 위 · 뒤에 오래 머문 공 — 경기장 쪽으로
       b.x += b.vx * h; b.y += b.vy * h;
       b.rot += (b.vx * h) / BALL_R;
       // 공에서 먼 선수를 먼저, 가까운(더 깊이 닿은) 선수를 나중에 본다 — 나중에 본 쪽이 공의 마지막 방향을 정한다.
@@ -520,15 +514,11 @@ window.HKSoccer = (function () {
   // 골대 안 높은 곳(뒤로 갈수록 높아지는 지붕 밑)에 뜬 공도 골이다 — 크로스바 높이 밑으로 다 내려와야 골로 치면 그 자리에 낀 공을
   // 빼낼 때 골키퍼를 뚫고 골망으로 떨어지는 일이 생겼다
   const roofAt = (d) => ROOF_Y + ((BAR_Y - ROOF_Y) * d) / GOAL_W; // 골대 지붕 높이 — 뒤 벽에서 d 만큼 앞
+  // 골대 위 · 뒤 — 공 가운데가 골라인 밖이고 그 자리 지붕보다 위. 경기장 쪽 방향(왼쪽 골대 1 · 오른쪽 골대 -1)을, 아니면 0
+  const roofSide = (b) => (b.x < GOAL_W && b.y < roofAt(Math.max(0, b.x)) ? 1 : b.x > W - GOAL_W && b.y < roofAt(Math.max(0, W - b.x)) ? -1 : 0);
   function goalSide(b) {
     if (b.x + BALL_R < GOAL_W && b.y > roofAt(b.x)) return 1; // 왼쪽 골대에 들어감 → 오른쪽 팀 득점
     if (b.x - BALL_R > W - GOAL_W && b.y > roofAt(W - b.x)) return 0;
-    return -1;
-  }
-  // 아웃 — 공 전체가 골라인을 넘었는데 골대 지붕보다 위(크로스바 위로 넘어감 · 지붕 위에 얹힘). 그 쪽 골대를 막던 쪽(0 왼쪽 · 1 오른쪽)을 돌려준다
-  function outSide(b) {
-    if (b.x + BALL_R < GOAL_W && b.y <= roofAt(Math.max(0, b.x))) return 0;
-    if (b.x - BALL_R > W - GOAL_W && b.y <= roofAt(Math.max(0, W - b.x))) return 1;
     return -1;
   }
 
@@ -537,37 +527,27 @@ window.HKSoccer = (function () {
     S.frame++;
     if (S.phase === "wait" || S.phase === "over") return;
     if (S.phase === "ready") {
-      if (S.out) {
-        // 「아웃!」 동안에도 시계는 간다(레퍼런스처럼). 그 사이 시간이 다 되면 그대로 끝
-        S.played++;
-        if (S.clock > 0) S.clock--;
-        if (S.clock <= 0) { S.out = 0; S.phase = "over"; S.pt = OVER_PT; if (fx) fx("over", 0); return; }
-      }
       if (S.pt > 0) S.pt--;
       if (S.pt > 0) return;
-      S.phase = "play"; S.out = 0;
+      S.phase = "play";
       if (fx) fx("whistle", 0);
     }
     for (let i = 0; i < 2; i++) stepPlayer(S.pl[i], inputs[i] || {}, fx);
     collidePlayers(S.pl[0], S.pl[1]);
     stepBall(S, fx);
     const b = S.ball;
+    S.roof = S.phase === "play" && roofSide(b) ? (S.roof | 0) + 1 : 0;
     // 어딘가에 걸려 멈춘 공(머리 위 · 지붕 끝)은 4초 뒤 가운데에서 다시
     if (b.y < GROUND - BALL_R - 2 && Math.hypot(b.vx, b.vy) < 0.25) S.stuck++; else S.stuck = 0;
     if (S.phase === "play") {
       S.played++;
       if (S.clock > 0) S.clock--;
-      const g = goalSide(b), o = g >= 0 ? -1 : outSide(b);
+      const g = goalSide(b);
       if (g >= 0) {
         S.score[g]++;
         S.conceded = 1 - g;
         S.phase = "goal"; S.pt = GOAL_PT;
         if (fx) fx("goal", g, S.score[g]);
-      } else if (o >= 0) {
-        if (!Array.isArray(S.outs)) S.outs = [0, 0];
-        S.outs[o]++;
-        placeOut(S, o); S.phase = "ready"; S.pt = OUT_PT; S.out = o + 1;
-        if (fx) fx("out", o);
       } else if (S.clock <= 0) {
         S.phase = "over"; S.pt = OVER_PT;
         if (fx) fx("over", 0);
@@ -586,13 +566,14 @@ window.HKSoccer = (function () {
   // 미리 굴려 보고 고르기 — 단추 조합 9가지(앞 · 그대로 · 뒤 × 그냥 · 점프 · 킥)를 판을 복사해 hz 프레임 앞까지 굴려 보고 가장 좋은 것을 고른다.
   // 처음 hold 프레임은 그 조합대로, 그 뒤는 「공 뒤에 붙어 밀기」(공을 지나가야 하면 뛰어넘기)로 굴린다. 상대는 지금 달리던 쪽으로 계속 달리고,
   // 공이 발 앞에 오면 차고 머리 위로 떨어지면 뛴다고 본다.
-  // 좋고 나쁨 — 굴리는 동안 공이 상대 골문에 가까울수록 +, 우리 골문에 가까울수록 −(지키기가 더 무겁다), 골은 크게 ±(빠를수록 크게), 아웃은 AI_OUT_*.
+  // 좋고 나쁨 — 굴리는 동안 공이 상대 골문에 가까울수록 +, 우리 골문에 가까울수록 −(지키기가 더 무겁다), 골은 크게 ±(빠를수록 크게).
+  // 상대 골대 위 · 뒤(roofSide)에 간 공은 + 로 세지 않는다(골이 될 수 없는 자리) — 골문 가까이로 쳐서 좋게 보니 골문 앞을 지키는 사람
+  // 골대 지붕 위로만 공을 계속 올려 판의 40% 넘게 공이 거기서 놀았다. 우리 골대 위 · 뒤 공의 값은 그대로 둔다(지키기는 그대로).
   // 끝에서는 공이 날아가는 쪽(나빠질 때만) · 공을 민 거리 · 공 뒤 자리(공이 우리 골대 가까울수록 무겁게)를 더한다.
   // 손이 늦는 단계(lag)는 정한 단추가 그만큼 뒤에 눌리고, 굴려 볼 때도 이미 눌러 둔 단추를 먼저 누른 뒤 고른다.
   // 화면 · 소리 · 판 난수는 건드리지 않는다(복사한 판에서만 굴린다). 좌우는 바라보는 쪽(face)으로만 정해 어느 편도 유리하지 않다
   const AI_BACK = BODY_R + BALL_R - 2; // 공 뒤에 서는 거리(몸 + 공)
   const AI_REACH = 250, AI_DEF = 3, AI_POS = 0.15, AI_SIDE = 0.1; // 골문까지 거리 눈금 · 지키기 무게 · 공 뒤 자리 무게 · 공보다 우리 골대 쪽에 섰을 때 덤
-  const AI_OUT_ATT = -0.4, AI_OUT_DEF = -0.6; // 아웃 값 — 공격하던 쪽(상대 골대 위로 넘김) · 막던 쪽(우리 골대 위로 넘어감)
   const AI_OPP_KICK = 85; // 굴려 볼 때 상대가 차는 거리(바라보는 쪽 공까지)
   const AI_URG = 4; // 공이 우리 골대 가까이 있을 때 끝 자리 값을 키우는 몫
   const AI_HOP = 100; // 굴려 볼 때 공을 지나가야 하면 이만큼 앞에서 뛰어넘는다
@@ -609,7 +590,7 @@ window.HKSoccer = (function () {
     return {
       frame: S.frame, phase: "play", pt: 0, cd: 0, clock: 1e9, minutes: S.minutes, score: [0, 0], ball: { ...S.ball },
       pl: S.pl.map((p) => ({ ...p })), ev: 0, stats: { kicks: [0, 0], heads: [0, 0] }, played: 0, stuck: 0, conceded: -1,
-      ver: S.ver, wedge: S.wedge, wx: S.wx, wy: S.wy, wya: S.wya, ghost: S.ghost, gx: S.gx, pops: S.pops, ties: S.ties, out: 0, outs: [0, 0],
+      ver: S.ver, wedge: S.wedge, wx: S.wx, wy: S.wy, wya: S.wya, ghost: S.ghost, gx: S.gx, pops: S.pops, ties: S.ties, roof: S.roof,
     };
   }
   // 공 자리 값 — 상대 골문(입구 가운데)에 가까울수록 +, 우리 골문에 가까울수록 −
@@ -646,9 +627,8 @@ window.HKSoccer = (function () {
       const sc0 = S.score[0] + S.score[1];
       simStep(S, side ? [theirs, mine] : [mine, theirs], null);
       if (S.score[0] + S.score[1] > sc0) return (S.score[side] > 0 ? 1 : -1) * (10 - t * 0.05);
-      // 아웃 — 남은 프레임은 아웃 값으로(공격하던 쪽은 기회를 날려 손해, 막던 쪽은 걷어 낸 셈이지만 공이 우리 골대 앞에서 다시 시작한다)
-      if (S.out) { const total = L.hz + nq; return (val + (total - n) * (S.out - 1 === side ? AI_OUT_DEF : AI_OUT_ATT)) / total; }
-      val += ballValue(S.ball, side);
+      const rz = roofSide(S.ball); // 1 왼쪽 골대 위 · 뒤 · -1 오른쪽 골대 위 · 뒤 · 0 아님
+      val += rz && (rz > 0 ? 0 : 1) !== side ? Math.min(0, ballValue(S.ball, side)) : ballValue(S.ball, side);
       n++;
     }
     // 끝 자리 — 공보다 우리 골대 쪽(공 뒤)에 섰으면 조금 좋고, 공 뒤 자리에 가까울수록 좋다(공이 멀어 굴려 봐도 차이가 없을 때 공 쪽으로 가게).
@@ -972,7 +952,7 @@ window.HKSoccer = (function () {
     const recent = []; // host 가 guest 에게 거듭 실어 보내는 최근 일(킥 · 헤딩 · 휘슬 …)
     const marks = [];  // 득점 · 끝 — 더 오래 싣고, 킥이 많아도 밀려나지 않게 따로 둔다
     function fx(type, side, n) {
-      if (mode === "host" && ["kick", "head", "bar", "goal", "whistle", "over", "out"].includes(type)) {
+      if (mode === "host" && ["kick", "head", "bar", "goal", "whistle", "over"].includes(type)) {
         S.ev++;
         const row = [S.ev, type, side | 0, n | 0, S.frame, S.score[0], S.score[1]];
         const list = type === "goal" || type === "over" ? marks : recent;
@@ -998,7 +978,6 @@ window.HKSoccer = (function () {
           emit({ type: "goal", side, score: S.score.slice() });
           break;
         case "whistle": snd("go"); meMark = 150; emit({ type: "start" }); break;
-        case "out": snd("whoosh"); emit({ type: "out", side }); break; // 「아웃!」 글자는 판(S.out · S.pt)을 보고 그린다 — guest 가 이 일을 놓쳐도 보인다
         case "over": snd("go"); setTimeout(() => snd("go"), 180); break;
       }
     }
@@ -1214,7 +1193,6 @@ window.HKSoccer = (function () {
         h: hostSess,
       };
       if (full || S.phase === "over") { o.mi = S.minutes; o.ev = S.ev; o.st = S.stats; o.pl = S.played; }
-      if (S.out) o.o = S.out; // 아웃 중(막던 쪽 + 1)
       return o;
     }
     let sendGap = 0;
@@ -1324,7 +1302,7 @@ window.HKSoccer = (function () {
       }
       const snap = {
         f, phase: PH[s.ph] || "play", pt: s.pt | 0, cd: s.cd | 0, clock: s.c | 0, score: sc,
-        b: s.b, p: s.p, fz: s.fz | 0, e: evs, out: s.o === 1 || s.o === 2 ? s.o : 0,
+        b: s.b, p: s.p, fz: s.fz | 0, e: evs, // 옛 host 가 보내는 o(아웃 중)는 쓰지 않는다
       };
       buf.push(snap);
       while (buf.length > 40) buf.shift();
@@ -1360,7 +1338,7 @@ window.HKSoccer = (function () {
       const A = useOld ? s0 : base, B = useOld ? s1 : base;
       const k = useOld ? t : 0;
       view = {
-        phase: A.phase, pt: A.pt, cd: A.cd, clock: A.clock, score: A.score, fz: A.fz, out: A.out,
+        phase: A.phase, pt: A.pt, cd: A.cd, clock: A.clock, score: A.score, fz: A.fz,
         b: { x: lerp(A.b[0], B.b[0], k), y: lerp(A.b[1], B.b[1], k), vx: A.b[2], vy: A.b[3], rot: lerp(A.b[4], B.b[4], k) },
         p: [0, 1].map((j) => ({ x: lerp(A.p[j][0], B.p[j][0], k), y: lerp(A.p[j][1], B.p[j][1], k), vx: A.p[j][2], vy: A.p[j][3], kick: A.p[j][4], ground: !!A.p[j][5] })),
       };
@@ -1375,7 +1353,10 @@ window.HKSoccer = (function () {
         }
       }
       // 판을 보여 줄 S 에 옮긴다(점수판 · 결과). host 판의 점수가 득점 없이 바뀌었으면 내가 센 점수를 보인다
-      S.phase = view.phase; S.pt = view.pt; S.cd = view.cd; S.clock = view.clock; S.out = view.out; S.score = tainted && tally ? tally.slice() : view.score.slice();
+      S.phase = view.phase; S.pt = view.pt; S.cd = view.cd; S.clock = view.clock; S.score = tainted && tally ? tally.slice() : view.score.slice();
+      // 경기한 시간 — host 는 전체 판(full)에만 실어 보내니 보통 판에서는 시계로 센다(시계는 경기 시간에서 played 와 함께 준다).
+      // 이게 없으면 다시 들어오기 전까지 guest 의 played 가 0 이라 골 뒤 킥오프 때 「준비」를 그리지 않았다
+      if (gotFull) S.played = Math.max(0, S.minutes * 3600 - S.clock);
       Object.assign(S.ball, view.b);
       S.pl[0].run += Math.abs(view.p[0].x - S.pl[0].x);
       S.pl[0].x = view.p[0].x; S.pl[0].y = view.p[0].y; S.pl[0].kick = view.p[0].kick; S.pl[0].ground = view.p[0].ground; S.pl[0].vx = view.p[0].vx;
@@ -1421,6 +1402,9 @@ window.HKSoccer = (function () {
           if (S.phase !== "goal" && S.phase !== "over" && goalSide(b) >= 0) { b.x = b.x < W / 2 ? GOAL_W + BALL_R + BAR_R + 2 : W - GOAL_W - BALL_R - BAR_R - 2; b.vx = 0; }
           S.ver = SAVE_VER;
         }
+        // 아웃 규칙이 있던 때 저장한 판 — 「아웃!」 중이었으면(공은 이미 골대 앞에 놓였다) 기다리지 않고 그냥 경기로 이어 간다
+        if (S.out && S.phase === "ready") { S.phase = "play"; S.pt = 0; }
+        delete S.out; delete S.outs;
         S.ev = (Number(S.ev) || 0) + 100; // 저장 뒤에 낸 일 번호와 겹치지 않게 건너뛴다(guest 가 새 득점을 옛 일로 여기지 않게)
         if (S.phase === "over") ended = false;
         // 멈춘 때를 모른다(새로고침 · 창을 닫았다 다시 엶 — performance.now() 는 이 화면이 열린 뒤부터 잰다) — 짧은 멈춤(1 만 세기)으로 치지 않고 늘 3 · 2 · 1
@@ -1690,13 +1674,6 @@ window.HKSoccer = (function () {
         bigText("골!", `${S.score[0]} : ${S.score[1]}`, "#ffffff", pop, TEAM[goalFx.side].main);
         return;
       }
-      if (S.phase === "ready" && S.out) {
-        // 아웃 — 레퍼런스의 「OUT!!!」처럼 다시 시작할 때까지 크게(그동안에도 시계는 간다)
-        const t = OUT_PT - S.pt, pop = t < 10 ? 0.6 + (t / 10) * 0.5 : t < 16 ? 1.1 - ((t - 10) / 6) * 0.1 : 1;
-        dim(0.12);
-        bigText("아웃!", "골대 위로 넘어갔어요 · 막던 쪽 공으로 다시 해요", "#ffffff", pop * 0.9, "#475569");
-        return;
-      }
       if (S.phase === "ready" && S.pt > 0 && S.played > 0) { bigText("준비", "", "#ffffff", 0.5); return; }
       if (S.phase === "over") { dim(0.3); bigText("경기 끝", `${S.score[0]} : ${S.score[1]}`, "#fde047", 0.8); }
     }
@@ -1805,6 +1782,6 @@ window.HKSoccer = (function () {
   return {
     create,
     // 시험용 — 물리 · 컴퓨터만 따로(화면 없이 판을 돌려 본다)
-    _sim: { W, H, GROUND, GOAL_W, BAR_Y, BALL_R, HEAD_R, HEAD_Y, AI_LEVEL, newState, placeKickoff, simStep, makeAI, aiInput, rngOf, goalSide, outSide },
+    _sim: { W, H, GROUND, GOAL_W, BAR_Y, BALL_R, HEAD_R, HEAD_Y, AI_LEVEL, newState, placeKickoff, simStep, makeAI, aiInput, rngOf, goalSide },
   };
 })();
