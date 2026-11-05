@@ -883,6 +883,8 @@ window.HKUI = (function () {
     const dayNum = d.getDate();
     let sub = "일반 신청 · 확정 대기";
     if (r.status === "DROPPED") sub = reapplyAvailable ? "탈락 — 재신청 가능" : "탈락";
+    // 확정자가 반납한 자리를 우선권 순서로 자동 확정받은 예약
+    else if (r.status === "CONFIRMED" && r.returnPromoted) sub = "반납 자리 · 자동 확정";
     else if (r.type === "REAPPLY") sub = "재신청 · 즉시 확정 (취소 불가)";
     else if (r.type === "TRANSFER" && r.status === "CONFIRMED") sub = "양도 수령 · 예약 확정";
     else if (r.type === "ADMIN_ASSIGN" && r.status === "CONFIRMED") sub = "관리자 지정 · 예약 확정";
@@ -892,7 +894,7 @@ window.HKUI = (function () {
     // 확정 예약의 시간이 끝났으면 「이용 완료」 — 배지·설명을 바꾸고 교환·양도 버튼은 뺀다
     const used = r.status === "CONFIRMED" && !!r.endTime && new Date(`${r.slotDate}T${r.endTime}:00+09:00`) <= new Date();
     if (used) {
-      const how = r.usedCoupon ? "무적 쿠폰" : r.type === "REAPPLY" ? "재신청" : r.type === "TRANSFER" ? "양도 수령" : r.type === "ADMIN_ASSIGN" ? "관리자 지정" : "일반 신청";
+      const how = r.usedCoupon ? "무적 쿠폰" : r.returnPromoted ? "반납 자리 자동 확정" : r.type === "REAPPLY" ? "재신청" : r.type === "TRANSFER" ? "양도 수령" : r.type === "ADMIN_ASSIGN" ? "관리자 지정" : "일반 신청";
       sub = `${how} · 이용 완료`;
     }
     else if (r.usedCoupon && r.status === "REQUESTED") sub = "무적 쿠폰 사용 · 확정 대기";

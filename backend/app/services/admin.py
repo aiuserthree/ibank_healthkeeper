@@ -420,8 +420,13 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
         .order_by(Reservation.applied_at)
     )
     by_slot: dict[int, list[tuple]] = {}
-    for reservation, member in reservations_result.all():
+    reservation_rows = reservations_result.all()
+    for reservation, member in reservation_rows:
         by_slot.setdefault(reservation.slot_id, []).append((reservation, member))
+    from app.services.return_promotion import return_promoted_in_place_ids
+
+    # 반납 자리 자동 확정 배지 — 교환으로 다른 시간대로 옮긴 예약에는 붙이지 않는다
+    return_promoted_ids = await return_promoted_in_place_ids(db, [r for r, _ in reservation_rows])
 
     board_slots = []
     flat_items = []
@@ -453,6 +458,8 @@ async def reservation_board(db: AsyncSession, cycle_id: Optional[int] = None) ->
                 "priority_rank": rank_info.get("priority_rank"),
                 "is_priority": reservation.is_priority,
                 "returned": reservation.returned_at is not None,
+                # 확정자 반납으로 자동 확정된 탈락자(그 시간대에 그대로 있을 때)
+                "return_promoted": reservation.id in return_promoted_ids,
             }
             if (
                 reservation.type == ReservationType.ADMIN_ASSIGN

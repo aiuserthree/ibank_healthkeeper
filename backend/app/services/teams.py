@@ -470,14 +470,25 @@ def render_reservation_returned_admin_body(
     cycle,
     now: datetime,
 ) -> str:
-    """회원 본인 반납 → 관리자 안내. 빈자리가 어떻게 채워지는지 시점별로 알려 준다."""
+    """회원 본인 반납으로 빈자리가 남았을 때 관리자 안내. 빈자리가 어떻게 채워지는지 시점별로 알려 준다.
+
+    재신청으로 채울 수 없는 시간대(휴가·공휴일 · 월 15:30 지정 확정)는 「탈락자가 가져갈 수 있어요」가
+    사실이 아니므로 그 시간대에 맞는 안내로 바꾼다.
+    """
     import html
+
+    from app.services.designated_slot import is_designated_confirm_slot
+    from app.services.korean_holidays import is_public_holiday
 
     slot_text = _slot_label(slot)
     now = to_kst(now)
     reapply_open = to_kst(cycle.reapply_open_at)
     reapply_close = to_kst(cycle.reapply_close_at)
-    if not cycle.reapply_skipped and now < reapply_open:
+    if slot.is_vacation or is_public_holiday(slot.slot_date):
+        how = "휴가·공휴일 시간대라 재신청·관리자 지정으로 채울 수 없어요."
+    elif is_designated_confirm_slot(slot):
+        how = "월 15:30 지정 확정 시간대라 관리자 화면에서 지정해 주세요."
+    elif not cycle.reapply_skipped and now < reapply_open:
         how = (
             f"{_datetime_label(reapply_open)} 재신청이 열리면 탈락자가 가져갈 수 있어요. "
             "그 전에 관리자 화면에서 바로 지정할 수도 있어요."
@@ -501,13 +512,21 @@ async def enqueue_reservation_returned_admin_notices(
     slot: Slot,
     cycle,
     now: datetime,
+    promotion=None,
 ) -> list[int]:
-    from app.services.transfer import TRANSFER_ADMIN_NOTIFY_EMAILS
+    """반납 관리자 알림 — 같은 시간대 탈락자에게 자동 확정됐으면 보내지 않는다.
 
+    빈자리로 남았을 때만(받을 분 없음 · 수동 모드 · 지정/휴가/공휴일 시간대 등)
+    RETURN_ADMIN_NOTIFY_EMAILS(조준형)에게만 보낸다.
+    """
+    from app.services.reservation_return import RETURN_ADMIN_NOTIFY_EMAILS
+
+    if promotion is not None and promotion.promoted:
+        return []
     body = render_reservation_returned_admin_body(
         member_name=member.name, slot=slot, cycle=cycle, now=now
     )
-    admins = await _lookup_members_by_emails(db, TRANSFER_ADMIN_NOTIFY_EMAILS)
+    admins = await _lookup_members_by_emails(db, RETURN_ADMIN_NOTIFY_EMAILS)
     message_ids: list[int] = []
     for admin in admins:
         msg = await enqueue_teams_message(

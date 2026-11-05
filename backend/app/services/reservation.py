@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from sqlalchemy import case, func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
@@ -280,7 +281,14 @@ async def reapply_slot(db: AsyncSession, member: Member, slot_id: int) -> Reserv
         confirmed_by=ConfirmedBy.REAPPLY,
     )
     db.add(reservation)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError as exc:
+        # 위 확인과 INSERT 사이에 같은 회원의 다른 확정이 커밋된 경우(반납 자리 자동 확정 등) — 500 대신 안내
+        await db.rollback()
+        if "uq_reservation_slot_member_active" in str(exc.orig):
+            raise_app_error("DUPLICATE_APPLY")
+        raise_app_error("WEEK_APPLY_LIMIT")
 
     slot.status = SlotStatus.CONFIRMED
     slot.confirmed_reservation_id = reservation.id
@@ -406,8 +414,12 @@ async def list_my_reservations(
         return_deadline_dt,
     )
 
+    from app.services.return_promotion import return_promoted_in_place_ids
+
     monthly_return_used = await count_monthly_returns(db, member.id, now=now)
     monthly_return_limit_reached = monthly_return_used >= MONTHLY_RETURN_LIMIT
+    # 반납 자리 자동 확정 표시 — 교환으로 다른 시간대로 옮긴 예약에는 붙이지 않는다
+    return_promoted_ids = await return_promoted_in_place_ids(db, [r for r, _, _ in rows])
     for reservation, slot, cycle in rows:
         cancelable = (
             state == CycleState.OPEN
@@ -522,6 +534,8 @@ async def list_my_reservations(
                     format_kst_iso(return_deadline_dt(slot)) if return_candidate else None
                 ),
                 "returned": reservation.returned_at is not None,
+                # 확정자가 반납한 자리를 우선권 순서로 자동 확정받은 예약(그 시간대에 그대로 있을 때)
+                "returnPromoted": reservation.id in return_promoted_ids,
             }
         )
 

@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css?v=20261104r">
-  <script src="/_shared/ui.js?v=20261104r"></script>
+  <script src="/_shared/ui.js?v=20261105r"></script>
   <script src="/_shared/api.js?v=20261104r"></script>
   <script src="/_shared/member-shell.js"></script>
 </head>
@@ -35,7 +35,7 @@
           <h1 style="font-size:34px;margin-bottom:4px">마이페이지</h1>
           <p style="font-size:16px;color:var(--text-secondary);margin:0 0 24px">${HKUI.escapeHtml(profile.name)}님의 예약 신청 내역입니다.</p>
           ${HKUI.subNav("res")}
-          <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b> 확정 후 <b>수 17:00 이후</b> 다른 확정 회원과 <b>슬롯 교환</b>을 제안하거나, 예약이 필요 없으면 <b>양도</b>할 수 있습니다. 양도는 <b>1인당 한 달에 1회</b>까지 가능하고, <b>무적 쿠폰</b>으로 확정된 예약은 양도·교환할 수 없어요. 양도로 받은 예약이 있으면 같은 주 <b>재신청은 불가</b>합니다. 교환·양도할 사람이 없으면 <b>예약 시작 2시간 전까지 반납</b>할 수 있어요(한 달에 1회).")}</div>
+          <div style="margin-bottom:18px">${HKUI.alertBox("info", "예약 상태 안내", "<b>신청</b>은 관리자 확정 후 완료됩니다. 일반 신청은 마감(수 17:00) 전까지 취소할 수 있고, <b>재신청 확정 건은 취소할 수 없어요.</b> 확정 후 <b>수 17:00 이후</b> 다른 확정 회원과 <b>슬롯 교환</b>을 제안하거나, 예약이 필요 없으면 <b>양도</b>할 수 있습니다. 양도는 <b>1인당 한 달에 1회</b>까지 가능하고, <b>무적 쿠폰</b>으로 확정된 예약은 양도·교환할 수 없어요. 양도로 받은 예약이 있으면 같은 주 <b>재신청은 불가</b>합니다. 교환·양도할 사람이 없으면 <b>예약 시작 2시간 전까지 반납</b>할 수 있어요(한 달에 1회). 반납한 자리는 같은 시간대에 함께 신청했던 분 중 <b>우선권이 가장 높은 분께 자동으로 확정</b>되고, 받을 분이 없으면 빈자리가 돼요.")}</div>
           <div id="swap-inbox" style="display:none;margin-bottom:20px"></div>
           <div id="list"></div>
           <div id="pager"></div>`;
@@ -335,14 +335,18 @@
               const coupon = r.usedCoupon ? "<br>무적 쿠폰은 <b>돌려받지 못해요.</b>" : "";
               const ok = await HKUI.confirmDialog(
                 "예약을 반납할까요?",
-                `${dateLabel} <b>${r.startTime}</b> 예약을 반납합니다. 반납하면 <b>되돌릴 수 없고</b>, 빈자리는 다른 직원에게 돌아가요.<br>반납은 <b>한 달에 1회</b>만 할 수 있어요. 이용한 것으로 남지 않아 <b>우선권에는 영향이 없어요.</b>${coupon}`,
+                `${dateLabel} <b>${r.startTime}</b> 예약을 반납합니다. 반납하면 <b>되돌릴 수 없어요</b>. 이 자리는 같은 시간대에 함께 신청했던 분 중 <b>우선권이 가장 높은 분께 자동으로 확정</b>되고, 받을 분이 없으면 빈자리가 돼요.<br>반납은 <b>한 달에 1회</b>만 할 수 있어요. 이용한 것으로 남지 않아 <b>우선권에는 영향이 없어요.</b>${coupon}`,
                 { confirmLabel: "반납하기", confirmVariant: "danger" }
               );
               if (!ok) return;
               btn.disabled = true;
               try {
-                await HKApi.returnReservation(r.id);
-                HKUI.toast("예약을 반납했어요 · 우선권에는 영향이 없어요");
+                const done = await HKApi.returnReservation(r.id);
+                HKUI.toast(
+                  done && done.autoConfirmed
+                    ? "반납했어요 · 함께 신청한 분께 자동 확정됐어요"
+                    : "예약을 반납했어요 · 우선권에는 영향이 없어요"
+                );
                 await refreshAll();
               } catch (e) {
                 btn.disabled = false;

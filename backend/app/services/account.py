@@ -257,6 +257,9 @@ async def change_password(
 
 
 async def withdraw(db: AsyncSession, member: Member) -> None:
+    # 회원 행을 먼저 잠근다 — 반납 자리 자동 확정(return_promotion)도 이 행을 잠근 뒤 확정하므로,
+    # 둘이 겹치면 순서대로 처리된다: 자동 확정이 먼저면 아래 확인에서 막히고, 탈퇴가 먼저면 자동 확정이 건너뛴다
+    await db.execute(select(Member.id).where(Member.id == member.id).with_for_update())
     active = await db.execute(
         select(Reservation)
         .where(Reservation.member_id == member.id)

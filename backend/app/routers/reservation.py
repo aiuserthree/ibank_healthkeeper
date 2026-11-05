@@ -290,16 +290,27 @@ async def return_reservation(
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
+    from app.services.mail import drain_pending_mails, process_one_mail
     from app.services.reservation_return import return_reservation as do_return
     from app.services.teams import deliver_teams_messages
 
-    reservation, _slot, teams_message_ids = await do_return(db, member, reservation_id)
+    reservation, _slot, teams_message_ids, outcome = await do_return(db, member, reservation_id)
+    # 같은 시간대 탈락자에게 자동 확정됐으면 확정 메일을 바로 보낸다 (놓친 메일은 5분 주기 작업이 다시 보냄)
+    for mail_id in drain_pending_mails():
+        await process_one_mail(db, mail_id)
     background_tasks.add_task(deliver_teams_messages, teams_message_ids)
+    auto_confirmed = outcome.promoted
     return {
         "data": {
             "reservationId": reservation.id,
             "status": reservation.status.value,
-            "message": "예약을 반납했어요.",
+            # 누가 받았는지는 알려 주지 않는다
+            "autoConfirmed": auto_confirmed,
+            "message": (
+                "예약을 반납했어요. 이 시간대에 함께 신청했던 분께 자동으로 확정됐어요."
+                if auto_confirmed
+                else "예약을 반납했어요."
+            ),
         }
     }
 

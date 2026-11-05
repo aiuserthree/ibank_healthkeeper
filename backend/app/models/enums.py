@@ -45,6 +45,7 @@ class ConfirmedBy(str, enum.Enum):
     SYSTEM = "SYSTEM"
     REAPPLY = "REAPPLY"
     TRANSFER = "TRANSFER"
+    RETURN_PROMOTE = "RETURN_PROMOTE"  # 반납 자리 자동 확정
 
 
 class MailType(str, enum.Enum):

@@ -43,6 +43,12 @@ MAIL_HTML_FILES: dict[MailType, str] = {
 DROP_ONLY_HTML_FILE = "05-탈락안내.html"
 DROP_ONLY_SUBJECT = "[헬스키퍼] 탈락 안내"
 
+# 확정자가 반납한 자리를 같은 시간대 탈락자에게 자동 확정했을 때 — RESERVE_DONE_NORMAL 타입 그대로
+# (발송 이력·재발송 공유), 확정 사유가 들어간 전용 디자인으로 보낸다. 관리자 템플릿 편집 대상 아님.
+# 사유(reasonHtml)와 이름은 보내는 쪽(return_promotion)에서 이스케이프해 넣는다.
+RETURN_PROMOTED_HTML_FILE = "06-예약확정-반납자리.html"
+RETURN_PROMOTED_SUBJECT = "[헬스키퍼] {날짜} {slotStart} 예약 확정 — 반납된 자리를 우선권 순서로 받으셨어요"
+
 DEFAULT_SUBJECTS: dict[MailType, str] = {
     MailType.EMAIL_VERIFY: "[헬스키퍼] 이메일 인증코드 안내",
     MailType.RESERVE_DONE_NORMAL: "[헬스키퍼] 예약이 확정되었습니다",
@@ -527,6 +533,10 @@ def render_mail_message(
         body_tpl = _load_mail_html(DROP_ONLY_HTML_FILE)
         if body_tpl:
             return render_template(DROP_ONLY_SUBJECT, body_tpl, context)
+    if mail_type == MailType.RESERVE_DONE_NORMAL and context.get("returnPromoted"):
+        body_tpl = _load_mail_html(RETURN_PROMOTED_HTML_FILE)
+        if body_tpl:
+            return render_template(RETURN_PROMOTED_SUBJECT, body_tpl, context)
 
     subject_tpl, body_tpl = resolve_template_parts(mail_type, template)
     render_ctx = dict(context)

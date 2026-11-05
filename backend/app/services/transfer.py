@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import collate, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
@@ -369,7 +370,12 @@ async def _complete_transfer(
         confirmed_by=ConfirmedBy.TRANSFER,
     )
     db.add(new_reservation)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # 확인 뒤 받는 분의 다른 확정이 커밋된 경우(반납 자리 자동 확정 등) — 500 대신 안내
+        await db.rollback()
+        raise_app_error("MEMBER_NOT_TRANSFERABLE")
 
     slot.confirmed_reservation_id = new_reservation.id
     slot.status = SlotStatus.CONFIRMED

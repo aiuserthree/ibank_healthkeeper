@@ -67,6 +67,8 @@ window.HKReservationBoard = (function () {
     function typeBadge(a) {
       const type = a.type;
       if (a.used_coupon) return `<span class="hk-badge" style="color:var(--color-ultraviolet);background:#efe8ff">무적 쿠폰</span>`;
+      // 확정자 반납으로 같은 시간대 탈락자 중 우선권 순서로 자동 확정 — 「구분」 칸(78px)에 맞게 짧게, 자세한 뜻은 title
+      if (a.status === "CONFIRMED" && a.return_promoted) return `<span class="hk-badge hk-badge--info" title="확정자가 반납한 자리 → 같은 시간대 탈락자 중 우선권 순서로 자동 확정">반납 자리</span>`;
       if (type === "REAPPLY") return HKUI.badge("재신청", "info");
       if (type === "TRANSFER") return HKUI.badge("양도", "info");
       if (type === "ADMIN_ASSIGN") return HKUI.badge("관리자 지정", "warning");
@@ -172,6 +174,9 @@ window.HKReservationBoard = (function () {
         return `<div style="display:grid;grid-template-columns:${GRID};gap:12px;min-width:660px;padding:0 8px 10px;border-bottom:1px solid var(--border-default)">${["", "신청자", "신청 시각", "마지막 이용", "구분", "우선권", "상태"].map((h) => `<div style="font-size:12px;font-weight:700;color:var(--text-muted);letter-spacing:0.03em">${h}</div>`).join("")}</div>`;
       }
       const isTop = rank === 0;
+      // 반납 자리 자동 확정 슬롯은 쿠폰 단계 없는 우선권으로 정했다 — 쿠폰 순위(priority_rank)와 다르므로 자동 확정된 분만 O
+      const promoted = ((slot && slot.applicants) || []).find((x) => x.status === "CONFIRMED" && x.return_promoted);
+      const prioTop = promoted ? a.id === promoted.id : (a.priority_rank === 1 || isTop);
       const noHist = !a.last_used_date && a.no_history;
       const pos = a.position || a.job_title || "";
       const dept = a.department || a.dept || "";
@@ -181,7 +186,7 @@ window.HKReservationBoard = (function () {
         <div style="font-size:14px;color:var(--text-secondary);font-variant-numeric:tabular-nums">${a.applied_at ? HKUI.formatTimeKst(a.applied_at) : "-"}</div>
         <div style="font-size:13px;color:${noHist ? "var(--color-warning)" : "var(--text-secondary)"};font-weight:${noHist ? 700 : 400}">${noHist ? "이력 없음" : a.last_used_date ? HKUI.formatDate(a.last_used_date) : "-"}</div>
         <div>${typeBadge(a)}</div>
-        <div>${a.priority_rank === 1 || isTop ? HKUI.badge("O", "info") : HKUI.badge("X", "neutral")}</div>
+        <div>${prioTop ? HKUI.badge("O", "info") : HKUI.badge("X", "neutral")}</div>
         <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px">${applicantStatusBadge(a)}${adminCancelConfirmedBtn(a, slot)}</div>
       </div>`;
     }

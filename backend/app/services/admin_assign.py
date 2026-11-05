@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
@@ -177,6 +178,15 @@ async def search_assignable_members(
     ]
 
 
+async def _flush_assign(db: AsyncSession) -> None:
+    """지정 INSERT — 확인 뒤 그 회원의 다른 확정이 커밋된 경우(반납 자리 자동 확정 등) 500 대신 안내."""
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise_app_error("MEMBER_NOT_ASSIGNABLE")
+
+
 async def _finalize_admin_assign(
     db: AsyncSession,
     reservation: Reservation,
@@ -217,7 +227,7 @@ async def assign_empty_slot(
         confirmed_by=ConfirmedBy.ADMIN,
     )
     db.add(reservation)
-    await db.flush()
+    await _flush_assign(db)
 
     await _finalize_admin_assign(db, reservation, slot, member)
     await db.commit()
@@ -326,7 +336,7 @@ async def change_admin_assign(
         confirmed_by=ConfirmedBy.ADMIN,
     )
     db.add(new_reservation)
-    await db.flush()
+    await _flush_assign(db)
     await _finalize_admin_assign(db, new_reservation, new_slot, new_member)
     await db.commit()
     await db.refresh(new_reservation)
