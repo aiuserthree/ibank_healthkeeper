@@ -308,14 +308,14 @@
       document.addEventListener("visibilitychange", wake);
     }
 
-    // 대전 알림 — 내 차례이거나 받은 도전이 있으면 꿀알바 입구 위에 띄운다
+    // 대전 알림 — 내 차례이거나 받은 도전이 있으면 도장판 바로 아래 알림 칸(#aa-notices)에 띄운다
     // [게임 key, 이름, 「…러 가기」] — 실시간 경기(축구 · 배구)의 「내 차례」는 아직 들어가지 않은 경기
     const MATCH_NOTICE = [
       ["chess", "체스", "두러"], ["gomoku", "오목", "두러"], ["baseball", "숫자 야구"], ["boxes", "칸 따먹기"], ["quizduel", "1:1 퀴즈", "풀러"],
       ["gostop", "고스톱", "치러"], ["memory", "도형 짝맞추기"], ["soccer", "헤딩 축구"], ["volley", "옥상 배구"],
     ];
     async function matchNotice(root) {
-      const box = root.querySelector(".hk-aa-series");
+      const box = root.querySelector("#aa-notices"); // 도장판 바로 아래 알림 칸 (꿀알바 입구는 자주 묻는 질문 위로 옮겼다)
       if (!box) return;
       const [inbox, co] = await Promise.all([HKApi.matchInbox().catch(() => null), HKApi.coopInbox().catch(() => null)]);
       const link = (href, text) => {
@@ -344,7 +344,7 @@
         more.style.cssText = "background:#f1f5f9;color:#334155";
         shown.push(more);
       }
-      box.parentElement.prepend(...shown);
+      box.append(...shown);
     }
 
     // 한국 시간 자정까지 남은 시간 — 1초마다
@@ -474,7 +474,7 @@
           const [st, allGames, sp, wk] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null), HKApi.playWeekly().catch(() => null)]);
           status = st;
           const games = allGames.filter((g) => !SERIES_ONLY.includes(g.key));
-          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + seriesHtml() + togetherHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + `<div class="hk-aa-wrap" id="aa-notices"></div>` + togetherHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + collectionHtml(games) + dailyHtml(games) + weeklyHtml(wk) + seriesHtml() + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
           animateSeriesEntrance(body);
           bindHof(body);
