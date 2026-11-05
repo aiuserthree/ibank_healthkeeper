@@ -158,7 +158,8 @@
       .sc-head { margin-bottom: 8px; }
       .sc-head p { display: none; }
       .sc-mode small, .sc-mode__ic { display: none; }
-      .sc-row { margin-top: 8px; }
+      .sc-row { margin-top: 6px; }
+      .sc-seg button { height: 32px; }
       .sc-go { height: 44px; margin-top: 10px; }
       .sc-help { display: none; }
       .sc-stats { margin-top: 8px; }
@@ -188,15 +189,19 @@
     const AWAY_WAIT_SEC = 30; // 상대가 화면을 떠났을 때(Teams 를 보러 가는 등)는 조금 더 기다린다
     const TINT = "linear-gradient(135deg, #2f6bff, #22c55e 60%, #ff7a3d)";
     const IS_TOUCH = matchMedia("(pointer: coarse)").matches;
-    const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    // 컴퓨터 난이도 · 화질 — 레퍼런스(1 on 1 Soccer)의 AI Skill · Quality 처럼 네 단계씩(Low · Medium · Good · Best). 기본은 그쪽처럼 보통 · 좋음
+    const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"], ["best", "최강"]];
     const LEVEL_NAME = Object.fromEntries(LEVELS);
-    const LEVEL_LOOK = { easy: 0, normal: 1, hard: 2 }; // 컴퓨터 얼굴 — 신입 · 대리 · 부장
+    const LEVEL_LOOK = { easy: 0, normal: 1, hard: 3, best: 2 }; // 컴퓨터 얼굴 — 신입 · 대리 · 과장 · 부장
+    const QUALITIES = [["low", "낮음"], ["medium", "보통"], ["good", "좋음"], ["best", "최고"]]; // 그리기만 바뀐다(동료와도 내 화면만)
     const PREF_KEY = "hk-soccer-pref";
-    const pref = { mode: "cpu", level: "normal", minutes: 2 };
-    try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY) || "{}")); } catch (_) { /* 처음 */ }
+    const pref = { mode: "cpu", level: "normal", minutes: 2, quality: "good" };
+    try { const saved = JSON.parse(localStorage.getItem(PREF_KEY) || "{}"); if (saved && typeof saved === "object" && !Array.isArray(saved)) Object.assign(pref, saved); } catch (_) { /* 처음 */ }
+    const known = (list, v) => list.some(([k]) => k === v); // 저장된 값이 고를 수 있는 것인지(예전 · 망가진 값은 기본으로)
     if (!["cpu", "local", "online"].includes(pref.mode) || (pref.mode === "local" && IS_TOUCH)) pref.mode = "cpu";
-    if (!LEVEL_NAME[pref.level]) pref.level = "normal";
-    if (![1, 2, 3].includes(pref.minutes)) pref.minutes = 2;
+    if (!known(LEVELS, pref.level)) pref.level = "normal";
+    if (![1, 2, 3, 5].includes(pref.minutes)) pref.minutes = 2;
+    if (!known(QUALITIES, pref.quality)) pref.quality = "good";
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (_) { /* 저장 못 해도 이번엔 그대로 */ } };
     const store = {
       get(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (_) { return null; } },
@@ -236,7 +241,7 @@
               <div class="sc-keys" id="sc-keys"></div>
               <div class="sc-tip">
                 <span class="sc-tip__rot">${icon("rotate-cw", 15)} 가로로 돌리면 더 크게 보여요</span>
-                <div class="sc-tip__how"><div><b>킥</b>공이 발 앞에 왔을 때</div><div><b>헤딩</b>점프해서 머리로</div><div><b>높이 차기</b>공이 조금 멀 때 차면</div></div>
+                <div class="sc-tip__how"><div><b>킥</b>공이 몸 앞에 왔을 때</div><div><b>헤딩</b>점프해서 머리로</div><div><b>높이 차기</b>공이 몸에 붙었을 때 차면</div></div>
               </div>
               <div class="sc-move" id="sc-move">
                 <button type="button" class="sc-btn" data-act="left" aria-label="왼쪽으로">${icon("chevron-left", 34)}</button>
@@ -308,16 +313,16 @@
 
     function keysHtml(mode) {
       if (mode === "local") {
-        return `<span><b>1P</b> ${k("A")}${k("D")} 이동 ${k("W")} 점프 ${k("F")} 킥</span>
-          <span><b>2P</b> ${k("←")}${k("→")} 이동 ${k("↑")} 점프 ${k("Enter")} 킥</span><span>${k("Esc")} 멈춤</span>`;
+        return `<span><b>1P</b> ${k("A")}${k("D")} 이동 ${k("W")} 점프 ${k("S")}·${k("F")} 킥</span>
+          <span><b>2P</b> ${k("←")}${k("→")} 이동 ${k("↑")} 점프 ${k("↓")}·${k("Enter")} 킥</span><span>${k("Esc")} 멈춤</span>`;
       }
-      return `<span>${k("←")}${k("→")} 이동</span><span>${k("↑")} 점프</span><span>${k("Space")} 킥</span><span>(${k("A")}${k("D")}${k("W")} ${k("F")} 도 돼요)</span>${mode === "cpu" ? `<span>${k("Esc")} 멈춤</span>` : ""}`;
+      return `<span>${k("←")}${k("→")} 이동</span><span>${k("↑")} 점프</span><span>${k("Space")}·${k("↓")} 킥</span><span>(${k("A")}${k("D")}${k("W")} ${k("S")}${k("F")} 도 돼요)</span>${mode === "cpu" ? `<span>${k("Esc")} 멈춤</span>` : ""}`;
     }
     function helpHtml(mode) {
-      const play = `<div>공이 <b>발 앞에 붙었을 때</b> 차면 낮고 세게, <b>조금 떨어졌을 때</b> 차면 높이 떠요</div><div>점프해서 <b>머리로 받으면</b> 상대 골대 쪽으로 날아가요</div>`;
+      const play = `<div>공이 <b>몸 앞에 붙었을 때</b> 차면 높이 뜨고, <b>조금 떨어졌을 때</b> 차면 낮고 길게 날아가요</div><div>점프해서 <b>머리로 받으면</b> 상대 골대 쪽으로 날아가요</div><div>큰 공은 머리 · 몸에 닿기만 해도 <b>통통</b> 튀어요. 둘 사이에 끼면 위로 튀어 올라요</div><div>공이 <b>골대 위로</b> 넘어가면 <b>아웃</b> — 막던 쪽 골대 앞에서 다시 시작해요(시계는 계속 가요)</div>`;
       if (IS_TOUCH) return `<div>왼쪽 ◀ ▶ 로 움직이고, 오른쪽 <b>점프 · 킥</b> 단추를 눌러요 (함께 눌러도 돼요)</div>${play}`;
-      if (mode === "local") return `<div><b>1P</b> ${k("A")}${k("D")} 이동 · ${k("W")} 점프 · ${k("F")} 킥</div><div><b>2P</b> ${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("Enter")} 킥</div>${play}`;
-      return `<div>${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("Space")} 킥 (${k("A")}${k("D")}${k("W")}${k("F")} 도 돼요)</div>${play}`;
+      if (mode === "local") return `<div><b>1P</b> ${k("A")}${k("D")} 이동 · ${k("W")} 점프 · ${k("S")}·${k("F")} 킥</div><div><b>2P</b> ${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("↓")}·${k("Enter")} 킥</div>${play}`;
+      return `<div>${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("Space")}·${k("↓")} 킥 (${k("A")}${k("D")}${k("W")}${k("S")}${k("F")} 도 돼요)</div>${play}`;
     }
 
     // ───── 첫 화면 — 뒤에서는 컴퓨터끼리 구경 경기
@@ -325,7 +330,7 @@
     function demo() {
       if (engine && engine.demo) return;
       stopEngine();
-      engine = HKSoccer.create(canvas, { mode: "demo", me: { name: "신입", look: 0 }, rival: { name: "부장", look: 2 } });
+      engine = HKSoccer.create(canvas, { mode: "demo", quality: pref.quality, me: { name: "신입", look: 0 }, rival: { name: "부장", look: 2 } });
       engine.demo = true;
       engine.start();
     }
@@ -346,7 +351,8 @@
             <button type="button" class="sc-mode" data-mode="online" role="radio"><span class="sc-mode__ic">${icon("wifi", 18)}</span><b>동료와</b><small>실시간 1:1 대전</small><span class="sc-mode__tag">기록</span></button>
           </div>
           <div class="sc-row" data-row="level"><span class="sc-row__k">난이도</span><div class="sc-seg">${LEVELS.map(([key, t]) => `<button type="button" data-level="${key}">${t}</button>`).join("")}</div></div>
-          <div class="sc-row" data-row="time"><span class="sc-row__k">시간</span><div class="sc-seg">${[1, 2, 3].map((m) => `<button type="button" data-min="${m}">${m}분</button>`).join("")}</div></div>
+          <div class="sc-row" data-row="time"><span class="sc-row__k">시간</span><div class="sc-seg">${[1, 2, 3, 5].map((m) => `<button type="button" data-min="${m}">${m}분</button>`).join("")}</div></div>
+          <div class="sc-row" data-row="quality"><span class="sc-row__k">화질</span><div class="sc-seg">${QUALITIES.map(([key, t]) => `<button type="button" data-quality="${key}">${t}</button>`).join("")}</div></div>
           <div class="sc-note" data-row="online">동료에게 도전장을 보내고, 수락하면 둘이 이 화면에서 <b>2분</b> 동안 겨뤄요. 결과는 대전 순위에 들어가요.${status.open ? "" : `<br>지금은 업무 시간이라 대전은 ${esc(status.opensAt || "")}부터 할 수 있어요. 연습은 지금도 돼요.`}</div>
           <button type="button" class="hk-btn hk-btn--primary sc-go" id="sc-go">경기 시작</button>
           <div class="sc-help" id="sc-help"></div>
@@ -357,6 +363,7 @@
       over.querySelectorAll("[data-mode]").forEach((b) => { const on = b.dataset.mode === pref.mode; b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
       over.querySelectorAll("[data-level]").forEach((b) => b.classList.toggle("is-on", b.dataset.level === pref.level));
       over.querySelectorAll("[data-min]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.min) === pref.minutes));
+      over.querySelectorAll("[data-quality]").forEach((b) => b.classList.toggle("is-on", b.dataset.quality === pref.quality));
       const row = (n) => over.querySelector(`[data-row="${n}"]`);
       if (row("level")) row("level").hidden = pref.mode !== "cpu";
       if (row("time")) row("time").hidden = pref.mode === "online";
@@ -377,7 +384,7 @@
       screen = "play"; setPlaying(true);
       $("#sc-keys").innerHTML = keysHtml(mode);
       engine = HKSoccer.create(canvas, {
-        mode, level: pref.level, minutes: pref.minutes, touch: IS_TOUCH,
+        mode, level: pref.level, minutes: pref.minutes, quality: pref.quality, touch: IS_TOUCH,
         me: mode === "local" ? { name: "1P" } : me, rival,
         onEnd: (r) => showPracticeResult(r),
       });
@@ -682,7 +689,7 @@
           if (saved && saved.st && Date.now() - saved.at < 2 * 3600e3 && saved.st.phase !== "wait") restore = saved.st;
         }
         engine = HKSoccer.create(canvas, {
-          mode: role, minutes: ONLINE_MINUTES, touch: IS_TOUCH, me, rival, net, restore,
+          mode: role, minutes: ONLINE_MINUTES, quality: pref.quality, touch: IS_TOUCH, me, rival, net, restore,
           onEnd: (r) => onOnlineEnd(r),
           onEvent: (e) => onOnlineEvent(e),
         });
@@ -868,6 +875,7 @@
       if (b.dataset.mode) { pref.mode = b.dataset.mode; savePref(); HKSound.play("select"); paintMenu(); b.blur(); return; }
       if (b.dataset.level) { pref.level = b.dataset.level; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
       if (b.dataset.min) { pref.minutes = Number(b.dataset.min); savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.dataset.quality) { pref.quality = b.dataset.quality; savePref(); HKSound.play("tap"); if (engine && engine.setQuality) engine.setQuality(pref.quality); paintMenu(); b.blur(); return; }
       if (b.id === "sc-go") {
         if (pref.mode === "online") { history.replaceState(null, "", "#online"); return showLobby(); }
         return startGame(pref.mode);

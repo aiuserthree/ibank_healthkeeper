@@ -58,13 +58,6 @@ location ~ ^/lounge(\.html)?$ {
     return 301 /arcade;
 }
 
-# 아직 비공개 — 함께하기 · 새 대전 · 협동 게임 화면은 운영에서 열지 않고 아케이드로 보낸다(로컬 개발 서버에서만 보임)
-# 공개할 때 이 블록을 지우고 backend/app/services/game.py LOCAL_ONLY_GAMES 도 함께 정리한다
-location ~ ^/(together|games/(baseball|boxes|quizduel|gostop|memory|soccer|volley|escape|kitchen|words|maze|sketch|sync|spotdiff))(\.html)?/?$ {
-    add_header Cache-Control "no-store";
-    return 302 /arcade;
-}
-
 # HTML·페이지 스크립트는 매번 재검증 — 배포 직후 로그인 리다이렉트 등에서 옛 페이지가 캐시로 뜨지 않게 함
 location / {
     add_header Cache-Control "no-cache, must-revalidate";

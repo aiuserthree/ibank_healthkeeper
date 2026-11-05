@@ -26,9 +26,6 @@ window.HKRaid = (function () {
   const num = (n) => Math.round(Number(n) || 0).toLocaleString("ko-KR");
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const reduce = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (_) { return false; } };
-  // 「동료랑 같이」 — 함께하기(/together)는 아직 로컬에서만 연다. 운영에서는 공개된 대전(사내 오목)으로
-  const peersHref = () => (window.HKLunch && HKLunch.isLocal() ? "/together" : "/games/gomoku");
-  const withPeers = () => (window.HKLunch && HKLunch.isLocal() ? "협동 · 대전" : "대전"); // 협동은 아직 로컬에서만
   const icon = (name, size = 16) => (window.HKUI ? HKUI.icon(name, size, "currentColor") : "");
 
   // ── 보스 그림 ────────────────────────────────────────────────
@@ -670,7 +667,7 @@ window.HKRaid = (function () {
               <span class="rd-chip">${icon("hourglass", 15)} <span data-rd-left>${leftHtml(w.endsAt)}</span></span>
               ${b.weakness ? `<span class="rd-chip">${icon("target", 15)} 약점 · ${esc(b.weakness)}</span>` : ""}
             </div>
-            <div class="rd-cta"><a class="rd-btn is-main" href="/arcade">${icon("gamepad-2", 18)} 공격하러 가기</a><a class="rd-btn" href="${peersHref()}">${icon("users", 18)} 동료랑 같이 공격</a></div>
+            <div class="rd-cta"><a class="rd-btn is-main" href="/arcade">${icon("gamepad-2", 18)} 공격하러 가기</a><a class="rd-btn" href="/together">${icon("users", 18)} 동료랑 같이 공격</a></div>
           </div>
         </div>
       </section>`;
@@ -798,9 +795,9 @@ window.HKRaid = (function () {
           <span class="rd-eyebrow">내 공격</span>
           <h3 class="rd-h3">이번 주는 구경하며 응원해요</h3>
           <p>${why}</p>
-          <p>그래도 레이드 현황은 언제든 볼 수 있어요. 다른 부서 동료와 ${withPeers()}하면 동료 부서에는 공격이 들어가요.</p>
+          <p>그래도 레이드 현황은 언제든 볼 수 있어요. 다른 부서 동료와 협동 · 대전하면 동료 부서에는 공격이 들어가요.</p>
           ${own > 0 ? `<div class="rd-weekline" style="margin-top:4px"><span>이번 주 내가 한 공격 (부서 판에는 빠져요)</span><b>${num(own)}</b></div>` : ""}
-          <div class="rd-mecta"><a class="rd-btn is-ink" href="/arcade">아케이드</a><a class="rd-btn is-soft" href="${peersHref()}">함께하기</a></div>
+          <div class="rd-mecta"><a class="rd-btn is-ink" href="/arcade">아케이드</a><a class="rd-btn is-soft" href="/together">함께하기</a></div>
           ${closed}
         </div>`;
     }
@@ -823,7 +820,7 @@ window.HKRaid = (function () {
         <div class="rd-gauge">${ringHtml(td, cap)}<div class="rd-gauge__txt${full ? " is-full" : ""}">${msg}</div></div>
         <ul class="rd-today${items.length ? "" : " is-empty"}">${items.length ? items.map((x) => `<li><span>${esc(x.label)}</span><b>+${num(x.dmg)}</b></li>`).join("") : `<li>오늘 넣은 공격이 여기 쌓여요.</li>`}</ul>
         <div class="rd-weekline"><span>이번 주 내 공격</span><b>${num(m.weekDamage)}</b></div>
-        <div class="rd-mecta"><a class="rd-btn is-ink" href="/arcade">공격하러 가기</a><a class="rd-btn is-soft" href="${peersHref()}">동료랑 같이</a></div>
+        <div class="rd-mecta"><a class="rd-btn is-ink" href="/arcade">공격하러 가기</a><a class="rd-btn is-soft" href="/together">동료랑 같이</a></div>
         ${closed}
       </div>`;
   }
@@ -867,7 +864,7 @@ window.HKRaid = (function () {
       <h2 class="rd-h2">이렇게 공격해요</h2>
       <p class="rd-sub">아케이드에서 하는 모든 게임이 우리 부서 보스에게 들어가요.</p>
       ${src.length ? `<ul class="rd-ways">${src.map((s) => `<li class="rd-way"><span class="rd-way__ico">${icon(wayIcon(s.key), 20)}</span><span><b>${esc(s.label)}</b>${s.note ? `<p>${esc(s.note)}</p>` : ""}</span><span class="rd-way__dmg">+${num(s.dmg)}</span></li>`).join("")}</ul>` : ""}
-      ${r.crossBonus ? `<div class="rd-cross"><span class="rd-cross__ico">${icon("handshake", 22)}</span><span><b>다른 부서 동료와 ${withPeers()}하면 두 부서 모두 보너스</b><p>판이 끝나면 나와 동료의 부서에 <em>+${num(r.crossBonus)}</em>씩 더 들어가요. 옆 부서 동료에게 먼저 말 걸어 보세요.</p></span></div>` : ""}
+      ${r.crossBonus ? `<div class="rd-cross"><span class="rd-cross__ico">${icon("handshake", 22)}</span><span><b>다른 부서 동료와 협동 · 대전하면 두 부서 모두 보너스</b><p>판이 끝나면 나와 동료의 부서에 <em>+${num(r.crossBonus)}</em>씩 더 들어가요. 옆 부서 동료에게 먼저 말 걸어 보세요.</p></span></div>` : ""}
       <ul class="rd-facts">
         ${Array.isArray(r.notes) && r.notes.length
           // 서버가 준 규칙 문장(하루 한도 · 보스가 하루에 깎이는 양 · 참여 인원 · 순위)을 그대로

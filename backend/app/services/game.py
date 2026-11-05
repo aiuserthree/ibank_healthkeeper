@@ -78,7 +78,7 @@ GAMES: dict[str, Game] = {
         Game("gostop", "고스톱", "MINI", "동료와 1:1 맞고 · 점수만으로 겨루는 턴제 대전", "layers", "승", 1_000_000),
         Game("memory", "도형 짝맞추기", "MINI", "번갈아 카드 두 장을 뒤집어 같은 도형 짝을 더 많이 · 턴제 대전", "shapes", "승", 1_000_000),
         Game("soccer", "헤딩 축구", "MINI", "동료와 실시간 1:1 · 2분 동안 머리로 골 넣기 대전", "goal", "승", 1_000_000),
-        Game("volley", "옥상 배구", "MINI", "동료와 실시간 1:1 · 먼저 7점 내면 승리하는 배구 대전", "volleyball", "승", 1_000_000),
+        Game("volley", "옥상 배구", "MINI", "동료와 실시간 1:1 · 먼저 7점(긴 경기 15점) 내면 승리하는 배구 대전", "volleyball", "승", 1_000_000),
         Game("escape", "야근 사무실 탈출", "MINI", "동료와 둘이 단서를 나눠 20분 안에 탈출하는 협동 방탈출", "door-open", "time", 3600, lower_better=True),
         Game("kitchen", "점심 분식집", "MINI", "동료와 홀·주방을 나눠 3분 동안 분식집 운영 · 협동", "chef-hat", "원", 10_000_000),
         Game("words", "말해 봐 맞혀 봐", "QUIZ", "동료와 번갈아 설명하고 맞히기 · 3분 동안 몇 개나 · 협동", "message-circle", "개", 1000),
@@ -126,12 +126,9 @@ DEPARTMENT_TOP_N = 3
 SUBMIT_PER_MINUTE = 20
 
 
-# 아직 비공개 — 로컬(DEBUG=true)에서만 보이는 대전 · 협동 게임. 운영(DEBUG=false)에서는 아케이드 목록 · 순위 · 도전 · 초대에서 빠진다.
-# 공개할 때는 여기서 빼고, deploy/nginx/app-locations.inc 의 「아직 비공개」 블록과 화면(HKLunch.isLocal 로 가린 함께하기 링크)도 함께 정리한다.
-LOCAL_ONLY_GAMES = frozenset({
-    "baseball", "boxes", "quizduel", "gostop", "memory", "soccer", "volley",  # 1:1 대전(오목 · 체스는 공개)
-    "escape", "kitchen", "words", "maze", "sketch", "sync", "spotdiff",  # 2인 협동
-})
+# 아직 비공개인 게임 — 로컬(DEBUG=true)에서만 보이고, 운영(DEBUG=false)에서는 아케이드 목록 · 순위 · 도전 · 초대에서 빠진다.
+# 지금은 모두 공개(빈 목록). 다시 가릴 게임이 생기면 여기에 키를 넣고, 화면 주소는 deploy/nginx/app-locations.inc 에서 /arcade 로 보낸다.
+LOCAL_ONLY_GAMES: frozenset[str] = frozenset()
 
 
 def game_visible(key: str) -> bool:

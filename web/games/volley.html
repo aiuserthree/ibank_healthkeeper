@@ -17,6 +17,8 @@
   <style>
     /* 옥상 배구 — 판(16:9) · PC 키 안내 · 휴대폰 조작판 · 위에 덮는 카드 */
     .vb-main { align-items: stretch !important; }
+    /* 경기 중 일시정지 버튼 — PC 에서도 보인다 (P · Esc 와 같음) */
+    .hk-pf.is-playing .hk-pf__pause:not([hidden]) { display: inline-flex; }
     .vb { position: relative; display: grid; box-sizing: border-box; --gw: 640px; --btn: 78px; --stick: 132px; }
     .vb.is-pc { margin: auto; grid-template-areas: "game" "keys"; grid-template-rows: auto auto; gap: 8px; }
     /* 휴대폰 세로 — 위 판 · 가운데 안내 · 아래 조작판(엄지 닿는 곳) */
@@ -54,13 +56,60 @@
     .vb.is-land .vb-btns { align-content: center; padding-bottom: 10px; }
     .vb-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: var(--btn); height: var(--btn); border-radius: 50%; border: 0; color: #fff; font: 800 15px/1.1 inherit; touch-action: none; cursor: pointer; box-shadow: 0 5px 0 rgba(15, 23, 42, .18); -webkit-tap-highlight-color: transparent; }
     .vb-btn[data-act="jump"] { grid-area: jump; background: linear-gradient(160deg, #4f86ff, #2f6bff); }
-    .vb-btn[data-act="hit"] { grid-area: hit; background: linear-gradient(160deg, #ff9a63, #ff7a3d); }
+    .vb-btn[data-act="spike"] { grid-area: hit; background: linear-gradient(160deg, #ff9a63, #ff7a3d); }
     .vb-btn[data-act="dive"] { grid-area: dive; justify-self: center; width: calc(var(--btn) * 1.55); height: calc(var(--btn) * .58); border-radius: 999px; background: linear-gradient(160deg, #64748b, #475569); font-size: 14px; }
     .vb-btn.is-down { transform: translateY(3px) scale(.96); box-shadow: 0 2px 0 rgba(15, 23, 42, .18); filter: brightness(.92); }
     .vb.is-land .vb-btns { gap: 10px 8px; padding-left: 2px; padding-right: calc(var(--sa-r, 0px) + 2px); }
     .vb.is-land .vb-btn { font-size: 14px; }
     .vb.is-land .vb-btn[data-act="dive"] { width: calc(var(--btn) * 1.6); height: calc(var(--btn) * .66); font-size: 13px; }
     .vb.is-land .vb-stick { padding-left: calc(var(--sa-l, 0px) + 2px); padding-right: 2px; }
+    /* 이동을 버튼으로 (환경 — 막대 대신) */
+    .vb-move { display: none; gap: 12px; }
+    .vb.is-btnmove .vb-stick__base { display: none; }
+    .vb.is-btnmove .vb-move { display: flex; }
+    .vb-btn[data-act="left"], .vb-btn[data-act="right"] { background: linear-gradient(160deg, #94a3b8, #64748b); font-size: 24px; }
+    /* PC — 코트 안 조작판(레퍼런스의 코트 조이스틱): 경기판 아래 모서리에 반투명으로, 마우스로도 누른다. 경기 중에만 먹는다 */
+    .vb.is-pc .vb-stick { grid-area: game; display: flex; align-self: end; justify-self: start; z-index: 2; padding: 0 0 8px 10px; gap: 0; }
+    /* 오른쪽 아래 세로로 — 위에서부터 점프 · 강타 · 다이빙 (레퍼런스 PC 코트 조작판과 같은 자리 · 순서) */
+    .vb.is-pc .vb-btns { grid-area: game; display: grid; align-self: end; justify-self: end; z-index: 2; grid-template-columns: auto; grid-template-areas: "jump" "hit" "dive"; gap: 8px; padding: 0 10px 8px 0; }
+    .vb.is-pc .vb-stick small { display: none; }
+    .vb.is-pc .vb-stick__base { width: 112px; height: 48px; border-radius: 999px; background: rgba(15, 23, 42, .22); border-color: rgba(255, 255, 255, .45); }
+    .vb.is-pc .vb-stick__base::before { border-right-color: rgba(255, 255, 255, .8); }
+    .vb.is-pc .vb-stick__base::after { border-left-color: rgba(255, 255, 255, .8); }
+    .vb.is-pc .vb-stick__knob { width: 40px; height: 40px; opacity: .92; }
+    .vb.is-pc .vb-btn { width: 60px; height: 44px; border-radius: 14px; font-size: 13px; opacity: .88; box-shadow: 0 3px 0 rgba(15, 23, 42, .2); }
+    .vb.is-pc .vb-btn[data-act="dive"] { width: 60px; height: 44px; border-radius: 14px; font-size: 13px; }
+    .hk-pf:not(.is-playing) .vb.is-pc .vb-stick, .hk-pf:not(.is-playing) .vb.is-pc .vb-btns { opacity: .4; pointer-events: none; }
+    /* PC — 아래 버튼(환경설정): 경기판 아래 한 줄 ← → 점프 다이빙 강타 */
+    .vb.is-pc.is-btnmove { grid-template-areas: "game game" "stick btns" "keys keys"; grid-template-columns: 1fr 1fr; }
+    .vb.is-pc.is-btnmove .vb-game { grid-area: game; }
+    .vb.is-pc.is-btnmove .vb-keys { grid-area: keys; }
+    .vb.is-pc.is-btnmove .vb-stick { grid-area: stick; align-self: center; justify-self: end; padding: 0 4px 0 0; }
+    .vb.is-pc.is-btnmove .vb-btns { grid-area: btns; align-self: center; justify-self: start; grid-template-areas: "jump dive hit"; padding: 0 0 0 4px; }
+    .vb.is-pc.is-btnmove .vb-move { gap: 8px; }
+    .vb.is-pc.is-btnmove .vb-btn { opacity: 1; }
+    .vb.is-pc .vb-btn[data-act="left"], .vb.is-pc .vb-btn[data-act="right"] { font-size: 20px; }
+    /* 선수 고르기 — 작은 그림 + 이름 */
+    .vb-chars button { display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 0 4px; min-width: 0; }
+    .vb-chr { width: 22px; height: 30px; object-fit: contain; flex-shrink: 0; }
+    .vb-chr--q { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #475569; font-weight: 800; font-size: 13px; }
+    .vb-chr.is-sm { width: 18px; height: 22px; }
+    .vb-card.vb-set .vb-row__k { width: 58px; text-align: left; }
+    .vb-card.vb-opt { max-width: 470px; text-align: left; }
+    .vb-card.vb-opt h2, .vb-card.vb-rules h2 { margin-bottom: 2px; }
+    .vb-card.vb-rules { max-width: 600px; }
+    .vb-rules h3 { margin: 14px 0 4px; font-size: 15px; font-weight: 800; color: #0f172a; }
+    .vb-rules ul { margin: 4px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); word-break: keep-all; }
+    .vb-rules li + li { margin-top: 3px; }
+    .vb-rules kbd { height: 20px; min-width: 20px; font-size: 11px; }
+    .hk-pf__tools > [hidden] { display: none !important; }
+    .vb-card.vb-set .vb-seg button { font-size: 13px; }
+    .vb-over--set { z-index: 6; }
+    /* 온라인 준비 · 계속 준비 */
+    .vb-who { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+    .vb-who div { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 6px; border-radius: 12px; background: #f1f5f9; font-size: 13px; font-weight: 700; color: #475569; }
+    .vb-who div.is-on { background: #dcfce7; color: #15803d; }
+    .vb-card .vb-row__k { text-align: left; }
     /* 위에 덮는 화면 (모드 고르기 · 멈춤 · 결과 · 연결) */
     .vb-over { position: absolute; inset: 0; z-index: 5; display: flex; padding: 14px; overflow-y: auto; background: rgba(10, 30, 50, .42); border-radius: 16px; box-sizing: border-box; }
     .vb-over[hidden] { display: none; }
@@ -115,9 +164,19 @@
     .vb-card.is-wide { max-width: 760px; padding: 0; overflow: hidden; }
     .vb-card.is-wide .gk { padding: 18px 18px 24px; }
     .vb-card .vb-mini.is-ok { color: #15803d; font-weight: 700; }
+    /* 코트 보기 — 결과 카드를 접고 끝난 코트를 본다. 아래 가운데 버튼으로 다시 연다 */
+    .vb-resback { position: absolute; left: 50%; bottom: 12px; z-index: 4; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .94); box-shadow: 0 6px 18px rgba(15, 23, 42, .22); font: 800 14px/1 inherit; color: #0f172a; cursor: pointer; }
+    .vb-resback[hidden] { display: none; }
+    .vb-btnrow.is-3 .hk-btn { padding-left: 6px; padding-right: 6px; font-size: 14px; }
+    .vb-again { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #eff5ff; font-size: 13px; font-weight: 700; color: #1d4ed8; word-break: keep-all; }
+    .vb-again[hidden] { display: none; }
     .vb-card .vb-mini.is-bad { color: #b45309; font-weight: 700; }
     /* 휴대폰 */
     @media (max-width: 640px) {
+      /* 위 막대 — 게임 옵션 · 게임 방법 · 환경설정 · 전체 화면까지 한 줄에 들어가게 */
+      .hk-pf__bar .hk-pf__icon { display: none; }
+      .hk-pf__tools { gap: 5px; }
+      .hk-pf__tools .hk-play-sound { padding: 7px 8px; }
       .vb-over { padding: 8px; }
       .vb-card { padding: 16px 14px; border-radius: 16px; }
       .vb-card h2 { font-size: 19px; }
@@ -137,17 +196,22 @@
       .hk-pf .hk-pf__main { padding: 4px !important; }
     }
     @media (max-height: 520px) and (orientation: landscape) {
-      .vb-over { padding: 8px; }
-      .vb-card { padding: 14px 16px; }
-      .vb-menu__head { margin-bottom: 8px; }
-      .vb-menu__head p { display: none; }
+      .vb-over { padding: 6px; }
+      .vb-card { padding: 12px 16px; }
+      .vb-menu__head { display: none; } /* 제목은 위 막대에 있다 — 선수 고르기 줄까지 한 화면에 */
+      .vb-card .vb-badge { display: none; } /* 낮은 화면 — 준비 · 멈춤 · 결과 카드의 큰 그림은 빼고 버튼까지 한 화면에 */
+      .vb-who { margin-top: 8px; }
+      .vb-who div { padding: 7px 6px; }
+      .vb-btnrow { margin-top: 10px; }
       .vb-mode small { display: none; }
       .vb-mode__ic { display: none; }
       .vb-row { margin-top: 8px; }
       .vb-go { height: 44px; margin-top: 10px; }
+      .vb-seg button { height: 32px; }
       .vb-help { display: none; }
       .vb-stats { margin-top: 8px; }
       .vb-score { margin: 8px 0 2px; }
+      .vb-opt > p, .vb-opt .vb-mini { display: none; } /* 게임 옵션 — 버튼(적용하고 새 경기)까지 한 화면에 */
     }
   </style>
 </head>
@@ -167,11 +231,33 @@
     const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
     const LEVEL_NAME = Object.fromEntries(LEVELS);
     const PREF_KEY = "hk-volley-pref";
-    const pref = { mode: "cpu", level: "normal", target: 7 };
+    // ctrl: 화면 조작 — "court"(코트 조이스틱 · 기본) | "buttons"(아래 버튼). char: 내 선수(고르지 않았으면 null — 온라인 손님은 주황)
+    // rival: 상대 선수 — "random"(나와 다른 선수 · 기본) | 번호. fps: 화면 표시 60 · 30(가볍게 — 동료와)
+    const pref = { mode: "cpu", level: "normal", target: 7, ctrl: "court", char: null, rival: "random", fps: 60 };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY) || "{}")); } catch (_) { /* 처음 */ }
     if (!["cpu", "local"].includes(pref.mode) || (pref.mode === "local" && IS_TOUCH)) pref.mode = "cpu";
     if (!LEVEL_NAME[pref.level]) pref.level = "normal";
     if (![7, 15].includes(pref.target)) pref.target = 7;
+    if (pref.move === "btn") pref.ctrl = "buttons"; // 예전 저장값(이동: 막대 · 버튼)
+    delete pref.move;
+    if (!["court", "buttons"].includes(pref.ctrl)) pref.ctrl = "court";
+    const LOOKS = HKVolley.LOOKS;
+    const okLook = (v) => Number.isInteger(v) && v >= 0 && v < LOOKS.length;
+    if (!okLook(pref.char)) pref.char = null;
+    if (pref.rival !== "random" && !okLook(pref.rival)) pref.rival = "random";
+    if (pref.fps !== 30) pref.fps = 60;
+    const myChar = () => (okLook(pref.char) ? pref.char : 0);
+    // 상대 선수 — 랜덤이면 나와 다른 선수 중 하나 (레퍼런스와 같음)
+    const rivalChar = () => {
+      if (okLook(pref.rival)) return pref.rival;
+      const others = LOOKS.map((l) => l.id).filter((i) => i !== myChar());
+      return others[Math.floor(Math.random() * others.length)];
+    };
+    const chrImg = (i) => `<img class="vb-chr" src="${HKVolley.thumb(i)}" alt="">`;
+    // 내 최고 랠리 — 난이도 · 목표 점수마다 이 브라우저에 (컴퓨터와 끝낸 경기만)
+    const BEST_KEY = "hk-volley-best";
+    const bestOf = (lv, tg) => { try { return Number((JSON.parse(localStorage.getItem(BEST_KEY) || "{}") || {})[`${lv}-${tg}`]) || 0; } catch (_) { return 0; } };
+    const putBest = (lv, tg, n) => { try { const o = JSON.parse(localStorage.getItem(BEST_KEY) || "{}") || {}; o[`${lv}-${tg}`] = n; localStorage.setItem(BEST_KEY, JSON.stringify(o)); } catch (_) { /* 저장 못 해도 경기는 그대로 */ } };
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (_) { /* 저장 못 해도 이번엔 그대로 */ } };
 
     await HKUI.loadLucide();
@@ -195,25 +281,32 @@
           <div class="hk-pf__title"><b>옥상 배구</b><small>점심시간 회사 옥상에서 1:1 배구</small></div>
           <div class="hk-pf__tools">
             <button type="button" class="hk-play-sound hk-pf__pause" id="vb-pause" aria-label="일시정지">${icon("pause")}<span>일시정지</span></button>
+            <button type="button" class="hk-play-sound" id="vb-opt" aria-label="게임 옵션" hidden>${icon("sliders-horizontal")}<span>게임 옵션</span></button>
+            <button type="button" class="hk-play-sound" id="vb-rules" aria-label="게임 방법">${icon("book-open")}<span>게임 방법</span></button>
+            <button type="button" class="hk-play-sound" id="vb-set" aria-label="환경설정">${icon("settings-2")}<span>환경설정</span></button>
+            <button type="button" class="hk-play-sound" id="vb-full" aria-label="전체 화면으로 보기" hidden></button>
             <button type="button" class="hk-play-sound" id="vb-sound"></button>
           </div>
         </header>
         <div class="hk-pf__body">
           <main class="hk-pf__main vb-main" id="vb-main">
             <div class="vb is-pc" id="vb">
-              <div class="vb-game"><canvas id="vb-canvas" aria-label="옥상 배구 경기장"></canvas></div>
+              <div class="vb-game"><canvas id="vb-canvas" aria-label="옥상 배구 경기장"></canvas><button type="button" class="vb-resback" id="vb-resback" hidden>경기 결과 보기</button></div>
               <div class="vb-keys" id="vb-keys"></div>
               <div class="vb-tip">
                 <span class="vb-tip__rot">${icon("rotate-cw", 15)} 가로로 돌리면 더 크게 보여요</span>
-                <div class="vb-tip__how"><div><b>받기</b>공 밑에 서면 저절로</div><div><b>강타</b>뛰어서 공 앞에서</div><div><b>방향</b>강타 때 막대로 골라요</div></div>
+                <div class="vb-tip__how"><div><b>받기</b>몸에 닿으면 저절로</div><div><b>강타</b>닿기 직전에 눌러요</div><div><b>다이빙</b>보는 쪽으로 몸을 날려요</div></div>
               </div>
-              <div class="vb-stick" id="vb-stick"><span class="vb-stick__base"><span class="vb-stick__knob" id="vb-knob"></span></span><small>끌어서 이동</small></div>
+              <div class="vb-stick" id="vb-stick"><span class="vb-stick__base"><span class="vb-stick__knob" id="vb-knob"></span></span>
+                <div class="vb-move"><button type="button" class="vb-btn" data-act="left" aria-label="왼쪽 이동">←</button><button type="button" class="vb-btn" data-act="right" aria-label="오른쪽 이동">→</button></div>
+                <small id="vb-stick-tip">끌어서 이동</small></div>
               <div class="vb-btns" id="vb-btns">
                 <button type="button" class="vb-btn" data-act="dive">다이빙</button>
-                <button type="button" class="vb-btn" data-act="hit">강타</button>
+                <button type="button" class="vb-btn" data-act="spike">강타</button>
                 <button type="button" class="vb-btn" data-act="jump">점프</button>
               </div>
               <div class="vb-over" id="vb-over" hidden></div>
+              <div class="vb-over vb-over--set" id="vb-setover" hidden></div>
             </div>
           </main>
         </div>
@@ -261,7 +354,7 @@
         vb.style.setProperty("--btn", `${Math.floor(clampN((inner - 4 - 8) / 2, 48, 66))}px`);
         vb.style.setProperty("--stick", `${Math.round(clampN(inner - 14, 96, 128))}px`);
         gw = Math.min(aw - sl - sr, ah * 16 / 9);
-      } else gw = Math.min(aw, (ah - 36) * 16 / 9, 1240);
+      } else gw = Math.min(aw, (ah - 36 - (pref.ctrl === "buttons" ? 58 : 0)) * 16 / 9, 1240); // 아래 버튼 줄이면 그만큼 낮게
       vb.style.setProperty("--gw", `${Math.max(240, Math.floor(gw))}px`);
     }
     layout();
@@ -287,46 +380,61 @@
     let resultAt = 0; // 결과 카드가 뜬 때 — 바로 뒤 Space · Enter 는 무시 (끝날 무렵 연타가 다시 하기로 새지 않게)
     const pauseBtn = $("#vb-pause");
     function stopEngine() { if (engine) { engine.destroy(); engine = null; } }
+    // 잡고 있던 터치(막대 · 버튼)를 놓는다 — 득점 · 멈춤 · 새 서브 때. 다시 손을 대야 먹는다 (조작판 코드가 아래에서 채운다)
+    let dropTouchImpl = () => {};
+    function dropTouch() { dropTouchImpl(); }
     if (DEV) window.__vbEngine = () => engine; // 시험용
-    function setPlaying(on) { $("#vb-pf").classList.toggle("is-playing", on); }
-    function showOver(html) { over.innerHTML = html; over.hidden = false; HKUI.refreshIcons(over); }
-    function hideOver() { over.hidden = true; over.innerHTML = ""; }
+    function setPlaying(on) { $("#vb-pf").classList.toggle("is-playing", on); paintTools(); }
+    const resBack = $("#vb-resback");
+    function showOver(html) { over.innerHTML = html; over.hidden = false; resBack.hidden = true; HKUI.refreshIcons(over); paintTools(); }
+    function hideOver() { over.hidden = true; over.innerHTML = ""; resBack.hidden = true; paintTools(); }
+    // 코트 보기 — 결과 카드를 접어 끝난 코트를 그대로 보여 주고, 「경기 결과 보기」로 다시 연다 (레퍼런스와 같음)
+    function courtView() {
+      if (screen !== "result") return;
+      screen = "court"; over.hidden = true; resBack.hidden = false;
+    }
+    function resultBack() {
+      if (screen !== "court") return;
+      screen = "result"; over.hidden = false; resBack.hidden = true;
+    }
+    resBack.onclick = () => { resBack.blur(); resultBack(); };
     const me = { name: profile.name || "나", avatarUrl: profile.avatarUrl || "" };
 
     function keysHtml(mode) {
       const k = (t) => `<kbd>${t}</kbd>`;
       if (mode === "local") {
-        return `<span><b>1P</b> ${k("A")}${k("D")} 이동 ${k("W")} 점프 ${k("S")} 다이빙 ${k("Space")} 강타</span>
+        return `<span><b>1P</b> ${k("A")}${k("D")} 이동 ${k("W")}${k("Space")} 점프 ${k("S")} 다이빙 ${k("Z")}${k("X")} 강타</span>
           <span><b>2P</b> ${k("←")}${k("→")} 이동 ${k("↑")} 점프 ${k("↓")} 다이빙 ${k("Enter")} 강타</span>
-          <span>${k("Esc")} 멈춤</span>`;
+          <span>${k("P")}${k("Esc")} 멈춤</span>`;
       }
-      return `<span>${k("←")}${k("→")} 이동</span><span>${k("↑")} 점프</span><span>${k("↓")} 다이빙</span><span>${k("Space")} 강타</span>
-        <span>강타 때 ${k("→")} 길게 · ${k("↓")} 내리꽂기 · ${k("←")} 살짝</span>${mode === "cpu" ? `<span>${k("Esc")} 멈춤</span>` : ""}`;
+      return `<span>${k("←")}${k("→")} 이동</span><span>${k("↑")}${k("Space")} 점프</span><span>${k("↓")} 다이빙</span><span>${k("Z")}${k("X")} 강타</span>
+        <span>${k("P")}${k("Esc")} ${mode === "online" ? "일시정지" : "멈춤"}</span>`;
     }
     function helpHtml(mode) {
       const k = (t) => `<kbd>${t}</kbd>`;
+      const rule = `<div>공이 몸에 닿으면 저절로 받아요 · 상대 코트 바닥에 떨어뜨리면 1점, 먼저 7점(또는 15점) 내면 승리 · 듀스 없음</div>
+        <div>${IS_TOUCH ? "득점 · 멈춤 뒤에는 손을 떼고 다시 대야 움직여요" : "득점하면 누르던 키가 풀려요 · 다시 눌러야 움직여요"}. 멈추면 「계속하기」를 눌러야 이어 가요</div>
+        <div>선수는 모습만 달라요(능력은 같아요) · 화면 조작은 환경설정에서 바꿔요</div>`;
       if (IS_TOUCH) {
-        return `<div>왼쪽을 끌어 이동 · 오른쪽 버튼으로 <b>점프 · 강타 · 다이빙</b></div>
-          <div>강타 때 막대를 앞으로 밀면 길게, 아래로 밀면 내리꽂고, 뒤로 당기면 살짝 넘겨요</div>
-          <div>공이 몸에 닿으면 저절로 받아 올려요</div>`;
+        return `<div>왼손으로 이동 · 오른손으로 <b>점프 · 강타 · 다이빙</b> (기술은 누를 때마다 한 번)</div>
+          <div>강타는 공에 닿기 직전에 — 높이 뛰어 치면 내리꽂고, 낮으면 위로 넘겨요</div>${rule}`;
       }
       if (mode === "local") {
-        return `<div><b>1P</b> ${k("A")}${k("D")} 이동 · ${k("W")} 점프 · ${k("S")} 다이빙 · ${k("Space")} 강타</div>
-          <div><b>2P</b> ${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("↓")} 다이빙 · ${k("Enter")} 강타</div>
-          <div>강타 때 상대 쪽 키 길게 · 아래 키 내리꽂기 · 내 쪽 키 살짝 넘기기</div>`;
+        return `<div><b>1P</b> ${k("A")}${k("D")} 이동 · ${k("W")}${k("Space")} 점프 · ${k("S")} 다이빙 · ${k("Z")}${k("X")} 강타</div>
+          <div><b>2P</b> ${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("↓")} 다이빙 · ${k("Enter")} 강타</div>${rule}`;
       }
-      return `<div>${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("↓")} 다이빙 · ${k("Space")} 강타</div>
-        <div>강타 때 ${k("→")} 길게 · ${k("↓")} 내리꽂기 · ${k("←")} 살짝 넘기기</div>
-        <div>공이 몸에 닿으면 저절로 받아요 · 높이 뛰어 강타하면 내리꽂아요</div>`;
+      return `<div>${k("←")}${k("→")} 이동 · ${k("↑")}${k("Space")} 점프 · ${k("↓")} 다이빙 · ${k("Z")}${k("X")} 강타</div>
+        <div>강타는 공에 닿기 직전에 — 높이 뛰어 치면 내리꽂고, 낮으면 위로 넘겨요</div>${rule}`;
     }
 
     // ───── 첫 화면 — 뒤에서는 컴퓨터끼리 구경 경기
     function showMenu() {
       stopEngine(); closeConn();
       screen = "menu"; playing = null; setPlaying(false);
-      pauseBtn.hidden = false;
+      pauseBtn.hidden = false; pauseBtn.disabled = false;
       $("#vb-keys").innerHTML = "";
-      engine = HKVolley.create(canvas, { mode: "demo", target: 99, me: { name: "토스" }, rival: { name: "스파이크" } });
+      const d0 = Math.floor(Math.random() * LOOKS.length), d1 = (d0 + 1 + Math.floor(Math.random() * (LOOKS.length - 1))) % LOOKS.length;
+      engine = HKVolley.create(canvas, { mode: "demo", target: 99, me: { name: "토스" }, rival: { name: "스파이크" }, looks: [d0, d1] });
       engine.start();
       const localOff = IS_TOUCH;
       showOver(`<div class="vb-card vb-menu" role="dialog" aria-label="옥상 배구 시작">
@@ -340,7 +448,9 @@
             <button type="button" class="vb-mode" data-mode="online" role="radio" ${ONLINE_READY ? "" : "disabled"}><span class="vb-mode__ic">${icon("wifi", 18)}</span><b>동료와</b><small>실시간 1:1 대전</small>${ONLINE_READY ? "" : `<span class="vb-mode__tag">곧 열려요</span>`}</button>
           </div>
           <div class="vb-row" data-row="level"><span class="vb-row__k">난이도</span><div class="vb-seg">${LEVELS.map(([k, t]) => `<button type="button" data-level="${k}">${t}</button>`).join("")}</div></div>
-          <div class="vb-row" data-row="target"><span class="vb-row__k">점수</span><div class="vb-seg"><button type="button" data-target="7">7점 내기</button><button type="button" data-target="15">15점 내기</button></div></div>
+          <div class="vb-row" data-row="target"><span class="vb-row__k">점수</span><div class="vb-seg"><button type="button" data-target="7">7점 빠른 경기</button><button type="button" data-target="15">15점 긴 경기</button></div></div>
+          <div class="vb-row" data-row="char"><span class="vb-row__k">내 선수</span><div class="vb-seg vb-chars">${LOOKS.map((l) => `<button type="button" data-char="${l.id}">${chrImg(l.id)}${l.name}</button>`).join("")}</div></div>
+          <div class="vb-row" data-row="rival"><span class="vb-row__k">상대</span><div class="vb-seg vb-chars"><button type="button" data-rival="random"><span class="vb-chr vb-chr--q">?</span>랜덤</button>${LOOKS.map((l) => `<button type="button" data-rival="${l.id}">${chrImg(l.id)}${l.name}</button>`).join("")}</div></div>
           <button type="button" class="hk-btn hk-btn--primary vb-go" id="vb-go">경기 시작</button>
           <div class="vb-help" id="vb-help"></div>
         </div>`);
@@ -350,37 +460,85 @@
       over.querySelectorAll("[data-mode]").forEach((b) => { const on = b.dataset.mode === pref.mode; b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
       over.querySelectorAll("[data-level]").forEach((b) => b.classList.toggle("is-on", b.dataset.level === pref.level));
       over.querySelectorAll("[data-target]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.target) === pref.target));
+      over.querySelectorAll("[data-char]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.char) === myChar()));
+      over.querySelectorAll("[data-rival]").forEach((b) => b.classList.toggle("is-on", b.dataset.rival === String(pref.rival)));
+      paintMove();
       const lv = over.querySelector('[data-row="level"]');
       if (lv) lv.hidden = pref.mode !== "cpu";
+      // 동료와 — 상대 선수는 상대가 고른다
+      const rr = over.querySelector('[data-row="rival"]');
+      if (rr) rr.hidden = pref.mode === "online";
+      // 온라인은 목표 점수를 들어간 뒤 준비 화면에서 도전한 사람이 정한다
+      const tg = over.querySelector('[data-row="target"]');
+      if (tg) tg.hidden = pref.mode === "online";
       const help = $("#vb-help");
       if (help) help.innerHTML = helpHtml(pref.mode);
     }
 
+    // 화면 조작 — 코트 조이스틱(기본) · 아래 버튼 (환경설정)
+    function paintMove() {
+      vb.classList.toggle("is-btnmove", pref.ctrl === "buttons");
+      const tip = $("#vb-stick-tip");
+      if (tip) tip.textContent = pref.ctrl === "buttons" ? "눌러서 이동" : "끌어서 이동";
+    }
+    paintMove();
+
     // ───── 경기
-    function startGame(mode) {
+    // wait: 레퍼런스의 「다시 경기」처럼 새 코트를 그려 두고 「서브 준비」에서 한 번 더 눌러 시작한다
+    function startGame(mode, wait) {
       stopEngine();
       hideOver();
+      dropTouch();
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); // 스페이스가 버튼을 누르지 않게
       const rival = mode === "cpu" ? { name: `컴퓨터(${LEVEL_NAME[pref.level]})` } : { name: "2P" };
       playing = { mode, level: pref.level, target: pref.target, rival };
-      screen = "play"; setPlaying(true);
-      pauseBtn.hidden = false;
+      pauseBtn.hidden = false; pauseBtn.disabled = false;
       $("#vb-keys").innerHTML = keysHtml(mode);
+      playing.best = mode === "cpu" ? bestOf(pref.level, pref.target) : 0;
       engine = HKVolley.create(canvas, {
-        mode, level: pref.level, target: pref.target, touch: IS_TOUCH,
+        mode, level: pref.level, target: pref.target, touch: IS_TOUCH, best: playing.best,
+        looks: [myChar(), rivalChar()], // 선택은 새 경기를 시작할 때 적용 (다시 하기도 랜덤이면 새로 뽑는다)
         me: mode === "local" ? { name: "1P" } : me, rival,
+        onEvent: (e) => {
+          if (e.type === "autopause") pauseGame("화면이 잠깐 멈춰서 경기를 세웠어요");
+          else if (e.type === "inputreset" && e.drop) dropTouch();
+        },
         onEnd: (r) => showResult(r),
       });
+      if (wait) {
+        screen = "serveready"; setPlaying(false);
+        showOver(`<div class="vb-card is-small" role="dialog" aria-label="서브 준비">
+            <span class="vb-badge">${icon("volleyball", 26)}</span>
+            <h2>서브 준비</h2>
+            <p>${IS_TOUCH ? "서브 시작을 누르면" : "서브 시작이나 Space를 누르면"} 시작해요 · 내 서브는 점프로 공에 닿을 때까지 기다려요</p>
+            <div class="vb-btnrow is-3">
+              <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">모드 고르기</button>
+              <button type="button" class="hk-btn hk-btn--secondary" data-act="opts">게임 옵션</button>
+              <button type="button" class="hk-btn hk-btn--primary" data-act="serve">서브 시작</button>
+            </div>
+          </div>`);
+        return;
+      }
+      beginServe();
+    }
+    function beginServe() {
+      if (!engine || !playing || playing.online) return;
+      hideOver();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      screen = "play"; setPlaying(true);
       engine.start();
     }
-    function pauseGame() {
+    function pauseGame(why) {
+      if (screen === "play" && playing && playing.online) { if (engine) engine.requestPause(); return; }
       if (screen !== "play" || !engine || !engine.pause()) return;
       screen = "pause";
+      dropTouch();
+      pauseBtn.disabled = true; // 레퍼런스: 일시정지 버튼은 멈추기만 — 이어 가기는 「계속하기」로
       const s = engine.score();
       showOver(`<div class="vb-card is-small" role="dialog" aria-label="일시정지">
           <span class="vb-badge">${icon("pause", 26)}</span>
           <h2>잠깐 멈췄어요</h2>
-          <p>지금 ${s.left} : ${s.right}</p>
+          <p>${why ? `${esc(why)} · ` : ""}지금 ${s.left} : ${s.right}</p>
           <div class="vb-btnrow">
             <button type="button" class="hk-btn hk-btn--secondary" data-act="quit">그만하기</button>
             <button type="button" class="hk-btn hk-btn--primary" data-act="resume">계속하기</button>
@@ -391,8 +549,134 @@
       if (screen !== "pause" || !engine) return;
       hideOver();
       screen = "play";
+      pauseBtn.disabled = false;
       engine.resume();
     }
+    // ───── 위에 따로 덮는 창 — 환경설정 · 게임 옵션 · 게임 방법 (한 번에 하나)
+    // 아래 화면(메뉴 · 멈춤 · 준비 · 결과 등)은 그대로 두고 덮는다. 혼자 · 둘이는 열면 경기가 멈추고(레퍼런스와 같음), 동료와는 계속된다
+    const setOver = $("#vb-setover"), optBtn = $("#vb-opt");
+    let layer = ""; // 지금 연 창 — "settings" | "options" | "rules"
+    const setOpen = () => !setOver.hidden;
+    function openLayer(kind, html) {
+      if (soloPlaying()) pauseGame();
+      layer = kind;
+      setOver.innerHTML = html;
+      setOver.hidden = false;
+      setOver.scrollTop = 0;
+      HKUI.refreshIcons(setOver);
+    }
+    function closeSettings() {
+      if (!setOpen()) return;
+      setOver.hidden = true; setOver.innerHTML = ""; layer = "";
+    }
+    // 위 막대 버튼 — 같은 창을 다시 누르면 닫고, 다른 창이면 바꿔 연다
+    function toggleLayer(kind, open) { if (setOpen() && layer === kind) closeSettings(); else open(); }
+    // 게임 옵션은 컴퓨터와 · 둘이 한 화면에서만 (동료와는 준비 화면에서 고른다 · 처음 화면에는 같은 줄이 있다)
+    const canOptions = () => !!(playing && !playing.online);
+    function paintTools() {
+      optBtn.hidden = !canOptions();
+      if (!canOptions() && layer === "options") closeSettings();
+    }
+
+    // 환경설정 — 화면 조작(코트 조이스틱 · 아래 버튼) · 화면 표시(동료와: 기본 60fps · 가볍게 30fps)
+    function paintSettings() {
+      setOver.querySelectorAll("[data-ctrl]").forEach((b) => b.classList.toggle("is-on", b.dataset.ctrl === pref.ctrl));
+      setOver.querySelectorAll("[data-fps]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.fps) === pref.fps));
+    }
+    function openSettings() {
+      const online = !!(playing && playing.online);
+      openLayer("settings", `<div class="vb-card is-small vb-set" role="dialog" aria-label="환경설정">
+          <span class="vb-badge">${icon("settings-2", 26)}</span>
+          <h2>환경설정</h2>
+          <div class="vb-row"><span class="vb-row__k">화면 조작</span><div class="vb-seg"><button type="button" data-ctrl="court">코트 조이스틱</button><button type="button" data-ctrl="buttons">아래 버튼</button></div></div>
+          ${online ? `<div class="vb-row"><span class="vb-row__k">화면 표시</span><div class="vb-seg"><button type="button" data-fps="60">기본 · 60fps</button><button type="button" data-fps="30">가볍게 · 30fps</button></div></div>` : ""}
+          <p class="vb-mini">${IS_TOUCH ? "코트 조이스틱: 왼손으로 끌어 이동 · 아래 버튼: ← → 를 눌러 이동" : "코트 조이스틱: 경기판 안 조작판(마우스) · 아래 버튼: 경기판 아래 버튼 줄"} · 키보드는 늘 써요 · 소리는 위 막대 소리 버튼으로 켜고 꺼요</p>
+          <p class="vb-mini">${online ? "내 화면에만 적용돼요 · 열어 둬도 경기는 계속돼요 · 쉬려면 일시정지를 눌러 주세요" : "내 화면에만 적용돼요 · 열면 경기가 멈춰요 · 난이도 · 목표 점수 · 선수는 게임 옵션에서 바꿔요"}</p>
+          <div class="vb-btnrow"><button type="button" class="hk-btn hk-btn--primary" data-act="setclose">닫기</button></div>
+        </div>`);
+      paintSettings();
+    }
+
+    // 게임 옵션 — 난이도 · 목표 점수 · 선수. 적용하면 지금 경기를 끝내고 새 경기(서브 준비)로 (레퍼런스의 「적용하고 새 경기」)
+    let draft = null; // 적용하기 전 고른 값
+    function paintOptions() {
+      if (!draft) return;
+      const dc = okLook(draft.char) ? draft.char : 0;
+      setOver.querySelectorAll("[data-dlevel]").forEach((b) => b.classList.toggle("is-on", b.dataset.dlevel === draft.level));
+      setOver.querySelectorAll("[data-dtarget]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.dtarget) === draft.target));
+      setOver.querySelectorAll("[data-dchar]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.dchar) === dc));
+      setOver.querySelectorAll("[data-drival]").forEach((b) => b.classList.toggle("is-on", b.dataset.drival === String(draft.rival)));
+    }
+    function openOptions() {
+      if (!canOptions()) return;
+      const local = playing.mode === "local";
+      draft = { level: pref.level, target: pref.target, char: pref.char, rival: pref.rival };
+      openLayer("options", `<div class="vb-card is-small vb-set vb-opt" role="dialog" aria-label="게임 옵션">
+          <h2>게임 옵션</h2>
+          <p>${local ? "목표 점수와 선수를" : "상대 난이도 · 목표 점수 · 선수를"} 골라요. 적용하면 지금 경기를 끝내고 새 경기를 준비해요.</p>
+          ${local ? "" : `<div class="vb-row"><span class="vb-row__k">난이도</span><div class="vb-seg">${LEVELS.map(([k, t]) => `<button type="button" data-dlevel="${k}">${t}</button>`).join("")}</div></div>`}
+          <div class="vb-row"><span class="vb-row__k">점수</span><div class="vb-seg"><button type="button" data-dtarget="7">7점 빠른 경기</button><button type="button" data-dtarget="15">15점 긴 경기</button></div></div>
+          <div class="vb-row"><span class="vb-row__k">${local ? "1P 선수" : "내 선수"}</span><div class="vb-seg vb-chars">${LOOKS.map((l) => `<button type="button" data-dchar="${l.id}">${chrImg(l.id)}${l.name}</button>`).join("")}</div></div>
+          <div class="vb-row"><span class="vb-row__k">${local ? "2P 선수" : "상대"}</span><div class="vb-seg vb-chars"><button type="button" data-drival="random"><span class="vb-chr vb-chr--q">?</span>랜덤</button>${LOOKS.map((l) => `<button type="button" data-drival="${l.id}">${chrImg(l.id)}${l.name}</button>`).join("")}</div></div>
+          <p class="vb-mini">선수는 모습만 달라요(능력은 같아요) · 랜덤은 ${local ? "1P" : "나"}와 다른 선수 중에서 골라요</p>
+          <div class="vb-btnrow"><button type="button" class="hk-btn hk-btn--secondary" data-act="setclose">취소</button><button type="button" class="hk-btn hk-btn--primary" data-act="optapply">적용하고 새 경기</button></div>
+        </div>`);
+      paintOptions();
+    }
+    function applyOptions() {
+      if (!draft || !canOptions()) { closeSettings(); return; }
+      Object.assign(pref, draft);
+      draft = null;
+      savePref();
+      const mode = playing.mode;
+      closeSettings();
+      startGame(mode, true);
+    }
+
+    // 게임 방법 — 규칙 · 조작 · 서브 · 멈춤 · 기록 (경기 중에도 연다)
+    function rulesHtml() {
+      const k = (t) => `<kbd>${t}</kbd>`;
+      const local = !!(playing && playing.mode === "local") || (!playing && pref.mode === "local");
+      const keys = IS_TOUCH ? `<li>왼손으로 코트 조이스틱을 좌우로 밀어 이동하고, 오른손으로 <b>점프 · 강타 · 다이빙</b>을 눌러요. 두 손가락을 함께 써도 돼요.</li>`
+        : local ? `<li><b>1P</b> ${k("A")}${k("D")} 이동 · ${k("W")}${k("Space")} 점프 · ${k("S")} 다이빙 · ${k("Z")}${k("X")} 강타</li><li><b>2P</b> ${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("↓")} 다이빙 · ${k("Enter")} 강타</li>`
+        : `<li>${k("←")}${k("→")} 또는 ${k("A")}${k("D")} 이동 · ${k("↑")}${k("W")}${k("Space")} 점프 · ${k("↓")}${k("S")} 다이빙 · ${k("Z")}${k("X")} 강타 · ${k("P")}${k("Esc")} 멈춤</li>`;
+      return `<div class="vb-card vb-rules" role="dialog" aria-label="게임 방법">
+          <h2>옥상 배구 게임 방법</h2>
+          <h3>공을 넘기고 코트를 지켜요</h3>
+          <ul>
+            <li>공이 몸에 닿으면 저절로 받아요. 상대 코트 바닥에 공을 떨어뜨리면 1점이에요.</li>
+            <li>먼저 7점(또는 15점)을 내면 이겨요. 듀스도, 터치 수 제한도 없어요.</li>
+            <li>내 자리는 머리 위 「나」(둘이 한 화면은 1P · 2P)로 보여 줘요. 발밑 줄은 왼쪽 자리가 이어진 줄, 오른쪽 자리가 끊긴 줄이에요.</li>
+          </ul>
+          <h3>이동 · 점프 · 다이빙 · 강타</h3>
+          <ul>
+            ${keys}
+            <li>다이빙은 보는 쪽으로 짧게 몸을 날려요. 이동을 함께 누르면 방향을 정할 수 있어요.</li>
+            <li>강타를 누르면 약 0.23초 동안 강타 준비예요(손이 빛나요). 그 안에 공이 몸에 닿으면 더 세게 쳐요. 높이 뛰어 치면 내리꽂고, 낮으면 위로 넘겨요. 강타만 눌러서는 뛰지 않아요.</li>
+            <li>화면 조작은 코트 조이스틱이 기본이고, 환경설정에서 아래 버튼으로 바꿀 수 있어요(바꾸면 경기가 멈춰요). 기술은 버튼을 다시 눌러야 또 나가요.</li>
+          </ul>
+          <h3>서브와 멈춤</h3>
+          <ul>
+            <li>처음에는 서브 시작${IS_TOUCH ? "" : "(또는 Space)"}을 눌러야 조작이 열려요. 서브는 점수를 내준 쪽이 넣고, 첫 서브는 왼쪽이에요.</li>
+            <li>서브 공은 서브하는 사람이 뛰어 몸에 닿을 때까지 멈춰 있어요. 시간이 지나도 저절로 나가지 않아요. 컴퓨터도 잠깐 준비한 뒤 직접 뛰어 쳐요.</li>
+            <li>득점하면 1.5초 보여 준 뒤 다음 서브예요. 누르던 ${IS_TOUCH ? "손은 떼고 다시 대야" : "키는 풀려서 다시 눌러야"} 움직여요.${IS_TOUCH ? "" : " Space로 시작했다면 한 번 떼고 다시 눌러야 점프해요."}</li>
+            <li>${IS_TOUCH ? "" : "P · Esc, "}다른 창 · 탭으로 가기, 경기판 밖으로 초점 옮기기, 화면 크기 바꾸기, 긴 지연은 경기를 멈춰요. 돌아와도 저절로 이어 가지 않으니 「계속하기」를 눌러 주세요.</li>
+          </ul>
+          <h3>동료와</h3>
+          <ul>
+            <li>목표 점수는 도전한 사람이, 선수는 각자 골라요. 바꾸면 두 사람 준비가 풀리고, 두 사람 모두 준비하면 3초 뒤 시작해요.</li>
+            <li>다른 창을 눌러도 경기는 계속되고 누르던 조작만 풀려요. 다른 탭 · 앱으로 가면 잠시 뒤 멈춰요. 일시정지 뒤에는 두 사람 모두 「계속 준비」를 눌러야 이어 가요.</li>
+            <li>두 사람이 보낸 결과가 맞으면 대전 기록에 남아요.</li>
+          </ul>
+          <h3>기록</h3>
+          <ul>
+            <li>컴퓨터와 끝낸 경기의 가장 긴 랠리(두 사람이 공을 받은 횟수)만 난이도 · 목표 점수별로 이 브라우저에 남겨요. 아케이드 순위에는 들어가지 않아요.</li>
+            <li>하던 경기는 저장되지 않아요. 나가거나 새로 불러오면 사라져요.</li>
+          </ul>
+          <div class="vb-btnrow"><button type="button" class="hk-btn hk-btn--primary" data-act="setclose">닫기</button></div>
+        </div>`;
+    }
+    function openRules() { openLayer("rules", rulesHtml()); }
     function sideHtml(p) {
       return `<span class="vb-score__side">${HKUI.avatar(p.name, "sm", p.avatarUrl || "")}<span>${esc(p.name)}</span></span>`;
     }
@@ -408,7 +692,15 @@
       const P = playing;
       const local = P.mode === "local";
       const title = local ? `${r.winner === 0 ? "1P" : "2P"} 승리!` : r.win ? "이겼어요!" : "아쉽게 졌어요";
-      const lead = local ? "키보드 하나로 둘이 겨뤘어요" : P.online ? `${esc(P.rival.name)}님과의 경기` : `${esc(P.rival.name)}와 ${r.win ? "겨뤄 이겼어요" : "겨뤘어요"}`;
+      const lead0 = local ? "키보드 하나로 둘이 겨뤘어요" : P.online ? `${esc(P.rival.name)}님과의 경기` : `${esc(P.rival.name)}와 ${r.win ? "겨뤄 이겼어요" : "겨뤘어요"}`;
+      // 내 최고 랠리 — 컴퓨터와 끝낸 경기만 난이도 · 목표 점수마다
+      let bestNote = "";
+      if (P.mode === "cpu") {
+        const old = bestOf(P.level, P.target);
+        if (r.rally > old) { putBest(P.level, P.target, r.rally); bestNote = old ? " · 최고 랠리 새 기록!" : ""; }
+        bestNote = ` · 내 최고 랠리 ${Math.max(old, r.rally)}회${bestNote}`;
+      }
+      const lead = `${lead0}<br><small>${P.mode === "cpu" ? `${LEVEL_NAME[P.level]} · ` : ""}${r.target}점 경기 · 최장 랠리 ${r.rally}회${bestNote}</small>`;
       // 왼쪽은 나(둘이 한 화면이면 1P) — 온라인 손님은 오른쪽 사람이라 내 색이 주황
       const L = local ? { name: "1P" } : me, R = local ? { name: "2P" } : P.rival;
       const ls = local ? r.left : r.me, rs = local ? r.right : r.rival;
@@ -419,21 +711,24 @@
           <p>${lead}</p>
           <div class="vb-score">${sideHtml(L)}<b class="vb-score__num ${flip ? "is-r" : "is-l"}">${ls}</b><b class="vb-score__num">:</b><b class="vb-score__num ${flip ? "is-l" : "is-r"}">${rs}</b>${sideHtml(R)}</div>
           <div class="vb-stats">
-            <div><b>${r.rally}터치</b><small>가장 긴 랠리</small></div>
+            <div><b>${r.rally}회</b><small>가장 긴 랠리</small></div>
             <div><b>${local ? `${r.spikes.me} · ${r.spikes.rival}` : `${r.spikes.me}번`}</b><small>${local ? "강타 1P · 2P" : "내 강타"}</small></div>
             <div><b>${timeText(r.sec)}</b><small>경기 시간</small></div>
           </div>
-          <div class="vb-btnrow">
+          <div class="vb-again" id="vb-again" hidden></div>
+          <div class="vb-btnrow is-3" id="vb-endbtns">
+            <button type="button" class="hk-btn hk-btn--secondary" data-act="court">코트 보기</button>
             <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">${P.online ? "처음으로" : "모드 고르기"}</button>
-            ${P.online ? "" : `<button type="button" class="hk-btn hk-btn--primary" data-act="again">다시 하기</button>`}
+            ${P.online ? (P.rival && P.rival.id ? `<button type="button" class="hk-btn hk-btn--primary" data-act="rematch">다시 도전</button>` : "") : `<button type="button" class="hk-btn hk-btn--primary" data-act="again">다시 하기</button>`}
           </div>
           <div class="vb-mini" id="vb-mini">${P.online && P.report ? "결과를 대전 기록에 남기는 중…" : "연습 · 대전 게임이라 아케이드 순위에는 들어가지 않아요"}</div>
         </div>`);
+      if (P.online && P.againId) showAgain(P.againId); // 상대가 먼저 다시 도전했다
       // 동료와 — 두 사람 모두 결과를 서버에 알린다 (서버가 두 점수를 맞춰 보고 승패를 적는다)
       if (P.online && typeof P.report === "function") {
         Promise.resolve(P.report(r)).catch(() => null).then((ok) => {
           const el = $("#vb-mini");
-          if (!el || screen !== "result") return;
+          if (!el || (screen !== "result" && screen !== "court")) return;
           el.textContent = ok ? "대전 기록에 남겼어요" : "결과를 아직 저장하지 못했어요 · 대전 목록에서 이 경기에 다시 들어오면 다시 보내요";
           el.classList.add(ok ? "is-ok" : "is-bad");
         });
@@ -460,7 +755,7 @@
     function playOnline({ matchId, rival, target, connect, report, resign, check, fallbackRole }) {
       stopEngine(); closeConn();
       screen = "connect"; setPlaying(false);
-      pauseBtn.hidden = true; // 온라인은 멈출 수 없다 (상대 화면이 같이 멈추지 않으니)
+      pauseBtn.hidden = false; pauseBtn.disabled = false; // 온라인 일시정지 — 두 사람 모두 「계속 준비」를 눌러야 이어 간다
       $("#vb-keys").innerHTML = keysHtml("online");
       showOver(cardHtml("wifi", "연결하는 중…", `${rival.name}님과 연결하고 있어요`, `<button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>`));
       const S2 = { closed: false, graceT: 0, role: null, peerHere: false };
@@ -498,12 +793,17 @@
       const peerBack = () => { clearTimeout(S2.graceT); link("ok"); };
       function begin(role) {
         S2.role = role;
-        playing = { mode: role, online: true, role, target, rival, report, resign };
+        playing = { mode: role, online: true, role, target, rival, report, resign, matchId: typeof matchId === "number" ? matchId : null };
         engine = HKVolley.create(canvas, {
-          mode: role, target, touch: IS_TOUCH, me, rival,
+          mode: role, target, touch: IS_TOUCH, me, rival, fps: pref.fps,
+          look: okLook(pref.char) ? pref.char : role === "host" ? 0 : 1, // 고르지 않았으면 주인 파랑 · 손님 주황
           resume: role === "host" ? loadSave() : null, // 주인이 새로고침했으면 그 점수부터
           net: { send: (o) => !S2.closed && !!conn && conn.send(o), onMessage: (fn) => handlers.push(fn) },
-          onEvent: (e) => { if (role === "host" && e.type === "point" && engine) putSave(engine.saveState()); },
+          onEvent: (e) => {
+            if (role === "host" && e.type === "point" && engine) putSave(engine.saveState());
+            if (e.type === "lobby") showLobby(e);
+            else if (e.type === "inputreset" && e.drop) dropTouch();
+          },
           onEnd: (r) => { dropSave(); showResult(r); },
         });
         hideOver();
@@ -528,13 +828,90 @@
           if (!engine) return;
           if (S2.peerHere) peerBack(); else if (engine.phase() !== "wait") peerAway(); else link("away");
         },
-        onMessage: (m) => { if (!S2.closed) handlers.forEach((fn) => fn(m)); },
+        onMessage: (m) => {
+          if (S2.closed) return;
+          // 상대가 결과 화면에서 다시 도전했다 — 내 결과 카드에 「다시 경기 수락」을 띄운다 (같은 방 다시 경기 대신)
+          if (m && m.t === "again" && Number.isInteger(m.id) && m.id > 0) {
+            if (playing && playing.online) { playing.againId = m.id; showAgain(m.id); }
+            return;
+          }
+          handlers.forEach((fn) => fn(m));
+        },
         onClose: (c) => {
           if (S2.closed) return;
           if (c && c.final) lost(c.text || "연결이 끊겼어요");
           else link("retry"); // 알아서 다시 붙는 중 — 붙으면 onHello 가 다시 온다
         },
       });
+    }
+    // 상대가 결과 화면에서 다시 도전했다 — 내 결과 카드에 「다시 경기 수락」 (수락하면 새 판으로 바로 들어가 준비 화면에서 만난다)
+    function showAgain(id) {
+      if (!playing || !playing.online || (screen !== "result" && screen !== "court")) return;
+      const box = $("#vb-again"), row = $("#vb-endbtns");
+      if (!box || !row) return;
+      box.hidden = false;
+      box.textContent = `${playing.rival.name}님이 다시 도전했어요`;
+      const mine = row.querySelector('[data-act="rematch"]');
+      if (mine) mine.remove(); // 두 사람이 서로 도전장을 보내지 않게 — 받은 것을 수락한다
+      const acc = row.querySelector('[data-act="accept"]');
+      if (acc) acc.dataset.id = String(id);
+      else row.insertAdjacentHTML("beforeend", `<button type="button" class="hk-btn hk-btn--primary" data-act="accept" data-id="${id}">다시 경기 수락</button>`);
+      if (screen === "court") resultBack(); // 접어 둔 결과 카드를 다시 연다
+    }
+    async function giveUp() {
+      if (!playing || !playing.online) return;
+      const P = playing;
+      const ok = await HKUI.confirmDialog("기권할까요?", "상대의 승리로 경기를 마쳐요.", { confirmLabel: "기권하기", cancelLabel: "계속하기" });
+      if (!ok || playing !== P) return;
+      if (engine && !engine.isOver() && P.resign) await P.resign();
+      closeConn();
+      if (P.matchId) openMatch(P.matchId); else showMenu();
+    }
+    // 온라인 준비 화면 — 경기 전: 목표 점수(도전한 사람만) · 준비, 일시정지 중: 계속 준비. 엔진이 상태가 바뀔 때마다 알려 준다
+    function showLobby(L) {
+      if (!playing || !playing.online || !["play", "ready", "opause"].includes(screen)) return;
+      const who2 = (on, name, here, look) => `<div class="${on ? "is-on" : ""}">${icon(on ? "check-circle-2" : here ? "circle" : "loader", 15)}${okLook(look) && here ? `<img class="vb-chr is-sm" src="${HKVolley.thumb(look)}" alt="">` : ""}${esc(name)} · ${on ? "준비 완료" : here ? "준비 전" : "들어오는 중…"}</div>`;
+      const rv = playing.rival.name;
+      if (L.phase === "wait") {
+        screen = "ready";
+        const seg = [7, 15].map((t) => `<button type="button" data-otarget="${t}" class="${L.target === t ? "is-on" : ""}" ${L.host ? "" : "disabled"}>${t}점 ${t === 7 ? "빠른 경기" : "긴 경기"}</button>`).join("");
+        showOver(`<div class="vb-card is-small" role="dialog" aria-label="경기 준비">
+            <span class="vb-badge">${icon("users", 26)}</span>
+            <h2>경기를 준비해 주세요</h2>
+            <p>${esc(rv)}님과 실시간 경기 · ${L.target}점 선승</p>
+            <div class="vb-row"><span class="vb-row__k">점수</span><div class="vb-seg">${seg}</div></div>
+            <div class="vb-row"><span class="vb-row__k">내 선수</span><div class="vb-seg vb-chars">${LOOKS.map((l) => `<button type="button" data-olook="${l.id}" class="${L.looks && L.looks[0] === l.id ? "is-on" : ""}">${chrImg(l.id)}${l.name}</button>`).join("")}</div></div>
+            <div class="vb-who">${who2(L.ready[0], "나", true, L.looks && L.looks[0])}${who2(L.ready[1], rv, L.peer, L.looks && L.looks[1])}</div>
+            <div class="vb-btnrow">
+              <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>
+              <button type="button" class="hk-btn hk-btn--primary" data-act="ready" data-on="${L.ready[0] ? 0 : 1}">${L.ready[0] ? "준비 취소" : "준비"}</button>
+            </div>
+            <div class="vb-mini">${L.host ? "목표 점수는 도전한 내가, 선수는 각자 골라요" : "목표 점수는 도전한 사람이, 선수는 각자 골라요"} · 바꾸면 두 사람 준비가 풀려요 · 선수 능력은 같아요 · 두 사람 모두 준비하면 3초 뒤 시작해요</div>
+          </div>`);
+      } else if (L.paused) {
+        screen = "opause";
+        dropTouch();
+        const by = L.pausedBy === "me" ? "내가" : `${esc(rv)}님이`;
+        const why = {
+          pause: `${by} 일시정지를 눌렀어요`,
+          away: `${by} 다른 화면으로 가서 멈췄어요`,
+          slow: `${L.pausedBy === "me" ? "내" : `${esc(rv)}님`} 조작 신호가 늦어 멈췄어요`,
+          link: "연결이 끊겨 멈췄어요",
+        }[L.pausedWhy] || `${by} 일시정지를 눌렀어요`;
+        showOver(`<div class="vb-card is-small" role="dialog" aria-label="일시정지">
+            <span class="vb-badge">${icon("pause", 26)}</span>
+            <h2>잠깐 멈췄어요</h2>
+            <p>${why} · 두 사람 모두 계속 준비를 누르면 3초 뒤 이어서 해요</p>
+            <div class="vb-who">${who2(L.ready[0], "나", true)}${who2(L.ready[1], rv, L.peer)}</div>
+            <div class="vb-btnrow">
+              <button type="button" class="hk-btn hk-btn--secondary" data-act="giveup">기권하기</button>
+              <button type="button" class="hk-btn hk-btn--primary" data-act="ready" data-on="${L.ready[0] ? 0 : 1}">${L.ready[0] ? "준비 취소" : "계속 준비"}</button>
+            </div>
+          </div>`);
+      } else if (screen === "ready" || screen === "opause") {
+        hideOver();
+        screen = "play";
+      }
     }
     // 시험용 연결 — 같은 브라우저의 두 탭이 BroadcastChannel 로 주고받는다. HKRt.connect 와 같은 순서 · 모양으로 알린다
     function devConnect(matchId, h) {
@@ -699,7 +1076,7 @@
       const saved = loadRep(id);
       if (saved) return resendResult(id, saved, m);
       if (!window.HKRt) { try { await loadScript("/_shared/rt.js"); } catch (_) { HKUI.toast("실시간 연결을 열지 못했어요", "error"); return showMenu(); } }
-      const rival = { name: (m.opponent && m.opponent.name) || "상대", avatarUrl: (m.opponent && m.opponent.avatarUrl) || "" };
+      const rival = { id: (m.opponent && m.opponent.id) || null, name: (m.opponent && m.opponent.name) || "상대", avatarUrl: (m.opponent && m.opponent.avatarUrl) || "" };
       playOnline({
         matchId: id, rival, target: [7, 15].includes(Number(m.target)) ? Number(m.target) : 7,
         // 자리는 연결이 알려 준 role(서버가 정함)을 쓴다. 혹시 없으면 판 정보의 role
@@ -737,24 +1114,91 @@
     addEventListener("beforeunload", (e) => { if (saving > 0 && !leaving) { e.preventDefault(); e.returnValue = ""; } });
 
     // ───── 화면 버튼
-    over.addEventListener("click", (e) => {
+    const overClick = (e) => {
       const b = e.target.closest("button");
       if (!b || b.disabled) return;
       // 고른 뒤에는 버튼에서 손을 뗀다 — 이어서 Enter · Space 를 누르면 바로 시작
       if (b.dataset.mode) { pref.mode = b.dataset.mode; savePref(); HKSound.play("select"); paintMenu(); b.blur(); return; }
       if (b.dataset.level) { pref.level = b.dataset.level; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
       if (b.dataset.target) { pref.target = Number(b.dataset.target); savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.dataset.char) { pref.char = Number(b.dataset.char); savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.dataset.rival) { pref.rival = b.dataset.rival === "random" ? "random" : Number(b.dataset.rival); savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.dataset.otarget) { if (engine) engine.setTarget(Number(b.dataset.otarget)); HKSound.play("tap"); return; }
+      // 동료와 · 경기 전 — 내 선수 (바꾸면 두 사람 준비가 풀린다)
+      if (b.dataset.olook) { pref.char = Number(b.dataset.olook); savePref(); if (engine) engine.setLook(pref.char); HKSound.play("tap"); return; }
+      // 게임 옵션 — 적용하기 전 고르기
+      if (b.dataset.dlevel && draft) { draft.level = b.dataset.dlevel; paintOptions(); HKSound.play("tap"); return; }
+      if (b.dataset.dtarget && draft) { draft.target = Number(b.dataset.dtarget) === 15 ? 15 : 7; paintOptions(); HKSound.play("tap"); return; }
+      if (b.dataset.dchar && draft) { draft.char = Number(b.dataset.dchar); paintOptions(); HKSound.play("tap"); return; }
+      if (b.dataset.drival && draft) { draft.rival = b.dataset.drival === "random" ? "random" : Number(b.dataset.drival); paintOptions(); HKSound.play("tap"); return; }
+      // 환경설정 — 화면 조작 · 화면 표시
+      if (b.dataset.ctrl) { pref.ctrl = b.dataset.ctrl; savePref(); dropTouch(); paintMove(); layout(); paintSettings(); HKSound.play("tap"); return; }
+      if (b.dataset.fps) { pref.fps = Number(b.dataset.fps) === 30 ? 30 : 60; savePref(); if (engine && engine.setFps) engine.setFps(pref.fps); paintSettings(); HKSound.play("tap"); return; }
       if (b.id === "vb-go") {
         if (pref.mode === "online") { if (ONLINE_READY) showOnlineLobby(); return; }
         return startGame(pref.mode);
       }
       const act = b.dataset.act;
+      if (act === "setclose") return closeSettings();
+      if (act === "optapply") return applyOptions();
+      if (act === "opts") { b.blur(); return openOptions(); } // 닫은 뒤 Space 가 이 버튼을 다시 누르지 않고 서브를 시작하게
       if (act === "resume") return resumeGame();
+      if (act === "serve") return beginServe();
+      if (act === "court") return courtView();
+      if (act === "accept") {
+        const id = Number(b.dataset.id);
+        if (!(id > 0)) return;
+        b.disabled = true;
+        HKApi.matchAccept(id).then(() => { closeConn(); location.hash = `m${id}`; })
+          .catch((err) => { b.disabled = false; HKMatch.fail(err); });
+        return;
+      }
+      if (act === "ready") { if (engine) engine.setReady(b.dataset.on === "1"); HKSound.play("select"); return; }
+      if (act === "giveup") return giveUp();
+      if (act === "rematch" && playing && playing.rival && playing.rival.id) {
+        b.disabled = true;
+        HKApi.matchCreate(Number(playing.rival.id), KEY).then((m) => {
+          // 같은 연결로 상대 결과 화면에 「다시 경기 수락」을 띄운다 — 못 받아도 상대 대전 목록에 도전장으로 남는다
+          const id = m && Number(m.id);
+          if (id > 0 && conn) { try { conn.send({ t: "again", id }); } catch (_) { /* 연결이 끊겼으면 목록으로만 */ } }
+          HKUI.toast("다시 도전장을 보냈어요 · 상대가 받으면 바로 들어가요");
+          // 보낸 메시지가 나간 뒤에 연결을 닫는다 (대전 목록이 수락을 기다렸다가 새 판으로 들어간다)
+          setTimeout(() => { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); showOnlineLobby(); }, 300);
+        }).catch((err) => { b.disabled = false; HKMatch.fail(err); });
+        return;
+      }
       if (act === "quit" || act === "menu") { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); return showMenu(); }
       if (act === "lobby") { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); return showOnlineLobby(); }
-      if (act === "again" && playing) return startGame(playing.mode);
-    });
-    $("#vb-pause").onclick = (e) => { e.currentTarget.blur(); if (screen === "pause") resumeGame(); else pauseGame(); };
+      if (act === "again" && playing) return startGame(playing.mode, true);
+    };
+    over.addEventListener("click", overClick);
+    setOver.addEventListener("click", overClick);
+    // 일시정지 버튼은 멈추기만 한다 (레퍼런스와 같음 — 이어 가기는 「계속하기」)
+    $("#vb-pause").onclick = (e) => { e.currentTarget.blur(); if (screen === "play") pauseGame(); };
+    $("#vb-set").onclick = (e) => { e.currentTarget.blur(); toggleLayer("settings", openSettings); };
+    optBtn.onclick = (e) => { e.currentTarget.blur(); toggleLayer("options", openOptions); };
+    $("#vb-rules").onclick = (e) => { e.currentTarget.blur(); toggleLayer("rules", openRules); };
+    // 전체 화면 — 브라우저 전체 화면(지원하는 곳만 버튼을 보인다 · 아이폰은 이 페이지가 이미 꽉 찬 화면). 크기가 바뀌니 혼자 · 둘이는 멈춘다(레퍼런스와 같음)
+    const fullBtn = $("#vb-full"), fsRoot = document.documentElement;
+    const canFull = !!(document.fullscreenEnabled && fsRoot.requestFullscreen && document.exitFullscreen);
+    function paintFull() {
+      const on = !!document.fullscreenElement;
+      fullBtn.innerHTML = `${icon(on ? "minimize" : "maximize")}<span>${on ? "화면 축소" : "전체 화면"}</span>`;
+      fullBtn.setAttribute("aria-label", on ? "전체 화면 닫기" : "전체 화면으로 보기");
+      fullBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      HKUI.refreshIcons(fullBtn);
+    }
+    fullBtn.hidden = !canFull;
+    if (canFull) {
+      paintFull();
+      // 켜고 끌 때마다 혼자 · 둘이 경기는 멈춘다 — 크기가 그대로인 화면(이미 꽉 찬 창 등)이어도 (레퍼런스와 같음)
+      document.addEventListener("fullscreenchange", () => { paintFull(); if (soloPlaying()) pauseGame("화면 크기가 바뀌어 멈췄어요"); });
+      fullBtn.onclick = (e) => {
+        e.currentTarget.blur();
+        if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        else fsRoot.requestFullscreen().catch(() => HKUI.toast("전체 화면을 열지 못했어요"));
+      };
+    }
     $("#vb-back").addEventListener("click", async (e) => {
       // 결과를 남기는 중(빨리 끝난 경기는 서버가 받아 줄 때까지 기다린다) — 나가면 결과가 안 들어가 무승부가 될 수 있다
       if (saving > 0 && screen !== "play" && screen !== "pause") {
@@ -763,13 +1207,13 @@
         if (ok) { leaving = true; closeConn(); location.href = HKRoutes.lounge; }
         return;
       }
-      if (screen !== "play" && screen !== "pause") return;
+      if (!["play", "pause", "ready", "opause"].includes(screen)) return;
       e.preventDefault();
       if (playing && playing.online) {
         // 동료와 — 시작 전이면 그냥 나가고(나중에 다시 들어올 수 있다), 경기 중이면 기권
         const before = !engine || engine.phase() === "wait";
         const ok = await HKUI.confirmDialog("경기를 그만할까요?", before ? "아직 시작 전이에요. 나중에 대전 목록에서 다시 들어올 수 있어요." : "그만하면 이 경기는 기권으로 져요.", { confirmLabel: "그만하기", cancelLabel: "계속하기" });
-        if (!ok || screen !== "play") return;
+        if (!ok || !["play", "ready", "opause"].includes(screen)) return;
         if (!before && engine && !engine.isOver() && playing.resign) await playing.resign();
         closeConn(); location.href = HKRoutes.lounge;
         return;
@@ -784,64 +1228,135 @@
       if (document.querySelector(".hk-dialog__overlay")) return;
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      // 환경설정 · 게임 옵션 · 게임 방법이 열려 있으면 Esc 로 닫기만 — 아래 화면의 Space · Enter 단축키는 쉬게
+      // (창 안 버튼은 Space · Enter 로 누를 수 있고, 동료와는 경기 키가 그대로 먹는다)
+      if (setOpen()) {
+        if (e.code === "Escape") { e.preventDefault(); closeSettings(); }
+        else if ((e.code === "Space" || e.code === "Enter" || e.code === "KeyP") && !(playing && playing.online && screen === "play") && !(t && t.closest && t.closest("#vb-setover button"))) e.preventDefault();
+        return;
+      }
+      // P · Esc 는 멈추기만 한다 (레퍼런스와 같음 — 이어 가기는 「계속하기」). 결과에서 Esc 는 코트 보기
       if (e.code === "Escape" || e.code === "KeyP") {
-        if (screen === "play") { e.preventDefault(); pauseGame(); }
-        else if (screen === "pause") { e.preventDefault(); resumeGame(); }
-        else if (screen === "result" && e.code === "Escape") { e.preventDefault(); showMenu(); }
+        if (screen === "play") { e.preventDefault(); if (!e.repeat) pauseGame(); }
+        else if (screen === "pause") e.preventDefault();
+        else if (screen === "result" && e.code === "Escape") { e.preventDefault(); courtView(); }
         return;
       }
       if (e.repeat) return;
+      const onBtn = t && t.closest && t.closest("button, a");
+      // 서브 준비 · 득점 안내 중 멈춤은 Space 로도 시작 · 계속 (레퍼런스의 Space 단축키). 이 키는 점프로 새지 않게 여기서 끝낸다
+      if (e.code === "Space" && !onBtn && (screen === "serveready" || (screen === "pause" && engine && engine.phase() === "point"))) {
+        e.preventDefault(); e.stopImmediatePropagation();
+        if (screen === "serveready") beginServe(); else resumeGame();
+        return;
+      }
       if (e.code === "Space" || e.code === "Enter" || e.code === "NumpadEnter") {
-        const onBtn = t && t.closest && t.closest("button, a");
         if (screen === "menu" && !onBtn) { e.preventDefault(); $("#vb-go")?.click(); }
-        else if (screen === "pause" && !onBtn) { e.preventDefault(); resumeGame(); }
+        else if ((screen === "ready" || screen === "opause") && !onBtn) { e.preventDefault(); over.querySelector('[data-act="ready"]')?.click(); }
         else if (screen === "result" && !onBtn && playing && !playing.online) {
           e.preventDefault();
-          if (performance.now() - resultAt > 900) startGame(playing.mode); // 카드가 뜬 직후 연타는 무시
+          if (performance.now() - resultAt > 900) startGame(playing.mode, true); // 카드가 뜬 직후 연타는 무시
         }
       }
     });
-    document.addEventListener("visibilitychange", () => { if (document.hidden && screen === "play" && playing && !playing.online) pauseGame(); });
+    // 혼자 · 둘이 한 화면 — 다른 창으로 가거나 · 창 크기가 바뀌거나 · 경기판 밖으로 초점이 가면 멈춘다 (돌아와도 저절로 이어 가지 않는다)
+    const soloPlaying = () => screen === "play" && playing && !playing.online;
+    const inBoard = (el) => !!(el && el.closest && el.closest("#vb"));
+    // 이 버튼들은 눌렀을 때 저마다 멈춘다 (전체 화면은 크기가 바뀌어 멈춘다)
+    const ownStop = (el) => !!(el && el.closest && el.closest("#vb-pause, #vb-back, #vb-set, #vb-opt, #vb-rules, #vb-full"));
+    document.addEventListener("pointerdown", (e) => { if (soloPlaying() && !inBoard(e.target) && !ownStop(e.target)) pauseGame("경기판 밖을 눌러 멈췄어요"); }, true);
+    document.addEventListener("focusin", (e) => { if (soloPlaying() && !inBoard(e.target) && !ownStop(e.target)) pauseGame("경기판 밖으로 초점이 옮겨 가 멈췄어요"); });
+    document.addEventListener("visibilitychange", () => { if (document.hidden && soloPlaying()) pauseGame(); });
+    addEventListener("blur", () => { if (soloPlaying()) pauseGame("다른 창으로 가서 멈췄어요"); });
+    let winSize = `${innerWidth}x${innerHeight}`;
+    addEventListener("resize", () => {
+      const now = `${innerWidth}x${innerHeight}`;
+      if (now === winSize) return;
+      winSize = now;
+      if (soloPlaying()) pauseGame("화면 크기가 바뀌어 멈췄어요");
+    });
+    // 보이는 화면 크기(휴대폰 주소창 · 확대 등)가 바뀌어도 멈춘다 (레퍼런스: visualViewport resize)
+    if (window.visualViewport) {
+      const vv = window.visualViewport;
+      let vvSize = `${Math.round(vv.width)}x${Math.round(vv.height)}`;
+      vv.addEventListener("resize", () => {
+        const now = `${Math.round(vv.width)}x${Math.round(vv.height)}`;
+        if (now === vvSize) return;
+        vvSize = now;
+        if (soloPlaying()) pauseGame("화면 크기가 바뀌어 멈췄어요");
+      });
+    }
 
     // ───── 휴대폰 조작판 — 이동 막대 + 점프 · 강타 · 다이빙 (여러 손가락 동시에)
     const stick = $("#vb-stick"), knob = $("#vb-knob");
-    let stickId = null, sx0 = 0, sy0 = 0, knobR = 40;
-    const DEAD = 12, VERT = 28;
-    function stickSet(dx, dy) {
-      const ctl = (n, on) => engine && engine.control(n, on);
-      ctl("left", dx < -DEAD); ctl("right", dx > DEAD); ctl("up", dy < -VERT); ctl("down", dy > VERT);
-      const r = Math.hypot(dx, dy), k = r > knobR ? knobR / r : 1;
-      knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
+    // 막대는 좌우만 — 가운데에서 막대 폭의 12%(적어도 8px) 넘게 밀면 그쪽으로 간다
+    let stickId = null, stickDir = null, sx0 = 0, sy0 = 0, knobR = 40, dead = 12;
+    // 방향이 바뀔 때만 누르고 뗀다 — 단계가 바뀌어 풀린 방향은 막대를 가운데로 돌렸다 다시 밀어야 먹는다 (레퍼런스와 같음)
+    function stickSet(dx) {
+      const dir = dx < -dead ? "left" : dx > dead ? "right" : null;
+      if (dir !== stickDir) {
+        if (stickDir && engine) engine.control(stickDir, false);
+        stickDir = dir;
+        if (dir && engine) engine.control(dir, true);
+      }
+      knob.style.transform = `translateX(${clampN(dx, -knobR, knobR)}px)`;
     }
+    // 터치가 취소됨(전화 · 알림 · 시스템 제스처 등) — 혼자 · 둘이는 멈춘다(레퍼런스와 같음), 온라인은 조작만 푼다
+    const touchCancel = () => { if (soloPlaying()) pauseGame("터치가 취소돼 멈췄어요"); };
     stick.addEventListener("pointerdown", (e) => {
-      if (stickId !== null) return;
+      if (stickId !== null || vb.classList.contains("is-btnmove")) return;
       stickId = e.pointerId;
       const base = stick.querySelector(".vb-stick__base").getBoundingClientRect();
-      knobR = Math.max(30, base.width * 0.3); // 막대 크기에 맞춰 손잡이가 움직이는 거리
+      knobR = Math.max(30, base.width / 2 - 24); // 막대 크기에 맞춰 손잡이가 움직이는 거리
+      dead = Math.max(8, base.width * 0.12);
       // 막대 둘레를 누르면 거기서부터, 먼 곳을 누르면 그 자리를 가운데로 본다
       const inBase = Math.hypot(e.clientX - (base.left + base.width / 2), e.clientY - (base.top + base.height / 2)) < base.width / 2;
       sx0 = inBase ? base.left + base.width / 2 : e.clientX;
       sy0 = inBase ? base.top + base.height / 2 : e.clientY;
       stick.classList.add("is-on");
-      try { stick.setPointerCapture(e.pointerId); } catch (_) { /* 오래된 브라우저 */ }
-      stickSet(e.clientX - sx0, e.clientY - sy0);
+      try { stick.setPointerCapture(e.pointerId); } catch (_) { stickId = null; stick.classList.remove("is-on"); touchCancel(); return; }
+      stickSet(e.clientX - sx0);
     });
-    stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickSet(e.clientX - sx0, e.clientY - sy0); });
-    const stickEnd = (e) => { if (e.pointerId !== stickId) return; stickId = null; stick.classList.remove("is-on"); stickSet(0, 0); };
-    ["pointerup", "pointercancel", "lostpointercapture"].forEach((t) => stick.addEventListener(t, stickEnd));
-    $("#vb-btns").querySelectorAll(".vb-btn").forEach((b) => {
+    stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickSet(e.clientX - sx0); });
+    // 손을 뗌(up) · 취소(cancel) · 잡기를 잃음(lostpointercapture — 뗄 때도 오지만 그땐 이미 놓은 뒤라 지나간다)
+    const stickEnd = (e, cancel) => { if (e.pointerId !== stickId) return; stickId = null; stick.classList.remove("is-on"); stickSet(0); if (cancel) touchCancel(); };
+    stick.addEventListener("pointerup", (e) => stickEnd(e, false));
+    stick.addEventListener("pointercancel", (e) => stickEnd(e, true));
+    stick.addEventListener("lostpointercapture", (e) => stickEnd(e, true));
+    const drops = [() => {
+      if (stickId === null) { stickSet(0); return; }
+      const id = stickId;
+      stickId = null; // 먼저 놓아야 아래 lostpointercapture 가 「취소」로 멈추지 않는다
+      stick.classList.remove("is-on");
+      stickSet(0);
+      try { stick.releasePointerCapture(id); } catch (_) { /* 이미 놓음 */ }
+    }];
+    // 점프 · 강타 · 다이빙(누를 때 한 번) · ← →(누르는 동안)
+    document.querySelectorAll("#vb-btns .vb-btn, .vb-move .vb-btn").forEach((b) => {
       const act = b.dataset.act;
       let pid = null;
       b.addEventListener("pointerdown", (e) => {
         e.preventDefault();
+        if (pid !== null) return;
         pid = e.pointerId;
-        try { b.setPointerCapture(e.pointerId); } catch (_) { /* 오래된 브라우저 */ }
+        try { b.setPointerCapture(e.pointerId); } catch (_) { pid = null; touchCancel(); return; }
         b.classList.add("is-down");
         if (engine) engine.control(act, true);
       });
-      const up = (e) => { if (e.pointerId !== pid) return; pid = null; b.classList.remove("is-down"); if (engine) engine.control(act, false); };
-      ["pointerup", "pointercancel", "lostpointercapture"].forEach((t) => b.addEventListener(t, up));
+      const up = (e, cancel) => { if (e.pointerId !== pid) return; pid = null; b.classList.remove("is-down"); if (engine) engine.control(act, false); if (cancel) touchCancel(); };
+      b.addEventListener("pointerup", (e) => up(e, false));
+      b.addEventListener("pointercancel", (e) => up(e, true));
+      b.addEventListener("lostpointercapture", (e) => up(e, true));
+      drops.push(() => {
+        if (pid === null) return;
+        const id = pid;
+        pid = null;
+        b.classList.remove("is-down");
+        if (engine) engine.control(act, false);
+        try { b.releasePointerCapture(id); } catch (_) { /* 이미 놓음 */ }
+      });
     });
+    dropTouchImpl = () => drops.forEach((f) => f());
   })();
   </script>
 </body>
