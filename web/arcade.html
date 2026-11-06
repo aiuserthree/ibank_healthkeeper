@@ -197,7 +197,8 @@
     const syl = (cho, med, jong) => String.fromCharCode(0xac00 + cho * 588 + med * 28 + jong);
     const find = { items: [], cat: "all", q: "", shown: [] };
     const findCatName = (id) => (FIND_CATS.concat(FIND_SETS).find(([k]) => k === id) || [])[1] || "";
-    const inFindCat = (it, cat) => cat === "all" || (cat === "daily" ? it.daily : cat === "series" ? it.series : it.cat === cat);
+    // 꿀알바 시리즈(1~8화)는 「꿀알바 시리즈」 칩에서만 보인다 — 전체 · 분류 · 오늘의 도전에는 넣지 않는다
+    const inFindCat = (it, cat) => cat === "series" ? it.series : !it.series && (cat === "all" || (cat === "daily" ? it.daily : it.cat === cat));
 
     // 찾기 목록 — 아케이드 게임(기본 순서) 뒤에 시리즈 2~8화. 비교용 글자는 미리 만들어 둔다
     function findIndex(games, allGames) {
@@ -313,14 +314,16 @@
       countEl.classList.toggle("hk-aa-sr", !list.length);
       if (!list.length) {
         const inAll = cat === "all" ? 0 : findSearch("all", q, composing).length;
+        const inSeries = cat === "series" ? 0 : findSearch("series", q, composing).length; // 꿀알바는 시리즈 칩에서만 보이니 거기 있으면 알려 준다
         const sugg = FIND_SUGGEST.filter((id) => id !== cat && find.items.some((it) => it.cat === id));
         countEl.textContent = `‘${qt}’에 맞는 게임이 없어요`;
         results.innerHTML = `<div class="hk-aa-find__empty">
             <span class="hk-aa-find__empty-icon">${HKUI.icon("search-x", 26, "currentColor")}</span>
             <b>‘${esc(qt)}’에 맞는 게임이 없어요</b>
-            <p>${inAll ? `${esc(name)} 말고 다른 분류에는 <b>${inAll}개</b> 있어요.` : "낱말을 줄이거나 초성(예: ㅅㄷㅋ)으로 찾아보세요."}</p>
+            <p>${inAll ? `${esc(name)} 말고 다른 분류에는 <b>${inAll}개</b> 있어요.` : inSeries ? `<b>꿀알바 시리즈</b>에 <b>${inSeries}개</b> 있어요.` : "낱말을 줄이거나 초성(예: ㅅㄷㅋ)으로 찾아보세요."}</p>
             <div class="hk-aa-find__sugg">
               ${inAll ? `<button type="button" class="hk-aa-find__chip is-strong" data-find-go="all" data-keep-q="1">전체에서 찾기<em>${inAll}</em></button>` : ""}
+              ${inSeries ? `<button type="button" class="hk-aa-find__chip${inAll ? "" : " is-strong"}" data-find-go="series" data-keep-q="1">꿀알바 시리즈에서 찾기<em>${inSeries}</em></button>` : ""}
               ${sugg.map((id) => `<button type="button" class="hk-aa-find__chip" data-find-go="${id}">${findCatName(id)} 게임 보기</button>`).join("")}
             </div>
           </div>`;
