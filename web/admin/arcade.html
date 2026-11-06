@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
+  <title>헬스키퍼 관리자 — 아케이드 이용현황</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/admin-shell.js"></script>
+  <style>
+    .ar-bar { --bar: var(--color-signal-blue); }
+    .ar-period { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 20px; }
+    .ar-period__dates { display: flex; gap: 6px; align-items: center; margin-left: auto; flex-wrap: wrap; }
+    .ar-period__dates input { height: 36px; width: auto; padding: 0 10px; font-size: 14px; }
+    .ar-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+    .ar-kpi__k { font-size: 13px; font-weight: 600; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; }
+    .ar-kpi__v { font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--color-midnight-navy); margin-top: 10px; font-variant-numeric: tabular-nums; }
+    .ar-kpi__v small { font-size: 15px; font-weight: 600; color: var(--text-secondary); margin-left: 3px; }
+    .ar-kpi__sub { font-size: 12.5px; color: var(--text-secondary); margin-top: 6px; line-height: 1.5; }
+    .ar-grid2 { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .ar-card { margin-bottom: 20px; }
+    .ar-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .ar-h h2 { font-size: 17px; margin: 0; color: var(--color-midnight-navy); }
+    .ar-h p { font-size: 12.5px; color: var(--text-muted); margin: 0; }
+    /* 세로 막대 — 바닥에 붙고 위만 4px 둥글게, 막대 사이 2px */
+    .ar-cols { position: relative; display: grid; gap: 2px; align-items: end; height: 180px; padding-left: 34px; }
+    .ar-cols__grid { position: absolute; inset: 0 0 0 34px; pointer-events: none; }
+    .ar-cols__grid div { position: absolute; left: 0; right: 0; border-top: 1px solid var(--color-fog); }
+    .ar-cols__grid span { position: absolute; left: -34px; width: 28px; text-align: right; transform: translateY(-50%); font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .ar-col { position: relative; height: 100%; display: flex; align-items: flex-end; cursor: default; }
+    .ar-col i { display: block; width: 100%; max-width: 28px; margin: 0 auto; background: var(--color-signal-blue); border-radius: 4px 4px 0 0; min-height: 0; }
+    .ar-col.is-zero i { background: transparent; }
+    .ar-col.is-weekend i { opacity: .55; }
+    .ar-col:hover i { background: var(--color-signal-blue-hover); }
+    .ar-xs { display: grid; gap: 2px; padding-left: 34px; margin-top: 6px; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .ar-xs span { text-align: center; white-space: nowrap; overflow: visible; }
+    /* 표 */
+    .ar-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .ar-table th { text-align: left; font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 8px 10px; border-bottom: 1px solid var(--border-default); white-space: nowrap; }
+    .ar-table th.num, .ar-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .ar-table td { padding: 9px 10px; border-bottom: 1px solid var(--color-fog); color: var(--color-midnight-navy); vertical-align: middle; white-space: nowrap; }
+    .ar-table tr.is-dim td { color: var(--text-muted); }
+    .ar-table th[data-sort] { cursor: pointer; }
+    .ar-table th[data-sort]:hover { color: var(--color-signal-blue); }
+    .ar-inbar { display: flex; align-items: center; gap: 8px; min-width: 120px; }
+    .ar-inbar b { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
+    .ar-inbar span { flex: 1; height: 8px; background: var(--color-fog); border-radius: 0 4px 4px 0; overflow: hidden; }
+    .ar-inbar span i { display: block; height: 100%; background: var(--color-signal-blue); border-radius: 0 4px 4px 0; }
+    .ar-tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--color-fog); color: var(--color-slate-blue); white-space: nowrap; }
+    .ar-scroll { overflow-x: auto; }
+    .ar-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .ar-tools input { height: 34px; width: 180px; padding: 0 10px; font-size: 13.5px; }
+    .ar-tip { position: fixed; z-index: 50; pointer-events: none; background: var(--color-midnight-navy); color: #fff; font-size: 12.5px; line-height: 1.55; padding: 8px 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(11, 53, 88, .25); white-space: nowrap; }
+    .ar-tip b { font-weight: 700; }
+    .ar-more { display: block; width: 100%; margin-top: 10px; }
+    @media (max-width: 1100px) { .ar-kpis { grid-template-columns: 1fr 1fr; } .ar-grid2 { grid-template-columns: 1fr; } }
+    @media (max-width: 560px) {
+      .ar-kpis { grid-template-columns: 1fr; }
+      .ar-period__dates { margin-left: 0; }
+      .ar-cols { height: 150px; }
+      .ar-tools input { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 아케이드 이용현황 — 기간 안의 참여 인원 · 끝까지 한 판 · 게임별 · 부서별 · 사람별 (서버 /admin/arcade/stats)
+    const esc = (t) => HKUI.escapeHtml(t == null ? "" : String(t));
+    const KIND = { solo: "혼자", versus: "대전", coop: "협동" };
+    const WD = ["월", "화", "수", "목", "금", "토", "일"];
+    const pad = (n) => String(n).padStart(2, "0");
+    const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const md = (s) => `${Number(s.slice(5, 7))}.${Number(s.slice(8, 10))}`;
+    const num = (n) => Number(n || 0).toLocaleString("ko-KR");
+
+    // 기간 — 오늘 · 이번 주(월~) · 이번 달 · 지난달 · 최근 30일
+    function presetRange(k) {
+      const t = new Date(); t.setHours(0, 0, 0, 0);
+      if (k === "today") return [t, t];
+      if (k === "week") { const s = new Date(t); s.setDate(t.getDate() - ((t.getDay() + 6) % 7)); return [s, t]; }
+      if (k === "month") return [new Date(t.getFullYear(), t.getMonth(), 1), t];
+      if (k === "last") return [new Date(t.getFullYear(), t.getMonth() - 1, 1), new Date(t.getFullYear(), t.getMonth(), 0)];
+      const s = new Date(t); s.setDate(t.getDate() - 29); return [s, t];
+    }
+    const PRESETS = [["today", "오늘"], ["week", "이번 주"], ["month", "이번 달"], ["last", "지난달"], ["d30", "최근 30일"]];
+    let preset = "d30";
+    let [from, to] = presetRange(preset).map(iso);
+    let data = null;
+    let gameKind = "all", peopleQ = "", peopleSort = "plays", peopleAll = false;
+
+    // ── 막대 위 말풍선 (마우스 · 손가락 모두)
+    const tip = document.createElement("div");
+    tip.className = "ar-tip"; tip.hidden = true;
+    document.body.appendChild(tip);
+    function showTip(el, x, y) {
+      tip.innerHTML = el.dataset.tip;
+      tip.hidden = false;
+      const w = tip.offsetWidth, h = tip.offsetHeight;
+      tip.style.left = `${Math.min(window.innerWidth - w - 8, Math.max(8, x - w / 2))}px`;
+      tip.style.top = `${Math.max(8, y - h - 14)}px`;
+    }
+    document.addEventListener("pointermove", (e) => {
+      const el = e.target.closest && e.target.closest("[data-tip]");
+      if (el) showTip(el, e.clientX, e.clientY); else tip.hidden = true;
+    });
+    document.addEventListener("scroll", () => (tip.hidden = true), true);
+
+    // 눈금 — 최댓값을 보기 좋은 수로 올리고 4칸
+    function niceMax(v) {
+      if (v <= 4) return 4;
+      const raw = v / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p;
+      const step = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+      return Math.max(4, Math.ceil(step) * 4);
+    }
+    function columns(items, { value, tipHtml, label, labelEvery = 1, weekend }) {
+      const max = niceMax(Math.max(0, ...items.map(value)));
+      const n = items.length;
+      const grid = [0, 0.25, 0.5, 0.75, 1].map((f) => `<div style="bottom:${f * 100}%"><span>${num(Math.round(max * f * 10) / 10)}</span></div>`).join("");
+      const cols = items.map((it, i) => {
+        const v = value(it);
+        return `<div class="ar-col${v ? "" : " is-zero"}${weekend && weekend(it) ? " is-weekend" : ""}" data-tip="${esc(tipHtml(it))}"><i style="height:${max ? (v / max) * 100 : 0}%"></i></div>`;
+      }).join("");
+      const xs = items.map((it, i) => `<span>${i % labelEvery === 0 ? esc(label(it)) : ""}</span>`).join("");
+      return `<div class="ar-cols" style="grid-template-columns:repeat(${n},1fr)"><div class="ar-cols__grid">${grid}</div>${cols}</div>
+        <div class="ar-xs" style="grid-template-columns:repeat(${n},1fr)">${xs}</div>`;
+    }
+    const inbar = (v, max, text) => `<div class="ar-inbar"><b>${text}</b><span><i style="width:${max ? Math.max(v ? 2 : 0, (v / max) * 100) : 0}%"></i></span></div>`;
+
+    function kpis(s) {
+      const rate = s.activeMembers ? Math.round((s.players / s.activeMembers) * 100) : 0;
+      const tile = (ic, k, v, unit, sub) => `<div class="hk-card hk-card--pad"><div class="ar-kpi__k">${HKUI.icon(ic, 16, "var(--color-signal-blue)")}${k}</div><div class="ar-kpi__v">${v}<small>${unit}</small></div><div class="ar-kpi__sub">${sub}</div></div>`;
+      return `<div class="ar-kpis">
+          ${tile("users", "참여 인원", num(s.players), "명", `회원 ${num(s.activeMembers)}명 중 <b>${rate}%</b> · 한 판이라도 끝까지 한 사람`)}
+          ${tile("gamepad-2", "끝까지 한 판", num(s.plays), "판", `혼자 ${num(s.solo)} · 대전 ${num(s.versus)} · 협동 ${num(s.coop)}`)}
+          ${tile("calendar-days", "하루 평균 참여", s.avgDailyPlayers, "명", s.peakDay ? `가장 많았던 날 ${md(s.peakDay)}` : "기간에 한 판도 없어요")}
+          ${tile("stamp", "참여 도장", num(s.stamps), "개", `${num(s.stampMembers)}명이 받음 · 아케이드 쿠폰 발급 ${num(s.couponsIssued)}장 · 사용 ${num(s.couponsUsed)}장`)}
+        </div>`;
+    }
+
+    function dailyCard(d) {
+      const every = Math.max(1, Math.ceil(d.length / 15));
+      const body = columns(d, {
+        value: (r) => r.members,
+        tipHtml: (r) => `<b>${md(r.date)} (${WD[(new Date(r.date + "T00:00:00").getDay() + 6) % 7]})</b><br>참여 ${r.members}명 · ${r.solo + r.versus + r.coop}판<br>혼자 ${r.solo} · 대전 ${r.versus} · 협동 ${r.coop}`,
+        label: (r) => md(r.date),
+        labelEvery: every,
+        weekend: (r) => { const w = new Date(r.date + "T00:00:00").getDay(); return w === 0 || w === 6; },
+      });
+      return `<div class="hk-card hk-card--pad"><div class="ar-h"><h2>날짜별 참여 인원</h2><p>막대에 올리면 판 수 · 주말은 옅게</p></div>${body}</div>`;
+    }
+    function hoursCard(h, w) {
+      const hours = h.map((v, i) => ({ i, v }));
+      const days = w.map((v, i) => ({ i, v }));
+      return `<div class="hk-card hk-card--pad">
+          <div class="ar-h"><h2>시간대별 판 수</h2><p>판을 끝낸 시각</p></div>
+          ${columns(hours, { value: (r) => r.v, tipHtml: (r) => `<b>${r.i}시대</b><br>${num(r.v)}판`, label: (r) => `${r.i}`, labelEvery: 3 })}
+          <div class="ar-h" style="margin-top:22px"><h2>요일별 판 수</h2></div>
+          ${columns(days, { value: (r) => r.v, tipHtml: (r) => `<b>${WD[r.i]}요일</b><br>${num(r.v)}판`, label: (r) => WD[r.i] })}
+        </div>`;
+    }
+
+    function gamesCard(games) {
+      const list = games.filter((g) => gameKind === "all" || g.kind === gameKind);
+      const max = Math.max(0, ...list.map((g) => g.plays));
+      const pills = [["all", "전체"], ["solo", "혼자"], ["versus", "대전"], ["coop", "협동"]].map(([k, l]) => HKAdmin.filterPill(l, gameKind === k, `data-gk="${k}"`)).join("");
+      const rows = list.map((g, i) => `<tr class="${g.plays ? "" : "is-dim"}"><td class="num" style="color:var(--text-muted)">${i + 1}</td><td><b style="font-weight:600">${esc(g.title)}</b></td><td><span class="ar-tag">${KIND[g.kind] || ""}</span></td><td style="width:45%">${inbar(g.plays, max, num(g.plays))}</td><td class="num">${num(g.members)}명</td></tr>`).join("");
+      const zero = list.filter((g) => !g.plays).length;
+      return `<div class="hk-card hk-card--pad ar-card">
+          <div class="ar-h"><h2>게임별</h2><div class="ar-tools">${pills}</div></div>
+          <div class="ar-scroll"><table class="ar-table"><thead><tr><th class="num">#</th><th>게임</th><th>종류</th><th>끝까지 한 판</th><th class="num">한 사람</th></tr></thead><tbody>${rows}</tbody></table></div>
+          ${zero ? `<p style="font-size:12.5px;color:var(--text-muted);margin:10px 0 0">이 기간에 아무도 끝내지 않은 게임 ${zero}개는 옅게 보여요.</p>` : ""}
+        </div>`;
+    }
+
+    function deptCard(depts) {
+      const maxP = Math.max(0, ...depts.map((d) => d.plays));
+      const rows = depts.map((d) => {
+        const rate = d.total ? Math.round((d.active / d.total) * 100) : 0;
+        return `<tr><td><b style="font-weight:600">${esc(d.name)}</b></td><td style="width:34%">${inbar(rate, 100, `${rate}%`)}</td><td class="num">${d.active} / ${d.total}명</td><td style="width:26%">${inbar(d.plays, maxP, num(d.plays))}</td></tr>`;
+      }).join("");
+      return `<div class="hk-card hk-card--pad ar-card">
+          <div class="ar-h"><h2>부서별</h2><p>참여율 = 지금 회원 중 한 판이라도 한 사람</p></div>
+          <div class="ar-scroll"><table class="ar-table"><thead><tr><th>부서</th><th>참여율</th><th class="num">참여 / 인원</th><th>끝까지 한 판</th></tr></thead><tbody>${rows || `<tr><td colspan="4" style="color:var(--text-muted)">자료 없음</td></tr>`}</tbody></table></div>
+        </div>`;
+    }
+
+    const PEOPLE_COLS = [["name", "이름"], ["department", "부서"], ["plays", "끝까지 한 판"], ["days", "한 날"], ["stamps", "도장"], ["favorite", "가장 많이 한 게임"], ["last", "마지막"]];
+    function peopleRows() {
+      const q = peopleQ.trim().toLowerCase();
+      const list = data.people.filter((p) => !q || `${p.name} ${p.department || ""} ${p.position || ""}`.toLowerCase().includes(q));
+      const k = peopleSort;
+      list.sort((a, b) => (typeof a[k] === "number" ? b[k] - a[k] : String(k === "last" ? b[k] : a[k] || "").localeCompare(String(k === "last" ? a[k] : b[k] || ""), "ko")) || b.plays - a.plays);
+      return list;
+    }
+    function peopleCard() {
+      const list = peopleRows();
+      const shown = peopleAll ? list : list.slice(0, 30);
+      const max = Math.max(0, ...list.map((p) => p.plays));
+      const rows = shown.map((p, i) => `<tr><td class="num" style="color:var(--text-muted)">${i + 1}</td><td><b style="font-weight:600">${esc(p.name)}</b>${p.position ? ` <span style="font-size:12px;color:var(--text-secondary)">${esc(p.position)}</span>` : ""}</td><td>${esc(p.department || "-")}</td><td style="width:22%">${inbar(p.plays, max, num(p.plays))}</td><td class="num">${p.days}일</td><td class="num">${p.stamps}개</td><td>${esc(p.favorite || "-")}${p.favoritePlays ? ` <span style="font-size:12px;color:var(--text-muted)">${p.favoritePlays}판</span>` : ""}</td><td class="num">${md(p.last)}</td></tr>`).join("");
+      const head = PEOPLE_COLS.map(([k, l]) => `<th data-sort="${k}" class="${["plays", "days", "stamps", "last"].includes(k) && k !== "plays" ? "num" : ""}">${l}${peopleSort === k ? " ↓" : ""}</th>`).join("");
+      return `<div class="ar-h"><h2>사람별 <span style="font-size:13px;font-weight:600;color:var(--text-secondary)">${num(list.length)}명</span></h2>
+            <div class="ar-tools"><input class="hk-input" id="ar-q" placeholder="이름 · 부서 찾기" value="${esc(peopleQ)}"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" id="ar-csv">${HKUI.icon("download", 15, "currentColor")} CSV</button></div></div>
+          <div class="ar-scroll"><table class="ar-table"><thead><tr><th class="num">#</th>${head}</tr></thead><tbody>${rows || `<tr><td colspan="8" style="color:var(--text-muted)">${peopleQ ? "찾는 사람이 없어요" : "이 기간에 끝까지 한 판이 없어요"}</td></tr>`}</tbody></table></div>
+          ${list.length > 30 ? `<button type="button" class="hk-btn hk-btn--ghost hk-btn--sm ar-more" id="ar-more">${peopleAll ? "30명만 보기" : `${num(list.length)}명 모두 보기`}</button>` : ""}`;
+    }
+    function paintPeople() {
+      const box = document.getElementById("ar-people");
+      if (!box) return;
+      const focus = document.activeElement && document.activeElement.id === "ar-q";
+      const pos = focus ? document.activeElement.selectionStart : 0;
+      box.innerHTML = peopleCard();
+      HKUI.refreshIcons(box);
+      const q = document.getElementById("ar-q");
+      q.oninput = () => { peopleQ = q.value; paintPeople(); };
+      if (focus) { q.focus(); q.setSelectionRange(pos, pos); }
+      box.querySelectorAll("[data-sort]").forEach((th) => (th.onclick = () => { peopleSort = th.dataset.sort; paintPeople(); }));
+      const more = document.getElementById("ar-more");
+      if (more) more.onclick = () => { peopleAll = !peopleAll; paintPeople(); };
+      document.getElementById("ar-csv").onclick = downloadCsv;
+    }
+    function downloadCsv() {
+      const cell = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
+      const lines = [["이름", "직급", "부서", "끝까지 한 판", "한 날", "도장", "가장 많이 한 게임", "그 게임 판 수", "마지막"].map(cell).join(",")];
+      peopleRows().forEach((p) => lines.push([p.name, p.position, p.department, p.plays, p.days, p.stamps, p.favorite, p.favoritePlays, p.last].map(cell).join(",")));
+      const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `아케이드_이용현황_${data.range.start}_${data.range.end}.csv`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    }
+
+    function paintPeriod() {
+      document.getElementById("ar-period").innerHTML = PRESETS.map(([k, l]) => HKAdmin.filterPill(l, preset === k, `data-p="${k}"`)).join("") +
+        `<div class="ar-period__dates"><input type="date" class="hk-input" id="ar-from" value="${from}" max="${iso(new Date())}"><span style="color:var(--text-muted)">~</span><input type="date" class="hk-input" id="ar-to" value="${to}" max="${iso(new Date())}"><button type="button" class="hk-btn hk-btn--primary hk-btn--sm" id="ar-go">조회</button></div>`;
+      document.querySelectorAll("[data-p]").forEach((b) => (b.onclick = () => { preset = b.dataset.p; [from, to] = presetRange(preset).map(iso); load(); }));
+      document.getElementById("ar-go").onclick = () => {
+        const f = document.getElementById("ar-from").value, t = document.getElementById("ar-to").value;
+        if (!f || !t) return HKUI.toast("시작일과 종료일을 골라 주세요", "warning");
+        [from, to] = f <= t ? [f, t] : [t, f];
+        preset = "";
+        load();
+      };
+    }
+
+    function paint() {
+      const s = data.summary;
+      document.getElementById("ar-body").innerHTML = `
+        <p style="font-size:13px;color:var(--text-secondary);margin:-6px 0 14px">${md(data.range.start)} ~ ${md(data.range.end)} · ${data.range.days}일 · 끝까지 한 판 기준(대전 · 협동은 끝난 날로 셈)</p>
+        ${kpis(s)}
+        <div class="ar-grid2">${dailyCard(data.daily)}${hoursCard(data.hours, data.weekdays)}</div>
+        <div id="ar-games">${gamesCard(data.games)}</div>
+        ${deptCard(data.departments)}
+        <div class="hk-card hk-card--pad ar-card" id="ar-people"></div>`;
+      bindGames();
+      paintPeople();
+      HKUI.refreshIcons();
+    }
+    function bindGames() {
+      document.querySelectorAll("[data-gk]").forEach((b) => (b.onclick = () => { gameKind = b.dataset.gk; document.getElementById("ar-games").innerHTML = gamesCard(data.games); bindGames(); }));
+    }
+
+    async function load() {
+      paintPeriod();
+      const body = document.getElementById("ar-body");
+      body.style.opacity = data ? ".5" : "";
+      if (!data) body.innerHTML = `<div style="text-align:center;padding:60px 0"><span class="hk-spin"></span></div>`;
+      try {
+        data = await HKApi.adminArcadeStats(from, to);
+        from = data.range.start; to = data.range.end;
+        paintPeriod();
+        paint();
+      } catch (e) {
+        body.innerHTML = HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "이용현황을 불러오지 못했어요."));
+        HKUI.refreshIcons();
+      }
+      body.style.opacity = "";
+    }
+
+    HKAdmin.mountPage({
+      active: "arcade",
+      render() {
+        return `${HKAdmin.pageHead("아케이드 이용현황", "누가 · 언제 · 어떤 게임을 얼마나 하는지 — 끝까지 한 판 기준이에요. 참여 인원은 도장을 받은 날도 함께 세요.")}
+          <div class="ar-period" id="ar-period"></div>
+          <div id="ar-body"></div>`;
+      },
+      afterMount: load,
+    });
+  </script>
+</body>
+</html>

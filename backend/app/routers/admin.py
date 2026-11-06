@@ -394,6 +394,19 @@ async def coupon_stats(
     return {"data": await admin_coupon_stats(db)}
 
 
+@router.get("/arcade/stats")
+async def arcade_stats(
+    start: Optional[date] = Query(None),
+    end: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin),
+):
+    """아케이드 이용현황 — 기간(한국 날짜, 기본 최근 30일) 안의 참여 인원 · 판 수 · 게임별 · 부서별 · 사람별."""
+    from app.services.arcade_stats import admin_arcade_stats
+
+    return {"data": await admin_arcade_stats(db, start, end)}
+
+
 @router.get("/coupons/members/{member_id}")
 async def member_coupons(
     member_id: int,

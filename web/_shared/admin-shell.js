@@ -10,6 +10,7 @@ window.HKAdminRoutes = {
   settings: "/admin/settings",
   coupons: "/admin/coupons",
   gameRequests: "/admin/game-requests",
+  arcade: "/admin/arcade",
   notices: "/admin/notices",
   health: "/admin/health",
 };
@@ -25,6 +26,7 @@ window.HKAdmin = (function () {
     { k: "vacation", label: "휴가 관리", href: R.vacation, icon: "palmtree" },
     { k: "coupons", label: "무적 쿠폰", href: R.coupons, icon: "ticket" },
     { k: "notices", label: "공지사항", href: R.notices, icon: "megaphone" },
+    { k: "arcade", label: "아케이드 이용현황", href: R.arcade, icon: "chart-column" },
     { k: "gameRequests", label: "게임 요청", href: R.gameRequests, icon: "gamepad-2" },
     { k: "health", label: "건강 정보", href: R.health, icon: "heart-pulse" },
     { k: "settings", label: "운영 설정", href: R.settings, icon: "settings" },
