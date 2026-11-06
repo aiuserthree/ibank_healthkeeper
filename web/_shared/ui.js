@@ -1244,6 +1244,38 @@ window.HKUI = (function () {
     return `${touch ? "휴대폰" : "PC"} · ${os} · ${br} · ${window.innerWidth}×${window.innerHeight}`;
   }
 
+  // ── Esc 로 팝업 닫기 (모든 화면 공통) ──
+  // 가장 위에 열린 팝업 하나만 닫는다: 대화상자(마지막에 연 것) → 말풍선 → 메뉴 서랍 → 페이지가 [data-esc-close] 로 표시한 닫기 단추.
+  // 대화상자는 바깥(어두운 곳)을 누른 것과 똑같이 닫는다 — 확인 창은 「취소」(false), 기록 남긴 뒤 결과 창처럼 바깥을 눌러도 안 닫히는 창은 그대로.
+  // 닫았으면 Esc 를 여기서 멈춘다 — 뒤의 게임이 Esc 를 「이어 하기 · 일시정지」로 받지 않게(먼저 받으려고 window 캡처 단계에 단다)
+  const shown = (el) => !!el && el.isConnected && !el.hidden && el.getClientRects().length > 0;
+  function closeTopPopup() {
+    const dialogs = [...document.querySelectorAll(".hk-dialog__overlay")].filter(shown);
+    const top = dialogs[dialogs.length - 1];
+    if (top) {
+      top.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+      return true;
+    }
+    if ([...document.querySelectorAll(".hk-tooltip-panel")].some(shown)) { closeAllTooltips(); return true; }
+    for (const id of ["hk-drawer", "hk-admin-drawer"]) {
+      const d = document.getElementById(id);
+      if (d && d.classList.contains("open")) { d.classList.remove("open"); return true; }
+    }
+    const marked = [...document.querySelectorAll("[data-esc-close]")].filter(shown);
+    if (marked.length) { marked[marked.length - 1].click(); return true; }
+    return false;
+  }
+  window.addEventListener(
+    "keydown",
+    (e) => {
+      if (e.key !== "Escape" || e.isComposing || e.keyCode === 229) return; // 한글 입력 중 Esc 는 글자 고르기 취소
+      if (!closeTopPopup()) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    },
+    true
+  );
+
   return {
     STATE_BANNER,
     STATUS_LABEL,
@@ -1322,5 +1354,6 @@ window.HKUI = (function () {
     openMailPreviewHtml,
     paginationBar,
     bindPagination,
+    closeTopPopup,
   };
 })();

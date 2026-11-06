@@ -439,7 +439,7 @@ window.HKPlay = (function () {
         <span>${ranks.join(" · ") || (result.counted ? "순위를 불러오는 중이에요" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.best != null && !result.newBest ? ` · 내 최고 ${formatScore(game, result.best)}` : ""}</span>
         ${result.stamp ? `<span class="hk-play-result__stamp${result.stamp.new ? " is-new" : ""}">${HKUI.icon("stamp", 13, "currentColor")} ${result.stamp.new ? "오늘 도장 쾅!" : result.stamp.today ? "오늘 도장은 이미 찍었어요" : result.stamp.pending ? "도장판이 꽉 찼어요" : "게임 화면에서 시작한 판만 도장이 찍혀요"} · ${result.stamp.pending ? `도장 <b>${result.stamp.goal}개 완성</b> · 쿠폰은 다음 달 1일에` : `도장 <b>${result.stamp.count}/${result.stamp.goal}</b>`}</span>` : ""}
       </div>
-      <button type="button" class="hk-play-result__close" aria-label="닫기">${HKUI.icon("x", 16, "currentColor")}</button>`;
+      <button type="button" class="hk-play-result__close" aria-label="닫기" data-esc-close>${HKUI.icon("x", 16, "currentColor")}</button>`;
     const close = () => {
       clearTimeout(resultTimer);
       el.style.transform = "";

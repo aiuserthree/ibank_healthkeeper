@@ -1058,7 +1058,7 @@
         : `<button type="button" class="gs-btn gs-btn--go" data-act="list">대국 목록</button>`;
       modal.innerHTML = `<div class="gs-card is-${r}" role="dialog" aria-label="결과">
           <h2>${title}</h2>${body}
-          <div class="gs-card__btns"><button type="button" class="gs-btn gs-btn--alt" data-act="look">판 보기</button>${next}</div></div>`;
+          <div class="gs-card__btns"><button type="button" class="gs-btn gs-btn--alt" data-act="look" data-esc-close>판 보기</button>${next}</div></div>`;
       modal.classList.add("is-open");
     }
 
@@ -1281,6 +1281,12 @@
         // PC 키 — 숫자로 손패 고르기 · Enter/Space 고른 패 내기 · G 고 · S 스톱 · Esc 취소
         window.addEventListener("keydown", (e) => {
           if (!match || !view || document.querySelector(".hk-dialog__overlay") || e.target.closest("input, textarea")) return;
+          // Esc — 고 · 스톱 창은 접어 판을 볼 수 있게(아래 「고르기」로 다시 연다). 결과 창은 「판 보기」 단추(공용 Esc)가 닫는다
+          if (e.key === "Escape" && !busy && view.phase === "gostop" && document.getElementById("gs-modal")?.classList.contains("is-open")) {
+            e.preventDefault();
+            document.getElementById("gs-modal").classList.remove("is-open");
+            return;
+          }
           if (busy && (e.key === "Escape" || e.code === "Space")) { e.preventDefault(); skip = true; if (wake) wake(); return; }
           const modalOpen = document.getElementById("gs-modal")?.classList.contains("is-open");
           if (view.phase === "gostop" && myTurnNow() && modalOpen && /^[gGsS]$/.test(e.key)) {

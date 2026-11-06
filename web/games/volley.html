@@ -94,6 +94,9 @@
     .vb-chr { width: 22px; height: 30px; object-fit: contain; flex-shrink: 0; }
     .vb-chr--q { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #e2e8f0; color: #475569; font-weight: 800; font-size: 13px; }
     .vb-chr.is-sm { width: 18px; height: 22px; }
+    /* 코트 배경 고르기 — 버튼마다 작은 색 견본 */
+    .vb-courts button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 4px; min-width: 0; }
+    .vb-court { width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .12); }
     .vb-card.vb-set .vb-row__k { width: 58px; text-align: left; }
     .vb-card.vb-opt { max-width: 470px; text-align: left; }
     .vb-card.vb-opt h2, .vb-card.vb-rules h2 { margin-bottom: 2px; }
@@ -233,7 +236,8 @@
     const PREF_KEY = "hk-volley-pref";
     // ctrl: 화면 조작 — "court"(코트 조이스틱 · 기본) | "buttons"(아래 버튼). char: 내 선수(고르지 않았으면 null — 온라인 손님은 주황)
     // rival: 상대 선수 — "random"(나와 다른 선수 · 기본) | 번호. fps: 화면 표시 60 · 30(가볍게 — 동료와)
-    const pref = { mode: "cpu", level: "normal", target: 7, ctrl: "court", char: null, rival: "random", fps: 60 };
+    // court: 코트 배경 — "day"(한낮 · 기본) | "sunset"(노을) | "night"(야간) | "snow"(눈 오는 날). 내 화면에만
+    const pref = { mode: "cpu", level: "normal", target: 7, ctrl: "court", char: null, rival: "random", fps: 60, court: "day" };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY) || "{}")); } catch (_) { /* 처음 */ }
     if (!["cpu", "local"].includes(pref.mode) || (pref.mode === "local" && IS_TOUCH)) pref.mode = "cpu";
     if (!LEVEL_NAME[pref.level]) pref.level = "normal";
@@ -246,6 +250,12 @@
     if (!okLook(pref.char)) pref.char = null;
     if (pref.rival !== "random" && !okLook(pref.rival)) pref.rival = "random";
     if (pref.fps !== 30) pref.fps = 60;
+    const COURTS = HKVolley.COURTS;
+    if (!COURTS.some((c) => c.id === pref.court)) pref.court = "day";
+    // 코트 배경 견본 색(하늘 → 바닥)
+    const COURT_SWATCH = { day: "#4aa8ec,#cfeafc 62%,#4bae78 62%", sunset: "#3a3f7c,#ffb27e 62%,#4c8f64 62%", night: "#060b22,#2f4176 62%,#25503c 62%", snow: "#8fa2b8,#e9eff5 62%,#f7fafd 62%" };
+    const courtRow = (attr) => `<div class="vb-row" data-row="court"><span class="vb-row__k">코트</span><div class="vb-seg vb-courts">${COURTS.map((c) => `<button type="button" ${attr}="${c.id}"><span class="vb-court" style="background:linear-gradient(${COURT_SWATCH[c.id] || "#ccc,#ccc"})"></span>${c.name}</button>`).join("")}</div></div>`;
+    const paintCourts = (root) => root.querySelectorAll("[data-court]").forEach((b) => b.classList.toggle("is-on", b.dataset.court === pref.court));
     const myChar = () => (okLook(pref.char) ? pref.char : 0);
     // 상대 선수 — 랜덤이면 나와 다른 선수 중 하나 (레퍼런스와 같음)
     const rivalChar = () => {
@@ -434,7 +444,7 @@
       pauseBtn.hidden = false; pauseBtn.disabled = false;
       $("#vb-keys").innerHTML = "";
       const d0 = Math.floor(Math.random() * LOOKS.length), d1 = (d0 + 1 + Math.floor(Math.random() * (LOOKS.length - 1))) % LOOKS.length;
-      engine = HKVolley.create(canvas, { mode: "demo", target: 99, me: { name: "토스" }, rival: { name: "스파이크" }, looks: [d0, d1] });
+      engine = HKVolley.create(canvas, { mode: "demo", target: 99, me: { name: "토스" }, rival: { name: "스파이크" }, looks: [d0, d1], court: pref.court });
       engine.start();
       const localOff = IS_TOUCH;
       showOver(`<div class="vb-card vb-menu" role="dialog" aria-label="옥상 배구 시작">
@@ -451,6 +461,7 @@
           <div class="vb-row" data-row="target"><span class="vb-row__k">점수</span><div class="vb-seg"><button type="button" data-target="7">7점 빠른 경기</button><button type="button" data-target="15">15점 긴 경기</button></div></div>
           <div class="vb-row" data-row="char"><span class="vb-row__k">내 선수</span><div class="vb-seg vb-chars">${LOOKS.map((l) => `<button type="button" data-char="${l.id}">${chrImg(l.id)}${l.name}</button>`).join("")}</div></div>
           <div class="vb-row" data-row="rival"><span class="vb-row__k">상대</span><div class="vb-seg vb-chars"><button type="button" data-rival="random"><span class="vb-chr vb-chr--q">?</span>랜덤</button>${LOOKS.map((l) => `<button type="button" data-rival="${l.id}">${chrImg(l.id)}${l.name}</button>`).join("")}</div></div>
+          ${courtRow("data-court")}
           <button type="button" class="hk-btn hk-btn--primary vb-go" id="vb-go">경기 시작</button>
           <div class="vb-help" id="vb-help"></div>
         </div>`);
@@ -462,6 +473,7 @@
       over.querySelectorAll("[data-target]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.target) === pref.target));
       over.querySelectorAll("[data-char]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.char) === myChar()));
       over.querySelectorAll("[data-rival]").forEach((b) => b.classList.toggle("is-on", b.dataset.rival === String(pref.rival)));
+      paintCourts(over);
       paintMove();
       const lv = over.querySelector('[data-row="level"]');
       if (lv) lv.hidden = pref.mode !== "cpu";
@@ -496,7 +508,7 @@
       $("#vb-keys").innerHTML = keysHtml(mode);
       playing.best = mode === "cpu" ? bestOf(pref.level, pref.target) : 0;
       engine = HKVolley.create(canvas, {
-        mode, level: pref.level, target: pref.target, touch: IS_TOUCH, best: playing.best,
+        mode, level: pref.level, target: pref.target, touch: IS_TOUCH, best: playing.best, court: pref.court,
         looks: [myChar(), rivalChar()], // 선택은 새 경기를 시작할 때 적용 (다시 하기도 랜덤이면 새로 뽑는다)
         me: mode === "local" ? { name: "1P" } : me, rival,
         onEvent: (e) => {
@@ -578,10 +590,11 @@
       if (!canOptions() && layer === "options") closeSettings();
     }
 
-    // 환경설정 — 화면 조작(코트 조이스틱 · 아래 버튼) · 화면 표시(동료와: 기본 60fps · 가볍게 30fps)
+    // 환경설정 — 화면 조작(코트 조이스틱 · 아래 버튼) · 코트 배경 · 화면 표시(동료와: 기본 60fps · 가볍게 30fps)
     function paintSettings() {
       setOver.querySelectorAll("[data-ctrl]").forEach((b) => b.classList.toggle("is-on", b.dataset.ctrl === pref.ctrl));
       setOver.querySelectorAll("[data-fps]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.fps) === pref.fps));
+      paintCourts(setOver);
     }
     function openSettings() {
       const online = !!(playing && playing.online);
@@ -589,6 +602,7 @@
           <span class="vb-badge">${icon("settings-2", 26)}</span>
           <h2>환경설정</h2>
           <div class="vb-row"><span class="vb-row__k">화면 조작</span><div class="vb-seg"><button type="button" data-ctrl="court">코트 조이스틱</button><button type="button" data-ctrl="buttons">아래 버튼</button></div></div>
+          ${courtRow("data-court")}
           ${online ? `<div class="vb-row"><span class="vb-row__k">화면 표시</span><div class="vb-seg"><button type="button" data-fps="60">기본 · 60fps</button><button type="button" data-fps="30">가볍게 · 30fps</button></div></div>` : ""}
           <p class="vb-mini">${IS_TOUCH ? "코트 조이스틱: 왼손으로 끌어 이동 · 아래 버튼: ← → 를 눌러 이동" : "코트 조이스틱: 경기판 안 조작판(마우스) · 아래 버튼: 경기판 아래 버튼 줄"} · 키보드는 늘 써요 · 소리는 위 막대 소리 버튼으로 켜고 꺼요</p>
           <p class="vb-mini">${online ? "내 화면에만 적용돼요 · 열어 둬도 경기는 계속돼요 · 쉬려면 일시정지를 눌러 주세요" : "내 화면에만 적용돼요 · 열면 경기가 멈춰요 · 난이도 · 목표 점수 · 선수는 게임 옵션에서 바꿔요"}</p>
@@ -795,7 +809,7 @@
         S2.role = role;
         playing = { mode: role, online: true, role, target, rival, report, resign, matchId: typeof matchId === "number" ? matchId : null };
         engine = HKVolley.create(canvas, {
-          mode: role, target, touch: IS_TOUCH, me, rival, fps: pref.fps,
+          mode: role, target, touch: IS_TOUCH, me, rival, fps: pref.fps, court: pref.court,
           look: okLook(pref.char) ? pref.char : role === "host" ? 0 : 1, // 고르지 않았으면 주인 파랑 · 손님 주황
           resume: role === "host" ? loadSave() : null, // 주인이 새로고침했으면 그 점수부터
           net: { send: (o) => !S2.closed && !!conn && conn.send(o), onMessage: (fn) => handlers.push(fn) },
@@ -1101,7 +1115,7 @@
       showMenu();
     }
     if (!status.open) {
-      engine = HKVolley.create(canvas, { mode: "demo", target: 99 });
+      engine = HKVolley.create(canvas, { mode: "demo", target: 99, court: pref.court });
       showOver(`<div class="vb-card is-small">${HKPlay.closedHtml(status.opensAt)}</div>`);
       over.querySelector(".hk-play-closed").style.cssText = "border:0;padding:8px 4px";
       setInterval(async () => { const st = await HKApi.playStatus().catch(() => null); if (st && st.open) location.reload(); }, 60000);
@@ -1133,6 +1147,7 @@
       if (b.dataset.drival && draft) { draft.rival = b.dataset.drival === "random" ? "random" : Number(b.dataset.drival); paintOptions(); HKSound.play("tap"); return; }
       // 환경설정 — 화면 조작 · 화면 표시
       if (b.dataset.ctrl) { pref.ctrl = b.dataset.ctrl; savePref(); dropTouch(); paintMove(); layout(); paintSettings(); HKSound.play("tap"); return; }
+      if (b.dataset.court) { pref.court = b.dataset.court; savePref(); if (engine && engine.setCourt) engine.setCourt(pref.court); paintCourts(over); paintCourts(setOver); HKSound.play("tap"); b.blur(); return; }
       if (b.dataset.fps) { pref.fps = Number(b.dataset.fps) === 30 ? 30 : 60; savePref(); if (engine && engine.setFps) engine.setFps(pref.fps); paintSettings(); HKSound.play("tap"); return; }
       if (b.id === "vb-go") {
         if (pref.mode === "online") { if (ONLINE_READY) showOnlineLobby(); return; }

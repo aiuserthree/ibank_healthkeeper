@@ -206,7 +206,9 @@ window.HKFun = (function () {
   function stampLine(st) {
     if (!st) return "";
     // 도장은 달이 바뀌어도 이어서 모인다 — 쿠폰만 한 달에 1장
-    const parts = st.pending
+    const parts = st.done
+      ? [`아케이드 도장 ${st.goal}/${st.goal} 완성`, "이번 달 쿠폰 받음", "내일부터 새 도장판"]
+      : st.pending
       ? [`아케이드 도장 ${st.goal}/${st.goal} 완성`, "쿠폰은 다음 달 1일에"]
       : st.coupon
       ? ["이번 달 아케이드 쿠폰 받음", `다음 쿠폰까지 ${st.goal - st.count}개`]

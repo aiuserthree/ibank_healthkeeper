@@ -81,6 +81,9 @@
     .sc-seg { flex: 1; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #f1f5f9; }
     .sc-seg button { flex: 1; height: 36px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; font-weight: 700; color: #475569; cursor: pointer; }
     .sc-seg button.is-on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
+    /* 코트 배경 고르기 — 버튼마다 작은 색 견본 */
+    .sc-courts button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 0 4px; min-width: 0; }
+    .sc-court { width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .12); }
     .sc-note { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #f0fdf4; font-size: 13px; line-height: 1.55; color: #166534; word-break: keep-all; }
     .sc-note[hidden] { display: none; }
     .sc-note.is-warn { background: #fff7ed; color: #9a3412; }
@@ -195,13 +198,18 @@
     const LEVEL_LOOK = { easy: 0, normal: 1, hard: 3, best: 2 }; // 컴퓨터 얼굴 — 신입 · 대리 · 과장 · 부장
     const QUALITIES = [["low", "낮음"], ["medium", "보통"], ["good", "좋음"], ["best", "최고"]]; // 그리기만 바뀐다(동료와도 내 화면만)
     const PREF_KEY = "hk-soccer-pref";
-    const pref = { mode: "cpu", level: "normal", minutes: 2, quality: "good" };
+    // court: 코트 배경 — "day"(한낮 · 기본) | "sunset"(노을) | "night"(야간) | "snow"(눈 오는 날). 그리기만 바뀐다(동료와도 내 화면만)
+    const pref = { mode: "cpu", level: "normal", minutes: 2, quality: "good", court: "day" };
     try { const saved = JSON.parse(localStorage.getItem(PREF_KEY) || "{}"); if (saved && typeof saved === "object" && !Array.isArray(saved)) Object.assign(pref, saved); } catch (_) { /* 처음 */ }
     const known = (list, v) => list.some(([k]) => k === v); // 저장된 값이 고를 수 있는 것인지(예전 · 망가진 값은 기본으로)
     if (!["cpu", "local", "online"].includes(pref.mode) || (pref.mode === "local" && IS_TOUCH)) pref.mode = "cpu";
     if (!known(LEVELS, pref.level)) pref.level = "normal";
     if (![1, 2, 3, 5].includes(pref.minutes)) pref.minutes = 2;
     if (!known(QUALITIES, pref.quality)) pref.quality = "good";
+    const COURTS = HKSoccer.COURTS;
+    if (!COURTS.some((c) => c.id === pref.court)) pref.court = "day";
+    // 코트 배경 견본 색(하늘 → 바닥)
+    const COURT_SWATCH = { day: "#3f9fe8,#cfeafc 62%,#5cbf5f 62%", sunset: "#3a3f7c,#ffb27e 62%,#56a259 62%", night: "#060b22,#2f4176 62%,#2b5a33 62%", snow: "#8fa2b8,#e9eff5 62%,#f7fafd 62%" };
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (_) { /* 저장 못 해도 이번엔 그대로 */ } };
     const store = {
       get(k) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch (_) { return null; } },
@@ -330,7 +338,7 @@
     function demo() {
       if (engine && engine.demo) return;
       stopEngine();
-      engine = HKSoccer.create(canvas, { mode: "demo", quality: pref.quality, me: { name: "신입", look: 0 }, rival: { name: "부장", look: 2 } });
+      engine = HKSoccer.create(canvas, { mode: "demo", quality: pref.quality, court: pref.court, me: { name: "신입", look: 0 }, rival: { name: "부장", look: 2 } });
       engine.demo = true;
       engine.start();
     }
@@ -353,6 +361,7 @@
           <div class="sc-row" data-row="level"><span class="sc-row__k">난이도</span><div class="sc-seg">${LEVELS.map(([key, t]) => `<button type="button" data-level="${key}">${t}</button>`).join("")}</div></div>
           <div class="sc-row" data-row="time"><span class="sc-row__k">시간</span><div class="sc-seg">${[1, 2, 3, 5].map((m) => `<button type="button" data-min="${m}">${m}분</button>`).join("")}</div></div>
           <div class="sc-row" data-row="quality"><span class="sc-row__k">화질</span><div class="sc-seg">${QUALITIES.map(([key, t]) => `<button type="button" data-quality="${key}">${t}</button>`).join("")}</div></div>
+          <div class="sc-row" data-row="court"><span class="sc-row__k">코트</span><div class="sc-seg sc-courts">${COURTS.map((c) => `<button type="button" data-court="${c.id}"><span class="sc-court" style="background:linear-gradient(${COURT_SWATCH[c.id] || "#ccc,#ccc"})"></span>${c.name}</button>`).join("")}</div></div>
           <div class="sc-note" data-row="online">동료에게 도전장을 보내고, 수락하면 둘이 이 화면에서 <b>2분</b> 동안 겨뤄요. 결과는 대전 순위에 들어가요.${status.open ? "" : `<br>지금은 업무 시간이라 대전은 ${esc(status.opensAt || "")}부터 할 수 있어요. 연습은 지금도 돼요.`}</div>
           <button type="button" class="hk-btn hk-btn--primary sc-go" id="sc-go">경기 시작</button>
           <div class="sc-help" id="sc-help"></div>
@@ -364,6 +373,7 @@
       over.querySelectorAll("[data-level]").forEach((b) => b.classList.toggle("is-on", b.dataset.level === pref.level));
       over.querySelectorAll("[data-min]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.min) === pref.minutes));
       over.querySelectorAll("[data-quality]").forEach((b) => b.classList.toggle("is-on", b.dataset.quality === pref.quality));
+      over.querySelectorAll("[data-court]").forEach((b) => b.classList.toggle("is-on", b.dataset.court === pref.court));
       const row = (n) => over.querySelector(`[data-row="${n}"]`);
       if (row("level")) row("level").hidden = pref.mode !== "cpu";
       if (row("time")) row("time").hidden = pref.mode === "online";
@@ -384,7 +394,7 @@
       screen = "play"; setPlaying(true);
       $("#sc-keys").innerHTML = keysHtml(mode);
       engine = HKSoccer.create(canvas, {
-        mode, level: pref.level, minutes: pref.minutes, quality: pref.quality, touch: IS_TOUCH,
+        mode, level: pref.level, minutes: pref.minutes, quality: pref.quality, court: pref.court, touch: IS_TOUCH,
         me: mode === "local" ? { name: "1P" } : me, rival,
         onEnd: (r) => showPracticeResult(r),
       });
@@ -689,7 +699,7 @@
           if (saved && saved.st && Date.now() - saved.at < 2 * 3600e3 && saved.st.phase !== "wait") restore = saved.st;
         }
         engine = HKSoccer.create(canvas, {
-          mode: role, minutes: ONLINE_MINUTES, quality: pref.quality, touch: IS_TOUCH, me, rival, net, restore,
+          mode: role, minutes: ONLINE_MINUTES, quality: pref.quality, court: pref.court, touch: IS_TOUCH, me, rival, net, restore,
           onEnd: (r) => onOnlineEnd(r),
           onEvent: (e) => onOnlineEvent(e),
         });
@@ -875,6 +885,7 @@
       if (b.dataset.mode) { pref.mode = b.dataset.mode; savePref(); HKSound.play("select"); paintMenu(); b.blur(); return; }
       if (b.dataset.level) { pref.level = b.dataset.level; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
       if (b.dataset.min) { pref.minutes = Number(b.dataset.min); savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.dataset.court) { pref.court = b.dataset.court; savePref(); HKSound.play("tap"); if (engine && engine.setCourt) engine.setCourt(pref.court); paintMenu(); b.blur(); return; }
       if (b.dataset.quality) { pref.quality = b.dataset.quality; savePref(); HKSound.play("tap"); if (engine && engine.setQuality) engine.setQuality(pref.quality); paintMenu(); b.blur(); return; }
       if (b.id === "sc-go") {
         if (pref.mode === "online") { history.replaceState(null, "", "#online"); return showLobby(); }

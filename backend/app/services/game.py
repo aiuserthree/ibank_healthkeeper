@@ -425,6 +425,8 @@ async def stamp_status(db: AsyncSession, member: Member, day: date | None = None
 
     지금 도장판 = 전체 도장에서 쿠폰으로 바꾼 만큼(쿠폰 수 × 10)을 뺀 나머지.
     이번 달 쿠폰을 이미 받았는데 10개가 또 차면 다음 달 1일에 쿠폰이 들어온다(pending).
+    오늘 10번째 도장을 찍어 쿠폰으로 바꾼 사람은 오늘 하루는 다 찬 판(10/10 · done)을 보여 주고, 다음 날부터 새 판(0개)을 보여 준다.
+    filled 는 보여 주는 값과 상관없이 지금 모으는 판에 실제로 찍힌 수(쿠폰 · 기다림 판정용).
     """
     day = day or today_kst()
     dates = (
@@ -442,15 +444,20 @@ async def stamp_status(db: AsyncSession, member: Member, day: date | None = None
         )
     ) or 0
     card = list(dates[used * STAMP_GOAL :])
-    count = min(len(card), STAMP_GOAL)
+    filled = min(len(card), STAMP_GOAL)
+    # 오늘 판을 다 채워 쿠폰으로 바꿨으면(새 판에 아직 하나도 없고, 바꾼 판의 10번째가 오늘) 오늘은 그 판을 그대로 보여 준다
+    done = used > 0 and not card and len(dates) >= used * STAMP_GOAL and dates[used * STAMP_GOAL - 1] == day
+    shown = list(dates[(used - 1) * STAMP_GOAL : used * STAMP_GOAL]) if done else card[:STAMP_GOAL]
     return {
         "month": month,
-        "days": [d.isoformat() for d in card[:STAMP_GOAL]],
-        "count": count,
+        "days": [d.isoformat() for d in shown],
+        "count": STAMP_GOAL if done else filled,
+        "filled": filled,
         "goal": STAMP_GOAL,
         "today": day in set(dates),
+        "done": done,  # 오늘 10개를 채워 쿠폰을 받았다 — 내일부터 새 판
         "coupon": bool(this_month),  # 이번 달 아케이드 쿠폰을 받았는지
-        "pending": count >= STAMP_GOAL and bool(this_month),  # 10개 다 찼지만 이번 달 몫은 받아서 다음 달 1일에
+        "pending": filled >= STAMP_GOAL and bool(this_month),  # 10개 다 찼지만 이번 달 몫은 받아서 다음 달 1일에
         "minSeconds": STAMP_MIN_SEC,
     }
 
@@ -458,7 +465,7 @@ async def stamp_status(db: AsyncSession, member: Member, day: date | None = None
 async def _issue_arcade_coupon_if_due(db: AsyncSession, member: Member, day: date) -> bool:
     """도장판이 10개 찼고 이번 달 쿠폰을 아직 안 받았으면 1장 준다 (커밋은 부르는 쪽에서)."""
     st = await stamp_status(db, member, day)
-    if st["count"] < STAMP_GOAL or st["coupon"]:
+    if st["filled"] < STAMP_GOAL or st["coupon"]:
         return False
     now = now_kst()
     # 받은 날부터 30일 (예: 10/1 받으면 10/31 23:59까지) — 언제 받든 수요일 신청이 4번 넘게 들어간다
@@ -512,7 +519,7 @@ async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -
     if new or issued:
         await db.commit()
     st = await stamp_status(db, member, today)
-    return {"new": new, "count": st["count"], "goal": st["goal"], "coupon": issued, "today": st["today"], "pending": st["pending"]}
+    return {"new": new, "count": st["count"], "goal": st["goal"], "coupon": issued, "today": st["today"], "pending": st["pending"], "done": st["done"]}
 
 
 def _daily_key(game: Game, member: Member, day: date, variant: str = "") -> str:

@@ -3,8 +3,9 @@
  *
  *   const game = HKVolley.create(canvas, opts)
  *     → { start, pause, resume, destroy, score, control, isPaused, isOver, setLink, saveState, setReady, setTarget,
- *         setLook, setFps, requestPause, lobby, phase, debug }
+ *         setLook, setFps, setCourt, requestPause, lobby, phase, debug }
  *   HKVolley.LOOKS [{ id, name }] 고를 수 있는 선수 모습(능력은 같음) · HKVolley.thumb(id) 그 선수 작은 그림(data URL)
+ *   HKVolley.COURTS [{ id, name }] 고를 수 있는 코트 배경(한낮 · 노을 · 야간 · 눈 오는 날 — 그림만 다름)
  *
  *   opts.mode    "cpu"(컴퓨터와) | "local"(한 화면 둘이) | "host"(온라인 — 판을 계산하는 쪽) | "guest"(온라인 — 받아서 그리는 쪽)
  *                | "demo"(첫 화면 뒤에서 도는 구경용 — 컴퓨터끼리, 소리 없음)
@@ -17,6 +18,7 @@
  *   opts.looks   cpu · local · demo — [왼쪽, 오른쪽] 선수 모습(LOOKS 번호). 자리는 발밑 표시(왼쪽 이어진 줄 · 오른쪽 끊긴 줄)로 구별
  *   opts.look    host · guest — 내 선수 모습. 상대 모습은 상대가 알려 준다 (경기 전에만 바꿀 수 있다)
  *   opts.fps     60(기본) | 30(가볍게 — 그리는 횟수만 줄인다. 계산은 그대로 120Hz)
+ *   opts.court   코트 배경 "day"(기본) | "sunset" | "night" | "snow" — 내 화면에만(통신에 싣지 않는다)
  *   opts.onEnd(result)  경기가 끝나면 한 번
  *                       { win, winner(0|1), me, rival, left, right, rally(가장 긴 랠리), spikes:{me, rival}, sec, mode, level, target }
  *   opts.onEvent(e)     { type: "start" | "serve" | "point" | "end" | "lobby" | "autopause" | "inputreset", ... } — 페이지가 필요하면 쓴다
@@ -34,6 +36,7 @@
  *   setTarget(t)        온라인 주인만 · 경기 전 — 목표 점수 7 · 15 (바꾸면 두 사람 준비가 풀린다)
  *   setLook(id)         온라인 · 경기 전 — 내 선수 모습 (바꾸면 두 사람 준비가 풀린다 — 레퍼런스 친구 대전과 같음)
  *   setFps(n)           화면 표시 60 · 30
+ *   setCourt(id)        코트 배경 바꾸기 — 바로 다시 그린다(경기 · 통신은 그대로)
  *   requestPause()      온라인 — 일시정지. 두 사람 모두 「계속 준비」를 눌러야 이어 간다
  *   saveState()         host — 이어 하기용 값 { sc, sv, sp, be, ss, sec, tg } (점수 · 서브 · 강타 수 · 가장 긴 랠리 · 경기 시간 · 목표)
  *
@@ -413,13 +416,61 @@
 
   // 배경 그림 좌표 — 예전 800×450 그림을 1.2배로 늘려 세계(960×540)에 맞춘다. 그림 속 바닥 = 세계 바닥(470) ÷ 1.2
   const ART = W / 800, AW = 800, AH = 450, AF = FLOOR / ART;
-  function paintSky(g) {
+  // 코트 배경 — 그림만 바꾼다(판 · 물리 · 통신은 그대로, 동료와도 내 화면에만).
+  //   sky 하늘 세 색 · sun 지는 해 [x, y, 색, 반지름] · moon · stars 달 · 별 · tint 하늘 앞 풍경 전체에 덮는 색(밤은 어둡게 · 노을은 주황으로) ·
+  //   cloud 구름 색 · lights 창문 · 전구 불빛 · snow 쌓인 눈 · 내리는 눈
+  const COURTS = {
+    day: { name: "한낮" },
+    sunset: { name: "노을", sky: ["#3a3f7c", "#e9786a", "#ffc98e"], sun: [606, 232, "#ffd9a0", 34], tint: "rgba(255,118,52,.17)", cloud: "rgba(255,205,188,.85)" },
+    night: { name: "야간", sky: ["#060b22", "#14224d", "#2f4176"], moon: true, stars: true, tint: "rgba(8,15,50,.6)", cloud: "rgba(150,166,210,.16)", lights: true },
+    snow: { name: "눈 오는 날", sky: ["#8fa2b8", "#bccad8", "#e9eff5"], tint: "rgba(214,226,242,.24)", cloud: "rgba(244,247,250,.8)", snow: true },
+  };
+  const okCourt = (k) => typeof k === "string" && Object.prototype.hasOwnProperty.call(COURTS, k);
+  // 내리는 눈(그림 좌표) — 늘 같은 자리에서 시작해 시각(clock)에 따라 떨어진다
+  const FLAKES = (() => { const r = seeded(9311); return Array.from({ length: 80 }, () => ({ x: r() * (AW + 60), y: r() * (AF + 60), sp: 16 + r() * 26, sz: 1.1 + r() * 2.2, ph: r() * 6.3 })); })();
+  function paintSky(g, C) {
+    C = C || COURTS.day;
+    const cols = C.sky || ["#4aa8ec", "#9fd7fb", "#e6f6ff"];
     const sky = g.createLinearGradient(0, -120, 0, AF);
-    sky.addColorStop(0, "#4aa8ec");
-    sky.addColorStop(0.55, "#9fd7fb");
-    sky.addColorStop(1, "#e6f6ff");
+    sky.addColorStop(0, cols[0]);
+    sky.addColorStop(0.55, cols[1]);
+    sky.addColorStop(1, cols[2]);
     g.fillStyle = sky;
     g.fillRect(-400, -400, AW + 800, AF + 400);
+    if (C.stars) {
+      const r = seeded(4242);
+      for (let i = 0; i < 90; i++) {
+        const x = -60 + r() * (AW + 120), y = -90 + r() * (AF - 120), a = 0.35 + r() * 0.6;
+        g.fillStyle = `rgba(255,255,240,${a})`;
+        g.fillRect(x, y, r() < 0.15 ? 2.2 : 1.3, r() < 0.15 ? 2.2 : 1.3);
+      }
+    }
+    if (C.moon) {
+      const glow = g.createRadialGradient(668, 70, 8, 668, 70, 110);
+      glow.addColorStop(0, "rgba(235,240,255,.55)");
+      glow.addColorStop(1, "rgba(235,240,255,0)");
+      g.fillStyle = glow;
+      g.fillRect(540, -60, 260, 260);
+      g.fillStyle = "#f3f0dc";
+      g.beginPath(); g.arc(668, 70, 22, 0, 7); g.fill();
+      g.fillStyle = "rgba(190,186,160,.45)";
+      g.beginPath(); g.arc(661, 64, 5, 0, 7); g.fill();
+      g.beginPath(); g.arc(675, 78, 3.5, 0, 7); g.fill();
+      return;
+    }
+    if (C.sun) {
+      const [x, y, col, rad] = C.sun;
+      const glow = g.createRadialGradient(x, y, 10, x, y, 190);
+      glow.addColorStop(0, "rgba(255,226,170,.9)");
+      glow.addColorStop(0.3, "rgba(255,190,130,.45)");
+      glow.addColorStop(1, "rgba(255,190,130,0)");
+      g.fillStyle = glow;
+      g.fillRect(x - 200, y - 200, 400, 400);
+      g.fillStyle = col;
+      g.beginPath(); g.arc(x, y, rad, 0, 7); g.fill();
+      return;
+    }
+    if (C.snow) return; // 흐린 하늘 — 해가 안 보인다
     // 한낮의 해
     const sun = g.createRadialGradient(668, 64, 10, 668, 64, 130);
     sun.addColorStop(0, "rgba(255,251,225,.95)");
@@ -431,8 +482,10 @@
     g.beginPath(); g.arc(668, 64, 26, 0, 7); g.fill();
   }
 
-  function paintScene(g, font) {
+  function paintScene(g, font, C) {
+    C = C || COURTS.day;
     const rnd = seeded(20261104);
+    const lrnd = seeded(5150), lit = []; // 야간 — 불 켜진 창(건물 모양은 그대로 두려고 따로 뽑는다)
     // 먼 빌딩 숲
     const far = (y0, color, minH, maxH, winColor) => {
       let x = -20;
@@ -443,7 +496,7 @@
         if (rnd() < 0.25) { g.fillRect(x + w * 0.45, y0 - h - 14, 2, 14); } // 안테나
         if (winColor) {
           g.fillStyle = winColor;
-          for (let wy = y0 - h + 8; wy < y0 - 8; wy += 11) for (let wx = x + 6; wx < x + w - 8; wx += 10) if (rnd() < 0.82) g.fillRect(wx, wy, 5, 6);
+          for (let wy = y0 - h + 8; wy < y0 - 8; wy += 11) for (let wx = x + 6; wx < x + w - 8; wx += 10) if (rnd() < 0.82) { g.fillRect(wx, wy, 5, 6); if (C.lights && lrnd() < 0.3) lit.push([wx, wy]); }
         }
         x += w + 2 + rnd() * 10;
       }
@@ -543,6 +596,51 @@
     for (let x = 0; x < AW; x += 40) g.fillRect(x, AF + 16, 20, AH - AF);
     g.fillStyle = "rgba(0,0,0,.12)";
     g.fillRect(-400, AF + 16, AW + 800, 3);
+    paintCourtMood(g, C, lit, top);
+  }
+  // 코트 배경 덧칠 — 풍경 전체에 색을 덮고(그려진 곳만), 야간 불빛 · 쌓인 눈을 얹는다
+  function paintCourtMood(g, C, lit, top) {
+    if (C.tint) {
+      g.save();
+      g.globalCompositeOperation = "source-atop";
+      g.fillStyle = C.tint;
+      g.fillRect(-400, -400, AW + 800, AH + 800);
+      g.restore();
+    }
+    if (C.lights) {
+      g.fillStyle = "rgba(255,212,120,.88)";
+      lit.forEach(([x, y]) => g.fillRect(x, y, 5, 6));
+      // 울타리 줄 전구 · 코트를 비추는 불빛
+      g.save();
+      g.globalCompositeOperation = "lighter";
+      const pool = g.createRadialGradient(AW / 2, AF, 20, AW / 2, AF, 420);
+      pool.addColorStop(0, "rgba(255,214,150,.22)");
+      pool.addColorStop(1, "rgba(255,214,150,0)");
+      g.fillStyle = pool;
+      g.fillRect(-400, AF - 420, AW + 800, 560);
+      for (let x0 = 7; x0 < AW - 20; x0 += 99) {
+        const x1 = Math.min(AW - 4, x0 + 99);
+        for (let i = 1; i < 6; i++) {
+          const tt = i / 6, fx = lerp(x0, x1, tt), fy = top + 18 * tt * (1 - tt) * 2 + 1;
+          const b = g.createRadialGradient(fx, fy, 0, fx, fy, 9);
+          b.addColorStop(0, "rgba(255,236,170,.95)");
+          b.addColorStop(1, "rgba(255,236,170,0)");
+          g.fillStyle = b;
+          g.fillRect(fx - 9, fy - 9, 18, 18);
+        }
+      }
+      g.restore();
+    }
+    if (C.snow) {
+      g.fillStyle = "#f7fafd";
+      const cap = (x, y, w, h) => { rr(g, x, y, w, h, h / 2); g.fill(); };
+      cap(-4, AF - 49, AW + 8, 7); // 난간 위
+      cap(-4, top - 8, AW + 8, 5); // 울타리 위
+      cap(48, AF - 227, 92, 10); // 물탱크 위
+      cap(650, AF - 45, 68, 6); cap(720, AF - 51, 68, 6); // 실외기 위
+      // 난간 밑에 쌓인 눈
+      for (let x = -10; x < AW + 20; x += 26) { g.beginPath(); g.ellipse(x, AF - 1, 18, 5 + ((x * 7) % 5), 0, Math.PI, 0); g.fill(); }
+    }
   }
 
   function drawNet(g, wob) {
@@ -785,6 +883,7 @@
     let myLook = okLook(opts.look) ? opts.look : mySide;
     if (online) S.looks[mySide] = myLook;
     else if (Array.isArray(opts.looks) && okLook(opts.looks[0]) && okLook(opts.looks[1])) S.looks = opts.looks.slice();
+    let court = COURTS[okCourt(opts.court) ? opts.court : "day"]; // 코트 배경 — 내 화면에만
     let fps = opts.fps === 30 ? 30 : 60, lastDraw = 0; // 화면 표시 — 가볍게(30fps)면 두 화면에 한 번만 그린다(계산은 그대로 120Hz)
 
     // 그리기 상태
@@ -1277,8 +1376,8 @@
         paint(x);
         return c;
       };
-      bgSky = mk(paintSky);
-      bgScene = mk((x) => paintScene(x, FONT));
+      bgSky = mk((x) => paintSky(x, court));
+      bgScene = mk((x) => paintScene(x, FONT, court));
     }
     const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => { resize(); if (!raf) draw(); }) : null;
     if (ro) ro.observe(canvas);
@@ -1288,12 +1387,22 @@
     // ───── 그리기
     const CLOUDS = [[60, 70, 1.1, 7], [300, 40, 0.8, 5], [520, 120, 1.3, 9], [760, 86, 0.9, 6], [190, 150, 0.7, 4]];
     function drawClouds(g2) {
-      g2.fillStyle = "rgba(255,255,255,.92)";
+      g2.fillStyle = court.cloud || "rgba(255,255,255,.92)";
       for (const [x0, y, s, sp] of CLOUDS) {
         const x = ((x0 + clock * sp) % (AW + 240)) - 120;
         for (const [dx, dy, rx, ry] of [[0, 0, 34, 14], [-22, 4, 20, 11], [24, 3, 22, 12], [2, -9, 20, 13]]) {
           g2.beginPath(); g2.ellipse(x + dx * s, y + dy * s, rx * s, ry * s, 0, 0, Math.PI * 2); g2.fill();
         }
+      }
+    }
+    // 눈 오는 날 — 풍경 앞 · 사람 뒤로 눈이 내린다
+    function drawSnow(g2) {
+      g2.fillStyle = "rgba(255,255,255,.9)";
+      const span = AF + 40;
+      for (const f of FLAKES) {
+        const y = ((f.y + clock * f.sp) % span) - 30;
+        const x = ((f.x + clock * 7 + Math.sin(clock * 0.9 + f.ph) * 10) % (AW + 60) + AW + 60) % (AW + 60) - 30;
+        g2.beginPath(); g2.arc(x, y, f.sz, 0, 7); g2.fill();
       }
     }
     function screenOf(x, y) { return [ox + x * scale, oy + y * scale]; }
@@ -1492,6 +1601,7 @@
       drawClouds(g);
       g.setTransform(1, 0, 0, 1, 0, 0);
       g.drawImage(bgScene, sx * k, sy * k);
+      if (court.snow) { g.setTransform(k * ART, 0, 0, k * ART, ox * dpr, oy * dpr); drawSnow(g); }
       g.setTransform(k, 0, 0, k, (ox + sx * scale) * dpr, (oy + sy * scale) * dpr);
       // 공 그림자
       const b = S.ball;
@@ -1747,6 +1857,13 @@
       },
       // 화면 표시 — 60(기본) · 30(가볍게). 계산은 그대로, 그리는 횟수만 줄인다
       setFps(n) { fps = n === 30 ? 30 : 60; },
+      // 코트 배경 — 배경을 새로 그려 둔다(경기 · 통신은 그대로)
+      setCourt(id) {
+        if (!okCourt(id) || COURTS[id] === court) return false;
+        court = COURTS[id]; bgSky = bgScene = null;
+        if (!raf) draw();
+        return true;
+      },
       requestPause() {
         if (!online || ended) return;
         if (mode === "host") pauseBy(0, "pause"); else send({ t: "pz" });
@@ -1790,6 +1907,7 @@
   window.HKVolley = {
     create,
     LOOKS: LOOKS.map((l, i) => ({ id: i, name: l.name })),
+    COURTS: Object.keys(COURTS).map((id) => ({ id, name: COURTS[id].name })),
     thumb,
     WORLD: { W, H, FLOOR, NET_X, NET_L, NET_R, NET_TOP, PR, PR_DIVE, BR, HZ },
     // 시험용 — 계산만 따로 (브라우저 없이 컴퓨터끼리 돌려 보기 · 레퍼런스와 같은 입력으로 맞춰 보기)

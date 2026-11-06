@@ -52,7 +52,7 @@
         return `<div class="hk-aa-wall__row">${imgs}${imgs}</div>`;
       };
       // 업무 시간에도 버튼은 그대로 — 누르면 안내 창 (아래 click 처리)
-      const cta = `<a class="hk-aa-pill" href="#aa-games" data-scroll data-play>지금 플레이</a>`;
+      const cta = `<a class="hk-aa-pill" href="#aa-together" data-scroll="aa-together" data-play>지금 플레이</a>`;
       return `<div class="hk-aa-hero">
           <div class="hk-aa-wall" aria-hidden="true">${row(0)}${row(4)}${row(8)}${row(2)}${row(6)}${row(10)}</div>
           <div class="hk-aa-hero__in">
@@ -92,7 +92,9 @@
         ? `<span class="hk-aa-stamp__cell is-on${i === sp.goal - 1 ? " is-goal" : ""}" style="--r:${((i * 37) % 21) - 10}deg">${HKUI.icon(i === sp.goal - 1 ? "ticket" : "paw-print", 22, "currentColor")}<small>${md(days[i])}</small></span>`
         : `<span class="hk-aa-stamp__cell${i === sp.goal - 1 ? " is-goal" : ""}">${i === sp.goal - 1 ? HKUI.icon("ticket", 20, "currentColor") : `<em>${i + 1}</em>`}</span>`).join("");
       const left = Math.max(0, sp.goal - sp.count);
-      const state = sp.pending
+      const state = sp.done
+        ? `${HKUI.icon("party-popper", 16, "currentColor")} 오늘 ${sp.goal}개 완성! 무적 쿠폰을 받았어요 · 내일부터 새 도장판이 시작돼요`
+        : sp.pending
         ? `${HKUI.icon("ticket", 16, "currentColor")} 10개 완성! 이번 달 쿠폰은 받아서 다음 달 1일에 들어와요`
         : sp.coupon
         ? `${HKUI.icon("party-popper", 16, "currentColor")} 이번 달 쿠폰을 받았어요 · 다음 쿠폰까지 ${left}개 (다음 달부터)`
@@ -576,7 +578,7 @@
     function togetherHtml() {
       const S = window.HKCoopStory;
       const tiles = S ? S.order.map((k) => `<span class="tg-entry__tile" style="${S.vars(k)}">${S.scene(k)}<i>${esc(S.chapters[k].time)}</i></span>`).join("") : "";
-      return `<div class="hk-aa-wrap"><a class="tg-entry" href="/together">
+      return `<div class="hk-aa-wrap" id="aa-together"><a class="tg-entry" href="/together">
           <span class="tg-entry__copy"><small>새 카테고리 · 둘이서 하는 게임</small><b>함께하기</b>
             <span>동료를 초대해 같이 해요. 입사 동기의 긴 하루를 그린 협동 시리즈${S ? ` 「${esc(S.series.title)}」` : ""}부터 1:1로 겨루는 대전까지.</span>
             <span class="tg-entry__go">함께하기 보러 가기 ›</span></span>
@@ -788,7 +790,13 @@
           const a = e.target.closest("[data-scroll]");
           if (!a) return;
           e.preventDefault();
-          document.getElementById("aa-games")?.scrollIntoView({ behavior: "smooth" });
+          // 지금 플레이 → 함께하기 배너부터(그 아래 레이드 · 게임 고르기로 이어진다) · 게임 고르기 → 게임 목록
+          // 위에 붙어 있는 머리(메뉴 줄)에 가리지 않게 그 높이 + 16px 만큼 띄운다
+          const to = document.getElementById(a.dataset.scroll || "aa-games") || document.getElementById("aa-games");
+          if (!to) return;
+          const head = document.querySelector("header");
+          const headH = head && getComputedStyle(head).position === "sticky" ? Math.max(0, head.getBoundingClientRect().bottom) : 0;
+          window.scrollTo({ top: Math.max(0, to.getBoundingClientRect().top + window.scrollY - headH - 16), behavior: "smooth" });
         });
         startResetClock();
         bindWish();
