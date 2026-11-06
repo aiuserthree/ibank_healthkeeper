@@ -172,7 +172,7 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
     ]
     game_rows.sort(key=lambda g: (-g["plays"], -g["members"], g["title"]))
 
-    # 부서 — 지금 회원(ACTIVE) 기준 인원 중 기간에 한 판이라도 한 사람
+    # 부서 — 지금 회원(ACTIVE) 기준 인원 중 기간에 한 판이라도 한 사람. 회원이 한 명뿐인 부서는 넣지 않는다(참여율이 0 · 100% 뿐이라)
     dept_total: Counter = Counter()
     dept_active: Counter = Counter()
     dept_plays: Counter = Counter()
@@ -188,6 +188,7 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
     dept_rows = [
         {"name": d, "total": dept_total.get(d, 0), "active": dept_active.get(d, 0), "plays": dept_plays.get(d, 0)}
         for d in set(dept_total) | set(dept_active)
+        if dept_total.get(d, 0) >= 2
     ]
     dept_rows.sort(key=lambda r: (-(r["active"] / r["total"] if r["total"] else 0), -r["plays"], r["name"]))
 
