@@ -107,7 +107,9 @@ window.HKSoccer = (function () {
   // 사람에게 크게 졌다(보통에 lag 3 이면 30판에 6승 17패). 내다보는 길이는 모두 32 이상(짧으면 골키퍼에 맞고 되튀는 공을 못 봐 공격도 약해졌다)
   //   hold 고른 조합을 누르는 프레임(그 뒤는 「공 뒤에 붙어 밀기」로 굴려 본다) · err 판단 흔들림(같은 판에서도 늘 똑같이 움직이지 않게)
   const AI_LEVEL = {
-    easy: { hz: 32, hold: 8, lag: 8, spd: 0.85, every: 6, err: 0.08 },
+    // 쉬움 — 「너무 어렵다」(2026-11) 뒤로 크게 낮춤: 느리고(spd) · 늦게 누르고(lag) · 드물게 다시 생각하고(every) · 가끔 엉뚱하게 움직이고(dumb) · 킥 · 점프를 놓친다(miss).
+    //   예전 쉬움의 머리에 사람 빠르기를 준 상대와 8판: 예전 쉬움 4.5 : 4.3(비김꼴) → 이 값 10.5 : 3.9(사람 쪽이 7승 1무)
+    easy: { hz: 32, hold: 8, lag: 16, spd: 0.72, every: 10, err: 0.2, dumb: 0.3, miss: 0.4 },
     normal: { hz: 36, hold: 10, lag: 0, spd: 0.88, every: 3, err: 0.04 },
     hard: { hz: 40, hold: 12, lag: 0, spd: 0.93, every: 3, err: 0.03 },
     best: { hz: 48, hold: 12, lag: 0, spd: 1, every: 2, err: 0.02 },
@@ -667,6 +669,9 @@ window.HKSoccer = (function () {
         const v = rollout(S, side, act, L, ai.q) + (L.err ? (ai.rng() * 2 - 1) * L.err : 0) - (act[1] ? AI_JUMP_COST : 0);
         if (v > best) { best = v; pick = act; }
       }
+      // 쉬움 — 가끔 엉뚱한 단추를 고르고(dumb), 고른 킥 · 점프를 놓친다(miss). 머리가 좋아 속도 · 반응만 늦춰서는 사람이 이기기 어려웠다
+      if (L.dumb && ai.rng() < L.dumb) pick = AI_ACTS[Math.floor(ai.rng() * AI_ACTS.length)];
+      if (L.miss && (pick[1] || pick[2]) && ai.rng() < L.miss) pick = [pick[0], 0, 0];
       ai.plan = { act: pick, t: 0 };
       ai.planT = L.every;
     }

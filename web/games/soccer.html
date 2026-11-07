@@ -43,11 +43,12 @@
     .sc.is-port .sc-move, .sc.is-land .sc-move { grid-area: move; display: flex; }
     .sc.is-port .sc-act, .sc.is-land .sc-act { grid-area: act; display: grid; }
     .sc-move { align-items: flex-end; justify-content: center; gap: 12px; padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 18px); touch-action: none; }
-    .sc-act { grid-template-columns: auto auto; grid-template-areas: "kick jump"; justify-content: center; align-items: center; align-content: end; gap: 0 12px; padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 18px + 25px + (var(--stick) - var(--abtn)) / 2); touch-action: none; }
+    .sc-act { grid-template-columns: auto auto; grid-template-areas: "kick jump"; justify-content: center; align-items: center; align-content: end; gap: 0 10px; padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 18px + 25px + (var(--stick) - var(--jbtn)) / 2); touch-action: none; }
     .sc.is-land .sc-move { align-items: center; padding: 8px 4px 8px calc(env(safe-area-inset-left, 0px) + 4px); gap: 8px; }
     /* 조이스틱 — 둥근 판 안에서 손잡이가 좌우로만 움직인다: 밀면 그쪽으로 이동 (점프 · 킥은 오른쪽 단추) */
-    .sc { --stick: clamp(116px, 36vw, 150px); --abtn: clamp(84px, 25vw, 100px); }
-    .sc.is-land { --stick: clamp(104px, 15vw, 136px); --abtn: 72px; }
+    /* 점프는 킥보다 크게 — 오른쪽 칸 어디를 눌러도 가까운 단추가 눌린다(아래 「점프 · 킥 단추」) */
+    .sc { --stick: clamp(116px, 36vw, 150px); --abtn: clamp(74px, 22vw, 90px); --jbtn: clamp(94px, 29vw, 116px); }
+    .sc.is-land { --stick: clamp(104px, 15vw, 136px); --abtn: 62px; --jbtn: 82px; }
     .sc-move { flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
     .sc.is-land .sc-move { justify-content: center; gap: 4px; }
     .sc-stick { position: relative; width: var(--stick); height: var(--stick); border-radius: 50%; background: rgba(15, 23, 42, .06); border: 2px solid rgba(15, 23, 42, .1); display: flex; align-items: center; justify-content: center; touch-action: none; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
@@ -59,10 +60,11 @@
     .sc-move small { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
     .sc.is-land .sc-act { align-content: center; padding: 8px calc(env(safe-area-inset-right, 0px) + 4px) 33px 4px; gap: 0 6px; }
     .sc-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: var(--abtn); height: var(--abtn); border-radius: 50%; border: 0; color: #fff; font: 800 20px/1.1 inherit; touch-action: none; cursor: pointer; box-shadow: 0 5px 0 rgba(15, 23, 42, .2); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
-    .sc-btn[data-act="jump"] { grid-area: jump; background: linear-gradient(160deg, #4f86ff, #2f6bff); }
+    .sc-btn[data-act="jump"] { grid-area: jump; width: var(--jbtn); height: var(--jbtn); font-size: 22px; background: linear-gradient(160deg, #4f86ff, #2f6bff); }
     .sc-btn[data-act="kick"] { grid-area: kick; background: linear-gradient(160deg, #ff9a63, #ff6a2b); }
     .sc-btn.is-down { transform: translateY(3px) scale(.95); box-shadow: 0 2px 0 rgba(15, 23, 42, .2); filter: brightness(.92); }
-    .sc.is-land .sc-btn { font-size: 17px; }
+    .sc.is-land .sc-btn { font-size: 16px; }
+    .sc.is-land .sc-btn[data-act="jump"] { font-size: 19px; }
 
     /* 위에 덮는 화면 (모드 고르기 · 멈춤 · 결과 · 연결 · 대전 목록) */
     .sc-over { position: absolute; inset: 0; z-index: 5; display: flex; padding: 14px; overflow-y: auto; background: rgba(8, 30, 52, .42); box-sizing: border-box; }
@@ -1006,19 +1008,39 @@
     }
 
     // ───── 점프 · 킥 단추 (누르는 동안)
-    document.querySelectorAll(".sc-btn").forEach((b) => {
-      const act = b.dataset.act;
-      let pid = null;
-      b.addEventListener("pointerdown", (e) => {
+    // 오른쪽 칸 전체가 누르는 자리 — 단추를 살짝 벗어나 눌러도 가까운 단추가 눌린다(이동하며 다른 손으로 누를 때 빗나가지 않게)
+    {
+      const pad = $("#sc-act"), btns = Array.from(pad.querySelectorAll(".sc-btn")), held = new Map(); // 손가락 → 단추
+      const nearest = (x, y) => {
+        let best = null, bd = Infinity;
+        for (const b of btns) {
+          const r = b.getBoundingClientRect();
+          const d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2)) - r.width / 2; // 단추 가장자리까지
+          if (d < bd) { bd = d; best = b; }
+        }
+        return best;
+      };
+      const busy = (b) => Array.from(held.values()).includes(b);
+      pad.addEventListener("pointerdown", (e) => {
         e.preventDefault();
-        pid = e.pointerId;
-        try { b.setPointerCapture(e.pointerId); } catch (_) { /* 오래된 브라우저 */ }
+        const b = nearest(e.clientX, e.clientY);
+        if (!b || held.has(e.pointerId)) return;
+        const again = busy(b);
+        held.set(e.pointerId, b);
+        try { pad.setPointerCapture(e.pointerId); } catch (_) { /* 오래된 브라우저 */ }
         b.classList.add("is-down");
-        if (engine) engine.control(act, true);
+        if (engine) { if (again) engine.control(b.dataset.act, false); engine.control(b.dataset.act, true); }
       });
-      const up = (e) => { if (e.pointerId !== pid) return; pid = null; b.classList.remove("is-down"); if (engine) engine.control(act, false); };
-      ["pointerup", "pointercancel", "lostpointercapture"].forEach((t) => b.addEventListener(t, up));
-    });
+      const up = (e) => {
+        const b = held.get(e.pointerId);
+        if (!b) return;
+        held.delete(e.pointerId);
+        if (busy(b)) return; // 다른 손가락이 아직 누르고 있다
+        b.classList.remove("is-down");
+        if (engine) engine.control(b.dataset.act, false);
+      };
+      ["pointerup", "pointercancel", "lostpointercapture"].forEach((t) => pad.addEventListener(t, up));
+    }
   })();
   </script>
 </body>
