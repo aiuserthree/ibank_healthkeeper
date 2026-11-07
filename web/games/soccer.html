@@ -20,7 +20,7 @@
     .sc-main { align-items: stretch !important; }
     .sc { position: relative; display: grid; box-sizing: border-box; --gw: 640px; }
     .sc.is-pc { margin: auto; grid-template-areas: "game" "keys"; grid-template-rows: auto auto; gap: 8px; }
-    .sc.is-port { width: 100%; min-height: 100%; grid-template-areas: "game game" "tip tip" "move act"; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; }
+    .sc.is-port { width: 100%; min-height: 100%; grid-template-areas: "game game" "tip tip" "move act"; grid-template-columns: auto 1fr; grid-template-rows: auto 1fr auto; }
     .sc.is-land { width: 100%; height: 100%; grid-template-areas: "move game act"; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
     /* 노치 쪽 안전 영역 재기(가로 iPhone) — layout() 이 판 너비에서 뺀다 */
     .sc-safe { position: fixed; left: 0; top: 0; width: 0; height: 0; visibility: hidden; pointer-events: none; padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
@@ -46,8 +46,8 @@
     .sc-act { grid-template-columns: auto auto; grid-template-areas: "kick jump"; justify-content: center; align-items: center; align-content: end; gap: 0 12px; padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 18px + 25px + (var(--stick) - var(--abtn)) / 2); touch-action: none; }
     .sc.is-land .sc-move { align-items: center; padding: 8px 4px 8px calc(env(safe-area-inset-left, 0px) + 4px); gap: 8px; }
     /* 조이스틱 — 둥근 판 안에서 손잡이가 좌우로만 움직인다: 밀면 그쪽으로 이동 (점프 · 킥은 오른쪽 단추) */
-    .sc { --stick: clamp(116px, 38vw, 164px); --abtn: 76px; }
-    .sc.is-land { --stick: clamp(104px, 15vw, 136px); --abtn: 64px; }
+    .sc { --stick: clamp(116px, 36vw, 150px); --abtn: clamp(84px, 25vw, 100px); }
+    .sc.is-land { --stick: clamp(104px, 15vw, 136px); --abtn: 72px; }
     .sc-move { flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
     .sc.is-land .sc-move { justify-content: center; gap: 4px; }
     .sc-stick { position: relative; width: var(--stick); height: var(--stick); border-radius: 50%; background: rgba(15, 23, 42, .06); border: 2px solid rgba(15, 23, 42, .1); display: flex; align-items: center; justify-content: center; touch-action: none; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
@@ -58,11 +58,11 @@
     .sc-stick.is-on .sc-stick__knob { background: linear-gradient(160deg, #dbe7ff, #b9cdfb); }
     .sc-move small { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
     .sc.is-land .sc-act { align-content: center; padding: 8px calc(env(safe-area-inset-right, 0px) + 4px) 33px 4px; gap: 0 6px; }
-    .sc-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: var(--abtn); height: var(--abtn); border-radius: 50%; border: 0; color: #fff; font: 800 16px/1.1 inherit; touch-action: none; cursor: pointer; box-shadow: 0 5px 0 rgba(15, 23, 42, .2); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+    .sc-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: var(--abtn); height: var(--abtn); border-radius: 50%; border: 0; color: #fff; font: 800 20px/1.1 inherit; touch-action: none; cursor: pointer; box-shadow: 0 5px 0 rgba(15, 23, 42, .2); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
     .sc-btn[data-act="jump"] { grid-area: jump; background: linear-gradient(160deg, #4f86ff, #2f6bff); }
     .sc-btn[data-act="kick"] { grid-area: kick; background: linear-gradient(160deg, #ff9a63, #ff6a2b); }
     .sc-btn.is-down { transform: translateY(3px) scale(.95); box-shadow: 0 2px 0 rgba(15, 23, 42, .2); filter: brightness(.92); }
-    .sc.is-land .sc-btn { font-size: 14px; }
+    .sc.is-land .sc-btn { font-size: 17px; }
 
     /* 위에 덮는 화면 (모드 고르기 · 멈춤 · 결과 · 연결 · 대전 목록) */
     .sc-over { position: absolute; inset: 0; z-index: 5; display: flex; padding: 14px; overflow-y: auto; background: rgba(8, 30, 52, .42); box-sizing: border-box; }
@@ -294,7 +294,7 @@
         // 양옆 단추 칸 + 안전 영역(노치 · 둥근 모서리 — 단추 칸 패딩에 더해진다). 두 칸은 같은 너비라 큰 쪽으로 맞춘다
         const sp = getComputedStyle($("#sc-safe"));
         const inset = Math.max(parseFloat(sp.paddingLeft) || 0, parseFloat(sp.paddingRight) || 0);
-        const side = Math.max(140, Math.min(172, (aw - inset * 2) * 0.17)) + inset;
+        const side = Math.max(160, Math.min(180, (aw - inset * 2) * 0.18)) + inset; // 오른쪽 킥 · 점프 두 단추(72px)가 나란히 들어가게
         gw = Math.min(aw - side * 2, ah * 16 / 9);
       }
       else gw = Math.min(aw, (ah - 34) * 16 / 9, 1280);
