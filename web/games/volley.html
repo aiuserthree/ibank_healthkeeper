@@ -1304,17 +1304,19 @@
 
     // ───── 휴대폰 조작판 — 이동 막대 + 점프 · 강타 · 다이빙 (여러 손가락 동시에)
     const stick = $("#vb-stick"), knob = $("#vb-knob");
-    // 막대는 좌우만 — 가운데에서 막대 폭의 12%(적어도 8px) 넘게 밀면 그쪽으로 간다
-    let stickId = null, stickDir = null, sx0 = 0, sy0 = 0, knobR = 40, dead = 12;
+    // 막대는 좌우만 — 막대 폭의 6%(적어도 6px) 넘게 밀면 그쪽으로 간다
+    // 기준점은 손가락을 따라온다 — 한쪽으로 멀리 끌어도 기준이 손가락에서 follow 만큼만 떨어져 있어, 반대로 조금만 밀면 바로 방향이 바뀐다
+    let stickId = null, stickDir = null, sx0 = 0, sy0 = 0, knobR = 40, dead = 8, follow = 24;
     // 방향이 바뀔 때만 누르고 뗀다 — 단계가 바뀌어 풀린 방향은 막대를 가운데로 돌렸다 다시 밀어야 먹는다 (레퍼런스와 같음)
     function stickSet(dx) {
+      if (dx > follow) { sx0 += dx - follow; dx = follow; } else if (dx < -follow) { sx0 += dx + follow; dx = -follow; }
       const dir = dx < -dead ? "left" : dx > dead ? "right" : null;
       if (dir !== stickDir) {
         if (stickDir && engine) engine.control(stickDir, false);
         stickDir = dir;
         if (dir && engine) engine.control(dir, true);
       }
-      knob.style.transform = `translateX(${clampN(dx, -knobR, knobR)}px)`;
+      knob.style.transform = `translateX(${(dx / follow) * knobR}px)`;
     }
     // 터치가 취소됨(전화 · 알림 · 시스템 제스처 등) — 혼자 · 둘이는 멈춘다(레퍼런스와 같음), 온라인은 조작만 푼다
     const touchCancel = () => { if (soloPlaying()) pauseGame("터치가 취소돼 멈췄어요"); };
@@ -1323,7 +1325,8 @@
       stickId = e.pointerId;
       const base = stick.querySelector(".vb-stick__base").getBoundingClientRect();
       knobR = Math.max(30, base.width / 2 - 24); // 막대 크기에 맞춰 손잡이가 움직이는 거리
-      dead = Math.max(8, base.width * 0.12);
+      dead = Math.max(6, base.width * 0.06); // 이만큼 밀면 움직인다
+      follow = Math.max(20, base.width * 0.17); // 이만큼 밀면 손잡이가 끝까지 — 더 밀면 기준점이 따라온다
       // 막대 둘레를 누르면 거기서부터, 먼 곳을 누르면 그 자리를 가운데로 본다
       const inBase = Math.hypot(e.clientX - (base.left + base.width / 2), e.clientY - (base.top + base.height / 2)) < base.width / 2;
       sx0 = inBase ? base.left + base.width / 2 : e.clientX;

@@ -43,11 +43,13 @@
     .sc.is-port .sc-move, .sc.is-land .sc-move { grid-area: move; display: flex; }
     .sc.is-port .sc-act, .sc.is-land .sc-act { grid-area: act; display: grid; }
     .sc-move { align-items: flex-end; justify-content: center; gap: 12px; padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 18px); touch-action: none; }
-    .sc-act { grid-template-columns: auto auto; grid-template-areas: ". jump" "kick ."; justify-content: center; align-content: end; gap: 2px 10px; padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 12px); touch-action: none; }
+    .sc-act { grid-template-columns: auto auto; grid-template-areas: "kick jump"; justify-content: center; align-items: center; align-content: end; gap: 0 12px; padding: 10px 8px calc(env(safe-area-inset-bottom, 0px) + 18px + 25px + (var(--stick) - var(--abtn)) / 2); touch-action: none; }
     .sc.is-land .sc-move { align-items: center; padding: 8px 4px 8px calc(env(safe-area-inset-left, 0px) + 4px); gap: 8px; }
     /* 조이스틱 — 둥근 판 안에서 손잡이가 좌우로만 움직인다: 밀면 그쪽으로 이동 (점프 · 킥은 오른쪽 단추) */
-    .sc-move { flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; --stick: clamp(116px, 38vw, 164px); }
-    .sc.is-land .sc-move { justify-content: center; --stick: clamp(104px, 15vw, 136px); gap: 4px; }
+    .sc { --stick: clamp(116px, 38vw, 164px); --abtn: 76px; }
+    .sc.is-land { --stick: clamp(104px, 15vw, 136px); --abtn: 64px; }
+    .sc-move { flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
+    .sc.is-land .sc-move { justify-content: center; gap: 4px; }
     .sc-stick { position: relative; width: var(--stick); height: var(--stick); border-radius: 50%; background: rgba(15, 23, 42, .06); border: 2px solid rgba(15, 23, 42, .1); display: flex; align-items: center; justify-content: center; touch-action: none; box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
     .sc-stick__ar { position: absolute; width: 0; height: 0; border: 9px solid transparent; }
     .sc-stick__ar.is-l { left: 10px; top: 50%; transform: translateY(-50%); border-right-color: rgba(15, 23, 42, .28); border-left-width: 0; }
@@ -55,13 +57,13 @@
     .sc-stick__knob { width: calc(var(--stick) * .44); height: calc(var(--stick) * .44); border-radius: 50%; background: linear-gradient(160deg, #ffffff, #e2e8f0); box-shadow: 0 4px 12px rgba(15, 23, 42, .22); transition: transform .05s linear; pointer-events: none; }
     .sc-stick.is-on .sc-stick__knob { background: linear-gradient(160deg, #dbe7ff, #b9cdfb); }
     .sc-move small { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
-    .sc.is-land .sc-act { align-content: center; padding: 8px calc(env(safe-area-inset-right, 0px) + 4px) 8px 4px; gap: 0 6px; }
-    .sc-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 80px; height: 80px; border-radius: 50%; border: 0; color: #fff; font: 800 16px/1.1 inherit; touch-action: none; cursor: pointer; box-shadow: 0 5px 0 rgba(15, 23, 42, .2); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
+    .sc.is-land .sc-act { align-content: center; padding: 8px calc(env(safe-area-inset-right, 0px) + 4px) 33px 4px; gap: 0 6px; }
+    .sc-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: var(--abtn); height: var(--abtn); border-radius: 50%; border: 0; color: #fff; font: 800 16px/1.1 inherit; touch-action: none; cursor: pointer; box-shadow: 0 5px 0 rgba(15, 23, 42, .2); -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; }
     .sc-btn[data-act="jump"] { grid-area: jump; background: linear-gradient(160deg, #4f86ff, #2f6bff); }
-    .sc-btn[data-act="kick"] { grid-area: kick; background: linear-gradient(160deg, #ff9a63, #ff6a2b); width: 88px; height: 88px; font-size: 18px; }
+    .sc-btn[data-act="kick"] { grid-area: kick; background: linear-gradient(160deg, #ff9a63, #ff6a2b); }
     .sc-btn.is-down { transform: translateY(3px) scale(.95); box-shadow: 0 2px 0 rgba(15, 23, 42, .2); filter: brightness(.92); }
-    .sc.is-land .sc-btn { width: 64px; height: 64px; font-size: 14px; }
-    .sc.is-land .sc-btn[data-act="kick"] { width: 70px; height: 70px; font-size: 15px; }
+    .sc.is-land .sc-btn { font-size: 14px; }
+
     /* 위에 덮는 화면 (모드 고르기 · 멈춤 · 결과 · 연결 · 대전 목록) */
     .sc-over { position: absolute; inset: 0; z-index: 5; display: flex; padding: 14px; overflow-y: auto; background: rgba(8, 30, 52, .42); box-sizing: border-box; }
     .sc-over[hidden] { display: none; }
@@ -971,22 +973,25 @@
     // 판 안을 누르면 판 가운데가 기준, 판 가장자리 밖에서 누르면 누른 자리가 기준
     {
       const stick = $("#sc-stick"), knob = $("#sc-knob");
-      let sid = null, sx0 = 0, R = 40, dead = 12, hDir = null;
+      // 기준점은 손가락을 따라온다 — 한쪽으로 멀리 끌어도 기준이 손가락에서 F 만큼만 떨어져 있어, 반대로 조금만 밀면 바로 방향이 바뀐다
+      let sid = null, sx0 = 0, R = 40, dead = 8, F = 24, hDir = null;
       const set = (dx) => {
+        if (dx > F) { sx0 += dx - F; dx = F; } else if (dx < -F) { sx0 += dx + F; dx = -F; }
         const dir = dx < -dead ? "left" : dx > dead ? "right" : null;
         if (dir !== hDir) {
           if (hDir && engine) engine.control(hDir, false);
           hDir = dir;
           if (dir && engine) engine.control(dir, true);
         }
-        knob.style.transform = `translateX(${Math.max(-R, Math.min(R, dx))}px)`;
+        knob.style.transform = `translateX(${(dx / F) * R}px)`;
       };
       stick.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         if (sid !== null) return;
         const base = stick.getBoundingClientRect();
         R = Math.max(30, base.width / 2 - 24);
-        dead = Math.max(8, base.width * 0.12);
+        dead = Math.max(6, base.width * 0.06); // 이만큼 밀면 움직인다
+        F = Math.max(20, base.width * 0.17); // 이만큼 밀면 손잡이가 끝까지 — 더 밀면 기준점이 따라온다
         const cx = base.left + base.width / 2, cy = base.top + base.height / 2;
         const inBase = Math.hypot(e.clientX - cx, e.clientY - cy) < base.width / 2;
         sx0 = inBase ? cx : e.clientX;
