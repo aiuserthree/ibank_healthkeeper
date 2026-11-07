@@ -50,6 +50,15 @@
     .vb-stick__base::after { right: 10px; border-left-color: rgba(15, 23, 42, .28); border-right-width: 0; }
     .vb-stick__knob { width: calc(var(--stick) * .44); height: calc(var(--stick) * .44); border-radius: 50%; background: linear-gradient(160deg, #ffffff, #e2e8f0); box-shadow: 0 4px 12px rgba(15, 23, 42, .22); transition: transform .05s linear; }
     .vb-stick.is-on .vb-stick__knob { background: linear-gradient(160deg, #dbe7ff, #b9cdfb); }
+    /* 휴대폰 코트 조이스틱 — 둥근 판 안에서 손잡이가 어느 쪽으로든 움직인다: 좌우 이동 · 위 점프 · 아래 다이빙 (오른쪽엔 강타만) */
+    .vb-stick__ar { display: none; position: absolute; left: 50%; width: 0; height: 0; border: 9px solid transparent; transform: translateX(-50%); }
+    .vb-stick__ar.is-u { top: 10px; border-bottom-color: rgba(15, 23, 42, .28); border-top-width: 0; }
+    .vb-stick__ar.is-d { bottom: 10px; border-top-color: rgba(15, 23, 42, .28); border-bottom-width: 0; }
+    .vb.is-port:not(.is-btnmove) .vb-stick__ar, .vb.is-land:not(.is-btnmove) .vb-stick__ar { display: block; }
+    .vb.is-port:not(.is-btnmove) .vb-btns, .vb.is-land:not(.is-btnmove) .vb-btns { grid-template-columns: auto; grid-template-areas: "hit"; }
+    .vb.is-port:not(.is-btnmove) .vb-btn[data-act="jump"], .vb.is-land:not(.is-btnmove) .vb-btn[data-act="jump"],
+    .vb.is-port:not(.is-btnmove) .vb-btn[data-act="dive"], .vb.is-land:not(.is-btnmove) .vb-btn[data-act="dive"] { display: none; }
+    .vb.is-port:not(.is-btnmove) .vb-btn[data-act="spike"], .vb.is-land:not(.is-btnmove) .vb-btn[data-act="spike"] { width: calc(var(--btn) * 1.35); height: calc(var(--btn) * 1.35); font-size: 18px; }
     .vb-stick small, .vb-btns small { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
     /* 점프 · 강타 · 다이빙 */
     .vb-btns { min-width: 0; grid-template-columns: auto auto; grid-template-areas: "dive dive" "hit jump"; justify-content: center; align-content: end; gap: 12px 14px; padding: 10px 6px calc(var(--sa-b, 0px) + 14px); touch-action: none; }
@@ -307,7 +316,7 @@
                 <span class="vb-tip__rot">${icon("rotate-cw", 15)} 가로로 돌리면 더 크게 보여요</span>
                 <div class="vb-tip__how"><div><b>받기</b>몸에 닿으면 저절로</div><div><b>강타</b>닿기 직전에 눌러요</div><div><b>다이빙</b>보는 쪽으로 몸을 날려요</div></div>
               </div>
-              <div class="vb-stick" id="vb-stick"><span class="vb-stick__base"><span class="vb-stick__knob" id="vb-knob"></span></span>
+              <div class="vb-stick" id="vb-stick"><span class="vb-stick__base"><i class="vb-stick__ar is-u"></i><i class="vb-stick__ar is-d"></i><span class="vb-stick__knob" id="vb-knob"></span></span>
                 <div class="vb-move"><button type="button" class="vb-btn" data-act="left" aria-label="왼쪽 이동">←</button><button type="button" class="vb-btn" data-act="right" aria-label="오른쪽 이동">→</button></div>
                 <small id="vb-stick-tip">끌어서 이동</small></div>
               <div class="vb-btns" id="vb-btns">
@@ -426,7 +435,7 @@
         <div>${IS_TOUCH ? "득점 · 멈춤 뒤에는 손을 떼고 다시 대야 움직여요" : "득점하면 누르던 키가 풀려요 · 다시 눌러야 움직여요"}. 멈추면 「계속하기」를 눌러야 이어 가요</div>
         <div>선수는 모습만 달라요(능력은 같아요) · 화면 조작은 환경설정에서 바꿔요</div>`;
       if (IS_TOUCH) {
-        return `<div>왼손으로 이동 · 오른손으로 <b>점프 · 강타 · 다이빙</b> (기술은 누를 때마다 한 번)</div>
+        return `<div>${pref.ctrl === "buttons" ? "왼손으로 이동 · 오른손으로 <b>점프 · 강타 · 다이빙</b>" : "왼손 조이스틱을 좌우로 밀어 이동 · <b>위로 밀면 점프 · 아래로 밀면 다이빙</b>, 오른손으로 <b>강타</b>"} (기술은 누를 때마다 한 번)</div>
           <div>강타는 공에 닿기 직전에 — 높이 뛰어 치면 내리꽂고, 낮으면 위로 넘겨요</div>${rule}`;
       }
       if (mode === "local") {
@@ -491,7 +500,7 @@
     function paintMove() {
       vb.classList.toggle("is-btnmove", pref.ctrl === "buttons");
       const tip = $("#vb-stick-tip");
-      if (tip) tip.textContent = pref.ctrl === "buttons" ? "눌러서 이동" : "끌어서 이동";
+      if (tip) tip.textContent = pref.ctrl === "buttons" ? "눌러서 이동" : IS_TOUCH ? "↑ 점프 · ↓ 다이빙" : "끌어서 이동";
     }
     paintMove();
 
@@ -604,7 +613,7 @@
           <div class="vb-row"><span class="vb-row__k">화면 조작</span><div class="vb-seg"><button type="button" data-ctrl="court">코트 조이스틱</button><button type="button" data-ctrl="buttons">아래 버튼</button></div></div>
           ${courtRow("data-court")}
           ${online ? `<div class="vb-row"><span class="vb-row__k">화면 표시</span><div class="vb-seg"><button type="button" data-fps="60">기본 · 60fps</button><button type="button" data-fps="30">가볍게 · 30fps</button></div></div>` : ""}
-          <p class="vb-mini">${IS_TOUCH ? "코트 조이스틱: 왼손으로 끌어 이동 · 아래 버튼: ← → 를 눌러 이동" : "코트 조이스틱: 경기판 안 조작판(마우스) · 아래 버튼: 경기판 아래 버튼 줄"} · 키보드는 늘 써요 · 소리는 위 막대 소리 버튼으로 켜고 꺼요</p>
+          <p class="vb-mini">${IS_TOUCH ? "코트 조이스틱: 왼손 조이스틱으로 이동 · 점프 · 다이빙, 오른쪽은 강타만 · 아래 버튼: ← → 이동과 점프 · 강타 · 다이빙 버튼" : "코트 조이스틱: 경기판 안 조작판(마우스) · 아래 버튼: 경기판 아래 버튼 줄"} · 키보드는 늘 써요 · 소리는 위 막대 소리 버튼으로 켜고 꺼요</p>
           <p class="vb-mini">${online ? "내 화면에만 적용돼요 · 열어 둬도 경기는 계속돼요 · 쉬려면 일시정지를 눌러 주세요" : "내 화면에만 적용돼요 · 열면 경기가 멈춰요 · 난이도 · 목표 점수 · 선수는 게임 옵션에서 바꿔요"}</p>
           <div class="vb-btnrow"><button type="button" class="hk-btn hk-btn--primary" data-act="setclose">닫기</button></div>
         </div>`);
@@ -651,7 +660,8 @@
     function rulesHtml() {
       const k = (t) => `<kbd>${t}</kbd>`;
       const local = !!(playing && playing.mode === "local") || (!playing && pref.mode === "local");
-      const keys = IS_TOUCH ? `<li>왼손으로 코트 조이스틱을 좌우로 밀어 이동하고, 오른손으로 <b>점프 · 강타 · 다이빙</b>을 눌러요. 두 손가락을 함께 써도 돼요.</li>`
+      const keys = IS_TOUCH ? (pref.ctrl === "buttons" ? `<li>왼손으로 ← → 를 눌러 이동하고, 오른손으로 <b>점프 · 강타 · 다이빙</b>을 눌러요. 두 손가락을 함께 써도 돼요.</li>`
+        : `<li>왼손으로 둥근 코트 조이스틱을 밀어요 — 좌우로 이동, <b>위로 밀면 점프</b>, <b>아래로 밀면 다이빙</b>(대각선이면 움직이면서 뛰어요). 오른손으로 <b>강타</b>를 눌러요.</li>`)
         : local ? `<li><b>1P</b> ${k("A")}${k("D")} 이동 · ${k("W")}${k("Space")} 점프 · ${k("S")} 다이빙 · ${k("Z")}${k("X")} 강타</li><li><b>2P</b> ${k("←")}${k("→")} 이동 · ${k("↑")} 점프 · ${k("↓")} 다이빙 · ${k("Enter")} 강타</li>`
         : `<li>${k("←")}${k("→")} 또는 ${k("A")}${k("D")} 이동 · ${k("↑")}${k("W")}${k("Space")} 점프 · ${k("↓")}${k("S")} 다이빙 · ${k("Z")}${k("X")} 강타 · ${k("P")}${k("Esc")} 멈춤</li>`;
       return `<div class="vb-card vb-rules" role="dialog" aria-label="게임 방법">
@@ -1304,17 +1314,37 @@
 
     // ───── 휴대폰 조작판 — 이동 막대 + 점프 · 강타 · 다이빙 (여러 손가락 동시에)
     const stick = $("#vb-stick"), knob = $("#vb-knob");
-    // 막대는 좌우만 — 가운데에서 막대 폭의 12%(적어도 8px) 넘게 밀면 그쪽으로 간다
-    let stickId = null, stickDir = null, sx0 = 0, sy0 = 0, knobR = 40, dead = 12;
+    // 좌우 — 가운데에서 막대 폭의 12%(적어도 8px) 넘게 밀면 그쪽으로 간다
+    // 휴대폰 코트 조이스틱은 둥근 판 — 위로 밀면 점프, 아래로 밀면 다이빙(키보드 ↑ · ↓ 와 같다). 대각선이면 이동하면서 뛴다
+    // PC 코트 조작판 · 아래 버튼 모드는 좌우만
+    let stickId = null, stickDir = null, stickV = null, sx0 = 0, sy0 = 0, knobR = 40, dead = 12;
+    const stickRound = () => !vb.classList.contains("is-pc") && !vb.classList.contains("is-btnmove");
     // 방향이 바뀔 때만 누르고 뗀다 — 단계가 바뀌어 풀린 방향은 막대를 가운데로 돌렸다 다시 밀어야 먹는다 (레퍼런스와 같음)
-    function stickSet(dx) {
+    // 점프 · 다이빙은 그 쪽으로 밀 때 한 번 — 다시 하려면 가운데 쪽으로 돌렸다가 다시 민다
+    function stickSet(dx, dy = 0) {
       const dir = dx < -dead ? "left" : dx > dead ? "right" : null;
       if (dir !== stickDir) {
         if (stickDir && engine) engine.control(stickDir, false);
         stickDir = dir;
         if (dir && engine) engine.control(dir, true);
       }
-      knob.style.transform = `translateX(${clampN(dx, -knobR, knobR)}px)`;
+      if (!stickRound()) {
+        if (stickV && engine) engine.control(stickV, false);
+        stickV = null;
+        knob.style.transform = `translateX(${clampN(dx, -knobR, knobR)}px)`;
+        return;
+      }
+      // 들어갈 때는 반경의 45%, 나올 때는 30% — 경계에서 손이 떨려도 두 번 뛰지 않게
+      const inV = knobR * 0.45, outV = knobR * 0.3;
+      const v = stickV === "jump" ? (dy < -outV ? "jump" : null) : stickV === "dive" ? (dy > outV ? "dive" : null) : null;
+      const nv = v || (dy < -inV ? "jump" : dy > inV ? "dive" : null);
+      if (nv !== stickV) {
+        if (stickV && engine) engine.control(stickV, false);
+        stickV = nv;
+        if (nv && engine) engine.control(nv, true);
+      }
+      const d = Math.hypot(dx, dy), k = d > knobR ? knobR / d : 1;
+      knob.style.transform = `translate(${dx * k}px, ${dy * k}px)`;
     }
     // 터치가 취소됨(전화 · 알림 · 시스템 제스처 등) — 혼자 · 둘이는 멈춘다(레퍼런스와 같음), 온라인은 조작만 푼다
     const touchCancel = () => { if (soloPlaying()) pauseGame("터치가 취소돼 멈췄어요"); };
@@ -1330,9 +1360,9 @@
       sy0 = inBase ? base.top + base.height / 2 : e.clientY;
       stick.classList.add("is-on");
       try { stick.setPointerCapture(e.pointerId); } catch (_) { stickId = null; stick.classList.remove("is-on"); touchCancel(); return; }
-      stickSet(e.clientX - sx0);
+      stickSet(e.clientX - sx0, e.clientY - sy0);
     });
-    stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickSet(e.clientX - sx0); });
+    stick.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickSet(e.clientX - sx0, e.clientY - sy0); });
     // 손을 뗌(up) · 취소(cancel) · 잡기를 잃음(lostpointercapture — 뗄 때도 오지만 그땐 이미 놓은 뒤라 지나간다)
     const stickEnd = (e, cancel) => { if (e.pointerId !== stickId) return; stickId = null; stick.classList.remove("is-on"); stickSet(0); if (cancel) touchCancel(); };
     stick.addEventListener("pointerup", (e) => stickEnd(e, false));
