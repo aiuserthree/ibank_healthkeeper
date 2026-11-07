@@ -1550,7 +1550,7 @@
       if (S.phase === "serve" && mode !== "demo") {
         const mine = mode === "local" || S.serve === mySide;
         const txt = mode === "local" ? `${S.serve ? "2P" : "1P"} 서브 · 점프로 공을 직접 쳐 주세요`
-          : mine ? `내 서브 · 점프로 공을 직접 쳐 주세요` : "상대 서브 · 점프해서 공에 닿아야 시작해요";
+          : mine ? `내 서브 · ${touchUI ? "점프 버튼" : "점프"}로 공을 직접 쳐 주세요` : "상대 서브 · 점프해서 공에 닿아야 시작해요";
         const y = oy + H * scale - 26 * hs;
         g.font = `700 ${12.5 * hs}px ${FONT}`;
         const tw = g.measureText(txt).width + 26 * hs;
