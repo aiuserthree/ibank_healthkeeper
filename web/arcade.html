@@ -589,19 +589,11 @@
         </a>`;
     }
 
-    // 입구 배너 롤링 — 함께하기 · 매니지먼트 · 꿀알바 시리즈를 한 자리에서 차례로 (6.5초마다, 손으로 밀어도 넘어간다)
-    // 마우스를 올리거나 · 누르거나 · 화면에서 벗어나 있으면 멈춘다. 움직임 줄이기 설정이면 저절로 넘기지 않는다
-    const ROLL = [["함께하기", () => togetherHtml()], ["매니지먼트", () => manageHtml()], ["꿀알바 시리즈", () => seriesHtml()]];
-    function rollHtml() {
-      return `<div class="hk-aa-wrap" id="aa-together"><div class="hk-aa-roll" data-roll role="region" aria-roledescription="배너" aria-label="새 카테고리">
-          <div class="hk-aa-roll__track">${ROLL.map(([name, html], i) => `<div class="hk-aa-roll__slide" role="group" aria-roledescription="배너" aria-label="${i + 1} / ${ROLL.length} · ${name}">${html()}</div>`).join("")}</div>
-          <div class="hk-aa-roll__nav">
-            <button type="button" class="hk-aa-roll__arrow" data-roll-prev aria-label="이전 배너">${HKUI.icon("chevron-left", 18, "currentColor")}</button>
-            ${ROLL.map(([name], i) => `<button type="button" class="hk-aa-roll__dot" data-roll-go="${i}" aria-label="${name} 배너 보기"${i ? "" : ' aria-current="true"'}></button>`).join("")}
-            <button type="button" class="hk-aa-roll__arrow" data-roll-next aria-label="다음 배너">${HKUI.icon("chevron-right", 18, "currentColor")}</button>
-          </div>
-        </div></div>`;
+    // 입구 배너 셋 — 함께하기 · 매니지먼트 · 꿀알바 시리즈를 한 줄에 3등분해서 모두 보여 준다 (휴대폰 · 좁은 화면은 위아래로)
+    function trioHtml() {
+      return `<div class="hk-aa-wrap" id="aa-together"><div class="hk-aa-trio">${togetherHtml()}${manageHtml()}${seriesHtml()}</div></div>`;
     }
+
     // 맨 위로 — 한 화면쯤 내려가면 오른쪽 아래에 나타난다
     function bindTop() {
       if (document.getElementById("aa-top")) return;
@@ -621,47 +613,6 @@
         window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
         b.blur();
       });
-    }
-
-    function bindRoll(root) {
-      const roll = root.querySelector("[data-roll]");
-      if (!roll) return;
-      const track = roll.querySelector(".hk-aa-roll__track");
-      const dots = Array.from(roll.querySelectorAll("[data-roll-go]"));
-      const n = dots.length;
-      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      let at = 0, seen = true, hover = false, holdUntil = 0, timer = 0, raf = 0;
-      const paint = () => dots.forEach((d, i) => (i === at ? d.setAttribute("aria-current", "true") : d.removeAttribute("aria-current")));
-      const go = (i, smooth = true) => {
-        at = ((i % n) + n) % n;
-        track.scrollTo({ left: at * track.clientWidth, behavior: smooth && !reduce ? "smooth" : "auto" });
-        paint();
-      };
-      const hold = (ms = 9000) => { holdUntil = Date.now() + ms; };
-      const tick = () => {
-        if (!reduce && seen && !hover && !document.hidden && Date.now() >= holdUntil && !roll.contains(document.activeElement)) go(at + 1);
-      };
-      timer = setInterval(tick, 6500);
-      track.addEventListener("scroll", () => {
-        cancelAnimationFrame(raf);
-        raf = requestAnimationFrame(() => {
-          const i = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
-          if (i !== at) { at = i; paint(); }
-        });
-      }, { passive: true });
-      roll.addEventListener("mouseenter", () => { hover = true; });
-      roll.addEventListener("mouseleave", () => { hover = false; });
-      track.addEventListener("pointerdown", () => hold());
-      track.addEventListener("touchstart", () => hold(), { passive: true });
-      roll.addEventListener("click", (e) => {
-        const b = e.target.closest("[data-roll-go], [data-roll-prev], [data-roll-next]");
-        if (!b) return;
-        hold();
-        go(b.hasAttribute("data-roll-prev") ? at - 1 : b.hasAttribute("data-roll-next") ? at + 1 : Number(b.dataset.rollGo));
-      });
-      addEventListener("resize", () => go(at, false));
-      if (window.IntersectionObserver) new IntersectionObserver(([en]) => { seen = en.isIntersecting; }).observe(roll);
-      roll.hkRollTo = (i) => { hold(); go(i); };
     }
 
     // 함께하기 입구 — 둘이서 하는 게임(협동 · 대전)을 모은 /together. 하루를 따라 그림 넷
@@ -859,10 +810,9 @@
           const [st, allGames, sp, wk] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null), HKApi.playWeekly().catch(() => null)]);
           status = st;
           const games = allGames.filter((g) => !SERIES_ONLY.includes(g.key));
-          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + `<div class="hk-aa-wrap" id="aa-notices"></div>` + rollHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + collectionHtml(games, allGames) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + `<div class="hk-aa-wrap" id="aa-notices"></div>` + trioHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + collectionHtml(games, allGames) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
           bindFind(body);
-          bindRoll(body);
           animateSeriesEntrance(body);
           bindHof(body);
           matchNotice(body);
@@ -889,9 +839,6 @@
           const head = document.querySelector("header");
           const headH = head && getComputedStyle(head).position === "sticky" ? Math.max(0, head.getBoundingClientRect().bottom) : 0;
           window.scrollTo({ top: Math.max(0, to.getBoundingClientRect().top + window.scrollY - headH - 16), behavior: "smooth" });
-          // 지금 플레이 → 배너 롤링은 함께하기(첫 장)로
-          const roll = to.querySelector("[data-roll]");
-          if (roll && roll.hkRollTo) roll.hkRollTo(0);
         });
         startResetClock();
         bindWish();
