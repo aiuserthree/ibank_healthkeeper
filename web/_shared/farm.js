@@ -753,6 +753,7 @@ window.HKFarm = (function () {
   // ══ 화면 ══════════════════════════════════════════════════
   function build() {
     root.innerHTML = `
+      <a class="hk-mg-back" href="/manage">${ic("chevron-left", 16)}매니지먼트</a>
       <div class="fm-top">
         <div class="fm-top__mark">${markSvg}</div>
         <div class="fm-top__title"><h1>${TITLE}<span id="fm-donebadge"></span></h1><p>출근 전에 심고, 점심 · 퇴근 후에 거둬요</p></div>

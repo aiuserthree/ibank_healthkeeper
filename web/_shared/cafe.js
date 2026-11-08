@@ -881,8 +881,9 @@ window.HKCafe = (function () {
 
     function build() {
       root.innerHTML = `
+        <a class="hk-mg-back" href="/manage">${ic("chevron-left", 16)}매니지먼트</a>
         <div class="cf-head">
-          <div class="cf-head__title"><a class="cf-back" href="/manage" aria-label="매니지먼트 모음으로">${ic("chevron-left", 20)}</a><div><h1>옥상 쉼터 카페</h1><p>회사 옥상의 작은 쉼터를 키워요</p></div></div>
+          <div class="cf-head__title"><div><h1>옥상 쉼터 카페</h1><p>회사 옥상의 작은 쉼터를 키워요</p></div></div>
           <div class="cf-head__btns">
             <button type="button" class="cf-iconbtn" data-act="help">${ic("circle-help", 18)}<span>도움말</span></button>
             <button type="button" class="cf-iconbtn" data-act="reset">${ic("rotate-ccw", 18)}<span>처음부터 다시</span></button>
