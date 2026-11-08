@@ -277,6 +277,22 @@ def _open_notice_together_html() -> str:
     )
 
 
+# 매니지먼트(매일 키우는 게임) 오픈 안내 — 함께하기 안내와 같은 날(11/11) 예약 오픈 안내에 한 번만 덧붙인다
+OPEN_NOTICE_MANAGE_DATE = date(2026, 11, 11)
+
+
+def _open_notice_manage_html() -> str:
+    manage_url = f"{get_settings().app_base_url.rstrip('/')}/manage"
+    return (
+        f"<p>&nbsp;</p>"
+        f"<p><strong>🏙️ 매일 조금씩 키우는 「매니지먼트」 게임 오픈</strong><br>"
+        f"<b>오피스 타운</b>(회사 동네 꾸미기) · <b>옥상 쉼터 카페</b> · <b>옥상 텃밭</b> — "
+        f"처음부터 다시 하지 않는 한 내 판이 그대로 저장돼요.<br>"
+        f"출근 전에 건설 · 씨앗을 걸어 두면 업무 시간에도 계속 진행되고(최대 8시간), 점심 · 퇴근 후에 들러 거두면 돼요.<br>"
+        f'<a href="{manage_url}">{manage_url}</a></p>'
+    )
+
+
 def render_open_notice_body(
     *,
     name: str,
@@ -298,6 +314,8 @@ def render_open_notice_body(
     arcade_html = _open_notice_arcade_html() if notice_date == OPEN_NOTICE_ARCADE_DATE else ""
     if notice_date == OPEN_NOTICE_TOGETHER_DATE:
         arcade_html = _open_notice_together_html()
+    if notice_date == OPEN_NOTICE_MANAGE_DATE:
+        arcade_html += _open_notice_manage_html()
     notice_html = ""
     if notice is not None:
         notice_url = notice_page_url(notice.id)
