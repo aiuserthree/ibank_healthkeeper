@@ -147,3 +147,29 @@ class EscapeRoom(Base):
         Index("ix_escape_room_guest", "guest_id", "status"),
         Index("ix_escape_room_status", "status"),
     )
+
+
+class MgmtSave(Base):
+    """매일 키우는 운영 게임(회사 문명 · 옥상 카페 · 옥상 텃밭)의 진행 상태 — 회원 · 게임마다 한 줄.
+
+    초기화하지 않는 한 그대로 이어진다. 판의 내용(state)은 게임 화면이 정하고, 서버는 저장 · 버전 · 서버 시각만 맡는다.
+    자리를 비운 동안의 진행은 화면이 saved_at(서버 시각)과 지금(서버 시각)의 차이로 계산한다 — 휴대폰 시계를 바꿔도 소용없게.
+    """
+
+    __tablename__ = "mgmt_save"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False)
+    game: Mapped[str] = mapped_column(String(20), nullable=False)  # civ · cafe · farm
+    state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    # 저장할 때마다 1씩 — 다른 창 · 기기에서 먼저 저장했으면 덮어쓰지 않는다
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # 처음부터 다시 한 횟수
+    resets: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    saved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("member_id", "game", name="uq_mgmt_save_member_game"),
+        Index("ix_mgmt_save_game", "game"),
+    )

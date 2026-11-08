@@ -5,7 +5,7 @@ from app.models.base import Base
 from app.models.cycle import ReservationCycle
 from app.models.coupon import Coupon, CouponSource, CouponStatus
 from app.models.email_token import EmailVerificationToken
-from app.models.game import ArcadeStamp, EscapeRoom, GameMatch, GamePlay, GameRequest
+from app.models.game import ArcadeStamp, EscapeRoom, GameMatch, GamePlay, GameRequest, MgmtSave
 from app.models.enums import (
     AdminRole,
     ConfirmedBy,
@@ -34,6 +34,7 @@ from app.models.transfer_request import TransferRequest
 from app.models.vacation import Vacation
 
 __all__ = [
+    "MgmtSave",
     "Base",
     "AdminUser",
     "AdminRole",

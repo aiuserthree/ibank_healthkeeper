@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
+  <title>헬스키퍼 — 매니지먼트 · 매일 조금씩 키우는 게임</title>
+  <meta name="description" content="출근 전에 걸어 두면 일하는 동안 자라요. 회사를 키우고, 옥상 카페를 열고, 텃밭을 가꾸는 매일 키우는 게임 모음. 진행은 늘 저장돼요.">
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/mgmt.js"></script>
+  <script src="/_shared/mgmt-art.js"></script>
+  <style>
+    /* 매니지먼트 — 매일 키우는 게임 모음. 함께하기 페이지와 같은 큰 글씨 소개 + 게임 카드 */
+    .mg { color: #0f172a; background: #fff; overflow-x: clip; }
+    .mg a:hover { text-decoration: none; }
+    .mg-wrap { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
+    .mg-hero { position: relative; overflow: hidden; isolation: isolate; padding: 54px 0 60px; color: #fff;
+      background: radial-gradient(50% 80% at 0% 0%, rgba(34, 197, 94, .38), transparent 62%), radial-gradient(45% 70% at 100% 100%, rgba(59, 130, 246, .35), transparent 60%),
+        linear-gradient(120deg, #052e1b 0%, #0b2a3d 45%, #0b1f3a 100%); }
+    .mg-hero__in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 44px; }
+    .mg-back { display: inline-flex; align-items: center; min-height: 40px; margin-bottom: 12px; font-size: 14px; font-weight: 700; color: rgba(255, 255, 255, .7); text-decoration: none; }
+    .mg-back:hover { color: #fff; }
+    .mg-kicker { font-size: 14px; font-weight: 800; color: #86efac; }
+    .mg h1.mg-title { margin: 8px 0 0; font-size: clamp(48px, 6.6vw, 88px); line-height: 1; font-weight: 900; letter-spacing: -0.04em; color: #fff; }
+    .mg-lead { margin: 18px 0 0; font-size: clamp(21px, 2.3vw, 28px); line-height: 1.32; font-weight: 800; letter-spacing: -0.02em; word-break: keep-all; }
+    .mg-desc { max-width: 520px; margin: 12px 0 0; font-size: 16px; line-height: 1.7; font-weight: 500; color: rgba(255, 255, 255, .78); word-break: keep-all; }
+    .mg-hours { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 13.5px; font-weight: 600; color: rgba(255, 255, 255, .66); word-break: keep-all; }
+    .mg-hero__art { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .mg-hero__art span { overflow: hidden; aspect-ratio: 3 / 4; border-radius: 18px; box-shadow: 0 16px 36px rgba(0, 0, 0, .4); }
+    .mg-hero__art span:nth-child(2) { transform: translateY(18px); }
+    .mg-hero__art svg { display: block; width: 100%; height: 100%; }
+
+    .mg-sec { padding: 52px 0 8px; }
+    .mg-sec h2 { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 900; letter-spacing: -0.03em; }
+    .mg-sec > .mg-wrap > p { margin: 8px 0 0; font-size: 16px; color: #475569; word-break: keep-all; }
+    .mg-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 24px; }
+    .mg-card { display: flex; flex-direction: column; overflow: hidden; border-radius: 22px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(15, 23, 42, .06); color: inherit; text-decoration: none; transition: transform .2s ease, box-shadow .2s ease; }
+    .mg-card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(15, 23, 42, .12); }
+    .mg-card__art { aspect-ratio: 4 / 3; background: var(--mg-deep); }
+    .mg-card__art svg { display: block; width: 100%; height: 100%; }
+    .mg-card__body { display: flex; flex-direction: column; gap: 6px; flex: 1; padding: 18px 20px 20px; }
+    .mg-card__body b { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; }
+    .mg-card__body p { margin: 0; font-size: 14.5px; line-height: 1.55; color: #475569; word-break: keep-all; }
+    .mg-card__me { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding: 9px 12px; border-radius: 12px; background: #f1f5f9; font-size: 13.5px; font-weight: 700; color: #334155; word-break: keep-all; }
+    .mg-card__me.is-new { background: #f0fdf4; color: #15803d; }
+    .mg-card__go { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; margin-top: auto; border-radius: 999px; background: var(--mg-main); color: #fff; font-size: 15.5px; font-weight: 800; }
+    .mg-card__body > .mg-card__go { margin-top: 12px; }
+
+    .mg-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+    .mg-flow div { padding: 18px; border-radius: 18px; background: #f8fafc; }
+    .mg-flow i { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: #fff; color: #0f766e; box-shadow: 0 2px 8px rgba(15, 23, 42, .06); }
+    .mg-flow b { display: block; margin-top: 10px; font-size: 16px; font-weight: 800; }
+    .mg-flow span { display: block; margin-top: 4px; font-size: 14px; line-height: 1.55; color: #475569; word-break: keep-all; }
+    .mg-notes { margin: 18px 0 64px; padding: 0 0 0 18px; font-size: 14px; line-height: 1.8; color: #475569; word-break: keep-all; }
+    .mg-loading { display: flex; justify-content: center; padding: 60px 0; }
+
+    @media (max-width: 900px) {
+      .mg-hero__in { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+      .mg-cards { grid-template-columns: minmax(0, 1fr); }
+      .mg-flow { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .mg-wrap { padding: 0 16px; }
+      .mg-hero { padding: 28px 0 40px; }
+      .mg-hero__art { gap: 8px; }
+      .mg-hero__art span { border-radius: 14px; }
+      .mg-sec { padding-top: 36px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 매니지먼트 — 매일 키우는 게임 모음(회사 문명 · 옥상 쉼터 카페 · 옥상 텃밭). 카드마다 내 진행(게임이 남긴 summary)을 보여 준다
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div class="mg" id="mg-root"><div class="mg-loading"><span class="hk-spin"></span></div></div>`,
+      afterMount: async () => {
+        const root = document.getElementById("mg-root");
+        const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const ago = (iso) => {
+          if (!iso) return "";
+          const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+          if (m < 1) return "방금";
+          if (m < 60) return `${m}분 전`;
+          if (m < 60 * 24) return `${Math.floor(m / 60)}시간 전`;
+          return `${Math.floor(m / 1440)}일 전`;
+        };
+        let games = [], status = { open: true };
+        try {
+          [games, status] = await Promise.all([HKApi.get("/play/mgmt"), HKApi.playStatus().catch(() => ({ open: true }))]);
+        } catch (e) {
+          root.innerHTML = `<div class="mg-wrap" style="padding:48px 16px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "목록을 불러오지 못했어요."))}</div>`;
+          return;
+        }
+        const card = (g) => {
+          const t = HKMgmtArt.tone(g.key);
+          const me = g.started
+            ? `<span class="mg-card__me">${HKUI.icon("bookmark-check", 15, "currentColor")}${esc((g.summary && g.summary.line) || "진행 중")} · ${ago(g.savedAt)} 저장</span>`
+            : `<span class="mg-card__me is-new">${HKUI.icon("sparkles", 15, "currentColor")}아직 시작하지 않았어요</span>`;
+          return `<a class="mg-card" href="/games/${g.key}" data-play style="--mg-deep:${t.deep};--mg-main:${t.main}">
+              <span class="mg-card__art">${HKMgmtArt.scene(g.key)}</span>
+              <span class="mg-card__body"><b>${esc(g.title)}</b><p>${esc(g.desc)}</p>${me}
+                <span class="mg-card__go">${g.started ? "이어 하기" : "시작하기"} ${HKUI.icon("arrow-right", 16, "currentColor")}</span></span>
+            </a>`;
+        };
+        root.innerHTML = `
+          <div class="mg-hero"><div class="mg-wrap mg-hero__in">
+            <div>
+              <a class="mg-back" href="/arcade">‹ 아케이드</a>
+              <div class="mg-kicker">새 카테고리 · 매일 조금씩 키우는 게임</div>
+              <h1 class="mg-title">매니지먼트</h1>
+              <p class="mg-lead">출근 전에 걸어 두면,<br>일하는 동안 자라요.</p>
+              <p class="mg-desc">회사를 키우고, 옥상에 카페를 열고, 텃밭을 가꿔요. 하루 1~3분이면 충분하고, 진행은 늘 저장돼서 다음에 그대로 이어져요.</p>
+              <div class="mg-hours">${HKUI.icon("clock-3", 15, "currentColor")}점심시간 · 퇴근 후 · 출근 전 · 주말에 열려요. 업무 시간에도 걸어 둔 일은 계속 진행돼요.</div>
+            </div>
+            <div class="mg-hero__art" aria-hidden="true">${games.map((g) => `<span style="background:${HKMgmtArt.tone(g.key).deep}">${HKMgmtArt.scene(g.key)}</span>`).join("")}</div>
+          </div></div>
+          <div class="mg-sec"><div class="mg-wrap">
+            <h2>무엇을 키울까요?</h2>
+            <p>셋 다 따로 저장돼요. 마음에 드는 것부터 시작해 보세요.</p>
+            <div class="mg-cards">${games.map(card).join("")}</div>
+          </div></div>
+          <div class="mg-sec"><div class="mg-wrap">
+            <h2>하루는 이렇게 흘러가요</h2>
+            <div class="mg-flow">
+              <div><i>${HKUI.icon("sunrise", 20, "currentColor")}</i><b>출근 전</b><span>건설 · 연구 · 메뉴 · 씨앗을 걸어 둬요.</span></div>
+              <div><i>${HKUI.icon("briefcase", 20, "currentColor")}</i><b>업무 시간</b><span>들어올 수는 없지만, 걸어 둔 일은 그동안에도 계속 진행돼요.</span></div>
+              <div><i>${HKUI.icon("utensils", 20, "currentColor")}</i><b>점심 · 퇴근 후</b><span>자리 비운 동안 쌓인 걸 받고, 다음 일을 다시 걸어 둬요.</span></div>
+            </div>
+            <ul class="mg-notes">
+              <li>자리를 비운 동안 쌓이는 건 최대 8시간까지예요. 하루 두세 번 들어오면 손해 없이 키울 수 있어요.</li>
+              <li>안 들어와도 망가지거나 줄어드는 건 없어요. 쉬었다가 언제든 이어 하면 돼요.</li>
+              <li>진행은 서버에 저장돼요. PC · 휴대폰 어디서 들어와도 같은 판이에요. 처음부터 다시 하려면 게임 안 「처음부터 다시」를 눌러요.</li>
+            </ul>
+          </div></div>`;
+        HKUI.refreshIcons(root);
+        // 업무 시간 — 카드를 누르면 안내 (그사이 열렸으면 그대로 들어간다)
+        root.addEventListener("click", async (e) => {
+          const a = e.target.closest("a[data-play]");
+          if (!a || status.open) return;
+          e.preventDefault();
+          status = await HKApi.playStatus().catch(() => status);
+          if (status.open) return void (location.href = a.getAttribute("href"));
+          HKUI.confirmDialog("지금은 업무 시간이라 쉬어요", `점심시간(11:30~13:00) · 18:00 이후 · 9:00 이전 · 주말에 들어올 수 있어요.${status.opensAt ? ` ${status.opensAt}에 다시 열려요.` : ""} 걸어 둔 일은 그동안에도 계속 진행돼요.`, { confirmLabel: "확인", hideCancel: true }).catch(() => null);
+        });
+      },
+    });
+  </script>
+</body>
+</html>

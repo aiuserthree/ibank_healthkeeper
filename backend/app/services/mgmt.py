@@ -1,0 +1,147 @@
+"""매일 키우는 운영 게임(매니지먼트) — 진행 상태 저장 · 불러오기 · 처음부터 다시.
+
+게임의 규칙과 계산은 화면(web/games/<게임>.html)이 맡고, 서버는 회원 · 게임마다 한 줄(mgmt_save)에
+상태(JSON) · 버전 · 저장한 서버 시각을 남긴다. 화면은 불러올 때 받은 서버 시각(now)과 저장 시각(savedAt)의
+차이로 자리를 비운 동안의 진행을 계산한다(휴대폰 시계를 바꿔도 소용없게).
+다른 창 · 기기에서 먼저 저장했으면(버전이 다르면) 덮어쓰지 않고 MGMT_STALE(409)로 알린다.
+이용 시간은 아케이드와 같다(업무 시간에는 닫힘) — 저장은 닫히기 직전에 하던 것까지 10분 더 받는다.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+
+from sqlalchemy import select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.errors import raise_app_error, register_messages
+from app.core.time import format_kst_iso, now_kst
+from app.models import Member, MgmtSave
+from app.services import game as game_service
+
+
+@dataclass(frozen=True)
+class MgmtGame:
+    key: str
+    title: str
+    desc: str
+    icon: str
+
+
+MGMT_GAMES: dict[str, MgmtGame] = {
+    g.key: g
+    for g in (
+        MgmtGame("civ", "회사 문명", "차고 창업에서 중소기업까지 · 땅을 넓히고 연구해 회사를 키워요", "landmark"),
+        MgmtGame("cafe", "옥상 쉼터 카페", "옥상에 작은 카페를 차려 메뉴를 늘리고 손님을 모아요", "coffee"),
+        MgmtGame("farm", "옥상 텃밭", "출근 전에 심고 점심 · 퇴근 후에 거둬 텃밭을 넓혀요", "sprout"),
+    )
+}
+
+MAX_STATE_BYTES = 128 * 1024  # 한 게임 상태의 최대 크기
+
+register_messages(
+    {
+        "MGMT_STALE": "다른 창이나 기기에서 먼저 저장했어요. 최신 상태를 다시 불러올게요.",
+        "MGMT_TOO_BIG": "저장할 내용이 너무 커요. 화면을 새로 불러 주세요.",
+    },
+    {"MGMT_STALE": 409, "MGMT_TOO_BIG": 413},
+)
+
+
+def _game(key: str) -> MgmtGame:
+    g = MGMT_GAMES.get(key)
+    if not g:
+        raise_app_error("NOT_FOUND", 404)
+    return g
+
+
+async def _row(db: AsyncSession, member: Member, key: str) -> MgmtSave | None:
+    return (
+        await db.execute(select(MgmtSave).where(MgmtSave.member_id == member.id, MgmtSave.game == key))
+    ).scalar_one_or_none()
+
+
+def _out(row: MgmtSave | None) -> dict:
+    return {
+        "state": row.state if row and row.state else None,  # None = 처음 — 화면이 새 판을 만든다
+        "version": row.version if row else 0,
+        "resets": row.resets if row else 0,
+        "savedAt": format_kst_iso(row.saved_at) if row else None,
+        "now": format_kst_iso(now_kst()),
+    }
+
+
+async def list_games(db: AsyncSession, member: Member) -> list[dict]:
+    """매니지먼트 게임 목록 — 내가 시작했는지 · 마지막으로 저장한 때 · 화면이 남긴 짧은 요약(state.summary)."""
+    rows = {
+        r.game: r
+        for r in (await db.execute(select(MgmtSave).where(MgmtSave.member_id == member.id))).scalars().all()
+    }
+    out = []
+    for g in MGMT_GAMES.values():
+        r = rows.get(g.key)
+        summary = (r.state or {}).get("summary") if r else None
+        out.append(
+            {
+                "key": g.key,
+                "title": g.title,
+                "desc": g.desc,
+                "icon": g.icon,
+                "started": bool(r and r.state),
+                "savedAt": format_kst_iso(r.saved_at) if r else None,
+                "summary": summary if isinstance(summary, dict) else None,
+            }
+        )
+    return out
+
+
+async def load(db: AsyncSession, member: Member, key: str) -> dict:
+    _game(key)
+    game_service.ensure_open()
+    return _out(await _row(db, member, key))
+
+
+async def save(db: AsyncSession, member: Member, key: str, state: dict, version: int) -> dict:
+    _game(key)
+    game_service.ensure_open(grace=True)
+    if len(json.dumps(state, ensure_ascii=False).encode("utf-8")) > MAX_STATE_BYTES:
+        raise_app_error("MGMT_TOO_BIG", 413)
+    now = now_kst()
+    if version == 0:
+        # 처음 저장 — 같은 판을 두 창에서 동시에 처음 저장해도 한 줄만 생기게(나머지는 MGMT_STALE)
+        done = await db.execute(
+            pg_insert(MgmtSave)
+            .values(member_id=member.id, game=key, state=state, version=1, resets=0, saved_at=now)
+            .on_conflict_do_nothing(constraint="uq_mgmt_save_member_game")
+            .returning(MgmtSave.id)
+        )
+    else:
+        # 내가 본 버전일 때만 고친다 — 그새 다른 창이 저장했으면 0줄
+        done = await db.execute(
+            update(MgmtSave)
+            .where(MgmtSave.member_id == member.id, MgmtSave.game == key, MgmtSave.version == version)
+            .values(state=state, version=MgmtSave.version + 1, saved_at=now)
+            .returning(MgmtSave.id)
+        )
+    if done.first() is None:
+        await db.rollback()
+        raise_app_error("MGMT_STALE", 409)
+    await db.commit()
+    return _out(await _row(db, member, key))
+
+
+async def reset(db: AsyncSession, member: Member, key: str) -> dict:
+    """처음부터 다시 — 상태를 비우고 횟수만 남긴다."""
+    _game(key)
+    game_service.ensure_open(grace=True)
+    row = await _row(db, member, key)
+    if row is not None:
+        row.state = {}
+        row.version = row.version + 1
+        row.resets = row.resets + 1
+        row.saved_at = now_kst()
+        await db.commit()
+        await db.refresh(row)
+    return _out(row)
