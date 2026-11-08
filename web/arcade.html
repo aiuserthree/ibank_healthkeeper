@@ -602,6 +602,27 @@
           </div>
         </div></div>`;
     }
+    // 맨 위로 — 한 화면쯤 내려가면 오른쪽 아래에 나타난다
+    function bindTop() {
+      if (document.getElementById("aa-top")) return;
+      const b = document.createElement("button");
+      b.type = "button";
+      b.id = "aa-top";
+      b.className = "hk-aa-top";
+      b.setAttribute("aria-label", "맨 위로");
+      b.innerHTML = `${HKUI.icon("arrow-up", 20, "currentColor")}<span>맨 위로</span>`;
+      document.body.appendChild(b);
+      HKUI.refreshIcons(b);
+      let raf = 0;
+      const sync = () => { raf = 0; b.classList.toggle("is-on", window.scrollY > Math.max(480, innerHeight * 0.8)); };
+      addEventListener("scroll", () => { if (!raf) raf = requestAnimationFrame(sync); }, { passive: true });
+      sync();
+      b.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+        b.blur();
+      });
+    }
+
     function bindRoll(root) {
       const roll = root.querySelector("[data-roll]");
       if (!roll) return;
@@ -874,6 +895,7 @@
         });
         startResetClock();
         bindWish();
+        bindTop();
         HKUI.refreshIcons();
       },
     });
