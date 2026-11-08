@@ -201,57 +201,224 @@ window.HKFarm = (function () {
     },
   };
 
-  // 밭 칸 하나 (viewBox 0 0 100 100). stage: -1 빈 칸 · 0 씨 · 1 싹 · 2 잎 · 3 다 자람
-  function plotSvg(k, stage) {
-    let s = `<svg viewBox="0 0 100 100" aria-hidden="true">`;
-    s += `<rect x="3" y="7" width="94" height="90" rx="15" fill="#9a5b2c"/><rect x="3" y="3" width="94" height="88" rx="15" fill="${stage === 3 ? "#d6995f" : "#c98a52"}"/>`;
-    s += `<path d="M14 6 H40 M60 6 H86" stroke="#e0a872" stroke-width="2" stroke-linecap="round" opacity=".7"/>`;
-    s += `<rect x="11" y="11" width="78" height="72" rx="10" fill="${stage === 3 ? "#7a4f2c" : "#6b4425"}"/>`;
-    s += `<path d="M20 30h60M20 47h60M20 64h60" stroke="#58371c" stroke-width="3" stroke-linecap="round" opacity=".55"/>`;
-    s += `<g fill="#7f5534"><circle cx="24" cy="22" r="1.6"/><circle cx="70" cy="38" r="1.4"/><circle cx="36" cy="56" r="1.5"/><circle cx="78" cy="72" r="1.6"/><circle cx="58" cy="20" r="1.2"/></g>`;
-    if (stage === 0) {
-      s += `<ellipse cx="50" cy="52" rx="16" ry="6.5" fill="#4a2e17"/><g fill="#fde68a"><circle cx="44" cy="50" r="2"/><circle cx="51" cy="52" r="2"/><circle cx="57" cy="49" r="2"/></g>`;
-    } else if (stage === 1) {
-      s += `<g transform="translate(0 -12)"><ellipse cx="50" cy="70" rx="12" ry="4" fill="#4a2e17"/><g class="fm-plant"><path d="M50 70 V56" stroke="#65a30d" stroke-width="3" stroke-linecap="round"/>${leaf(50, 57, 12, -150, "#84cc16", 0.5)}${leaf(50, 57, 12, -30, "#65a30d", 0.5)}</g></g>`;
-    } else if (stage >= 2 && PLANT[k]) {
-      // 아래쪽은 남은 시간 글자가 덮으니 그림을 조금 위로 올린다
-      s += `<g transform="translate(0 -9)"><ellipse cx="50" cy="72" rx="16" ry="4.5" fill="#4a2e17"/>`;
-      const inner = PLANT[k](stage === 3);
-      s += stage === 2 ? `<g class="fm-plant"><g transform="translate(50 72) scale(.82) translate(-50 -72)">${inner}</g></g>` : `<g class="fm-plant">${inner}</g>`;
-      s += `</g>`;
-    }
-    return s + `</svg>`;
+  // ── 아이소메트릭 옥상 장면 ── 보드 좌표(viewBox 0 0 BW BH). 칸 (u, v) → 화면 (x, y). 빛은 늘 왼쪽 위.
+  //    밭 칸 i(5×5, 처음 3×3 은 i = 0·1·2·5·6·7·10·11·12) 는 앞쪽(보는 사람 쪽)부터 놓는다 — 잠긴 칸은 뒤쪽 하늘 쪽에.
+  const BW = 530, BH = 418, OX = 265, OY = 84, HW = 50, HH = 25;
+  const iso = (u, v) => [OX + (u - v) * HW, OY + (u + v) * HH];
+  const cellUV = (i) => [4 - Math.floor(i / 5), 4 - (i % 5)];
+  const cellFloor = (i) => { const [u, v] = cellUV(i); return iso(u + 0.5, v + 0.5); };
+  const DEPTH = Array.from({ length: 25 }, (_, i) => i).sort((a, b) => { const [ua, va] = cellUV(a), [ub, vb] = cellUV(b); return ua + va - (ub + vb) || ua - ub; });
+  const BOX = { ax: 42, ay: 21, h: 15 }; // 화단 상자: 반 너비 · 반 높이 · 벽 높이
+  const f1 = (n) => +n.toFixed(1);
+  const P = (pts) => pts.map((p) => `${f1(p[0])},${f1(p[1])}`).join(" ");
+  const pct = (x, y) => `left:${f1((x / BW) * 100)}%;top:${f1((y / BH) * 100)}%`;
+
+  // 작물 색 — 날아가는 구슬 · 씨앗 봉투
+  const CROP_COLOR = { sprout: "#84cc16", lettuce: "#22c55e", scallion: "#16a34a", tomato: "#ef4444", pepper: "#dc2626", eggplant: "#8b3fd1", cucumber: "#15803d", carrot: "#f97316", strawberry: "#e11d48", corn: "#eab308", pumpkin: "#f97316", watermelon: "#16a34a" };
+  const ballOf = (k) => `radial-gradient(circle at 35% 30%, #fff 0, ${CROP_COLOR[k] || "#22b35e"} 48%, ${CROP_COLOR[k] || "#22b35e"})`;
+
+  // 화단 상자(두께 있는 나무 상자 · 윗면 흙). cx, cy = 바닥 가운데. st: -1 빈 칸(마른 흙) · 그 밖 심은 칸(젖은 흙)
+  function boxSvg(cx, cy, st) {
+    const { ax, ay, h } = BOX, t = cy - h;
+    const L = [cx - ax, t], R = [cx + ax, t], F = [cx, t + ay], B = [cx, t - ay];
+    const Lf = [cx - ax, cy], Rf = [cx + ax, cy], Ff = [cx, cy + ay];
+    let s = `<ellipse cx="${cx + 7}" cy="${cy + 5}" rx="${ax + 5}" ry="${ay + 4}" fill="rgba(60,40,20,.16)"/>`;
+    s += `<g class="fm-hit"><polygon points="${P([L, F, Ff, Lf])}" fill="#c98a4f"/><polygon points="${P([F, R, Rf, Ff])}" fill="#9c6232"/>`;
+    for (const k of [0.36, 0.7]) s += `<path d="M${f1(cx - ax)} ${f1(t + h * k)} L${cx} ${f1(t + ay + h * k)} L${f1(cx + ax)} ${f1(t + h * k)}" stroke="rgba(80,44,16,.3)" stroke-width="1.1" fill="none"/>`;
+    s += `<path d="M${cx} ${f1(t + ay)} V${f1(cy + ay)}" stroke="rgba(255,226,180,.55)" stroke-width="1.6"/>`;
+    s += `<polygon points="${P([B, R, F, L])}" fill="#e6b077"/><path d="M${f1(L[0])} ${f1(L[1])} L${B[0]} ${f1(B[1])} L${f1(R[0])} ${f1(R[1])}" stroke="#f6cf9c" stroke-width="1.4" fill="none"/>`;
+    const k = 0.76, sx = ax * k, sy = ay * k;
+    const q = (p, r) => [cx + ((p - r) * sx) / 2, t + ((p + r) * sy) / 2];
+    s += `<polygon class="fm-soil" points="${P([q(-1, -1), q(1, -1), q(1, 1), q(-1, 1)])}" fill="${st === -1 ? "#a67449" : "#6b4124"}"/>`;
+    s += `<path d="M${P([q(-1, 1), q(-1, -1), q(1, -1)]).replace(/ /g, " L")}" stroke="rgba(0,0,0,.24)" stroke-width="2" fill="none"/>`;
+    for (const r of [-0.5, 0, 0.5]) { const a = q(-0.82, r), b = q(0.82, r); s += `<path d="M${f1(a[0])} ${f1(a[1])} L${f1(b[0])} ${f1(b[1])}" stroke="${st === -1 ? "rgba(120,78,44,.55)" : "rgba(40,22,10,.4)"}" stroke-width="2" stroke-linecap="round"/>`; }
+    s += `</g>`;
+    return s;
   }
+  // 작물 — 앞에서 본 그림(PLANT)을 흙 가운데 (cx, sy) 에 세운다. 단계: 0 씨 · 1 싹 · 2 잎 · 3 열매
+  function plantSvg(k, stage, cx, sy, seedN = 0) {
+    if (stage === 0) {
+      return `<g class="fm-seedbed"><ellipse cx="${cx}" cy="${sy + 1}" rx="11" ry="4.6" fill="#4a2c16"/><g fill="#f5d98a"><ellipse cx="${cx - 5}" cy="${sy}" rx="1.9" ry="1.3"/><ellipse cx="${cx + 1}" cy="${sy + 2}" rx="1.9" ry="1.3"/><ellipse cx="${cx + 5}" cy="${sy - 1}" rx="1.9" ry="1.3"/></g></g>`;
+    }
+    let inner, sc;
+    if (stage === 1) { inner = `<path d="M50 72 V56" stroke="#65a30d" stroke-width="3" stroke-linecap="round"/>${leaf(50, 57, 13, -150, "#84cc16", 0.5)}${leaf(50, 57, 13, -30, "#65a30d", 0.5)}`; sc = 1.05; }
+    else if (stage === 2) { inner = PLANT[k] ? PLANT[k](false) : ""; sc = 0.92; }
+    else { inner = PLANT[k] ? PLANT[k](true) : ""; sc = 1.14; }
+    return `<g transform="translate(${f1(cx)} ${f1(sy)}) scale(${sc}) translate(-50 -72)"><g class="fm-plant" style="--d:-${((seedN * 0.53) % 2.4).toFixed(2)}s">${inner}</g></g>`;
+  }
+  // 칸 하나의 그림(보드 좌표). 화단 + 작물 + 자동 물주기 표시 + 남은 시간 고리
+  function cellArt(i, cx, cy, st, opt = {}) {
+    const t = cy - BOX.h, ready = st.stage === 3;
+    let s = `<g class="fm-lift">` + boxSvg(cx, cy, st.stage);
+    if (ready) s += `<polygon class="fm-glow" points="${P([[cx, t - 18], [cx + 36, t], [cx, t + 18], [cx - 36, t]])}" fill="#ffe27a"/>`;
+    if (st.stage >= 0) s += `<g class="fm-nohit">${plantSvg(st.k, st.stage, cx, t, opt.seedN || 0)}</g>`;
+    if (ready) s += `<g class="fm-nohit fm-sparkle"><path d="M${cx - 22} ${t - 40} l2 -5 l2 5 l5 2 l-5 2 l-2 5 l-2 -5 l-5 -2z" fill="#fff6c4"/><path d="M${cx + 20} ${t - 26} l1.4 -3.6 l1.4 3.6 l3.6 1.4 l-3.6 1.4 l-1.4 3.6 l-1.4 -3.6 l-3.6 -1.4z" fill="#fff"/></g>`;
+    if (opt.auto) s += `<g class="fm-nohit" transform="translate(${f1(cx - BOX.ax + 6)} ${f1(t - 3)})"><circle r="7.5" fill="#fff"/><circle r="6" fill="#3b82f6"/><path d="M0 -3.6 C2.4 -0.6 2.8 0.6 2.8 1.4 A2.8 2.8 0 0 1 -2.8 1.4 C-2.8 0.6 -2.4 -0.6 0 -3.6Z" fill="#fff"/></g>`;
+    if (opt.ring) s += `<g class="fm-nohit" transform="translate(${cx} ${f1(t + BOX.ay + 4)})"><circle r="9.5" fill="#fff" stroke="rgba(0,0,0,.08)"/><circle r="6.4" fill="none" stroke="#e3efe2" stroke-width="3.4"/><circle r="6.4" fill="none" stroke="#22b35e" stroke-width="3.4" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${opt.ring.off}" transform="rotate(-90)" data-ring="${opt.ring.p}" data-rd="${opt.ring.d}"/></g>`;
+    return s + `</g>`;
+  }
+  // 따로 쓰는 화단 그림(팝업 · 안내)
+  function planterSvg(k, stage, cls = "fm-planter") {
+    return `<svg class="${cls}" viewBox="0 0 120 110" aria-hidden="true">${cellArt(0, 60, 86, { stage, k })}</svg>`;
+  }
+
   // 작물 아이콘 (목록용)
   function cropIco(k) {
     const big = { pumpkin: 1.35, watermelon: 1.3, lettuce: 1.45, sprout: 1.45 }[k] || 1.4;
-    return `<svg class="fm-ico" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#f0fdf4"/>${at(20, 21, big, FRUIT[k] || "")}</svg>`;
+    return `<svg class="fm-ico" viewBox="0 0 40 40" aria-hidden="true"><ellipse cx="20" cy="33" rx="11" ry="2.6" fill="rgba(0,0,0,.08)"/>${at(20, 20, big, FRUIT[k] || "")}</svg>`;
   }
-  const coinSvg = (s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f59e0b"/><circle cx="10" cy="10" r="6.4" fill="#fbbf24"/><path d="M7 8.4 L8.4 12.6 L10 9 L11.6 12.6 L13 8.4" stroke="#b45309" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-  const markSvg = `<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="5" y="22" width="30" height="13" rx="4" fill="#c98a52"/><rect x="8" y="25" width="24" height="7" rx="2" fill="#6b4425"/><path d="M20 26 V14" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round"/>${leaf(20, 16, 11, -150, "#4ade80", 0.5)}${leaf(20, 16, 11, -30, "#22c55e", 0.5)}${at(29, 13, 0.55, FRUIT.tomato)}</svg>`;
+  const coinSvg = (s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10.6" r="9" fill="#d98a00"/><circle cx="10" cy="9.6" r="9" fill="#ffb020"/><circle cx="10" cy="9.6" r="6.3" fill="#ffd25e"/><path d="M7 8 L8.4 12.2 L10 8.6 L11.6 12.2 L13 8" stroke="#a86400" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const starSvg = (s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.8 L12.5 7 L18.2 7.6 L13.9 11.4 L15.2 17 L10 14.1 L4.8 17 L6.1 11.4 L1.8 7.6 L7.5 7Z" fill="#ffb020" stroke="#e08f00" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+  const markSvg = `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M4 24 L20 16 L36 24 L20 32Z" fill="#e6b077"/><path d="M4 24 L20 32 V37 L4 29Z" fill="#c98a4f"/><path d="M36 24 L20 32 V37 L36 29Z" fill="#9c6232"/><path d="M8 24 L20 18 L32 24 L20 30Z" fill="#6b4124"/><path d="M20 25 V13" stroke="#16a34a" stroke-width="2.4" stroke-linecap="round"/>${leaf(20, 15, 10, -150, "#4ade80", 0.5)}${leaf(20, 15, 10, -30, "#22c55e", 0.5)}${at(28, 12, 0.55, FRUIT.tomato)}</svg>`;
 
-  // 옥상 하늘(시간대에 따라)
-  function skySvg(hour) {
-    const t = hour >= 5 && hour < 10 ? "morning" : hour >= 10 && hour < 17 ? "day" : hour >= 17 && hour < 20 ? "evening" : "night";
-    const sky = { morning: ["#bae6fd", "#fef9c3"], day: ["#7dd3fc", "#e0f2fe"], evening: ["#fb923c", "#fde68a"], night: ["#1e3a8a", "#475569"] }[t];
-    const bld = t === "night" ? ["#1e293b", "#334155"] : t === "evening" ? ["#c2410c", "#ea580c"] : ["#93c5fd", "#bfdbfe"];
-    const win = t === "night" ? "#fde68a" : "rgba(255,255,255,.7)";
-    let b = "";
-    const tall = [[0, 30, 44], [34, 22, 30], [60, 26, 52], [92, 18, 26], [116, 30, 40], [152, 24, 58], [182, 34, 34], [222, 20, 46], [248, 28, 30], [282, 26, 54], [314, 22, 36], [342, 32, 48], [380, 24, 32]];
-    tall.forEach(([x, w, h], i) => {
-      b += `<rect x="${x}" y="${66 - h}" width="${w}" height="${h}" fill="${bld[i % 2]}"/>`;
-      for (let yy = 70 - h; yy < 58; yy += 9) for (let xx = x + 4; xx < x + w - 4; xx += 8) if ((xx + yy + i) % 3) b += `<rect x="${xx}" y="${yy}" width="3" height="4" fill="${win}" opacity="${t === "night" ? 0.8 : 0.5}"/>`;
+  // 작은 그림 아이콘(독 · HUD · 카드)
+  const ART = {
+    seed: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 6 h18 v21 a2 2 0 0 1 -2 2 h-14 a2 2 0 0 1 -2 -2z" fill="#fff4d6" stroke="#e7b75f" stroke-width="1.4"/><path d="M7 6 l2 -2 l2 2 l2 -2 l2 2 l2 -2 l2 2 l2 -2 l2 2 l2 -2 l2 2" fill="none" stroke="#e7b75f" stroke-width="1.4" stroke-linejoin="round"/><rect x="10" y="11" width="12" height="10" rx="3" fill="#dcf5df"/><path d="M16 20 V15" stroke="#16a34a" stroke-width="1.8" stroke-linecap="round"/>${leaf(16, 16, 6, -150, "#4ade80", 0.55)}${leaf(16, 16, 6, -30, "#22c55e", 0.55)}<rect x="10" y="23.5" width="12" height="2" rx="1" fill="#e7b75f"/></svg>`,
+    crate: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 12 L16 7 L28 12 L16 17Z" fill="#7a4a26"/><circle cx="12" cy="11.4" r="3" fill="#ef4444"/><circle cx="17" cy="10" r="3" fill="#22c55e"/><circle cx="20" cy="12.6" r="2.8" fill="#f97316"/><path d="M4 12 L16 17 V28 L4 23Z" fill="#d79a5c"/><path d="M28 12 L16 17 V28 L28 23Z" fill="#a8693a"/><path d="M4 17.5 L16 22.5 L28 17.5" stroke="rgba(80,40,10,.35)" stroke-width="1.2" fill="none"/></svg>`,
+    memo: `<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="6" y="5" width="20" height="23" rx="3" fill="#ffe98a" transform="rotate(-4 16 16)"/><rect x="12" y="2.6" width="8" height="5" rx="1.5" fill="rgba(160,200,255,.85)" transform="rotate(-4 16 5)"/><path d="M10 13 h11 M10 17.5 h11 M10 22 h7" stroke="#b8932a" stroke-width="1.8" stroke-linecap="round" transform="rotate(-4 16 16)"/></svg>`,
+    can: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 12 Q4 4 13 6" stroke="#167f9c" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M6 12 h14 l-1.4 14 a2 2 0 0 1 -2 1.8 h-7.2 a2 2 0 0 1 -2 -1.8z" fill="#22a6c9"/><path d="M19 17 L27 10" stroke="#22a6c9" stroke-width="3.2" stroke-linecap="round"/><ellipse cx="27.6" cy="9.4" rx="3" ry="2" transform="rotate(-42 27.6 9.4)" fill="#167f9c"/><path d="M9 15 l.6 9" stroke="rgba(255,255,255,.5)" stroke-width="2" stroke-linecap="round"/></svg>`,
+    book: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 7 a2 2 0 0 1 2 -2 h17 v21 h-17 a2 2 0 0 0 -2 2z" fill="#2f9e5b"/><path d="M5 28 a2 2 0 0 1 2 -2 h17 v3 h-17 a2 2 0 0 1 -2 -1z" fill="#fff4d6"/><rect x="10" y="9" width="10" height="7" rx="2" fill="#dcf5df"/><circle cx="21" cy="21" r="3.6" fill="#ffd25e" stroke="#fff" stroke-width="1.4"/><path d="M19 4 v8 l2 -1.6 l2 1.6 v-8" fill="#ef4444"/></svg>`,
+  };
+  const TOOL_ART = {
+    can: ART.can,
+    fert: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 8 h16 l2 18 a2 2 0 0 1 -2 2 h-16 a2 2 0 0 1 -2 -2z" fill="#e9c46a"/><path d="M8 8 l2 -3 h12 l2 3z" fill="#c99a3a"/><rect x="10" y="13" width="12" height="9" rx="2" fill="#fff8e3"/><path d="M16 21 V16" stroke="#16a34a" stroke-width="1.6" stroke-linecap="round"/>${leaf(16, 17, 5, -150, "#4ade80", 0.55)}${leaf(16, 17, 5, -30, "#22c55e", 0.55)}</svg>`,
+    auto: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 29 V14" stroke="#64748b" stroke-width="3" stroke-linecap="round"/><ellipse cx="16" cy="29" rx="6" ry="2" fill="#94a3b8"/><rect x="11" y="10" width="10" height="5" rx="2.5" fill="#3b82f6"/><g stroke="#7dd3fc" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-dasharray="2 3"><path d="M14 10 Q8 2 3 9"/><path d="M18 10 Q24 2 29 9"/><path d="M16 9 V2"/></g></svg>`,
+    shed: ART.crate,
+    plot: `<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M2 16 L16 9 L30 16 L16 23Z" fill="#e6b077"/><path d="M2 16 L16 23 V27 L2 20Z" fill="#c98a4f"/><path d="M30 16 L16 23 V27 L30 20Z" fill="#9c6232"/><path d="M9 16 L16 12.5 L23 16 L16 19.5Z" fill="#6b4124"/><circle cx="24" cy="8" r="6" fill="#22b35e"/><path d="M24 5 v6 M21 8 h6" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>`,
+  };
+
+  // 동료 얼굴 — 이름표 색 · 머리 모양은 주문 id 로 고정
+  function faceSvg(o) {
+    const h = hashStr(o.id || o.name || "x");
+    const skin = ["#ffd9b8", "#f6c9a0", "#eab38a", "#ffe2c8"][h % 4];
+    const hair = ["#3b2a20", "#5a3a22", "#1f1f2b", "#7a4a2a", "#2b2b2b"][(h >>> 3) % 5];
+    const style = (h >>> 6) % 3;
+    const hairPath = style === 0 ? `<path d="M9 19 Q8 7 20 7 Q32 7 31 19 Q28 12 20 12 Q12 12 9 19Z" fill="${hair}"/>`
+      : style === 1 ? `<path d="M8 22 Q6 6 20 6 Q34 6 32 22 L30 22 Q30 13 20 12 Q12 12 10 22Z" fill="${hair}"/>`
+      : `<path d="M9 18 Q9 7 20 7 Q31 7 31 18 Q26 10 17 13 Q12 14 9 18Z" fill="${hair}"/><circle cx="20" cy="6" r="3.6" fill="${hair}"/>`;
+    return `<svg class="fm-face" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="20" fill="${o.color}" opacity=".18"/><path d="M8 40 Q8 29 20 29 Q32 29 32 40Z" fill="${o.color}"/><circle cx="20" cy="19" r="10.5" fill="${skin}"/>${hairPath}<circle cx="16.4" cy="20" r="1.3" fill="#2b2118"/><circle cx="23.6" cy="20" r="1.3" fill="#2b2118"/><path d="M17.4 24 Q20 26.4 22.6 24" stroke="#2b2118" stroke-width="1.3" fill="none" stroke-linecap="round"/><circle cx="14" cy="23.4" r="1.8" fill="#ff8f8f" opacity=".45"/><circle cx="26" cy="23.4" r="1.8" fill="#ff8f8f" opacity=".45"/></svg>`;
+  }
+
+  // ── 장면 배경: 시간대 · 먼 도시 · 옥상 바닥(두께) · 난간 ──
+  const timeOf = (hour) => (hour >= 5 && hour < 10 ? "morning" : hour >= 10 && hour < 17 ? "day" : hour >= 17 && hour < 20 ? "evening" : "night");
+  const CITY = [[-260, 52, 30], [-212, 40, 64], [-160, 58, 18], [-96, 44, 46], [-48, 36, 8], [-6, 50, 40], [48, 40, 22], [92, 56, 50], [152, 34, 12], [190, 46, 34], [240, 52, 4], [296, 40, 30], [340, 54, 14], [398, 42, 44], [444, 50, 20], [498, 38, 56], [540, 56, 10], [600, 44, 36], [648, 52, 24], [704, 40, 50], [748, 60, 16]];
+  function backdropSvg(t) {
+    const C = { morning: ["#c3d9ee", "#9dbcdc", "rgba(255,255,255,.7)", "#d3e3f1"], day: ["#a8cae8", "#84afd6", "rgba(255,255,255,.6)", "#c6dcef"],
+      evening: ["#d79aa6", "#b06f86", "#ffd88a", "#e4aeae"], night: ["#2b3b74", "#1f2b5e", "#ffd76a", "#2a3a72"] }[t];
+    const lit = t === "night" || t === "evening";
+    let s = `<g class="fm-city">`;
+    // 먼 줄
+    CITY.forEach(([x, w, top], j) => {
+      const y = 6 + ((top * 7 + j * 13) % 40);
+      s += `<rect x="${x + 18}" y="${y}" width="${w - 6}" height="${260 - y}" fill="${C[3]}"/>`;
     });
-    const orb = t === "night"
-      ? `<circle cx="340" cy="18" r="9" fill="#fef3c7"/><circle cx="345" cy="15" r="8" fill="${sky[0]}"/><g fill="#fff"><circle cx="60" cy="12" r="1"/><circle cx="140" cy="20" r="1.2"/><circle cx="230" cy="10" r="1"/><circle cx="290" cy="24" r="1"/></g>`
-      : `<circle cx="${t === "evening" ? 70 : 330}" cy="${t === "evening" ? 30 : 18}" r="11" fill="${t === "evening" ? "#fef08a" : "#fde047"}" opacity=".95"/><g fill="#fff" opacity=".85"><ellipse cx="120" cy="18" rx="18" ry="6"/><ellipse cx="134" cy="14" rx="12" ry="6"/><ellipse cx="250" cy="26" rx="16" ry="5"/></g>`;
-    return `<svg viewBox="0 0 400 76" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><defs><linearGradient id="fm-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky[0]}"/><stop offset="1" stop-color="${sky[1]}"/></linearGradient></defs>
-      <rect width="400" height="76" fill="url(#fm-sky)"/>${orb}${b}
-      <rect x="0" y="62" width="400" height="14" fill="#d6d3d1"/><path d="M0 50 H400 M0 62 H400" stroke="#78716c" stroke-width="2.4"/>
-      ${Array.from({ length: 21 }, (_, i) => `<path d="M${i * 20} 50 V62" stroke="#78716c" stroke-width="1.6"/>`).join("")}
-      <g transform="translate(18 34)"><rect width="34" height="28" rx="4" fill="#60a5fa"/><rect y="4" width="34" height="3" fill="#3b82f6"/><rect y="14" width="34" height="3" fill="#3b82f6"/><rect x="4" y="28" width="4" height="6" fill="#64748b"/><rect x="26" y="28" width="4" height="6" fill="#64748b"/></g>
-      <g transform="translate(352 44)"><rect width="30" height="18" rx="3" fill="#fbbf24"/><rect x="2" y="-4" width="26" height="6" rx="2" fill="#f59e0b"/><path d="M6 6 h18 M6 11 h18" stroke="#d97706" stroke-width="1.6"/></g>
-    </svg>`;
+    // 가까운 줄 + 창문
+    CITY.forEach(([x, w, top], j) => {
+      const y = 22 + top;
+      s += `<rect x="${x}" y="${y}" width="${w}" height="${250 - y}" fill="${j % 2 ? C[0] : C[1]}"/>`;
+      if (j % 4 === 1) s += `<rect x="${x + w / 2 - 1}" y="${y - 14}" width="2" height="14" fill="${C[1]}"/>`;
+      for (let yy = y + 6; yy < 150; yy += 11) for (let xx = x + 5; xx < x + w - 6; xx += 9) {
+        const on = (xx * 3 + yy * 7 + j) % (lit ? 3 : 4);
+        if (on) s += `<rect x="${xx}" y="${yy}" width="4" height="5" rx="1" fill="${C[2]}" opacity="${lit ? (on === 1 ? 0.95 : 0.25) : 0.5}"/>`;
+      }
+    });
+    s += `</g>`;
+    // 옥상 바닥 판 — 두께 있는 콘크리트 + 밭 자리(자갈)
+    const b = iso(-0.2, -0.2), r = iso(6.2, -0.2), f = iso(6.2, 6.2), l = iso(-0.2, 6.2), T = 18;
+    s += `<polygon points="${P([[l[0] + 10, l[1] + T + 4], [f[0] + 10, f[1] + T + 8], [r[0] + 10, r[1] + T + 4]])}" fill="rgba(40,50,70,.12)" filter="url(#fm-blur)"/>`;
+    s += `<polygon points="${P([l, f, [f[0], f[1] + T], [l[0], l[1] + T]])}" fill="#d3c2a5"/><polygon points="${P([f, r, [r[0], r[1] + T], [f[0], f[1] + T]])}" fill="#ad9876"/>`;
+    s += `<path d="M${l[0]} ${l[1] + 6} L${f[0]} ${f[1] + 6} L${r[0]} ${r[1] + 6}" stroke="rgba(90,70,40,.18)" stroke-width="2" fill="none"/>`;
+    s += `<polygon points="${P([b, r, f, l])}" fill="#eee4d4"/>`;
+    let lines = "";
+    for (let k = 0; k <= 6; k++) { const a = iso(k, -0.2), c = iso(k, 6.2), d = iso(-0.2, k), e = iso(6.2, k); lines += `M${a[0]} ${a[1]} L${c[0]} ${c[1]} M${d[0]} ${d[1]} L${e[0]} ${e[1]} `; }
+    s += `<path d="${lines}" stroke="rgba(130,110,80,.13)" stroke-width="1.2"/>`;
+    const g0 = iso(-0.06, -0.06), g1 = iso(5.06, -0.06), g2 = iso(5.06, 5.06), g3 = iso(-0.06, 5.06);
+    s += `<polygon points="${P([g0, g1, g2, g3])}" fill="#d9c5a1"/><path d="M${P([g3, g2, g1]).replace(/ /g, " L")}" stroke="#fff8ec" stroke-width="2.4" fill="none"/>`;
+    let dots = "";
+    for (let k = 0; k < 70; k++) { const u = ((k * 37) % 100) / 20, v = ((k * 61) % 100) / 20, [x, y] = iso(u, v); dots += `<circle cx="${f1(x)}" cy="${f1(y)}" r="${k % 3 ? 1 : 1.5}"/>`; }
+    s += `<g fill="rgba(120,90,50,.28)">${dots}</g>`;
+    s += `<path d="M${l[0]} ${l[1]} L${f[0]} ${f[1]} L${r[0]} ${r[1]}" stroke="#fffaf2" stroke-width="2" fill="none"/>`;
+    // 난간(뒤쪽 두 변) + 꼬마전구
+    let rail = "", top = [], bulbs = "";
+    const posts = [];
+    for (let k = 6.2; k >= -0.2; k -= 0.8) posts.push(iso(-0.2, k));
+    for (let k = 0.6; k <= 6.21; k += 0.8) posts.push(iso(k, -0.2));
+    posts.forEach(([x, y]) => { rail += `<path d="M${f1(x)} ${f1(y)} v-24" stroke="#93a1b3" stroke-width="2.6" stroke-linecap="round"/>`; top.push([x, y - 24]); });
+    const mid = top.map(([x, y]) => [x, y + 12]);
+    rail += `<polyline points="${P(mid)}" stroke="#a9b6c6" stroke-width="2" fill="none"/><polyline points="${P(top)}" stroke="#d6dee8" stroke-width="3.2" fill="none" stroke-linejoin="round"/>`;
+    for (let k = 0; k < top.length - 1; k++) {
+      const [x1, y1] = top[k], [x2, y2] = top[k + 1], mx = (x1 + x2) / 2, my = (y1 + y2) / 2 + 6;
+      bulbs += `<path d="M${f1(x1)} ${f1(y1)} Q${f1(mx)} ${f1(my + 3)} ${f1(x2)} ${f1(y2)}" stroke="rgba(70,70,80,.35)" stroke-width="1" fill="none"/><circle class="fm-bulb" cx="${f1(mx)}" cy="${f1(my + 2.6)}" r="2.6" style="--bd:${(k % 4) * 0.4}s"/>`;
+    }
+    s += `<g class="fm-rail">${rail}${bulbs}</g>`;
+    return s;
+  }
+
+  // ── 장면 소품 — 누르면 그 판이 열린다 ──
+  function propBox(cx, cy, ax, ay, h, cols) {
+    const t = cy - h;
+    return `<polygon points="${P([[cx - ax, t], [cx, t + ay], [cx, cy + ay], [cx - ax, cy]])}" fill="${cols[0]}"/><polygon points="${P([[cx, t + ay], [cx + ax, t], [cx + ax, cy], [cx, cy + ay]])}" fill="${cols[1]}"/><polygon points="${P([[cx, t - ay], [cx + ax, t], [cx, t + ay], [cx - ax, t]])}" fill="${cols[2]}"/>`;
+  }
+  const shadowAt = (x, y, rx, ry) => `<ellipse cx="${f1(x + 5)}" cy="${f1(y + 4)}" rx="${rx}" ry="${ry}" fill="rgba(60,40,20,.17)"/>`;
+  const lvBadge = (x, y, n) => (n ? `<g transform="translate(${f1(x)} ${f1(y)})"><circle r="8.5" fill="#fff" stroke="rgba(0,0,0,.08)"/><text y="3.6" text-anchor="middle" font-size="10" font-weight="900" fill="#158a45">${n}</text></g>` : "");
+  function canProp(lv) {
+    const [x, y] = iso(1.1, 5.65);
+    const body = lv ? "#22a6c9" : "#a9bcc6", dark = lv ? "#167f9c" : "#8aa0ab";
+    return `<g class="fm-prop" id="fm-prop-can" data-act="tab" data-tab="tools" role="button" tabindex="0" aria-label="도구 — 물뿌리개 ${lv}단계">
+      ${shadowAt(x, y, 24, 9)}<g transform="translate(${f1(x)} ${f1(y)})">
+      <path d="M-12 -26 Q-30 -46 2 -40" stroke="${dark}" stroke-width="4.4" fill="none" stroke-linecap="round"/>
+      <path d="M-17 -2 L-14 -28 Q0 -32 14 -28 L17 -2 Q0 5 -17 -2Z" fill="${body}"/><ellipse cy="-28" rx="14" ry="5" fill="${dark}"/>
+      <path d="M13 -11 L35 -33" stroke="${body}" stroke-width="5.4" stroke-linecap="round"/><ellipse cx="36.5" cy="-34.5" rx="6" ry="3.4" fill="${dark}" transform="rotate(-45 36.5 -34.5)"/>
+      <path d="M-11 -7 L-9.4 -23" stroke="rgba(255,255,255,.5)" stroke-width="3.2" stroke-linecap="round"/></g>${lvBadge(x + 14, y - 40, lv)}</g>`;
+  }
+  function sprinklerProp(lv) {
+    if (!lv) return "";
+    const [x, y] = iso(3.2, 5.6);
+    return `<g class="fm-prop" id="fm-prop-auto" data-act="tab" data-tab="tools" role="button" tabindex="0" aria-label="도구 — 자동 물주기 ${lv}단계">
+      ${shadowAt(x, y, 12, 5)}<g transform="translate(${f1(x)} ${f1(y)})"><ellipse rx="9" ry="4" fill="#94a3b8"/><rect x="-2.6" y="-36" width="5.2" height="36" rx="2" fill="#64748b"/><rect x="-9" y="-42" width="18" height="8" rx="4" fill="#3b82f6"/><rect x="-6" y="-41" width="6" height="3" rx="1.5" fill="#93c5fd"/>
+      <g class="fm-spray" stroke="#7dd3fc" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-dasharray="3 6"><path d="M-6 -42 Q-24 -64 -44 -36"/><path d="M6 -42 Q24 -64 44 -36"/><path d="M0 -44 Q-6 -70 -18 -64"/></g></g>${lvBadge(x + 14, y - 44, lv)}</g>`;
+  }
+  function crateProp() {
+    const [x, y] = iso(5.62, 1.25);
+    const fill = Math.min(1, invTotal() / cap()), full = invTotal() >= cap(), lv = S.tools.shed;
+    let s = `<g class="fm-prop" id="fm-prop-shed" data-act="tab" data-tab="shed" role="button" tabindex="0" aria-label="창고 ${invTotal()}/${cap()}">${shadowAt(x, y, 40, 18)}`;
+    if (lv >= 3) s += propBox(x + 30, y - 6, 18, 9, 18, ["#d79a5c", "#a8693a", "#e7b77d"]);
+    s += propBox(x, y, 34, 17, 30, ["#d79a5c", "#a8693a", "#5e3a1e"]);
+    const t = y - 30;
+    s += `<path d="M${x - 34} ${t + 10} L${x} ${t + 27} L${x + 34} ${t + 10} M${x - 34} ${t + 20} L${x} ${t + 37} L${x + 34} ${t + 20}" stroke="rgba(80,40,10,.3)" stroke-width="1.4" fill="none"/>`;
+    s += `<path d="M${x - 34} ${t} L${x} ${t - 17} L${x + 34} ${t} L${x} ${t + 17}Z" fill="none" stroke="#f0c48e" stroke-width="3"/>`;
+    const kinds = Object.keys(S.inv).filter((k) => S.inv[k] > 0);
+    const n = Math.round(fill * 9);
+    const spots = [[-12, 2], [10, -1], [0, 6], [-4, -6], [16, 5], [-18, -2], [6, -9], [-8, 9], [20, -4]];
+    for (let k = 0; k < n; k++) {
+      const [dx, dy] = spots[k], kk = kinds[k % Math.max(1, kinds.length)] || "tomato";
+      s += `<circle cx="${x + dx}" cy="${t + dy - fill * 4}" r="5.4" fill="${CROP_COLOR[kk]}" stroke="rgba(0,0,0,.12)"/><circle cx="${x + dx - 1.6}" cy="${t + dy - fill * 4 - 1.8}" r="1.6" fill="#fff" opacity=".45"/>`;
+    }
+    if (full) s += `<g transform="translate(${x} ${t - 30})"><g class="fm-warnbob"><circle r="10" fill="#e5484d" stroke="#fff" stroke-width="2.4"/><path d="M0 -5 v5.4" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cy="4.6" r="1.5" fill="#fff"/></g></g>`;
+    return s + `</g>`;
+  }
+  function bookProp() {
+    const [x, y] = iso(5.6, 3.55), n = dexCount();
+    let s = `<g class="fm-prop" id="fm-prop-dex" data-act="tab" data-tab="dex" role="button" tabindex="0" aria-label="도감 ${n}/${CROPS.length}">${shadowAt(x, y, 28, 12)}`;
+    s += propBox(x, y, 26, 13, 12, ["#fff4d6", "#e8d6ac", "#2f9e5b"]);
+    s += `<path d="M${x - 26} ${y - 12} L${x} ${y + 1} L${x} ${y + 13} L${x - 26} ${y}Z" fill="#2f9e5b" opacity=".0"/>`;
+    s += `<path d="M${x - 26} ${y - 9} L${x} ${y + 4} M${x - 26} ${y - 5} L${x} ${y + 8}" stroke="#d9c79a" stroke-width="1"/>`;
+    s += `<polygon points="${P([[x - 10, y - 14], [x + 2, y - 20], [x + 12, y - 15], [x, y - 9]])}" fill="#dcf5df"/>`;
+    s += `<path d="M${x + 14} ${y - 22} l0 14 l3 -2 l3 3 l0 -14z" fill="#ef4444"/>`;
+    if (n >= 3) s += `<g transform="translate(${x - 4} ${y - 15}) scale(.9)"><circle r="6.5" fill="#ffd25e" stroke="#fff" stroke-width="1.6"/><path d="M0 -3.4 L1 -1 L3.4 -.8 L1.6 .8 L2.1 3.2 L0 2 L-2.1 3.2 L-1.6 .8 L-3.4 -.8 L-1 -1Z" fill="#fff"/></g>`;
+    s += `<g transform="translate(${x + 2} ${y - 32})"><rect x="-15" y="-9" width="30" height="16" rx="8" fill="#fff" stroke="rgba(0,0,0,.08)"/><text y="3" text-anchor="middle" font-size="10" font-weight="900" fill="#158a45">${n}/${CROPS.length}</text></g>`;
+    return s + `</g>`;
+  }
+  function boardProp() {
+    const [x, y] = iso(5.72, 5.72);
+    const active = S.orders.filter((o) => o.items).length, ok = S.orders.filter(canDeliver).length;
+    let s = `<g class="fm-prop" id="fm-prop-orders" data-act="tab" data-tab="orders" role="button" tabindex="0" aria-label="동료 주문판 — 드릴 수 있는 주문 ${ok}장">${shadowAt(x, y, 26, 8)}`;
+    s += `<g transform="translate(${x} ${y})"><path d="M-16 0 L-12 -40 M16 0 L12 -40" stroke="#8a5a2e" stroke-width="3.4" stroke-linecap="round"/><rect x="-24" y="-60" width="48" height="34" rx="4" fill="#c58e5b"/><rect x="-21" y="-57" width="42" height="28" rx="2.6" fill="#e9c393"/>`;
+    const papers = [["#fff3a6", -14, -54, -6], ["#c8f0d2", 0, -55, 5], ["#ffd3d8", -6, -46, 3]];
+    for (let k = 0; k < Math.min(3, active); k++) { const [c, px, py, rot] = papers[k]; s += `<g transform="translate(${px} ${py}) rotate(${rot})"><rect width="13" height="12" rx="1.5" fill="${c}"/><circle cx="6.5" cy="1.4" r="1.6" fill="#e5484d"/><path d="M3 6 h7 M3 9 h5" stroke="rgba(0,0,0,.25)" stroke-width="1"/></g>`; }
+    s += `</g>`;
+    if (ok) s += `<g transform="translate(${x + 22} ${y - 62})"><g class="fm-warnbob"><circle r="9" fill="#22b35e" stroke="#fff" stroke-width="2.2"/><text y="3.6" text-anchor="middle" font-size="10.5" font-weight="900" fill="#fff">${ok}</text></g></g>`;
+    return s + `</g>`;
   }
 
   // ══ 상태 ══════════════════════════════════════════════════
@@ -274,7 +441,8 @@ window.HKFarm = (function () {
     return S;
   }
 
-  let store, root, S, tickTimer = 0, lastSky = -1, lastBarSig = "", lastTabSig = "", popping = false, ticksSinceSave = 0;
+  let store, root, S, tickTimer = 0, lastSky = "", lastBarSig = "", lastTabSig = "", popping = false, ticksSinceSave = 0;
+  let lastStripSig = "", lastPropSig = "", lastMoney = null, lastLv = null, lastTodaySig = ""; // 화면 다시 그리기 판단용
   const queue = []; // 보여 줄 팝업들 (() => Promise)
   let newDex = []; // 이번 행동에서 처음 거둔 작물 — commit 때 팝업 하나로 묶는다
   const plotOpen = (i) => PLOT_ORDER.indexOf(i) < S.open;
@@ -479,14 +647,16 @@ window.HKFarm = (function () {
     const p = S.plots[i], c = CROP[p.k], st = plotState(i);
     const isAuto = S.autos.includes(i);
     const autoRow = S.tools.auto
-      ? `<button type="button" class="fm-btn ${isAuto ? "" : "fm-btn--blue"}" data-m="auto">${ic("refresh-cw", 16)} ${isAuto ? "자동 다시 심기 끄기" : "자동 다시 심기 켜기"}</button>`
+      ? `<button type="button" class="mgx-btn is-lg ${isAuto ? "is-white" : ""}" data-m="auto">${ic("refresh-cw", 18)} ${isAuto ? "자동 다시 심기 끄기" : "자동 다시 심기 켜기"}</button>`
       : "";
-    const v = await modal(`<h2>${c.n}</h2><p class="fm-sub">자라는 중이에요. 다 자라도 시들지 않으니 편할 때 거두세요.</p>
-      <div class="fm-modal__hero">${plotSvg(p.k, st.stage)}</div>
-      <ul class="fm-list"><li><span class="fm-li-ico">${ic("clock", 18)}</span><span><b data-cd="${p.p + p.d}">${dur(st.left)}</b> 뒤에 거둘 수 있어요</span></li>
-      <li><span class="fm-li-ico">${ic("package", 18)}</span><span>거두면 ${c.n} <b>${yieldOf(p.k)}개</b> · 경험치 ${c.xp}</span></li>
+    const frac = Math.max(0, Math.min(1, (S.ft - p.p) / p.d));
+    const stageName = ["씨앗", "새싹", "잎이 자라는 중", "다 자람"][st.stage] || "";
+    const v = await modal(`<div class="fm-timer"><svg class="fm-timer__ring" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="#e3efe2" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="#22b35e" stroke-width="10" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${f1(100 - frac * 100)}" transform="rotate(-90 60 60)" data-ring="${p.p}" data-rd="${p.d}"/></svg>${planterSvg(p.k, st.stage, "fm-planter fm-timer__art")}</div>
+      <div class="fm-modal__title is-center">${c.n} <span class="mgx-chip">${stageName}</span></div>
+      <p class="fm-sub is-center"><b class="fm-bigtime" data-cd="${p.p + p.d}">${dur(st.left)}</b> 뒤에 거둘 수 있어요<br>다 자라도 시들지 않으니 편할 때 거두세요.</p>
+      <ul class="fm-list"><li><span class="fm-li-ico">${cropIco(p.k)}</span><span>거두면 ${c.n} <b>${yieldOf(p.k)}개</b> · 경험치 ${c.xp}</span></li>
       ${S.tools.auto ? `<li><span class="fm-li-ico">${ic("refresh-cw", 18)}</span><span>자동 다시 심기 ${isAuto ? "<b>켜짐</b>" : "꺼짐"} · ${S.autos.length}/${autoMax()}칸</span></li>` : ""}</ul>
-      <div class="fm-modal__btns">${autoRow}<button type="button" class="fm-btn" data-m="pull">${ic("shovel", 16)} 뽑기</button></div>`);
+      <div class="fm-modal__btns">${autoRow}<button type="button" class="mgx-btn is-white is-lg" data-m="pull">${ic("shovel", 18)} 뽑기</button></div>`, "is-sheet");
     if (v === "auto") {
       if (isAuto) S.autos = S.autos.filter((x) => x !== i);
       else if (S.autos.length >= autoMax()) { HKUI.toast(`자동 다시 심기는 ${autoMax()}칸까지예요 — 다른 칸을 먼저 꺼 주세요`, "error"); return; }
@@ -626,10 +796,11 @@ window.HKFarm = (function () {
   }
 
   // ══ 팝업 ══════════════════════════════════════════════════
-  function modal(html) {
+  // cls: "is-sheet"(휴대폰에선 아래에서 올라오는 판) · "is-party"(축하)
+  function modal(html, cls = "") {
     return new Promise((res) => {
       const ov = document.createElement("div");
-      ov.className = "fm-ov";
+      ov.className = `fm-ov mgx fm-theme ${cls}`;
       ov.innerHTML = `<div class="fm-modal" role="dialog" aria-modal="true"><button type="button" class="fm-x" data-esc-close aria-label="닫기">${ic("x", 20)}</button>${html}</div>`;
       const close = (v) => { if (!ov.isConnected) return; ov.remove(); res(v); };
       ov.addEventListener("click", (e) => {
@@ -640,6 +811,7 @@ window.HKFarm = (function () {
       ov.querySelector(".fm-x").onclick = () => close();
       document.body.appendChild(ov);
       HKUI.refreshIcons(ov);
+      countdowns();
       const f = ov.querySelector("[data-m]");
       if (f) f.focus({ preventScroll: true });
     });
@@ -649,30 +821,36 @@ window.HKFarm = (function () {
     popping = true;
     try { while (queue.length) await queue.shift()(); } finally { popping = false; }
   }
+  const party = (n = 90) => { HKFx.confetti({ x: innerWidth / 2, y: innerHeight * 0.32, n, colors: ["#22b35e", "#ffb020", "#ef4444", "#7cc8ff", "#f9a8d4", "#a3e635"] }); };
   function levelUpPopup(L) {
     const items = unlocksAt(L);
-    return modal(`<div class="fm-modal__hero">${markSvg}</div><h2 style="text-align:center;margin-right:0">텃밭 레벨 ${L}!</h2>
-      <p class="fm-sub" style="text-align:center">${L >= MAX_LV ? "1차 마지막 레벨이에요." : "새로 열린 것들이에요."}</p>
+    setTimeout(() => party(), 60);
+    return modal(`<div class="fm-burst"><div class="fm-burst__rays"></div><div class="fm-lvbadge"><small>텃밭 레벨</small><b>${L}</b></div></div>
+      <div class="fm-modal__title is-center">레벨 업!</div>
+      <p class="fm-sub is-center">${L >= MAX_LV ? "1차 마지막 레벨이에요." : "새로 열린 것들이에요."}</p>
       <ul class="fm-list">${items.map((it) => `<li>${it.ico || `<span class="fm-li-ico">${ic(it.icon, 18)}</span>`}<span>${it.txt}</span></li>`).join("") || `<li>계속 가꿔 보세요</li>`}</ul>
-      <div class="fm-modal__btns"><button type="button" class="fm-btn fm-btn--blue" data-m="ok">좋아요</button></div>`);
+      <div class="fm-modal__btns"><button type="button" class="mgx-btn is-lg is-wide" data-m="ok">좋아요</button></div>`, "is-party");
   }
   function dexPopup(list, before, after) {
     const miles = DEX_MILES.filter((m) => m.n > before && m.n <= after);
     const one = list.length === 1 ? CROP[list[0]] : null;
-    return modal(`<div class="fm-modal__hero">${one ? cropIco(one.k) : markSvg}</div>
-      <h2 style="text-align:center;margin-right:0">${one ? `도감에 ${jo(one.n, "이", "가")} 올랐어요` : `도감에 ${list.length}종이 올랐어요`}</h2>
-      <p class="fm-sub" style="text-align:center">처음 거둔 작물은 경험치를 더 받아요 · 도감 ${after}/${CROPS.length}</p>
+    if (miles.length) setTimeout(() => party(50), 60);
+    return modal(`<div class="fm-stickers">${list.slice(0, 4).map((k, j) => `<span class="fm-sticker" style="--r:${[-8, 6, -3, 9][j]}deg">${cropIco(k)}</span>`).join("")}</div>
+      <div class="fm-modal__title is-center">${one ? `도감에 ${jo(one.n, "이", "가")} 올랐어요` : `도감에 ${list.length}종이 올랐어요`}</div>
+      <p class="fm-sub is-center">처음 거둔 작물은 경험치를 더 받아요 · 도감 ${after}/${CROPS.length}</p>
       <ul class="fm-list">${list.map((k) => `<li>${cropIco(k)}<span><b>${CROP[k].n}</b> — 경험치 +${10 + CROP[k].xp}</span></li>`).join("")}
       ${miles.map((m) => `<li class="is-warn"><span class="fm-li-ico">${ic("award", 18)}</span><span>도감 ${m.n}종 보너스 — <b>${m.txt}</b> (계속 적용돼요)</span></li>`).join("")}</ul>
-      <div class="fm-modal__btns"><button type="button" class="fm-btn fm-btn--blue" data-m="ok">좋아요</button></div>`);
+      <div class="fm-modal__btns"><button type="button" class="mgx-btn is-lg is-wide" data-m="ok">좋아요</button></div>`);
   }
   function donePopup() {
     const days = S.stats.start ? Math.max(1, Math.ceil((store.now() - S.stats.start) / 86400e3)) : 1;
-    return modal(`<div class="fm-modal__hero">${markSvg}</div><h2 style="text-align:center;margin-right:0">1차 완주를 축하해요!</h2>
-      <p class="fm-sub" style="text-align:center">텃밭 레벨 15, 밭 25칸 — 옥상이 온통 초록이에요.<br>앞으로도 계속 가꾸고 주문을 채울 수 있어요.</p>
+    setTimeout(() => { party(120); setTimeout(() => party(80), 700); }, 60);
+    return modal(`<div class="fm-burst is-gold"><div class="fm-burst__rays"></div>${planterSvg("watermelon", 3, "fm-planter is-hero")}</div>
+      <div class="fm-modal__title is-center">1차 완주를 축하해요!</div>
+      <p class="fm-sub is-center">텃밭 레벨 15, 밭 25칸 — 옥상이 온통 초록이에요.<br>앞으로도 계속 가꾸고 주문을 채울 수 있어요.</p>
       <div class="fm-stats3"><div><b>${num(days)}일</b><small>가꾼 날</small></div><div><b>${num(S.stats.harv)}번</b><small>거둔 횟수</small></div><div><b>${num(S.stats.orders)}장</b><small>끝낸 주문</small></div></div>
       <ul class="fm-list"><li><span class="fm-li-ico">${coinSvg(18)}</span><span>모두 번 돈 <b>${won(S.stats.earned)}</b></span></li><li><span class="fm-li-ico">${ic("book-open", 18)}</span><span>도감 <b>${dexCount()}/${CROPS.length}</b></span></li></ul>
-      <div class="fm-modal__btns"><button type="button" class="fm-btn fm-btn--blue" data-m="ok">계속 가꾸기</button></div>`);
+      <div class="fm-modal__btns"><button type="button" class="mgx-btn is-gold is-lg is-wide" data-m="ok">계속 가꾸기</button></div>`, "is-party");
   }
   function awayPopup(info) {
     const rows = [];
@@ -685,9 +863,10 @@ window.HKFarm = (function () {
     if (info.newDay) rows.push(`<li><span class="fm-li-ico">${ic("sun", 18)}</span><span>새 날이에요 — 오늘의 작물은 <b>${CROP[S.daily.crop].n}</b> (판매가 2배)</span></li>`);
     if (!grown.length && !info.growing) rows.push(`<li><span class="fm-li-ico">${ic("shovel", 18)}</span><span>심어 둔 작물이 없었어요. 떠나기 전에 심어 두면 그동안 자라요.</span></li>`);
     const ready = readyIdx().length;
-    return modal(`<h2>자리 비운 동안</h2><p class="fm-sub">옥상 텃밭은 그동안에도 조용히 자랐어요.</p><ul class="fm-list">${rows.join("")}</ul>
-      <div class="fm-modal__btns">${ready ? `<button type="button" class="fm-btn fm-btn--green" data-m="harvest">${ic("hand", 16)} 모두 거두기 (${ready}칸)</button>` : ""}<button type="button" class="fm-btn ${ready ? "" : "fm-btn--blue"}" data-m="ok">확인</button></div>`)
-      .then((v) => { if (v === "harvest") harvestAll(); });
+    const hero = grown.length ? `<div class="fm-stickers">${grown.slice(0, 4).map(([k], j) => `<span class="fm-sticker" style="--r:${[-8, 6, -3, 9][j]}deg">${cropIco(k)}</span>`).join("")}</div>` : `<div class="fm-modal__hero">${planterSvg("lettuce", 1)}</div>`;
+    return modal(`${hero}<div class="fm-modal__title is-center">자리 비운 동안</div><p class="fm-sub is-center">옥상 텃밭은 그동안에도 조용히 자랐어요.</p><ul class="fm-list">${rows.join("")}</ul>
+      <div class="fm-modal__btns">${ready ? `<button type="button" class="mgx-btn is-gold is-lg" data-m="harvest">${ic("hand", 18)} 모두 거두기 (${ready}칸)</button>` : ""}<button type="button" class="mgx-btn is-lg ${ready ? "is-white" : ""}" data-m="ok">확인</button></div>`)
+      .then((v) => { if (v === "harvest") doHarvestAll(); });
   }
   function awayInfo(adv, newDay, ordersBefore) {
     const info = { gap: adv.gap, capped: adv.capped, grown: {}, grownN: 0, growing: 0, soonest: Infinity, orders: 0, newDay };
@@ -704,20 +883,20 @@ window.HKFarm = (function () {
 
   function tutorial() {
     const steps = [
-      { ico: plotSvg("lettuce", 1), h: "씨앗을 심어요", p: "빈 칸을 누르면 고른 씨앗이 바로 심어져요. 「같은 씨앗 모두 심기」로 빈 칸을 한 번에 채울 수도 있어요." },
-      { ico: plotSvg("tomato", 3), h: "다 자라면 거둬요", p: "실제 시간으로 자라요. 출근 전에 심고 점심 · 퇴근 후에 거두세요. 자리 비운 동안에도 8시간까지 자라고, 다 자라도 시들지 않아요." },
-      { ico: markSvg, h: "팔고, 주문을 채우고, 넓혀요", p: "거둔 작물은 창고에 쌓여요. 팔거나 동료 주문에 쓰면 돈과 경험치를 받아요. 레벨이 오르면 새 작물 · 밭 · 도구가 열려요." },
+      { ico: planterSvg("lettuce", 1, "fm-planter is-hero"), h: "씨앗을 심어요", p: "빈 화단을 누르면 고른 씨앗이 바로 심어져요. 「모두 심기」로 빈 칸을 한 번에 채울 수도 있어요." },
+      { ico: planterSvg("tomato", 3, "fm-planter is-hero"), h: "다 자라면 거둬요", p: "실제 시간으로 자라요. 출근 전에 심고 점심 · 퇴근 후에 거두세요. 자리 비운 동안에도 8시간까지 자라고, 다 자라도 시들지 않아요." },
+      { ico: `<span class="fm-tut-art">${ART.crate}${ART.memo}${ART.can}</span>`, h: "팔고, 주문을 채우고, 넓혀요", p: "거둔 작물은 창고에 쌓여요. 팔거나 동료 주문에 쓰면 돈과 경험치를 받아요. 레벨이 오르면 새 작물 · 밭 · 도구가 열려요." },
     ];
     let i = 0;
     const ov = document.createElement("div");
-    ov.className = "fm-ov";
+    ov.className = "fm-ov mgx fm-theme";
     const draw = () => {
       const s = steps[i];
       ov.innerHTML = `<div class="fm-modal" role="dialog" aria-modal="true"><button type="button" class="fm-x" data-esc-close aria-label="닫기">${ic("x", 20)}</button>
         <div class="fm-steps">${steps.map((_, j) => `<i class="${j === i ? "is-on" : ""}"></i>`).join("")}</div>
-        <div class="fm-modal__hero">${s.ico}</div><h2 style="text-align:center;margin-right:0">${s.h}</h2><p class="fm-sub" style="text-align:center">${s.p}</p>
-        <div class="fm-modal__btns">${i ? `<button type="button" class="fm-btn" data-t="prev">이전</button>` : `<button type="button" class="fm-btn" data-t="close">건너뛰기</button>`}
-        <button type="button" class="fm-btn fm-btn--blue" data-t="${i === steps.length - 1 ? "close" : "next"}">${i === steps.length - 1 ? "시작하기" : "다음"}</button></div></div>`;
+        <div class="fm-modal__hero is-big">${s.ico}</div><div class="fm-modal__title is-center">${s.h}</div><p class="fm-sub is-center">${s.p}</p>
+        <div class="fm-modal__btns">${i ? `<button type="button" class="mgx-btn is-white is-lg" data-t="prev">이전</button>` : `<button type="button" class="mgx-btn is-white is-lg" data-t="close">건너뛰기</button>`}
+        <button type="button" class="mgx-btn is-lg" data-t="${i === steps.length - 1 ? "close" : "next"}">${i === steps.length - 1 ? "시작하기" : "다음"}</button></div></div>`;
       HKUI.refreshIcons(ov);
     };
     const close = () => { ov.remove(); if (!S.tut) { S.tut = true; store.dirty(); } flush(); };
@@ -730,54 +909,83 @@ window.HKFarm = (function () {
       else return close();
       draw();
     });
-    draw();
     document.body.appendChild(ov);
+    draw();
   }
   function help() {
-    return modal(`<h2>옥상 텃밭 도움말</h2><div class="fm-help">
+    return modal(`<div class="fm-modal__title">옥상 텃밭 도움말</div><div class="fm-help">
       <h3>하루 리듬</h3><ul><li>출근 전에 심고, 점심 · 퇴근 후에 거둬요. 업무 시간에는 들어올 수 없지만 작물은 계속 자라요.</li>
       <li>자리 비운 동안은 <b>8시간</b>까지만 자라요. 그 뒤로는 멈춰 기다려요. 밤에는 8시간짜리 딸기가 딱 맞아요.</li>
       <li>다 자란 작물은 시들지 않아요. 언제 와도 손해가 없어요.</li></ul>
-      <h3>밭과 창고</h3><ul><li>빈 칸을 누르면 고른 씨앗을 심고, 다 자란 칸을 누르면 거둬요. 자라는 칸을 누르면 남은 시간을 볼 수 있어요.</li>
+      <h3>밭과 창고</h3><ul><li>빈 칸을 누르면 고른 씨앗을 심고, 다 자란 칸(말풍선)을 누르면 거둬요. 자라는 칸을 누르면 남은 시간을 볼 수 있어요.</li>
       <li>거둔 작물은 창고에 쌓여요. 창고가 가득 차면 거둘 수 없으니 팔거나 창고를 넓혀요.</li>
       <li>밭은 레벨과 돈으로 넓혀요. 처음 3×3에서 5×5(25칸)까지.</li></ul>
       <h3>주문 · 오늘의 일</h3><ul><li>동료 주문을 채우면 그냥 팔 때보다 돈을 더 받고 경험치도 받아요. 끝내거나 넘기면 ${dur(ORDER_WAIT)} 뒤 새 주문이 와요.</li>
       <li>「오늘의 작물」은 하루 동안 판매가가 2배예요. 「오늘의 일」을 끝내면 작은 보너스를 받아요. 놓쳐도 손해는 없어요.</li></ul>
       <h3>도구 · 도감</h3><ul><li>물뿌리개는 자라는 시간을 줄이고, 비료는 수확량을 늘려요. 자동 물주기를 켠 칸은 거두면 같은 작물을 저절로 다시 심어요.</li>
       <li>처음 거둔 작물은 도감에 올라가요. 3 · 6 · 9 · 12종을 모으면 계속 적용되는 보너스를 받아요.</li>
+      <li>옥상의 물뿌리개 · 창고 상자 · 도감 책 · 주문판을 누르면 그 판이 바로 열려요.</li>
       <li>텃밭 레벨 15와 밭 25칸을 채우면 1차 완주예요.</li></ul></div>
-      <div class="fm-modal__btns" style="margin-top:16px"><button type="button" class="fm-btn" data-m="tut">처음 안내 다시 보기</button><button type="button" class="fm-btn fm-btn--blue" data-m="ok">닫기</button></div>`)
+      <div class="fm-modal__btns" style="margin-top:16px"><button type="button" class="mgx-btn is-white is-lg" data-m="tut">처음 안내 다시 보기</button><button type="button" class="mgx-btn is-lg" data-m="ok">닫기</button></div>`, "is-sheet")
       .then((v) => { if (v === "tut") tutorial(); });
+  }
+  function moreMenu() {
+    return modal(`<div class="fm-modal__title">더보기</div>
+      <div class="fm-menu"><button type="button" class="fm-menu__item" data-m="tut">${ic("graduation-cap", 20)}<span><b>처음 안내 다시 보기</b><small>심고 · 거두고 · 넓히는 방법</small></span></button>
+      <button type="button" class="fm-menu__item is-danger" data-m="reset">${ic("rotate-ccw", 20)}<span><b>처음부터 다시</b><small>밭 · 창고 · 도구 · 도감 · 레벨을 모두 지워요</small></span></button></div>`, "is-sheet")
+      .then((v) => { if (v === "tut") tutorial(); else if (v === "reset") resetAll(); });
   }
 
   // ══ 화면 ══════════════════════════════════════════════════
+  const DOCK = [["seed", "씨앗", "seed"], ["shed", "창고", "crate"], ["orders", "주문", "memo"], ["tools", "도구", "can"], ["dex", "도감", "book"]];
+  const topBar = (full) => `<div class="mgx-top fm-top">
+      <a class="mgx-top__back" href="/manage">${ic("chevron-left", 18)}매니지먼트</a>
+      <div class="mgx-top__title"><span class="fm-logo">${markSvg}</span><span class="fm-top__name">${TITLE}</span>${full ? `<span class="mgx-chip" id="fm-lvchip"></span><span id="fm-donebadge"></span>` : ""}</div>
+      ${full ? `<div class="mgx-top__actions"><button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button><button type="button" class="mgx-icon" data-act="more" aria-label="더보기">${ic("ellipsis", 20)}</button></div>` : ""}
+    </div>`;
+  function showMessage(html) {
+    root.innerHTML = topBar(false) + `<div class="fm-msg">${html}</div>`;
+    HKUI.refreshIcons(root);
+  }
   function build() {
-    root.innerHTML = `
-      <a class="hk-mg-back" href="/manage">${ic("chevron-left", 16)}매니지먼트</a>
-      <div class="fm-top">
-        <div class="fm-top__mark">${markSvg}</div>
-        <div class="fm-top__title"><h1>${TITLE}<span id="fm-donebadge"></span></h1><p>출근 전에 심고, 점심 · 퇴근 후에 거둬요</p></div>
-        <div class="fm-top__btns">
-          <button type="button" class="fm-iconbtn" data-act="help" aria-label="도움말">${ic("circle-help", 18)}<span>도움말</span></button>
-          <button type="button" class="fm-iconbtn" data-act="reset" aria-label="처음부터 다시">${ic("rotate-ccw", 18)}<span>처음부터 다시</span></button>
-        </div>
-      </div>
-      <div class="fm-hud" id="fm-hud"></div>
+    root.innerHTML = topBar(true) + `
       <div class="fm-main">
-        <div class="fm-scene" role="region" aria-label="옥상 텃밭">
-          <div class="fm-sky" id="fm-sky"></div>
-          <div class="fm-floor"><div class="fm-field" id="fm-field"></div></div>
-          <div class="fm-bar" id="fm-bar"></div>
+        <div class="fm-left">
+          <div class="mgx-stage fm-stage" id="fm-stage" role="region" aria-label="옥상 텃밭 장면">
+            <div class="fm-sky" aria-hidden="true"><i class="fm-orb"></i><i class="fm-stars"></i>
+              <svg class="fm-cloud is-1" viewBox="0 0 120 40"><path d="M14 34 Q2 34 4 24 Q6 15 18 17 Q22 4 38 6 Q52 0 62 12 Q76 6 84 18 Q100 14 104 26 Q116 26 114 34Z" fill="#fff"/></svg>
+              <svg class="fm-cloud is-2" viewBox="0 0 120 40"><path d="M14 34 Q2 34 4 24 Q6 15 18 17 Q22 4 38 6 Q52 0 62 12 Q76 6 84 18 Q100 14 104 26 Q116 26 114 34Z" fill="#fff"/></svg>
+              <svg class="fm-cloud is-3" viewBox="0 0 120 40"><path d="M14 34 Q2 34 4 24 Q6 15 18 17 Q22 4 38 6 Q52 0 62 12 Q76 6 84 18 Q100 14 104 26 Q116 26 114 34Z" fill="#fff"/></svg>
+              <svg class="fm-birds" viewBox="0 0 60 24"><g stroke="#334155" stroke-width="2" fill="none" stroke-linecap="round"><path class="fm-wing" d="M2 10 Q7 4 12 10 Q17 4 22 10"/><path class="fm-wing" d="M24 18 Q28 13 32 18 Q36 13 40 18"/><path class="fm-wing" d="M40 6 Q44 1 48 6 Q52 1 56 6"/></g></svg>
+            </div>
+            <div class="mgx-hud fm-hud" id="fm-hud">
+              <div class="mgx-pill fm-pill" id="fm-pill-lv" role="img"><span class="fm-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="#fff"/><circle cx="18" cy="18" r="13.5" fill="none" stroke="#e3efe2" stroke-width="4"/><circle id="fm-lvring" cx="18" cy="18" r="13.5" fill="none" stroke="#22b35e" stroke-width="4" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" transform="rotate(-90 18 18)"/></svg><b id="fm-lvnum"></b></span><span class="fm-pill__txt"><small>레벨</small><em id="fm-xp"></em></span></div>
+              <div class="mgx-pill fm-pill" id="fm-pill-money"><span class="fm-pill__art">${coinSvg(26)}</span><b id="fm-money"></b></div>
+              <button type="button" class="mgx-pill fm-pill" id="fm-pill-shed" data-act="tab" data-tab="shed"><span class="fm-pill__art">${ART.crate}</span><b id="fm-shed"></b></button>
+              <button type="button" class="mgx-pill fm-pill is-today" id="fm-pill-today" data-act="tab" data-tab="seed"></button>
+            </div>
+            <div class="fm-board" id="fm-board">
+              <svg class="fm-board__svg" viewBox="0 0 ${BW} ${BH}"><defs><filter id="fm-blur" x="-20%" y="-50%" width="140%" height="200%"><feGaussianBlur stdDeviation="6"/></filter></defs>
+                <g id="fm-back"></g>
+                <g id="fm-cells">${DEPTH.map((i) => `<g class="fm-cell" data-i="${i}"></g>`).join("")}</g>
+                <g id="fm-props"></g>
+              </svg>
+              <div class="fm-overlay" id="fm-overlay"></div>
+              <i class="fm-butterfly" aria-hidden="true"><i><svg viewBox="0 0 24 20"><g class="fm-wings"><path d="M12 10 Q4 -2 1 5 Q0 11 12 10Z" fill="#f9a8d4"/><path d="M12 10 Q20 -2 23 5 Q24 11 12 10Z" fill="#f472b6"/><path d="M12 10 Q5 18 4 14 Q4 10 12 10Z" fill="#fbcfe8"/><path d="M12 10 Q19 18 20 14 Q20 10 12 10Z" fill="#f9a8d4"/></g><path d="M12 5 V15" stroke="#3b2a20" stroke-width="1.6" stroke-linecap="round"/></svg></i></i>
+            </div>
+          </div>
+          <div class="fm-act">
+            <div class="fm-strip" id="fm-strip" role="group" aria-label="심을 씨앗 고르기"></div>
+            <div class="fm-act__btns" id="fm-btns"></div>
+          </div>
         </div>
-        <div class="fm-side">
-          <div class="fm-today" id="fm-today"></div>
-          <div class="fm-tabs" role="tablist" id="fm-tabs"></div>
+        <div class="fm-right">
+          <div class="fm-quest" id="fm-today"></div>
+          <div class="mgx-dock fm-dock" role="tablist" id="fm-tabs"></div>
           <div class="fm-panel" id="fm-panel"></div>
         </div>
       </div>`;
-    const field = root.querySelector("#fm-field");
-    field.innerHTML = Array.from({ length: 25 }, (_, i) => `<button type="button" class="fm-cell" data-act="plot" data-i="${i}"></button>`).join("");
-    lastSky = -1; lastBarSig = ""; lastTabSig = "";
+    lastSky = ""; lastBarSig = ""; lastTabSig = ""; lastStripSig = ""; lastPropSig = ""; lastMoney = null; lastLv = null; lastTodaySig = "";
     refresh();
     HKUI.refreshIcons(root);
   }
@@ -785,6 +993,8 @@ window.HKFarm = (function () {
     drawHud();
     drawSky();
     drawField();
+    drawProps();
+    drawStrip();
     drawBar(true);
     drawToday();
     drawTabs(true);
@@ -792,19 +1002,41 @@ window.HKFarm = (function () {
     countdowns();
   }
   function drawHud() {
-    const el = root.querySelector("#fm-hud");
-    const need = NEED[S.lv] || 0, full = invTotal() >= cap();
-    el.innerHTML = `
-      <div class="fm-stat"><small>텃밭 레벨</small><b>${S.lv} <em>${S.lv >= MAX_LV ? "최고 레벨" : `${num(S.xp)} / ${num(need)}`}</em></b><div class="fm-xp"><i style="width:${S.lv >= MAX_LV ? 100 : Math.min(100, (S.xp / need) * 100)}%"></i></div></div>
-      <div class="fm-stat"><small>가진 돈</small><div class="fm-stat__row">${coinSvg(18)}<b>${num(S.money)}</b></div></div>
-      <div class="fm-stat ${full ? "is-full" : ""}"><small>창고</small><b>${num(invTotal())}<em> / ${num(cap())}</em></b></div>`;
-    root.querySelector("#fm-donebadge").innerHTML = S.done ? ` <span class="fm-done-badge">1차 완주</span>` : "";
+    const need = NEED[S.lv] || 0, max = S.lv >= MAX_LV, full = invTotal() >= cap();
+    const f = max ? 1 : Math.min(1, S.xp / need);
+    const $ = (id) => root.querySelector(id);
+    $("#fm-lvring").setAttribute("stroke-dashoffset", String(f1(100 - f * 100)));
+    $("#fm-lvnum").textContent = S.lv;
+    $("#fm-xp").textContent = max ? "최고" : `${num(S.xp)}/${num(need)}`;
+    $("#fm-pill-lv").setAttribute("aria-label", `텃밭 레벨 ${S.lv}${max ? " (최고 레벨)" : ` · 경험치 ${num(S.xp)} / ${num(need)}`}`);
+    $("#fm-lvchip").textContent = `Lv ${S.lv}`;
+    if (lastLv != null && S.lv > lastLv) { HKFx.bump($("#fm-pill-lv")); HKFx.bump($("#fm-lvchip")); }
+    lastLv = S.lv;
+    const m = $("#fm-money");
+    if (lastMoney == null || lastMoney === S.money) m.textContent = num(S.money);
+    else HKFx.count(m, lastMoney, S.money, { fmt: (v) => num(Math.round(v)) });
+    lastMoney = S.money;
+    $("#fm-pill-money").setAttribute("aria-label", `가진 돈 ${won(S.money)}`);
+    const sp = $("#fm-pill-shed");
+    sp.classList.toggle("is-full", full);
+    $("#fm-shed").innerHTML = `${num(invTotal())}<small>/${num(cap())}</small>${full ? `<span class="fm-pill__warn">가득</span>` : ""}`;
+    sp.setAttribute("aria-label", `창고 ${num(invTotal())} / ${num(cap())}${full ? " — 가득 찼어요" : ""}`);
+    const d = S.daily, tsig = d ? d.crop : "";
+    if (tsig !== lastTodaySig) {
+      lastTodaySig = tsig;
+      $("#fm-pill-today").innerHTML = d ? `<span class="fm-pill__art">${cropIco(d.crop)}</span><span class="fm-pill__txt"><small>오늘</small><em>×2</em></span>` : "";
+      $("#fm-pill-today").setAttribute("aria-label", d ? `오늘의 작물 ${CROP[d.crop].n} — 판매가 2배` : "오늘의 작물");
+    }
+    $("#fm-donebadge").innerHTML = S.done ? `<span class="mgx-chip is-gold">1차 완주</span>` : "";
   }
   function drawSky() {
-    const h = hourKst(store.now());
-    if (h === lastSky) return;
-    lastSky = h;
-    root.querySelector("#fm-sky").innerHTML = skySvg(h);
+    const t = timeOf(hourKst(store.now()));
+    if (t === lastSky) return;
+    lastSky = t;
+    const st = root.querySelector("#fm-stage");
+    st.classList.remove("is-morning", "is-day", "is-evening", "is-night");
+    st.classList.add(`is-${t}`);
+    root.querySelector("#fm-back").innerHTML = backdropSvg(t);
   }
   function cellSig(i) {
     if (!plotOpen(i)) {
@@ -816,66 +1048,117 @@ window.HKFarm = (function () {
     return `${st.stage}:${st.k || ""}:${S.autos.includes(i) ? "a" : ""}`;
   }
   function drawField() {
-    root.querySelectorAll("#fm-field .fm-cell").forEach((btn) => {
-      const i = +btn.dataset.i, sig = cellSig(i);
-      if (btn.dataset.sig === sig) return;
-      btn.dataset.sig = sig;
-      btn.className = "fm-cell";
+    let changed = false;
+    root.querySelectorAll("#fm-cells .fm-cell").forEach((g) => {
+      const i = +g.dataset.i, sig = cellSig(i);
+      if (g.dataset.sig === sig) return;
+      const old = g.dataset.sig || "";
+      g.dataset.sig = sig;
+      changed = true;
+      const [cx, cy] = cellFloor(i);
+      g.removeAttribute("data-act"); g.removeAttribute("role"); g.removeAttribute("tabindex"); g.removeAttribute("aria-label");
+      g.setAttribute("class", "fm-cell");
       if (!plotOpen(i)) {
+        const k = 0.86, pts = P([[cx, cy - HH * k], [cx + HW * k, cy], [cx, cy + HH * k], [cx - HW * k, cy]]);
         if (i === nextPlotIdx()) {
           const r = nextPlotReq(), lvOk = S.lv >= r[0];
-          btn.classList.add("is-next");
-          if (!lvOk) btn.classList.add("is-wait");
-          btn.innerHTML = `${ic(lvOk ? "plus" : "lock", 16)}<b>넓히기</b><small>${lvOk ? won(r[1]) : `레벨 ${r[0]}`}</small>`;
-          btn.setAttribute("aria-label", lvOk ? `밭 넓히기 ${won(r[1])}` : `텃밭 레벨 ${r[0]}부터 넓힐 수 있어요`);
-          HKUI.refreshIcons(btn);
+          g.setAttribute("class", `fm-cell is-next ${lvOk ? "" : "is-wait"}`);
+          g.setAttribute("data-act", "plot"); g.setAttribute("role", "button"); g.setAttribute("tabindex", "0");
+          g.setAttribute("aria-label", lvOk ? `밭 넓히기 ${won(r[1])}` : `텃밭 레벨 ${r[0]}부터 넓힐 수 있어요`);
+          g.innerHTML = `<polygon class="fm-hit fm-nextpad" points="${pts}"/>`;
         } else {
-          btn.classList.add("is-locked");
-          btn.innerHTML = "";
-          btn.setAttribute("aria-label", "아직 없는 칸");
-          btn.tabIndex = -1;
+          g.setAttribute("class", "fm-cell is-locked");
+          g.innerHTML = `<polygon points="${pts}" fill="rgba(255,255,255,.22)" stroke="rgba(110,95,75,.32)" stroke-width="1.6" stroke-dasharray="5 4"/><g transform="translate(${cx} ${cy - 2})" opacity=".32"><rect x="-5" y="-2" width="10" height="8" rx="2" fill="#7c6f60"/><path d="M-3 -2 v-2.4 a3 3 0 0 1 6 0 V-2" stroke="#7c6f60" stroke-width="1.8" fill="none"/></g>`;
         }
         return;
       }
-      btn.tabIndex = 0;
       const st = plotState(i), p = S.plots[i];
-      let extra = "";
-      if (S.autos.includes(i)) extra += `<span class="fm-cell__auto">${ic("refresh-cw", 12)}</span>`;
+      g.setAttribute("data-act", "plot"); g.setAttribute("role", "button"); g.setAttribute("tabindex", "0");
+      let ring = null;
       if (st.stage === -1) {
-        btn.setAttribute("aria-label", `빈 칸 — 눌러서 ${CROP[S.seed].n} 심기`);
-        btn.innerHTML = plotSvg(null, -1) + extra;
+        g.classList.add("is-empty");
+        g.setAttribute("aria-label", `빈 칸 — 눌러서 ${CROP[S.seed].n} 심기`);
       } else if (st.stage === 3) {
-        btn.classList.add("is-ready");
-        btn.setAttribute("aria-label", `${CROP[p.k].n} 다 자랐어요 — 눌러서 거두기`);
-        btn.innerHTML = plotSvg(p.k, 3) + `<span class="fm-cell__ok">${ic("check", 14)}</span><span class="fm-cell__tm">거두기</span>` + extra;
+        g.classList.add("is-ready");
+        g.setAttribute("aria-label", `${CROP[p.k].n} 다 자랐어요 — 눌러서 거두기`);
       } else {
-        btn.setAttribute("aria-label", `${CROP[p.k].n} 자라는 중`);
-        btn.innerHTML = plotSvg(p.k, st.stage) + `<span class="fm-cell__tm" data-cd="${p.p + p.d}">${dur(st.left)}</span>` + extra;
+        g.classList.add("is-grow");
+        g.setAttribute("aria-label", `${CROP[p.k].n} 자라는 중 — 눌러서 남은 시간 보기`);
+        ring = { p: p.p, d: p.d, cd: p.p + p.d, off: f1(100 - Math.min(1, (S.ft - p.p) / p.d) * 100) };
       }
-      HKUI.refreshIcons(btn);
+      g.innerHTML = cellArt(i, cx, cy, st, { auto: S.autos.includes(i), ring, seedN: i });
+      if (old.startsWith("-1:") && sig.startsWith("0:")) { g.classList.add("is-fresh"); setTimeout(() => g.classList.remove("is-fresh"), 600); }
     });
+    if (changed) drawOverlay();
+  }
+  // 장면 위 HTML — 다 자란 칸 말풍선 · 넓히기 표
+  function drawOverlay() {
+    let h = "", n = 0;
+    DEPTH.forEach((i) => {
+      const [cx, cy] = cellFloor(i);
+      if (!plotOpen(i)) {
+        if (i !== nextPlotIdx()) return;
+        const r = nextPlotReq(), lvOk = S.lv >= r[0], money = S.money >= r[1];
+        h += `<button type="button" class="fm-addtag ${lvOk ? (money ? "" : "is-poor") : "is-wait"}" style="${pct(cx, cy)}" data-act="plot" data-i="${i}" aria-label="${lvOk ? `밭 넓히기 ${won(r[1])}` : `텃밭 레벨 ${r[0]}부터 넓힐 수 있어요`}">
+          <span class="fm-addtag__ic">${ic(lvOk ? "plus" : "lock", 16)}</span><span>${lvOk ? `${coinSvg(13)}${num(r[1])}` : `Lv ${r[0]}`}</span></button>`;
+        return;
+      }
+      const p = S.plots[i];
+      // 자라는 칸 — 남은 시간을 칸 아래에 바로 보여 준다(맨 위 층이라 앞줄 화단에 가리지 않는다)
+      if (p && p.p + p.d > S.ft) h += `<span class="fm-cdtag" style="${pct(cx, cy + 27)}" data-cd="${p.p + p.d}">${dur(p.p + p.d - S.ft)}</span>`;
+      if (p && p.p + p.d <= S.ft) {
+        h += `<button type="button" class="mgx-ready fm-bubble" style="${pct(cx, cy - BOX.h - 56)};animation-delay:-${((n++ * 0.31) % 1.6).toFixed(2)}s" data-act="plot" data-i="${i}" aria-label="${CROP[p.k].n} 거두기"><span>${cropIco(p.k)}</span></button>`;
+      }
+    });
+    const el = root.querySelector("#fm-overlay");
+    el.innerHTML = h;
+    HKUI.refreshIcons(el);
+  }
+  function drawProps(force) {
+    const sig = `${S.tools.can}|${S.tools.auto}|${S.tools.shed}|${Math.round(Math.min(1, invTotal() / cap()) * 9)}|${invTotal() >= cap()}|${Object.keys(S.inv).join()}|${invTotal()}|${dexCount()}|${S.orders.filter((o) => o.items).length}|${S.orders.filter(canDeliver).length}`;
+    if (!force && sig === lastPropSig) return;
+    lastPropSig = sig;
+    root.querySelector("#fm-props").innerHTML = canProp(S.tools.can) + sprinklerProp(S.tools.auto) + crateProp() + bookProp() + boardProp();
+  }
+  function drawStrip() {
+    const av = unlocked(), nxt = CROPS.find((c) => c.lv > S.lv);
+    const sig = `${S.seed}|${S.lv}|${S.daily ? S.daily.crop : ""}|${av.map((c) => (S.money >= c.seed ? 1 : 0)).join("")}|${S.tools.can}|${dexCount() >= 12}`;
+    if (sig === lastStripSig) return;
+    lastStripSig = sig;
+    const el = root.querySelector("#fm-strip");
+    const keep = el.scrollLeft;
+    el.innerHTML = av.map((c) => {
+      const on = S.seed === c.k;
+      return `<button type="button" class="fm-chipseed ${on ? "is-on" : ""} ${S.money >= c.seed ? "" : "is-poor"}" data-act="seed" data-k="${c.k}" aria-pressed="${on}" aria-label="${c.n} 씨앗 ${won(c.seed)} · ${dur(growTime(c.k))}">
+        ${S.daily && S.daily.crop === c.k ? `<span class="fm-chipseed__x2">×2</span>` : ""}${cropIco(c.k)}<span class="fm-chipseed__n">${c.n}</span><span class="fm-chipseed__p">${coinSvg(12)}${num(c.seed)}</span></button>`;
+    }).join("") + (nxt ? `<span class="fm-chipseed is-lock" aria-label="${nxt.n} — 레벨 ${nxt.lv}에 열려요">${cropIco(nxt.k)}<span class="fm-chipseed__n">Lv ${nxt.lv}</span><span class="fm-chipseed__p">${ic("lock", 11)}</span></span>` : "");
+    el.scrollLeft = keep;
+    HKUI.refreshIcons(el);
+    const on = el.querySelector(".is-on");
+    if (on && !keep) on.scrollIntoView({ block: "nearest", inline: "center" });
   }
   function drawBar(force) {
     const ready = readyIdx().length, empty = emptyIdx().length, c = CROP[S.seed];
-    const sig = `${ready}|${empty}|${S.seed}|${S.money >= c.seed}|${S.tools.can}|${dexCount()}`;
+    const sig = `${ready}|${empty}|${S.seed}|${S.money >= c.seed}`;
     if (!force && sig === lastBarSig) return;
     lastBarSig = sig;
-    root.querySelector("#fm-bar").innerHTML = `
-      <button type="button" class="fm-seedchip" data-act="tab" data-tab="seed">${cropIco(S.seed)}<span>심을 씨앗 <b>${c.n}</b> · ${won(c.seed)} · ${dur(growTime(S.seed))}</span>${ic("chevron-right", 18)}</button>
-      <button type="button" class="fm-bigbtn fm-bigbtn--green" data-act="harvestAll" ${ready ? "" : "disabled"}>${ic("hand", 18)} 모두 거두기 <em>${ready}칸</em></button>
-      <button type="button" class="fm-bigbtn fm-bigbtn--blue" data-act="plantAll" ${empty ? "" : "disabled"}>${ic("shovel", 18)} 같은 씨앗 모두 심기 <em>${empty}칸</em></button>`;
-    HKUI.refreshIcons(root.querySelector("#fm-bar"));
+    root.querySelector("#fm-btns").innerHTML = `
+      <button type="button" class="mgx-btn is-gold is-lg fm-harvest ${ready ? "is-live" : ""}" data-act="harvestAll" ${ready ? "" : "disabled"}>${ART.crate}<span>모두 거두기</span><em>${ready}</em></button>
+      <button type="button" class="mgx-btn is-lg fm-plantall" data-act="plantAll" ${empty ? "" : "disabled"}>${cropIco(S.seed)}<span>모두 심기</span><em>${empty}</em></button>`;
   }
   function drawToday() {
     const d = S.daily;
     if (!d) return;
     const c = CROP[d.crop], done = d.prog >= d.task.n;
-    root.querySelector("#fm-today").innerHTML = `
-      <div class="fm-today__card is-crop">${cropIco(d.crop)}<div class="fm-today__txt"><small>오늘의 작물</small><b>${c.n} 판매가 2배</b><p>오늘 하루 ${won(unitPrice(d.crop))}에 팔려요</p></div></div>
-      <div class="fm-today__card"><span class="fm-today__ico">${ic("calendar-check", 20)}</span><div class="fm-today__txt"><small>오늘의 텃밭 일</small><b>${dailyText(d)}</b>
-        ${d.claimed ? `<p>받았어요. 내일 또 새 일이 와요.</p>` : `<div class="fm-mini"><i style="width:${(d.prog / d.task.n) * 100}%"></i></div><p>${num(d.prog)} / ${num(d.task.n)} · 보상 ${won(d.money)} · 경험치 ${d.xp}</p>`}</div>
-        ${d.claimed ? "" : `<button type="button" class="fm-btn ${done ? "fm-btn--green" : ""}" data-act="claim" ${done ? "" : "disabled"}>받기</button>`}</div>`;
-    HKUI.refreshIcons(root.querySelector("#fm-today"));
+    const el = root.querySelector("#fm-today");
+    el.innerHTML = `
+      <div class="fm-quest__crop">${cropIco(d.crop)}<span><small>오늘의 작물</small><b>${c.n}</b><em>${won(unitPrice(d.crop))} · 2배</em></span></div>
+      <div class="fm-quest__task ${d.claimed ? "is-claimed" : done ? "is-done" : ""}">
+        <span class="fm-quest__txt"><small>오늘의 텃밭 일</small><b>${dailyText(d)}</b>
+        ${d.claimed ? `<em>받았어요. 내일 또 새 일이 와요.</em>` : `<span class="mgx-bar ${done ? "is-full" : ""}"><i style="--v:${f1((d.prog / d.task.n) * 100)}%"></i></span><em>${num(d.prog)}/${num(d.task.n)} · ${coinSvg(12)} ${num(d.money)} · ${starSvg(12)} ${d.xp}</em>`}</span>
+        ${d.claimed ? `<span class="fm-quest__ok">${ic("check", 18)}</span>` : `<button type="button" class="mgx-btn is-sm ${done ? "is-gold" : ""}" data-act="claim" ${done ? "" : "disabled"}>받기</button>`}
+      </div>`;
+    HKUI.refreshIcons(el);
   }
   function tabBadges() {
     const deliverable = S.orders.filter(canDeliver).length;
@@ -887,89 +1170,131 @@ window.HKFarm = (function () {
     const sig = `${S.tab}|${b.orders}|${b.tools}|${b.shed}`;
     if (!force && sig === lastTabSig) return;
     lastTabSig = sig;
-    const tabs = [["seed", "씨앗", "sprout"], ["shed", "창고", "warehouse"], ["orders", "주문", "clipboard-list"], ["tools", "도구", "wrench"], ["dex", "도감", "book-open"]];
-    root.querySelector("#fm-tabs").innerHTML = tabs.map(([k, n, icn]) => {
+    root.querySelector("#fm-tabs").innerHTML = DOCK.map(([k, n, art]) => {
       let dot = "";
-      if (k === "orders" && b.orders) dot = `<span class="fm-tab__dot">${b.orders}</span>`;
-      if (k === "tools" && b.tools) dot = `<span class="fm-tab__dot is-dot"></span>`;
-      if (k === "shed" && b.shed) dot = `<span class="fm-tab__dot is-dot"></span>`;
-      return `<button type="button" class="fm-tab ${S.tab === k ? "is-on" : ""}" role="tab" aria-selected="${S.tab === k}" data-act="tab" data-tab="${k}">${ic(icn, 15)}${n}${dot}</button>`;
+      if (k === "orders" && b.orders) dot = `<span class="mgx-dot">${b.orders}</span>`;
+      if (k === "tools" && b.tools) dot = `<span class="mgx-dot is-pip"></span>`;
+      if (k === "shed" && b.shed) dot = `<span class="mgx-dot is-pip"></span>`;
+      return `<button type="button" class="mgx-tab fm-tab" role="tab" aria-selected="${S.tab === k}" data-act="tab" data-tab="${k}"><span class="fm-tab__art">${ART[art]}</span>${n}${dot}</button>`;
     }).join("");
-    HKUI.refreshIcons(root.querySelector("#fm-tabs"));
   }
   function drawPanel() {
     const el = root.querySelector("#fm-panel");
     el.innerHTML = ({ seed: panelSeed, shed: panelShed, orders: panelOrders, tools: panelTools, dex: panelDex }[S.tab] || panelSeed)();
     HKUI.refreshIcons(el);
   }
+  const panelHead = (title, sub, extra = "") => `<div class="fm-phead"><div><div class="fm-phead__t">${title}</div>${sub ? `<p>${sub}</p>` : ""}</div>${extra}</div>`;
   function panelSeed() {
-    return `<p class="fm-note">고른 씨앗은 빈 칸을 누르거나 「같은 씨앗 모두 심기」로 심어요.</p>` + CROPS.map((c) => {
-      const lock = c.lv > S.lv, on = S.seed === c.k;
-      return `<button type="button" class="fm-card fm-seed ${on ? "is-on" : ""} ${lock ? "is-lock" : ""}" ${lock ? "disabled" : `data-act="seed" data-k="${c.k}"`} aria-pressed="${on}">
-        <div class="fm-row">${cropIco(c.k)}<div class="fm-row__txt"><b>${c.n}${S.daily && S.daily.crop === c.k ? ` <span class="fm-tag fm-tag--gold">오늘 2배</span>` : ""}${lock ? ` <span class="fm-tag">레벨 ${c.lv}에 열려요</span>` : ""}</b>
-          <div class="fm-facts"><span>${ic("clock", 13)} ${dur(lock ? c.t : growTime(c.k))}</span><span>씨앗 ${won(c.seed)}</span><span>${lock ? c.y : yieldOf(c.k)}개 × ${won(lock ? c.p : unitPrice(c.k))}</span><span>경험치 ${c.xp}</span></div></div>
-          ${lock ? "" : `<span class="fm-seed__check">${on ? ic("check", 15) : ""}</span>`}</div></button>`;
-    }).join("");
+    return panelHead("씨앗 봉투", "고른 씨앗은 빈 화단을 누르거나 「모두 심기」로 심어요.") + `<div class="fm-packs">` + CROPS.map((c) => {
+      const lock = c.lv > S.lv, on = S.seed === c.k, today = S.daily && S.daily.crop === c.k;
+      return `<button type="button" class="fm-pack ${on ? "is-on" : ""} ${lock ? "is-lock" : ""}" style="--pk:${CROP_COLOR[c.k]}" ${lock ? "disabled" : `data-act="seed" data-k="${c.k}"`} aria-pressed="${on}">
+        <span class="fm-pack__zig"></span>
+        ${today ? `<span class="fm-pack__ribbon">오늘 2배</span>` : ""}
+        <span class="fm-pack__win">${cropIco(c.k)}</span>
+        <b class="fm-pack__n">${c.n}</b>
+        <span class="fm-pack__time">${ic("clock", 12)} ${dur(lock ? c.t : growTime(c.k))}</span>
+        <span class="fm-pack__row"><span>${coinSvg(14)}<b>${num(c.seed)}</b></span><span class="fm-pack__yield">${lock ? c.y : yieldOf(c.k)}개 × ${won(lock ? c.p : unitPrice(c.k))}</span></span>
+        <span class="fm-pack__xp">${starSvg(12)} 경험치 ${c.xp}</span>
+        ${lock ? `<span class="fm-pack__lock">${ic("lock", 14)} 레벨 ${c.lv}</span>` : on ? `<span class="fm-pack__check">${ic("check", 16)}</span>` : ""}
+      </button>`;
+    }).join("") + `</div>`;
   }
   function panelShed() {
     const items = Object.entries(S.inv).filter(([, n]) => n > 0).sort((a, b) => CROPS.indexOf(CROP[a[0]]) - CROPS.indexOf(CROP[b[0]]));
     const need = {};
     S.orders.forEach((o) => (o.items || []).forEach((it) => { need[it.k] = (need[it.k] || 0) + it.n; }));
     const total = items.reduce((a, [k, n]) => a + n * unitPrice(k), 0);
-    const t = TOOLS.shed, l = S.tools.shed;
-    let head = `<div class="fm-card"><div class="fm-row"><div class="fm-row__txt"><b>창고 ${num(invTotal())} / ${num(cap())}</b><div class="fm-cap"><i style="width:${Math.min(100, (invTotal() / cap()) * 100)}%"></i></div>
-      <p>${invTotal() >= cap() ? "가득 찼어요 — 팔거나 넓혀야 더 거둘 수 있어요." : `${num(cap() - invTotal())}개 더 들어가요.`}${l < t.cost.length ? ` 다음 단계는 ${SHED_CAP[l + 1]}개 (${won(t.cost[l])} · 레벨 ${t.lv[l]})` : ""}</p></div>
-      ${l < t.cost.length ? `<button type="button" class="fm-btn" data-act="tool" data-k="shed" ${S.lv >= t.lv[l] && S.money >= t.cost[l] ? "" : "disabled"}>넓히기</button>` : ""}</div></div>`;
-    if (!items.length) return head + `<div class="fm-card fm-empty">창고가 비었어요. 다 자란 칸을 눌러 거둬 보세요.</div>`;
-    head += `<div class="fm-card"><div class="fm-row"><div class="fm-row__txt"><b>모두 팔기</b><p>창고에 있는 걸 한 번에 팔면 ${won(total)}</p></div><button type="button" class="fm-btn fm-btn--blue" data-act="sellAll">${coinSvg(16)} 모두 팔기</button></div></div>`;
-    return head + items.map(([k, n]) => `<div class="fm-card"><div class="fm-row">${cropIco(k)}<div class="fm-row__txt"><b>${CROP[k].n} <span class="fm-tag">${num(n)}개</span>${S.daily && S.daily.crop === k ? ` <span class="fm-tag fm-tag--gold">오늘 2배</span>` : ""}${need[k] ? ` <span class="fm-tag fm-tag--blue">주문에 ${need[k]}개</span>` : ""}</b>
-      <p>한 개 ${won(unitPrice(k))} · 모두 ${won(n * unitPrice(k))}</p></div>
-      <div class="fm-btns"><button type="button" class="fm-btn" data-act="sell" data-k="${k}" data-n="1" aria-label="${CROP[k].n} 1개 팔기">1개</button><button type="button" class="fm-btn" data-act="sell" data-k="${k}" data-n="all">모두</button></div></div></div>`).join("");
+    const t = TOOLS.shed, l = S.tools.shed, full = invTotal() >= cap();
+    let out = panelHead("창고", full ? "가득 찼어요 — 팔거나 넓혀야 더 거둘 수 있어요." : `${num(cap() - invTotal())}개 더 들어가요.`);
+    out += `<div class="mgx-card fm-capcard ${full ? "is-full" : ""}"><span class="fm-capcard__art">${ART.crate}</span><div class="fm-grow"><b>${num(invTotal())} <small>/ ${num(cap())}</small></b><span class="mgx-bar ${full ? "is-full" : ""}" style="--bar:#d98a3a"><i style="--v:${f1(Math.min(100, (invTotal() / cap()) * 100))}%"></i></span>
+      <p>${l < t.cost.length ? `다음 단계 ${SHED_CAP[l + 1]}개 · ${won(t.cost[l])} · 레벨 ${t.lv[l]}` : "가장 큰 창고예요"}</p></div>
+      ${l < t.cost.length ? `<button type="button" class="mgx-btn is-soft is-sm" data-act="tool" data-k="shed" ${S.lv >= t.lv[l] && S.money >= t.cost[l] ? "" : "disabled"}>넓히기</button>` : ""}</div>`;
+    if (!items.length) return out + `<div class="fm-empty">${ART.crate}<b>창고가 비었어요</b><span>다 자란 화단의 말풍선을 눌러 거둬 보세요.</span></div>`;
+    out += `<button type="button" class="mgx-btn is-gold is-lg is-wide fm-sellall" data-act="sellAll">${coinSvg(22)} 모두 팔기 <em>${won(total)}</em></button>`;
+    return out + `<div class="fm-slots">` + items.map(([k, n]) => `<div class="fm-slot">
+      <div class="fm-slot__top">${cropIco(k)}<span class="fm-slot__n">×${num(n)}</span>${S.daily && S.daily.crop === k ? `<span class="fm-slot__x2">2배</span>` : ""}</div>
+      <b>${CROP[k].n}</b><small>한 개 ${won(unitPrice(k))}</small>${need[k] ? `<span class="mgx-chip fm-slot__need">주문에 ${need[k]}개</span>` : ""}
+      <div class="fm-slot__btns"><button type="button" class="mgx-btn is-white is-sm" data-act="sell" data-k="${k}" data-n="1" aria-label="${CROP[k].n} 1개 팔기">1개</button><button type="button" class="mgx-btn is-soft is-sm" data-act="sell" data-k="${k}" data-n="all" aria-label="${CROP[k].n} 모두 팔기 ${won(n * unitPrice(k))}">모두</button></div></div>`).join("") + `</div>`;
   }
   function panelOrders() {
-    return `<p class="fm-note">주문을 채우면 그냥 팔 때보다 더 받아요. 끝내거나 넘기면 ${dur(ORDER_WAIT)} 뒤 새 주문이 와요.</p>` + S.orders.map((o, si) => {
-      if (!o.items) return `<div class="fm-card fm-wait">${ic("hourglass", 18)}<span>새 주문이 오고 있어요 · <b data-cd="${o.wait}">${dur(o.wait - S.ft)}</b></span></div>`;
+    const tilts = [-1.2, 0.9, -0.5], papers = ["#fff6bf", "#e6f7df", "#ffe6e1"];
+    return panelHead("동료 주문", `채우면 그냥 팔 때보다 더 받아요. 끝내거나 넘기면 ${dur(ORDER_WAIT)} 뒤 새 주문이 와요.`) + S.orders.map((o, si) => {
+      if (!o.items) return `<div class="fm-memo is-wait" style="--tilt:${tilts[si % 3]}deg">${ic("hourglass", 20)}<span>새 주문이 오고 있어요 · <b data-cd="${o.wait}">${dur(o.wait - S.ft)}</b></span></div>`;
       const ok = canDeliver(o);
-      return `<div class="fm-card"><div class="fm-order__who"><span class="fm-avatar" style="background:${o.color}">${esc(o.name.charAt(0))}</span><div><b>${esc(o.dept)} ${esc(o.name)}</b><p>“${esc(o.line)}”</p></div></div>
-        <div class="fm-order__items">${o.items.map((it) => { const have = S.inv[it.k] || 0; return `<span class="fm-need ${have >= it.n ? "is-ok" : ""}">${cropIco(it.k)}${CROP[it.k].n} ${it.n} <em>(${Math.min(have, it.n)}/${it.n})</em></span>`; }).join("")}</div>
-        <div class="fm-order__foot"><div class="fm-order__reward"><span>${coinSvg(16)} ${won(o.money)}</span><span>${ic("star", 15, "#f59e0b")} 경험치 ${o.xp}</span></div>
-          <div class="fm-btns"><button type="button" class="fm-btn" data-act="skip" data-i="${si}">넘기기</button><button type="button" class="fm-btn ${ok ? "fm-btn--green" : ""}" data-act="deliver" data-i="${si}" ${ok ? "" : "disabled"}>드리기</button></div></div></div>`;
+      return `<div class="fm-memo ${ok ? "is-ok" : ""}" style="--tilt:${tilts[si % 3]}deg;--paper:${papers[si % 3]}"><span class="fm-memo__tape"></span>
+        <div class="fm-memo__who">${faceSvg(o)}<div><b>${esc(o.dept)} ${esc(o.name)}</b><p>“${esc(o.line)}”</p></div></div>
+        <div class="fm-memo__items">${o.items.map((it) => { const have = S.inv[it.k] || 0, done = have >= it.n; return `<span class="fm-need ${done ? "is-ok" : ""}">${cropIco(it.k)}<span><b>${CROP[it.k].n} ${it.n}</b><em>${Math.min(have, it.n)}/${it.n}</em></span>${done ? `<i>${ic("check", 12)}</i>` : ""}</span>`; }).join("")}</div>
+        <div class="fm-memo__foot"><div class="fm-memo__reward"><span>${coinSvg(16)} ${won(o.money)}</span><span>${starSvg(15)} ${o.xp}</span></div>
+          <button type="button" class="mgx-btn is-white is-sm" data-act="skip" data-i="${si}">넘기기</button><button type="button" class="mgx-btn is-sm" data-act="deliver" data-i="${si}" ${ok ? "" : "disabled"}>드리기</button></div></div>`;
     }).join("");
   }
   function panelTools() {
     const req = nextPlotReq();
-    let out = "";
+    let out = panelHead("도구", "도구를 사면 옥상에도 놓여요.");
     if (req) {
       const can = S.lv >= req[0] && S.money >= req[1];
-      out += `<div class="fm-card"><div class="fm-row"><span class="fm-toolico" style="background:#dcfce7;color:#16a34a">${ic("grid-3x3", 22)}</span><div class="fm-row__txt"><b>밭 넓히기 <span class="fm-tag">${S.open} / 25칸</span></b>
-        <p>다음 칸 ${won(req[1])} · 텃밭 레벨 ${req[0]}</p></div><button type="button" class="fm-btn ${can ? "fm-btn--blue" : ""}" data-act="expand" ${can ? "" : "disabled"}>넓히기</button></div></div>`;
-    } else out += `<div class="fm-card"><div class="fm-row"><span class="fm-toolico" style="background:#dcfce7;color:#16a34a">${ic("grid-3x3", 22)}</span><div class="fm-row__txt"><b>밭 25칸 완성</b><p>옥상을 모두 텃밭으로 채웠어요.</p></div></div></div>`;
+      out += `<div class="mgx-card fm-tool"><span class="fm-tool__art">${TOOL_ART.plot}</span><div class="fm-grow"><b>밭 넓히기 <span class="mgx-chip is-gray">${S.open} / 25칸</span></b>
+        <p>다음 칸 · 텃밭 레벨 ${req[0]}${S.lv >= req[0] ? "" : "에 열려요"}</p></div><button type="button" class="mgx-btn is-sm fm-buy" data-act="expand" ${can ? "" : "disabled"}>${coinSvg(15)}${num(req[1])}</button></div>`;
+    } else out += `<div class="mgx-card fm-tool"><span class="fm-tool__art">${TOOL_ART.plot}</span><div class="fm-grow"><b>밭 25칸 완성</b><p>옥상을 모두 텃밭으로 채웠어요.</p></div></div>`;
     out += TOOL_KEYS.map((tk) => {
       const t = TOOLS[tk], l = S.tools[tk], max = t.cost.length, maxed = l >= max;
       const can = !maxed && S.lv >= t.lv[l] && S.money >= t.cost[l];
       const dots = `<span class="fm-lvdots">${Array.from({ length: max }, (_, j) => `<i class="${j < l ? "is-on" : ""}"></i>`).join("")}</span>`;
       const extra = tk === "auto" && l ? `<br>자라는 칸을 눌러 켜요 · 지금 ${S.autos.length}/${autoMax()}칸` : "";
-      return `<div class="fm-card"><div class="fm-row"><span class="fm-toolico" style="background:${t.bg};color:${t.color}">${ic(t.icon, 22)}</span><div class="fm-row__txt"><b>${t.n} ${dots}</b>
-        <p>${t.desc}<br>${l || tk === "shed" ? `지금: ${t.eff(l)}${maxed ? " (최고 단계)" : ` → 다음: ${t.eff(l + 1)}`}` : `사면: ${t.eff(1)}`}${extra}</p>
-        ${maxed ? "" : `<div class="fm-facts"><span>${won(t.cost[l])}</span><span>텃밭 레벨 ${t.lv[l]}${S.lv >= t.lv[l] ? "" : "에 열려요"}</span></div>`}</div>
-        ${maxed ? `<span class="fm-tag fm-tag--green">최고</span>` : `<button type="button" class="fm-btn ${can ? "fm-btn--blue" : ""}" data-act="tool" data-k="${tk}" ${can ? "" : "disabled"}>사기</button>`}</div></div>`;
+      return `<div class="mgx-card fm-tool ${l ? "" : "is-none"}"><span class="fm-tool__art" style="--tb:${t.bg}">${TOOL_ART[tk]}</span><div class="fm-grow"><b>${t.n} ${dots}</b>
+        <p>${t.desc}<br>${l || tk === "shed" ? `지금 <b>${t.eff(l)}</b>${maxed ? " (최고 단계)" : ` → 다음 ${t.eff(l + 1)}`}` : `사면 <b>${t.eff(1)}</b>`}${extra}</p>
+        ${maxed || S.lv >= t.lv[l] ? "" : `<span class="mgx-chip is-gray">${ic("lock", 12)} 텃밭 레벨 ${t.lv[l]}에 열려요</span>`}</div>
+        ${maxed ? `<span class="mgx-chip is-good">최고</span>` : `<button type="button" class="mgx-btn is-sm fm-buy" data-act="tool" data-k="${tk}" ${can ? "" : "disabled"} aria-label="${t.n} ${l + 1}단계 사기 ${won(t.cost[l])}">${coinSvg(15)}${num(t.cost[l])}</button>`}</div>`;
     }).join("");
     return out;
   }
   function panelDex() {
     const n = dexCount();
-    return `<div class="fm-card"><b style="font-size:15px">도감 ${n} / ${CROPS.length}</b><div class="fm-cap"><i style="width:${(n / CROPS.length) * 100}%;background:#16a34a"></i></div>
-      <div class="fm-miles">${DEX_MILES.map((m) => `<div class="fm-mile ${n >= m.n ? "is-on" : ""}"><i>${n >= m.n ? ic("check", 13) : ""}</i>${m.n}종 — ${m.txt}</div>`).join("")}</div></div>
-      <div class="fm-dex">${CROPS.map((c) => {
+    const track = `<div class="fm-track"><span class="mgx-bar"><i style="--v:${f1((n / CROPS.length) * 100)}%"></i></span>${DEX_MILES.map((m) => `<span class="fm-track__node ${n >= m.n ? "is-on" : ""}" style="left:${(m.n / CROPS.length) * 100}%">${n >= m.n ? ic("check", 12) : m.n}</span>`).join("")}</div>`;
+    return panelHead(`작물 도감 <span class="mgx-chip">${n} / ${CROPS.length}</span>`, "처음 거둔 작물이 스티커로 붙어요.") + `<div class="fm-book">${track}
+      <div class="fm-miles">${DEX_MILES.map((m) => `<div class="fm-mile ${n >= m.n ? "is-on" : ""}"><i>${n >= m.n ? ic("check", 12) : m.n}</i>${m.n}종 — ${m.txt}</div>`).join("")}</div>
+      <div class="fm-dex">${CROPS.map((c, j) => {
         const got = S.dex[c.k];
-        return `<div class="fm-dexcard ${got ? "" : "is-off"}">${cropIco(c.k)}<b>${got ? c.n : "?"}</b><small>${got ? `모두 ${num(got)}개 거둠` : c.lv > S.lv ? `레벨 ${c.lv}` : "아직 못 거뒀어요"}</small></div>`;
-      }).join("")}</div>`;
+        return `<div class="fm-dexcard ${got ? "is-got" : ""}" style="--r:${[-5, 4, -2, 6, -4, 3][j % 6]}deg"><span class="fm-dexcard__slot">${cropIco(c.k)}${got ? "" : `<i>?</i>`}</span><b>${got ? c.n : "???"}</b><small>${got ? `${num(got)}개 거둠` : c.lv > S.lv ? `레벨 ${c.lv}` : "아직이에요"}</small></div>`;
+      }).join("")}</div></div>`;
   }
-  // 남은 시간 글자 — data-cd="텃밭 시계 목표(초)"
+  // 남은 시간 글자 — data-cd="텃밭 시계 목표(초)" · 남은 시간 고리 — data-ring="심은 시각" data-rd="자라는 시간"
   function countdowns() {
     document.querySelectorAll("[data-cd]").forEach((el) => {
       const left = +el.dataset.cd - S.ft;
       el.textContent = left > 0 ? dur(left) : "곧";
+    });
+    document.querySelectorAll("[data-ring]").forEach((el) => {
+      const f = Math.max(0, Math.min(1, (S.ft - +el.dataset.ring) / +el.dataset.rd));
+      el.setAttribute("stroke-dashoffset", String(f1(100 - f * 100)));
+    });
+  }
+
+  // ══ 반응(손맛) ═════════════════════════════════════════════
+  const ptOf = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+  const cellPt = (i) => ptOf(root.querySelector(`#fm-overlay [data-i="${i}"]`) || root.querySelector(`#fm-cells [data-i="${i}"] .fm-soil`) || root.querySelector(`#fm-cells [data-i="${i}"]`));
+  function flyCrops(from, k, q) {
+    if (!from) return;
+    const crate = root.querySelector("#fm-prop-shed"), pill = root.querySelector("#fm-pill-shed");
+    HKFx.float(from, `+${q}`, { color: "#158a45" });
+    HKFx.fly(from, crate || pill, { n: Math.min(6, Math.max(2, q)), color: ballOf(k), done: () => HKFx.bump(pill) });
+  }
+  function flyCoins(from, gain) {
+    const pill = root.querySelector("#fm-pill-money");
+    if (gain <= 0 || !pill) return;
+    HKFx.fly(from, pill, { n: Math.min(10, 3 + Math.floor(gain / 60)) });
+    HKFx.float(pill, `+${won(gain)}`, { color: "#c27c00", dy: 24 });
+  }
+  function spendFx(cost) {
+    const pill = root.querySelector("#fm-pill-money");
+    if (cost > 0 && pill) { HKFx.float(pill, `−${won(cost)}`, { color: "#e5484d", dy: 24 }); HKFx.bump(pill); }
+  }
+  function doHarvestAll() {
+    const pts = readyIdx().slice(0, 8).map((i) => ({ i, k: S.plots[i].k, pt: cellPt(i) }));
+    harvestAll();
+    pts.forEach(({ i, k, pt }, j) => {
+      const p = S.plots[i];
+      if (!p || p.p + p.d > S.ft) setTimeout(() => flyCrops(pt, k, yieldOf(k)), j * 70);
     });
   }
 
@@ -990,7 +1315,7 @@ window.HKFarm = (function () {
       flush();
       return;
     }
-    if (newDay || ordersChanged) { store.dirty(); drawToday(); if (S.tab === "orders" || S.tab === "shed") drawPanel(); }
+    if (newDay || ordersChanged) { store.dirty(); drawToday(); drawHud(); drawStrip(); drawProps(); if (S.tab === "orders" || S.tab === "shed" || S.tab === "seed") drawPanel(); }
     drawSky();
     drawField();
     drawBar(false);
@@ -1000,27 +1325,73 @@ window.HKFarm = (function () {
     if (++ticksSinceSave >= 300) { ticksSinceSave = 0; store.dirty(); }
   }
 
-  function onClick(e) {
+  async function onClick(e) {
     const b = e.target.closest("[data-act]");
     if (!b || b.disabled || !root.contains(b)) return;
     const a = b.dataset.act;
-    if (a === "plot") onPlot(+b.dataset.i);
-    else if (a === "harvestAll") harvestAll();
-    else if (a === "plantAll") plantAll();
+    const m0 = S.money, from = ptOf(b);
+    if (a === "plot") {
+      const i = +b.dataset.i, st = plotOpen(i) ? plotState(i) : null;
+      if (st && st.stage === 3) {
+        const pt = cellPt(i), h0 = S.stats.harv;
+        await onPlot(i);
+        if (S.stats.harv > h0) flyCrops(pt, st.k, yieldOf(st.k));
+      } else {
+        const opened = S.open;
+        await onPlot(i);
+        if (S.open > opened) {
+          spendFx(m0 - S.money);
+          const g = root.querySelector(`#fm-cells [data-i="${i}"]`);
+          if (g) { g.classList.add("is-fresh"); setTimeout(() => g.classList.remove("is-fresh"), 600); }
+          const p = cellPt(i);
+          if (p) HKFx.confetti({ x: p.x, y: p.y, n: 36 });
+        }
+      }
+    } else if (a === "harvestAll") doHarvestAll();
+    else if (a === "plantAll") { plantAll(); if (S.money < m0) spendFx(m0 - S.money); }
     else if (a === "tab") {
       S.tab = b.dataset.tab;
+      store.dirty();
       drawTabs(true); drawPanel();
-      if (b.classList.contains("fm-seedchip") && matchMedia("(max-width: 919px)").matches) root.querySelector("#fm-tabs").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
-    } else if (a === "seed") { S.seed = b.dataset.k; store.dirty(); drawBar(true); drawPanel(); drawField(); HKUI.toast(`이제 빈 칸을 누르면 ${jo(CROP[S.seed].n, "을", "를")} 심어요`); }
-    else if (a === "sell") sell(b.dataset.k, b.dataset.n === "all" ? Infinity : +b.dataset.n);
-    else if (a === "sellAll") sellAll();
-    else if (a === "deliver") deliver(+b.dataset.i);
+      if (!b.closest("#fm-tabs") && b.classList.contains("fm-prop")) HKFx.bump(b);
+      if (matchMedia("(max-width: 959px)").matches && !b.closest("#fm-tabs")) {
+        root.querySelector("#fm-panel").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+      } else if (matchMedia("(max-width: 959px)").matches) {
+        const r = root.querySelector("#fm-panel").getBoundingClientRect();
+        if (r.top > innerHeight * 0.55 || r.top < 0) root.querySelector("#fm-panel").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+      }
+    } else if (a === "seed") {
+      S.seed = b.dataset.k; store.dirty(); drawStrip(); drawBar(true); drawField();
+      if (S.tab === "seed") drawPanel();
+      HKUI.toast(`이제 빈 칸을 누르면 ${jo(CROP[S.seed].n, "을", "를")} 심어요`);
+    }
+    else if (a === "sell") { sell(b.dataset.k, b.dataset.n === "all" ? Infinity : +b.dataset.n); flyCoins(from, S.money - m0); }
+    else if (a === "sellAll") { await sellAll(); flyCoins(from, S.money - m0); }
+    else if (a === "deliver") { deliver(+b.dataset.i); if (S.money > m0) { flyCoins(from, S.money - m0); HKFx.confetti({ x: from.x, y: from.y, n: 28 }); } }
     else if (a === "skip") skipOrder(+b.dataset.i);
-    else if (a === "tool") buyTool(b.dataset.k);
-    else if (a === "expand") expand();
-    else if (a === "claim") claimDaily();
+    else if (a === "tool") {
+      const tk = b.dataset.k, l0 = S.tools[tk];
+      buyTool(tk);
+      if (S.tools[tk] > l0) {
+        spendFx(m0 - S.money);
+        const prop = root.querySelector(`#fm-prop-${tk}`);
+        if (prop) HKFx.bump(prop);
+        HKFx.confetti({ x: from.x, y: from.y, n: 24 });
+      }
+    }
+    else if (a === "expand") { const o = S.open; await expand(); if (S.open > o) spendFx(m0 - S.money); }
+    else if (a === "claim") { claimDaily(); flyCoins(from, S.money - m0); }
     else if (a === "help") help();
+    else if (a === "more") moreMenu();
     else if (a === "reset") resetAll();
+  }
+  // 장면 속 칸 · 소품(svg)은 단추가 아니라서 Enter · 스페이스를 따로 받는다
+  function onKey(e) {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const t = e.target;
+    if (!(t instanceof SVGElement) || !t.matches("[data-act][role=button]")) return;
+    e.preventDefault();
+    onClick({ target: t });
   }
 
   async function mount(container) {
@@ -1029,11 +1400,11 @@ window.HKFarm = (function () {
       store = await HKMgmt.open(KEY, {
         blank,
         onStale: (st) => { S = fix(st); advance(store.now()); ensureDaily(store.now()); ensureOrders(); build(); HKUI.toast("다른 창에서 바뀐 내용을 불러왔어요"); },
-        onClosed: (opensAt) => { clearInterval(tickTimer); S = null; root.innerHTML = HKMgmt.closedHtml(opensAt, TITLE); HKUI.refreshIcons(root); },
+        onClosed: (opensAt) => { clearInterval(tickTimer); S = null; showMessage(HKMgmt.closedHtml(opensAt, TITLE)); },
       });
     } catch (e) {
-      if (e && e.closed) { root.innerHTML = HKMgmt.closedHtml(e.opensAt, TITLE); HKUI.refreshIcons(root); return; }
-      root.innerHTML = `<div class="fm-card fm-empty">텃밭을 불러오지 못했어요. 잠시 뒤 다시 들어와 주세요.<br><small>${esc(e && e.message)}</small></div>`;
+      if (e && e.closed) { showMessage(HKMgmt.closedHtml(e.opensAt, TITLE)); return; }
+      showMessage(`<div class="fm-empty">${ART.crate}<b>텃밭을 불러오지 못했어요</b><span>잠시 뒤 다시 들어와 주세요.<br><small>${esc(e && e.message)}</small></span></div>`);
       return;
     }
     S = fix(store.state);
@@ -1046,6 +1417,9 @@ window.HKFarm = (function () {
     ensureOrders();
     summary();
     root.addEventListener("click", onClick);
+    root.addEventListener("keydown", onKey);
+    // 화면이 안 보이면 장면 움직임도 멈춘다
+    document.addEventListener("visibilitychange", () => root.classList.toggle("is-paused", document.hidden));
     build();
     if (first || store.isNew) store.saveNow();
     else store.dirty();

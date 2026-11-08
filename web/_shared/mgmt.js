@@ -123,7 +123,7 @@ window.HKMgmt = (function () {
         <span class="hk-mg-closed__icon">${window.HKUI ? HKUI.icon("moon", 28, "currentColor") : ""}</span>
         <b>지금은 업무 시간이라 쉬어요</b>
         <p>${title ? `${title}은(는) ` : ""}점심시간(11:30~13:00) · 18:00 이후 · 9:00 이전 · 주말에 열려요.${opens ? `<br><b>${opens}</b>에 다시 열려요.` : ""}</p>
-        <small>걸어 둔 생산 · 연구는 그동안에도 계속 진행돼요.</small>
+        <small>걸어 둔 일은 그동안에도 계속 진행돼요.</small>
         <a class="hk-btn hk-btn--secondary" href="/manage">매니지먼트 모음으로</a>
       </div>`;
   }

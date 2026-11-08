@@ -428,13 +428,19 @@ window.HKCafe = (function () {
     collect, startUpgrade, toggleMenu, bestMenu, hire, buyDeco, placeDeco, claimOrder, menuSlotsFree,
   };
 
-
-  // ══ 옥상 그림(canvas) ═════════════════════════════════════════
-  // 400×230 기준 좌표로 그리고, 화면 폭에 맞춰 늘린다. 하늘은 실제 시각(한국 시간)에 맞춘다.
-  const W = 400, H = 230, FLOOR = 146;
+  // ══ 옥상 디오라마(canvas) ═════════════════════════════════════
+  // 비스듬히 내려다본(2:1 아이소메트릭) 10×10 칸 옥상 바닥판이 하늘에 떠 있는 미니어처.
+  // 논리 좌표 420×330 안에 그리고 장면 크기에 맞춰 키운다. 빛은 늘 왼쪽 위. 하늘 · 조명은 실제 시각(한국 시간).
+  //   격자 (gx, gy, z): gx 는 오른쪽 아래로, gy 는 왼쪽 아래로 늘어난다. 맨 위 꼭짓점이 (0, 0).
+  //   왼쪽 뒤 벽(gx = 0)에 가게 · 오른쪽 뒤(gy = 0)는 난간 너머 도시 · 오른쪽 구석에 계단실.
+  const W = 420, H = 330, OX = 210, OY = 92, HW = 18, HH = 9, SLAB = 20;
+  const P = (gx, gy, z = 0) => [OX + (gx - gy) * HW, OY + (gx + gy) * HH - z];
   const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
-  const mix = (a, b, t) => { const A = hex(a), B = hex(b); return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",")})`; };
-  const SKY = [[0, "#0b1433", "#24305e"], [5, "#0f1a3d", "#2c3a6e"], [6.3, "#4a5aa0", "#f6b38e"], [7.6, "#7cc0ff", "#d9eeff"], [16.2, "#78b9ff", "#d4ecff"], [17.6, "#6d78c8", "#ffb17a"], [18.8, "#2f3577", "#c4708f"], [20, "#141d45", "#2e3a6c"], [24, "#0b1433", "#24305e"]];
+  const mixHex = (a, b, t) => { const A = hex(a), B = hex(b); return "#" + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, "0")).join(""); };
+  const mix = mixHex;
+  const shade = (h, t) => (t >= 0 ? mixHex(h, "#ffffff", t) : mixHex(h, "#000000", -t));
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const SKY = [[0, "#0d1538", "#2a3266"], [5, "#121b44", "#36407a"], [6.3, "#5865a8", "#ffb894"], [7.6, "#86c6ff", "#ffe9d6"], [16.2, "#7cbcff", "#ffe6cf"], [17.6, "#7a6fc4", "#ffae7a"], [18.8, "#3a3780", "#e9849a"], [20, "#161f4c", "#3a3f78"], [24, "#0d1538", "#2a3266"]];
   function skyAt(h) {
     for (let i = 0; i < SKY.length - 1; i++) {
       const [h0, t0, b0] = SKY[i], [h1, t1, b1] = SKY[i + 1];
@@ -442,340 +448,787 @@ window.HKCafe = (function () {
     }
     return [SKY[0][1], SKY[0][2]];
   }
-  const nightOf = (h) => (h < 5.5 || h > 19.5 ? 1 : h < 7.5 ? (7.5 - h) / 2 : h > 17 ? (h - 17) / 2.5 : 0);
+  const nightOf = (h) => clamp01(h < 5.5 || h > 19.5 ? 1 : h < 7.5 ? (7.5 - h) / 2 : h > 17 ? (h - 17) / 2.5 : 0);
+  const duskOf = (h) => (h > 15.8 && h < 19.6 ? Math.sin(((h - 15.8) / 3.8) * Math.PI) : h > 5.6 && h < 8 ? Math.sin(((h - 5.6) / 2.4) * Math.PI) * 0.6 : 0);
+
   function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); c.fill(); }
   function circ(c, x, y, r) { c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); }
-  function ell(c, x, y, rx, ry) { c.beginPath(); c.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); c.fill(); }
-  function glow(c, x, y, r, color, a) { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, color.replace("A", a)); g.addColorStop(1, color.replace("A", 0)); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }
+  function ell(c, x, y, rx, ry) { c.beginPath(); c.ellipse(x, y, Math.max(0.1, rx), Math.max(0.1, ry), 0, 0, Math.PI * 2); c.fill(); }
+  function poly(c, pts, fill) { c.beginPath(); c.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) c.lineTo(pts[i][0], pts[i][1]); c.closePath(); c.fillStyle = fill; c.fill(); }
+  function seg(c, a, b, col, w) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke(); }
+  // 상자 — 윗면 · 앞 왼쪽 면(gy1, 빛 받아 밝음) · 앞 오른쪽 면(gx1, 그늘)
+  function box(c, gx0, gy0, gx1, gy1, z0, h, col, o = {}) {
+    const z1 = z0 + h;
+    poly(c, [P(gx0, gy1, z0), P(gx1, gy1, z0), P(gx1, gy1, z1), P(gx0, gy1, z1)], o.left || shade(col, -0.1));
+    poly(c, [P(gx1, gy0, z0), P(gx1, gy1, z0), P(gx1, gy1, z1), P(gx1, gy0, z1)], o.right || shade(col, -0.26));
+    poly(c, [P(gx0, gy0, z1), P(gx1, gy0, z1), P(gx1, gy1, z1), P(gx0, gy1, z1)], o.top || col);
+    if (o.edge !== false) { c.strokeStyle = "rgba(255,255,255,.42)"; c.lineWidth = 0.6; c.beginPath(); const a = P(gx0, gy1, z1), b = P(gx1, gy1, z1), d = P(gx1, gy0, z1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.stroke(); }
+  }
+  const qX = (c, gx, a, b, p, q, f) => poly(c, [P(gx, a, p), P(gx, b, p), P(gx, b, q), P(gx, a, q)], f); // gx 가 일정한 면(오른쪽 아래를 봄)
+  const qY = (c, gy, a, b, p, q, f) => poly(c, [P(a, gy, p), P(b, gy, p), P(b, gy, q), P(a, gy, q)], f); // gy 가 일정한 면(왼쪽 아래를 봄)
+  const qZ = (c, z, x0, y0, x1, y1, f) => poly(c, [P(x0, y0, z), P(x1, y0, z), P(x1, y1, z), P(x0, y1, z)], f); // 바닥과 나란한 면
+  function shadow(c, gx, gy, rx, a = 0.17) { const [x, y] = P(gx, gy); c.fillStyle = `rgba(90,45,20,${a})`; ell(c, x + 2.2, y + 1.1, rx, rx * 0.5); }
+  const NOFX = { glow() {}, dot() {}, bubble() {} };
+
+  // 김(스팀)
+  function steam(c, x, y, tm, a = 0.75) {
+    c.strokeStyle = `rgba(255,255,255,${a})`; c.lineWidth = 1; c.lineCap = "round";
+    for (let i = 0; i < 2; i++) {
+      const t = (tm * 0.8 + i * 0.5) % 1, yy = y - t * 9;
+      c.globalAlpha = 1 - t; c.beginPath(); c.moveTo(x + i * 2.2 - 1, yy); c.quadraticCurveTo(x + i * 2.2 - 3, yy - 2.5, x + i * 2.2 - 1, yy - 5); c.stroke();
+    }
+    c.globalAlpha = 1; c.lineCap = "butt";
+  }
 
   // 사람 — y 는 발끝. o: skin hair shirt pants style(short|bun|long|cap) sit dir walk cup apron
   function person(c, x, y, o) {
     const dir = o.dir || 1, sk = o.skin || "#f3c9a7";
     c.save(); c.translate(x, y);
+    if (o.alpha != null) c.globalAlpha = o.alpha;
+    if (o.sc) c.scale(o.sc, o.sc);
+    c.fillStyle = "rgba(90,45,20,.18)"; ell(c, 1.5, 0.5, 7, 2.6);
     if (o.sit) {
-      c.save(); c.scale(dir, 1); c.fillStyle = o.pants || "#475569"; rr(c, -3, -9, 10, 4, 2); rr(c, 5, -9, 3, 9, 1.5); c.fillStyle = "#334155"; rr(c, 5, -1.5, 5, 2, 1); c.restore();
-      c.translate(0, 5);
+      c.save(); c.scale(dir, 1); c.fillStyle = o.pants || "#475569"; rr(c, -3, -9, 10, 4, 2); rr(c, 5, -9, 3, 9, 1.5); c.fillStyle = "#3b2f2a"; rr(c, 5, -1.5, 5, 2, 1); c.restore();
+      c.translate(0, 4);
     } else {
       const sw = o.walk ? Math.sin(o.walk) * 2.2 : 0;
       c.fillStyle = o.pants || "#475569"; rr(c, -4 + sw, -9, 3, 9, 1.4); rr(c, 1 - sw, -9, 3, 9, 1.4);
-      c.fillStyle = "#334155"; rr(c, -4.5 + sw, -1.5, 4, 2, 1); rr(c, 0.5 - sw, -1.5, 4, 2, 1);
+      c.fillStyle = "#3b2f2a"; rr(c, -4.5 + sw, -1.5, 4, 2, 1); rr(c, 0.5 - sw, -1.5, 4, 2, 1);
       if (o.walk) c.translate(0, -Math.abs(Math.sin(o.walk)) * 1.1);
     }
-    c.fillStyle = o.shirt || "#60a5fa"; rr(c, -6, -21, 12, 13, 4);
+    c.fillStyle = o.shirt || "#60a5fa"; rr(c, -6, -21, 12, 13, 4.5);
     if (o.apron) { c.fillStyle = o.apron; rr(c, -4, -17, 8, 10, 2); }
-    c.fillStyle = o.shirt || "#60a5fa"; rr(c, -8, -20, 3, 8, 1.5); rr(c, 5, -20, 3, 8, 1.5);
+    c.fillStyle = shade(o.shirt || "#60a5fa", -0.08); rr(c, -8, -20, 3, 8, 1.5); rr(c, 5, -20, 3, 8, 1.5);
     c.fillStyle = sk; circ(c, -6.5, -11.5, 1.6); circ(c, 6.5, -11.5, 1.6);
-    if (o.cup) { c.fillStyle = "#fff"; rr(c, 6, -16, 4, 5, 1); c.fillStyle = "#a16207"; c.fillRect(6, -15, 4, 1.4); }
-    c.fillStyle = sk; circ(c, 0, -27, 6.2);
+    if (o.cup) { c.fillStyle = "#fffaf3"; rr(c, 6, -16, 4, 5, 1); c.fillStyle = "#c27a45"; c.fillRect(6, -15, 4, 1.4); }
+    c.fillStyle = sk; circ(c, 0, -27.5, 6.8);
     c.fillStyle = o.hair || "#3b2a20";
     const st = o.style || "short";
-    c.beginPath(); c.arc(0, -28, 6.6, Math.PI * 1.02, Math.PI * 1.98); c.lineTo(5.5, -27); c.quadraticCurveTo(0, -29.5, -5.5, -27); c.closePath(); c.fill();
-    if (st === "bun") circ(c, 0, -35, 3.2);
-    if (st === "long") { rr(c, -6.8, -29, 2.6, 10, 1.3); rr(c, 4.2, -29, 2.6, 10, 1.3); }
-    if (st === "cap") { c.fillStyle = o.capColor || "#ef4444"; c.beginPath(); c.arc(0, -29, 6.6, Math.PI, 0); c.fill(); rr(c, dir > 0 ? 2 : -9, -30, 7, 2, 1); }
-    c.fillStyle = "#1e1b2e"; const ex = dir * 0.8; circ(c, -2.2 + ex, -26.5, 0.9); circ(c, 2.2 + ex, -26.5, 0.9);
-    c.fillStyle = "rgba(244,114,182,.45)"; circ(c, -3.6 + ex, -24.6, 1.2); circ(c, 3.6 + ex, -24.6, 1.2);
+    if (st === "long") { rr(c, -7.2, -30, 3, 11, 1.5); rr(c, 4.2, -30, 3, 11, 1.5); }
+    c.beginPath(); c.arc(0, -28.5, 7.1, Math.PI * 1.02, Math.PI * 1.98); c.lineTo(6, -27.5); c.quadraticCurveTo(1 * dir, -31, -6, -27.5); c.closePath(); c.fill();
+    if (st === "bun") circ(c, 0, -36, 3.4);
+    if (st === "cap") { c.fillStyle = o.capColor || "#ef4444"; c.beginPath(); c.arc(0, -29.5, 7.1, Math.PI, 0); c.fill(); rr(c, dir > 0 ? 2 : -10, -30.5, 8, 2.2, 1); }
+    c.fillStyle = "#2a1d16"; const ex = dir * 0.9; ell(c, -2.4 + ex, -26.6, 1.05, 1.3); ell(c, 2.4 + ex, -26.6, 1.05, 1.3);
+    c.fillStyle = "rgba(255,120,140,.42)"; circ(c, -3.9 + ex, -24.4, 1.3); circ(c, 3.9 + ex, -24.4, 1.3);
     c.restore();
   }
 
-  function chair(c, x, y, side) { // side -1: 등받이가 왼쪽
-    c.fillStyle = "#9a6b45"; c.fillRect(x - 5, y - 8, 10, 2.5); c.fillRect(x - 4.5, y - 6, 1.6, 6); c.fillRect(x + 3, y - 6, 1.6, 6);
-    c.fillStyle = "#b07a4f"; c.fillRect(side < 0 ? x - 5.5 : x + 3.5, y - 18, 2, 12);
+  // 화분 — x, y 는 바닥(화면 좌표), k 종류, sc 크기, sw 흔들림
+  function pot(c, x, y, k, sc = 1, sw = 0) {
+    c.save(); c.translate(x, y); c.scale(sc, sc);
+    c.fillStyle = "rgba(90,45,20,.16)"; ell(c, 2, 0.5, 8, 3);
+    const potC = ["#d9714a", "#f2ece3", "#7fb5a0", "#e3a35a"][k % 4];
+    c.fillStyle = potC; c.beginPath(); c.moveTo(-6.5, -10); c.lineTo(6.5, -10); c.lineTo(4.8, 0); c.lineTo(-4.8, 0); c.closePath(); c.fill();
+    c.fillStyle = shade(potC, -0.18); c.beginPath(); c.moveTo(1.5, -10); c.lineTo(6.5, -10); c.lineTo(4.8, 0); c.lineTo(1, 0); c.closePath(); c.fill();
+    c.fillStyle = shade(potC, 0.12); rr(c, -7.2, -11.8, 14.4, 3, 1.4);
+    c.translate(0, -11); c.rotate(sw);
+    const gr = ["#3fb56b", "#2f9e5b", "#5fcf7f", "#278a4f"];
+    c.fillStyle = gr[k % 4];
+    if (k % 3 === 0) { ell(c, 0, -8, 7.5, 8.5); c.fillStyle = shade(gr[k % 4], 0.18); ell(c, -2.5, -10, 3.5, 4); }
+    else if (k % 3 === 1) { for (let i = -2; i <= 2; i++) { c.save(); c.rotate(i * 0.36); c.fillStyle = i % 2 ? gr[(k + 1) % 4] : gr[k % 4]; ell(c, 0, -8, 2.4, 8.5); c.restore(); } }
+    else { circ(c, -3.4, -5, 4.8); circ(c, 3.4, -6, 4.8); circ(c, 0, -10, 4.8); c.fillStyle = ["#ff8fb1", "#ffd23f", "#ff7a6b"][k % 3]; circ(c, -3.4, -7, 1.7); circ(c, 3.4, -9, 1.7); circ(c, 0, -13, 1.7); }
+    c.restore();
   }
-  function table(c, x, y) {
-    c.fillStyle = "rgba(0,0,0,.08)"; ell(c, x, y + 1, 13, 3);
-    c.fillStyle = "#6b7280"; c.fillRect(x - 1, y - 12, 2, 12); c.fillRect(x - 6, y - 1, 12, 1.6);
-    c.fillStyle = "#f8fafc"; ell(c, x, y - 13, 12, 4); c.fillStyle = "#e2e8f0"; c.fillRect(x - 12, y - 13, 24, 1.4);
-  }
-  function pot(c, x, y, k, night) {
-    const greens = ["#22c55e", "#16a34a", "#4ade80", "#15803d"];
-    c.fillStyle = "#c2410c"; c.beginPath(); c.moveTo(x - 6, y - 10); c.lineTo(x + 6, y - 10); c.lineTo(x + 4.5, y); c.lineTo(x - 4.5, y); c.fill();
-    c.fillStyle = "#ea580c"; c.fillRect(x - 6.5, y - 11, 13, 2.4);
-    c.fillStyle = greens[k % 4];
-    if (k % 3 === 0) { ell(c, x, y - 18, 7, 8); ell(c, x - 4, y - 14, 4, 4); }
-    else if (k % 3 === 1) { for (let i = -2; i <= 2; i++) { c.save(); c.translate(x, y - 11); c.rotate(i * 0.35); ell(c, 0, -8, 2.2, 8); c.restore(); } }
-    else { circ(c, x - 3, y - 15, 4.5); circ(c, x + 3, y - 16, 4.5); circ(c, x, y - 20, 4.5); c.fillStyle = ["#f472b6", "#facc15", "#f87171"][k % 3]; circ(c, x - 3, y - 17, 1.6); circ(c, x + 3, y - 19, 1.6); circ(c, x, y - 23, 1.6); }
-  }
-  function bulbs(c, x1, y1, x2, y2, sag, n, night, tm) {
-    c.strokeStyle = "rgba(51,65,85,.7)"; c.lineWidth = 0.7; c.beginPath(); c.moveTo(x1, y1); c.quadraticCurveTo((x1 + x2) / 2, Math.max(y1, y2) + sag, x2, y2); c.stroke();
-    const cols = ["#fde68a", "#fca5a5", "#a5f3fc", "#fde68a", "#bbf7d0"];
+
+  // 전구 줄 — a, b 화면 좌표(바닥 위 높은 곳)
+  function bulbs(c, a, b, sag, n, night, tm, fx) {
+    const mx = (a[0] + b[0]) / 2, my = Math.max(a[1], b[1]) + sag;
+    c.strokeStyle = "rgba(70,50,40,.55)"; c.lineWidth = 0.6; c.beginPath(); c.moveTo(a[0], a[1]); c.quadraticCurveTo(mx, my, b[0], b[1]); c.stroke();
+    const cols = ["#ffe08a", "#ffb4a2", "#b8f2e6", "#ffe08a", "#ffd1f0"];
     for (let i = 1; i < n; i++) {
-      const t = i / n, mx = (x1 + x2) / 2, my = Math.max(y1, y2) + sag;
-      const bx = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * mx + t * t * x2, by = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * my + t * t * y2;
-      const tw = 0.75 + 0.25 * Math.sin(tm * 2 + i);
-      if (night > 0.2) glow(c, bx, by + 2, 6, "rgba(253,230,138,A)", 0.5 * night * tw);
-      c.fillStyle = night > 0.2 ? cols[i % 5] : "#e5e7eb"; circ(c, bx, by + 2, 1.5);
+      const t = i / n, bx = (1 - t) * (1 - t) * a[0] + 2 * (1 - t) * t * mx + t * t * b[0], by = (1 - t) * (1 - t) * a[1] + 2 * (1 - t) * t * my + t * t * b[1] + 1.6;
+      const tw = 0.8 + 0.2 * Math.sin(tm * 2.2 + i * 1.3);
+      c.fillStyle = "#5b4a40"; c.fillRect(bx - 0.5, by - 2.2, 1, 1);
+      c.fillStyle = night > 0.2 ? cols[i % 5] : "#f4efe6"; circ(c, bx, by, 1.45);
+      if (night > 0.15) { fx.glow(bx, by, 9, "255,214,140", 0.42 * night * tw); fx.dot(bx, by, cols[i % 5], 1.45); }
     }
   }
 
-  // 꾸미기 물건 — x, y 는 바닥 기준점
-  function deco(c, id, x, y, night, tm) {
+  // 꾸미기 물건 — x, y 는 바닥 기준점(화면 좌표)
+  function deco(c, id, x, y, night, tm, fx = NOFX) {
     c.save();
-    c.fillStyle = "rgba(0,0,0,.08)"; ell(c, x, y, 14, 3);
+    c.fillStyle = "rgba(90,45,20,.15)"; ell(c, x + 2, y, 15, 3.6);
     switch (id) {
       case "parasol": {
-        c.fillStyle = "#94a3b8"; c.fillRect(x - 0.8, y - 36, 1.6, 36); c.fillStyle = "#64748b"; ell(c, x, y - 1, 6, 2);
-        const cols = ["#f87171", "#fff", "#f87171", "#fff", "#f87171", "#fff"];
-        for (let i = 0; i < 6; i++) { c.fillStyle = cols[i]; c.beginPath(); c.moveTo(x, y - 44); c.lineTo(x - 22 + i * 7.33, y - 32); c.lineTo(x - 22 + (i + 1) * 7.33, y - 32); c.fill(); }
-        c.fillStyle = "#ef4444"; circ(c, x, y - 44, 1.6); break;
+        c.fillStyle = "#c9b8a6"; c.fillRect(x - 0.9, y - 36, 1.8, 36); c.fillStyle = "#8b7765"; ell(c, x, y - 1, 6, 2.2);
+        const cols = ["#ff7a45", "#fff6ea"];
+        for (let i = 0; i < 8; i++) { c.fillStyle = cols[i % 2]; c.beginPath(); c.moveTo(x, y - 46); c.lineTo(x - 24 + i * 6, y - 33 + Math.abs(i - 4) * 0.5); c.lineTo(x - 24 + (i + 1) * 6, y - 33 + Math.abs(i - 3) * 0.5); c.fill(); }
+        c.fillStyle = "#d9541f"; circ(c, x, y - 46, 1.7); break;
       }
-      case "pots": pot(c, x - 9, y, 2, night); pot(c, x + 8, y, 5, night); c.save(); c.translate(x, y + 2); c.scale(0.75, 0.75); pot(c, 0, 0, 8, night); c.restore(); break;
-      case "lights": c.fillStyle = "#475569"; c.fillRect(x - 15, y - 34, 1.8, 34); c.fillRect(x + 13, y - 34, 1.8, 34); bulbs(c, x - 14, y - 33, x + 14, y - 33, 6, 6, Math.max(night, 0.25), tm); break;
+      case "pots": pot(c, x - 9, y, 2, 0.95, Math.sin(tm * 1.4) * 0.05); pot(c, x + 8, y, 5, 0.95, Math.sin(tm * 1.4 + 1) * 0.05); pot(c, x, y + 3, 8, 0.75, Math.sin(tm * 1.4 + 2) * 0.05); break;
+      case "lights": c.fillStyle = "#6b5a50"; c.fillRect(x - 15, y - 34, 1.8, 34); c.fillRect(x + 13, y - 34, 1.8, 34); bulbs(c, [x - 14, y - 33], [x + 14, y - 33], 6, 6, Math.max(night, 0.25), tm, fx); break;
       case "bench":
         c.fillStyle = "#8b5a33"; c.fillRect(x - 14, y - 10, 2, 10); c.fillRect(x + 12, y - 10, 2, 10);
-        c.fillStyle = "#b7794a"; rr(c, x - 16, y - 12, 32, 3.5, 1.5); rr(c, x - 16, y - 20, 32, 3, 1.5); rr(c, x - 16, y - 25, 32, 3, 1.5); break;
+        c.fillStyle = "#c98a55"; rr(c, x - 16, y - 12, 32, 3.5, 1.5); rr(c, x - 16, y - 20, 32, 3, 1.5); rr(c, x - 16, y - 25, 32, 3, 1.5);
+        c.fillStyle = "#ffb4a2"; rr(c, x - 10, y - 16, 8, 4, 2); break;
       case "board":
         c.fillStyle = "#8b5a33"; c.save(); c.translate(x, y); c.beginPath(); c.moveTo(-9, 0); c.lineTo(-5, -30); c.lineTo(5, -30); c.lineTo(9, 0); c.lineTo(7, 0); c.lineTo(3.5, -27); c.lineTo(-3.5, -27); c.lineTo(-7, 0); c.fill();
-        c.fillStyle = "#1f3b2d"; rr(c, -9, -28, 18, 20, 1.5); c.strokeStyle = "rgba(255,255,255,.8)"; c.lineWidth = 0.8;
-        c.beginPath(); c.moveTo(-6, -24); c.lineTo(3, -24); c.moveTo(-6, -20); c.lineTo(5, -20); c.moveTo(-6, -16); c.lineTo(1, -16); c.stroke(); c.fillStyle = "#f9a8d4"; circ(c, 5, -13, 1.6); c.restore(); break;
+        c.fillStyle = "#24382f"; rr(c, -9, -28, 18, 20, 1.5); c.strokeStyle = "rgba(255,255,255,.8)"; c.lineWidth = 0.8;
+        c.beginPath(); c.moveTo(-6, -24); c.lineTo(3, -24); c.moveTo(-6, -20); c.lineTo(5, -20); c.moveTo(-6, -16); c.lineTo(1, -16); c.stroke(); c.fillStyle = "#ffb4c8"; circ(c, 5, -13, 1.6); c.restore(); break;
       case "hammock":
         c.fillStyle = "#8b5a33"; c.fillRect(x - 20, y - 30, 2.4, 30); c.fillRect(x + 18, y - 30, 2.4, 30);
-        c.strokeStyle = "#f59e0b"; c.lineWidth = 3; c.beginPath(); c.moveTo(x - 18, y - 26); c.quadraticCurveTo(x, y - 4 + Math.sin(tm * 1.5) * 1.5, x + 18, y - 26); c.stroke();
-        c.strokeStyle = "#fde68a"; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 16, y - 24); c.quadraticCurveTo(x, y - 8 + Math.sin(tm * 1.5) * 1.5, x + 16, y - 24); c.stroke(); break;
+        c.strokeStyle = "#ff9f5a"; c.lineWidth = 3; c.beginPath(); c.moveTo(x - 18, y - 26); c.quadraticCurveTo(x, y - 4 + Math.sin(tm * 1.5) * 1.5, x + 18, y - 26); c.stroke();
+        c.strokeStyle = "#ffe0a8"; c.lineWidth = 1; c.beginPath(); c.moveTo(x - 16, y - 24); c.quadraticCurveTo(x, y - 8 + Math.sin(tm * 1.5) * 1.5, x + 16, y - 24); c.stroke(); break;
       case "scope":
-        c.strokeStyle = "#475569"; c.lineWidth = 1.4; c.beginPath(); c.moveTo(x, y - 16); c.lineTo(x - 7, y); c.moveTo(x, y - 16); c.lineTo(x + 7, y); c.moveTo(x, y - 16); c.lineTo(x, y); c.stroke();
-        c.save(); c.translate(x, y - 18); c.rotate(-0.5); c.fillStyle = "#1e3a8a"; rr(c, -9, -2.6, 18, 5.2, 2); c.fillStyle = "#facc15"; c.fillRect(-9, -2.6, 2, 5.2); c.fillStyle = "#93c5fd"; c.fillRect(7.5, -2, 1.5, 4); c.restore(); break;
+        c.strokeStyle = "#6b5a50"; c.lineWidth = 1.4; c.beginPath(); c.moveTo(x, y - 16); c.lineTo(x - 7, y); c.moveTo(x, y - 16); c.lineTo(x + 7, y); c.moveTo(x, y - 16); c.lineTo(x, y); c.stroke();
+        c.save(); c.translate(x, y - 18); c.rotate(-0.5); c.fillStyle = "#3d4a8a"; rr(c, -9, -2.6, 18, 5.2, 2); c.fillStyle = "#ffc83d"; c.fillRect(-9, -2.6, 2, 5.2); c.fillStyle = "#a9d6ff"; c.fillRect(7.5, -2, 1.5, 4); c.restore(); break;
       case "fountain": {
-        c.fillStyle = "#94a3b8"; ell(c, x, y - 4, 17, 5); c.fillStyle = "#cbd5e1"; c.fillRect(x - 17, y - 8, 34, 4); ell(c, x, y - 8, 17, 5);
-        c.fillStyle = "#60a5fa"; ell(c, x, y - 8.5, 14, 3.6); c.fillStyle = "#94a3b8"; c.fillRect(x - 2, y - 20, 4, 12); ell(c, x, y - 20, 6, 2);
-        c.strokeStyle = "rgba(147,197,253,.9)"; c.lineWidth = 1.2;
+        c.fillStyle = "#b9b2a8"; ell(c, x, y - 4, 17, 5.5); c.fillStyle = "#ddd6cc"; c.fillRect(x - 17, y - 8, 34, 4); ell(c, x, y - 8, 17, 5.5);
+        c.fillStyle = "#6fc3f0"; ell(c, x, y - 8.5, 14, 3.8); c.fillStyle = "#b9b2a8"; c.fillRect(x - 2, y - 20, 4, 12); ell(c, x, y - 20, 6, 2);
+        c.strokeStyle = "rgba(170,220,255,.95)"; c.lineWidth = 1.2;
         for (let i = -1; i <= 1; i += 2) { c.beginPath(); c.moveTo(x, y - 22); c.quadraticCurveTo(x + i * 8, y - 32 - Math.sin(tm * 4) * 1.5, x + i * 12, y - 10); c.stroke(); }
         break;
       }
       case "cathouse": {
-        c.fillStyle = "#fb923c"; c.fillRect(x - 14, y - 16, 18, 16); c.fillStyle = "#c2410c"; c.beginPath(); c.moveTo(x - 17, y - 15); c.lineTo(x - 5, y - 26); c.lineTo(x + 7, y - 15); c.fill();
-        c.fillStyle = "#431407"; c.beginPath(); c.arc(x - 5, y - 4, 4.5, Math.PI, 0); c.lineTo(x - 0.5, y); c.lineTo(x - 9.5, y); c.fill();
-        // 고양이
+        c.fillStyle = "#ff9a5c"; c.fillRect(x - 14, y - 16, 18, 16); c.fillStyle = "#d9541f"; c.beginPath(); c.moveTo(x - 17, y - 15); c.lineTo(x - 5, y - 26); c.lineTo(x + 7, y - 15); c.fill();
+        c.fillStyle = "#4a2312"; c.beginPath(); c.arc(x - 5, y - 4, 4.5, Math.PI, 0); c.lineTo(x - 0.5, y); c.lineTo(x - 9.5, y); c.fill();
         const tail = Math.sin(tm * 2) * 3;
-        c.strokeStyle = "#57534e"; c.lineWidth = 2; c.beginPath(); c.moveTo(x + 15, y - 3); c.quadraticCurveTo(x + 21, y - 8, x + 18 + tail, y - 14); c.stroke();
-        c.fillStyle = "#57534e"; ell(c, x + 12, y - 5, 5, 5); circ(c, x + 12, y - 12, 4);
+        c.strokeStyle = "#6b625c"; c.lineWidth = 2; c.beginPath(); c.moveTo(x + 15, y - 3); c.quadraticCurveTo(x + 21, y - 8, x + 18 + tail, y - 14); c.stroke();
+        c.fillStyle = "#6b625c"; ell(c, x + 12, y - 5, 5, 5); circ(c, x + 12, y - 12, 4);
         c.beginPath(); c.moveTo(x + 8.6, y - 14); c.lineTo(x + 9.4, y - 18); c.lineTo(x + 11.4, y - 15); c.fill(); c.beginPath(); c.moveTo(x + 15.4, y - 14); c.lineTo(x + 14.6, y - 18); c.lineTo(x + 12.6, y - 15); c.fill();
-        c.fillStyle = "#fde047"; circ(c, x + 10.5, y - 12.5, 0.9); circ(c, x + 13.5, y - 12.5, 0.9); break;
+        c.fillStyle = "#ffe066"; circ(c, x + 10.5, y - 12.5, 0.9); circ(c, x + 13.5, y - 12.5, 0.9); break;
       }
     }
     c.restore();
   }
 
-  const TABLE_POS = [[176, 176], [250, 172], [318, 182], [206, 204], [282, 206], [150, 200], [236, 190], [330, 210]];
-  const PLANT_POS = [124, 166, 200, 258, 292, 336, 180, 314];
+  // ── 시설 그림(레벨이 오르면 커지고 화려해진다) — 장면과 카드 그림이 같이 쓴다 ──
+  // o: { tm, brew, night, fx }
+  const CTR = { x0: 1.25, x1: 2.25, y0: 0.85, y1: 6.5, h: 18 }; // 카운터
+  function drawCounter(c, L, o) {
+    const top = L >= 6 ? "#f7f1ea" : L >= 4 ? "#e8bf8f" : "#d39a63";
+    const front = L >= 6 ? "#3b4a63" : L >= 4 ? "#bf7f4d" : "#ad7045";
+    box(c, CTR.x0, CTR.y0, CTR.x1, CTR.y1, 0, CTR.h, top, { left: shade(front, 0.08), right: front });
+    c.strokeStyle = L >= 6 ? "rgba(227,176,75,.45)" : "rgba(60,30,10,.16)"; c.lineWidth = 0.6; c.beginPath();
+    for (let g = CTR.y0 + 0.45; g < CTR.y1 - 0.05; g += 0.46) { const a = P(CTR.x1 + 0.002, g, 2), b = P(CTR.x1 + 0.002, g, 16); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+    c.stroke();
+    if (L >= 4) qX(c, CTR.x1 + 0.003, CTR.y0, CTR.y1, 0, 2.6, shade(front, -0.3));
+    if (L >= 6) { qX(c, CTR.x1 + 0.004, CTR.y0, CTR.y1, 15.4, 17.2, "#e3b04b"); c.strokeStyle = "rgba(160,150,140,.25)"; c.lineWidth = 0.5; c.beginPath(); const a = P(1.5, 1.6, 18), b = P(2.1, 3.2, 18); c.moveTo(a[0], a[1]); c.quadraticCurveTo(a[0] + 10, a[1] + 8, b[0], b[1]); c.stroke(); }
+    // 계산대(POS)
+    const pos = (gy, big) => {
+      if (!big) { box(c, 1.55, gy - 0.22, 1.95, gy + 0.22, 18, 6, "#4a4458"); qX(c, 1.951, gy - 0.15, gy + 0.15, 20.5, 23, "#a6f0c9"); return; }
+      box(c, 1.6, gy - 0.12, 1.85, gy + 0.12, 18, 2, "#5b5566");
+      poly(c, [P(1.7, gy - 0.28, 20), P(1.7, gy + 0.28, 20), P(1.86, gy + 0.28, 31), P(1.86, gy - 0.28, 31)], "#2a2633");
+      poly(c, [P(1.72, gy - 0.22, 21.4), P(1.72, gy + 0.22, 21.4), P(1.84, gy + 0.22, 29.6), P(1.84, gy - 0.22, 29.6)], "#8fdcff");
+    };
+    pos(5.9, L >= 4);
+    if (L >= 6) { pos(5.15, true); const [bx, by] = P(1.95, 6.25, 18); c.fillStyle = "#e3b04b"; c.beginPath(); c.arc(bx, by - 1, 3, Math.PI, 0); c.fill(); c.fillStyle = "#c48e2a"; c.fillRect(bx - 3.6, by - 1, 7.2, 1.2); }
+    // 팁 통 · 쿠키 병
+    if (L >= 3) { const [jx, jy] = P(1.85, 6.35, 18); c.fillStyle = "rgba(220,240,255,.7)"; rr(c, jx - 2.2, jy - 6, 4.4, 6, 1.2); c.fillStyle = "#ffc83d"; rr(c, jx - 1.8, jy - 2.6, 3.6, 2.4, 1); }
+  }
+
+  function drawCoffee(c, L, o) {
+    const t = L >= 7 ? 3 : L >= 5 ? 2 : L >= 3 ? 1 : 0, z = 18, cx = 1.75, cy = 1.8;
+    const wy = [0.62, 0.86, 1.04, 1.26][t], dx = [0.26, 0.3, 0.32, 0.35][t], h = [13, 16, 18, 22][t];
+    const col = ["#4f5363", "#c6ccd6", "#ef6a4e", "#eef1f5"][t];
+    const gy0 = cy - wy / 2, gy1 = cy + wy / 2, gx0 = cx - dx, gx1 = cx + dx;
+    box(c, gx0, gy0, gx1, gy1, z, h, col);
+    if (t === 2) qY(c, gy1 + 0.001, gx0, gx1, z + h * 0.35, z + h * 0.55, "#fff1e2");
+    qX(c, gx1 + 0.002, gy0 + 0.06, gy1 - 0.06, z + 0.6, z + 2.6, "#2c2b33");
+    const n = [1, 2, 2, 3][t];
+    for (let i = 0; i < n; i++) {
+      const a = gy0 + (wy * (i + 0.5)) / n;
+      qX(c, gx1 + 0.003, a - 0.09, a + 0.09, z + h * 0.5, z + h * 0.64, "#2c2b33");
+      const [ux, uy] = P(gx1 + 0.08, a, z + 2.6); c.fillStyle = "#fffaf3"; rr(c, ux - 2, uy - 3.8, 4, 3.8, 1);
+      if (o.brew) steam(c, ux, uy - 5, o.tm + i * 0.33, 0.8);
+    }
+    if (t >= 1) for (let i = 0; i <= t; i++) { const [ux, uy] = P(cx - 0.06, gy0 + 0.16 + i * 0.19, z + h); c.fillStyle = "#fffaf3"; rr(c, ux - 2.2, uy - 4, 4.4, 4, 1.2); c.fillStyle = "#eadfce"; ell(c, ux, uy - 4, 2.2, 0.8); }
+    if (t >= 2) { const [gx2, gy2] = P(gx1 + 0.003, cy, z + h * 0.84); c.fillStyle = t === 3 ? "#e3b04b" : "#fff3e6"; circ(c, gx2, gy2, 2.3); c.fillStyle = "#3a2a22"; c.fillRect(gx2 - 0.3, gy2 - 1.7, 0.6, 1.7); }
+    if (t === 3) { qX(c, gx1 + 0.004, gy0, gy1, z + h - 2.2, z + h - 0.8, "#e3b04b"); o.fx.glow(...P(gx1, cy, z + h * 0.84), 7, "255,210,120", 0.5 * (o.night || 0)); }
+    const [lx, ly] = P(gx1 + 0.003, gy0 + 0.1, z + h * 0.84); c.fillStyle = t >= 3 ? "#ffd23f" : "#ff5a5a"; circ(c, lx, ly, 1.1);
+    if (t >= 1) { // 그라인더
+      const g0 = gy1 + 0.06;
+      box(c, cx - 0.15, g0, cx + 0.15, g0 + 0.3, z, 9, t === 3 ? "#d8dde4" : "#3f3c48");
+      const [hx, hy] = P(cx, g0 + 0.15, z + 9);
+      c.fillStyle = "rgba(225,242,255,.7)"; rr(c, hx - 4, hy - 8, 8, 6.5, 2); c.fillStyle = "#6b3f22"; ell(c, hx, hy - 3.8, 3.2, 1.5); c.fillStyle = "#8a5430"; ell(c, hx, hy - 4.6, 2.4, 1);
+    }
+  }
+
+  function drawDessert(c, L, o) {
+    const x0 = 1.42, x1 = 2.08, g0 = 2.85, len = 0.92 + 0.12 * Math.min(8, L), g1 = g0 + len, z = 18;
+    const tall = L >= 5 ? 15 : 11, frame = L >= 7 ? "#e3b04b" : L >= 4 ? "#a9805f" : "#9a7457";
+    box(c, x0, g0, x1, g1, z, 3, frame);
+    const zi = z + 3, rows = L >= 3 ? 2 : 1, cols = Math.max(2, Math.round(len / 0.3));
+    const cake = ["#ffb3c1", "#ffe08a", "#f7a8d0", "#c9b6ff", "#ffc48a", "#9fe3c1"];
+    const row = (r) => {
+      for (let i = 0; i < cols; i++) {
+        const [x, y] = P(x0 + 0.33, g0 + (len * (i + 0.5)) / cols, zi + (r ? tall * 0.52 : 0.4));
+        c.fillStyle = "#fff6ea"; rr(c, x - 3, y - 3, 6, 3.2, 1.2); c.fillStyle = cake[(i + r * 3) % cake.length]; rr(c, x - 3, y - 4.8, 6, 2.4, 1.1); c.fillStyle = "#ef3b4f"; circ(c, x, y - 5.2, 0.9);
+      }
+    };
+    if (L >= 5) o.fx.glow(...P((x0 + x1) / 2, (g0 + g1) / 2, zi + 7), 20, "255,226,170", 0.55 * (o.night || 0));
+    row(0);
+    if (rows === 2) { qZ(c, zi + tall * 0.5, x0 + 0.04, g0 + 0.04, x1 - 0.04, g1 - 0.04, "rgba(255,255,255,.45)"); row(1); }
+    qY(c, g1, x0, x1, zi, zi + tall, "rgba(205,236,255,.28)");
+    qX(c, x1, g0, g1, zi, zi + tall, "rgba(190,226,250,.32)");
+    qZ(c, zi + tall, x0, g0, x1, g1, "rgba(230,246,255,.5)");
+    c.strokeStyle = L >= 7 ? "#e3b04b" : "rgba(255,255,255,.85)"; c.lineWidth = 0.7; c.beginPath();
+    [[P(x0, g1, zi), P(x0, g1, zi + tall)], [P(x1, g1, zi), P(x1, g1, zi + tall)], [P(x1, g0, zi), P(x1, g0, zi + tall)], [P(x0, g1, zi + tall), P(x1, g1, zi + tall)], [P(x1, g1, zi + tall), P(x1, g0, zi + tall)]].forEach(([a, b]) => { c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); });
+    c.stroke();
+    seg(c, P(x1 - 0.02, g0 + 0.2, zi + tall - 2), P(x1 - 0.02, g0 + 0.45, zi + 3), "rgba(255,255,255,.7)", 0.8);
+    if (L >= 7) { const [dx, dy] = P((x0 + x1) / 2, g0 + len * 0.5, zi + tall); c.fillStyle = "rgba(225,245,255,.55)"; c.beginPath(); c.arc(dx, dy - 1, 5, Math.PI, 0); c.fill(); c.fillStyle = "#ffb3c1"; rr(c, dx - 3, dy - 3.6, 6, 2.6, 1); c.fillStyle = "#e3b04b"; ell(c, dx, dy - 0.6, 6, 1.4); }
+  }
+
+  const TEA = { x0: 1.05, x1: 2.1, y0: 6.9, y1: 8.25, h: 16 };
+  function drawTea(c, L, o) {
+    const top = "#f6f0e4", front = L >= 6 ? "#4fae8c" : "#7cc3a0";
+    box(c, TEA.x0, TEA.y0, TEA.x1, TEA.y1, 0, TEA.h, top, { left: shade(front, 0.1), right: front });
+    if (L >= 4) { c.fillStyle = "rgba(255,255,255,.25)"; for (let g = TEA.y0 + 0.2; g < TEA.y1 - 0.1; g += 0.34) qX(c, TEA.x1 + 0.002, g, g + 0.16, 4, 12, "rgba(255,255,255,.18)"); }
+    const z = TEA.h;
+    // 주전자
+    const [kx, ky] = P(1.62, 7.22, z);
+    c.fillStyle = "#e08a4f"; ell(c, kx, ky - 5, 5, 4.6); c.fillStyle = shade("#e08a4f", 0.2); ell(c, kx - 1.5, ky - 6.5, 2, 1.6);
+    c.strokeStyle = "#b96b38"; c.lineWidth = 1.4; c.beginPath(); c.moveTo(kx + 4, ky - 5); c.lineTo(kx + 7.5, ky - 8.5); c.stroke(); c.beginPath(); c.arc(kx, ky - 9.4, 3, Math.PI, 0); c.stroke();
+    if (o.brew) steam(c, kx + 7.5, ky - 10, o.tm + 0.4, 0.7);
+    // 차 병
+    const jc = ["#9fd98a", "#ffd166", "#ffb38a", "#f7a8d0", "#b5b0ff", "#7ee0cf"];
+    const nj = Math.min(5, L + 1);
+    for (let i = 0; i < nj; i++) { const [jx, jy] = P(1.36, 7.55 + i * 0.15, z); c.fillStyle = "rgba(230,245,255,.85)"; rr(c, jx - 1.9, jy - 6.5, 3.8, 6.5, 1.2); c.fillStyle = jc[i]; rr(c, jx - 1.5, jy - 4.2, 3, 4, 1); c.fillStyle = "#8b5a33"; c.fillRect(jx - 1.9, jy - 7.4, 3.8, 1.3); }
+    if (L >= 3) { const [tx, ty] = P(1.85, 7.95, z); c.fillStyle = "rgba(225,245,255,.7)"; ell(c, tx, ty - 4, 4, 3.6); c.fillStyle = "#e2a03a"; ell(c, tx, ty - 3, 3.2, 2.2); c.fillStyle = "rgba(255,255,255,.7)"; ell(c, tx - 1.4, ty - 5.4, 1, 0.8); }
+    if (L >= 5) { const [bx, by] = P(1.9, 7.15, z); c.fillStyle = "#b5824f"; ell(c, bx, by - 1, 4.4, 1.8); c.fillStyle = "#ffe14d"; circ(c, bx - 1.6, by - 2.6, 1.8); circ(c, bx + 1.4, by - 2.4, 1.8); circ(c, bx, by - 4, 1.8); }
+    if (L >= 7) o.fx.glow(...P(0.02, 7.55, 44), 16, "120,240,190", 0.6 * (o.night || 0));
+  }
+
+  // 탁자 · 의자 (좌석 레벨에 따라 모양이 바뀐다)
+  function tableTop(c, gx, gy, L, cups) {
+    shadow(c, gx, gy, 12, 0.14);
+    const [x, y] = P(gx, gy, 0);
+    const topC = L >= 5 ? "#f8f4ee" : L >= 3 ? "#d7a06a" : "#f4eee6";
+    c.fillStyle = "#7d6b5e"; c.fillRect(x - 1, y - 13, 2, 13); ell(c, x, y, 5, 2);
+    c.fillStyle = shade(topC, -0.22); ell(c, x, y - 12.2, 12.5, 6.4);
+    c.fillStyle = topC; ell(c, x, y - 13.6, 12.5, 6.3);
+    if (L >= 7) { c.fillStyle = "#ff9a6b"; ell(c, x, y - 13.7, 9.5, 4.6); c.fillStyle = "#fff4ea"; ell(c, x, y - 13.8, 7.5, 3.5); }
+    if (L >= 5) { c.strokeStyle = "#e3b04b"; c.lineWidth = 0.7; c.beginPath(); c.ellipse(x, y - 13.6, 12.5, 6.3, 0, 0, Math.PI * 2); c.stroke(); }
+    if (L >= 3) { c.fillStyle = "rgba(220,240,255,.8)"; rr(c, x - 1.3, y - 19, 2.6, 4.6, 1); c.fillStyle = ["#ff8fb1", "#ffd23f", "#ff7a6b"][(gx * 3 + gy) % 3 | 0]; circ(c, x, y - 20, 1.7); }
+    cups.forEach((side) => { const cx = x + side * 5, cy = y - 13.6 - side * 2.2; c.fillStyle = "#fffaf3"; rr(c, cx - 1.8, cy - 3, 3.6, 3, 1); c.fillStyle = "#b8743f"; ell(c, cx, cy - 3, 1.6, 0.6); });
+  }
+  function chairSeat(c, gx, gy, L) {
+    const arm = L >= 5, col = L >= 7 ? "#e0527a" : arm ? "#ff9a6b" : L >= 3 ? "#b9824f" : "#e8dccd";
+    shadow(c, gx, gy, 6, 0.12);
+    const s = arm ? 0.32 : 0.26;
+    box(c, gx - s, gy - s, gx + s, gy + s, 0, arm ? 7 : 6, col, { edge: false });
+    if (arm) qZ(c, 7.01, gx - s + 0.05, gy - s + 0.05, gx + s - 0.05, gy + s - 0.05, shade(col, 0.15));
+  }
+  function chairBack(c, gx, gy, side, L) { // side -1: 뒤쪽(gy 작은 쪽) 등받이, 1: 앞쪽
+    const arm = L >= 5, col = L >= 7 ? "#e0527a" : arm ? "#ff9a6b" : L >= 3 ? "#b9824f" : "#e8dccd";
+    const s = arm ? 0.32 : 0.26, g = gy + side * s, top = side < 0 ? (arm ? 19 : 16) : (arm ? 13 : 12);
+    qY(c, g, gx - s, gx + s, 6, top, side < 0 ? shade(col, -0.05) : shade(col, -0.12));
+    qZ(c, top, gx - s, g - 0.06, gx + s, g + 0.06, shade(col, 0.1));
+  }
+  function parasolBig(c, gx, gy, col, tm) {
+    const [x, y] = P(gx, gy, 0);
+    c.fillStyle = "#d8cfc4"; c.fillRect(x - 0.8, y - 50, 1.6, 36);
+    const cols = [col, "#fff6ea"], sw = Math.sin(tm * 0.8) * 0.4;
+    for (let i = 0; i < 10; i++) {
+      const a0 = (i / 10) * Math.PI * 2, a1 = ((i + 1) / 10) * Math.PI * 2;
+      c.fillStyle = cols[i % 2]; c.beginPath(); c.moveTo(x, y - 58); c.lineTo(x + Math.cos(a0) * 21, y - 44 + Math.sin(a0) * 9 + sw); c.lineTo(x + Math.cos(a1) * 21, y - 44 + Math.sin(a1) * 9 + sw); c.closePath(); c.fill();
+    }
+    c.fillStyle = "rgba(0,0,0,.06)"; c.beginPath(); c.moveTo(x, y - 58); c.lineTo(x + 21, y - 44); c.lineTo(x, y - 35); c.closePath(); c.fill();
+    c.fillStyle = shade(col, -0.2); circ(c, x, y - 58, 1.6);
+  }
+  function lampPost(c, gx, gy, night, fx) {
+    shadow(c, gx, gy, 5, 0.15);
+    const [x, y] = P(gx, gy, 0);
+    c.fillStyle = "#4a3f3a"; c.fillRect(x - 1, y - 44, 2, 44); ell(c, x, y, 4.5, 1.8);
+    c.fillStyle = "#4a3f3a"; rr(c, x - 3.4, y - 50, 6.8, 2.2, 1);
+    c.fillStyle = night > 0.2 ? "#fff1b8" : "#f4efe6"; rr(c, x - 2.6, y - 48, 5.2, 5, 1.5);
+    if (night > 0.15) { fx.glow(x, y - 45, 26, "255,214,140", 0.62 * night); fx.dot(x, y - 45.5, "#fff6d0", 2.2); }
+  }
+
+  const TBL = [[4.7, 3.6], [7.5, 3.6], [4.7, 5.9], [7.5, 5.9], [4.7, 8.2], [7.5, 8.2]];
+  const PLANT_G = [[2.8, 0.45], [5.0, 0.45], [7.2, 0.45], [9.55, 9.55], [9.55, 7.1], [0.5, 9.55], [9.55, 3.0], [2.3, 9.55]];
+  // 꾸미기 자리(격자) — SPOTS 와 같은 순서 · 같은 이름
+  const SPOT_G = [[1.6, 9.2], [3.9, 0.95], [6.1, 0.95], [3.2, 9.35], [6.1, 9.45], [9.45, 2.95]];
+  const AWN = [["#ff7a45", "#fff3e6"], ["#3cc9a5", "#f2fff9"], ["#d98a4e", "#fff4e6"], ["#e0527a", "#fff0f4"]];
   const LOOKS = [
-    { hair: "#3b2a20", shirt: "#60a5fa", pants: "#334155", style: "short" }, { hair: "#7c4a2d", shirt: "#f9a8d4", pants: "#475569", style: "long" },
-    { hair: "#111827", shirt: "#a7f3d0", pants: "#1e3a8a", style: "short" }, { hair: "#b45309", shirt: "#fde68a", pants: "#334155", style: "bun" },
-    { hair: "#1f2937", shirt: "#c4b5fd", pants: "#44403c", style: "cap", capColor: "#2563eb" }, { hair: "#57534e", shirt: "#fca5a5", pants: "#0f172a", style: "long" },
-    { hair: "#292524", shirt: "#e5e7eb", pants: "#1e40af", style: "short" }, { hair: "#9a3412", shirt: "#93c5fd", pants: "#3f3f46", style: "bun" },
+    { hair: "#3b2a20", shirt: "#7cb7ff", pants: "#3d4a63", style: "short" }, { hair: "#7c4a2d", shirt: "#ffb4c8", pants: "#5b5266", style: "long" },
+    { hair: "#1c1a24", shirt: "#9fe3c1", pants: "#36507a", style: "short" }, { hair: "#b45f20", shirt: "#ffe08a", pants: "#4a4458", style: "bun" },
+    { hair: "#2a2430", shirt: "#c9b6ff", pants: "#5a4a40", style: "cap", capColor: "#ff7a45" }, { hair: "#5e4a40", shirt: "#ffb38a", pants: "#2c3348", style: "long" },
+    { hair: "#2a2220", shirt: "#f4efe6", pants: "#4060a8", style: "short" }, { hair: "#9a3f12", shirt: "#a9d6ff", pants: "#4a4450", style: "bun" },
   ];
   const SKINS = ["#f6d2b5", "#f3c9a7", "#e8b48f", "#f9dcc4", "#d9a07a"];
+  const ANCH = { coffee: [1.7, 1.75, 64], counter: [2.3, 6.85, 34], dessert: [1.75, 3.6, 52], tea: [1.55, 7.6, 46], seat: [4.7, 3.6, 40], plant: [5.0, 0.45, 42] };
 
+  // 하늘 미리 보기 — 주소에 ?sky=14 처럼 붙이면 그 시각의 하늘 · 조명으로만 그린다(게임 시간 · 저장은 그대로)
+  const SKY_PREVIEW = (() => { try { const v = new URLSearchParams(location.search).get("sky"); return v != null && v !== "" && isFinite(+v) ? ((+v % 24) + 24) % 24 : null; } catch (_) { return null; } })();
   function makeScene(canvas, getState, opts = {}) {
     const ctx = canvas.getContext("2d");
+    const off = document.createElement("canvas"), oc = off.getContext("2d");
     const reduce = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (_) { return false; } })();
-    let cw = 0, ch = 0, dpr = 1, raf = 0, last = 0, tm = 0, spawnIn = 1.5, alive = true;
+    let cw = 1, ch = 1, dpr = 1, k = 1, ox = 0, oy = 0, raf = 0, last = 0, tm = 0, spawnIn = 1.2, alive = true, uid = 0, acc = 0;
     const people = [], floats = [];
-    const stars = Array.from({ length: 34 }, (_, i) => [((i * 97) % 389) + 5, ((i * 53) % 100) + 4, (i % 3) * 0.3 + 0.6]);
-    const blds = Array.from({ length: 12 }, (_, i) => { const w = 22 + ((i * 37) % 18); return { x: i * 34 - 6 + ((i * 13) % 9), w, h: 34 + ((i * 41) % 46), tone: i % 3 }; });
+    let hits = [];
+    const stars = Array.from({ length: 56 }, (_, i) => [((i * 97) % 640) - 110, ((i * 53) % 190) - 60, (i % 3) * 0.3 + 0.5]);
+    const city = (() => {
+      const far = [], near = [];
+      for (let x = -170, i = 0; x < 600; i++) { const w = 20 + ((i * 37) % 22); far.push({ x, w, h: 52 + ((i * 41) % 70), r: i % 4 === 0 }); x += w + 2 + (i % 3); }
+      for (let x = -160, i = 0; x < 600; i++) { const w = 24 + ((i * 29) % 20); near.push({ x, w, h: 34 + ((i * 53) % 52), ant: i % 5 === 1 }); x += w + 6 + ((i * 7) % 9); }
+      return { far, near };
+    })();
 
     function resize() {
       const r = canvas.getBoundingClientRect();
-      dpr = Math.min(3, window.devicePixelRatio || 1);
-      cw = Math.max(1, r.width); ch = cw * H / W;
-      canvas.style.height = ch + "px";
-      canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
+      dpr = Math.min(2.5, window.devicePixelRatio || 1);
+      cw = Math.max(1, r.width); ch = Math.max(1, r.height);
+      canvas.width = off.width = Math.round(cw * dpr); canvas.height = off.height = Math.round(ch * dpr);
+      const top = opts.hudSpace ? opts.hudSpace() : 0;
+      k = Math.min(cw / (W - 40), (ch - top) / (H - 8)); // 좌우 빈 여백 20씩은 잘려도 된다
+      ox = (cw - W * k) / 2; oy = top + Math.max(0, ch - top - (H - 8) * k) * 0.5 - 4 * k;
+      if (opts.onLayout) opts.onLayout();
     }
+    const toCss = (gx, gy, z = 0) => { const [x, y] = P(gx, gy, z); return [ox + x * k, oy + y * k]; };
+
+    // ── 손님 ──
+    const DOOR = [9.0, 1.3], AISLE = 2.0;
+    const QUEUE = [[3.05, 5.9], [3.05, 4.95], [3.05, 4.0], [3.05, 3.05]];
     function seatsList(s) {
       const n = TABLES[s.fac.seat] || 0, out = [];
-      for (let i = 0; i < n; i++) { const [x, y] = TABLE_POS[i]; out.push({ x: x - 15, y, dir: 1 }, { x: x + 15, y, dir: -1 }); }
+      for (let i = 0; i < n; i++) { const [x, y] = TBL[i]; out.push({ gx: x, gy: y - 0.85, dir: -1, t: i, side: -1 }, { gx: x, gy: y + 0.85, dir: 1, t: i, side: 1 }); }
       return out;
     }
-
+    const aisleOf = (gx) => (gx < 6 ? 3.4 : 6.1);
+    function leave(p) {
+      const a = p.st === "sit" ? aisleOf(p.gx) : 3.4;
+      p.st = "leave"; p.seat = null; p.emo = null;
+      p.path = [[a, p.gy], [a, AISLE], [DOOR[0], AISLE], DOOR];
+    }
     function update(dt, s, info) {
       tm += dt;
       const seats = seatsList(s);
-      const busy = new Set(people.map((p) => p.seat));
+      const busy = new Set(people.filter((p) => p.seat != null).map((p) => p.seat));
       const want = info.full || !info.served ? 0 : Math.min(seats.length, 1 + Math.round(info.served / 12));
+      const q = people.filter((p) => p.st === "come" || p.st === "line" || p.st === "order").sort((a, b) => a.id - b.id);
       spawnIn -= dt;
-      if (spawnIn <= 0 && people.filter((p) => p.st !== "out").length < want) {
+      if (spawnIn <= 0) {
+        spawnIn = 1.8 + Math.random() * 3.4;
+        const active = people.filter((p) => p.st !== "leave").length;
         const free = seats.map((_, i) => i).filter((i) => !busy.has(i));
-        if (free.length) {
+        if (active < want && q.length < 3 && free.length) {
           const seat = free[Math.floor(Math.random() * free.length)];
-          const lk = LOOKS[Math.floor(Math.random() * LOOKS.length)];
-          people.push({ x: 371, y: 150, st: "in", tx: 128 + Math.random() * 10, ty: 160 + Math.random() * 6, seat, lk, skin: SKINS[Math.floor(Math.random() * SKINS.length)], walk: 0, wait: 0, cup: false });
+          people.push({ id: ++uid, gx: DOOR[0], gy: DOOR[1], path: [[DOOR[0], AISLE], [3.4, AISLE]], st: "come", seat, lk: LOOKS[Math.floor(Math.random() * LOOKS.length)], skin: SKINS[Math.floor(Math.random() * SKINS.length)], walk: 0, dir: 1, emo: null, cup: false });
         }
-        spawnIn = 2 + Math.random() * 4;
       }
+      q.forEach((p, i) => {
+        if (p.st === "order" || p.path.length) return;
+        const t = QUEUE[Math.min(i, QUEUE.length - 1)];
+        if (Math.hypot(t[0] - p.gx, t[1] - p.gy) > 0.03) { p.path = [t]; p.st = "line"; }
+        else if (i === 0) { p.st = "order"; p.wait = 1.8; p.emo = { k: "coffee", t: 1.8 }; p.dir = -1; }
+      });
       for (const p of people) {
-        if (p.st === "order") { p.wait -= dt; if (p.wait <= 0) { const st = seats[p.seat]; if (!st) { p.st = "out"; p.tx = 371; p.ty = 150; } else { p.st = "seat"; p.tx = st.x; p.ty = st.y; } p.cup = true; } continue; }
-        if (p.st === "sit") { p.wait -= dt; if (p.wait <= 0 || !seats[p.seat]) { p.st = "out"; p.tx = 371; p.ty = 150; } continue; }
-        const dx = p.tx - p.x, dy = p.ty - p.y, d = Math.hypot(dx, dy), sp = 34 * dt;
-        p.dir = dx >= 0 ? 1 : -1;
+        if (p.emo) { p.emo.t -= dt; if (p.emo.t <= 0) p.emo = null; }
+        if (p.st === "order") {
+          p.wait -= dt;
+          if (p.wait <= 0) {
+            const st = seats[p.seat];
+            if (info.price) { const [fx2, fy2] = P(2.9, 5.6, 40); floats.push({ x: fx2, y: fy2, a: 1, text: "+" + num(info.price) + "원" }); }
+            p.cup = true;
+            if (!st) leave(p);
+            else { p.st = "toSeat"; const a = aisleOf(st.gx); p.path = a < 5 ? [[3.4, p.gy], [3.4, st.gy], [st.gx, st.gy]] : [[3.4, p.gy], [3.4, AISLE], [6.1, AISLE], [6.1, st.gy], [st.gx, st.gy]]; }
+          }
+          continue;
+        }
+        if (p.st === "sit") {
+          p.wait -= dt; p.heart -= dt;
+          if (p.heart <= 0) { p.emo = { k: Math.random() < 0.7 ? "heart" : "note", t: 1.7 }; p.heart = 6 + Math.random() * 9; }
+          if (p.wait <= 0 || !seats[p.seat]) leave(p);
+          continue;
+        }
+        if (!p.path.length) { p.walk = 0; continue; }
+        const [tx, ty] = p.path[0], dx = tx - p.gx, dy = ty - p.gy, d = Math.hypot(dx, dy), sp = 2.1 * dt;
+        if (Math.abs(dx - dy) > 0.01) p.dir = dx - dy >= 0 ? 1 : -1;
         if (d <= sp) {
-          p.x = p.tx; p.y = p.ty; p.walk = 0;
-          if (p.st === "in") { p.st = "order"; p.wait = 1.6; if (info.price) floats.push({ x: 109, y: 100, a: 1, text: "+" + num(info.price) }); }
-          else if (p.st === "seat") { p.st = "sit"; p.wait = 10 + Math.random() * 14; p.dir = seats[p.seat] ? seats[p.seat].dir : 1; }
-          else if (p.st === "out") p.gone = true;
-        } else { p.x += dx / d * sp; p.y += dy / d * sp; p.walk += dt * 11; }
+          p.gx = tx; p.gy = ty; p.path.shift();
+          if (!p.path.length) {
+            p.walk = 0;
+            if (p.st === "toSeat") { const st = seats[p.seat]; if (!st) leave(p); else { p.st = "sit"; p.gx = st.gx; p.gy = st.gy; p.dir = st.dir; p.wait = 10 + Math.random() * 14; p.heart = 1.4; } }
+            else if (p.st === "leave") p.gone = true;
+          }
+        } else { p.gx += (dx / d) * sp; p.gy += (dy / d) * sp; p.walk += dt * 11; }
       }
       for (let i = people.length - 1; i >= 0; i--) if (people[i].gone) people.splice(i, 1);
-      for (const f of floats) { f.y -= dt * 10; f.a -= dt * 0.7; }
+      for (const f of floats) { f.y -= dt * 11; f.a -= dt * 0.7; }
       for (let i = floats.length - 1; i >= 0; i--) if (floats[i].a <= 0) floats.splice(i, 1);
     }
 
-    function draw(s, info) {
-      const c = ctx, k = (cw / W) * dpr;
-      c.setTransform(k, 0, 0, k, 0, 0);
-      const h = kstHour(info.now), night = Math.max(0, Math.min(1, nightOf(h)));
-      // 하늘
-      const [top, bot] = skyAt(h);
-      const g = c.createLinearGradient(0, 0, 0, FLOOR); g.addColorStop(0, top); g.addColorStop(1, bot);
-      c.fillStyle = g; c.fillRect(0, 0, W, FLOOR + 2);
-      if (night > 0.05) { c.fillStyle = "#fff"; stars.forEach(([x, y, r], i) => { c.globalAlpha = night * (0.5 + 0.5 * Math.sin(tm * 1.3 + i)); circ(c, x, y, r * 0.7); }); c.globalAlpha = 1; }
-      if (h > 5.8 && h < 19.2) { // 해
-        const t = (h - 5.8) / 13.4, sx = 30 + t * 340, sy = 118 - Math.sin(Math.PI * t) * 96;
-        glow(c, sx, sy, 26, h > 16.5 || h < 7.5 ? "rgba(255,170,90,A)" : "rgba(255,240,180,A)", 0.55);
-        c.fillStyle = h > 16.5 || h < 7.5 ? "#ffb26b" : "#fff3c4"; circ(c, sx, sy, 9);
+    // ── 하늘 · 도시 ──
+    function drawSky(c, h, night, L, top) {
+      if (night > 0.05) { c.fillStyle = "#fff"; stars.forEach(([x, y, r], i) => { if (x < L.x0 || x > L.x1) return; c.globalAlpha = night * (0.45 + 0.55 * Math.abs(Math.sin(tm * 0.9 + i))); circ(c, x, y, r * 0.75); }); c.globalAlpha = 1; }
+      const span = L.x1 - L.x0;
+      if (h > 5.8 && h < 19.2) {
+        const t = (h - 5.8) / 13.4, sx = L.x0 + span * (0.1 + t * 0.8), sy = 120 - Math.sin(Math.PI * t) * 120;
+        const warm = h > 16.5 || h < 7.5;
+        const g = c.createRadialGradient(sx, sy, 0, sx, sy, 40); g.addColorStop(0, warm ? "rgba(255,180,110,.6)" : "rgba(255,245,200,.6)"); g.addColorStop(1, "rgba(255,240,200,0)");
+        c.fillStyle = g; c.fillRect(sx - 40, sy - 40, 80, 80);
+        c.fillStyle = warm ? "#ffb877" : "#fff6cf"; circ(c, sx, sy, 11);
       }
-      if (night > 0.3) { c.globalAlpha = night; c.fillStyle = "#fef9c3"; circ(c, 330, 30, 9); c.fillStyle = top; circ(c, 334, 27, 8); c.globalAlpha = 1; }
+      if (night > 0.3) { const mx = L.x1 - span * 0.16, my = 18; c.globalAlpha = night; const g = c.createRadialGradient(mx, my, 0, mx, my, 30); g.addColorStop(0, "rgba(255,250,220,.35)"); g.addColorStop(1, "rgba(255,250,220,0)"); c.fillStyle = g; c.fillRect(mx - 30, my - 30, 60, 60); c.fillStyle = "#fff6cf"; circ(c, mx, my, 10); c.fillStyle = top; circ(c, mx + 4.5, my - 3.2, 8.6); c.globalAlpha = 1; }
       // 구름
-      c.fillStyle = `rgba(255,255,255,${0.75 - night * 0.55})`;
-      [[0, 26, 1], [140, 46, 0.8], [260, 18, 1.1]].forEach(([ox, y, sc]) => {
-        const x = ((ox + tm * 3 * sc) % 470) - 50;
-        ell(c, x, y, 16 * sc, 5 * sc); ell(c, x + 10 * sc, y - 4 * sc, 10 * sc, 6 * sc); ell(c, x - 9 * sc, y - 1, 8 * sc, 4 * sc);
+      const ca = 0.85 - night * 0.62;
+      [[0, 4, 1.1], [190, 34, 0.8], [330, -14, 1.25], [520, 58, 0.7]].forEach(([o, y, sc], i) => {
+        const x = L.x0 - 60 + ((o + tm * 2.6 * sc) % (span + 140));
+        c.fillStyle = `rgba(255,255,255,${ca})`; ell(c, x, y, 22 * sc, 7 * sc); ell(c, x + 12 * sc, y - 6 * sc, 13 * sc, 8 * sc); ell(c, x - 10 * sc, y - 3 * sc, 10 * sc, 6 * sc);
+        c.fillStyle = `rgba(255,220,200,${ca * 0.35})`; ell(c, x, y + 3 * sc, 20 * sc, 3 * sc);
+        void i;
       });
-      // 먼 빌딩
-      blds.forEach((b, i) => {
-        const base = [["#a9bdd6", "#93a8c5", "#b9cade"], ["#26315a", "#1f2a4f", "#2c3866"]];
-        c.fillStyle = mix(base[0][b.tone], base[1][b.tone], night); c.fillRect(b.x, FLOOR - 12 - b.h, b.w, b.h + 12);
-        for (let wy = FLOOR - 6 - b.h; wy < FLOOR - 16; wy += 7) for (let wx = b.x + 4; wx < b.x + b.w - 4; wx += 6) {
-          const on = ((wx * 7 + wy * 13 + i) % 5) < 2;
-          c.fillStyle = on && night > 0.3 ? `rgba(253,224,130,${night * 0.9})` : `rgba(255,255,255,${0.25 - night * 0.15})`;
-          c.fillRect(wx, wy, 2.6, 3.4);
+      if (night < 0.4) { // 새
+        c.strokeStyle = `rgba(80,70,90,${0.5 * (1 - night)})`; c.lineWidth = 0.9;
+        for (let i = 0; i < 3; i++) { const x = L.x0 + ((tm * 9 + i * 26) % (span + 60)) - 30, y = 30 + i * 7 + Math.sin(tm * 2 + i) * 2, f = Math.sin(tm * 9 + i) * 1.6; c.beginPath(); c.moveTo(x - 3, y - f); c.lineTo(x, y); c.lineTo(x + 3, y - f); c.stroke(); }
+      }
+    }
+    function drawCity(c, night, L, bot) {
+      const farC = mix("#c7d3e8", "#28325e", night), nearC = mix("#a9b9d4", "#1f2850", night);
+      city.far.forEach((b) => { if (b.x + b.w < L.x0 || b.x > L.x1) return; c.fillStyle = farC; c.fillRect(b.x, 236 - b.h, b.w, b.h + 40); if (b.r) c.fillRect(b.x + b.w / 2 - 0.5, 236 - b.h - 8, 1, 8); });
+      city.near.forEach((b, i) => {
+        if (b.x + b.w < L.x0 || b.x > L.x1) return;
+        c.fillStyle = nearC; c.fillRect(b.x, 250 - b.h, b.w, b.h + 40);
+        c.fillStyle = mix("#bccbe2", "#2a3462", night); c.fillRect(b.x + b.w - 4, 250 - b.h, 4, b.h + 40);
+        if (b.ant) { c.fillStyle = nearC; c.fillRect(b.x + 5, 250 - b.h - 10, 1.2, 10); if (night > 0.3) { c.fillStyle = `rgba(255,90,90,${0.6 + 0.4 * Math.sin(tm * 3 + i)})`; circ(c, b.x + 5.6, 250 - b.h - 10, 1.3); } }
+        for (let wy = 250 - b.h + 5; wy < 248; wy += 7) for (let wx = b.x + 3; wx < b.x + b.w - 6; wx += 5.5) {
+          const on = ((wx * 7 + wy * 13 + i * 5) | 0) % 5 < 2;
+          c.fillStyle = on && night > 0.3 ? `rgba(255,220,140,${night * 0.85})` : `rgba(255,255,255,${0.32 - night * 0.22})`;
+          c.fillRect(wx, wy, 2.4, 3.2);
         }
       });
-      // 난간 · 바닥
-      c.fillStyle = mix("#d6d0c6", "#5b5f78", night * 0.6); c.fillRect(0, FLOOR - 14, W, 14);
-      c.fillStyle = mix("#ebe6dd", "#6e7290", night * 0.6); c.fillRect(0, FLOOR - 15, W, 3);
-      c.fillStyle = mix("#8a94a6", "#4b5370", night * 0.5);
-      c.fillRect(0, FLOOR - 30, W, 2); for (let x = 4; x < W; x += 18) c.fillRect(x, FLOOR - 30, 1.6, 16);
-      const fg = c.createLinearGradient(0, FLOOR, 0, H); fg.addColorStop(0, mix("#e7dccb", "#6f6a7d", night * 0.6)); fg.addColorStop(1, mix("#d8c9b2", "#5d586b", night * 0.6));
-      c.fillStyle = fg; c.fillRect(0, FLOOR, W, H - FLOOR);
-      c.strokeStyle = `rgba(120,100,80,${0.18})`; c.lineWidth = 0.6; c.beginPath();
-      for (let y = FLOOR + 12; y < H; y += 14) { c.moveTo(0, y); c.lineTo(W, y); }
-      for (let x = -200; x < W + 200; x += 28) { c.moveTo(200 + (x - 200) * 0.55, FLOOR); c.lineTo(x, H); }
-      c.stroke();
-      // 화분 · 조명 (전구 줄은 Lv 2부터)
-      if (s.fac.plant >= 2) bulbs(c, 122, FLOOR - 30, 236, FLOOR - 30, 9, 9, night, tm), bulbs(c, 236, FLOOR - 30, 342, FLOOR - 30, 9, 8, night, tm);
-      // 계단실(문)
-      c.fillStyle = mix("#cfd6df", "#4a5170", night * 0.6); c.fillRect(346, 76, 52, FLOOR - 76 + 4);
-      c.fillStyle = mix("#8b98ab", "#3a4060", night * 0.6); c.fillRect(342, 70, 60, 8);
-      c.fillStyle = "#5b6b82"; rr(c, 358, 98, 26, FLOOR - 98 + 4, 2); c.fillStyle = night > 0.4 ? "#fde68a" : "#93c5fd"; c.fillRect(364, 104, 14, 9);
-      c.fillStyle = "#e2e8f0"; circ(c, 380, 128, 1.4);
-      if (night > 0.3) glow(c, 371, 90, 16, "rgba(253,230,138,A)", night * 0.6);
-      c.fillStyle = "#fde68a"; c.fillRect(368, 84, 6, 3);
-      // 가게
-      drawBooth(c, s, night, info);
-      // 앞쪽 물건들 — 바닥 기준 y 순서로
-      const items = [];
-      for (let i = 0; i < Math.min(8, s.fac.plant); i++) items.push({ y: FLOOR + 4, f: () => pot(c, PLANT_POS[i], FLOOR + 4, i, night) });
-      if (s.fac.plant >= 5) [[140, 222], [387, 219]].forEach(([x, y]) => items.push({ y, f: () => { c.fillStyle = "#334155"; c.fillRect(x - 1, y - 40, 2, 40); ell(c, x, y, 5, 1.6); if (night > 0.2) glow(c, x, y - 42, 22, "rgba(253,224,138,A)", night * 0.7); c.fillStyle = night > 0.2 ? "#fef08a" : "#f1f5f9"; circ(c, x, y - 42, 3.5); } }));
-      const nT = TABLES[s.fac.seat] || 0;
-      for (let i = 0; i < nT; i++) { const [x, y] = TABLE_POS[i]; items.push({ y: y - 0.5, f: () => { chair(c, x - 15, y, -1); chair(c, x + 15, y, 1); } }, { y: y + 0.5, f: () => table(c, x, y) }); }
-      s.deco.place.forEach((id, i) => { if (id) items.push({ y: SPOTS[i].y, f: () => deco(c, id, SPOTS[i].x, SPOTS[i].y, night, tm) }); });
-      people.forEach((p) => items.push({ y: p.y, f: () => person(c, p.x, p.y, { ...p.lk, skin: p.skin, dir: p.dir, walk: p.walk, sit: p.st === "sit", cup: p.cup }) }));
-      items.sort((a, b) => a.y - b.y).forEach((it) => it.f());
-      // 꾸미기 자리 표시
-      if (opts.showSpots && opts.showSpots()) SPOTS.forEach((sp, i) => {
-        const open = s.grade >= sp.g;
-        c.save(); c.setLineDash([2.5, 2]); c.strokeStyle = open ? "#2f6bff" : "rgba(100,116,139,.6)"; c.lineWidth = 1.2;
-        c.fillStyle = open ? "rgba(47,107,255,.14)" : "rgba(100,116,139,.12)"; c.beginPath(); c.ellipse(sp.x, sp.y - 2, 15, 5, 0, 0, Math.PI * 2); c.fill(); c.stroke(); c.restore();
-        c.fillStyle = open ? "#2f6bff" : "#94a3b8"; circ(c, sp.x, sp.y - 30, 7);
-        c.fillStyle = "#fff"; c.font = "bold 9px Pretendard, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(i + 1), sp.x, sp.y - 29.5);
-      });
-      floats.forEach((f) => { c.globalAlpha = Math.max(0, f.a); c.fillStyle = "#16a34a"; c.font = "bold 9px Pretendard, sans-serif"; c.textAlign = "center"; c.fillText(f.text + "원", f.x, f.y); });
-      c.globalAlpha = 1;
-      if (night > 0.2) { c.fillStyle = `rgba(20,24,60,${night * 0.18})`; c.fillRect(0, 0, W, H); }
+      // 아래로 갈수록 안개에 잠긴다(흐릿한 먼 도시)
+      const hz = c.createLinearGradient(0, 120, 0, 266); hz.addColorStop(0, "rgba(255,255,255,0)"); hz.addColorStop(0.55, bot + "99"); hz.addColorStop(1, bot);
+      c.fillStyle = hz; c.fillRect(L.x0, 120, L.x1 - L.x0, 146); c.fillStyle = bot; c.fillRect(L.x0, 265.5, L.x1 - L.x0, Math.max(0, L.y1 - 265));
     }
 
-    function drawBooth(c, s, night, info) {
-      const tier = s.grade >= 15 ? 3 : s.grade >= 10 ? 2 : s.grade >= 5 ? 1 : 0;
-      const aw = [["#2f6bff", "#fff"], ["#10b981", "#fff"], ["#f97316", "#fff7ed"], ["#be185d", "#fdf2f8"]][tier];
-      c.fillStyle = mix("#fff7ec", "#8c86a3", night * 0.5); c.fillRect(8, 64, 110, FLOOR - 64);
-      c.fillStyle = mix("#d9b48f", "#6c5a63", night * 0.5); c.fillRect(8, 100, 110, 8);
-      // 뒤 선반 — 차 코너
-      if (s.fac.tea > 0) {
-        c.fillStyle = "#a16207"; c.fillRect(14, 84, 48, 2.4);
-        const jc = ["#86efac", "#fde68a", "#fdba74", "#f9a8d4", "#a5b4fc", "#5eead4", "#fca5a5", "#c4b5fd"];
-        for (let i = 0; i < Math.min(8, s.fac.tea + 1); i++) { c.fillStyle = jc[i]; rr(c, 15 + i * 6, 76, 4.6, 8, 1.2); c.fillStyle = "#78350f"; c.fillRect(15 + i * 6, 75, 4.6, 1.6); }
+    // ── 디오라마 ──
+    function drawSlab(c) {
+      const sh = c.createRadialGradient(210, 318, 10, 210, 318, 190); sh.addColorStop(0, "rgba(60,30,30,.22)"); sh.addColorStop(1, "rgba(60,30,30,0)");
+      c.save(); c.translate(210, 318); c.scale(1, 0.18); c.translate(-210, -318); c.fillStyle = sh; c.fillRect(0, 128, 420, 380); c.restore();
+      // 옆면
+      qY(c, 10, 0, 10, -SLAB, 0, "#e7cdb0"); qX(c, 10, 0, 10, -SLAB, 0, "#c9a689");
+      qY(c, 10.001, 0, 10, -SLAB, -SLAB + 5, "#d7b896"); qX(c, 10.001, 0, 10, -SLAB, -SLAB + 5, "#b48f72");
+      c.fillStyle = "rgba(255,255,255,.14)";
+      for (let i = 0.6; i < 10; i += 1.4) { qY(c, 10.002, i, i + 0.5, -14, -8, "rgba(120,170,210,.35)"); qX(c, 10.002, i, i + 0.5, -14, -8, "rgba(90,140,180,.32)"); }
+      // 윗면 타일
+      for (let i = 0; i < 10; i++) for (let j = 0; j < 10; j++) qZ(c, 0, i, j, i + 1, j + 1, (i + j) % 2 ? "#f3dfc8" : "#ecd2b6");
+      c.strokeStyle = "rgba(160,110,70,.14)"; c.lineWidth = 0.5; c.beginPath();
+      for (let i = 0; i <= 10; i++) { let a = P(i, 0), b = P(i, 10); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); a = P(0, i); b = P(10, i); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+      c.stroke();
+      // 가장자리 턱
+      qY(c, 10, 0, 10, 0, 1.6, "#fbeee0"); qX(c, 10, 0, 10, 0, 1.6, "#eedac4");
+      // 가게 앞 매트
+      qZ(c, 0.05, 2.55, 4.6, 3.55, 6.8, "rgba(255,122,69,.22)");
+    }
+    function railBack(c) {
+      qY(c, 0.02, 0, 8.25, 1, 13, "rgba(200,232,250,.3)");
+      for (let g = 0; g <= 8; g += 1) qY(c, 0.03, g, g + 0.08, 0, 14, "#e9dfd3");
+      seg(c, P(0, 0.03, 14), P(8.25, 0.03, 14), "#f5ede3", 1.6);
+    }
+    function railFront(c) {
+      const glass = "rgba(210,236,252,.22)", post = "#f1e7db";
+      qY(c, 10, 0, 10, 1.6, 11, glass); qX(c, 10, 1.25, 10, 1.6, 11, glass); qX(c, 0, 8.5, 10, 1.6, 11, glass);
+      for (let g = 0; g <= 10; g += 1.25) { qY(c, 10.01, Math.min(g, 9.92), Math.min(g, 9.92) + 0.08, 1.6, 12, post); qX(c, 10.01, Math.max(1.25, g), Math.max(1.25, g) + 0.08, 1.6, 12, shade(post, -0.12)); }
+      seg(c, P(0, 10, 12), P(10, 10, 12), "#fff8ef", 1.5); seg(c, P(10, 1.25, 12), P(10, 10, 12), "#f3e6d8", 1.5); seg(c, P(0, 8.5, 12), P(0, 10, 12), "#fff8ef", 1.5);
+    }
+    function drawWall(c, s, info, night, fx) {
+      const cream = "#fff4e4";
+      qX(c, 0, 0, 8.5, 0, 66, cream);
+      qX(c, 0.001, 0, 8.5, 0, 22, "#d6a67a");
+      for (let g = 0.4; g < 8.5; g += 0.5) seg(c, P(0.002, g, 1), P(0.002, g, 21), "rgba(110,60,30,.18)", 0.5);
+      qY(c, 8.5, -0.3, 0, 0, 66, "#efdcc4"); qZ(c, 66, -0.3, 0, 0, 8.5, "#f6e7d4");
+      // 선반(컵 · 원두 병)
+      box(c, 0, 0.5, 0.32, 3.6, 38, 1.4, "#b98256", { edge: false });
+      for (let i = 0; i < 7; i++) { const [x, y] = P(0.16, 0.75 + i * 0.42, 39.4); if (i % 3 === 2) { c.fillStyle = "rgba(230,245,255,.85)"; rr(c, x - 2, y - 6, 4, 6, 1); c.fillStyle = "#7a4a2a"; rr(c, x - 1.6, y - 3.6, 3.2, 3.4, 0.8); } else { c.fillStyle = ["#fffaf3", "#ffb38a", "#9fe3c1"][i % 3 === 0 ? 0 : (i % 2) + 1]; rr(c, x - 2.2, y - 4.4, 4.4, 4.4, 1.2); } }
+      // 차 선반
+      if (s.fac.tea > 0) { box(c, 0, 6.95, 0.3, 8.3, 36, 1.4, "#b98256", { edge: false }); for (let i = 0; i < Math.min(7, s.fac.tea + 2); i++) { const [x, y] = P(0.15, 7.12 + i * 0.17, 37.4); c.fillStyle = ["#9fd98a", "#ffd166", "#ffb38a", "#f7a8d0", "#b5b0ff", "#7ee0cf", "#ff9a6b"][i]; rr(c, x - 1.6, y - 5, 3.2, 5, 1); } }
+      // 칠판 메뉴판
+      qX(c, 0.004, 3.95, 6.35, 30, 54, "#9a6a45"); qX(c, 0.006, 4.08, 6.22, 31.6, 52.4, "#2b4034");
+      c.save(); const [tx, ty] = P(0.01, 5.95, 48.5); c.translate(tx, ty); c.transform(1, -0.5, 0, 1, 0, 0);
+      c.fillStyle = "rgba(255,255,255,.9)"; c.font = "800 4.6px Pretendard, 'Apple SD Gothic Neo', sans-serif"; c.textAlign = "left"; c.textBaseline = "middle"; c.fillText("오늘의 메뉴", 0, 0);
+      const catC = { coffee: "#ffcf9a", dessert: "#ffb3c8", tea: "#b8f0c8" };
+      s.menu.slice(0, 4).forEach((id, i) => { const m = MENU_BY[id]; if (!m) return; c.fillStyle = catC[m.cat]; circ(c, 1.5, 5.2 + i * 3.9, 1.1); c.fillStyle = "rgba(255,255,255,.75)"; c.fillRect(4, 4.8 + i * 3.9, 14 + ((i * 7) % 9), 0.8); });
+      c.restore();
+      // 진짜 시각 시계
+      const [kx, ky] = P(0.01, 7.4, 52); c.fillStyle = "#fffaf3"; ell(c, kx, ky, 5.2, 6); c.strokeStyle = "#c98a55"; c.lineWidth = 1; c.beginPath(); c.ellipse(kx, ky, 5.2, 6, 0, 0, Math.PI * 2); c.stroke();
+      const hr = kstHour(info.now), ha = ((hr % 12) / 12) * Math.PI * 2 - Math.PI / 2, ma = ((hr % 1) * Math.PI * 2) - Math.PI / 2;
+      seg(c, [kx, ky], [kx + Math.cos(ha) * 2.6, ky + Math.sin(ha) * 3], "#3a2418", 1); seg(c, [kx, ky], [kx + Math.cos(ma) * 3.8, ky + Math.sin(ma) * 4.4], "#3a2418", 0.7);
+    }
+    function drawAwning(c, s, night, fx) {
+      const tier = s.grade >= 15 ? 3 : s.grade >= 10 ? 2 : s.grade >= 5 ? 1 : 0, A = AWN[tier];
+      qX(c, 0.003, 0, 8.5, 46, 60, "rgba(80,40,20,.08)");
+      for (let i = 0; i < 17; i++) {
+        const g = i * 0.5, col = A[i % 2];
+        poly(c, [P(0, g, 64), P(0, g + 0.5, 64), P(1.15, g + 0.5, 52), P(1.15, g, 52)], col);
+        const [x, y] = P(1.15, g + 0.25, 52); c.fillStyle = shade(col, -0.06); c.beginPath(); c.ellipse(x, y, 4.6, 3, -0.46, 0, Math.PI); c.fill();
       }
-      // 메뉴판
-      c.fillStyle = "#1f3b2d"; rr(c, 70, 70, 42, 26, 2); c.fillStyle = "#8b5a33"; c.fillRect(70, 95, 42, 2);
-      c.strokeStyle = "rgba(255,255,255,.75)"; c.lineWidth = 0.9; c.beginPath();
-      s.menu.forEach((_, i) => { c.moveTo(75, 76 + i * 5); c.lineTo(96 + (i % 2) * 8, 76 + i * 5); }); c.stroke();
-      // 알바생 · 사장님(카운터 뒤)
-      const crew = [{ id: "me", skin: "#f3c9a7", hair: "#4b3621", shirt: "#334155", style: "short", apron: "#2f6bff" }].concat(s.staff.map((x) => ({ ...STAFF_BY[x.id], apron: "#fff" })));
-      const xs = [50, 26, 72, 94];
-      crew.forEach((p, i) => { const b = Math.sin(tm * 2 + i * 1.7) * 0.6; person(c, xs[i], 131 + b, { ...p, dir: i % 2 ? -1 : 1, pants: "#334155" }); });
-      // 차양 · 간판
-      for (let i = 0; i < 11; i++) { c.fillStyle = aw[i % 2]; c.fillRect(4 + i * 10.4, 56, 10.4, 12); c.beginPath(); c.arc(4 + i * 10.4 + 5.2, 68, 5.2, 0, Math.PI); c.fill(); }
-      c.fillStyle = mix("#475569", "#2b3150", night * 0.5); c.fillRect(4, 54, 114, 3);
-      c.fillStyle = "#fffdf7"; rr(c, 22, 36, 78, 17, 4); c.strokeStyle = aw[0]; c.lineWidth = 1.4; c.strokeRect(23, 37, 76, 15);
-      if (night > 0.3) glow(c, 61, 44, 40, "rgba(255,240,200,A)", night * 0.35);
-      c.fillStyle = "#1e293b"; c.font = "bold 9px Pretendard, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("옥상 쉼터 카페", 61, 45);
-      // 카운터
-      c.fillStyle = mix("#c08552", "#6b4e4a", night * 0.4); c.fillRect(6, 120, 114, FLOOR - 120 + 6);
-      c.fillStyle = mix("#8a5a35", "#4f3a36", night * 0.4); c.fillRect(4, 117, 118, 5);
-      c.fillStyle = "rgba(255,255,255,.12)"; for (let x = 14; x < 118; x += 16) c.fillRect(x, 125, 1.2, 22);
-      // 커피 머신
-      const L = s.fac.coffee;
-      const mc = L >= 7 ? "#e5e7eb" : L >= 4 ? "#94a3b8" : "#475569";
-      c.fillStyle = mc; rr(c, 10, 98, L >= 4 ? 30 : 22, 19, 2);
-      c.fillStyle = "#1e293b"; c.fillRect(13, 109, L >= 4 ? 24 : 16, 2);
-      c.fillStyle = L >= 7 ? "#facc15" : "#ef4444"; circ(c, 14, 102, 1.4); if (L >= 4) circ(c, 36, 102, 1.4);
-      c.fillStyle = "#fff"; c.fillRect(17, 112, 4, 5); if (L >= 4) c.fillRect(29, 112, 4, 5);
-      if (info.served && !info.full) { c.strokeStyle = "rgba(255,255,255,.7)"; c.lineWidth = 0.8; c.beginPath(); const sy = 96 - (tm * 6 % 6); c.moveTo(19, sy); c.quadraticCurveTo(17, sy - 3, 19, sy - 6); c.stroke(); }
-      // 계산대
-      const C2 = s.fac.counter;
-      c.fillStyle = "#334155"; rr(c, 102, 106, 14, 11, 1.5); c.fillStyle = C2 >= 4 ? "#7dd3fc" : "#a7f3d0"; c.fillRect(104, 108, 10, 4);
-      if (C2 >= 6) { c.fillStyle = "#334155"; c.fillRect(94, 110, 6, 7); c.fillStyle = "#e2e8f0"; c.fillRect(95, 111, 4, 3); }
-      // 디저트 진열장
-      if (s.fac.dessert > 0) {
-        c.fillStyle = "rgba(186,230,253,.55)"; rr(c, 56, 98, 36, 19, 2); c.strokeStyle = "#94a3b8"; c.lineWidth = 0.8; c.strokeRect(56.5, 98.5, 35, 18);
-        c.fillStyle = "#cbd5e1"; c.fillRect(57, 107, 34, 1);
-        const n = Math.min(10, 2 + s.fac.dessert), cols = ["#fda4af", "#fde68a", "#f9a8d4", "#c4b5fd", "#fdba74"];
-        for (let i = 0; i < n; i++) { const row = i < 5 ? 0 : 1, x = 61 + (i % 5) * 6.5, y = row ? 113 : 104; c.fillStyle = "#fff7ed"; rr(c, x - 2.5, y, 5, 3, 1); c.fillStyle = cols[i % 5]; rr(c, x - 2.5, y - 1.5, 5, 2, 1); }
+      poly(c, [P(0, 0, 64), P(1.15, 0, 52), P(1.15, 0, 50), P(0, 0, 62)], shade(A[0], -0.25));
+      // 펜던트 등(카운터 Lv 3부터)
+      if (s.fac.counter >= 3) [2.4, 4.6].concat(s.fac.counter >= 6 ? [0.9] : []).forEach((g) => {
+        const a = P(1.0, g, 53), b = P(1.0, g, 44); seg(c, a, b, "#5b4a40", 0.5);
+        c.fillStyle = s.fac.counter >= 6 ? "#e3b04b" : "#3d3a44"; c.beginPath(); c.moveTo(b[0] - 3.2, b[1] + 2.6); c.lineTo(b[0] + 3.2, b[1] + 2.6); c.lineTo(b[0] + 1.4, b[1]); c.lineTo(b[0] - 1.4, b[1]); c.closePath(); c.fill();
+        if (night > 0.15) { fx.glow(b[0], b[1] + 4, 20, "255,214,150", 0.55 * night); fx.dot(b[0], b[1] + 3, "#fff3c4", 1.4); }
+      });
+      // 간판
+      qX(c, 0, 1.3, 7.2, 67, 83, shade(A[0], -0.2)); qX(c, 0.004, 1.45, 7.05, 68.4, 81.6, "#fffaf2");
+      c.save(); const [tx, ty] = P(0.01, 4.25, 75); c.translate(tx, ty); c.transform(1, -0.5, 0, 1, 0, 0);
+      c.fillStyle = "#3a2418"; c.font = "900 9px Pretendard, 'Apple SD Gothic Neo', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("옥상 쉼터 카페", 5, 0.5);
+      c.fillStyle = A[0] === "#fff3e6" ? "#ff7a45" : A[0]; rr(c, -44, -3.5, 7, 6, 1.6); c.fillRect(-37.5, -2, 2, 2.5);
+      c.restore();
+      if (night > 0.15) fx.glow(...P(0.2, 4.25, 75), 56, "255,236,200", 0.3 * night);
+    }
+    function drawHut(c, s, night, fx) {
+      box(c, 8.25, 0, 10, 1.25, 0, 50, "#efe3d4", { left: "#f6ebdd", right: "#d9c6b0" });
+      box(c, 8.1, -0.15, 10.12, 1.4, 50, 4, "#d9714a");
+      box(c, 8.6, 0.2, 9.3, 0.8, 54, 6, "#cfd6dd");
+      qY(c, 1.251, 8.62, 9.45, 0, 32, "#9a6243"); qY(c, 1.252, 8.72, 9.35, 17, 28, night > 0.3 ? "#ffe3a3" : "#a9d6f0");
+      const [nx, ny] = P(9.32, 1.25, 15); c.fillStyle = "#e3b04b"; circ(c, nx, ny, 0.9);
+      qX(c, 10.001, 0.3, 0.95, 26, 38, night > 0.3 ? "#ffe3a3" : "#a9d6f0");
+      const [lx, ly] = P(9.04, 1.27, 37); c.fillStyle = "#4a3f3a"; rr(c, lx - 2.5, ly - 1.5, 5, 3, 1); c.fillStyle = night > 0.2 ? "#fff1b8" : "#f4efe6"; rr(c, lx - 2, ly + 1, 4, 2.6, 1);
+      if (night > 0.15) { fx.glow(lx, ly + 2, 24, "255,214,140", 0.55 * night); fx.glow(...P(9.05, 1.25, 22), 14, "255,214,140", 0.35 * night); }
+      if (s.fac.plant >= 7) { box(c, 8.4, 1.3, 8.58, 1.62, 0, 6, "#d9714a", { edge: false }); pot(c, ...P(8.5, 1.5, 5), 2, 0.6, Math.sin(tm) * 0.05); }
+    }
+
+    function drawDiorama(c, s, info, night, fx) {
+      const brew = info.served > 0 && !info.full;
+      const o = { tm, brew, night, fx };
+      drawSlab(c);
+      railBack(c);
+      drawWall(c, s, info, night, fx);
+      drawHut(c, s, night, fx);
+      // 카운터 뒤 사람들(나 + 알바생)
+      const crew = [{ skin: "#f3c9a7", hair: "#4b3621", shirt: "#5b4a63", style: "short", apron: "#ff7a45" }].concat(s.staff.map((x) => ({ ...STAFF_BY[x.id], apron: "#fffaf3" })));
+      const cy = [3.4, 1.55, 4.55, 2.45];
+      crew.forEach((p, i) => { const [x, y] = P(0.72, cy[i], 0); person(c, x, y + Math.sin(tm * 2 + i * 1.7) * 0.5, { ...p, dir: 1, pants: "#4a4050", sc: 0.86 }); });
+      drawCounter(c, s.fac.counter, o); hit("counter", 1.25, 0.85, 2.25, 6.5, 0, 24);
+      drawCoffee(c, s.fac.coffee, o); hit("coffee", 1.3, 1.1, 2.2, 2.5, 18, 46);
+      const unlocked = (id) => s.grade >= FAC_BY[id].g;
+      if (s.fac.dessert > 0) { drawDessert(c, s.fac.dessert, o); hit("dessert", 1.4, 2.85, 2.1, 4.8, 18, 40); }
+      else if (unlocked("dessert")) { dashed(c, [P(1.42, 2.85, 18), P(2.08, 2.85, 18), P(2.08, 4.0, 18), P(1.42, 4.0, 18)]); hit("dessert", 1.4, 2.85, 2.1, 4.0, 18, 28); }
+      if (s.fac.tea > 0) { drawTea(c, s.fac.tea, o); hit("tea", TEA.x0, TEA.y0, TEA.x1, TEA.y1, 0, 30); }
+      else if (unlocked("tea")) { dashed(c, [P(TEA.x0, TEA.y0), P(TEA.x1, TEA.y0), P(TEA.x1, TEA.y1), P(TEA.x0, TEA.y1)]); hit("tea", TEA.x0, TEA.y0, TEA.x1, TEA.y1, 0, 10); }
+      drawAwning(c, s, night, fx);
+      if (night > 0.1) { fx.glow(...P(2.2, 3.8, 26), 74, "255,196,130", 0.34 * night); fx.glow(...P(3.4, 4.6, 0), 60, "255,180,110", 0.16 * night); }
+      // 바닥 위 물건들 — 깊이(gx + gy) 순서로
+      const items = [], add = (d, f) => items.push({ d, f });
+      const seats = seatsList(s), nT = TABLES[s.fac.seat] || 0, sL = s.fac.seat;
+      const sitters = people.filter((p) => p.st === "sit");
+      for (let i = 0; i < nT; i++) {
+        const [tx, ty] = TBL[i];
+        const cups = sitters.filter((p) => seats[p.seat] && seats[p.seat].t === i).map((p) => seats[p.seat].side);
+        add(tx + ty - 0.85 - 0.05, () => chairBack(c, tx, ty - 0.85, -1, sL));
+        add(tx + ty - 0.85, () => chairSeat(c, tx, ty - 0.85, sL));
+        add(tx + ty + 0.85, () => chairSeat(c, tx, ty + 0.85, sL));
+        add(tx + ty + 0.85 + 0.3, () => chairBack(c, tx, ty + 0.85, 1, sL));
+        add(tx + ty, () => tableTop(c, tx, ty, sL, cups));
+        if ((sL >= 4 && (i === 0 || i === 3)) || (sL >= 7 && i === 5)) add(tx + ty + 0.95, () => parasolBig(c, tx, ty, AWN[i % 2 ? 1 : 0][0], tm + i));
+        hit("seat", tx - 1, ty - 1.2, tx + 1, ty + 1.2, 0, 22);
       }
+      for (let i = 0; i < Math.min(8, s.fac.plant); i++) {
+        const [gx, gy] = PLANT_G[i], sc = 0.9 + 0.05 * s.fac.plant;
+        add(gx + gy, () => pot(c, ...P(gx, gy), i, sc, Math.sin(tm * 1.3 + i) * 0.05));
+        hit("plant", gx - 0.5, gy - 0.5, gx + 0.5, gy + 0.5, 0, 28);
+      }
+      if (s.fac.plant >= 5) [[9.7, 5.15], [3.0, 9.7]].forEach(([gx, gy]) => add(gx + gy, () => lampPost(c, gx, gy, night, fx)));
+      const poles = [];
+      if (s.fac.plant >= 2) poles.push([9.85, 9.85]);
+      if (s.fac.plant >= 4) poles.push([9.85, 4.3]);
+      poles.forEach(([gx, gy]) => add(gx + gy, () => { shadow(c, gx, gy, 3, 0.12); const [x, y] = P(gx, gy); c.fillStyle = "#6b5a50"; c.fillRect(x - 0.8, y - 46, 1.6, 46); }));
+      s.deco.place.forEach((id, i) => { if (!id) return; const [gx, gy] = SPOT_G[i]; add(gx + gy, () => { const [x, y] = P(gx, gy); c.save(); c.translate(x, y); c.scale(0.86, 0.86); deco(c, id, 0, 0, night, tm, fx); c.restore(); }); });
+      people.forEach((p) => {
+        const st = p.st === "sit" && seats[p.seat];
+        const d = st ? p.gx + p.gy + 0.02 : p.gx + p.gy;
+        const alpha = Math.abs(p.gx - DOOR[0]) < 0.3 ? clamp01((p.gy - DOOR[1]) / 0.45) : 1;
+        add(d, () => {
+          const [x, y] = P(p.gx, p.gy, st ? 6 : 0);
+          person(c, x, y, { ...p.lk, skin: p.skin, dir: p.dir, walk: p.walk, sit: !!st, cup: p.cup && !st, sc: 0.84, alpha });
+          if (p.emo) fx.bubble(x, y - 36, p.emo.k, p.emo.t);
+        });
+      });
+      items.sort((a, b) => a.d - b.d).forEach((it) => it.f());
+      // 전구 줄
+      if (s.fac.plant >= 2) { bulbs(c, P(0, 0.05, 66), P(8.25, 0.05, 54), 12, 12, night, tm, fx); bulbs(c, P(0, 8.45, 66), P(9.85, 9.85, 46), 22, 13, night, tm, fx); }
+      if (s.fac.plant >= 4) bulbs(c, P(0, 4.2, 66), P(9.85, 4.3, 46), 18, 12, night, tm, fx);
+      railFront(c);
+    }
+    function dashed(c, pts) { c.save(); c.setLineDash([2.2, 1.8]); c.strokeStyle = "rgba(217,84,31,.55)"; c.lineWidth = 0.9; c.fillStyle = "rgba(255,122,69,.08)"; c.beginPath(); pts.forEach((p, i) => (i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]))); c.closePath(); c.fill(); c.stroke(); c.restore(); }
+    function hit(id, gx0, gy0, gx1, gy1, z0, z1) {
+      const pts = [P(gx0, gy0, z0), P(gx1, gy0, z0), P(gx1, gy1, z0), P(gx0, gy1, z0), P(gx0, gy0, z1), P(gx1, gy1, z1), P(gx1, gy0, z1), P(gx0, gy1, z1)];
+      hits.push({ id, x0: Math.min(...pts.map((p) => p[0])), x1: Math.max(...pts.map((p) => p[0])), y0: Math.min(...pts.map((p) => p[1])), y1: Math.max(...pts.map((p) => p[1])) });
+    }
+    function bubble(c, x, y, kind, t) {
+      const a = Math.min(1, t * 4), s = 0.7 + 0.3 * Math.min(1, (1.8 - t) * 6);
+      c.save(); c.globalAlpha = Math.max(0, a); c.translate(x, y); c.scale(s, s);
+      c.fillStyle = "rgba(90,45,20,.16)"; rr(c, -7, -6, 15, 12, 5);
+      c.fillStyle = "#fff"; rr(c, -7.5, -7, 15, 12, 5); c.beginPath(); c.moveTo(-2, 4.8); c.lineTo(0, 8); c.lineTo(2, 4.8); c.fill();
+      if (kind === "coffee") { c.fillStyle = "#b8743f"; rr(c, -3.6, -3.6, 6, 5.6, 1.4); c.strokeStyle = "#b8743f"; c.lineWidth = 1.1; c.beginPath(); c.arc(2.8, -1, 1.7, -Math.PI / 2, Math.PI / 2); c.stroke(); c.fillStyle = "#fff4e4"; c.fillRect(-3.2, -3.4, 5.2, 1.1); }
+      else if (kind === "heart") { c.fillStyle = "#ff5c7a"; c.beginPath(); c.moveTo(0, 3); c.bezierCurveTo(-6, -1.5, -3, -6, 0, -3); c.bezierCurveTo(3, -6, 6, -1.5, 0, 3); c.fill(); }
+      else { c.fillStyle = "#7a5af5"; ell(c, -1.6, 1.6, 1.8, 1.4); c.fillRect(-0.1, -4.6, 1, 6.2); c.fillRect(-0.1, -4.6, 3.4, 1.1); }
+      c.restore();
+    }
+
+    function draw(s, info) {
+      const c = ctx, h = SKY_PREVIEW != null ? SKY_PREVIEW : kstHour(info.now), night = nightOf(h);
+      hits = [];
+      const glows = [], dots = [], bubs = [];
+      const fx = { glow: (x, y, r, rgb, a) => { if (a > 0.01) glows.push([x, y, r, rgb, a]); }, dot: (x, y, col, r) => dots.push([x, y, col, r]), bubble: (x, y, kd, t) => bubs.push([x, y, kd, t]) };
+      c.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const [top, bot] = skyAt(h);
+      const g = c.createLinearGradient(0, 0, 0, ch); g.addColorStop(0, top); g.addColorStop(0.75, bot); g.addColorStop(1, bot);
+      c.fillStyle = g; c.fillRect(0, 0, cw, ch);
+      const T = [dpr * k, 0, 0, dpr * k, dpr * ox, dpr * oy];
+      c.setTransform(...T);
+      const L = { x0: -ox / k, x1: (cw - ox) / k, y0: -oy / k, y1: (ch - oy) / k };
+      drawSky(c, h, night, L, top);
+      drawCity(c, night, L, bot);
+      const d = oc;
+      d.setTransform(1, 0, 0, 1, 0, 0); d.clearRect(0, 0, off.width, off.height);
+      d.setTransform(...T);
+      drawDiorama(d, s, info, night, fx);
+      d.setTransform(1, 0, 0, 1, 0, 0);
+      d.globalCompositeOperation = "source-atop";
+      const warm = duskOf(h);
+      if (warm > 0.01) { d.fillStyle = `rgba(255,130,70,${0.16 * warm})`; d.fillRect(0, 0, off.width, off.height); }
+      if (night > 0.01) { d.fillStyle = `rgba(24,26,78,${0.5 * night})`; d.fillRect(0, 0, off.width, off.height); }
+      d.globalCompositeOperation = "source-over";
+      c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(off, 0, 0);
+      c.setTransform(...T);
+      if (glows.length) {
+        c.globalCompositeOperation = "lighter";
+        glows.forEach(([x, y, r, rgb, a]) => { const gg = c.createRadialGradient(x, y, 0, x, y, r); gg.addColorStop(0, `rgba(${rgb},${a})`); gg.addColorStop(1, `rgba(${rgb},0)`); c.fillStyle = gg; c.fillRect(x - r, y - r, r * 2, r * 2); });
+        c.globalCompositeOperation = "source-over";
+      }
+      dots.forEach(([x, y, col, r]) => { c.fillStyle = col; circ(c, x, y, r); });
+      bubs.forEach(([x, y, kd, t]) => bubble(c, x, y, kd, t));
+      floats.forEach((f) => { c.globalAlpha = Math.max(0, f.a); c.font = "900 8.5px Pretendard, sans-serif"; c.textAlign = "center"; c.lineWidth = 2.6; c.strokeStyle = "#fff"; c.strokeText(f.text, f.x, f.y); c.fillStyle = "#e8890c"; c.fillText(f.text, f.x, f.y); });
+      c.globalAlpha = 1;
     }
 
     function frame(ts) {
       if (!alive) return;
-      const dt = Math.min(0.1, last ? (ts - last) / 1000 : 0.016); last = ts;
-      const s = getState(); const info = opts.info();
-      if (!reduce) update(dt, s, info);
-      draw(s, info);
       raf = requestAnimationFrame(frame);
+      const dt = Math.min(0.1, last ? (ts - last) / 1000 : 0.016); last = ts;
+      acc += dt;
+      if (acc < 1 / 45) return; // 45프레임이면 충분
+      const step = acc; acc = 0;
+      const s = getState(); const info = opts.info();
+      update(step, s, info);
+      draw(s, info);
     }
     function start() {
       resize();
-      if (reduce) { const s = getState(); const info = opts.info(); seatsList(s).slice(0, Math.min(4, Math.round((info.served || 0) / 20))).forEach((st, i) => people.push({ x: st.x, y: st.y, st: "sit", seat: i, dir: st.dir, lk: LOOKS[i % 8], skin: SKINS[i % 5], walk: 0, wait: 1e9, cup: true })); draw(s, info); }
-      else raf = requestAnimationFrame(frame);
+      if (reduce) {
+        const s = getState(), info = opts.info();
+        seatsList(s).slice(0, Math.min(4, Math.round((info.served || 0) / 20))).forEach((st, i) => people.push({ id: ++uid, gx: st.gx, gy: st.gy, st: "sit", seat: i, dir: st.dir, lk: LOOKS[i % 8], skin: SKINS[i % 5], walk: 0, wait: 1e9, heart: 1e9, path: [], cup: true }));
+        draw(s, info);
+      } else raf = requestAnimationFrame(frame);
     }
-    const ro = new ResizeObserver(() => { resize(); if (reduce) draw(getState(), opts.info()); });
+    const ro = new ResizeObserver(() => { resize(); if (reduce || !raf) draw(getState(), opts.info()); });
     ro.observe(canvas);
-    document.addEventListener("visibilitychange", () => { if (reduce || !alive) return; cancelAnimationFrame(raf); last = 0; if (document.visibilityState === "visible") raf = requestAnimationFrame(frame); });
+    const onVis = () => { if (reduce || !alive) return; cancelAnimationFrame(raf); raf = 0; last = 0; if (document.visibilityState === "visible") raf = requestAnimationFrame(frame); };
+    document.addEventListener("visibilitychange", onVis);
+    const pick = (e) => {
+      const r = canvas.getBoundingClientRect(), lx = (e.clientX - r.left - ox) / k, ly = (e.clientY - r.top - oy) / k;
+      for (let i = hits.length - 1; i >= 0; i--) { const hh = hits[i]; if (lx >= hh.x0 && lx <= hh.x1 && ly >= hh.y0 && ly <= hh.y1) return hh.id; }
+      return null;
+    };
+    canvas.addEventListener("click", (e) => { const id = pick(e); if (id && opts.onPick) opts.onPick(id); });
+    canvas.addEventListener("mousemove", (e) => { canvas.style.cursor = pick(e) ? "pointer" : ""; });
     start();
     return {
+      toCss, relayout: () => { resize(); if (reduce) draw(getState(), opts.info()); },
       redraw: () => { if (reduce) draw(getState(), opts.info()); },
-      destroy: () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); },
+      destroy: () => { alive = false; cancelAnimationFrame(raf); ro.disconnect(); document.removeEventListener("visibilitychange", onVis); },
     };
   }
 
-  // 작은 그림(꾸미기 · 알바생 얼굴) — canvas 를 dataURL 로
+  // ── 작은 그림(카드용) — canvas 를 dataURL 로 ──
   function thumb(w, h, fn) {
-    const cv = document.createElement("canvas"), d = 2;
+    const cv = document.createElement("canvas"), d = 3;
     cv.width = w * d; cv.height = h * d;
     const c = cv.getContext("2d"); c.scale(d, d); fn(c);
     return cv.toDataURL();
   }
-  const decoThumb = (id) => thumb(64, 52, (c) => { c.fillStyle = "#f1f5f9"; c.fillRect(0, 0, 64, 52); c.fillStyle = "#e7dccb"; c.fillRect(0, 36, 64, 16); deco(c, id, 32, 46, 0, 0); });
-  const staffThumb = (st) => thumb(56, 56, (c) => { c.fillStyle = "#eef3ff"; c.fillRect(0, 0, 56, 56); c.save(); c.translate(28, 0); c.scale(1.5, 1.5); person(c, 0, 37, { ...st, pants: "#334155", apron: "#fff" }); c.restore(); });
+  function tile(c, x, y, rx, col) { c.fillStyle = col; c.beginPath(); c.moveTo(x, y - rx / 2); c.lineTo(x + rx, y); c.lineTo(x, y + rx / 2); c.lineTo(x - rx, y); c.closePath(); c.fill(); }
+  const decoThumb = (id) => thumb(72, 60, (c) => { tile(c, 36, 48, 30, "#ffe7da"); tile(c, 36, 47, 26, "#fff3ea"); deco(c, id, 36, 50, 0, 0.6); });
+  // 시설 카드 그림 — 장면에서 쓰는 그리기를 그대로, 그 레벨 모양으로
+  function facThumb(id, L) {
+    const o = { tm: 0.3, brew: false, night: 0, fx: NOFX };
+    return thumb(96, 80, (c) => {
+      tile(c, 48, 60, 40, "#ffe7da"); tile(c, 48, 58.5, 36, "#fff5ec");
+      const at = (gx, gy, z, sc) => { const [ax, ay] = P(gx, gy, z); c.translate(48, 56); c.scale(sc, sc); c.translate(-ax, -ay); };
+      c.save();
+      if (id === "coffee") { at(1.75, 1.8, 10, 1.55); box(c, 1.25, 0.9, 2.25, 2.9, 0, 18, "#e3b98a", { right: "#b97a4b" }); drawCoffee(c, Math.max(1, L), o); }
+      else if (id === "counter") { at(1.75, 3.65, 4, 0.6); drawCounter(c, Math.max(1, L), o); drawCoffee(c, 1, o); }
+      else if (id === "dessert") { at(1.75, 3.6, 14, 1.25); box(c, 1.25, 2.6, 2.25, 5.2, 0, 18, "#e3b98a", { right: "#b97a4b" }); drawDessert(c, Math.max(1, L), o); }
+      else if (id === "tea") { at(1.55, 7.6, 8, 1.65); drawTea(c, Math.max(1, L), o); }
+      else if (id === "seat") {
+        const lv = Math.max(1, L);
+        at(4.7, 3.6, lv >= 4 ? 14 : 8, lv >= 4 ? 0.95 : 1.35);
+        chairBack(c, 4.7, 2.75, -1, lv); chairSeat(c, 4.7, 2.75, lv); tableTop(c, 4.7, 3.6, lv, []); chairSeat(c, 4.7, 4.45, lv); chairBack(c, 4.7, 4.45, 1, lv);
+        if (lv >= 4) parasolBig(c, 4.7, 3.6, "#ff7a45", 0);
+      } else if (id === "plant") {
+        const lv = Math.max(1, L);
+        at(5, 5, 14, 0.95);
+        const spots = [[5, 5], [4.3, 5.5], [5.6, 4.3], [4.6, 4.2], [5.5, 5.7], [4, 4.6], [6, 5], [5, 6.1]];
+        for (let i = 0; i < Math.min(lv, 8); i++) { const [gx, gy] = spots[i]; pot(c, ...P(gx, gy), i, 0.9 + 0.04 * lv, 0); }
+        if (lv >= 2) bulbs(c, P(3.4, 4.3, 34), P(6.2, 3.4, 34), 6, 6, 0, 0, NOFX);
+      }
+      c.restore();
+    });
+  }
+
+  // ── 카드용 SVG 그림: 음료 · 알바생 얼굴 · 작은 아이콘 ──
+  let svgUid = 0;
+  const glass = (body) => `<path d="M26 22h28l-3 44a4 4 0 0 1-4 3.6H33a4 4 0 0 1-4-3.6z" fill="#eef8fc" opacity=".95"/>${body}<path d="M29.5 26l2.4 38" stroke="#fff" stroke-width="2" opacity=".7" stroke-linecap="round"/>`;
+  const mug = (layers, foam) => `<path d="M56 36h4a8 8 0 0 1 0 16h-4" fill="none" stroke="#dcebf2" stroke-width="4"/><path d="M20 26h36v34a9 9 0 0 1-9 9H29a9 9 0 0 1-9-9z" fill="#eef7fb"/>${layers}<ellipse cx="38" cy="28" rx="16" ry="3.4" fill="${foam}"/><path d="M24 31v27" stroke="#fff" stroke-width="2" opacity=".65" stroke-linecap="round"/>`;
+  const steamSvg = (x) => `<path d="M${x - 4} 16c-3-3 3-5 0-9M${x + 4} 16c-3-3 3-5 0-9" stroke="#d8c4b2" stroke-width="2" fill="none" stroke-linecap="round" opacity=".85"/>`;
+  const macaron = (y, a, b) => `<ellipse cx="40" cy="${y + 7}" rx="17" ry="6.5" fill="${b}"/><rect x="23.5" y="${y}" width="33" height="4.5" rx="2.2" fill="#fff6f0"/><ellipse cx="40" cy="${y - 1}" rx="17" ry="6.5" fill="${a}"/><ellipse cx="34" cy="${y - 3}" rx="5" ry="1.6" fill="#fff" opacity=".45"/>`;
+  function drinkSvg(id, size = 72) {
+    const u = "cfd" + ++svgUid;
+    const sh = `<ellipse cx="40" cy="71" rx="18" ry="3.6" fill="#5a2d14" opacity=".13"/>`;
+    const art = {
+      americano: `${sh}<path d="M25 27h30l-3.6 41a3 3 0 0 1-3 2.6H31.6a3 3 0 0 1-3-2.6z" fill="#fffaf3"/><path d="M26.6 40h26.8l-1.5 16H28.1z" fill="#c07a43"/><path d="M27.6 44h24.8" stroke="#8f5428" stroke-width="1.4" opacity=".5"/><rect x="22" y="21" width="36" height="7.5" rx="3.5" fill="#f3e6d6"/><path d="M28 21c2-5 22-5 24 0z" fill="#e6d3bd"/>${steamSvg(40)}`,
+      latte: `${sh}${mug(`<path d="M22 50h32v10a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7z" fill="#8b5433"/><path d="M22 37h32v13H22z" fill="#d8ad80"/><path d="M22 29h32v8H22z" fill="#fff4e4"/>`, "#fffaf2")}<path d="M38 31.4c-3-2.2-5-3.6-3.6-5.2 1-1 2.6-.6 3.6.6 1-1.2 2.6-1.6 3.6-.6 1.4 1.6-.6 3-3.6 5.2z" fill="#c98c5a"/>`,
+      cookie: `<ellipse cx="40" cy="64" rx="28" ry="7.5" fill="#f1e1cf"/><ellipse cx="40" cy="62" rx="24" ry="5.8" fill="#fffaf3"/><circle cx="29" cy="54" r="10.5" fill="#d99a52"/><circle cx="29" cy="53" r="9" fill="#f0bd75"/><circle cx="51" cy="55" r="10.5" fill="#d99a52"/><circle cx="51" cy="54" r="9" fill="#f0bd75"/><circle cx="40" cy="43" r="10.5" fill="#d99a52"/><circle cx="40" cy="42" r="9" fill="#f5c983"/><g fill="#6b3a1e"><circle cx="26" cy="51" r="1.6"/><circle cx="31" cy="56" r="1.4"/><circle cx="49" cy="52" r="1.6"/><circle cx="54" cy="57" r="1.4"/><circle cx="37" cy="40" r="1.6"/><circle cx="43" cy="45" r="1.4"/><circle cx="42" cy="38" r="1.2"/></g>`,
+      greentea: `${sh}<path d="M24 32h32l-2.5 30a7 7 0 0 1-7 6.4H33.5a7 7 0 0 1-7-6.4z" fill="#86bd70"/><path d="M24.8 44h30.4" stroke="#679c54" stroke-width="3"/><ellipse cx="40" cy="32" rx="16" ry="4" fill="#679c54"/><ellipse cx="40" cy="32.6" rx="13.5" ry="3" fill="#d4e8a0"/><path d="M33 56c4-6 10-6 13-4-2 4-8 6-13 4z" fill="#e0f0c0"/>${steamSvg(40)}`,
+      cake: `${sh}<path d="M18 46L58 36l6 8-40 10z" fill="#fff8f0"/><path d="M24 54l40-10v14l-40 10z" fill="#ffe8d4"/><path d="M18 46l6 8v14l-6-8z" fill="#f4d0b2"/><path d="M24 60l40-10v3l-40 10z" fill="#ff8fa3"/><path d="M18 52l6 8v3l-6-8z" fill="#ef7a8f"/><g fill="#fff"><circle cx="26" cy="46" r="2.4"/><circle cx="36" cy="43.6" r="2.4"/><circle cx="46" cy="41.2" r="2.4"/><circle cx="56" cy="38.8" r="2.4"/></g><path d="M44 27c4 0 7 3 6 7-1 4-4 6-6 7-2-1-5-3-6-7-1-4 2-7 6-7z" fill="#ef3b4f"/><path d="M40 27c2-2 6-2 8 0-2 1-6 1-8 0z" fill="#4caf50"/><g fill="#ffd8a0"><circle cx="42" cy="32" r=".7"/><circle cx="46" cy="33" r=".7"/><circle cx="44" cy="36" r=".7"/></g>`,
+      ade: `${sh}${glass(`<path d="M27.3 34h25.4l-2.2 31.4a3 3 0 0 1-3 2.6H32.5a3 3 0 0 1-3-2.6z" fill="#ffe066"/><rect x="31" y="39" width="8" height="8" rx="2" fill="#fff" opacity=".65" transform="rotate(-12 35 43)"/><rect x="40" y="46" width="8" height="8" rx="2" fill="#fff" opacity=".55" transform="rotate(10 44 50)"/><g fill="#fff" opacity=".7"><circle cx="36" cy="58" r="1.2"/><circle cx="44" cy="61" r="1"/><circle cx="41" cy="55" r=".8"/></g>`)}<path d="M44 33L51 8" stroke="#ff7a45" stroke-width="3.2" stroke-linecap="round"/><circle cx="54" cy="25" r="8.5" fill="#ffd43b"/><circle cx="54" cy="25" r="6.4" fill="#fff3a6"/><path d="M54 18.6v12.8M47.6 25h12.8M49.5 20.5l9 9M58.5 20.5l-9 9" stroke="#ffd43b" stroke-width="1"/>`,
+      vanilla: `${sh}${glass(`<path d="M27.6 30h24.8l-2.5 35.4a3 3 0 0 1-3 2.6H32.6a3 3 0 0 1-3-2.6z" fill="url(#${u})"/>`)}<path d="M25 24c0-9 30-9 30 0z" fill="#fffaf2"/><path d="M28 22c4 2 6-2 10 0s6-2 10 0 4 0 4 0" stroke="#d08a3a" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M41 12l2 5" stroke="#ff7a45" stroke-width="3" stroke-linecap="round"/><defs><linearGradient id="${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6e8"/><stop offset=".45" stop-color="#e8c79c"/><stop offset="1" stop-color="#9a5b34"/></linearGradient></defs>`,
+      macaron: `<ellipse cx="40" cy="70" rx="19" ry="3.6" fill="#5a2d14" opacity=".13"/>${macaron(58, "#ffa8c5", "#f48fb1")}${macaron(42, "#a8ecd2", "#86dcbc")}${macaron(26, "#ffe08a", "#f7cf5f")}`,
+      yuja: `${sh}${mug(`<path d="M22 32h32v28a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7z" fill="#f6a623" opacity=".92"/><g fill="#ffd54a"><rect x="28" y="44" width="9" height="2.4" rx="1.2" transform="rotate(-20 32 45)"/><rect x="40" y="52" width="9" height="2.4" rx="1.2" transform="rotate(15 44 53)"/><rect x="31" y="58" width="7" height="2.2" rx="1.1"/></g>`, "#ffc24a")}${steamSvg(38)}`,
+      tart: `<ellipse cx="40" cy="66" rx="28" ry="6" fill="#5a2d14" opacity=".12"/><ellipse cx="40" cy="58" rx="27" ry="9.5" fill="#c9884a"/><ellipse cx="40" cy="54" rx="27" ry="9.5" fill="#e9ad66"/><ellipse cx="40" cy="53" rx="22" ry="7" fill="#fff1c9"/><circle cx="31" cy="52" r="4.2" fill="#8bc34a"/><circle cx="31" cy="52" r="2.4" fill="#c5e1a5"/><circle cx="48" cy="51" r="4.2" fill="#8bc34a"/><circle cx="48" cy="51" r="2.4" fill="#c5e1a5"/><path d="M38 47c2.6 0 4.4 2 3.8 4.6-.6 2.4-2.6 3.6-3.8 4.2-1.2-.6-3.2-1.8-3.8-4.2-.6-2.6 1.2-4.6 3.8-4.6z" fill="#ef3b4f"/><g fill="#3f51b5"><circle cx="42" cy="57" r="1.8"/><circle cx="35" cy="57.5" r="1.8"/><circle cx="45" cy="55" r="1.6"/></g><circle cx="53" cy="55" r="2.4" fill="#ffb74d"/>`,
+      sunset: `${sh}${glass(`<path d="M27.6 30h24.8l-2.5 35.4a3 3 0 0 1-3 2.6H32.6a3 3 0 0 1-3-2.6z" fill="url(#${u})"/>`)}<path d="M25 25c0-8 30-8 30 0z" fill="#fff7ee"/><circle cx="52" cy="20" r="6.5" fill="#ffcf3f"/><path d="M45 20h14" stroke="#ff9a3c" stroke-width="1.2"/><defs><linearGradient id="${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset=".5" stop-color="#ff7a8a"/><stop offset="1" stop-color="#8a5cd6"/></linearGradient></defs>`,
+    }[id] || "";
+    return `<svg viewBox="0 0 80 80" width="${size}" height="${size}" aria-hidden="true">${art}</svg>`;
+  }
+  const SKILL_BG = { barista: "#ffe2cf", pastry: "#ffe0ee", service: "#d9f6ec" };
+  function faceSvg(st, size = 64) {
+    const u = "cff" + ++svgUid, hair = st.hair, skin = st.skin;
+    const back = st.style === "long" ? `<path d="M16 34c0-14 7-22 16-22s16 8 16 22v20H16z" fill="${hair}"/>` : "";
+    const bun = st.style === "bun" ? `<circle cx="32" cy="12" r="6.5" fill="${hair}"/>` : "";
+    return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true"><defs><clipPath id="${u}"><circle cx="32" cy="32" r="32"/></clipPath></defs>
+      <circle cx="32" cy="32" r="32" fill="${SKILL_BG[st.skill] || "#ffe7da"}"/><g clip-path="url(#${u})">${back}
+      <path d="M9 66c1-13 10-18 23-18s22 5 23 18z" fill="${st.shirt}"/><path d="M24.5 50h15l-1.6 16H26.1z" fill="#fffaf3"/>
+      <rect x="28" y="41" width="8" height="9" rx="3.5" fill="${skin}"/>
+      <ellipse cx="32" cy="31.5" rx="14.5" ry="14" fill="${skin}"/>${bun}
+      <path d="M17.4 31c-.6-10.4 6.2-17 14.6-17s15.2 6.6 14.6 17c-2.6-5-7.6-7.8-14-7.8-3.4 3.6-9 6.2-15.2 7.8z" fill="${hair}"/>
+      <ellipse cx="26.6" cy="33.2" rx="1.9" ry="2.4" fill="#2a1d16"/><ellipse cx="37.4" cy="33.2" rx="1.9" ry="2.4" fill="#2a1d16"/>
+      <circle cx="27.2" cy="32.4" r=".7" fill="#fff"/><circle cx="38" cy="32.4" r=".7" fill="#fff"/>
+      <ellipse cx="22.6" cy="37.6" rx="2.6" ry="1.6" fill="#ff8fa3" opacity=".5"/><ellipse cx="41.4" cy="37.6" rx="2.6" ry="1.6" fill="#ff8fa3" opacity=".5"/>
+      <path d="M29 39.4q3 2.8 6 0" stroke="#7a3b2a" stroke-width="1.6" fill="none" stroke-linecap="round"/></g></svg>`;
+  }
+  // 흰 글리프(HUD 알약) · 탭 아이콘(두 톤)
+  const G = {
+    coin: `<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="12" r="8.2" fill="none" stroke="#fff" stroke-width="2.2"/><path d="M8.4 9l1.7 6 1.9-4.4 1.9 4.4 1.7-6" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    up: `<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M4 17l5.5-5.5 3.5 3.5L20 8" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 8h5v5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    guest: `<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><circle cx="12" cy="8.5" r="4" fill="#fff"/><path d="M4.5 20c.6-4.4 3.6-6.6 7.5-6.6s6.9 2.2 7.5 6.6z" fill="#fff"/></svg>`,
+    mat: `<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true"><path d="M12 3l2.2 5.8L20 11l-5.8 2.2L12 19l-2.2-5.8L4 11l5.8-2.2z" fill="#fff"/><circle cx="19" cy="18.5" r="1.8" fill="#fff"/></svg>`,
+    hammer: `<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M14.5 3.5l6 6-2.4 2.4-1.6-1.6-7.6 7.6a2 2 0 0 1-2.8-2.8l7.6-7.6-1.6-1.6z" fill="currentColor"/></svg>`,
+    sun: `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="4.4" fill="#ffd23f"/><g stroke="#ffd23f" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3L7 7M17 17l1.7 1.7M5.3 18.7L7 17M17 7l1.7-1.7"/></g></svg>`,
+    moon: `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z" fill="#ffe7a3"/></svg>`,
+    plus: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+  };
+  const TABG = {
+    fac: `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3 20.5h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".45"/><path d="M14.5 3l6.5 6.5-2.6 2.6-1.7-1.7-7.9 7.9a2.1 2.1 0 0 1-3-3l7.9-7.9-1.7-1.7z" fill="currentColor"/></svg>`,
+    menu: `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M8 3.5c-1 1.2 1 2 0 3.2M12 3.5c-1 1.2 1 2 0 3.2" stroke="currentColor" stroke-width="1.7" fill="none" stroke-linecap="round" opacity=".5"/><path d="M17 10.5h1.4a2.6 2.6 0 0 1 0 5.2H17" stroke="currentColor" stroke-width="2" fill="none"/><path d="M4 9h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6z" fill="currentColor"/></svg>`,
+    staff: `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3.5 21c.6-4.6 3.9-7 8.5-7s7.9 2.4 8.5 7z" fill="currentColor" opacity=".5"/><circle cx="12" cy="8.2" r="4.6" fill="currentColor"/></svg>`,
+    deco: `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M12 13v8M12 17c-2-2.4-4.6-2.6-6-2 .6 2.2 3 3.4 6 2z" stroke="currentColor" stroke-width="1.8" fill="currentColor" opacity=".5" stroke-linecap="round"/><g fill="currentColor"><circle cx="12" cy="5.2" r="2.8"/><circle cx="15.8" cy="8" r="2.8"/><circle cx="14.4" cy="12.2" r="2.8"/><circle cx="9.6" cy="12.2" r="2.8"/><circle cx="8.2" cy="8" r="2.8"/></g><circle cx="12" cy="9" r="2" fill="#fff"/></svg>`,
+    orders: `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M5 4a1.5 1.5 0 0 1 1.5-1.5h11A1.5 1.5 0 0 1 19 4v17l-2.3-1.5-2.4 1.5-2.3-1.5-2.3 1.5-2.4-1.5L5 21z" fill="currentColor"/><path d="M8.6 7.5h6.8M8.6 11h6.8M8.6 14.5h4" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+  };
 
   // ══ 화면 ══════════════════════════════════════════════════════
   // 조사 — jo("커피 머신", "이/가") → "커피 머신이", jo("Lv 3", "으로/로") → "Lv 3으로"
@@ -792,14 +1245,14 @@ window.HKCafe = (function () {
   const dur = (sec) => (window.HKMgmt ? HKMgmt.dur(sec) : Math.round(sec) + "초");
   const pct = (a, b) => Math.max(0, Math.min(100, b > 0 ? (a / b) * 100 : 0));
   const TABS = [
-    { id: "fac", name: "시설", icon: "hammer" }, { id: "menu", name: "메뉴", icon: "coffee" }, { id: "staff", name: "알바", icon: "users" },
-    { id: "deco", name: "꾸미기", icon: "flower-2" }, { id: "orders", name: "주문", icon: "clipboard-list" },
+    { id: "fac", name: "시설" }, { id: "menu", name: "메뉴" }, { id: "staff", name: "알바" },
+    { id: "deco", name: "꾸미기" }, { id: "orders", name: "주문" },
   ];
   const CAT_ICON = { coffee: "coffee", dessert: "cake-slice", tea: "leaf" };
   const LIMIT_TEXT = {
-    demand: { title: "손님이 더 오면 좋겠어요", body: "화분 · 조명과 꾸미기로 평판을 올리거나, 인기 있는 메뉴를 진열해 보세요." },
-    seat: { title: "자리가 모자라 손님이 돌아가요", body: "좌석을 늘리면 바로 손님이 늘어요." },
-    service: { title: "주문이 밀려 있어요", body: "계산대를 올리거나 알바생을 뽑으면 더 빨리 받아요." },
+    demand: { title: "손님이 더 오면 좋겠어요", body: "화분 · 조명과 꾸미기로 평판을 올리거나, 인기 있는 메뉴를 진열해 보세요.", chip: "손님이 더 오면 좋겠어요", icon: "footprints" },
+    seat: { title: "자리가 모자라 손님이 돌아가요", body: "좌석을 늘리면 바로 손님이 늘어요.", chip: "자리가 모자라요", icon: "armchair" },
+    service: { title: "주문이 밀려 있어요", body: "계산대를 올리거나 알바생을 뽑으면 더 빨리 받아요.", chip: "주문이 밀려요", icon: "hand-coins" },
   };
 
   function facEffect(id, L) {
@@ -820,7 +1273,7 @@ window.HKCafe = (function () {
   }
   function unlocksAt(g) {
     const out = [];
-    MENU.filter((m) => m.g === g).forEach((m) => out.push({ icon: CAT_ICON[m.cat], text: `새 메뉴 「${m.name}」` }));
+    MENU.filter((m) => m.g === g).forEach((m) => out.push({ icon: CAT_ICON[m.cat], text: `새 메뉴 「${m.name}」`, drink: m.id }));
     FAC.filter((f) => f.g === g && g > 1).forEach((f) => out.push({ icon: f.icon, text: `새 시설 「${f.name}」` }));
     if (facCapAt(g) > facCapAt(g - 1)) out.push({ icon: "arrow-up-circle", text: `시설을 Lv ${facCapAt(g)}까지 올릴 수 있어요` });
     DECO.filter((d) => d.g === g).forEach((d) => out.push({ icon: "flower-2", text: `꾸미기 「${d.name}」` }));
@@ -830,12 +1283,24 @@ window.HKCafe = (function () {
     if (buildSlotsAt(g) > buildSlotsAt(g - 1)) out.push({ icon: "hammer", text: `공사를 ${buildSlotsAt(g)}곳 동시에` });
     return out;
   }
+  const CONFETTI = ["#ff7a45", "#ffc83d", "#3cc9a5", "#ff8fb1", "#8fd3ff", "#fff3e2"];
 
   function mount(root) {
-    root.innerHTML = `<div class="cf-loading"><span class="hk-spin"></span></div>`;
-    let store = null, S = null, scene = null, tab = "fac", sig = "", lastSave = 0, modalOpen = 0;
+    root.classList.add("mgx", "mgx-shell", "cf");
+    const topBar = (withActions) => `<div class="mgx-top cf-top">
+        <a class="mgx-top__back" href="/manage">${ic("chevron-left", 18)}매니지먼트</a>
+        <div class="mgx-top__title"><span class="cf-logo" aria-hidden="true">${drinkSvg("latte", 26)}</span><span class="cf-top__name">옥상 쉼터 카페</span><span class="mgx-chip cf-top__chip" id="cf-gchip" hidden></span></div>
+        ${withActions ? `<div class="mgx-top__actions">
+          <button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button>
+          <button type="button" class="mgx-icon" data-act="more" aria-label="더보기" aria-haspopup="menu">${ic("ellipsis", 20)}</button>
+        </div>` : ""}
+      </div>`;
+    root.innerHTML = topBar(false) + `<div class="cf-loading"><span class="hk-spin"></span></div>`;
+    HKUI.refreshIcons(root);
+    let store = null, S = null, scene = null, tab = "fac", sig = "", lastSave = 0, modalOpen = 0, cashLock = 0, hudH = 0, spotSig = "";
     let liveLog = newLog();
     const thumbs = {};
+    const $ = (id) => root.querySelector("#" + id);
 
     const fresh = (st) => { // 예전 · 빠진 칸 채우기
       const b = blank(st && st.t ? st.t : Date.now());
@@ -846,11 +1311,12 @@ window.HKCafe = (function () {
       st.orders = st.orders && Array.isArray(st.orders.list) ? st.orders : b.orders;
       return st;
     };
+    const closed = (opens) => { root.innerHTML = topBar(false) + `<div class="cf-closed">${HKMgmt.closedHtml(opens, "옥상 쉼터 카페")}</div>`; HKUI.refreshIcons(root); };
 
     HKMgmt.open("cafe", {
       blank: () => blank(Date.now()),
       onStale: (st) => { S = fresh(st); store.state = S; sig = ""; HKUI.toast("다른 창에서 바꾼 내용으로 다시 불러왔어요", "info"); renderAll(); },
-      onClosed: (opens) => { if (scene) scene.destroy(); root.innerHTML = HKMgmt.closedHtml(opens, "옥상 쉼터 카페"); HKUI.refreshIcons(root); },
+      onClosed: (opens) => { if (scene) scene.destroy(); closed(opens); },
     }).then((st) => {
       store = st;
       const now = store.now();
@@ -869,8 +1335,9 @@ window.HKCafe = (function () {
       const hide = () => { if (document.visibilityState === "hidden") { advance(S, store.now()); store.saveNow({ keepalive: true }); } };
       document.addEventListener("visibilitychange", hide);
     }).catch((e) => {
-      if (e && e.closed) { root.innerHTML = HKMgmt.closedHtml(e.opensAt, "옥상 쉼터 카페"); HKUI.refreshIcons(root); return; }
-      root.innerHTML = `<div class="hk-mg-closed"><b>카페를 불러오지 못했어요</b><p>${esc((e && e.message) || "잠시 뒤 다시 들어와 주세요.")}</p><button class="hk-btn hk-btn--secondary" onclick="location.reload()">다시 불러오기</button></div>`;
+      if (e && e.closed) { closed(e.opensAt); return; }
+      root.innerHTML = topBar(false) + `<div class="cf-closed"><div class="hk-mg-closed"><b>카페를 불러오지 못했어요</b><p>${esc((e && e.message) || "잠시 뒤 다시 들어와 주세요.")}</p><button class="hk-btn hk-btn--secondary" onclick="location.reload()">다시 불러오기</button></div></div>`;
+      HKUI.refreshIcons(root);
     });
 
     function info() {
@@ -880,99 +1347,150 @@ window.HKCafe = (function () {
     }
 
     function build() {
-      root.innerHTML = `
-        <a class="hk-mg-back" href="/manage">${ic("chevron-left", 16)}매니지먼트</a>
-        <div class="cf-head">
-          <div class="cf-head__title"><div><h1>옥상 쉼터 카페</h1><p>회사 옥상의 작은 쉼터를 키워요</p></div></div>
-          <div class="cf-head__btns">
-            <button type="button" class="cf-iconbtn" data-act="help">${ic("circle-help", 18)}<span>도움말</span></button>
-            <button type="button" class="cf-iconbtn" data-act="reset">${ic("rotate-ccw", 18)}<span>처음부터 다시</span></button>
-          </div>
-        </div>
-        <div class="cf-grid">
-          <div class="cf-left">
-            <div class="cf-scene">
-              <canvas id="cf-canvas" aria-label="옥상 카페 그림"></canvas>
-              <div class="cf-scene__chips"><span class="cf-chip cf-chip--grade" id="cf-chip-grade"></span><span class="cf-chip" id="cf-chip-time"></span></div>
-              <div class="cf-scene__full" id="cf-full" hidden>${ic("package-check", 16)}<span>가득 찼어요 · 수입을 받아 주세요</span></div>
-            </div>
-            <div class="cf-stats" id="cf-stats"></div>
-            <div class="cf-card cf-income">
-              <div class="cf-income__top">
-                <div><div class="cf-label">쌓인 수입</div><div class="cf-income__num" id="cf-pending">0원</div></div>
-                <button type="button" class="hk-btn hk-btn--primary cf-collect" data-act="collect" id="cf-collect">${ic("hand-coins", 18)}<span>수입 받기</span></button>
+      root.innerHTML = topBar(true) + `
+        <div class="cf-main">
+          <div class="cf-stagecol">
+            <div class="mgx-stage cf-stage" id="cf-stage">
+              <canvas id="cf-canvas" role="img" aria-label="옥상 카페 장면 — 물건을 누르면 그 시설로 가요"></canvas>
+              <div class="mgx-hud cf-hud" id="cf-hud">
+                <div class="mgx-pill cf-pill" id="cf-p-cash" style="--pill:#f5a524"><span class="mgx-pill__ic">${G.coin}</span><b id="cf-cash">0원</b></div>
+                <button type="button" class="mgx-pill cf-pill" data-tab="fac" style="--pill:#ff7a45" aria-label="시간당 수입"><span class="mgx-pill__ic">${G.up}</span><b id="cf-ph">0원</b><small>/시간</small></button>
+                <button type="button" class="mgx-pill cf-pill" data-tab="fac" style="--pill:#2bb39a" aria-label="시간당 손님"><span class="mgx-pill__ic">${G.guest}</span><b id="cf-guest">0명</b><small>/시간</small></button>
+                <button type="button" class="mgx-pill cf-pill" data-tab="deco" style="--pill:#b77cf0" aria-label="꾸미기 재료"><span class="mgx-pill__ic">${G.mat}</span><b id="cf-mat">0</b></button>
+                <button type="button" class="mgx-pill cf-gpill" data-act="grade" aria-label="카페 등급">
+                  <svg viewBox="0 0 34 34" width="32" height="32" aria-hidden="true"><circle cx="17" cy="17" r="13.5" fill="#fff4ea" stroke="#ffe0cf" stroke-width="4"/><circle id="cf-gring" cx="17" cy="17" r="13.5" fill="none" stroke="#ff7a45" stroke-width="4" stroke-linecap="round" stroke-dasharray="0 85" transform="rotate(-90 17 17)"/><text id="cf-gnum" x="17" y="21.5" text-anchor="middle" font-size="13" font-weight="900" fill="#d9541f">1</text></svg>
+                  <span class="cf-gpill__t"><small>카페 등급</small><b id="cf-gpct">0%</b></span>
+                </button>
               </div>
-              <div class="cf-bar"><i id="cf-pend-bar"></i></div>
-              <div class="cf-sub" id="cf-pend-sub"></div>
+              <button type="button" class="mgx-ready cf-ready" id="cf-ready" data-act="collect" hidden><span>${G.coin}</span><b id="cf-ready-n">0원</b></button>
+              <div class="cf-tags" id="cf-tags"></div>
+              <div class="cf-spots-layer" id="cf-spots"></div>
+              <div class="mgx-pill is-dark cf-clock" id="cf-clock"></div>
+              <button type="button" class="cf-limit" id="cf-limit" data-act="limit"></button>
             </div>
-            <div class="cf-card cf-grade" id="cf-grade"></div>
-            <div id="cf-builds"></div>
-            <div id="cf-done"></div>
           </div>
-          <div class="cf-right">
-            <div class="cf-tabs" role="tablist">${TABS.map((t) => `<button type="button" role="tab" class="cf-tab" data-tab="${t.id}">${ic(t.icon, 18)}<span>${t.name}</span><b class="cf-tab__dot" id="cf-dot-${t.id}" hidden></b></button>`).join("")}</div>
+          <div class="cf-side">
+            <div class="mgx-card cf-status" id="cf-status">
+              <div class="cf-inc">
+                <div class="cf-inc__body">
+                  <div class="cf-k">쌓인 수입</div>
+                  <div class="cf-inc__num" id="cf-pending">0원</div>
+                </div>
+                <button type="button" class="mgx-btn is-gold cf-inc__btn" data-act="collect" id="cf-collect">${ic("hand-coins", 18)}<span>받기</span></button>
+              </div>
+              <div class="mgx-bar cf-inc__bar"><i id="cf-pbar"></i></div>
+              <div class="cf-mini" id="cf-psub"></div>
+              <div class="cf-gr" id="cf-gr"></div>
+              <div id="cf-builds"></div>
+            </div>
+            <div id="cf-done"></div>
             <div class="cf-panel" id="cf-panel"></div>
+            <div class="mgx-dock cf-dock" role="tablist">${TABS.map((t) => `<button type="button" role="tab" class="mgx-tab" data-tab="${t.id}">${TABG[t.id]}<span>${t.name}</span><b class="mgx-dot" id="cf-dot-${t.id}" hidden></b></button>`).join("")}</div>
           </div>
         </div>`;
       root.addEventListener("click", onClick);
-      scene = makeScene(root.querySelector("#cf-canvas"), () => S, { info, showSpots: () => tab === "deco" });
+      scene = makeScene($("cf-canvas"), () => S, {
+        info,
+        hudSpace: () => { const h = $("cf-hud"); return h ? h.offsetTop + h.offsetHeight + 4 : 0; },
+        onLayout: () => { spotSig = ""; placeOverlays(); },
+        onPick: (id) => goFac(id),
+      });
+      hudH = $("cf-hud").offsetHeight;
       sig = "";
       renderAll();
     }
 
     // ── 그리기 ──
-    function renderAll() { if (!root.querySelector("#cf-panel")) return; renderLive(); renderPanel(); HKUI.refreshIcons(root); }
+    function renderAll() { if (!$("cf-panel")) return; renderLive(); renderPanel(); HKUI.refreshIcons(root); }
+    function gradeProg() {
+      if (S.grade >= MAX_GRADE) return 1;
+      const q = GRADE_REQ[S.grade];
+      return Math.min(S.sales / q.sales, facSum(S) / q.fac, 1);
+    }
     function renderLive() {
       const r = rates(S), cap = capOf(r), full = S.pending >= cap - 1;
-      const $ = (id) => root.querySelector("#" + id);
-      $("cf-chip-grade").textContent = `카페 등급 ${S.grade}`;
+      // 위 막대 · HUD
+      const chip = $("cf-gchip"); chip.hidden = false; chip.textContent = `등급 ${S.grade}`;
+      if (Date.now() > cashLock) $("cf-cash").textContent = won(S.cash);
+      $("cf-ph").textContent = won(r.perHour);
+      $("cf-guest").textContent = `${num(r.served)}명`;
+      $("cf-mat").textContent = num(S.mat);
+      const gp = gradeProg();
+      $("cf-gring").setAttribute("stroke-dasharray", `${(gp * 84.8).toFixed(1)} 85`);
+      $("cf-gnum").textContent = S.grade;
+      $("cf-gpct").textContent = S.grade >= MAX_GRADE ? "완주" : `${Math.floor(gp * 100)}%`;
+      const hh2 = $("cf-hud").offsetHeight; if (hh2 !== hudH) { hudH = hh2; scene.relayout(); }
+      // 시각 · 막힌 곳
       const h = kstHour(store.now()), hh = Math.floor(h), mm = Math.floor((h - hh) * 60);
       const part = h < 6 ? "새벽" : h < 11 ? "아침" : h < 14 ? "점심" : h < 17.5 ? "오후" : h < 20 ? "저녁" : "밤";
-      $("cf-chip-time").textContent = `${part} ${hh % 12 || 12}:${String(mm).padStart(2, "0")}`;
-      $("cf-full").hidden = !full;
-      $("cf-stats").innerHTML = `
-        <div class="cf-stat"><span>${ic("wallet", 16)}</span><div><small>가진 돈</small><b>${won(S.cash)}</b></div></div>
-        <div class="cf-stat"><span>${ic("trending-up", 16)}</span><div><small>시간당 수입</small><b>${won(r.perHour)}</b></div></div>
-        <div class="cf-stat"><span>${ic("users", 16)}</span><div><small>시간당 손님</small><b>${num(r.served)}명</b></div></div>
-        <div class="cf-stat"><span>${ic("sparkles", 16)}</span><div><small>꾸미기 재료</small><b>${num(S.mat)}개</b></div></div>`;
+      $("cf-clock").innerHTML = `${h >= 6 && h < 19 ? G.sun : G.moon}<span>${part} ${hh % 12 || 12}:${String(mm).padStart(2, "0")}</span>`;
+      const LT = LIMIT_TEXT[r.limit], lim = $("cf-limit");
+      if (lim.dataset.k !== r.limit) { lim.dataset.k = r.limit; lim.innerHTML = `${ic(LT.icon, 15)}<span>${LT.chip}</span>`; HKUI.refreshIcons(lim); }
+      // 말풍선 · 쌓인 수입
+      const rd = $("cf-ready");
+      rd.hidden = S.pending < 1;
+      rd.classList.toggle("is-full", full);
+      $("cf-ready-n").textContent = full ? `가득! ${won(S.pending)}` : won(S.pending);
       $("cf-pending").textContent = won(S.pending);
-      $("cf-pend-bar").style.width = pct(S.pending, cap) + "%";
-      $("cf-pend-bar").classList.toggle("is-full", full);
-      $("cf-pend-sub").innerHTML = full ? `<b class="cf-full-txt">가득 찼어요</b> · 받으면 다시 장사해요 (최대 ${CAP_HOURS}시간치 ${won(cap)})`
+      const pb = $("cf-pbar"); pb.style.setProperty("--v", pct(S.pending, cap) + "%"); pb.parentElement.classList.toggle("is-full", full);
+      $("cf-psub").innerHTML = full ? `<b class="cf-warn">가득 찼어요</b> · 받으면 다시 장사해요 (최대 ${CAP_HOURS}시간치 ${won(cap)})`
         : `자리 비운 동안에도 최대 ${CAP_HOURS}시간치(${won(cap)})까지 쌓여요${r.perHour > 0 ? ` · 가득 차기까지 ${dur((cap - S.pending) / r.perHour * 3600)}` : ""}`;
-      const btn = $("cf-collect"); btn.disabled = S.pending < 1;
+      $("cf-collect").disabled = S.pending < 1;
       // 등급
       const q = GRADE_REQ[S.grade];
-      $("cf-grade").innerHTML = S.grade >= MAX_GRADE
-        ? `<div class="cf-grade__head"><b>카페 등급 ${S.grade}</b><span class="cf-pill cf-pill--gold">${ic("award", 14)} 1차 완주</span></div><div class="cf-sub">누적 매출 ${won(S.sales)} · 맞이한 손님 ${num(S.served)}명</div>`
-        : `<div class="cf-grade__head"><b>카페 등급 ${S.grade}</b><span class="cf-sub">다음 등급까지</span></div>
-          <div class="cf-req"><span>누적 매출</span><div class="cf-bar cf-bar--sm"><i style="width:${pct(S.sales, q.sales)}%"></i></div><em>${won(Math.min(S.sales, q.sales))} / ${won(q.sales)}</em></div>
-          <div class="cf-req"><span>시설 레벨 합</span><div class="cf-bar cf-bar--sm cf-bar--violet"><i style="width:${pct(facSum(S), q.fac)}%"></i></div><em>${facSum(S)} / ${q.fac}</em></div>`;
+      $("cf-gr").innerHTML = S.grade >= MAX_GRADE
+        ? `<div class="cf-gr__head"><b>카페 등급 ${S.grade}</b><span class="mgx-chip is-gold">1차 완주</span></div><div class="cf-mini">누적 매출 ${won(S.sales)} · 맞이한 손님 ${num(S.served)}명</div>`
+        : `<div class="cf-gr__head"><b>등급 ${S.grade} → ${S.grade + 1}</b><span class="cf-mini">둘 다 채우면 올라요</span></div>
+          <div class="cf-req"><span>누적 매출</span><div class="mgx-bar" style="--bar:#ff7a45"><i style="--v:${pct(S.sales, q.sales)}%"></i></div><em>${won(Math.min(S.sales, q.sales))} / ${won(q.sales)}</em></div>
+          <div class="cf-req"><span>시설 레벨 합</span><div class="mgx-bar" style="--bar:#3cc9a5"><i style="--v:${pct(facSum(S), q.fac)}%"></i></div><em>${facSum(S)} / ${q.fac}</em></div>`;
       // 공사
       const nb = buildSlotsAt(S.grade);
-      $("cf-builds").innerHTML = S.builds.length ? `<div class="cf-card cf-builds"><div class="cf-label">${ic("hammer", 14)} 공사 중 ${S.builds.length} / ${nb}</div>${S.builds.map((b) => {
+      $("cf-builds").innerHTML = S.builds.length ? `<div class="cf-builds"><div class="cf-k">${G.hammer} 공사 중 ${S.builds.length} / ${nb}</div>${S.builds.map((b) => {
         const left = Math.max(0, (b.end - store.now()) / 1000), tot = (b.end - b.start) / 1000;
-        return `<div class="cf-build"><span>${esc(FAC_BY[b.id].name)} Lv ${b.to}</span><div class="cf-bar cf-bar--sm cf-bar--amber"><i style="width:${pct(tot - left, tot)}%"></i></div><em>${dur(left)} 남음</em></div>`;
+        return `<div class="cf-req"><span>${esc(FAC_BY[b.id].name)} Lv ${b.to}</span><div class="mgx-bar" style="--bar:#ffb020"><i style="--v:${pct(tot - left, tot)}%"></i></div><em>${dur(left)} 남음</em></div>`;
       }).join("")}</div>` : "";
-      $("cf-done").innerHTML = S.done1 ? `<button type="button" class="cf-card cf-donecard" data-act="done">${ic("award", 22)}<div><b>1차 완주했어요!</b><span>다음 업데이트 안내 보기</span></div>${ic("chevron-right", 18)}</button>` : "";
+      // 장면 위 공사 표시
+      $("cf-tags").innerHTML = S.builds.map((b) => {
+        const [gx, gy, z] = ANCH[b.id], [x, y] = scene.toCss(gx, gy, z), left = Math.max(0, (b.end - store.now()) / 1000), tot = (b.end - b.start) / 1000;
+        return `<div class="cf-btag" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;--v:${pct(tot - left, tot)}%">${G.hammer}<span>${dur(left)}</span></div>`;
+      }).join("");
+      const doneHtml = S.done1 ? `<button type="button" class="mgx-card cf-donecard" data-act="done">${ic("award", 24)}<div><b>1차 완주했어요!</b><span>다음 업데이트 안내 보기</span></div>${ic("chevron-right", 18)}</button>` : "";
+      if ($("cf-done").dataset.v !== String(S.done1)) { $("cf-done").dataset.v = String(S.done1); $("cf-done").innerHTML = doneHtml; HKUI.refreshIcons($("cf-done")); }
       // 탭 점
       const ordersReady = S.orders.list.filter((o) => !o.claimed && orderDone(o)).length;
-      const dOrders = root.querySelector("#cf-dot-orders"); dOrders.hidden = !ordersReady; dOrders.textContent = ordersReady || "";
-      root.querySelector("#cf-dot-fac").hidden = !FAC.some((f) => !facBlock(S, f.id));
-      root.querySelectorAll(".cf-tab").forEach((b) => { b.classList.toggle("is-on", b.dataset.tab === tab); b.setAttribute("aria-selected", b.dataset.tab === tab); });
+      const dO = $("cf-dot-orders"); dO.hidden = !ordersReady; dO.textContent = ordersReady || "";
+      const facReady = FAC.filter((f) => !facBlock(S, f.id)).length;
+      const dF = $("cf-dot-fac"); dF.hidden = !facReady; dF.textContent = facReady || "";
+      root.querySelectorAll(".cf-dock .mgx-tab").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === tab));
+      placeOverlays();
       liveFields();
-      HKUI.refreshIcons(root.querySelector("#cf-stats"));
-      HKUI.refreshIcons(root.querySelector("#cf-grade"));
-      HKUI.refreshIcons(root.querySelector("#cf-builds"));
-      HKUI.refreshIcons(root.querySelector("#cf-done"));
+      HKUI.refreshIcons($("cf-status"));
+    }
+    // 장면 위에 얹는 것들 — 말풍선 · 꾸미기 자리 「+」
+    function placeOverlays() {
+      if (!scene || !S) return;
+      const [rx, ry] = scene.toCss(1.75, 5.9, 50); const rd = $("cf-ready"); rd.style.left = rx.toFixed(0) + "px"; rd.style.top = ry.toFixed(0) + "px";
+      const hasLoose = S.deco.owned.some((id) => !S.deco.place.includes(id));
+      const key = JSON.stringify([tab, S.grade, S.deco.place, hasLoose, Math.round(scene.toCss(0, 0)[0]), Math.round(scene.toCss(10, 10)[1])]);
+      if (key === spotSig) return;
+      spotSig = key;
+      $("cf-spots").innerHTML = SPOTS.map((sp, i) => {
+        const open = S.grade >= sp.g, id = S.deco.place[i];
+        if (!open) return "";
+        if (id && tab !== "deco") return "";
+        if (!id && tab !== "deco" && !hasLoose) return "";
+        const [x, y] = scene.toCss(SPOT_G[i][0] + (id ? 0.55 : 0), SPOT_G[i][1] + (id ? 0.55 : 0), id ? 0 : 8);
+        return `<button type="button" class="cf-spot-pin${id ? " is-filled" : ""}" data-act="spot" data-i="${i}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px" aria-label="${i + 1}번 자리 ${esc(sp.name)}">${id ? `<b>${i + 1}</b>` : G.plus}</button>`;
+      }).join("");
     }
     // 패널 안 실시간 글자 — 남은 공사 시간 · 주문 진행 · 알바생 일한 시간
     function liveFields() {
       root.querySelectorAll("[data-live]").forEach((el) => {
         const [k, id] = el.dataset.live.split(":");
-        if (k === "build") { const b = S.builds.find((x) => x.id === id); if (b) { const left = Math.max(0, (b.end - store.now()) / 1000), tot = (b.end - b.start) / 1000; if (el.tagName === "I") el.style.width = pct(tot - left, tot) + "%"; else el.textContent = `${dur(left)} 남음`; } }
-        if (k === "order") { const o = S.orders.list.find((x) => x.id === id); if (o) { if (el.tagName === "I") el.style.width = pct(o.p, o.target) + "%"; else el.textContent = orderProg(o); } }
-        if (k === "xp") { const st = S.staff.find((x) => x.id === id); if (st) { if (el.tagName === "I") el.style.width = pct(st.xp, staffNeed(st.lv)) + "%"; else el.textContent = st.lv >= STAFF_MAX ? "가장 높은 레벨" : `다음 레벨까지 ${dur((staffNeed(st.lv) - st.xp) * 3600)} 일하기`; } }
+        const bar = (v) => el.style.setProperty("--v", v + "%");
+        if (k === "build") { const b = S.builds.find((x) => x.id === id); if (b) { const left = Math.max(0, (b.end - store.now()) / 1000), tot = (b.end - b.start) / 1000; if (el.tagName === "I") bar(pct(tot - left, tot)); else el.textContent = `${dur(left)} 남음`; } }
+        if (k === "order") { const o = S.orders.list.find((x) => x.id === id); if (o) { if (el.tagName === "I") bar(pct(o.p, o.target)); else el.textContent = orderProg(o); } }
+        if (k === "xp") { const st = S.staff.find((x) => x.id === id); if (st) { if (el.tagName === "I") bar(st.lv >= STAFF_MAX ? 100 : pct(st.xp, staffNeed(st.lv))); else el.textContent = st.lv >= STAFF_MAX ? "가장 높은 레벨" : `다음 레벨까지 ${dur((staffNeed(st.lv) - st.xp) * 3600)} 일하기`; } }
       });
     }
 
@@ -989,37 +1507,40 @@ window.HKCafe = (function () {
       const s2 = panelSig();
       if (s2 === sig) return;
       sig = s2;
-      const el = root.querySelector("#cf-panel");
+      const el = $("cf-panel");
       el.innerHTML = tab === "fac" ? panelFac() : tab === "menu" ? panelMenu() : tab === "staff" ? panelStaff() : tab === "deco" ? panelDeco() : panelOrders();
       HKUI.refreshIcons(el);
       liveFields();
     }
+    const head = (title, extra = "") => `<div class="cf-phead"><div class="cf-phead__t">${title}</div>${extra}</div>`;
+    const coinCost = (n) => `<span class="cf-cost"><i class="cf-coin"></i>${won(n)}</span>`;
 
     function panelFac() {
-      const r = rates(S), L = LIMIT_TEXT[r.limit];
-      const row = (label, v, on) => `<div class="cf-flow__row${on ? " is-limit" : ""}"><span>${label}</span><b>${num(v)}명</b></div>`;
-      return `<div class="cf-hint">
-          <div class="cf-hint__icon">${ic("lightbulb", 18)}</div>
-          <div><b>${L.title}</b><p>${L.body}</p>
-            <div class="cf-flow">${row("찾아오는 손님", r.demand, r.limit === "demand")}${row("자리로 받을 수 있는", r.seatCap, r.limit === "seat")}${row("주문 받을 수 있는", r.serviceCap, r.limit === "service")}</div>
-            <small>모두 시간당 · 가장 작은 수만큼 손님을 받아요</small></div>
+      const r = rates(S), L = LIMIT_TEXT[r.limit], mx = Math.max(r.demand, r.seatCap, r.serviceCap, 1);
+      const row = (key, label, v, icon) => `<div class="cf-flow__row${r.limit === key ? " is-limit" : ""}"><span class="cf-flow__ic">${ic(icon, 15)}</span><span class="cf-flow__lb">${label}</span><div class="cf-flow__bar"><i style="width:${pct(v, mx)}%"></i></div><b>${num(v)}명</b></div>`;
+      return head("시설", `<span class="mgx-chip">공사 ${S.builds.length} / ${buildSlotsAt(S.grade)}곳</span>`) + `<div class="mgx-card cf-hint">
+          <div class="cf-hint__head"><span class="cf-hint__ic">${ic("lightbulb", 18)}</span><div><b>${L.title}</b><p>${L.body}</p></div></div>
+          <div class="cf-flow">${row("demand", "찾아오는 손님", r.demand, "footprints")}${row("seat", "자리로 받는 손님", r.seatCap, "armchair")}${row("service", "주문 받는 손님", r.serviceCap, "hand-coins")}</div>
+          <div class="cf-mini">모두 시간당 · 가장 작은 수만큼 손님을 받아요</div>
         </div>
         <div class="cf-list">${FAC.map((f) => {
-          const lv = S.fac[f.id], b = facBlock(S, f.id), building = S.builds.find((x) => x.id === f.id);
-          const to = lv + 1, cost = upCost(f.id, Math.min(to, f.max)), t = upTime(Math.min(to, f.max));
+          const lv = S.fac[f.id], b = facBlock(S, f.id), building = S.builds.find((x) => x.id === f.id), locked = S.grade < f.g;
+          const to = lv + 1, cost = upCost(f.id, Math.min(to, f.max)), t = upTime(Math.min(to, f.max)), cap = facCapAt(S.grade);
+          const tk = "f-" + f.id + Math.max(1, lv); thumbs[tk] = thumbs[tk] || facThumb(f.id, lv);
           let foot;
-          if (building) foot = `<div class="cf-prog"><div class="cf-bar cf-bar--sm cf-bar--amber"><i data-live="build:${f.id}"></i></div><em data-live="build:${f.id}"></em></div>`;
+          if (building) foot = `<div class="cf-prog"><div class="mgx-bar" style="--bar:#ffb020"><i data-live="build:${f.id}"></i></div><em data-live="build:${f.id}"></em></div>`;
           else if (b && b.why !== "cash") foot = `<div class="cf-lock">${ic(b.why === "max" ? "check" : "lock", 14)}${esc(b.text)}</div>`;
-          else foot = `<button type="button" class="hk-btn ${b ? "hk-btn--secondary" : "hk-btn--primary"} cf-act" data-act="up" data-id="${f.id}" ${b ? "disabled" : ""}><span>${lv ? `${jo("Lv " + to, "으로/로")} 올리기` : "놓기"}</span><small>${won(cost)}${t ? ` · ${dur(t)} 걸려요` : " · 바로 끝나요"}</small></button>`;
-          const next = lv < f.max && S.grade >= f.g ? `<div class="cf-next">${ic("arrow-right", 12)} ${esc(facEffect(f.id, to))}</div>` : "";
-          return `<div class="cf-item${S.grade < f.g ? " is-locked" : ""}">
-            <div class="cf-item__icon cf-c-${f.id}">${ic(f.icon, 22)}</div>
-            <div class="cf-item__body">
-              <div class="cf-item__title"><b>${esc(f.name)}</b><span class="cf-lv">${lv ? `Lv ${lv}` : "없음"}<small> / ${f.max}</small></span></div>
-              <div class="cf-item__desc">${esc(f.desc)}</div>
-              <div class="cf-now">${esc(facEffect(f.id, lv) || "")}</div>${next}
-              ${foot}
-            </div></div>`;
+          else foot = `<button type="button" class="mgx-btn cf-buy" data-act="up" data-id="${f.id}" ${b ? "disabled" : ""}><span>${lv ? `${jo("Lv " + to, "으로/로")} 올리기` : "놓기"}</span><small>${coinCost(cost)}${t ? ` · ${dur(t)}` : " · 바로"}</small></button>${b ? `<div class="cf-mini cf-warn">돈이 모자라요</div>` : ""}`;
+          const next = lv < f.max && !locked ? `<div class="cf-next">${ic("arrow-up-right", 13)} ${esc(facEffect(f.id, to))}</div>` : "";
+          const pips = Array.from({ length: f.max }, (_, i) => `<i class="${i < lv ? "on" : i >= cap ? "cap" : ""}${building && i === lv ? " build" : ""}"></i>`).join("");
+          return `<div class="mgx-card cf-fac${locked ? " is-locked" : ""}${building ? " is-building" : ""}" id="cf-fac-${f.id}">
+            <div class="cf-fac__art"><img src="${thumbs[tk]}" alt=""></div>
+            <div class="cf-fac__body">
+              <div class="cf-fac__head"><b>${esc(f.name)}</b><span class="cf-lv">${lv ? `Lv ${lv}` : "없음"}</span></div>
+              <div class="cf-pips" aria-label="레벨 ${lv} / ${f.max}">${pips}</div>
+              <div class="cf-fac__now">${esc(facEffect(f.id, lv) || f.desc)}</div>${next}
+            </div>
+            <div class="cf-fac__foot">${foot}</div></div>`;
         }).join("")}</div>`;
     }
 
@@ -1027,128 +1548,191 @@ window.HKCafe = (function () {
       const slots = menuSlotsAt(S.grade), r = rates(S);
       const on = S.menu.filter((id) => menuOk(S, MENU_BY[id]));
       const best = bestMenu(S), isBest = best.length === on.length && best.every((x) => on.includes(x));
-      return `<div class="cf-slots">
-          <div class="cf-slots__head"><b>진열 칸 ${on.length} / ${slots}</b>${slots < 4 ? `<span class="cf-sub">등급 9부터 4칸</span>` : ""}</div>
-          <div class="cf-slots__row">${Array.from({ length: slots }, (_, i) => { const m = MENU_BY[on[i]]; return m ? `<div class="cf-slot is-on">${ic(CAT_ICON[m.cat], 16)}<span>${esc(m.name)}</span></div>` : `<div class="cf-slot">빈 칸</div>`; }).join("")}</div>
-          <button type="button" class="hk-btn hk-btn--secondary cf-act" data-act="bestmenu" ${isBest ? "disabled" : ""}>${ic("wand-sparkles", 16)} ${isBest ? "지금이 가장 많이 버는 조합이에요" : "가장 많이 버는 조합으로 진열"}</button>
-          <div class="cf-sub">메뉴 매력 ${r.appeal.toFixed(2)} · 손님 한 명이 평균 ${won(r.avgPrice)} 써요. 여러 가지를 진열할수록 손님이 더 와요.</div>
+      return head("메뉴", `<span class="mgx-chip">진열 ${on.length} / ${slots}칸</span>`) + `<div class="mgx-card cf-shelf">
+          <div class="cf-shelf__row">${Array.from({ length: slots }, (_, i) => { const m = MENU_BY[on[i]]; return m ? `<div class="cf-slot is-on">${drinkSvg(m.id, 44)}<span>${esc(m.name)}</span></div>` : `<div class="cf-slot">${G.plus}<span>빈 칸</span></div>`; }).join("")}</div>
+          ${slots < 4 ? `<div class="cf-mini">등급 9부터 진열 칸이 4칸이 돼요</div>` : ""}
+          <button type="button" class="mgx-btn is-soft is-sm is-wide" data-act="bestmenu" ${isBest ? "disabled" : ""}>${ic("wand-sparkles", 16)} ${isBest ? "지금이 가장 많이 버는 조합이에요" : "가장 많이 버는 조합으로 진열"}</button>
+          <div class="cf-mini">메뉴 매력 ${r.appeal.toFixed(2)} · 손님 한 명이 평균 ${won(r.avgPrice)} 써요. 여러 가지를 진열할수록 손님이 더 와요.</div>
         </div>
-        <div class="cf-list">${MENU.map((m) => {
+        <div class="cf-drinks">${MENU.map((m) => {
           const ok = menuOk(S, m), isOn = on.includes(m.id);
           const facName = FAC_BY[CATS[m.cat].fac].name;
           const lock = S.grade < m.g ? `등급 ${m.g}에 열려요` : `${jo(facName + " Lv " + m.need, "이/가")} 있어야 해요`;
           const stars = Math.round(m.pop * 3) - 1;
           const share = r.items.find((x) => x.id === m.id);
-          return `<div class="cf-item cf-item--menu${ok ? "" : " is-locked"}${isOn ? " is-on" : ""}">
-            <div class="cf-item__icon cf-c-${m.cat}">${ic(CAT_ICON[m.cat], 20)}</div>
-            <div class="cf-item__body">
-              <div class="cf-item__title"><b>${esc(m.name)}</b><span class="cf-tag">${CATS[m.cat].name}</span></div>
-              <div class="cf-meta"><span>${ic("tag", 13)} ${won(ok ? itemPrice(S, m) : m.price)}</span><span>${ic("timer", 13)} ${dur(ok ? itemPrep(S, m) : m.prep)}</span><span class="cf-stars" aria-label="인기 ${stars}">${"★".repeat(stars)}<i>${"★".repeat(5 - stars)}</i></span></div>
-              ${share ? `<div class="cf-sub">시간당 ${num(share.perHour)}${CATS[m.cat].unit}쯤 팔려요</div>` : ""}
-              ${ok ? `<button type="button" class="hk-btn ${isOn ? "hk-btn--secondary" : "hk-btn--primary"} cf-act" data-act="menu" data-id="${m.id}">${isOn ? "진열 내리기" : "진열하기"}</button>` : `<div class="cf-lock">${ic("lock", 14)}${esc(lock)}</div>`}
-            </div></div>`;
+          return `<div class="cf-drink cf-cat-${m.cat}${ok ? "" : " is-locked"}${isOn ? " is-on" : ""}">
+            ${isOn ? `<span class="cf-drink__badge">${ic("check", 12)}진열 중</span>` : ""}
+            <div class="cf-drink__art">${drinkSvg(m.id, 76)}</div>
+            <div class="cf-drink__name">${esc(m.name)}</div>
+            <div class="cf-drink__meta"><span class="cf-cost"><i class="cf-coin"></i>${won(ok ? itemPrice(S, m) : m.price)}</span><span>${ic("timer", 12)}${dur(ok ? itemPrep(S, m) : m.prep)}</span></div>
+            <div class="cf-stars" aria-label="인기 ${stars}">${"★".repeat(stars)}<i>${"★".repeat(5 - stars)}</i></div>
+            <div class="cf-mini cf-drink__sold">${share ? `시간당 ${num(share.perHour)}${CATS[m.cat].unit}쯤 팔려요` : esc(CATS[m.cat].name)}</div>
+            ${ok ? `<button type="button" class="mgx-btn is-sm is-wide ${isOn ? "is-white" : ""}" data-act="menu" data-id="${m.id}">${isOn ? "진열 내리기" : "진열하기"}</button>` : `<div class="cf-lock">${ic("lock", 13)}${esc(lock)}</div>`}
+          </div>`;
         }).join("")}</div>`;
     }
 
     function panelStaff() {
       const open = staffSlots(S), n = S.staff.length, slot = STAFF_SLOTS[n];
       const nextG = STAFF_SLOTS.find((x) => x.g > S.grade);
-      return `<div class="cf-note">${ic("users", 16)}<span>알바 자리 <b>${n} / ${open}</b>${nextG ? ` · 다음 자리는 등급 ${nextG.g}에 열려요` : ""}. 알바생은 일손이 되어 주문을 더 받고, 장기에 따라 효과가 있어요. 장사한 시간만큼 저절로 레벨이 올라요.</span></div>
+      return head("알바", `<span class="mgx-chip">자리 ${n} / ${open}</span>`) + `<div class="mgx-card cf-crew">
+          <div class="cf-crew__slots">${STAFF_SLOTS.map((x, i) => {
+            const me = S.staff[i];
+            if (me) return `<div class="cf-cslot is-on">${faceSvg(STAFF_BY[me.id], 46)}<small>${esc(STAFF_BY[me.id].name)}</small></div>`;
+            if (S.grade >= x.g) return `<div class="cf-cslot is-open"><span>${G.plus}</span><small>빈 자리</small></div>`;
+            return `<div class="cf-cslot"><span>${ic("lock", 16)}</span><small>등급 ${x.g}</small></div>`;
+          }).join("")}</div>
+          <div class="cf-mini">알바생은 일손이 되어 주문을 더 받고, 장기에 따라 효과가 있어요. 장사한 시간만큼 저절로 레벨이 올라요.${nextG ? ` 다음 자리는 등급 ${nextG.g}에 열려요.` : ""}</div>
+        </div>
         <div class="cf-list">${STAFF.map((st) => {
           const me = S.staff.find((x) => x.id === st.id);
-          thumbs["st-" + st.id] = thumbs["st-" + st.id] || staffThumb(st);
           let foot;
-          if (me) foot = `<div class="cf-prog"><div class="cf-bar cf-bar--sm cf-bar--green"><i data-live="xp:${st.id}"></i></div><em data-live="xp:${st.id}"></em></div><div class="cf-now">지금 효과: ${esc(staffEffect(st.skill, me.lv))}</div>`;
+          if (me) foot = `<div class="cf-prog"><div class="mgx-bar" style="--bar:#3cc9a5"><i data-live="xp:${st.id}"></i></div></div><div class="cf-mini" data-live="xp:${st.id}"></div><div class="cf-fac__now">지금 효과: ${esc(staffEffect(st.skill, me.lv))}</div>`;
           else if (!slot) foot = `<div class="cf-lock">${ic("lock", 14)}알바 자리가 모두 찼어요</div>`;
           else if (S.grade < slot.g) foot = `<div class="cf-lock">${ic("lock", 14)}등급 ${slot.g}에 ${n + 1}번째 자리가 열려요</div>`;
-          else foot = `<button type="button" class="hk-btn ${S.cash >= slot.cost ? "hk-btn--primary" : "hk-btn--secondary"} cf-act" data-act="hire" data-id="${st.id}" ${S.cash >= slot.cost ? "" : "disabled"}><span>함께 일하기</span><small>${won(slot.cost)}</small></button>${S.cash < slot.cost ? `<div class="cf-sub">돈이 모자라요</div>` : ""}`;
-          return `<div class="cf-item${me ? " is-on" : ""}">
-            <img class="cf-face" src="${thumbs["st-" + st.id]}" alt="">
-            <div class="cf-item__body">
-              <div class="cf-item__title"><b>${esc(st.name)}</b><span class="cf-tag cf-tag--${st.skill}">${esc(st.skillName)}</span>${me ? `<span class="cf-lv">Lv ${me.lv}<small> / ${STAFF_MAX}</small></span>` : ""}</div>
-              <div class="cf-item__desc">${esc(st.desc)} · 레벨마다 ${esc(staffEffect(st.skill, 1))}</div>
-              ${foot}
-            </div></div>`;
+          else foot = `<button type="button" class="mgx-btn cf-buy" data-act="hire" data-id="${st.id}" ${S.cash >= slot.cost ? "" : "disabled"}><span>함께 일하기</span><small>${coinCost(slot.cost)}</small></button>${S.cash < slot.cost ? `<div class="cf-mini cf-warn">돈이 모자라요</div>` : ""}`;
+          return `<div class="mgx-card cf-staff cf-sk-${st.skill}${me ? " is-on" : ""}">
+            <div class="cf-staff__face">${faceSvg(st, 72)}${me ? `<span class="cf-staff__lv">Lv ${me.lv}</span>` : ""}</div>
+            <div class="cf-fac__body">
+              <div class="cf-fac__head"><b>${esc(st.name)}</b><span class="mgx-chip cf-skill">${esc(st.skillName)}</span></div>
+              <div class="cf-fac__now">${esc(st.desc)}</div>
+              <div class="cf-mini">레벨마다 ${esc(staffEffect(st.skill, 1))}</div>
+            </div>
+            <div class="cf-fac__foot">${foot}</div></div>`;
         }).join("")}</div>`;
     }
 
     function panelDeco() {
-      return `<div class="cf-note">${ic("flower-2", 16)}<span>꾸미기 물건을 사서 옥상 자리에 놓으면 평판이 올라요. 지금 꾸미기 평판 <b>+${decoRep(S)}</b> · 재료 <b>${num(S.mat)}개</b> (재료는 오늘의 주문으로 받아요)</span></div>
-        <div class="cf-spots">${SPOTS.map((sp, i) => {
-          const id = S.deco.place[i], open = S.grade >= sp.g;
-          return `<button type="button" class="cf-spot${id ? " is-filled" : ""}" data-act="spot" data-i="${i}" ${open ? "" : "disabled"}>
-            <span class="cf-spot__no">${i + 1}</span><span class="cf-spot__name">${esc(sp.name)}</span>
-            <span class="cf-spot__item">${open ? (id ? esc(DECO_BY[id].name) : "비어 있어요") : `등급 ${sp.g}에 열려요`}</span></button>`;
-        }).join("")}</div>
-        <div class="cf-list cf-list--deco">${DECO.map((d) => {
+      return head("꾸미기", `<span class="mgx-chip is-gold">평판 +${decoRep(S)}</span>`) + `<div class="mgx-card cf-decohead">
+          <div class="cf-mini">꾸미기 물건을 사서 옥상 자리에 놓으면 평판이 올라요. 재료 <b>${num(S.mat)}개</b> — 재료는 오늘의 주문으로 받아요. 장면 속 「+」를 눌러도 놓을 수 있어요.</div>
+          <div class="cf-spots">${SPOTS.map((sp, i) => {
+            const id = S.deco.place[i], open = S.grade >= sp.g;
+            return `<button type="button" class="cf-spot${id ? " is-filled" : ""}" data-act="spot" data-i="${i}" ${open ? "" : "disabled"}>
+              <span class="cf-spot__no">${open ? i + 1 : ic("lock", 11)}</span><span class="cf-spot__txt"><b>${esc(sp.name)}</b><small>${open ? (id ? esc(DECO_BY[id].name) : "비어 있어요") : `등급 ${sp.g}에 열려요`}</small></span></button>`;
+          }).join("")}</div>
+        </div>
+        <div class="cf-decos">${DECO.map((d) => {
           thumbs["d-" + d.id] = thumbs["d-" + d.id] || decoThumb(d.id);
           const own = S.deco.owned.includes(d.id), placed = S.deco.place.indexOf(d.id);
           const ok = S.cash >= d.cost && S.mat >= d.mat;
           let foot;
-          if (own) foot = `<div class="cf-now">${placed >= 0 ? `${ic("map-pin", 13)} ${placed + 1}번 자리에 놓았어요` : "가지고 있어요 · 위 자리를 눌러 놓아요"}</div>`;
-          else if (S.grade < d.g) foot = `<div class="cf-lock">${ic("lock", 14)}등급 ${d.g}에 열려요</div>`;
-          else foot = `<button type="button" class="hk-btn ${ok ? "hk-btn--primary" : "hk-btn--secondary"} cf-act" data-act="deco" data-id="${d.id}" ${ok ? "" : "disabled"}><span>사기</span><small>${won(d.cost)} · 재료 ${d.mat}개</small></button>${ok ? "" : `<div class="cf-sub">${S.mat < d.mat ? "재료가" : "돈이"} 모자라요</div>`}`;
-          return `<div class="cf-item${own ? " is-on" : ""}${S.grade < d.g ? " is-locked" : ""}">
-            <img class="cf-face cf-face--deco" src="${thumbs["d-" + d.id]}" alt="">
-            <div class="cf-item__body"><div class="cf-item__title"><b>${esc(d.name)}</b><span class="cf-tag">평판 +${d.rep}</span></div>${foot}</div></div>`;
+          if (own) foot = `<div class="cf-owned">${ic(placed >= 0 ? "map-pin" : "package", 13)} ${placed >= 0 ? `${placed + 1}번 자리에 있어요` : "가지고 있어요 · 자리를 골라요"}</div>`;
+          else if (S.grade < d.g) foot = `<div class="cf-lock">${ic("lock", 13)}등급 ${d.g}에 열려요</div>`;
+          else foot = `<button type="button" class="mgx-btn is-sm is-wide cf-buy" data-act="deco" data-id="${d.id}" ${ok ? "" : "disabled"}><span>사기</span><small>${coinCost(d.cost)} · 재료 ${d.mat}</small></button>${ok ? "" : `<div class="cf-mini cf-warn">${S.mat < d.mat ? "재료가" : "돈이"} 모자라요</div>`}`;
+          return `<div class="cf-deco${own ? " is-on" : ""}${S.grade < d.g ? " is-locked" : ""}">
+            <img src="${thumbs["d-" + d.id]}" alt="">
+            <div class="cf-deco__name">${esc(d.name)}</div><span class="mgx-chip is-gold">평판 +${d.rep}</span>${foot}</div>`;
         }).join("")}</div>`;
     }
 
     function panelOrders() {
       const list = S.orders.list.filter((o) => !o.claimed).sort((a, b) => (orderDone(b) ? 1 : 0) - (orderDone(a) ? 1 : 0));
       const now = store.now(), midnight = Date.parse(dayKey(now) + "T00:00:00+09:00") + 86400000;
-      return `<div class="cf-note">${ic("clipboard-list", 16)}<span>오늘의 주문은 하루 3개씩 와요. 못 한 주문은 3일치(9개)까지 쌓여 있으니 천천히 해도 괜찮아요. 새 주문까지 <b>${dur((midnight - now) / 1000)}</b></span></div>
-        ${list.length ? `<div class="cf-list">${list.map((o) => {
+      return head("오늘의 주문", `<span class="mgx-chip">${ic("clock", 12)} 새 주문까지 ${dur((midnight - now) / 1000)}</span>`) + `<div class="cf-mini cf-pnote">하루 3개씩 와요. 못 한 주문은 3일치(9개)까지 쌓여 있으니 천천히 해도 괜찮아요.</div>
+        ${list.length ? `<div class="cf-list cf-coupons">${list.map((o) => {
           const done = orderDone(o);
-          return `<div class="cf-item cf-order${done ? " is-done" : ""}">
-            <div class="cf-item__icon ${done ? "cf-c-done" : "cf-c-order"}">${ic(done ? "check" : o.kind === "keep" ? "clock" : o.kind === "upgrade" ? "hammer" : o.kind === "collect" ? "hand-coins" : o.kind === "earn" ? "coins" : o.kind === "serve" ? "users" : CAT_ICON[o.cat || (MENU_BY[o.item] || {}).cat] || "coffee", 20)}</div>
-            <div class="cf-item__body">
-              <div class="cf-item__title"><b>${esc(orderText(o))}</b></div>
-              <div class="cf-prog"><div class="cf-bar cf-bar--sm ${done ? "cf-bar--green" : ""}"><i data-live="order:${o.id}"></i></div><em data-live="order:${o.id}"></em></div>
-              <div class="cf-reward">${ic("gift", 13)} ${won(o.cash)} · 재료 ${o.mat}개</div>
-              ${done ? `<button type="button" class="hk-btn hk-btn--primary cf-act" data-act="claim" data-id="${o.id}">보상 받기</button>` : ""}
+          const icon = done ? "check" : o.kind === "keep" ? "clock" : o.kind === "upgrade" ? "hammer" : o.kind === "collect" ? "hand-coins" : o.kind === "earn" ? "coins" : o.kind === "serve" ? "users" : CAT_ICON[o.cat || (MENU_BY[o.item] || {}).cat] || "coffee";
+          return `<div class="cf-coupon${done ? " is-done" : ""}">
+            <div class="cf-coupon__stub"><span class="cf-coupon__ic">${ic(icon, 22)}</span><b>${won(o.cash)}</b><small>재료 ${o.mat}개</small></div>
+            <div class="cf-coupon__body">
+              <b class="cf-coupon__t">${esc(orderText(o))}</b>
+              <div class="mgx-bar${done ? " is-full" : ""}" style="--bar:#ff7a45"><i data-live="order:${o.id}"></i></div>
+              <div class="cf-coupon__row"><em data-live="order:${o.id}"></em>${done ? `<button type="button" class="mgx-btn is-gold is-sm" data-act="claim" data-id="${o.id}">${ic("gift", 15)}보상 받기</button>` : ""}</div>
             </div></div>`;
-        }).join("")}</div>` : `<div class="cf-empty">${ic("party-popper", 26)}<b>오늘 주문을 모두 마쳤어요</b><span>내일 새 주문이 와요</span></div>`}`;
+        }).join("")}</div>` : `<div class="mgx-card cf-empty">${ic("party-popper", 30)}<b>오늘 주문을 모두 마쳤어요</b><span>내일 새 주문이 와요</span></div>`}`;
     }
 
     // ── 행동 ──
     function changed(big) { sig = ""; summary(S); if (big) store.saveNow(); else store.dirty(); renderAll(); scene && scene.redraw(); }
+    function setTab(t, scroll) {
+      tab = t; sig = ""; renderAll();
+      if (scroll !== false && innerWidth < 960) { const p = $("cf-panel"); const y = p.getBoundingClientRect().top; if (y > innerHeight * 0.62 || y < 0) scrollTo({ top: scrollY + y - 70, behavior: "smooth" }); }
+    }
+    function goFac(id) {
+      setTab("fac", false);
+      const el = $("cf-fac-" + id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("is-flash"); void el.offsetWidth; el.classList.add("is-flash");
+    }
+    function payFx(btn, cost) { if (btn && cost) HKFx.float(btn, "-" + won(cost), { color: "#e5484d" }); HKFx.bump($("cf-p-cash")); }
+    function doCollect(from) {
+      const before = S.cash, n = collect(S);
+      if (!n) return 0;
+      cashLock = Date.now() + 2000;
+      const pill = $("cf-p-cash");
+      HKFx.float(from || pill, "+" + won(n), { color: "#e8890c" });
+      HKFx.fly(from || pill, pill, { n: Math.min(10, 4 + Math.floor(Math.log10(n + 1))), done: () => { HKFx.count($("cf-cash"), before, S.cash, { fmt: won, ms: 700 }); setTimeout(() => { cashLock = 0; }, 720); } });
+      changed(true);
+      return n;
+    }
     async function onClick(e) {
       const tb = e.target.closest("[data-tab]");
-      if (tb) { tab = tb.dataset.tab; sig = ""; renderAll(); return; }
+      if (tb && root.contains(tb)) { setTab(tb.dataset.tab); return; }
       const b = e.target.closest("[data-act]");
       if (!b || b.disabled || !root.contains(b)) return;
       const act = b.dataset.act, id = b.dataset.id;
       advance(S, store.now(), liveLog);
       if (act === "collect") {
-        const n = collect(S);
-        if (n) { HKUI.toast(`${jo(won(n), "을/를")} 받았어요`); changed(true); }
+        const n = doCollect(b);
+        if (n) HKUI.toast(`${jo(won(n), "을/를")} 받았어요`);
       } else if (act === "up") {
-        const f = FAC_BY[id], lv = S.fac[id];
+        const f = FAC_BY[id], lv = S.fac[id], cost = upCost(id, lv + 1);
         if (startUpgrade(S, id, store.now())) {
           const t = upTime(lv + 1);
+          payFx(b, cost);
           HKUI.toast(t ? `${f.name} 공사를 시작했어요 · ${dur(t)}` : lv ? `${jo(f.name, "이/가")} ${jo("Lv " + (lv + 1), "이/가")} 됐어요` : `${jo(f.name, "을/를")} 놓았어요`);
           const before = S.grade; checkGrade(S, liveLog); if (S.grade > before) flushGrades();
           changed(true);
+          const card = $("cf-fac-" + id); if (card) HKFx.bump(card.querySelector(".cf-fac__art"));
         }
       } else if (act === "menu") {
         const res = toggleMenu(S, id);
         if (res === "full") HKUI.toast("진열 칸이 가득 찼어요. 하나를 먼저 내려 주세요", "info");
-        else changed(false);
-      } else if (act === "bestmenu") { S.menu = bestMenu(S); HKUI.toast("가장 많이 버는 조합으로 진열했어요"); changed(false); }
+        else { changed(false); if (res === "on") HKFx.bump(root.querySelector(".cf-shelf__row")); }
+      } else if (act === "bestmenu") { S.menu = bestMenu(S); HKUI.toast("가장 많이 버는 조합으로 진열했어요"); changed(false); HKFx.bump(root.querySelector(".cf-shelf__row")); }
       else if (act === "hire") {
-        const st = STAFF_BY[id];
-        if (hire(S, id)) { HKUI.toast(`${jo(st.name, "이/가")} 함께 일하게 됐어요`); changed(true); }
+        const st = STAFF_BY[id], cost = (STAFF_SLOTS[S.staff.length] || {}).cost;
+        if (hire(S, id)) { payFx(b, cost); HKUI.toast(`${jo(st.name, "이/가")} 함께 일하게 됐어요`); changed(true); HKFx.confetti({ ...pt(b), n: 30, colors: CONFETTI }); }
       } else if (act === "deco") {
         const d = DECO_BY[id];
-        if (buyDeco(S, id)) { const at = S.deco.place.indexOf(id); HKUI.toast(at >= 0 ? `${jo(d.name, "을/를")} ${at + 1}번 자리에 놓았어요` : `${jo(d.name, "을/를")} 샀어요 · 자리를 골라 놓아요`); changed(true); }
+        if (buyDeco(S, id)) { payFx(b, d.cost); const at = S.deco.place.indexOf(id); HKUI.toast(at >= 0 ? `${jo(d.name, "을/를")} ${at + 1}번 자리에 놓았어요` : `${jo(d.name, "을/를")} 샀어요 · 자리를 골라 놓아요`); changed(true); }
       } else if (act === "spot") openSpot(+b.dataset.i);
       else if (act === "claim") {
         const o = claimOrder(S, id);
-        if (o) { HKUI.toast(`보상 ${won(o.cash)} · 재료 ${o.mat}개를 받았어요`); changed(true); }
+        if (o) {
+          const before = S.cash - o.cash; cashLock = Date.now() + 2000;
+          HKFx.float(b, `+${won(o.cash)} · 재료 ${o.mat}`, { color: "#e8890c" });
+          HKFx.fly(b, $("cf-p-cash"), { n: 6, done: () => { HKFx.count($("cf-cash"), before, S.cash, { fmt: won }); setTimeout(() => { cashLock = 0; }, 650); } });
+          HKFx.bump($("cf-mat").parentElement);
+          HKUI.toast(`보상 ${won(o.cash)} · 재료 ${o.mat}개를 받았어요`); changed(true);
+        }
       } else if (act === "help") showHelp();
-      else if (act === "reset") doReset();
+      else if (act === "more") toggleMore(b);
+      else if (act === "grade") showGradeInfo();
+      else if (act === "limit") { const k = rates(S).limit; if (k === "seat") goFac("seat"); else if (k === "service") goFac("counter"); else if (S.grade >= FAC_BY.plant.g) goFac("plant"); else setTab("menu"); }
       else if (act === "done") showDone();
+    }
+    const pt = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+
+    // 더보기(처음 안내 · 처음부터 다시)
+    function toggleMore(btn) {
+      const was = document.querySelector(".cf-more");
+      if (was) { was.remove(); return; }
+      const r = btn.getBoundingClientRect();
+      const m = document.createElement("div");
+      m.className = "mgx cf cf-more"; m.setAttribute("role", "menu"); m.setAttribute("data-esc-close", "");
+      m.style.top = (r.bottom + 6) + "px"; m.style.right = Math.max(8, innerWidth - r.right) + "px";
+      m.innerHTML = `<button type="button" role="menuitem" data-more="tut">${ic("book-open", 17)}처음 안내 다시 보기</button><button type="button" role="menuitem" class="is-danger" data-more="reset">${ic("rotate-ccw", 17)}처음부터 다시</button>`;
+      document.body.appendChild(m); HKUI.refreshIcons(m);
+      const off = (e) => { if (!m.contains(e.target) && e.target !== btn && !btn.contains(e.target)) { m.remove(); document.removeEventListener("pointerdown", off, true); } };
+      document.addEventListener("pointerdown", off, true);
+      m.addEventListener("click", (e) => {
+        if (e.target === m) { m.remove(); return; } // Esc
+        const it = e.target.closest("[data-more]"); if (!it) return;
+        m.remove(); document.removeEventListener("pointerdown", off, true);
+        if (it.dataset.more === "tut") showTutorial(); else doReset();
+      });
     }
 
     async function doReset() {
@@ -1159,21 +1743,22 @@ window.HKCafe = (function () {
       try {
         await store.reset();
         S = store.state = blank(store.now()); advance(S, store.now()); await store.saveNow();
-        liveLog = newLog(); tab = "fac"; sig = "";
+        liveLog = newLog(); tab = "fac"; sig = ""; spotSig = "";
         if (scene) scene.destroy();
+        root.removeEventListener("click", onClick);
         build(); showTutorial();
       } catch (e) { HKUI.toast((e && e.message) || "지우지 못했어요", "danger"); }
     }
 
     // ── 1초마다 ──
     function tick() {
-      if (!S || !root.querySelector("#cf-panel")) return;
+      if (!S || !$("cf-panel")) return;
       const now = store.now(), gap = now - S.t;
       if (gap > 60000 && !modalOpen) { // 화면을 오래 숨겨 두었다 돌아옴
         const log = newLog(); advance(S, now, log); store.dirty(); sig = ""; renderAll(); showAway(gap, log); return;
       }
       advance(S, now, liveLog);
-      if (liveLog.builds.length) { liveLog.builds.forEach((b) => HKUI.toast(`${FAC_BY[b.id].name} Lv ${b.to} 공사가 끝났어요`)); liveLog.builds = []; store.dirty(); }
+      if (liveLog.builds.length) { liveLog.builds.forEach((b) => { HKUI.toast(`${FAC_BY[b.id].name} Lv ${b.to} 공사가 끝났어요`); const [gx, gy, z] = ANCH[b.id], [x, y] = scene.toCss(gx, gy, z), r = $("cf-stage").getBoundingClientRect(); HKFx.confetti({ x: r.left + x, y: r.top + y, n: 24, colors: CONFETTI }); }); liveLog.builds = []; store.dirty(); }
       if (liveLog.staffUp.length) { liveLog.staffUp.forEach((u) => HKUI.toast(`${jo(STAFF_BY[u.id].name, "이/가")} ${jo("Lv " + u.lv, "이/가")} 됐어요`)); liveLog.staffUp = []; store.dirty(); }
       if (liveLog.newOrders) { HKUI.toast(`오늘의 주문 ${liveLog.newOrders}개가 새로 왔어요`, "info"); liveLog.newOrders = 0; store.dirty(); }
       if (liveLog.grades.length) flushGrades();
@@ -1183,27 +1768,27 @@ window.HKCafe = (function () {
     }
     function flushGrades() { const g = liveLog.grades.slice(); liveLog.grades = []; store.saveNow(); showGrades(g); }
 
-    // ── 팝업 ──
+    // ── 팝업(아래에서 올라오는 판 · PC 는 가운데) ──
     function modal(html, { cls = "", onClose } = {}) {
       modalOpen++;
       const ov = document.createElement("div");
-      ov.className = "cf-ov";
-      ov.innerHTML = `<div class="cf-modal ${cls}" role="dialog" aria-modal="true"><button type="button" class="cf-modal__x" data-esc-close aria-label="닫기">${ic("x", 20)}</button>${html}</div>`;
+      ov.className = "mgx cf mgx-sheet-wrap cf-ov";
+      ov.innerHTML = `<div class="mgx-sheet cf-modal ${cls}" role="dialog" aria-modal="true"><button type="button" class="mgx-icon cf-x" data-esc-close aria-label="닫기">${ic("x", 20)}</button>${html}</div>`;
       const close = () => { if (!ov.isConnected) return; ov.remove(); modalOpen--; if (onClose) onClose(); };
       ov.addEventListener("click", (e) => { if (e.target === ov || e.target.closest("[data-esc-close]") || e.target.closest("[data-close]")) close(); });
       document.body.appendChild(ov);
       HKUI.refreshIcons(ov);
-      const f = ov.querySelector(".hk-btn--primary") || ov.querySelector(".cf-modal__x"); if (f) f.focus({ preventScroll: true });
+      const f = ov.querySelector(".mgx-btn:not(.is-white):not(.is-soft)") || ov.querySelector(".cf-x"); if (f) f.focus({ preventScroll: true });
       return { el: ov, close };
     }
+    const mIcon = (name, cls = "") => `<div class="cf-micon ${cls}">${ic(name, 28)}</div>`;
 
     function showAway(ms, log) {
-      const r = rates(S);
       const sold = Object.entries(log.sold).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]).slice(0, 3);
       const rows = [];
       // 손님 수는 소수로 쌓인다 — 1명이 안 되면 「손님 몇 명」으로
       rows.push(`<li>${ic("users", 16)}<span>${Math.floor(log.served) >= 1 ? `손님 <b>${num(log.served)}명</b>이 다녀가` : "손님 몇 명이 다녀가"} <b>${won(log.gain)}</b>어치 팔았어요</span></li>`);
-      if (sold.length) rows.push(`<li>${ic("coffee", 16)}<span>${sold.map(([id, v]) => `${esc(MENU_BY[id].name)} ${num(v)}${CATS[MENU_BY[id].cat].unit}`).join(" · ")}</span></li>`);
+      if (sold.length) rows.push(`<li class="cf-rc__sold">${sold.map(([id, v]) => `<span class="cf-rc__item">${drinkSvg(id, 30)}<span>${esc(MENU_BY[id].name)}</span><b>${num(v)}${CATS[MENU_BY[id].cat].unit}</b></span>`).join("")}</li>`);
       if (log.fullAt) rows.push(`<li class="is-warn">${ic("package-check", 16)}<span>${dur((log.fullAt - (store.now() - ms)) / 1000)} 만에 수입이 가득 차서 그 뒤로는 쉬었어요</span></li>`);
       log.builds.forEach((b) => rows.push(`<li>${ic("hammer", 16)}<span>${esc(FAC_BY[b.id].name)} Lv ${b.to} 공사가 끝났어요</span></li>`));
       const ups = {}; log.staffUp.forEach((u) => { ups[u.id] = u.lv; });
@@ -1211,17 +1796,19 @@ window.HKCafe = (function () {
       if (log.grades.length) rows.push(`<li class="is-good">${ic("award", 16)}<span>카페 <b>${jo("등급 " + log.grades[log.grades.length - 1], "이/가")}</b> 됐어요</span></li>`);
       if (log.newOrders) rows.push(`<li>${ic("clipboard-list", 16)}<span>오늘의 주문이 새로 왔어요</span></li>`);
       const grades = log.grades.slice();
-      const m = modal(`<div class="cf-modal__icon">${ic("sunrise", 26)}</div>
-        <h2>자리 비운 동안</h2>
-        <p class="cf-modal__lead">${dur(ms / 1000)} 동안 카페가 장사했어요${ms > CAP_HOURS * 3600000 ? ` (쌓이는 건 최대 ${CAP_HOURS}시간)` : ""}</p>
-        <ul class="cf-away">${rows.join("")}</ul>
-        <div class="cf-modal__btns">
-          <button type="button" class="hk-btn hk-btn--secondary" data-close>닫기</button>
-          <button type="button" class="hk-btn hk-btn--primary" data-away-collect ${S.pending >= 1 ? "" : "disabled"}>${ic("hand-coins", 16)} 수입 받기 · ${won(S.pending)}</button>
-        </div>`, { onClose: () => { if (grades.length) showGrades(grades); } });
-      void r;
-      m.el.querySelector("[data-away-collect]").addEventListener("click", () => {
-        const n = collect(S); if (n) HKUI.toast(`${jo(won(n), "을/를")} 받았어요`); changed(true); m.close();
+      const m = modal(`<div class="cf-receipt">
+          <div class="cf-rc__top">${drinkSvg("americano", 46)}<div><div class="cf-mh">자리 비운 동안</div><div class="cf-mini">${dur(ms / 1000)} 동안 카페가 장사했어요${ms > CAP_HOURS * 3600000 ? ` (쌓이는 건 최대 ${CAP_HOURS}시간)` : ""}</div></div></div>
+          <ul class="cf-away">${rows.join("")}</ul>
+          <div class="cf-rc__total"><span>받을 수입</span><b>${won(S.pending)}</b></div>
+        </div>
+        <div class="cf-mbtns">
+          <button type="button" class="mgx-btn is-white" data-close>닫기</button>
+          <button type="button" class="mgx-btn is-gold" data-away-collect ${S.pending >= 1 ? "" : "disabled"}>${ic("hand-coins", 18)} 수입 받기</button>
+        </div>`, { cls: "cf-modal--away", onClose: () => { if (grades.length) showGrades(grades); } });
+      m.el.querySelector("[data-away-collect]").addEventListener("click", (e) => {
+        const btn = e.currentTarget, from = pt(btn);
+        m.close();
+        const n = doCollect(from); if (n) HKUI.toast(`${jo(won(n), "을/를")} 받았어요`); else changed(true);
       });
     }
 
@@ -1229,47 +1816,62 @@ window.HKCafe = (function () {
       if (!list.length) return;
       const g = list[list.length - 1];
       const items = list.flatMap((x) => unlocksAt(x));
-      const m = modal(`<div class="cf-modal__icon cf-modal__icon--gold">${ic("award", 28)}</div>
-        <h2>카페 등급 ${g}!</h2>
-        <p class="cf-modal__lead">옥상 카페가 한층 더 아늑해졌어요${list.length > 1 ? ` (등급 ${list[0]}~${g})` : ""}</p>
-        ${items.length ? `<div class="cf-label">새로 열렸어요</div><ul class="cf-away">${items.map((x) => `<li>${ic(x.icon, 16)}<span>${esc(x.text)}</span></li>`).join("")}</ul>` : ""}
-        <div class="cf-modal__btns"><button type="button" class="hk-btn hk-btn--primary" data-close>좋아요</button></div>`,
-      { onClose: () => { if (g >= MAX_GRADE && !S.done1) { S.done1 = true; changed(true); showDone(); } } });
-      void m;
+      modal(`<div class="cf-burst"><div class="cf-burst__rays"></div><div class="cf-badge"><small>카페 등급</small><b>${g}</b></div></div>
+        <div class="cf-mh cf-center">등급이 올랐어요!</div>
+        <p class="cf-lead">옥상 카페가 한층 더 아늑해졌어요${list.length > 1 ? ` (등급 ${list[0]}~${g})` : ""}</p>
+        ${items.length ? `<div class="cf-k">새로 열렸어요</div><ul class="cf-unlocks">${items.map((x) => `<li>${x.drink ? drinkSvg(x.drink, 30) : `<span class="cf-unlocks__ic">${ic(x.icon, 16)}</span>`}<span>${esc(x.text)}</span></li>`).join("")}</ul>` : ""}
+        <div class="cf-mbtns"><button type="button" class="mgx-btn is-lg is-wide" data-close>좋아요</button></div>`,
+      { cls: "cf-modal--grade", onClose: () => { if (g >= MAX_GRADE && !S.done1) { S.done1 = true; changed(true); showDone(); } } });
+      HKFx.confetti({ x: innerWidth / 2, y: innerHeight * 0.32, n: 90, colors: CONFETTI });
+    }
+    function showGradeInfo() {
+      const q = GRADE_REQ[S.grade];
+      const next = S.grade < MAX_GRADE ? unlocksAt(S.grade + 1) : [];
+      modal(`${mIcon("award", "is-gold")}<div class="cf-mh cf-center">카페 등급 ${S.grade}</div>
+        ${S.grade >= MAX_GRADE ? `<p class="cf-lead">1차 완주했어요! 누적 매출 ${won(S.sales)} · 맞이한 손님 ${num(S.served)}명</p>` : `<p class="cf-lead">누적 매출과 시설 레벨 합이 모두 채워지면 등급 ${S.grade + 1}이 돼요.</p>
+        <div class="mgx-card is-soft cf-ginfo">
+          <div class="cf-req"><span>누적 매출</span><div class="mgx-bar" style="--bar:#ff7a45"><i style="--v:${pct(S.sales, q.sales)}%"></i></div><em>${won(Math.min(S.sales, q.sales))} / ${won(q.sales)}</em></div>
+          <div class="cf-req"><span>시설 레벨 합</span><div class="mgx-bar" style="--bar:#3cc9a5"><i style="--v:${pct(facSum(S), q.fac)}%"></i></div><em>${facSum(S)} / ${q.fac}</em></div>
+        </div>
+        ${next.length ? `<div class="cf-k">등급 ${S.grade + 1}에 열려요</div><ul class="cf-unlocks">${next.map((x) => `<li>${x.drink ? drinkSvg(x.drink, 30) : `<span class="cf-unlocks__ic">${ic(x.icon, 16)}</span>`}<span>${esc(x.text)}</span></li>`).join("")}</ul>` : ""}`}
+        <div class="cf-mbtns"><button type="button" class="mgx-btn is-wide" data-close>알겠어요</button></div>`);
     }
 
     function showDone() {
       const days = Math.max(1, Math.ceil((store.now() - S.born) / 86400000));
-      modal(`<div class="cf-done-art">${doneArt()}</div>
-        <h2>1차 완주를 축하해요!</h2>
-        <p class="cf-modal__lead">작은 커피 머신 하나로 시작한 옥상 카페가 등급 ${MAX_GRADE}이 됐어요.</p>
+      modal(`<div class="cf-burst"><div class="cf-burst__rays"></div><div class="cf-done-art">${doneArt()}</div></div>
+        <div class="cf-mh cf-center">1차 완주를 축하해요!</div>
+        <p class="cf-lead">작은 커피 머신 하나로 시작한 옥상 카페가 등급 ${MAX_GRADE}이 됐어요.</p>
         <div class="cf-done-stats">
           <div><small>누적 매출</small><b>${won(S.sales)}</b></div>
           <div><small>맞이한 손님</small><b>${num(S.served)}명</b></div>
           <div><small>함께한 날</small><b>${days}일</b></div>
         </div>
         <div class="cf-next-up">${ic("calendar-clock", 18)}<div><b>다음 업데이트 안내</b><p>2차에서는 저녁 영업 · 계절 메뉴 · 옥상 정원 가꾸기가 열릴 예정이에요. 그때까지 카페는 지금처럼 계속 장사하고, 시설 · 꾸미기도 이어서 키울 수 있어요.</p></div></div>
-        <div class="cf-modal__btns"><button type="button" class="hk-btn hk-btn--primary" data-close>계속 장사하기</button></div>`, { cls: "cf-modal--done" });
+        <div class="cf-mbtns"><button type="button" class="mgx-btn is-lg is-wide" data-close>계속 장사하기</button></div>`, { cls: "cf-modal--done" });
+      HKFx.confetti({ x: innerWidth / 2, y: innerHeight * 0.3, n: 120, colors: CONFETTI });
+      setTimeout(() => HKFx.confetti({ x: innerWidth * 0.3, y: innerHeight * 0.4, n: 50, colors: CONFETTI }), 350);
+      setTimeout(() => HKFx.confetti({ x: innerWidth * 0.7, y: innerHeight * 0.4, n: 50, colors: CONFETTI }), 600);
     }
     function doneArt() {
-      return `<svg viewBox="0 0 120 90" width="120" height="90" aria-hidden="true"><circle cx="60" cy="48" r="38" fill="#fef3c7"/><path d="M38 38h44v22a22 22 0 0 1-44 0z" fill="#fff" stroke="#f59e0b" stroke-width="3"/><path d="M82 44h6a8 8 0 0 1 0 16h-7" fill="none" stroke="#f59e0b" stroke-width="3"/><path d="M50 30q-4-6 0-12M60 28q-4-6 0-12M70 30q-4-6 0-12" stroke="#f59e0b" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M48 50l8 7 14-15" fill="none" stroke="#2f6bff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><g fill="#f472b6"><circle cx="20" cy="22" r="3"/><circle cx="102" cy="18" r="3"/></g><g fill="#60a5fa"><circle cx="14" cy="60" r="2.5"/><circle cx="108" cy="64" r="2.5"/></g><g fill="#facc15"><path d="M28 10l2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1z"/><path d="M94 76l1.6 4 4 .8-3 2.4.8 4-3.4-2.2-3.4 2.2.8-4-3-2.4 4-.8z"/></g></svg>`;
+      return `<svg viewBox="0 0 120 90" width="132" height="99" aria-hidden="true"><circle cx="60" cy="48" r="38" fill="#fff1e6"/><path d="M38 38h44v22a22 22 0 0 1-44 0z" fill="#fff" stroke="#ff7a45" stroke-width="3"/><path d="M82 44h6a8 8 0 0 1 0 16h-7" fill="none" stroke="#ff7a45" stroke-width="3"/><path d="M50 30q-4-6 0-12M60 28q-4-6 0-12M70 30q-4-6 0-12" stroke="#ffb38a" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M48 50l8 7 14-15" fill="none" stroke="#3cc9a5" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><g fill="#ff8fb1"><circle cx="20" cy="22" r="3"/><circle cx="102" cy="18" r="3"/></g><g fill="#8fd3ff"><circle cx="14" cy="60" r="2.5"/><circle cx="108" cy="64" r="2.5"/></g><g fill="#ffc83d"><path d="M28 10l2 5 5 1-4 3 1 5-4-3-4 3 1-5-4-3 5-1z"/><path d="M94 76l1.6 4 4 .8-3 2.4.8 4-3.4-2.2-3.4 2.2.8-4-3-2.4 4-.8z"/></g></svg>`;
     }
 
     function showTutorial() {
       const steps = [
-        { icon: "store", title: "옥상에 작은 카페를 열었어요", body: "동료들이 쉬러 와서 커피를 사 가요. 판매 수입은 「쌓인 수입」에 모이고, <b>수입 받기</b>를 누르면 가진 돈이 돼요." },
-        { icon: "hammer", title: "시설을 올리고 메뉴를 늘려요", body: "좌석 · 계산대 · 커피 머신을 올리면 손님과 값이 늘어요. 큰 공사는 실제로 몇 분~1시간 걸리니 <b>출근 전에 걸어 두면</b> 일하는 동안 끝나요." },
-        { icon: "clipboard-list", title: "자리 비운 동안에도 장사해요", body: `최대 ${CAP_HOURS}시간치까지 쌓여요. 점심 · 퇴근 뒤에 들러 받아 가세요. <b>오늘의 주문</b>을 하면 돈과 꾸미기 재료를 받아요.` },
+        { art: drinkSvg("americano", 64), title: "옥상에 작은 카페를 열었어요", body: "동료들이 쉬러 와서 커피를 사 가요. 판매 수입은 카운터 위 <b>동전 말풍선</b>에 모이고, 누르면 가진 돈이 돼요." },
+        { art: `<div class="cf-micon">${ic("hammer", 30)}</div>`, title: "시설을 올리고 메뉴를 늘려요", body: "좌석 · 계산대 · 커피 머신을 올리면 손님과 값이 늘고, 장면 속 물건도 커져요. 큰 공사는 실제로 몇 분~1시간 걸리니 <b>출근 전에 걸어 두면</b> 일하는 동안 끝나요." },
+        { art: `<div class="cf-micon">${ic("clipboard-list", 30)}</div>`, title: "자리 비운 동안에도 장사해요", body: `최대 ${CAP_HOURS}시간치까지 쌓여요. 점심 · 퇴근 뒤에 들러 받아 가세요. <b>오늘의 주문</b>을 하면 돈과 꾸미기 재료를 받아요.` },
       ];
       let i = 0;
       const m = modal(`<div id="cf-tut"></div>`, { cls: "cf-modal--tut", onClose: () => { S.tut = 1; store.dirty(); } });
       const draw = () => {
         const st = steps[i];
-        m.el.querySelector("#cf-tut").innerHTML = `<div class="cf-modal__icon">${ic(st.icon, 26)}</div>
-          <div class="cf-tut__step">${i + 1} / ${steps.length}</div>
-          <h2>${st.title}</h2><p class="cf-modal__lead">${st.body}</p>
-          <div class="cf-modal__btns">${i ? `<button type="button" class="hk-btn hk-btn--secondary" data-tut="prev">이전</button>` : `<button type="button" class="hk-btn hk-btn--secondary" data-close>건너뛰기</button>`}
-          ${i < steps.length - 1 ? `<button type="button" class="hk-btn hk-btn--primary" data-tut="next">다음</button>` : `<button type="button" class="hk-btn hk-btn--primary" data-close>시작하기</button>`}</div>`;
+        m.el.querySelector("#cf-tut").innerHTML = `<div class="cf-tut__art">${st.art}</div>
+          <div class="cf-tut__dots">${steps.map((_, j) => `<i class="${j === i ? "on" : ""}"></i>`).join("")}</div>
+          <div class="cf-mh cf-center">${st.title}</div><p class="cf-lead">${st.body}</p>
+          <div class="cf-mbtns">${i ? `<button type="button" class="mgx-btn is-white" data-tut="prev">이전</button>` : `<button type="button" class="mgx-btn is-white" data-close>건너뛰기</button>`}
+          ${i < steps.length - 1 ? `<button type="button" class="mgx-btn" data-tut="next">다음</button>` : `<button type="button" class="mgx-btn" data-close>시작하기</button>`}</div>`;
         HKUI.refreshIcons(m.el);
       };
       m.el.addEventListener("click", (e) => { const t = e.target.closest("[data-tut]"); if (!t) return; i += t.dataset.tut === "next" ? 1 : -1; draw(); });
@@ -1277,35 +1879,36 @@ window.HKCafe = (function () {
     }
 
     function showHelp() {
-      modal(`<div class="cf-modal__icon">${ic("circle-help", 26)}</div><h2>옥상 쉼터 카페 도움말</h2>
+      const m = modal(`${mIcon("circle-help")}<div class="cf-mh cf-center">옥상 쉼터 카페 도움말</div>
         <div class="cf-help">
-          <p><b>손님</b> — 시간당 손님은 「찾아오는 손님(평판 × 메뉴 매력)」, 「좌석이 받을 수 있는 손님」, 「주문 받을 수 있는 손님」 중 가장 작은 수예요. 시설 탭 위에서 무엇이 모자란지 알려 줘요.</p>
-          <p><b>수입</b> — 팔린 만큼 「쌓인 수입」에 모여요. 시간당 수입 × ${CAP_HOURS}시간이 차면 가득 차서 쉬어요. 받으면 다시 장사해요.</p>
-          <p><b>시설</b> — Lv 3부터는 실제 시간이 걸려요(2분~1시간). 공사는 처음엔 한 곳, 등급 3부터 두 곳, 등급 10부터 세 곳 동시에 할 수 있어요.</p>
+          <p><b>손님</b> — 시간당 손님은 「찾아오는 손님(평판 × 메뉴 매력)」, 「좌석이 받을 수 있는 손님」, 「주문 받을 수 있는 손님」 중 가장 작은 수예요. 시설 탭 위와 장면 오른쪽 아래에서 무엇이 모자란지 알려 줘요.</p>
+          <p><b>수입</b> — 팔린 만큼 카운터 위 말풍선(쌓인 수입)에 모여요. 시간당 수입 × ${CAP_HOURS}시간이 차면 가득 차서 쉬어요. 받으면 다시 장사해요.</p>
+          <p><b>시설</b> — Lv 3부터는 실제 시간이 걸려요(2분~1시간). 공사는 처음엔 한 곳, 등급 3부터 두 곳, 등급 10부터 세 곳 동시에 할 수 있어요. 장면 속 물건을 누르면 그 시설로 가요.</p>
           <p><b>메뉴</b> — 등급과 시설 레벨로 열려요. 진열 칸(3칸, 등급 9부터 4칸)에 놓은 것만 팔아요.</p>
           <p><b>알바생</b> — 등급 3 · 7 · 11에 자리가 하나씩 열려요. 장사한 시간만큼 저절로 레벨이 올라요.</p>
           <p><b>카페 등급</b> — 누적 매출과 시설 레벨 합이 모두 채워지면 올라요. 등급 ${MAX_GRADE}이 1차 완주예요.</p>
           <p><b>쉬어도 괜찮아요</b> — 며칠 안 들어와도 카페는 망가지지 않아요. 수입은 가득 찬 채로, 주문은 3일치까지 기다려요.</p>
         </div>
-        <div class="cf-modal__btns"><button type="button" class="hk-btn hk-btn--secondary" data-tut-again>처음 안내 다시 보기</button><button type="button" class="hk-btn hk-btn--primary" data-close>알겠어요</button></div>`);
-      const again = document.querySelector("[data-tut-again]");
-      if (again) again.addEventListener("click", () => { const ov = again.closest(".cf-ov"); ov.querySelector("[data-esc-close]").click(); showTutorial(); });
+        <div class="cf-mbtns"><button type="button" class="mgx-btn is-white" data-tut-again>처음 안내 다시 보기</button><button type="button" class="mgx-btn" data-close>알겠어요</button></div>`);
+      m.el.querySelector("[data-tut-again]").addEventListener("click", () => { m.close(); showTutorial(); });
     }
 
     function openSpot(i) {
       const sp = SPOTS[i], cur = S.deco.place[i];
       const owned = S.deco.owned;
-      const m = modal(`<h2>${i + 1}번 자리 · ${esc(sp.name)}</h2>
-        <p class="cf-modal__lead">${cur ? `지금은 「${esc(DECO_BY[cur].name)}」${jo(DECO_BY[cur].name, "이/가").slice(-1)} 있어요.` : "비어 있어요."} 놓을 물건을 골라요.</p>
+      const m = modal(`<div class="cf-mh">${i + 1}번 자리 · ${esc(sp.name)}</div>
+        <p class="cf-lead cf-left">${cur ? `지금은 「${esc(DECO_BY[cur].name)}」${jo(DECO_BY[cur].name, "이/가").slice(-1)} 있어요.` : "비어 있어요."} 놓을 물건을 골라요.</p>
         ${owned.length ? `<div class="cf-pick">${owned.map((id) => {
           thumbs["d-" + id] = thumbs["d-" + id] || decoThumb(id);
           const at = S.deco.place.indexOf(id);
           return `<button type="button" class="cf-pick__item${id === cur ? " is-on" : ""}" data-pick="${id}"><img src="${thumbs["d-" + id]}" alt=""><b>${esc(DECO_BY[id].name)}</b><small>${at >= 0 ? (at === i ? "여기 있어요" : `${at + 1}번 자리에서 옮겨요`) : "놓지 않았어요"} · 평판 +${DECO_BY[id].rep}</small></button>`;
-        }).join("")}</div>` : `<div class="cf-empty">${ic("shopping-bag", 24)}<b>아직 가진 꾸미기 물건이 없어요</b><span>아래 목록에서 사 보세요</span></div>`}
-        <div class="cf-modal__btns">${cur ? `<button type="button" class="hk-btn hk-btn--secondary" data-pick="">자리 비우기</button>` : ""}<button type="button" class="hk-btn hk-btn--primary" data-close>닫기</button></div>`);
+        }).join("")}</div>` : `<div class="cf-empty">${ic("shopping-bag", 26)}<b>아직 가진 꾸미기 물건이 없어요</b><span>꾸미기 탭에서 사 보세요</span></div>`}
+        <div class="cf-mbtns">${cur ? `<button type="button" class="mgx-btn is-white" data-pick="">자리 비우기</button>` : ""}${owned.length ? "" : `<button type="button" class="mgx-btn is-soft" data-go-deco>꾸미기로 가기</button>`}<button type="button" class="mgx-btn" data-close>닫기</button></div>`);
       m.el.addEventListener("click", (e) => {
+        if (e.target.closest("[data-go-deco]")) { m.close(); setTab("deco"); return; }
         const p = e.target.closest("[data-pick]"); if (!p) return;
         placeDeco(S, i, p.dataset.pick || null); changed(false); m.close();
+        if (p.dataset.pick) { const [gx, gy] = SPOT_G[i], [x, y] = scene.toCss(gx, gy, 20), r = $("cf-stage").getBoundingClientRect(); HKFx.confetti({ x: r.left + x, y: r.top + y, n: 26, colors: CONFETTI }); }
       });
     }
   }

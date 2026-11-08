@@ -1,0 +1,115 @@
+/* 매니지먼트 게임 공통 디자인 부품 (회사 문명 · 옥상 쉼터 카페 · 옥상 텃밭)
+   방향(2025~26 트렌드): 게임 장면이 주인공 — 화면 가득한 장면(디오라마) 위에 반투명 HUD를 띄우고, 정보는 꼭 필요한 것만.
+   손에 잡히는 두툼한 버튼(누르면 쑥 들어감) · 둥근 점토 느낌 카드 · 숫자가 톡 튀는 반응 · 게임마다 대표색 하나 + 은은한 파스텔 바탕.
+   게임마다 .mgx 에 변수만 바꿔 쓴다:  --mg-accent(대표색) --mg-accent-deep(버튼 아래 턱) --mg-tint(바탕) --mg-soft(옅은 대표색) --mg-ink(글자) */
+
+.mgx {
+  --mg-accent: #2f6bff; --mg-accent-deep: #1f4fd1; --mg-soft: #e8efff; --mg-tint: #f4f6fb; --mg-ink: #18213a; --mg-sub: #5b6478; --mg-line: rgba(24, 33, 58, .08);
+  --mg-gold: #ffb020; --mg-gold-deep: #d98a00; --mg-good: #16a34a; --mg-warn: #e5484d;
+  --mg-r: 22px; --mg-r-sm: 14px;
+  --mg-shadow: 0 10px 30px rgba(24, 33, 58, .10), 0 2px 6px rgba(24, 33, 58, .06);
+  color: var(--mg-ink); background: var(--mg-tint); font-variant-numeric: tabular-nums;
+}
+.mgx *, .mgx *::before, .mgx *::after { box-sizing: border-box; }
+:where(.mgx) :where(button) { font: inherit; color: inherit; } /* 우선순위 0 — .mgx-btn 등의 글자색 · 굵기를 덮지 않게 */
+
+/* ── 꽉 찬 게임 화면 뼈대: 위 막대 · 장면 · 아래 독(탭) ── */
+.mgx-body { margin: 0; background: var(--mg-tint, #f4f6fb); }
+.mgx-shell { min-height: 100dvh; display: flex; flex-direction: column; }
+.mgx-top { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 8px; height: 56px; padding: 0 12px; padding-top: env(safe-area-inset-top, 0px); box-sizing: content-box;
+  background: color-mix(in srgb, var(--mg-tint) 82%, transparent); backdrop-filter: saturate(1.4) blur(14px); -webkit-backdrop-filter: saturate(1.4) blur(14px); border-bottom: 1px solid var(--mg-line); }
+.mgx-top__back { display: inline-flex; align-items: center; gap: 2px; min-height: 40px; padding: 0 8px 0 4px; border-radius: 12px; font-size: 14px; font-weight: 700; color: var(--mg-sub); text-decoration: none; }
+.mgx-top__back:hover { background: rgba(24, 33, 58, .05); color: var(--mg-ink); text-decoration: none; }
+.mgx-top__title { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 900; letter-spacing: -0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mgx-top__actions { display: flex; gap: 6px; }
+
+/* ── 아이콘 버튼(동그란) ── */
+.mgx-icon { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 14px; background: #fff; color: var(--mg-ink); box-shadow: 0 2px 0 var(--mg-line), 0 4px 12px rgba(24, 33, 58, .06); cursor: pointer; transition: transform .14s ease; }
+.mgx-icon:active { transform: translateY(2px) scale(.96); box-shadow: 0 0 0 var(--mg-line); }
+
+/* ── 두툼한 버튼 — 아래 턱(그림자)이 있고 누르면 쑥 들어간다 ── */
+.mgx-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 0 20px; border: 0; border-radius: 16px;
+  background: var(--mg-accent); color: #fff; font-size: 16px; font-weight: 800; letter-spacing: -0.01em; cursor: pointer; text-decoration: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  box-shadow: 0 4px 0 var(--mg-accent-deep), 0 8px 18px color-mix(in srgb, var(--mg-accent) 35%, transparent); transition: transform .14s ease, box-shadow .14s ease, filter .14s ease; }
+.mgx-btn::after { content: ""; position: absolute; inset: 2px 8px auto; height: 40%; border-radius: 12px 12px 18px 18px; background: linear-gradient(rgba(255, 255, 255, .28), rgba(255, 255, 255, 0)); pointer-events: none; }
+.mgx-btn:hover { filter: brightness(1.05); text-decoration: none; }
+.mgx-btn:active { transform: translateY(3px) scale(.98); box-shadow: 0 1px 0 var(--mg-accent-deep), 0 3px 8px color-mix(in srgb, var(--mg-accent) 25%, transparent); }
+.mgx-btn[disabled], .mgx-btn.is-off { background: #cfd5e1; color: #fff; box-shadow: 0 4px 0 #b4bccb; cursor: not-allowed; filter: none; transform: none; }
+.mgx-btn.is-gold { background: var(--mg-gold); box-shadow: 0 4px 0 var(--mg-gold-deep), 0 8px 18px rgba(255, 176, 32, .35); color: #3b2500; }
+.mgx-btn.is-soft { background: var(--mg-soft); color: var(--mg-accent-deep); box-shadow: 0 4px 0 color-mix(in srgb, var(--mg-accent) 22%, #fff); }
+.mgx-btn.is-white { background: #fff; color: var(--mg-ink); box-shadow: 0 4px 0 #dfe3ec, 0 8px 18px rgba(24, 33, 58, .08); }
+.mgx-btn.is-sm { min-height: 38px; padding: 0 14px; border-radius: 12px; font-size: 14px; }
+.mgx-btn.is-lg { min-height: 56px; padding: 0 26px; border-radius: 18px; font-size: 18px; }
+.mgx-btn.is-wide { width: 100%; }
+/* 못 누름은 색 갈래(.is-gold · .is-soft · .is-white)보다 뒤에 — 어느 색이든 회색으로 */
+.mgx-btn[disabled], .mgx-btn.is-off { background: #cfd5e1; color: #fff; box-shadow: 0 4px 0 #b4bccb; cursor: not-allowed; filter: none; transform: none; }
+
+/* ── 반투명 HUD 알약 — 장면 위에 떠 있는 자원 표시 ── */
+.mgx-hud { position: absolute; z-index: 5; left: 10px; right: 10px; top: 10px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.mgx-hud > * { pointer-events: auto; }
+.mgx-pill { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 3px 12px 3px 3px; border-radius: 999px;
+  background: rgba(255, 255, 255, .78); backdrop-filter: blur(12px) saturate(1.3); -webkit-backdrop-filter: blur(12px) saturate(1.3); border: 1px solid rgba(255, 255, 255, .6);
+  box-shadow: 0 4px 14px rgba(24, 33, 58, .12); font-size: 14px; font-weight: 800; color: var(--mg-ink); white-space: nowrap; }
+.mgx-pill__ic { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 999px; background: var(--pill, var(--mg-accent)); color: #fff; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .15); }
+.mgx-pill small { font-size: 11.5px; font-weight: 700; color: var(--mg-sub); }
+.mgx-pill.is-dark { background: rgba(15, 20, 35, .55); border-color: rgba(255, 255, 255, .12); color: #fff; }
+.mgx-pill.is-dark small { color: rgba(255, 255, 255, .7); }
+
+/* ── 장면(디오라마) 틀 ── */
+.mgx-stage { position: relative; overflow: hidden; border-radius: 26px; background: var(--mg-soft); box-shadow: var(--mg-shadow); isolation: isolate; }
+.mgx-stage canvas, .mgx-stage > svg { display: block; width: 100%; height: 100%; }
+
+/* ── 점토 느낌 카드 ── */
+.mgx-card { position: relative; border-radius: var(--mg-r); background: #fff; padding: 16px; box-shadow: 0 1px 0 rgba(255, 255, 255, .9) inset, 0 -2px 0 rgba(24, 33, 58, .04) inset, var(--mg-shadow); }
+.mgx-card.is-soft { background: var(--mg-soft); box-shadow: inset 0 2px 0 rgba(255, 255, 255, .7), 0 6px 16px color-mix(in srgb, var(--mg-accent) 14%, transparent); }
+.mgx-card h3, .mgx-h { margin: 0; font-size: 17px; font-weight: 900; letter-spacing: -0.02em; }
+.mgx-sub { font-size: 13px; color: var(--mg-sub); line-height: 1.5; word-break: keep-all; }
+
+/* ── 진행 막대 — 반짝이 지나간다 ── */
+.mgx-bar { position: relative; height: 12px; border-radius: 999px; background: rgba(24, 33, 58, .08); overflow: hidden; box-shadow: inset 0 1px 2px rgba(24, 33, 58, .12); }
+.mgx-bar > i { position: absolute; inset: 0 auto 0 0; width: var(--v, 0%); border-radius: inherit; background: linear-gradient(180deg, color-mix(in srgb, var(--bar, var(--mg-accent)) 75%, #fff), var(--bar, var(--mg-accent))); transition: width .5s cubic-bezier(.2, .8, .2, 1); }
+.mgx-bar > i::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, .55) 45%, transparent 70%); background-size: 200% 100%; animation: mgx-shine 2.4s linear infinite; }
+.mgx-bar.is-full > i { background: linear-gradient(180deg, #ffd566, var(--mg-gold)); }
+@keyframes mgx-shine { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+
+/* ── 아래 독(탭 막대) — 큰 아이콘 · 짧은 이름 · 고른 탭은 알약 ── */
+.mgx-dock { position: sticky; bottom: 0; z-index: 25; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 8px 10px calc(env(safe-area-inset-bottom, 0px) + 8px);
+  background: color-mix(in srgb, #fff 88%, transparent); backdrop-filter: blur(16px) saturate(1.3); -webkit-backdrop-filter: blur(16px) saturate(1.3); border-top: 1px solid var(--mg-line); }
+.mgx-tab { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 54px; padding: 4px 2px; border: 0; border-radius: 16px; background: transparent; color: var(--mg-sub); font-size: 12px; font-weight: 800; cursor: pointer; transition: background .15s ease, color .15s ease, transform .14s ease; }
+.mgx-tab svg { transition: transform .2s cubic-bezier(.3, 1.6, .5, 1); }
+.mgx-tab[aria-selected="true"], .mgx-tab.is-on { background: var(--mg-soft); color: var(--mg-accent-deep); }
+.mgx-tab[aria-selected="true"] svg, .mgx-tab.is-on svg { transform: translateY(-1px) scale(1.12); }
+.mgx-tab:active { transform: scale(.95); }
+.mgx-dot { position: absolute; top: 4px; right: calc(50% - 20px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--mg-warn); color: #fff; font-size: 11px; font-weight: 900; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px #fff; }
+
+/* ── 아래에서 올라오는 판(휴대폰) · 옆 판(PC) ── */
+.mgx-sheet-wrap { position: fixed; inset: 0; z-index: 80; display: flex; align-items: flex-end; justify-content: center; background: rgba(15, 20, 35, .36); animation: mgx-fade .18s ease; }
+.mgx-sheet { width: min(560px, 100%); max-height: min(86dvh, 760px); overflow-y: auto; padding: 10px 18px calc(env(safe-area-inset-bottom, 0px) + 18px); border-radius: 28px 28px 0 0; background: #fff; box-shadow: 0 -10px 40px rgba(15, 20, 35, .2); animation: mgx-up .26s cubic-bezier(.2, .9, .3, 1.05); }
+.mgx-sheet::before { content: ""; display: block; width: 44px; height: 5px; margin: 0 auto 12px; border-radius: 999px; background: #dfe3ec; }
+@media (min-width: 720px) { .mgx-sheet-wrap { align-items: center; } .mgx-sheet { border-radius: 28px; padding-bottom: 20px; } .mgx-sheet::before { display: none; } }
+@keyframes mgx-fade { from { opacity: 0; } }
+@keyframes mgx-up { from { transform: translateY(40px); opacity: .4; } }
+
+/* ── 받을 것 있음 말풍선(장면 위 물건 위에 띄움) ── */
+.mgx-ready { position: absolute; z-index: 6; transform: translate(-50%, -100%); display: inline-flex; align-items: center; gap: 4px; padding: 4px 9px 4px 5px; border: 0; border-radius: 999px; background: #fff; color: var(--mg-ink); font-size: 12.5px; font-weight: 900; box-shadow: 0 6px 16px rgba(24, 33, 58, .22); cursor: pointer; animation: mgx-bob 1.6s ease-in-out infinite; }
+.mgx-ready::after { content: ""; position: absolute; left: 50%; bottom: -5px; width: 10px; height: 10px; background: #fff; transform: translateX(-50%) rotate(45deg); border-radius: 2px; }
+.mgx-ready > span:first-child { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: var(--mg-gold); color: #fff; }
+@keyframes mgx-bob { 0%, 100% { transform: translate(-50%, -100%); } 50% { transform: translate(-50%, calc(-100% - 5px)); } }
+
+/* ── 작은 이름표 · 칩 ── */
+.mgx-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 26px; padding: 0 10px; border-radius: 999px; background: var(--mg-soft); color: var(--mg-accent-deep); font-size: 12.5px; font-weight: 800; white-space: nowrap; }
+.mgx-chip.is-gold { background: #fff3d6; color: #8a5a00; }
+.mgx-chip.is-good { background: #dcfce7; color: #166534; }
+.mgx-chip.is-gray { background: #eef0f5; color: var(--mg-sub); }
+
+/* ── 반응(fx) — mgmt-fx.js 가 붙인다 ── */
+.mgx-float { position: fixed; z-index: 120; pointer-events: none; font-size: 18px; font-weight: 900; color: var(--c, #16a34a); text-shadow: 0 2px 0 #fff, 0 0 8px rgba(255, 255, 255, .9); animation: mgx-float .9s cubic-bezier(.2, .8, .3, 1) forwards; white-space: nowrap; }
+@keyframes mgx-float { 0% { transform: translate(-50%, 0) scale(.6); opacity: 0; } 15% { transform: translate(-50%, -8px) scale(1.15); opacity: 1; } 100% { transform: translate(-50%, -54px) scale(1); opacity: 0; } }
+.mgx-coin { position: fixed; z-index: 121; pointer-events: none; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 999px; background: radial-gradient(circle at 35% 30%, #fff3b0, var(--mg-gold, #ffb020) 55%, #d98a00); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .15); }
+.mgx-bump { animation: mgx-bump .45s cubic-bezier(.3, 1.8, .5, 1); }
+@keyframes mgx-bump { 0% { transform: scale(1); } 35% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.mgx-confetti { position: fixed; z-index: 122; pointer-events: none; width: 9px; height: 14px; border-radius: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mgx *, .mgx-float, .mgx-ready, .mgx-bar > i::after { animation: none !important; transition: none !important; }
+}
