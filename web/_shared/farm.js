@@ -413,11 +413,11 @@ window.HKFarm = (function () {
     const [x, y] = iso(5.72, 5.72);
     const active = S.orders.filter((o) => o.items).length, ok = S.orders.filter(canDeliver).length;
     let s = `<g class="fm-prop" id="fm-prop-orders" data-act="tab" data-tab="orders" role="button" tabindex="0" aria-label="동료 주문판 — 드릴 수 있는 주문 ${ok}장">${shadowAt(x, y, 26, 8)}`;
-    s += `<g transform="translate(${x} ${y})"><path d="M-16 0 L-12 -40 M16 0 L12 -40" stroke="#8a5a2e" stroke-width="3.4" stroke-linecap="round"/><rect x="-24" y="-60" width="48" height="34" rx="4" fill="#c58e5b"/><rect x="-21" y="-57" width="42" height="28" rx="2.6" fill="#e9c393"/>`;
-    const papers = [["#fff3a6", -14, -54, -6], ["#c8f0d2", 0, -55, 5], ["#ffd3d8", -6, -46, 3]];
+    s += `<g transform="translate(${x} ${y})"><path d="M-16 0 L-13 -20 M16 0 L13 -20" stroke="#8a5a2e" stroke-width="3.4" stroke-linecap="round"/><rect x="-24" y="-40" width="48" height="32" rx="4" fill="#c58e5b"/><rect x="-21" y="-37" width="42" height="26" rx="2.6" fill="#e9c393"/>`;
+    const papers = [["#fff3a6", -14, -35, -6], ["#c8f0d2", 0, -36, 5], ["#ffd3d8", -6, -27, 3]];
     for (let k = 0; k < Math.min(3, active); k++) { const [c, px, py, rot] = papers[k]; s += `<g transform="translate(${px} ${py}) rotate(${rot})"><rect width="13" height="12" rx="1.5" fill="${c}"/><circle cx="6.5" cy="1.4" r="1.6" fill="#e5484d"/><path d="M3 6 h7 M3 9 h5" stroke="rgba(0,0,0,.25)" stroke-width="1"/></g>`; }
     s += `</g>`;
-    if (ok) s += `<g transform="translate(${x + 22} ${y - 62})"><g class="fm-warnbob"><circle r="9" fill="#22b35e" stroke="#fff" stroke-width="2.2"/><text y="3.6" text-anchor="middle" font-size="10.5" font-weight="900" fill="#fff">${ok}</text></g></g>`;
+    if (ok) s += `<g transform="translate(${x + 22} ${y - 42})"><g class="fm-warnbob"><circle r="9" fill="#22b35e" stroke="#fff" stroke-width="2.2"/><text y="3.6" text-anchor="middle" font-size="10.5" font-weight="900" fill="#fff">${ok}</text></g></g>`;
     return s + `</g>`;
   }
 
@@ -1086,7 +1086,7 @@ window.HKFarm = (function () {
         g.setAttribute("aria-label", `${CROP[p.k].n} 자라는 중 — 눌러서 남은 시간 보기`);
         ring = { p: p.p, d: p.d, cd: p.p + p.d, off: f1(100 - Math.min(1, (S.ft - p.p) / p.d) * 100) };
       }
-      g.innerHTML = cellArt(i, cx, cy, st, { auto: S.autos.includes(i), ring, seedN: i });
+      g.innerHTML = cellArt(i, cx, cy, st, { auto: S.autos.includes(i), seedN: i });
       if (old.startsWith("-1:") && sig.startsWith("0:")) { g.classList.add("is-fresh"); setTimeout(() => g.classList.remove("is-fresh"), 600); }
     });
     if (changed) drawOverlay();
@@ -1105,7 +1105,11 @@ window.HKFarm = (function () {
       }
       const p = S.plots[i];
       // 자라는 칸 — 남은 시간을 칸 아래에 바로 보여 준다(맨 위 층이라 앞줄 화단에 가리지 않는다)
-      if (p && p.p + p.d > S.ft) h += `<span class="fm-cdtag" style="${pct(cx, cy + 27)}" data-cd="${p.p + p.d}">${dur(p.p + p.d - S.ft)}</span>`;
+      // 고리 + 시간 알약 — 자기 화단 흙 위(작물 바로 앞)에 겹쳐 올려, 어느 화단의 시간인지 바로 보이게
+      if (p && p.p + p.d > S.ft) {
+        const off = f1(100 - Math.min(1, (S.ft - p.p) / p.d) * 100);
+        h += `<span class="fm-cdtag" style="${pct(cx, cy - BOX.h + 8)}"><svg class="fm-cdtag__ring" viewBox="-8 -8 16 16" aria-hidden="true"><circle r="5.6" fill="none" stroke="#e3efe2" stroke-width="2.8"/><circle r="5.6" fill="none" stroke="#22b35e" stroke-width="2.8" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${off}" transform="rotate(-90)" data-ring="${p.p}" data-rd="${p.d}"/></svg><b data-cd="${p.p + p.d}">${dur(p.p + p.d - S.ft)}</b></span>`;
+      }
       if (p && p.p + p.d <= S.ft) {
         h += `<button type="button" class="mgx-ready fm-bubble" style="${pct(cx, cy - BOX.h - 56)};animation-delay:-${((n++ * 0.31) % 1.6).toFixed(2)}s" data-act="plot" data-i="${i}" aria-label="${CROP[p.k].n} 거두기"><span>${cropIco(p.k)}</span></button>`;
       }
