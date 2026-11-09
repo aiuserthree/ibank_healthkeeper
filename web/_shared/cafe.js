@@ -1291,6 +1291,7 @@ window.HKCafe = (function () {
         <a class="mgx-top__back" href="/manage">${ic("chevron-left", 18)}매니지먼트</a>
         <div class="mgx-top__title"><span class="cf-logo" aria-hidden="true">${drinkSvg("latte", 26)}</span><span class="cf-top__name">옥상 쉼터 카페</span><span class="mgx-chip cf-top__chip" id="cf-gchip" hidden></span></div>
         ${withActions ? `<div class="mgx-top__actions">
+          <button type="button" class="mgx-icon cf-music" data-act="music" id="cf-music"></button>
           <button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button>
           <button type="button" class="mgx-icon" data-act="more" aria-label="더보기" aria-haspopup="menu">${ic("ellipsis", 20)}</button>
         </div>` : ""}
@@ -1301,6 +1302,18 @@ window.HKCafe = (function () {
     let liveLog = newLog();
     const thumbs = {};
     const $ = (id) => root.querySelector("#" + id);
+    // 배경음악 「옥상 쉼터 라운지」(mgmt-music.js) — 머리의 음표 단추로 켜고 끈다. 아케이드 공통 소리 설정을 따른다
+    const music = window.HKMgmtMusic ? HKMgmtMusic.create("cafe") : null;
+    function paintMusic() {
+      const b = $("cf-music"); if (!b) return;
+      if (!music) { b.hidden = true; return; }
+      const on = music.isOn(), label = on ? "배경음악 끄기" : "배경음악 켜기";
+      b.innerHTML = ic(on ? "music" : "volume-x", 20);
+      b.setAttribute("aria-label", label); b.title = label; b.setAttribute("aria-pressed", String(on));
+      b.classList.toggle("is-off", !on);
+      HKUI.refreshIcons(b);
+    }
+    if (music) music.onChange(paintMusic);
 
     const fresh = (st) => { // 예전 · 빠진 칸 채우기
       const b = blank(st && st.t ? st.t : Date.now());
@@ -1398,6 +1411,7 @@ window.HKCafe = (function () {
       hudH = $("cf-hud").offsetHeight;
       sig = "";
       renderAll();
+      paintMusic();
     }
 
     // ── 그리기 ──
@@ -1707,7 +1721,8 @@ window.HKCafe = (function () {
           HKFx.bump($("cf-mat").parentElement);
           HKUI.toast(`보상 ${won(o.cash)} · 재료 ${o.mat}개를 받았어요`); changed(true);
         }
-      } else if (act === "help") showHelp();
+      } else if (act === "music") { if (music) music.toggle(); }
+      else if (act === "help") showHelp();
       else if (act === "more") toggleMore(b);
       else if (act === "grade") showGradeInfo();
       else if (act === "limit") { const k = rates(S).limit; if (k === "seat") goFac("seat"); else if (k === "service") goFac("counter"); else if (S.grade >= FAC_BY.plant.g) goFac("plant"); else setTab("menu"); }
