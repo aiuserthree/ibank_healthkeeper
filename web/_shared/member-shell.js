@@ -12,6 +12,17 @@ window.HKRoutes = {
   lounge: "/arcade",
 };
 
+// 본문 안의 「아케이드」 링크(‹ 아케이드 · 공격하러 가기 · 아케이드로 …)를 누르면 아케이드가 배너 영역부터 보이게 표시를 남긴다.
+// 위쪽 메뉴(GNB · 게임 화면 위 막대 — 모두 <header>)와 휴대폰 메뉴 서랍의 「아케이드」는 표시하지 않는다 — 그때는 아케이드 맨 위부터.
+document.addEventListener("click", (e) => {
+  const a = e.target && e.target.closest && e.target.closest("a[href]");
+  if (!a || a.closest("header, #hk-drawer")) return;
+  let path = "";
+  try { const u = new URL(a.href, location.href); if (u.origin === location.origin && !u.hash) path = u.pathname; } catch (_) { return; }
+  if (path !== "/arcade" && path !== "/arcade.html") return;
+  try { sessionStorage.setItem("hk-aa-land", String(Date.now())); } catch (_) { /* 표시 못 남겨도 아케이드는 열린다 */ }
+}, true);
+
 /**
  * 라운지(게임) 노출 시간 — 메뉴는 게임 가능 시간(점심·퇴근 후·출근 전·주말), 메인 배너는 점심시간에만.
  * 로컬(개발) 화면은 테스트용이라 항상 보인다. 라운지 주소로 직접 들어가는 것은 언제나 가능.
