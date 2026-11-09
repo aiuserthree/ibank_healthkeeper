@@ -247,6 +247,7 @@
     document.getElementById("app").innerHTML = `<div class="hk-pf" id="sc-pf">
         <header class="hk-pf__bar">
           <a class="hk-pf__back" href="${HKRoutes.lounge}" id="sc-back">${icon("chevron-left", 20)}<span>아케이드</span></a>
+          <a class="hk-pf__back hk-pf__vs" href="/together#tg-versus" id="sc-vs">${icon("swords", 18)}<span>대전 보기</span></a>
           <span class="hk-pf__icon" style="background:${TINT}">${icon("goal", 18, "#fff")}</span>
           <div class="hk-pf__title"><b>옥상 헤딩 축구</b><small>점심시간 회사 옥상 풋살장 1:1</small></div>
           <div class="hk-pf__tools">
@@ -940,7 +941,8 @@
       }
     });
     $("#sc-pause").onclick = (e) => { e.currentTarget.blur(); if (screen === "pause") resumeGame(); else pauseGame(); };
-    $("#sc-back").addEventListener("click", async (e) => {
+    // 「‹ 아케이드」 · 「대전 보기」 — 경기 중이면 확인 창을 거친 뒤 간다(go)
+    const guardLeave = async (e, go) => {
       if (screen !== "play" && screen !== "pause" && screen !== "connect") return;
       e.preventDefault();
       const isOnline = playing && playing.online;
@@ -949,9 +951,11 @@
       const ok = await HKUI.confirmDialog(isOnline ? "경기를 떠날까요?" : "경기를 그만할까요?",
         isOnline ? "판은 수락부터 2시간 동안 열려 있어요. 다시 들어오면 이어서 해요." : "연습 경기는 저장되지 않아요.",
         { confirmLabel: isOnline ? "떠나기" : "그만하기", cancelLabel: "계속하기" });
-      if (ok) { closeConn(); HKGoArcade(); }
+      if (ok) { closeConn(); go(); }
       else if (wasPlaying && screen === "pause") resumeGame();
-    });
+    };
+    $("#sc-back").addEventListener("click", (e) => guardLeave(e, HKGoArcade));
+    $("#sc-vs").addEventListener("click", (e) => guardLeave(e, () => { location.href = "/together#tg-versus"; }));
     addEventListener("keydown", (e) => {
       if (document.querySelector(".hk-dialog__overlay")) return;
       const t = e.target;

@@ -412,7 +412,19 @@
         });
         let jump = null;
         try { jump = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1))); } catch (_) { jump = null; }
-        if (jump) jump.scrollIntoView(); // /together#tg-versus 처럼 칸 주소로 들어오면 그 칸으로
+        // /together#tg-versus 처럼 칸 주소로 들어오면 그 칸으로 — 위쪽 레이드 판이 늦게 떠 자리가 밀려도 2.5초 동안은 따라가 맞춘다(그사이 사람이 움직이면 그대로)
+        if (jump) {
+          let moved = false;
+          ["wheel", "touchstart", "keydown", "mousedown"].forEach((t) => addEventListener(t, () => { moved = true; }, { once: true, passive: true }));
+          const until = performance.now() + 2500;
+          const tick = () => {
+            if (moved || performance.now() > until) return;
+            const y = Math.max(0, jump.getBoundingClientRect().top + scrollY);
+            if (Math.abs(scrollY - y) > 2) window.scrollTo({ top: y, behavior: "instant" });
+            requestAnimationFrame(tick);
+          };
+          tick();
+        }
       },
     });
   </script>
