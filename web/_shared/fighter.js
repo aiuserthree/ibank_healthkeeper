@@ -1317,9 +1317,21 @@
       A.step = step;
       p.atk = A; p.st = "atk"; p.f = 0; p.t = 0; p.hits = new Set(); p.queued = false; p.connected = false;
     }
-    function startJump(ix, run) {
+    // 걷기 한 걸음 — 대기 · 걷기 · 공격 중에 같이 쓴다 (turn: 바라보는 쪽도 바꿀지)
+    function walkStep(ix, iy, mul, turn) {
       const p = S.p, H = HERO[S.hero];
-      p.st = "jump"; p.t = 0; p.vz = 255; p.vx = ix * (run ? H.run * 0.85 : H.spd); if (ix) p.dir = ix;
+      const run = runDir !== 0 && ix === runDir;
+      if (!ix && !iy) return run;
+      if (ix && turn) p.dir = ix;
+      const k = (ix && iy ? 0.8 : 1) * mul;
+      p.x += ix * (run ? H.run : H.spd) * k * STEP;
+      p.y += iy * H.spdY * k * STEP;
+      return run;
+    }
+    function startJump(ix, iy, run) {
+      const p = S.p, H = HERO[S.hero];
+      p.jspd = run ? H.run * 0.9 : H.spd;
+      p.st = "jump"; p.t = 0; p.vz = 255; p.vx = ix * p.jspd; if (ix) p.dir = ix;
       p.jk = 0; p.hits = new Set(); p.connected = false;
       sfx("jump");
     }
@@ -1438,18 +1450,12 @@
       }
       switch (p.st) {
         case "idle": case "walk": case "run": case "land": {
-          if (p.st === "land" && p.t < 0.07) break;
-          if (p.jmpBuf) { p.jmpBuf = 0; startJump(ix, p.st === "run"); break; }
+          // 착지 직후 · 공격 · 점프를 누른 그 프레임에도 멈추지 않고 걷던 걸 그대로 이어 간다
+          const run = walkStep(ix, iy, 1, true);
+          if (p.jmpBuf) { p.jmpBuf = 0; startJump(ix, iy, run); break; }
           if (p.atkBuf) { p.atkBuf = 0; if (p.st === "run") startDash(); else startAttack(); break; }
-          const run = runDir !== 0 && ix === runDir;
-          if (ix || iy) {
-            if (ix) p.dir = ix;
-            const k = ix && iy ? 0.8 : 1;
-            p.x += ix * (run ? H.run : H.spd) * k * STEP;
-            p.y += iy * H.spdY * k * STEP;
-            const ns = run ? "run" : "walk";
-            if (p.st !== ns) { p.st = ns; p.t = 0; }
-          } else if (p.st !== "idle") { p.st = "idle"; p.t = 0; }
+          if (ix || iy) { const ns = run ? "run" : "walk"; if (p.st !== ns && !(p.st === "land" && p.t < 0.07)) { p.st = ns; p.t = 0; } }
+          else if (p.st !== "idle" && !(p.st === "land" && p.t < 0.07)) { p.st = "idle"; p.t = 0; }
           if (ix && ix === p.dir && !run && !iy) {
             const e = grabTarget();
             if (e) { p.grabPush += STEP; if (p.grabPush > 0.12) { p.grabPush = 0; startGrab(e); } } else p.grabPush = 0;
@@ -1459,16 +1465,26 @@
         case "atk": {
           const A = p.atk;
           p.f++;
+          // 공격하는 동안에도 방향 입력대로 계속 걷는다 (조금 느리게 · 바라보는 쪽은 그대로)
+          walkStep(ix, iy, 0.78, false);
           if (p.f >= A.s && p.f < A.s + A.a) { if (A.fin) p.x += p.dir * 0.6; doHits(A); }
           if (p.atkBuf && p.f >= A.s - 1) { p.queued = true; p.atkBuf = 0; }
-          if (p.jmpBuf && p.f >= A.s + A.a) { p.jmpBuf = 0; startJump(ix, false); break; }
+          if (p.jmpBuf && p.f >= A.s + A.a) { p.jmpBuf = 0; startJump(ix, iy, runDir !== 0 && ix === runDir); break; }
           if (p.f >= A.s + A.a + A.r) {
             p.comboStep = A.step; p.comboT = 0.4;
-            if (p.queued) startAttack(); else { p.st = "idle"; p.t = 0; }
+            if (p.queued) { if (ix) p.dir = ix; startAttack(); }
+            else { const run = runDir !== 0 && ix === runDir; p.st = ix || iy ? (run ? "run" : "walk") : "idle"; p.t = 0; if (ix) p.dir = ix; }
           }
           break;
         }
         case "jump": {
+          // 공중에서도 좌우 조작 — 걷던 · 달리던 가로 속도를 이어 가고, 누른 쪽으로 빠르게 바뀐다
+          if (ix) {
+            const want = ix * Math.max(p.jspd, H.spd);
+            p.vx += clamp(want - p.vx, -900 * STEP, 900 * STEP);
+            if (!p.jk) p.dir = ix;
+          }
+          p.y += iy * H.spdY * 0.6 * STEP;
           p.x += p.vx * STEP; p.z += p.vz * STEP; p.vz -= GRAV * STEP;
           if (p.atkBuf && !p.jk) { p.atkBuf = 0; p.jk = 1; p.hits = new Set(); p.connected = false; }
           if (p.jk) doHits(Object.assign({ dmg: Math.round(9 * H.dmg) }, JK));

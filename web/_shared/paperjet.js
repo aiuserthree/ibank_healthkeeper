@@ -1131,7 +1131,8 @@ window.HKPaperJet = (function () {
 
     // ---------- 갱신 ----------
     function update(dt) {
-      if (S.hitStop > 0) { S.hitStop -= dt; return; }
+      // 히트 스톱 — 세상만 잠깐 멈추고 내 기체 이동 · 쏘기는 그대로 (멈춘 것처럼 느껴지지 않게)
+      if (S.hitStop > 0) { S.hitStop -= dt; updatePlayer(dt); return; }
       S.t += dt; S.phaseT += dt;
       const bossTime = S.phase === "warning" || S.phase === "boss" || S.phase === "bossdown" || S.phase === "clear";
       if (bossTime) S.scrollSpeed = Math.max(0, S.scrollSpeed - (ST.speed * dt) / 1.4);

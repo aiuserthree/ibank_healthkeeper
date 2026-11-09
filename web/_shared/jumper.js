@@ -2363,9 +2363,15 @@
     window.addEventListener("blur", () => { held.clear(); clearTouch(); if (scene === "play") pause(); });
     document.addEventListener("visibilitychange", () => { if (document.hidden) { held.clear(); clearTouch(); if (scene !== "title" && scene !== "result") pause(); } });
 
-    // 휴대폰 단추 — 손가락마다 따로(동시 누르기), 미끄러뜨려 옆 단추로 옮겨도 된다
+    // 휴대폰 단추 — 손가락(pointerId)마다 따로 기억한다. 다른 손가락이 눌리고 떼어져도 서로 건드리지 않는다.
+    //  · 포인터 캡처를 따로 걸지 않는다 — 터치는 처음 누른 단추로 이벤트가 계속 오고(암묵 캡처), 캡처를 옮기면
+    //    손가락이 살짝만 움직여도 lostpointercapture 가 와서 누르고 있던 ◀ ▶ 가 풀려 버렸다
+    //  · 미끄러뜨리기는 같은 묶음(방향 ◀ ▼ ▶ / 점프 · 달리기) 안의 다른 단추 위로 갔을 때만 바꾼다.
+    //    단추 사이 틈이나 바깥으로 살짝 벗어나도(다른 손가락을 누를 때 흔들림) 누르던 단추는 그대로
     const ptr = new Map();
     const btnAt = (x, y) => { const el = document.elementFromPoint(x, y); const b = el && el.closest && el.closest(".jp-btn"); return b && pad.contains(b) ? b.dataset.k : null; };
+    const DIR = new Set(["l", "r", "down"]);
+    const sameGroup = (a, b) => DIR.has(a) === DIR.has(b);
     function syncTouch() {
       const was = { ...touch };
       Object.keys(touch).forEach((k) => (touch[k] = false));
@@ -2379,12 +2385,19 @@
     pad.addEventListener("pointerdown", (e) => {
       e.preventDefault();
       if (!touchUi) { touchUi = true; layout(); }
-      try { pad.setPointerCapture(e.pointerId); } catch (_) { /* 없어도 동작 */ }
-      ptr.set(e.pointerId, btnAt(e.clientX, e.clientY));
+      const k = btnAt(e.clientX, e.clientY) || (e.target.closest && e.target.closest(".jp-btn") ? e.target.closest(".jp-btn").dataset.k : null);
+      if (!k) return;
+      ptr.set(e.pointerId, k);
       syncTouch();
     });
-    pad.addEventListener("pointermove", (e) => { if (!ptr.has(e.pointerId)) return; const k = btnAt(e.clientX, e.clientY); if (k !== ptr.get(e.pointerId)) { ptr.set(e.pointerId, k); syncTouch(); } });
-    ["pointerup", "pointercancel", "lostpointercapture"].forEach((t) => pad.addEventListener(t, (e) => { if (ptr.delete(e.pointerId)) syncTouch(); }));
+    pad.addEventListener("pointermove", (e) => {
+      const cur = ptr.get(e.pointerId);
+      if (!cur) return;
+      const k = btnAt(e.clientX, e.clientY);
+      if (k && k !== cur && sameGroup(k, cur)) { ptr.set(e.pointerId, k); syncTouch(); }
+    });
+    // 뗄 때는 그 손가락만 — 마우스로 눌렀다가 단추 밖에서 떼도 풀리게 창 전체에서 듣는다
+    ["pointerup", "pointercancel"].forEach((t) => window.addEventListener(t, (e) => { if (ptr.delete(e.pointerId)) syncTouch(); }, true));
     pad.addEventListener("contextmenu", (e) => e.preventDefault());
     screen.addEventListener("pointerdown", (e) => { if (e.pointerType === "touch" && !touchUi) { touchUi = true; layout(); } });
 

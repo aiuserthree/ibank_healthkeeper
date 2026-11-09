@@ -1070,14 +1070,24 @@
       ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right", ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down",
       KeyZ: "fire", KeyJ: "fire", KeyX: "jump", KeyK: "jump", Space: "jump", KeyC: "gren", KeyL: "gren",
     };
-    let stickId = null;
-    const btnPointers = new Map();
-    function clearInput() {
-      for (const k in keys) { keys[k] = 0; tch[k] = 0; }
-      jumpEdge = grenEdge = false;
-      stickId = null; knob.style.transform = "";
+    // 휴대폰 손가락 — 손가락(또는 마우스 포인터)마다 따로 기억한다.
+    // 스틱은 스틱을 누른 손가락이 떨어질 때만, 단추는 그 단추를 누른 손가락이 떨어질 때만 풀린다
+    let stickId = null; // "t3"(터치 identifier) 또는 "p1"(마우스 · 펜 pointerId)
+    const btnFingers = new Map(); // 손가락 id → 단추 요소
+    function releaseStick() {
+      stickId = null; tch.left = tch.right = tch.up = tch.down = 0; knob.style.transform = "";
+      pad.querySelectorAll(".vt-ar.is-on").forEach((x) => x.classList.remove("is-on"));
+    }
+    function clearTouch() {
+      releaseStick();
+      tch.fire = tch.jump = tch.gren = 0;
+      btnFingers.clear();
       pad.querySelectorAll(".is-on").forEach((b) => b.classList.remove("is-on"));
-      btnPointers.clear();
+    }
+    function clearKeys() { for (const k in keys) keys[k] = 0; }
+    function clearInput() {
+      clearKeys(); clearTouch();
+      jumpEdge = grenEdge = false;
     }
     function mergeInput() { for (const k in inp) inp[k] = keys[k] || tch[k] ? 1 : 0; }
     const typing = (e) => { const t = e.target; return t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable); };
@@ -1104,7 +1114,8 @@
       if (a && (mode === "paused" || mode === "over")) e.preventDefault();
     });
     window.addEventListener("keyup", (e) => { const a = KEYMAP[e.code]; if (a) keys[a] = 0; });
-    window.addEventListener("blur", clearInput);
+    // 창이 포커스를 잃으면 키보드만 지운다 (손가락은 손가락 이벤트가 스스로 정리한다)
+    window.addEventListener("blur", () => { clearKeys(); jumpEdge = grenEdge = false; });
     // 휴대폰 조작판 — 왼쪽 방향 패드(끌어서 8방향), 오른쪽 단추 셋 (여러 손가락 동시에)
     function stickAt(e) {
       const base = pad.querySelector(".vt-stick__base").getBoundingClientRect();
@@ -1123,41 +1134,57 @@
       pad.querySelector(".vt-ar--u").classList.toggle("is-on", !!tch.up);
       pad.querySelector(".vt-ar--d").classList.toggle("is-on", !!tch.down);
     }
-    pad.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      const b = e.target.closest("[data-btn]");
-      if (b) {
+    // 손가락이 닿음 — 처음 닿은 곳이 단추면 그 단추, 스틱이면 스틱 (포인터 캡처는 쓰지 않는다)
+    function fingerDown(id, target, x, y) {
+      const b = target && target.closest && target.closest("[data-btn]");
+      if (b && pad.contains(b)) {
         const k = b.dataset.btn;
-        btnPointers.set(e.pointerId, b);
         if (k === "jump" && !tch.jump) jumpEdge = true;
         if (k === "gren" && !tch.gren) grenEdge = true;
+        btnFingers.set(id, b);
         tch[k] = 1;
         b.classList.add("is-on");
-        try { b.setPointerCapture(e.pointerId); } catch (_) {}
         if (mode === "title" || mode === "over") clickGo();
         return;
       }
-      if (e.target.closest(".vt-stick") && stickId == null) {
-        stickId = e.pointerId;
-        try { e.target.closest(".vt-stick").setPointerCapture(e.pointerId); } catch (_) {}
-        stickAt(e);
+      if (target && target.closest && target.closest(".vt-stick") && stickId == null) {
+        stickId = id;
+        stickAt({ clientX: x, clientY: y });
       }
-    });
-    pad.addEventListener("pointermove", (e) => { if (e.pointerId === stickId) stickAt(e); });
-    const padUp = (e) => {
-      if (e.pointerId === stickId) {
-        stickId = null; tch.left = tch.right = tch.up = tch.down = 0; knob.style.transform = "";
-        pad.querySelectorAll(".vt-ar.is-on").forEach((x) => x.classList.remove("is-on"));
-      }
-      const b = btnPointers.get(e.pointerId);
+    }
+    function fingerMove(id, x, y) { if (id === stickId) stickAt({ clientX: x, clientY: y }); }
+    // 손가락이 떨어짐 — 그 손가락이 맡은 것만 푼다 (다른 손가락의 스틱 · 단추는 그대로)
+    function fingerUp(id) {
+      if (id === stickId) releaseStick();
+      const b = btnFingers.get(id);
       if (b) {
-        btnPointers.delete(e.pointerId);
-        if (![...btnPointers.values()].includes(b)) { tch[b.dataset.btn] = 0; b.classList.remove("is-on"); }
+        btnFingers.delete(id);
+        if (![...btnFingers.values()].includes(b)) { tch[b.dataset.btn] = 0; b.classList.remove("is-on"); }
       }
-    };
-    pad.addEventListener("pointerup", padUp);
-    pad.addEventListener("pointercancel", padUp);
-    pad.addEventListener("lostpointercapture", padUp);
+    }
+    // 터치 — 손가락마다 identifier 가 다르다. changedTouches 에 든 손가락만 처리한다
+    const tid = (t) => "t" + t.identifier;
+    pad.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) fingerDown(tid(t), t.target, t.clientX, t.clientY);
+    }, { passive: false });
+    pad.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      for (const t of e.changedTouches) fingerMove(tid(t), t.clientX, t.clientY);
+    }, { passive: false });
+    const touchEnd = (e) => { for (const t of e.changedTouches) fingerUp(tid(t)); };
+    pad.addEventListener("touchend", touchEnd);
+    pad.addEventListener("touchcancel", touchEnd);
+    // 마우스 · 펜 (PC 에서 조작판을 눌러 볼 때) — 터치는 위의 터치 이벤트가 맡는다
+    const pid = (e) => "p" + e.pointerId;
+    pad.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "touch") return;
+      e.preventDefault();
+      fingerDown(pid(e), e.target, e.clientX, e.clientY);
+    });
+    window.addEventListener("pointermove", (e) => { if (e.pointerType !== "touch") fingerMove(pid(e), e.clientX, e.clientY); });
+    window.addEventListener("pointerup", (e) => { if (e.pointerType !== "touch") fingerUp(pid(e)); });
+    window.addEventListener("pointercancel", (e) => { if (e.pointerType !== "touch") fingerUp(pid(e)); });
     canvas.addEventListener("pointerdown", (e) => { e.preventDefault(); if (mode === "title") clickGo(); });
 
     // ── 상태 ──
@@ -2000,7 +2027,12 @@
       if (mode === "title" && titleS) { updateAmb(titleS, dt); return; }
       if (mode !== "play") return;
       mergeInput();
-      if (S.hitStop > 0) { S.hitStop -= dt; return; } // 히트 스톱 — 잠깐 멈춘다
+      // 히트 스톱 — 적 · 탄 · 효과만 잠깐 멈춘다. 주인공 이동 · 점프 · 쏘기는 끊기지 않는다
+      if (S.hitStop > 0) {
+        S.hitStop -= dt;
+        if (S.phase === "run" || S.phase === "warning" || S.phase === "boss" || S.phase === "bossmid" || S.phase === "bossdown") { updatePlayer(dt); if (mode === "play" && S.phase !== "gameover") updateCamera(dt); }
+        return;
+      }
       S.t += dt; S.phaseT += dt;
       if (S.banner) { S.banner.t += dt; if (S.banner.t >= S.banner.life) S.banner = null; }
       if (S.boss) S.bossLag += ((S.boss.hp / S.boss.max) - S.bossLag) * Math.min(1, dt * 2.2);
@@ -2588,22 +2620,23 @@
     }
 
     // ───────────── 루프 ─────────────
-    let raf = 0, last = 0, acc = 0;
+    let raf = 0, last = 0;
     function frame(now) {
       raf = 0;
       if (mode !== "play" && mode !== "title") return;
       let el = (now - last) / 1000;
       last = now;
-      el = clamp(el, 0, 0.25);
-      acc += el;
+      el = clamp(el, 0, 0.1);
+      // 지난 시간을 1/120초 이하 조각으로 나눠 매 프레임 갱신한다 — 갱신 없는 프레임(끊겨 보임)이 없고,
+      // 60 · 90 · 120Hz 어디서나 속도는 같다
       try {
-        let n = 0;
-        while (acc >= DT && n < 40) { update(DT); acc -= DT; n++; if (mode !== "play" && mode !== "title") break; }
+        const n = Math.max(1, Math.ceil(el / DT - 1e-6));
+        for (let i = 0; i < n && el > 0; i++) { update(el / n); if (mode !== "play" && mode !== "title") break; }
         draw();
       } catch (err) { console.error(err); }
       if (mode === "play" || mode === "title") raf = requestAnimationFrame(frame);
     }
-    function run() { if (raf) cancelAnimationFrame(raf); last = performance.now(); acc = 0; raf = requestAnimationFrame(frame); }
+    function run() { if (raf) cancelAnimationFrame(raf); last = performance.now(); raf = requestAnimationFrame(frame); }
 
     // ───────────── 화면 전환 (DOM 창) ─────────────
     function showOverlay(html, cls) {
