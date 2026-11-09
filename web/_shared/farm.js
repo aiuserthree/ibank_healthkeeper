@@ -941,7 +941,7 @@ window.HKFarm = (function () {
   const topBar = (full) => `<div class="mgx-top fm-top">
       <a class="mgx-top__back" href="/manage">${ic("chevron-left", 18)}매니지먼트</a>
       <div class="mgx-top__title"><span class="fm-logo">${markSvg}</span><span class="fm-top__name">${TITLE}</span>${full ? `<span class="mgx-chip" id="fm-lvchip"></span><span id="fm-donebadge"></span>` : ""}</div>
-      ${full ? `<div class="mgx-top__actions"><button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button><button type="button" class="mgx-icon" data-act="more" aria-label="더보기">${ic("ellipsis", 20)}</button></div>` : ""}
+      ${full ? `<div class="mgx-top__actions">${window.HKMgmtMusic ? HKMgmtMusic.buttonHtml() : ""}<button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button><button type="button" class="mgx-icon" data-act="more" aria-label="더보기">${ic("ellipsis", 20)}</button></div>` : ""}
     </div>`;
   function showMessage(html) {
     root.innerHTML = topBar(false) + `<div class="fm-msg">${html}</div>`;

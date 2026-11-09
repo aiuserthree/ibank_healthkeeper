@@ -1,9 +1,11 @@
-// 매니지먼트 게임 배경음악 — 소리 파일 없이 Web Audio 로 바로 연주하는 오리지널 곡(지금은 카페 「옥상 쉼터 라운지」)
+// 매니지먼트 게임 배경음악 — 소리 파일 없이 Web Audio 로 바로 연주하는 오리지널 곡
+//   cafe 「옥상 쉼터 라운지」(느린 로파이 재즈) · farm 「옥상 텃밭의 오후」(어쿠스틱 기타 · 피리 · 새소리) · civ 「우리 동네 출근길」(마림바 · 통통 베이스, 경쾌하게)
 //
-// const music = HKMgmtMusic.create("cafe");
+// const music = HKMgmtMusic.create("cafe");  // "farm" · "civ"
 //   music.toggle()        켜기 ↔ 끄기 (아케이드 공통 소리 설정과 같은 값 — 한쪽에서 끄면 다른 쪽도 꺼져 있다)
 //   music.isOn()          지금 켜져 있는지
 //   music.onChange(fn)    켜고 끌 때마다 fn(on)
+// 머리 단추는 HKMgmtMusic.buttonHtml() 을 넣기만 하면 된다 — 그림 · 켜고 끄기는 이 파일이 맡는다(data-mgmt-music)
 // 기본은 켜짐. 브라우저 정책상 화면을 처음 누르거나 키를 누른 뒤부터 소리가 난다.
 // 다른 탭 · 앱으로 가면 멈추고, 돌아오면 이어서 연주한다. 소리는 작게(말소리 · 업무에 방해되지 않게).
 window.HKMgmtMusic = (function () {
@@ -20,6 +22,7 @@ window.HKMgmtMusic = (function () {
   // 옥상 쉼터 라운지 — 느린 로파이 재즈. 한 마디 = 16칸(16분음표), 8마디 한 바퀴(A 4마디 + B 4마디)
   const SONGS = {
     cafe: {
+      style: "lounge",
       bpm: 74,
       swing: 0.62, // 8분음표 뒷박을 늦게 — 출렁이는 느낌
       // 마디마다 [베이스 근음, 건반 화음(아래→위), 멜로디에 쓰는 음]
@@ -32,6 +35,38 @@ window.HKMgmtMusic = (function () {
         ["G2", ["F3", "Bb3", "D4", "A4"], ["D5", "F5", "G5", "A5", "Bb5"]], // Gm9
         ["Bb2", ["A3", "D4", "F4", "C5"], ["D5", "F5", "A5", "C6"]], // Bbmaj9
         ["C3", ["Bb3", "E4", "G4", "A4"], ["C5", "E5", "G5", "A5", "Bb5"]], // C13
+      ],
+    },
+    // 옥상 텃밭의 오후 — 곧은 박자의 포크. 기타 아르페지오 위로 피리가 가끔, 새소리 · 바람
+    farm: {
+      style: "meadow",
+      bpm: 84,
+      swing: 0.5,
+      bars: [
+        ["G2", ["G3", "B3", "D4", "G4"], ["B4", "D5", "E5", "G5"]], // G
+        ["E2", ["E3", "B3", "D4", "G4"], ["B4", "D5", "E5", "G5"]], // Em7
+        ["C3", ["C3", "G3", "D4", "E4"], ["C5", "D5", "E5", "G5"]], // Cadd9
+        ["D3", ["D3", "A3", "D4", "G4"], ["A4", "D5", "E5", "G5"]], // Dsus4
+        ["G2", ["G3", "B3", "D4", "G4"], ["B4", "D5", "G5", "A5"]], // G
+        ["B2", ["B2", "F#3", "A3", "D4"], ["A4", "B4", "D5", "F#5"]], // Bm7
+        ["C3", ["C3", "G3", "D4", "E4"], ["C5", "D5", "E5", "G5"]], // Cadd9
+        ["D3", ["D3", "A3", "D4", "F#4"], ["A4", "D5", "E5", "F#5"]], // D
+      ],
+    },
+    // 우리 동네 출근길 — 통통 튀는 마림바 · 피치카토 베이스 · 손뼉, 동네가 커 가는 기분
+    civ: {
+      style: "town",
+      bpm: 100,
+      swing: 0.56,
+      bars: [
+        ["C3", ["C4", "E4", "G4"], ["E5", "G5", "A5", "C6"]], // C
+        ["A2", ["A3", "C4", "E4"], ["E5", "G5", "A5", "C6"]], // Am
+        ["F2", ["F3", "A3", "C4"], ["F5", "A5", "C6", "D6"]], // F
+        ["G2", ["G3", "B3", "D4"], ["D5", "G5", "A5", "B5"]], // G
+        ["C3", ["C4", "E4", "G4"], ["E5", "G5", "C6", "D6"]], // C
+        ["E2", ["E3", "G3", "B3"], ["E5", "G5", "B5", "D6"]], // Em
+        ["F2", ["F3", "A3", "C4"], ["F5", "A5", "C6", "D6"]], // F
+        ["G2", ["G3", "B3", "F4"], ["D5", "F5", "G5", "B5"]], // G7
       ],
     },
   };
@@ -116,6 +151,59 @@ window.HKMgmtMusic = (function () {
       o.connect(g); o2.connect(g2).connect(g); g.connect(dest()); g.connect(verb);
       [o, o2, vib].forEach((x) => { x.start(t); x.stop(t + 1.5); });
     }
+    // 어쿠스틱 기타 — 밝은 세모파가 빨리 줄고 고음을 깎는다(줄을 튕긴 느낌)
+    function pluck(t, m, vel) {
+      const g = ac.createGain(), f = ac.createBiquadFilter(), o = ac.createOscillator(), o2 = ac.createOscillator(), g2 = ac.createGain();
+      o.type = "triangle"; o.frequency.value = hz(m); o2.type = "sawtooth"; o2.frequency.value = hz(m); g2.gain.value = 0.18;
+      f.type = "lowpass"; f.frequency.setValueAtTime(3200, t); f.frequency.exponentialRampToValueAtTime(700, t + 0.6);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.085 * vel, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.6);
+      o.connect(f); o2.connect(g2).connect(f); f.connect(g); g.connect(dest()); g.connect(verb);
+      [o, o2].forEach((x) => { x.start(t); x.stop(t + 1.7); });
+    }
+    // 피리 — 천천히 차오르는 사인 + 숨소리, 떨림
+    function flute(t, m, len) {
+      const g = ac.createGain(), o = ac.createOscillator(), vib = ac.createOscillator(), vg = ac.createGain();
+      o.type = "sine"; o.frequency.value = hz(m);
+      vib.frequency.value = 5; vg.gain.setValueAtTime(0, t); vg.gain.linearRampToValueAtTime(9, t + 0.4); vib.connect(vg).connect(o.detune);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.045, t + 0.09);
+      g.gain.setValueAtTime(0.045, t + len * 0.8);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + len + 0.25);
+      o.connect(g); g.connect(dest()); g.connect(verb);
+      [o, vib].forEach((x) => { x.start(t); x.stop(t + len + 0.3); });
+      noise(t, Math.min(0.25, len), 0.006, "bandpass", hz(m) * 2, 2); // 숨
+    }
+    // 마림바 — 사인 + 네 배음이 아주 빨리 사라진다
+    function marimba(t, m, vel) {
+      const g = ac.createGain();
+      [[1, 1, 0.55], [4, 0.25, 0.08], [9.2, 0.06, 0.03]].forEach(([mul, amp, dec]) => {
+        const o = ac.createOscillator(), og = ac.createGain();
+        o.type = "sine"; o.frequency.value = hz(m) * mul;
+        og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(amp, t + 0.003); og.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+        o.connect(og).connect(g); o.start(t); o.stop(t + dec + 0.05);
+      });
+      g.gain.value = 0.11 * vel;
+      g.connect(dest()); g.connect(verb);
+    }
+    // 피치카토 베이스 — 짧고 통통하게
+    function pizz(t, m) {
+      const g = ac.createGain(), o = ac.createOscillator(), f = ac.createBiquadFilter();
+      o.type = "triangle"; o.frequency.value = hz(m); f.type = "lowpass"; f.frequency.value = 900;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.2, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32);
+      o.connect(f).connect(g).connect(dest()); o.start(t); o.stop(t + 0.35);
+    }
+    // 새 — 짧게 미끄러지는 높은 휘파람 두세 번
+    function bird(t) {
+      const n = 2 + Math.floor(rand() * 3), base = 2600 + rand() * 1400;
+      for (let i = 0; i < n; i++) {
+        const tt = t + i * (0.09 + rand() * 0.05), o = ac.createOscillator(), g = ac.createGain();
+        o.type = "sine"; o.frequency.setValueAtTime(base * (1 + rand() * 0.2), tt); o.frequency.exponentialRampToValueAtTime(base * (1.3 + rand() * 0.4), tt + 0.06);
+        g.gain.setValueAtTime(0.0001, tt); g.gain.exponentialRampToValueAtTime(0.012, tt + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, tt + 0.08);
+        o.connect(g).connect(dest()); o.start(tt); o.stop(tt + 0.1);
+      }
+    }
     function noise(t, len, gain, type, freq, q = 0.8) {
       const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
       s.buffer = noiseBuf; s.playbackRate.value = 0.9 + Math.random() * 0.2;
@@ -135,10 +223,15 @@ window.HKMgmtMusic = (function () {
     const brush = (t) => noise(t, 0.22, 0.05, "bandpass", 2400, 0.6); // 2 · 4박 브러시
     const shaker = (t, acc) => noise(t, 0.06, acc ? 0.022 : 0.012, "highpass", 7000);
     // 레코드판 지직 — 아주 작게, 가끔 톡
+    // 텃밭은 지직 대신 아주 작은 바람 소리(천천히 일렁임), 동네는 아무것도 깔지 않는다
     function startCrackle() {
-      if (crackle) return;
+      if (crackle || song.style === "town") return;
       const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-      s.buffer = noiseBuf; s.loop = true; f.type = "highpass"; f.frequency.value = 3000; g.gain.value = 0.004;
+      s.buffer = noiseBuf; s.loop = true;
+      if (song.style === "meadow") {
+        f.type = "lowpass"; f.frequency.value = 500; g.gain.value = 0.012;
+        const lfo = ac.createOscillator(), lg = ac.createGain(); lfo.frequency.value = 0.08; lg.gain.value = 0.008; lfo.connect(lg).connect(g.gain); lfo.start();
+      } else { f.type = "highpass"; f.frequency.value = 3000; g.gain.value = 0.004; }
       s.connect(f).connect(g).connect(dest()); s.start();
       crackle = s;
     }
@@ -147,9 +240,11 @@ window.HKMgmtMusic = (function () {
     let melody = []; // 이번 마디 멜로디 [칸, 음]
     function planBar(bar) {
       melody = [];
-      if (rand() < 0.35) return; // 쉬는 마디도 있어야 숨이 쉬어진다
+      const rest = { lounge: 0.35, meadow: 0.45, town: 0.25 }[song.style];
+      if (rand() < rest) return; // 쉬는 마디도 있어야 숨이 쉬어진다
       const pool = bar[2].map(midi);
-      const spots = [0, 3, 6, 8, 10, 12, 14].filter(() => rand() < 0.42);
+      const grid = song.style === "meadow" ? [0, 4, 8, 12] : song.style === "town" ? [0, 2, 4, 6, 8, 10, 12, 14] : [0, 3, 6, 8, 10, 12, 14];
+      const spots = grid.filter(() => rand() < (song.style === "meadow" ? 0.55 : 0.42));
       let last = pool[Math.floor(rand() * pool.length)];
       for (const sp of spots) {
         // 가까운 음으로 이어 가기(크게 뛰지 않게)
@@ -170,6 +265,39 @@ window.HKMgmtMusic = (function () {
         const swingOff = s16 % 4 === 2 ? (song.swing - 0.5) * 2 * stepDur : 0;
         const t = nextT + swingOff;
         const chord = bar[1].map(midi), root = midi(bar[0]);
+        if (song.style === "meadow") meadowStep(t, s16, barN, chord, root);
+        else if (song.style === "town") townStep(t, s16, barN, chord, root);
+        else loungeStep(t, s16, barN, chord, root);
+        nextT += stepDur;
+        step++;
+      }
+    }
+    // 텃밭 — 기타 8분 아르페지오, 1 · 3박 베이스, 셰이커만 살짝, 피리 멜로디, 가끔 새
+    function meadowStep(t, s16, barN, chord, root) {
+      const ARP = [0, 2, 1, 3, 2, 1, 3, 2]; // 8분마다 화음의 몇 번째 음
+      if (s16 % 2 === 0) pluck(t + (s16 === 0 ? 0 : (rand() - 0.5) * 0.01), chord[ARP[s16 / 2]] + (s16 >= 8 && rand() < 0.2 ? 12 : 0), s16 % 8 === 0 ? 1 : 0.7);
+      if (s16 === 0) bass(t, root, stepDur * 7);
+      if (s16 === 8) bass(t, root + 7 - (root + 7 > 52 ? 12 : 0), stepDur * 6);
+      if (s16 % 4 === 2) shaker(t, false);
+      for (const [sp, m] of melody) if (sp === s16) flute(t, m, stepDur * (rand() < 0.5 ? 4 : 3));
+      if (s16 === 0 && rand() < 0.3) bird(t + stepDur * Math.floor(rand() * 12));
+    }
+    // 동네 — 마림바 통통(1 · 2박 뒷박 · 3박 · 4박 뒷박 화음), 피치카토 베이스, 손뼉 2 · 4박, 나무 딱딱이
+    function townStep(t, s16, barN, chord, root) {
+      if (s16 === 0 || s16 === 6 || s16 === 8 || s16 === 14) chord.forEach((m, i) => marimba(t + i * 0.008, m, s16 % 8 === 0 ? 0.9 : 0.6));
+      if (s16 === 0) pizz(t, root);
+      if (s16 === 4 && rand() < 0.6) pizz(t, root + 12);
+      if (s16 === 8) pizz(t, root + 7);
+      if (s16 === 12) pizz(t, root + (rand() < 0.5 ? 4 : 5));
+      if (s16 === 0 || s16 === 8) kick(t);
+      if (s16 === 4 || s16 === 12) noise(t, 0.12, 0.05, "bandpass", 1600, 1.2); // 손뼉
+      if (s16 % 2 === 1 && rand() < 0.35) noise(t, 0.04, 0.025, "bandpass", 3200, 6); // 딱딱이
+      if (s16 % 2 === 0) shaker(t, s16 % 4 === 0);
+      for (const [sp, m] of melody) if (sp === s16) bell(t, m, 0.7 + rand() * 0.3);
+    }
+    // 카페 — 원래 연주
+    function loungeStep(t, s16, barN, chord, root) {
+      {
         // 건반 — 1박 화음 길게, 2박 뒷박에 짧게 한 번 더(가끔 3박 뒷박도)
         if (s16 === 0) chord.forEach((m, i) => keys(t + i * 0.012, m, stepDur * 9, 0.9));
         if (s16 === 6) chord.slice(1).forEach((m) => keys(t, m, stepDur * 3, 0.55));
@@ -187,8 +315,6 @@ window.HKMgmtMusic = (function () {
         if (s16 % 2 === 0) shaker(t, s16 % 4 === 0);
         // 멜로디
         for (const [sp, m] of melody) if (sp === s16) bell(t, m, 0.8 + rand() * 0.3);
-        nextT += stepDur;
-        step++;
       }
     }
 
@@ -236,6 +362,21 @@ window.HKMgmtMusic = (function () {
       if (m) { stop(false); setTimeout(() => { if (muted && ac && ac.state === "running") ac.suspend().catch(() => {}); }, 400); } else { started = true; play(); }
       listeners.forEach((fn) => { try { fn(!m); } catch (_) { /* 화면 쪽 */ } });
     }
+    // 머리의 음표 단추(data-mgmt-music) — 화면이 다시 그려져도 새 단추를 찾아 칠하고, 누르면 켜고 끈다
+    function paint(b) {
+      const on = !muted, label = on ? "배경음악 끄기" : "배경음악 켜기";
+      b.dataset.mm = "1";
+      b.innerHTML = window.HKUI ? HKUI.icon(on ? "music" : "volume-x", 20, "currentColor") : on ? "♪" : "×";
+      b.setAttribute("aria-label", label); b.title = label; b.setAttribute("aria-pressed", String(on));
+      b.classList.toggle("is-off", !on);
+      if (window.HKUI && HKUI.refreshIcons) HKUI.refreshIcons(b);
+    }
+    const paintAll = (fresh) => document.querySelectorAll(fresh ? "[data-mgmt-music]:not([data-mm])" : "[data-mgmt-music]").forEach(paint);
+    listeners.push(() => paintAll(false));
+    const watch = () => { paintAll(true); new MutationObserver(() => paintAll(true)).observe(document.body, { childList: true, subtree: true }); };
+    if (document.body) watch(); else document.addEventListener("DOMContentLoaded", watch);
+    document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest("[data-mgmt-music]"); if (b) { e.preventDefault(); set(!muted); } });
+
     return {
       isOn: () => !muted,
       toggle: () => set(!muted),
@@ -243,5 +384,6 @@ window.HKMgmtMusic = (function () {
     };
   }
 
-  return { create };
+  const buttonHtml = () => `<button type="button" class="mgx-icon mgx-music" data-mgmt-music aria-label="배경음악"></button>`;
+  return { create, buttonHtml };
 })();

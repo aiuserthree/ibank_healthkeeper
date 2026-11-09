@@ -138,22 +138,21 @@
         </a>`;
     }
 
-    // 대표 게임 — 매주 월요일(한국 시간)에 다음 게임으로 바뀐다. 2026-11-02 주(아케이드 공지 주)까지 별까지 계단
-    const LEAD_ROTATION = [
-      "stairs", "match3", "blocks", "crossing", "bubble", "shooter", "stack", "pairs", "snake",
-      "bricks", "coffee", "sudoku", "mines", "promote", "typing", "chosung", "trivia", "korean", "nightshift",
-    ];
-    function weeklyLead(games) {
-      const kstWeek = (ms) => Math.floor((Math.floor((ms + 9 * 3600e3) / 864e5) + 3) / 7); // 월요일 시작 주 번호
-      const n = Math.max(0, kstWeek(Date.now()) - kstWeek(Date.UTC(2026, 10, 2) - 9 * 3600e3));
-      const order = LEAD_ROTATION.map((k) => games.find((g) => g.key === k)).filter(Boolean);
-      if (!order.length) return games[0];
-      return order[((n % order.length) + order.length) % order.length];
+    // 대표 게임 — 아케이드에 들어올 때마다 무작위로 하나(꿀알바 2~8화는 빼고). 바로 전에 본 게임은 연달아 나오지 않게
+    const LEAD_KEY = "hk-aa-lead";
+    function randomLead(games) {
+      if (!games.length) return null;
+      let last = null;
+      try { last = localStorage.getItem(LEAD_KEY); } catch (_) { /* 저장 못 해도 무작위는 그대로 */ }
+      const pool = games.length > 1 ? games.filter((g) => g.key !== last) : games;
+      const lead = pool[Math.floor(Math.random() * pool.length)];
+      try { localStorage.setItem(LEAD_KEY, lead.key); } catch (_) { /* 위와 같음 */ }
+      return lead;
     }
 
-    // 게임 모음 — 제목 · 이번 주 대표 게임 · 게임 찾기(검색칸 + 분류 칩 + 결과)
+    // 게임 모음 — 제목 · 대표 게임(무작위) · 게임 찾기(검색칸 + 분류 칩 + 결과)
     function collectionHtml(games, allGames) {
-      const lead = weeklyLead(games);
+      const lead = randomLead(games);
       return `<div class="hk-aa-collection" id="aa-games">
           <div class="hk-aa-collection__head hk-aa-wrap">
             <h2>블록, 슈팅, 퀴즈 등<br>게임이 고플 땐.</h2>

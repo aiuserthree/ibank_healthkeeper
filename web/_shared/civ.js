@@ -1134,7 +1134,7 @@
   const topHtml = (title) => `<div class="mgx-top cv-top">
       <a class="mgx-top__back" href="/manage">${ic("chevron-left", 18)}매니지먼트</a>
       <div class="mgx-top__title"><span class="cv-logo" aria-hidden="true"></span><span class="cv-ttl">${title || "오피스 타운"}</span><span class="mgx-chip cv-erachip" id="cv-era"></span></div>
-      <div class="mgx-top__actions"><button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button><button type="button" class="mgx-icon" data-act="more" aria-label="더보기">${ic("ellipsis", 20)}</button></div>
+      <div class="mgx-top__actions">${window.HKMgmtMusic ? HKMgmtMusic.buttonHtml() : ""}<button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button><button type="button" class="mgx-icon" data-act="more" aria-label="더보기">${ic("ellipsis", 20)}</button></div>
     </div>`;
 
   async function mount(el) {
