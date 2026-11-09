@@ -728,6 +728,7 @@ async def compute_week(db: AsyncSession, monday: date, today: date, redis=None) 
     board = tally(apply_caps(acts), people, today, sizes=sizes, fixed_down=down)
     await _remember_down(redis, monday, board, down)
     board["updatedAt"] = now_kst().isoformat(timespec="seconds")
+    board["computedAt"] = now_kst().isoformat()  # 새 활동이 있었는지 견줄 때 쓰는 정확한 계산 시각
     return board
 
 
@@ -770,15 +771,42 @@ async def _cached(redis, key: str, ttl: int, make: Callable[[], Awaitable]):
     return value
 
 
+async def _latest_today(db: AsyncSession, today: date) -> Optional[datetime]:
+    """오늘(KST) 끝난 활동 가운데 가장 늦은 시각 — 아케이드 판 · 대전 · 협동 · 도장. 없으면 None.
+
+    판을 끝내자마자 레이드를 열어도 내 피해가 바로 보이게, 담아 둔 판보다 늦은 활동이 있으면 다시 계산한다.
+    오늘 것만 보므로 가볍다(아케이드 판은 (game, played_on) 색인을 탄다).
+    """
+    start_at = datetime.combine(today, time(0), tzinfo=KST)
+    stamps = await db.execute(
+        select(
+            select(func.max(GamePlay.played_at)).where(GamePlay.game.in_(tuple(GAMES)), GamePlay.played_on == today).scalar_subquery(),
+            select(func.max(GameMatch.finished_at)).where(GameMatch.finished_at >= start_at).scalar_subquery(),
+            select(func.max(EscapeRoom.finished_at)).where(EscapeRoom.finished_at >= start_at).scalar_subquery(),
+            select(func.max(ArcadeStamp.created_at)).where(ArcadeStamp.created_at >= start_at).scalar_subquery(),
+        )
+    )
+    found = [t for t in stamps.one() if t is not None]
+    return max(found) if found else None
+
+
 async def raid_board(db: AsyncSession, redis, member: Member, now: Optional[datetime] = None) -> dict:
     """GET /api/play/raid — 이번 주 보스 · 부서 판 · 내 몫 · 우리 부서 순위 · 지난 4주."""
     now = to_kst(now) if now is not None else now_kst()
     today = now.date()
     monday = week_start(today)
-    board = await _cached(
-        redis, f"{CACHE_PREFIX}week:{monday.isoformat()}:{today.isoformat()}", CACHE_TTL,
-        lambda: compute_week(db, monday, today, redis),
-    )
+    week_key = f"{CACHE_PREFIX}week:{monday.isoformat()}:{today.isoformat()}"
+    board = await _cached(redis, week_key, CACHE_TTL, lambda: compute_week(db, monday, today, redis))
+    # 담아 둔 판보다 늦게 끝난 판이 있으면(방금 한 판을 끝냈으면) 60초를 기다리지 않고 다시 계산한다
+    try:
+        latest = await _latest_today(db, today)
+        made = datetime.fromisoformat(board.get("computedAt") or board["updatedAt"])
+        if latest is not None and latest > made:
+            board = await compute_week(db, monday, today, redis)
+            if redis is not None:
+                await redis.set(week_key, json.dumps(board, ensure_ascii=False, separators=(",", ":")), ex=CACHE_TTL)
+    except Exception:  # noqa: BLE001 — 새로 계산 못 해도 담아 둔 판은 보여 준다
+        logger.warning("raid: freshness check failed", exc_info=True)
     history = await _cached(
         redis, f"{CACHE_PREFIX}history:{monday.isoformat()}", HISTORY_TTL,
         lambda: compute_history(db, monday, redis=redis),
