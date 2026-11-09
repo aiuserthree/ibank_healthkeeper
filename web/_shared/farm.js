@@ -1358,11 +1358,9 @@ window.HKFarm = (function () {
       store.dirty();
       drawTabs(true); drawPanel();
       if (!b.closest("#fm-tabs") && b.classList.contains("fm-prop")) HKFx.bump(b);
-      if (matchMedia("(max-width: 959px)").matches && !b.closest("#fm-tabs")) {
-        root.querySelector("#fm-panel").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
-      } else if (matchMedia("(max-width: 959px)").matches) {
+      if (matchMedia("(max-width: 959px)").matches) { // 패널이 화면 아래에 있을 때만 내려서 보여 준다(위로는 올리지 않는다)
         const r = root.querySelector("#fm-panel").getBoundingClientRect();
-        if (r.top > innerHeight * 0.55 || r.top < 0) root.querySelector("#fm-panel").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
+        if (r.top > innerHeight * 0.55) root.querySelector("#fm-panel").scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "start" });
       }
     } else if (a === "seed") {
       S.seed = b.dataset.k; store.dirty(); drawStrip(); drawBar(true); drawField();

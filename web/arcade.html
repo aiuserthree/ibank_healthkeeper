@@ -594,6 +594,28 @@
       return `<div class="hk-aa-wrap" id="aa-together"><div class="hk-aa-trio">${togetherHtml()}${manageHtml()}${retroHtml()}</div></div>`;
     }
 
+    // 게임 · 모음 페이지에서 아케이드로 돌아오면 맨 위가 아니라 배너 영역(함께하기 · 매니지먼트 · 레트로 오락실)부터 보여 준다.
+    // 게임 찾기 분류(#aa-games?cat=…)가 주소에 있으면 그쪽이 먼저 — 그대로 둔다
+    function landOnBanner() {
+      if (location.hash) return;
+      let from = "";
+      try { const r = new URL(document.referrer); if (r.origin === location.origin) from = r.pathname; } catch (_) { return; }
+      if (!/^\/(games\/|retro|manage|together|series)/.test(from)) return;
+      const go = () => {
+        const to = document.getElementById("aa-together");
+        if (!to) return;
+        const head = document.querySelector("header");
+        const headH = head && getComputedStyle(head).position === "sticky" ? Math.max(0, head.getBoundingClientRect().bottom) : 0;
+        window.scrollTo({ top: Math.max(0, to.getBoundingClientRect().top + window.scrollY - headH - 16), behavior: "instant" });
+      };
+      requestAnimationFrame(() => requestAnimationFrame(go));
+      // 위쪽 그림이 늦게 그려져 자리가 밀려도 한 번 더 맞춘다(그사이 사람이 움직였으면 그대로)
+      let moved = false;
+      const stop = () => { moved = true; };
+      ["wheel", "touchstart", "keydown"].forEach((t) => addEventListener(t, stop, { once: true, passive: true }));
+      setTimeout(() => { if (!moved) go(); }, 450);
+    }
+
     // 맨 위로 — 한 화면쯤 내려가면 오른쪽 아래에 나타난다
     function bindTop() {
       if (document.getElementById("aa-top")) return;
@@ -827,6 +849,7 @@
         bindWish();
         bindTop();
         HKUI.refreshIcons();
+        landOnBanner();
       },
     });
   </script>

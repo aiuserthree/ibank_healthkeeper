@@ -1660,13 +1660,14 @@ window.HKCafe = (function () {
     function changed(big) { sig = ""; summary(S); if (big) store.saveNow(); else store.dirty(); renderAll(); scene && scene.redraw(); }
     function setTab(t, scroll) {
       tab = t; sig = ""; renderAll();
-      if (scroll !== false && innerWidth < 960) { const p = $("cf-panel"); const y = p.getBoundingClientRect().top; if (y > innerHeight * 0.62 || y < 0) scrollTo({ top: scrollY + y - 70, behavior: "smooth" }); }
+      if (scroll !== false && innerWidth < 960) { const p = $("cf-panel"); const y = p.getBoundingClientRect().top; if (y > innerHeight * 0.62) scrollTo({ top: scrollY + y - 70, behavior: "smooth" }); } // 아래로만 — 위로는 올리지 않는다
     }
     function goFac(id) {
       setTab("fac", false);
       const el = $("cf-fac-" + id);
       if (!el) return;
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const r = el.getBoundingClientRect(); // 아래에 가려 있을 때만 내려서 보여 준다(위로는 올리지 않는다)
+      if (r.bottom > innerHeight - 20) scrollTo({ top: scrollY + r.top - innerHeight / 2 + r.height / 2, behavior: "smooth" });
       el.classList.remove("is-flash"); void el.offsetWidth; el.classList.add("is-flash");
     }
     function payFx(btn, cost) { if (btn && cost) HKFx.float(btn, "-" + won(cost), { color: "#e5484d" }); HKFx.bump($("cf-p-cash")); }

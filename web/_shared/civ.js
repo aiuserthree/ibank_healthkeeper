@@ -1893,8 +1893,7 @@
   function act(a, d, el, at) {
     if (a === "tab") {
       if (tab === d.tab && innerWidth >= 960) return;
-      tab = d.tab; polSlot = -1; renderAll();
-      if (innerWidth < 960) window.scrollTo({ top: 0, behavior: reduce() ? "auto" : "smooth" });
+      tab = d.tab; polSlot = -1; renderAll(); // 화면은 그 자리 그대로(위로 올리지 않는다)
       return;
     }
     if (a === "goTile") { const i = +d.i; if (tab !== "map") { tab = "map"; sel = i; renderAll(); } else pickTile(i); focusTile(i); return; }

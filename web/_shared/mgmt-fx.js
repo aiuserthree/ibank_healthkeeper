@@ -105,3 +105,40 @@ window.HKFx = (function () {
 
   return { float, fly, bump, confetti, count };
 })();
+
+// 단추를 눌러도 보던 자리 그대로 — 매니지먼트 게임에서는 「맨 위로」 단추(data-scroll-top)만 화면을 위로 올린다.
+// 어떤 단추를 누른 뒤에든(레벨 올리기 · 고용 · 진열 · 도구 · 건설 · 탭 …) 화면이 위로 올라가면 바로 원래 자리로 되돌린다.
+//  · 탭을 바꿔 내용이 짧아지면 페이지가 짧아져 브라우저가 위로 당긴다 — 그만큼 페이지 끝에 빈 칸(spacer)을 덧대 그 자리에 머문다.
+//    빈 칸은 사람이 위로 스크롤하는 만큼 줄어들어 사라진다(되튀지 않게).
+//  · 아래로 내려 보여 주는 것은 그대로 두고, 사람이 직접 휠 · 터치 · 키로 움직이면 바로 놓아준다.
+(function keepScrollOnTap() {
+  let guard = null, spacer = null, pad = 0;
+  const natural = () => document.documentElement.scrollHeight - pad;
+  function setPad(px) {
+    px = Math.max(0, Math.round(px));
+    if (px === pad) return;
+    if (!spacer) { spacer = document.createElement("div"); spacer.setAttribute("aria-hidden", "true"); spacer.style.cssText = "width:1px;pointer-events:none"; }
+    if (px && !spacer.isConnected) document.body.appendChild(spacer);
+    spacer.style.height = px + "px";
+    pad = px;
+  }
+  const check = () => {
+    if (!guard) return;
+    if (performance.now() > guard.until) { guard = null; return; }
+    const need = guard.y + innerHeight - natural(); // 원래 자리를 지키려면 모자란 높이
+    if (need > pad) setPad(need);
+    if (scrollY < guard.y - 2) window.scrollTo({ top: guard.y, behavior: "instant" });
+    requestAnimationFrame(check);
+  };
+  document.addEventListener("click", (e) => {
+    const t = e.target;
+    if (!t || !t.closest || t.closest("[data-scroll-top]") || scrollY < 4) return;
+    if (!t.closest("button, a, [data-act], [role='tab'], [data-tab]")) return;
+    guard = { y: scrollY, until: performance.now() + 1500 };
+    setTimeout(check, 0);
+    requestAnimationFrame(check);
+  }, true);
+  ["wheel", "touchmove", "keydown"].forEach((ev) => addEventListener(ev, () => { guard = null; }, { passive: true, capture: true }));
+  // 덧댄 빈 칸 — 위로 스크롤하는 만큼 줄인다
+  addEventListener("scroll", () => { if (pad && !guard) setPad(Math.min(pad, scrollY + innerHeight - natural())); }, { passive: true });
+})();
