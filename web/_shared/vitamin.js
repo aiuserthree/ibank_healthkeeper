@@ -11,7 +11,9 @@
 (function () {
   "use strict";
   const W = 384, H = 216, DT = 1 / 120, BASE = 188;
-  const GRAV = 900, JUMP_V = -345, RUN = 82, CRAWL = 30;
+  const GRAV = 900, RUN = 82, CRAWL = 30;
+  // 주인공 점프 — 높이(약 69px)는 그대로, 더 빨리 튀어 오르고 빨리 내려온다(체공 약 0.77초 → 0.55초). 적 · 수류탄은 GRAV 그대로
+  const JUMP_V = -470, P_GRAV = 1600, P_FALL = 1.2, P_SHORT = -230;
   const TICK = 1.5; // 남은 시간 1 이 줄어드는 실제 초
   const LIMIT = { pb: 48, eb: 70, enemies: 18, fx: 360 };
   const PTS = { sol: 100, germ: 150, drone: 200, para: 250, shield: 300, mortar: 300, turret: 400, mini: 100 };
@@ -1434,8 +1436,9 @@
         p.vy = JUMP_V; p.ground = false; p.coyote = 0; p.jumpBuf = 0; p.crouch = false;
         sfx("jump", 0.1); dust(p.x, p.y, 3);
       }
-      if (!inp.jump && p.vy < -160) p.vy = -160; // 짧게 누르면 낮게
-      const landed = fall(p, 6, dt);
+      if (!inp.jump && p.vy < P_SHORT) p.vy = P_SHORT; // 짧게 누르면 낮게
+      const landed = fall(p, 6, dt, p.vy > 0 ? P_GRAV * P_FALL : P_GRAV); // 내려올 때 조금 더 빨리
+      if (p.vy > 600) p.vy = 600;
       if (landed) { sfx("land", 0.2); dust(p.x, p.y, 6); p.landT = 0.08; }
       if (p.landT > 0) p.landT -= dt;
       if (p.ground && mv) { p.anim += dt * 12; if (!p.crouch && Math.random() < dt * 3) dust(p.x - p.f * 4, p.y, 1); }
