@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>물병 색 맞추기 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-ws { --gm-a: #0e7490; --gm-b: #a855f7; --gm-ink: #083344; --gm-soft: #64748b; --gm-chip: #ecfeff;
+      --bw: 36px; --bh: 119px; --lh: 24px; --glass: rgba(71, 85, 105, .42);
+      position: relative; display: flex; flex-direction: column; gap: 8px; color: var(--gm-ink); outline: none;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    /* 1. 점수 줄 */
+    .gm-ws__bar { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+    .gm-ws__chip { display: inline-flex; align-items: center; gap: 5px; padding: 7px 11px; border-radius: 12px; background: var(--gm-chip); color: var(--gm-ink); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-ws__chip b { font-size: 16px; }
+    .gm-ws__gap { flex: 1; }
+    .gm-ws__chip--time b { font-size: 18px; min-width: 40px; text-align: right; }
+    .gm-ws__chip--time.is-low { background: #fee2e2; color: #b91c1c; }
+    .gm-ws__time { position: relative; height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+    .gm-ws__time i { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--gm-a), var(--gm-b)); transition: width .2s linear; }
+    .gm-ws__time.is-low i { background: linear-gradient(90deg, #dc2626, #fb923c); }
+    .gm-ws__meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--gm-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-ws__meta b { color: var(--gm-ink); }
+    /* 2. 병 선반 */
+    .gm-ws__board { position: relative; width: 100%; height: 360px; border-radius: 16px; background: linear-gradient(180deg, #f0fbff 0%, #f6f3ff 100%); border: 1px solid #dceef4; overflow: hidden; touch-action: none; }
+    .gm-ws__shelf { position: absolute; height: 6px; border-radius: 999px; background: linear-gradient(180deg, #dbe6ef, #c9d6e3); box-shadow: 0 2px 4px rgba(15, 23, 42, .06); pointer-events: none; }
+    .gm-ws__b { position: absolute; padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; z-index: 1; }
+    .gm-ws__b.is-pouring { z-index: 6; }
+    .gm-ws__b:focus { outline: none; }
+    .gm-ws__wob { position: absolute; left: 0; top: 0; width: var(--bw); height: var(--bh); }
+    .gm-ws__wob.is-shake { animation: ws-shake .28s; }
+    @keyframes ws-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px) rotate(-3deg); } 50% { transform: translateX(4px) rotate(2deg); } 80% { transform: translateX(-2px); } }
+    .gm-ws__glass { position: absolute; inset: 0; transform-origin: 50% 50%; transition: transform .13s ease-out; }
+    .gm-ws__b.is-sel .gm-ws__glass { transform: translateY(calc(var(--bh) * -.14)); }
+    .gm-ws__tube { position: absolute; inset: 0; box-sizing: border-box; border: 2.5px solid var(--glass); border-top: 0; border-radius: 3px 3px calc(var(--bw) / 2) calc(var(--bw) / 2);
+      background: linear-gradient(90deg, rgba(255, 255, 255, .82), rgba(236, 244, 250, .55) 60%, rgba(255, 255, 255, .7)); overflow: hidden;
+      box-shadow: inset 0 -3px 6px rgba(15, 23, 42, .05), 0 3px 8px rgba(15, 23, 42, .08); }
+    .gm-ws__b.is-sel .gm-ws__tube { border-color: var(--gm-a); box-shadow: 0 0 0 3px rgba(14, 116, 144, .22), 0 8px 14px rgba(15, 23, 42, .14); }
+    .gm-ws__rim { position: absolute; left: -3px; right: -3px; top: -3px; height: 6px; box-sizing: border-box; border: 2.5px solid var(--glass); border-radius: 5px; background: rgba(255, 255, 255, .9); }
+    .gm-ws__b.is-sel .gm-ws__rim { border-color: var(--gm-a); }
+    .gm-ws__shine { position: absolute; z-index: 2; left: 14%; top: 9%; width: 13%; height: 70%; border-radius: 999px; background: linear-gradient(180deg, rgba(255, 255, 255, .9), rgba(255, 255, 255, .12)); pointer-events: none; }
+    .gm-ws__l { position: absolute; left: 0; right: 0; height: calc(var(--lh) + .5px); bottom: calc(1px + var(--lh) * var(--k)); display: flex; align-items: center; justify-content: center; transform-origin: 50% 100%;
+      background: linear-gradient(90deg, rgba(255, 255, 255, .2), rgba(255, 255, 255, 0) 45%, rgba(0, 0, 0, .07)), var(--c); }
+    .gm-ws__l.is-top { box-shadow: inset 0 3px 0 rgba(255, 255, 255, .35); }
+    .gm-ws__l svg { width: 44%; height: 62%; fill: var(--s); pointer-events: none; }
+    .gm-ws__l.is-in { animation: ws-in 200ms ease-out both; }
+    .gm-ws__l.is-out { animation: ws-out 200ms ease-in both; }
+    @keyframes ws-in { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+    @keyframes ws-out { from { transform: scaleY(1); } to { transform: scaleY(0); } }
+    .gm-ws__cork { position: absolute; z-index: 3; left: 14%; right: 14%; top: calc(var(--bh) * -.1); height: calc(var(--bh) * .12); border-radius: 4px 4px 3px 3px; display: none;
+      background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0) 0 4px, rgba(0, 0, 0, .07) 4px 5px), linear-gradient(180deg, #d6a46c, #a8723f); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .15); }
+    .gm-ws__b.is-done .gm-ws__cork { display: block; }
+    .gm-ws__b.is-corked .gm-ws__cork { animation: ws-cork .32s cubic-bezier(.3, 1.6, .5, 1) both; }
+    @keyframes ws-cork { from { transform: translateY(calc(var(--bh) * -.22)); opacity: 0; } to { transform: none; opacity: 1; } }
+    .gm-ws__num { position: absolute; left: 0; right: 0; bottom: 0; display: none; text-align: center; font-size: 11px; font-weight: 700; color: #94a3b8; line-height: 14px; }
+    @media (hover: hover) and (pointer: fine) { .gm-ws.has-nums .gm-ws__num { display: block; } }
+    .gm-ws__stream { position: absolute; z-index: 5; border-radius: 3px; transform-origin: 50% 0; pointer-events: none; background: var(--c); animation: ws-stream 260ms linear both; }
+    @keyframes ws-stream { 0% { transform: scaleY(0); opacity: 1; } 30% { transform: scaleY(1); opacity: 1; } 80% { opacity: 1; } 100% { transform: scaleY(1) translateY(6px); opacity: 0; } }
+    .gm-ws__spark { position: absolute; z-index: 7; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; pointer-events: none; background: #fde047; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: ws-spark .6s ease-out forwards; }
+    @keyframes ws-spark { 0% { transform: translate(0, 0) scale(.4); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.3) rotate(90deg); opacity: 0; } }
+    .gm-ws__float { position: absolute; z-index: 8; left: 50%; pointer-events: none; transform: translate(-50%, -50%); padding: 6px 14px; border-radius: 999px; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); color: #fff; font-weight: 800; font-size: 15px; white-space: nowrap; box-shadow: 0 6px 14px rgba(14, 116, 144, .28); animation: ws-float 1.1s ease-out forwards; }
+    .gm-ws__float.is-plain { background: #334155; font-size: 13px; box-shadow: none; animation-duration: 1.8s; }
+    @keyframes ws-float { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 15% { opacity: 1; transform: translate(-50%, -55%) scale(1.05); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -120%) scale(1); } }
+    /* 3. 아래 단추 */
+    .gm-ws__tools { display: flex; gap: 8px; }
+    .gm-ws__tool { flex: 1; height: 44px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--gm-chip); color: var(--gm-a); font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+    .gm-ws__tool small { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--gm-a); color: #fff; font-size: 12px; font-weight: 800; }
+    @media (hover: hover) { .gm-ws__tool:hover:not(:disabled) { background: #cffafe; } }
+    .gm-ws__tool:active:not(:disabled) { transform: scale(.97); }
+    .gm-ws__tool:disabled { opacity: .45; cursor: default; }
+    .gm-ws__tool.is-nudge { animation: ws-nudge .9s ease-in-out 2; }
+    @keyframes ws-nudge { 0%, 100% { box-shadow: 0 0 0 0 rgba(14, 116, 144, 0); } 50% { box-shadow: 0 0 0 4px rgba(14, 116, 144, .35); } }
+    .gm-ws__help { margin: 0; font-size: 12.5px; color: var(--gm-soft); text-align: center; }
+    @media (pointer: coarse), (max-width: 640px) { .gm-ws__help { display: none; } }
+    /* 덮개 — 시작 · 일시정지 · 끝 */
+    .gm-ws__cover { position: absolute; inset: 0; z-index: 20; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; box-sizing: border-box; text-align: center; color: #fff; overflow-y: auto;
+      background: linear-gradient(140deg, #0e7490 0%, #4f63c9 60%, #8b5cf6 100%); }
+    .gm-ws__cover[hidden] { display: none; }
+    .gm-ws__cover h2 { margin: 0; color: #fff; font-size: 24px; line-height: 1.3; word-break: keep-all; }
+    .gm-ws__cover p { margin: 0; font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .92); word-break: keep-all; }
+    .gm-ws__cover .gm-ws__keys { font-size: 12.5px; color: rgba(255, 255, 255, .78); }
+    .gm-ws__cover .gm-ws__big { font-size: 34px; font-weight: 800; line-height: 1.2; }
+    .gm-ws__how { width: 100%; max-width: 340px; box-sizing: border-box; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .14); text-align: left; }
+    .gm-ws__how b { display: block; margin-bottom: 4px; font-size: 13px; color: #fff; }
+    .gm-ws__how ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, .92); word-break: keep-all; }
+    .gm-ws__go { border: 0; padding: 12px 34px; border-radius: 14px; background: #fff; color: var(--gm-a); font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; }
+    @media (hover: hover) { .gm-ws__go:hover { background: #ecfeff; } }
+    /* 시작 화면 병 그림 — 판의 병과 같은 부품을 작게 */
+    .gm-ws__demo { --bw: 26px; --bh: 86px; --lh: 17.1px; --glass: rgba(255, 255, 255, .7); position: relative; width: 150px; height: 104px; flex-shrink: 0; }
+    .gm-ws__demo .gm-ws__b { cursor: default; pointer-events: none; }
+    .gm-ws__demo .gm-ws__tube { background: linear-gradient(90deg, rgba(255, 255, 255, .5), rgba(255, 255, 255, .2) 60%, rgba(255, 255, 255, .4)); }
+    .gm-ws__demo .gm-ws__rim { background: rgba(255, 255, 255, .55); }
+    .gm-ws__demo .gm-ws__stream { animation: none; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "watersort",
+      setup(stage, ctx) {
+        // ── 퍼즐 엔진 (화면과 무관 — node 검사용으로 이 구간만 떼어 쓴다) ── WS-CORE-START
+        const CAP = 4;            // 병 하나에 4칸
+        const MAX_COLORS = 12;
+        const SPARE = 2;          // 빈 병은 늘 2개
+        const SEARCH_LIMIT = 6000; // 한 번 섞을 때 해법 탐색 상한(상태 수) — 넘으면 다시 섞는다
+        const GEN_TRIES = 60;
+        // 1·2단계 3색, 3·4단계 4색, 5·6단계 5색 … 19단계부터 12색
+        const colorsFor = (lv) => Math.min(MAX_COLORS, 3 + Math.floor((lv - 1) / 2));
+        const LET = "abcdefghijklmnop";
+
+        function topRun(b) {
+          const n = b.length;
+          if (!n) return 0;
+          const c = b[n - 1];
+          let k = 1;
+          while (k < n && b[n - 1 - k] === c) k++;
+          return k;
+        }
+        const isDone = (b) => b.length === CAP && topRun(b) === CAP;
+        const isSolved = (bs) => bs.every((b) => b.length === 0 || isDone(b));
+        // 받는 병이 비었거나, 맨 위 색이 같고 빈 칸이 있을 때만
+        function canPour(bs, i, j) {
+          if (i === j) return false;
+          const s = bs[i], d = bs[j];
+          if (!s.length || d.length >= CAP) return false;
+          return !d.length || d[d.length - 1] === s[s.length - 1];
+        }
+        // 맨 위 같은 색을 들어갈 수 있는 만큼 한꺼번에 — 새 판(두 병만 복사)과 옮긴 칸 수
+        function applyPour(bs, i, j) {
+          const n = Math.min(topRun(bs[i]), CAP - bs[j].length);
+          const out = bs.slice();
+          const s = bs[i].slice(), d = bs[j].slice();
+          for (let k = 0; k < n; k++) d.push(s.pop());
+          out[i] = s;
+          out[j] = d;
+          return { state: out, n };
+        }
+        const bottleKey = (b) => { let s = ""; for (const c of b) s += LET[c]; return s; };
+        // 병 순서를 무시한 상태 열쇠
+        const canonKey = (bs) => bs.map(bottleKey).sort().join("|");
+        const exactKey = (bs) => bs.map(bottleKey).join("|");
+        // 남은 수의 하한 — 한 번 부을 때 덩어리 수는 많아야 1개 준다
+        function chunks(bs) {
+          let n = 0;
+          for (const b of bs) for (let k = 0; k < b.length; k++) if (k === 0 || b[k] !== b[k - 1]) n++;
+          return n;
+        }
+
+        // 해 볼 만한 수 — 좋은 수부터 (병 하나를 채우는 수 > 같은 색 위로 통째 > 일부만 > 빈 병)
+        function listMoves(bs) {
+          const out = [];
+          for (let i = 0; i < bs.length; i++) {
+            const s = bs[i];
+            if (!s.length) continue;
+            const run = topRun(s);
+            if (run === CAP) continue;              // 이미 다 찬 병
+            const c = s[s.length - 1];
+            const whole = run === s.length;         // 한 색만 든 병
+            let emptyTried = false;
+            for (let j = 0; j < bs.length; j++) {
+              if (j === i) continue;
+              const d = bs[j];
+              if (d.length >= CAP) continue;
+              let p;
+              if (!d.length) {
+                if (whole || emptyTried) continue;  // 한 색 병을 빈 병으로 옮기는 건 제자리, 빈 병은 하나만 보면 된다
+                emptyTried = true;
+                p = 6;
+              } else {
+                if (d[d.length - 1] !== c) continue;
+                const dWhole = topRun(d) === d.length;
+                if (whole && dWhole && (s.length > d.length || (s.length === d.length && i < j))) continue; // 한 색 병 둘은 적은 쪽 → 많은 쪽 하나만
+                const room = CAP - d.length;
+                if (room >= run) p = dWhole ? (d.length + run === CAP ? 0 : 1) : (whole ? 2 : 3);
+                else p = dWhole ? 4 : 5;
+              }
+              out.push([p, i, j]);
+            }
+          }
+          out.sort((a, b) => a[0] - b[0]);
+          return out;
+        }
+
+        // 해법 탐색 — 깊이 우선 + 본 상태 기억(병 순서 무시). 상한을 넘으면 null(모름)
+        function solve(start, limit = SEARCH_LIMIT) {
+          const seen = new Set();
+          const path = [];
+          let nodes = 0, aborted = false;
+          function dfs(bs) {
+            if (isSolved(bs)) return true;
+            const key = canonKey(bs);
+            if (seen.has(key)) return false;
+            if (++nodes > limit) { aborted = true; return false; }
+            seen.add(key);
+            for (const [, i, j] of listMoves(bs)) {
+              path.push([i, j]);
+              if (dfs(applyPour(bs, i, j).state)) return true;
+              path.pop();
+              if (aborted) return false;
+            }
+            return false;
+          }
+          const ok = dfs(start);
+          return { moves: ok ? shorten(start, path) : null, nodes, aborted };
+        }
+        // 찾은 해의 돌아가는 길 줄이기 — 한 수로 더 뒤 상태에 갈 수 있으면 건너뛴다
+        function shorten(start, moves) {
+          const states = [start];
+          for (const [i, j] of moves) states.push(applyPour(states[states.length - 1], i, j).state);
+          const at = new Map();
+          states.forEach((s, k) => at.set(exactKey(s), k)); // 같은 상태가 또 나오면 뒤쪽 번호
+          const out = [];
+          let k = 0;
+          while (k < states.length - 1) {
+            let best = k + 1, bestMove = moves[k];
+            const far = at.get(exactKey(states[k]));
+            if (far > k) { k = far; continue; }    // 같은 상태로 돌아온 고리
+            const s = states[k];
+            for (let i = 0; i < s.length; i++) for (let j = 0; j < s.length; j++) {
+              if (!canPour(s, i, j)) continue;
+              const t = at.get(exactKey(applyPour(s, i, j).state));
+              if (t !== undefined && t > best) { best = t; bestMove = [i, j]; }
+            }
+            out.push(bestMove);
+            k = best;
+          }
+          return out;
+        }
+
+        // 새 단계 만들기 — 섞고, 풀리는지 확인하고, 처음부터 다 찬 병이 있으면 다시
+        function makePuzzle(level, rnd = Math.random) {
+          const n = colorsFor(level);
+          let tries = 0;
+          for (;;) {
+            tries++;
+            const pool = [];
+            for (let c = 0; c < n; c++) for (let k = 0; k < CAP; k++) pool.push(c);
+            for (let a = pool.length - 1; a > 0; a--) {
+              const b = Math.floor(rnd() * (a + 1));
+              [pool[a], pool[b]] = [pool[b], pool[a]];
+            }
+            const bottles = [];
+            for (let c = 0; c < n; c++) bottles.push(pool.slice(c * CAP, c * CAP + CAP));
+            for (let e = 0; e < SPARE; e++) bottles.push([]);
+            if (bottles.some(isDone)) continue;
+            const res = solve(bottles);
+            if (res.moves) {
+              const par = Math.max(res.moves.length, chunks(bottles) - n);
+              return { bottles, colors: n, par, solution: res.moves, tries };
+            }
+            if (tries >= GEN_TRIES) {
+              // 거의 없는 일 — 상한을 크게 늘려 끝까지 찾는다
+              const deep = solve(bottles, 200000);
+              if (deep.moves) return { bottles, colors: n, par: deep.moves.length, solution: deep.moves, tries };
+            }
+          }
+        }
+        // ── 퍼즐 엔진 끝 ── WS-CORE-END
+
+        // ── 상수 ───────────────────────────────────────────────
+        const TIME_LIMIT = 180;          // 3분
+        const UNDO_PER_STAGE = 3;
+        const MAX_SCORE = 1_000_000;
+        const T_TILT = 170, T_FLOW = 260, T_BACK = 160; // 붓기 애니메이션 — 기울이기 · 흐르기 · 돌아오기
+        const CLEAR_MS = 950;            // 단계를 푼 뒤 다음 단계까지
+        // 12색 — 색만으로 가리지 않게 무늬를 하나씩. [이름, 색, 무늬 색]
+        const COLORS = [
+          ["빨강", "#e5484d", "rgba(255,255,255,.62)"],
+          ["파랑", "#2f6bff", "rgba(255,255,255,.62)"],
+          ["노랑", "#f5c518", "rgba(90,60,0,.36)"],
+          ["초록", "#1f9d55", "rgba(255,255,255,.6)"],
+          ["보라", "#8b5cf6", "rgba(255,255,255,.62)"],
+          ["주황", "#f97316", "rgba(255,255,255,.62)"],
+          ["하늘", "#38bdf8", "rgba(8,51,68,.36)"],
+          ["분홍", "#f472b6", "rgba(255,255,255,.66)"],
+          ["갈색", "#8b5a35", "rgba(255,255,255,.55)"],
+          ["회색", "#94a3b8", "rgba(15,23,42,.34)"],
+          ["연두", "#a3e635", "rgba(40,70,0,.38)"],
+          ["남색", "#1e3a8a", "rgba(255,255,255,.55)"],
+        ];
+        // 무늬 (24×24) — 하트 · 동그라미 · 별 · 세모 · 마름모 · 네모 · 물방울 · 고리 · 줄 · 엑스 · 달 · 더하기
+        const SHAPES = [
+          `<path d="M12 20s-7.5-4.6-7.5-10A4.2 4.2 0 0 1 12 7.6 4.2 4.2 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>`,
+          `<circle cx="12" cy="12" r="7"/>`,
+          `<path d="M12 3.5l2.6 5.6 6.1.6-4.6 4.1 1.3 6-5.4-3.1-5.4 3.1 1.3-6L3.3 9.7l6.1-.6z"/>`,
+          `<path d="M12 4.5 20.5 19h-17z"/>`,
+          `<path d="M12 3.5 20 12l-8 8.5L4 12z"/>`,
+          `<rect x="5.5" y="5.5" width="13" height="13" rx="1.5"/>`,
+          `<path d="M12 3s6.5 7.2 6.5 11.3a6.5 6.5 0 0 1-13 0C5.5 10.2 12 3 12 3z"/>`,
+          `<path fill-rule="evenodd" d="M12 4a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm0 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/>`,
+          `<path d="M4 5h16v3.4H4zm0 5.3h16v3.4H4zm0 5.3h16V19H4z"/>`,
+          `<path d="M12 8.6 16.6 4 20 7.4 15.4 12l4.6 4.6-3.4 3.4-4.6-4.6L7.4 20 4 16.6 8.6 12 4 7.4 7.4 4z"/>`,
+          `<path d="M15 3.5a8.5 8.5 0 1 0 5.5 14A7 7 0 0 1 15 3.5z"/>`,
+          `<path d="M9.5 4h5v5.5H20v5h-5.5V20h-5v-5.5H4v-5h5.5z"/>`,
+        ].map((p) => `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`);
+        const fmt = (n) => n.toLocaleString("ko-KR");
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+        // ── 화면 ───────────────────────────────────────────────
+        stage.innerHTML = `<div class="gm-ws" tabindex="0">
+          <div class="gm-ws__bar">
+            <span class="gm-ws__chip">${HKUI.icon("star", 15, "currentColor")}<b data-score>0</b></span>
+            <span class="gm-ws__chip">${HKUI.icon("flask-conical", 15, "currentColor")}<span data-level>1단계</span></span>
+            <span class="gm-ws__gap"></span>
+            <span class="gm-ws__chip gm-ws__chip--time" data-timechip>${HKUI.icon("timer", 15, "currentColor")}<b data-time>3:00</b></span>
+          </div>
+          <div class="gm-ws__time" data-timebar><i></i></div>
+          <div class="gm-ws__meta"><span>이번 단계 <b data-moves>0</b>수 · 목표 <b data-par>0</b>수</span><span><b data-colors>3</b>가지 색</span></div>
+          <div class="gm-ws__board" data-board></div>
+          <div class="gm-ws__tools">
+            <button type="button" class="gm-ws__tool" data-undo>${HKUI.icon("undo-2", 16, "currentColor")} 되돌리기 <small data-undos>3</small></button>
+            <button type="button" class="gm-ws__tool" data-reset>${HKUI.icon("rotate-ccw", 16, "currentColor")} 이 단계 처음부터</button>
+          </div>
+          <p class="gm-ws__help">병을 눌러 들고, 부을 병을 눌러요 · 숫자키 1~0 병 고르기 · Z 되돌리기 · Esc 쉬기</p>
+          <div class="gm-ws__cover" data-cover></div>
+        </div>`;
+        const root = stage.querySelector(".gm-ws");
+        const boardEl = root.querySelector("[data-board]");
+        const cover = root.querySelector("[data-cover]");
+        const scoreEl = root.querySelector("[data-score]");
+        const levelEl = root.querySelector("[data-level]");
+        const timeEl = root.querySelector("[data-time]");
+        const timeChip = root.querySelector("[data-timechip]");
+        const timeBar = root.querySelector("[data-timebar]");
+        const movesEl = root.querySelector("[data-moves]");
+        const parEl = root.querySelector("[data-par]");
+        const colorsEl = root.querySelector("[data-colors]");
+        const undoBtn = root.querySelector("[data-undo]");
+        const undosEl = root.querySelector("[data-undos]");
+        const resetBtn = root.querySelector("[data-reset]");
+        HKUI.refreshIcons(root);
+
+        // ── 상태 ───────────────────────────────────────────────
+        let state = "ready";   // ready · play · pause · over
+        let level = 1, score = 0, solvedCount = 0;
+        let puzzle = null;     // { bottles, colors, par }
+        let bottles = [];      // 지금 병들 — 병 = 색 번호 배열(아래 → 위)
+        let history = [];      // 되돌리기용 이전 상태들
+        let undoLeft = UNDO_PER_STAGE;
+        let sel = -1;
+        let clearing = false;  // 단계를 풀고 다음 단계로 넘어가는 중
+        let nextPuzzle = null, nextTimer = 0, clearTimer = 0;
+        let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, rafId = 0, lastSec = 0;
+        let els = [];          // 병 단추
+        let geo = [];          // 병 자리 { x, y(유리 위 끝), w, h } — 판 기준 px
+        const anims = new Map(); // 병 번호 → 붓는 중인 애니메이션
+        // 효과음은 판을 하는 동안만
+        const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
+
+        // ── 병 그리기 ─────────────────────────────────────────
+        // opt.out / opt.inn: 맨 위 몇 칸이 빠져나가는 중 / 들어오는 중
+        function bottleInner(b, opt = {}) {
+          const n = b.length;
+          const per = opt.per || 0;
+          let h = "";
+          b.forEach((c, k) => {
+            let cls = "gm-ws__l";
+            let st = `--k:${k};--c:${COLORS[c][1]};--s:${COLORS[c][2]}`;
+            if (k === n - 1) cls += " is-top";
+            if (opt.inn && k >= n - opt.inn) {
+              cls += " is-in";
+              st += `;animation-delay:${T_TILT + (k - (n - opt.inn)) * per}ms;animation-duration:${per}ms`;
+            } else if (opt.out && k >= n - opt.out) {
+              cls += " is-out";
+              st += `;animation-delay:${T_TILT + (n - 1 - k) * per}ms;animation-duration:${per}ms`;
+            }
+            h += `<i class="${cls}" style="${st}">${SHAPES[c]}</i>`;
+          });
+          return `<span class="gm-ws__tube">${h}<span class="gm-ws__shine"></span></span><span class="gm-ws__rim"></span><span class="gm-ws__cork"></span>`;
+        }
+        function bottleLabel(i, b) {
+          if (!b.length) return `${i + 1}번 병 · 비어 있음`;
+          return `${i + 1}번 병 · 아래부터 ${b.map((c) => COLORS[c][0]).join(", ")}${isDone(b) ? " · 다 찼어요" : ""}`;
+        }
+        function renderBottle(i, b = bottles[i], opt) {
+          const el = els[i];
+          if (!el) return;
+          el.querySelector(".gm-ws__glass").innerHTML = bottleInner(b, opt);
+          el.classList.toggle("is-done", isDone(b));
+          el.classList.toggle("is-sel", i === sel);
+          el.setAttribute("aria-label", bottleLabel(i, b));
+        }
+        function drawSel() {
+          els.forEach((el, i) => el.classList.toggle("is-sel", i === sel));
+        }
+
+        // ── 병 놓기 — 판 크기에 맞춰 줄 수를 고른다(병이 가장 커지게) ──
+        function fit() {
+          finishAll();
+          const n = bottles.length || 5;
+          const room = HKPlay.roomFor(stage, boardEl);
+          const H = clamp(room, 220, 620);
+          boardEl.style.height = `${H}px`;
+          const W = boardEl.clientWidth || 320;
+          const hasNums = n <= 10;
+          root.classList.toggle("has-nums", hasNums);
+          const numH = hasNums && matchMedia("(hover: hover) and (pointer: fine)").matches ? 14 : 0;
+          const padX = 6, padY = 6;
+          let best = null;
+          for (let rows = 1; rows <= 3; rows++) {
+            const cols = Math.ceil(n / rows);
+            const slotW = (W - padX * 2) / cols;
+            const slotH = (H - padY * 2) / rows;
+            // 유리 높이 = 폭 × 3.3, 위로 들림 + 코르크 자리 + 선반 + 번호
+            const w = Math.min(slotW * 0.68, (slotH - numH - 10) / (3.3 * 1.3), 60);
+            const score = rows === 3 ? w * 0.88 : w; // 세 줄은 정말 좁을 때만
+            if (!best || score > best.score + 0.01) best = { rows, cols, slotW, slotH, w, score };
+          }
+          const { rows, cols, slotW } = best;
+          let { slotH } = best;
+          const bw = Math.max(18, Math.floor(best.w));
+          const bh = Math.round(bw * 3.3);
+          // 병이 판보다 한참 작으면(병이 적은 앞 단계 · 넓은 화면) 줄 높이를 병에 맞춰 줄이고 판 가운데에 모은다 — 병 위로 큰 빈 칸이 생기지 않게.
+          // 한 줄 높이 = 병 + 들림 · 기운 병이 들어갈 머리 공간 + 선반 · 번호
+          slotH = Math.min(slotH, bh * 1.55 + numH + 18);
+          const lh = (bh - 2.5) * 0.205;
+          root.style.setProperty("--bw", `${bw}px`);
+          root.style.setProperty("--bh", `${bh}px`);
+          root.style.setProperty("--lh", `${lh.toFixed(2)}px`);
+          // 위 줄에 더 많이 (7병 → 4 + 3)
+          const perRow = [];
+          let left = n;
+          for (let r = 0; r < rows; r++) { const c = Math.ceil(left / (rows - r)); perRow.push(c); left -= c; }
+          geo = [];
+          boardEl.innerHTML = "";
+          const blockH = slotH * rows;
+          const y0 = (H - blockH) / 2;
+          let idx = 0;
+          perRow.forEach((cnt, r) => {
+            const rowW = cnt * slotW;
+            const x0 = (W - rowW) / 2;
+            const sy = y0 + r * slotH;
+            const glassTop = sy + slotH - numH - 8 - bh;
+            const shelf = document.createElement("div");
+            shelf.className = "gm-ws__shelf";
+            shelf.style.cssText = `left:${x0 + slotW * 0.12}px;width:${rowW - slotW * 0.24}px;top:${glassTop + bh + 1}px`;
+            boardEl.appendChild(shelf);
+            for (let c = 0; c < cnt; c++, idx++) {
+              const sx = x0 + c * slotW;
+              geo[idx] = { x: sx + slotW / 2, y: glassTop, w: bw, h: bh };
+              const el = els[idx] || document.createElement("button");
+              el.type = "button";
+              el.className = "gm-ws__b";
+              el.tabIndex = -1;
+              el.dataset.i = idx;
+              el.style.cssText = `left:${sx}px;top:${sy}px;width:${slotW}px;height:${slotH}px`;
+              el.innerHTML = `<span class="gm-ws__wob" style="left:${(slotW - bw) / 2}px;top:${glassTop - sy}px"><span class="gm-ws__glass"></span></span><small class="gm-ws__num">${(idx + 1) % 10}</small>`;
+              els[idx] = el;
+              boardEl.appendChild(el);
+            }
+          });
+          els.length = n;
+          bottles.forEach((b, i) => renderBottle(i, b));
+        }
+
+        // ── 붓기 애니메이션 — 병이 받는 병 위로 기울고 물줄기가 흐른다 ──
+        function animatePour(i, j, before, n) {
+          const a = geo[i], t = geo[j];
+          if (!a || !t) return;
+          const per = Math.round(T_FLOW / n);
+          const anim = { i, j, timers: [], stream: null };
+          const ang = 68 * Math.PI / 180;
+          // 기우는 쪽 — 받는 병 쪽으로 기울되, 기운 병이 판 밖으로 나가면 반대쪽에서 붓는다(휴대폰 가장자리 병)
+          const W = boardEl.clientWidth || 320;
+          const reach = Math.sin(ang) * a.h + a.w / 2; // 받는 병 입구에서 기운 병 바닥 끝까지의 가로 길이
+          const roomL = t.x - reach, roomR = W - (t.x + reach); // side 1 이면 왼쪽에, -1 이면 오른쪽에 놓인다
+          let side = t.x >= a.x ? 1 : -1;
+          if ((side === 1 ? roomL : roomR) < 0) side = (side === 1 ? roomR : roomL) >= 0 || (side === 1 ? roomR > roomL : roomL > roomR) ? -side : side;
+          // 기운 병의 입구(위 가운데)가 받는 병 입구 바로 위에 오게
+          const tx = t.x - a.x - side * Math.sin(ang) * a.h / 2;
+          const ty = (t.y - a.h * 0.06) - (a.y + a.h / 2) + Math.cos(ang) * a.h / 2;
+          const src = els[i], dst = els[j];
+          src.classList.add("is-pouring");
+          renderBottle(i, before, { out: n, per });
+          renderBottle(j, bottles[j], { inn: n, per });
+          const g = src.querySelector(".gm-ws__glass");
+          g.style.transition = `transform ${T_TILT}ms ease-in-out`;
+          void g.offsetWidth;
+          g.style.transform = `translate(${tx.toFixed(1)}px, ${ty.toFixed(1)}px) rotate(${side * 68}deg)`;
+          anim.timers.push(setTimeout(() => {
+            const c = bottles[j][bottles[j].length - 1];
+            const s = document.createElement("i");
+            s.className = "gm-ws__stream";
+            const sw = Math.max(3, Math.round(t.w * 0.14));
+            const top = t.y - t.h * 0.06;
+            const surface = t.y + t.h - 3 - bottles[j].length * (t.h - 2.5) * 0.205;
+            s.style.cssText = `--c:${COLORS[c][1]};left:${t.x - sw / 2}px;top:${top}px;width:${sw}px;height:${Math.max(4, surface - top + 4)}px;animation-duration:${T_FLOW}ms`;
+            boardEl.appendChild(s);
+            anim.stream = s;
+          }, T_TILT));
+          anim.timers.push(setTimeout(() => {
+            g.style.transition = `transform ${T_BACK}ms ease-in-out`;
+            g.style.transform = "";
+          }, T_TILT + T_FLOW));
+          anim.timers.push(setTimeout(() => endAnim(anim, true), T_TILT + T_FLOW + T_BACK));
+          anims.set(i, anim);
+          anims.set(j, anim);
+          // 받는 병이 한 색으로 꽉 차면 — 반짝 + 코르크
+          if (isDone(bottles[j])) anim.timers.push(setTimeout(() => { anim.corked = true; corked(j); }, T_TILT + T_FLOW - 20));
+        }
+        // 애니메이션 끝 — 다 돌았으면 받는 병은 이미 맞게 그려져 있다. 중간에 끊으면(빠른 다음 조작) 바로 끝 모습으로
+        function endAnim(anim, natural) {
+          if (anims.get(anim.i) !== anim) return;
+          anim.timers.forEach(clearTimeout);
+          if (anim.stream) anim.stream.remove();
+          anims.delete(anim.i);
+          anims.delete(anim.j);
+          const src = els[anim.i], dst = els[anim.j];
+          if (src) {
+            src.classList.remove("is-pouring");
+            const g = src.querySelector(".gm-ws__glass");
+            g.style.transition = "none";
+            g.style.transform = "";
+            void g.offsetWidth;
+            g.style.transition = "";
+            renderBottle(anim.i);
+          }
+          if (dst) {
+            if (natural) {
+              dst.classList.toggle("is-done", isDone(bottles[anim.j]));
+              dst.setAttribute("aria-label", bottleLabel(anim.j, bottles[anim.j]));
+            } else {
+              renderBottle(anim.j);
+              if (isDone(bottles[anim.j]) && !anim.corked) corked(anim.j);
+            }
+          }
+        }
+        function finishAll() {
+          [...new Set(anims.values())].forEach((a) => endAnim(a));
+        }
+        function corked(j) {
+          const el = els[j];
+          if (!el || !isDone(bottles[j])) return;
+          el.classList.add("is-done");
+          el.classList.remove("is-corked");
+          void el.offsetWidth;
+          el.classList.add("is-corked");
+          setTimeout(() => el.classList.remove("is-corked"), 420);
+          const t = geo[j];
+          for (let k = 0; k < 7; k++) {
+            const sp = document.createElement("i");
+            sp.className = "gm-ws__spark";
+            const ang = (k / 7) * Math.PI * 2 - Math.PI / 2;
+            const r = t.w * (0.8 + Math.random() * 0.5);
+            sp.style.cssText = `left:${t.x}px;top:${t.y + t.h * 0.15}px;--dx:${(Math.cos(ang) * r).toFixed(1)}px;--dy:${(Math.sin(ang) * r).toFixed(1)}px;animation-delay:${k * 20}ms`;
+            boardEl.appendChild(sp);
+            setTimeout(() => sp.remove(), 800);
+          }
+          if (!isSolved(bottles)) sfx("coin");
+        }
+        function shake(i) {
+          const w = els[i] && els[i].querySelector(".gm-ws__wob");
+          if (!w) return;
+          w.classList.remove("is-shake");
+          void w.offsetWidth;
+          w.classList.add("is-shake");
+        }
+        function floatText(text, plain, yFrac = 0.42) {
+          const f = document.createElement("div");
+          f.className = `gm-ws__float${plain ? " is-plain" : ""}`;
+          f.textContent = text;
+          f.style.top = `${boardEl.clientHeight * yFrac}px`;
+          boardEl.appendChild(f);
+          setTimeout(() => f.remove(), plain ? 1900 : 1200);
+        }
+
+        // ── 점수 줄 ─────────────────────────────────────────────
+        function drawHud() {
+          scoreEl.textContent = fmt(score);
+          levelEl.textContent = `${level}단계`;
+          movesEl.textContent = history.length;
+          parEl.textContent = puzzle ? puzzle.par : 0;
+          colorsEl.textContent = puzzle ? puzzle.colors : colorsFor(level);
+          undosEl.textContent = undoLeft;
+          undoBtn.disabled = state !== "play" || clearing || !undoLeft || !history.length;
+          resetBtn.disabled = state !== "play" || clearing || !history.length;
+          drawTime();
+        }
+        function drawTime() {
+          const sec = Math.ceil(timeLeftMs / 1000);
+          timeEl.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+          timeBar.firstElementChild.style.width = `${clamp((timeLeftMs / (TIME_LIMIT * 1000)) * 100, 0, 100)}%`;
+          timeBar.classList.toggle("is-low", sec <= 20);
+          timeChip.classList.toggle("is-low", sec <= 20);
+        }
+
+        // ── 단계 ───────────────────────────────────────────────
+        // 다음 단계는 미리 만들어 둔다 (12색도 금방이지만 넘어갈 때 멈칫하지 않게)
+        function prepareNext() {
+          clearTimeout(nextTimer);
+          const want = level + 1;
+          nextPuzzle = null;
+          nextTimer = setTimeout(() => { nextPuzzle = { level: want, p: makePuzzle(want) }; }, 120);
+        }
+        function loadLevel() {
+          finishAll();
+          const p = nextPuzzle && nextPuzzle.level === level ? nextPuzzle.p : makePuzzle(level);
+          puzzle = { bottles: p.bottles.map((b) => b.slice()), colors: p.colors, par: p.par };
+          bottles = puzzle.bottles.map((b) => b.slice());
+          history = [];
+          undoLeft = UNDO_PER_STAGE;
+          sel = -1;
+          els = [];
+          fit();
+          drawHud();
+          prepareNext();
+        }
+        // 단계 점수 — 단계 × 100 + 수 절약 보너스(목표 수에 가까울수록, 목표의 두 배를 넘으면 0)
+        function stagePoints(lv, moves, par) {
+          const base = lv * 100;
+          const bonus = Math.round(base * clamp((2 * par - moves) / par, 0, 1));
+          return { base, bonus };
+        }
+        function stageClear() {
+          clearing = true;
+          sel = -1;
+          drawSel();
+          const { base, bonus } = stagePoints(level, history.length, puzzle.par);
+          score = Math.min(MAX_SCORE, score + base + bonus);
+          solvedCount++;
+          drawHud();
+          sfx("powerup");
+          setTimeout(() => floatText(`${level}단계 완료! +${fmt(base + bonus)}`), T_TILT + T_FLOW);
+          if (bonus) setTimeout(() => floatText(`${history.length}수 · 절약 보너스 +${fmt(bonus)}`, true, 0.58), T_TILT + T_FLOW + 200);
+          clearTimeout(clearTimer);
+          clearTimer = setTimeout(() => {
+            if (state !== "play" && state !== "pause") return;
+            level++;
+            clearing = false;
+            loadLevel();
+            sfx("whoosh");
+          }, CLEAR_MS + T_TILT + T_FLOW);
+        }
+
+        // ── 조작 ───────────────────────────────────────────────
+        function tap(i) {
+          if (state !== "play" || clearing || i < 0 || i >= bottles.length) return;
+          if (anims.has(i)) endAnim(anims.get(i));
+          if (sel < 0) {
+            const b = bottles[i];
+            if (!b.length || isDone(b)) { shake(i); sfx("invalid"); return; }
+            sel = i;
+            sfx("select");
+            drawSel();
+            return;
+          }
+          if (sel === i) {
+            sel = -1;
+            sfx("tap");
+            drawSel();
+            return;
+          }
+          if (anims.has(sel)) endAnim(anims.get(sel));
+          if (!canPour(bottles, sel, i)) {
+            shake(i);
+            sfx("invalid");
+            return;
+          }
+          pour(sel, i);
+        }
+        function pour(i, j) {
+          const before = bottles[i];
+          history.push(bottles);
+          const { state: next, n } = applyPour(bottles, i, j);
+          bottles = next;
+          sel = -1;
+          drawSel();
+          animatePour(i, j, before, n);
+          sfx("drop");
+          drawHud();
+          if (isSolved(bottles)) { stageClear(); return; }
+          // 더 부을 곳이 아예 없으면 알려 준다
+          let any = false;
+          for (let a = 0; a < bottles.length && !any; a++) for (let b = 0; b < bottles.length; b++) if (canPour(bottles, a, b)) { any = true; break; }
+          if (!any) {
+            setTimeout(() => {
+              if (state !== "play" || clearing) return;
+              floatText(undoLeft ? "더 부을 곳이 없어요 · 되돌리거나 처음부터 해요" : "더 부을 곳이 없어요 · 처음부터 해 봐요", true);
+              (undoLeft ? undoBtn : resetBtn).classList.remove("is-nudge");
+              void resetBtn.offsetWidth;
+              (undoLeft ? undoBtn : resetBtn).classList.add("is-nudge");
+            }, T_TILT + T_FLOW + T_BACK);
+          }
+        }
+        function undo() {
+          if (state !== "play" || clearing || !undoLeft || !history.length) return;
+          finishAll();
+          bottles = history.pop();
+          undoLeft--;
+          sel = -1;
+          bottles.forEach((b, i) => { renderBottle(i, b); els[i].classList.remove("is-corked"); });
+          sfx("whoosh");
+          drawHud();
+        }
+        function restartStage() {
+          if (state !== "play" || clearing || !history.length) return;
+          finishAll();
+          bottles = puzzle.bottles.map((b) => b.slice());
+          history = [];
+          sel = -1;
+          bottles.forEach((b, i) => { renderBottle(i, b); els[i].classList.remove("is-corked"); });
+          sfx("whoosh");
+          floatText("이 단계를 처음부터 해요 · 시간은 그대로 흘러요", true);
+          drawHud();
+        }
+
+        // ── 시간 ───────────────────────────────────────────────
+        function loop() {
+          if (state !== "play") return;
+          const t = performance.now();
+          timeLeftMs -= clamp(t - lastTick, 0, 250);
+          lastTick = t;
+          const sec = Math.ceil(timeLeftMs / 1000);
+          if (sec !== lastSec) {
+            lastSec = sec;
+            if (sec >= 1 && sec <= 5) sfx("countdown");
+          }
+          if (timeLeftMs <= 0) {
+            timeLeftMs = 0;
+            gameOver();
+            return;
+          }
+          drawTime();
+          rafId = requestAnimationFrame(loop);
+        }
+
+        // ── 판 흐름 ─────────────────────────────────────────────
+        function start() {
+          if (state !== "ready") return;
+          state = "play";
+          lastSec = Math.ceil(timeLeftMs / 1000);
+          sfx("go");
+          showCover("none");
+          lastTick = performance.now();
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "pause";
+          cancelAnimationFrame(rafId);
+          finishAll();
+          sel = -1;
+          drawSel();
+          ctx.sfx("select");
+          showCover("pause");
+          drawHud();
+        }
+        function resume() {
+          if (state !== "pause") return;
+          state = "play";
+          showCover("none");
+          lastTick = performance.now();
+          sfx("go");
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        function gameOver() {
+          // 단계를 막 풀어 점수가 들어간 뒤라면 그대로 — 넘어가는 중인 다음 단계만 멈춘다
+          clearTimeout(clearTimer);
+          ctx.sfx(solvedCount ? "win" : "lose");
+          state = "over";
+          cancelAnimationFrame(rafId);
+          finishAll();
+          sel = -1;
+          drawSel();
+          drawHud();
+          const final = clamp(Math.round(score), 0, MAX_SCORE);
+          showCover("over");
+          ctx.submit(final);
+        }
+        function again() {
+          if (state !== "over") return;
+          ctx.sfx("tap");
+          reset();
+        }
+        function reset() {
+          cancelAnimationFrame(rafId);
+          clearTimeout(clearTimer);
+          state = "ready";
+          level = 1;
+          score = 0;
+          solvedCount = 0;
+          clearing = false;
+          timeLeftMs = TIME_LIMIT * 1000;
+          nextPuzzle = null;
+          loadLevel();
+          showCover("ready");
+        }
+
+        // ── 덮개 ───────────────────────────────────────────────
+        function demoHtml() {
+          // 시작 화면 그림 — 섞인 병 · 붓는 병 · 다 찬 병
+          const g = [{ x: 8, b: [0, 1, 2, 0] }, { x: 62, b: [2, 2], tilt: true }, { x: 116, b: [1, 1, 1, 1] }];
+          return `<div class="gm-ws__demo" aria-hidden="true">${g.map(({ x, b, tilt }) =>
+            `<span class="gm-ws__b${isDone(b) ? " is-done" : ""}" style="left:${x}px;top:14px;width:26px;height:86px">
+              <span class="gm-ws__wob"><span class="gm-ws__glass" style="${tilt ? "transform:translate(10px,-10px) rotate(-38deg)" : ""}">${bottleInner(b)}</span></span>
+            </span>`).join("")}</div>`;
+        }
+        function showCover(kind) {
+          if (kind === "none") {
+            cover.hidden = true;
+            return;
+          }
+          cover.hidden = false;
+          if (kind === "ready") {
+            cover.innerHTML = `${demoHtml()}
+              <h2>물병 색 맞추기</h2>
+              <p>맨 위 물을 다른 병에 부어<br>병마다 한 가지 색만 담아요.</p>
+              <div class="gm-ws__how"><b>이렇게 해요</b><ol>
+                <li>병을 눌러 들고, 부을 병을 눌러요.</li>
+                <li>빈 병이나 맨 위가 같은 색인 병에만 부어져요.</li>
+                <li>3분 동안 단계를 풀수록 점수가 쌓여요. 적은 수로 풀면 보너스!</li>
+              </ol></div>
+              <p class="gm-ws__keys">되돌리기는 단계마다 ${UNDO_PER_STAGE}번 · 숫자키 1~0 · Z 되돌리기 · Esc 쉬기</p>
+              <button type="button" class="gm-ws__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
+          } else if (kind === "pause") {
+            cover.innerHTML = `<h2>잠깐 쉬는 중</h2><p>시간이 멈춰 있어요. 판은 가려 둘게요.</p>
+              <p class="gm-ws__keys">${level}단계 · ${fmt(score)}점</p>
+              <button type="button" class="gm-ws__go" data-go>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
+          } else {
+            // [다시 하기] — 결과 창을 닫은 뒤에도 돌아올 길 (글자 '다시 하기'는 스페이스로도 눌린다)
+            cover.innerHTML = `<h2>시간 끝!</h2><div class="gm-ws__big">${fmt(score)}점</div>
+              <p>${solvedCount ? `${solvedCount}단계까지 풀었어요` : "다음엔 한 단계라도 풀어 봐요"}</p>
+              <button type="button" class="gm-ws__go" data-go>${HKUI.icon("rotate-ccw", 18, "currentColor")} 다시 하기</button>`;
+          }
+          HKUI.refreshIcons(cover);
+          const go = cover.querySelector("[data-go]");
+          if (go) go.onclick = () => (state === "ready" ? start() : state === "pause" ? resume() : again());
+        }
+
+        // ── 입력 ───────────────────────────────────────────────
+        // 손가락이 닿는 순간 바로 — 단추에 포커스가 가지 않게 기본 동작은 막는다
+        boardEl.addEventListener("pointerdown", (e) => {
+          if (!e.isPrimary || e.button > 0) return;
+          const b = e.target.closest(".gm-ws__b");
+          if (!b) {
+            if (sel >= 0 && state === "play") { sel = -1; drawSel(); }
+            return;
+          }
+          e.preventDefault();
+          tap(Number(b.dataset.i));
+        });
+        undoBtn.addEventListener("click", undo);
+        resetBtn.addEventListener("click", restartStage);
+        document.addEventListener("keydown", (e) => {
+          if (e.target && e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          if (state !== "play") return;
+          if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); return; }
+          const m = /^(?:Digit|Numpad)(\d)$/.exec(e.code);
+          if (m) {
+            e.preventDefault();
+            if (!e.repeat) tap(m[1] === "0" ? 9 : Number(m[1]) - 1);
+          } else if (e.code === "KeyZ" || e.code === "Backspace") {
+            e.preventDefault();
+            if (!e.repeat) undo();
+          }
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+        let rt = 0;
+        window.addEventListener("resize", () => {
+          clearTimeout(rt);
+          rt = setTimeout(fit, 80);
+        });
+
+        // 게임 중 뒤로 가기 → '기록 남기고 나가기'에 쓰는 지금 점수
+        ctx.onScore && ctx.onScore(() => Math.round(score));
+        ctx.onRestart(reset);
+        ctx.onPause(pause);
+        reset();
+        requestAnimationFrame(fit);
+      },
+    });
+  </script>
+</body>
+</html>

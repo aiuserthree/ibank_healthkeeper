@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <!-- 한글 픽셀 글꼴 「갈무리」(OFL) — 못 받으면 기본 글꼴로 넘어간다 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/paperjet.js"></script>
+  <style>
+    /* 종이비행기 편대 전용 — 레트로 오락실 (게임 화면은 저해상도 캔버스를 키운 픽셀, 글자는 갈무리 픽셀 글꼴) */
+    /* 가로로 긴 화면이라 공통 창(세로 비율)을 이 게임만 가운데 영역 가득 넓히고, 흰 카드 테두리는 숨긴다 */
+    .hk-pf .hk-play-frame.pj-wide { width: 100% !important; height: 100% !important; max-width: 1240px; padding: 6px; background: #140c2a; border-color: #140c2a; box-shadow: none; }
+    .hk-pf .hk-play-stage > .pj { flex: 0 0 auto; }
+    @media (max-width: 640px) { .hk-pf .hk-play-frame.pj-wide { padding: 0; border: 0; border-radius: 0; } }
+    .pj { --pj-deep: #140c2a; --pj-panel: #1d1440; --pj-line: #4a3d78; --pj-hi: #8f82c8; --pj-cream: #fff6e0; --pj-gold: #ffd166; --pj-mint: #3dffd0;
+      display: flex; flex-direction: column; margin: 0 auto; max-width: 100%; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+      font-family: Galmuri11, "Pretendard", "Apple SD Gothic Neo", sans-serif; color: var(--pj-cream); }
+    .pj-hud { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 12px 12px 0 0; background: linear-gradient(180deg, #2a1d58, var(--pj-deep)); border: 1px solid var(--pj-hi); border-bottom: 0; box-shadow: inset 0 1px 0 rgba(255,246,224,.18); font-variant-numeric: tabular-nums; }
+    .pj-hud small { display: block; font-family: Galmuri9, Galmuri11, sans-serif; font-size: 9px; line-height: 11px; color: #b9addf; letter-spacing: .02em; }
+    .pj-hud__score { flex: 1 1 auto; min-width: 0; }
+    .pj-hud__score b { display: inline-block; font-family: GalmuriMono11, Galmuri11, ui-monospace, monospace; font-weight: 400; font-size: 22px; line-height: 22px; color: var(--pj-gold); letter-spacing: 1px; text-shadow: 2px 2px 0 #3a1c5c; transform-origin: left bottom; }
+    .pj-hud__score b i { font-style: normal; color: #5e5390; text-shadow: none; }
+    .pj-hud__score b.is-bump { animation: pj-bump .22s steps(3) 1; }
+    @keyframes pj-bump { 0% { transform: translateY(0); } 40% { transform: translateY(-3px); color: var(--pj-cream); } 100% { transform: translateY(0); } }
+    .pj-hud__stat { display: flex; flex-direction: column; align-items: flex-start; flex-shrink: 0; }
+    .pj-stage { font-size: 11px; line-height: 14px; color: var(--pj-cream); }
+    .pj-icons { display: flex; gap: 2px; height: 14px; align-items: center; }
+    .pj-icons em { font-style: normal; font-size: 11px; color: #8f82c8; }
+    .pj-pips { display: inline-flex; gap: 1px; margin-right: 3px; }
+    .pj-pips i { width: 4px; height: 11px; background: #3a2f66; box-shadow: inset 0 0 0 1px #5e5390; }
+    .pj-pips i.is-on { background: linear-gradient(180deg, #ff9a7a 0 50%, #ff4848 50%); box-shadow: inset 0 0 0 1px #ffd8b8; }
+    .pj-tag { font-size: 9px; font-family: Galmuri9, Galmuri11, sans-serif; line-height: 12px; padding: 0 3px; margin-left: 2px; border: 1px solid; }
+    .pj-tag--blue { color: #a8d6ff; border-color: #4a9cff; background: #0f1f4a; }
+    .pj-tag--green { color: #9cf59a; border-color: #3cdc6a; background: #0e3622; }
+    @media (max-width: 420px) { .pj-hud { gap: 7px; padding: 6px 8px; } .pj-hud__score b { font-size: 18px; line-height: 20px; letter-spacing: 0; } }
+    .pj-screen { position: relative; overflow: hidden; background: var(--pj-deep); border-left: 1px solid var(--pj-hi); border-right: 1px solid var(--pj-hi); }
+    .pj-cv { display: block; image-rendering: crisp-edges; image-rendering: pixelated; touch-action: none; }
+    .pj-ui { position: absolute; left: 0; top: 0; pointer-events: none; image-rendering: pixelated; }
+    .pj.is-playing .pj-cv { cursor: none; }
+    /* 배치 — pc: 캔버스 최대 + 한두 줄 안내, 메뉴는 게임 화면 위 · over(휴대폰 가로): 조작 단추도 화면 위 · below(휴대폰 세로): 아래 조작 칸 */
+    .pj[data-mode="pc"] .pj-pad, .pj[data-mode="over"] .pj-pad { display: none; }
+    .pj[data-mode="pc"] .pj-screen, .pj[data-mode="over"] .pj-screen { border-bottom: 1px solid var(--pj-hi); border-radius: 0 0 10px 10px; }
+    .pj-hint { display: none; padding: 7px 4px 0; font-size: 11px; line-height: 20px; color: #b9addf; text-align: center; word-break: keep-all; }
+    .pj[data-mode="pc"] .pj-hint { display: block; }
+    .pj-hint kbd { display: inline-block; min-width: 14px; padding: 0 4px; margin: 0 1px; border: 1px solid var(--pj-hi); border-bottom-width: 2px; border-radius: 3px; background: #241a52; color: var(--pj-cream); font: inherit; font-size: 11px; line-height: 14px; }
+    .pj-hint__items { margin-left: 10px; white-space: nowrap; }
+    .pj-hint__items i { display: inline-block; width: 8px; height: 8px; margin: 0 3px 0 6px; box-shadow: 0 0 0 1px #ffb02e; }
+    .pj-screen > .pj-panel { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 100%; box-sizing: border-box; padding: 18px 14px 12px; justify-content: flex-end; background: linear-gradient(180deg, rgba(20,12,42,0), rgba(20,12,42,.8) 26%); }
+    .pj-screen > .pj-panel[data-kind="card"] { top: 0; justify-content: center; background: rgba(20,12,42,.55); }
+    .pj-screen > .pj-panel .pj-card { max-width: 340px; padding: 16px 16px 14px; box-sizing: border-box; background: rgba(29,20,64,.94); border: 1px solid var(--pj-hi); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+    .pj-screen > .pj-panel .pj-title { max-width: 460px; }
+    .pj-screen > .pj-panel .pj-title .pj-keys { display: none; }
+    .pj[data-mode="over"] .pj-screen > .pj-panel { padding: 8px 10px 8px; }
+    .pj[data-mode="over"] .pj-screen > .pj-panel .pj-desc, .pj[data-mode="over"] .pj-ship canvas { display: none; }
+    .pj[data-mode="over"] .pj-ship { padding: 4px; }
+    .pj[data-mode="over"] .pj-go { padding: 7px; }
+    .pj-screen > .pj-touch { z-index: 2; background: none; }
+    .pj-screen > .pj-touch .pj-touch__hint { display: none; }
+    .pj-screen > .pj-touch .pj-btn { opacity: .78; }
+    .pj-pad { position: relative; flex: 1 1 auto; min-height: 0; display: flex; border-radius: 0 0 12px 12px; background: radial-gradient(120% 90% at 50% 0%, #2a1d58 0%, var(--pj-deep) 70%); border: 1px solid var(--pj-hi); border-top: 1px solid var(--pj-line); overflow: hidden; }
+    .pj-panel { flex: 1; min-width: 0; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+    .pj-panel[hidden] { display: none; }
+    .pj-title, .pj-guide, .pj-card { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 420px; margin: 0 auto; }
+    .pj-ships { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .pj-ship { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 4px 6px; border: 1px solid var(--pj-line); border-radius: 8px; background: rgba(29,20,64,.85); color: var(--pj-cream); font: inherit; font-size: 11px; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,246,224,.08); -webkit-tap-highlight-color: transparent; }
+    .pj-ship canvas { width: 68px; height: 44px; image-rendering: pixelated; }
+    .pj-ship b { font-weight: 700; font-size: 11px; line-height: 14px; }
+    .pj-ship small { font-family: Galmuri9, Galmuri11, sans-serif; font-size: 9px; color: #b9addf; }
+    .pj-ship[aria-pressed="true"] { border-color: var(--pj-gold); background: linear-gradient(180deg, #3a2a78, #241a52); box-shadow: 0 0 0 1px var(--pj-gold), 0 0 14px rgba(255,209,102,.25); }
+    .pj-ship[aria-pressed="true"] b { color: var(--pj-gold); }
+    .pj-ship[aria-pressed="true"] canvas { animation: pj-bob .6s steps(2) infinite alternate; }
+    @keyframes pj-bob { from { transform: translateY(1px); } to { transform: translateY(-2px); } }
+    .pj-desc { margin: 0; text-align: center; font-size: 11px; line-height: 16px; color: #e4ddf4; word-break: keep-all; }
+    .pj-go { width: 100%; padding: 10px; border: 1px solid #fff0b0; border-radius: 8px; background: linear-gradient(180deg, #ffd98a 0 45%, #ffb02e 45%); color: #3a1c00; font: inherit; font-weight: 700; font-size: 14px; line-height: 18px; box-shadow: 0 3px 0 #ac6416, inset 0 1px 0 rgba(255,255,255,.5); cursor: pointer; }
+    .pj-go:active { transform: translateY(2px); box-shadow: 0 1px 0 #ac6416; }
+    .pj-go:focus-visible, .pj-sub:focus-visible, .pj-ship:focus-visible { outline: 2px solid var(--pj-mint); outline-offset: 2px; }
+    .pj-sub { width: 100%; padding: 8px; border: 1px solid var(--pj-line); border-radius: 8px; background: rgba(29,20,64,.9); color: #e4ddf4; font: inherit; font-size: 11px; cursor: pointer; }
+    .pj-row { display: flex; gap: 6px; }
+    .pj-row > * { flex: 1; }
+    .pj .hk-quit-wrap { display: flex; gap: 6px; width: 100%; }
+    .pj .hk-quit-wrap > * { flex: 1; }
+    .pj-keys { margin: 0; font-size: 11px; line-height: 19px; color: #b9addf; text-align: center; word-break: keep-all; }
+    .pj-keys kbd { display: inline-block; min-width: 14px; padding: 0 4px; margin: 0 1px; border: 1px solid var(--pj-hi); border-bottom-width: 2px; border-radius: 3px; background: #241a52; color: var(--pj-cream); font: inherit; font-size: 11px; line-height: 14px; }
+    .pj-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; justify-content: center; font-size: 11px; color: #e4ddf4; }
+    .pj-legend span { display: inline-flex; align-items: center; gap: 5px; }
+    .pj-legend i { width: 9px; height: 9px; box-shadow: 0 0 0 1px #ffb02e, 0 0 6px currentColor; }
+    .pj-tip { font-family: Galmuri9, Galmuri11, sans-serif; font-size: 9px; line-height: 14px; color: #8f82c8; text-align: center; word-break: keep-all; }
+    .pj-card { padding: 4px 0; text-align: center; }
+    .pj-card h3 { margin: 0; font-family: Galmuri14, Galmuri11, sans-serif; font-weight: 400; font-size: 28px; line-height: 30px; color: var(--pj-gold); text-shadow: 2px 2px 0 #3a1c5c; }
+    .pj-card p { margin: 0; font-size: 11px; line-height: 17px; color: #e4ddf4; word-break: keep-all; }
+    .pj-card p b { color: var(--pj-gold); font-weight: 700; }
+    .pj-big { font-family: GalmuriMono11, Galmuri11, monospace; font-size: 22px; line-height: 26px; color: var(--pj-cream); text-shadow: 2px 2px 0 #3a1c5c; }
+    /* 휴대폰 조작판 — 어두운 유리 + 1px 밝은 테두리, 누르면 눌린 표시 */
+    .pj-touch { position: absolute; inset: 0; touch-action: none; background-image: radial-gradient(rgba(143,130,200,.22) 1px, transparent 1.3px); background-size: 12px 12px; }
+    .pj-touch[hidden] { display: none; }
+    .pj-touch__hint { position: absolute; left: 0; right: 0; top: 10px; text-align: center; font-family: Galmuri9, Galmuri11, sans-serif; font-size: 9px; color: #8f82c8; pointer-events: none; }
+    .pj-btn { position: absolute; bottom: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border-radius: 50%; border: 1px solid rgba(255,246,224,.55); color: var(--pj-cream); font: inherit; touch-action: none; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; box-shadow: inset 0 1px 0 rgba(255,246,224,.3), 0 4px 0 rgba(10,6,24,.6); backdrop-filter: blur(3px); cursor: pointer; padding: 0; }
+    .pj-btn small { font-family: Galmuri9, Galmuri11, sans-serif; font-size: 9px; line-height: 9px; }
+    .pj-ico { width: 26px; height: 24px; image-rendering: pixelated; }
+    .pj-btn:active, .pj-btn.is-down { transform: translateY(3px); box-shadow: inset 0 1px 0 rgba(255,246,224,.2), 0 1px 0 rgba(10,6,24,.6); }
+    .pj-btn--bomb { right: 14px; width: 60px; height: 60px; background: rgba(110,60,10,.55); border-color: #ffd166; }
+    .pj-btn--bomb em { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; background: var(--pj-gold); color: #3a1c00; font-style: normal; font-size: 11px; line-height: 18px; }
+    .pj-btn--bomb:disabled { opacity: .35; }
+    .pj-btn--charge { right: 86px; width: 72px; height: 72px; --c: 0; background: radial-gradient(circle, rgba(11,74,82,.75) 0 58%, transparent 59%), conic-gradient(var(--pj-mint) calc(var(--c) * 1turn), rgba(29,20,64,.8) 0); border-color: var(--pj-mint); }
+    .pj-btn--charge.is-full { box-shadow: 0 0 16px rgba(61,255,208,.55), inset 0 1px 0 rgba(255,246,224,.3); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 종이비행기 편대 — 레트로 오락실 횡스크롤 비행 슈팅. 그림 · 규칙은 모두 /_shared/paperjet.js(HKPaperJet) 가 맡는다.
+    HKPlay.mountGame({ key: "paperjet", setup: (stage, ctx) => HKPaperJet.setup(stage, ctx) });
+  </script>
+</body>
+</html>

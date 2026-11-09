@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 사내 알까기</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 사내 알까기 — 나무 바둑판 위에 흑 · 백 알. 판은 canvas, 그 밖(목록 · 점수 줄 · 버튼)은 다른 대전 게임과 같은 틀 */
+    :root { --ak-wood: #e2b56a; --ak-wood-ink: #7a4f1d; --ak-paper: #fffaf0; --ak-table: #2f2a26; }
+    /* --ak-w: 판 폭 — PC 는 창 높이에 맞춰 판 · 버튼이 한 화면에 들어오게(폰은 화면 폭이 먼저 막는다) */
+    .ak { --ak-w: clamp(340px, calc(100vh - 330px), 560px); }
+    .ak.is-over { --ak-w: clamp(320px, calc(100vh - 420px), 560px); }
+
+    /* 목록 — 이렇게 해요 */
+    .ak-how { margin: 0 0 20px; border: 1px solid #ecd9b4; border-radius: 14px; background: var(--ak-paper); overflow: hidden; }
+    .ak-how > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px; font-size: 15px; font-weight: 800; cursor: pointer; list-style: none; user-select: none; }
+    .ak-how > summary::-webkit-details-marker { display: none; }
+    .ak-how > summary::after { content: ""; width: 8px; height: 8px; margin-left: auto; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; transform: rotate(45deg); transition: transform .2s; }
+    .ak-how[open] > summary::after { transform: rotate(-135deg); }
+    .ak-how > summary small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .ak-how__body { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 18px; align-items: center; padding: 4px 18px 18px; }
+    .ak-how__pic { display: block; width: 100%; height: auto; border-radius: 10px; }
+    .ak-how ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.65; color: var(--color-midnight-navy); word-break: keep-all; }
+    .ak-how ol li + li { margin-top: 3px; }
+    .ak-how ol b { color: var(--ak-wood-ink); }
+    .ak-how__tip { margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: #fef3c7; font-size: 13px; line-height: 1.55; color: #713f12; word-break: keep-all; }
+    @media (max-width: 640px) {
+      .ak-how__body { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 14px 16px; }
+      .ak-how__pic { max-width: 220px; margin: 0 auto; }
+    }
+
+    /* 대국 화면 — 판을 올려 둔 탁자 */
+    .ak-table { position: relative; max-width: var(--ak-w); margin: 0 auto; border-radius: 16px; background: var(--ak-paper); box-shadow: 0 1px 0 #efe2c6, 0 12px 30px rgba(15, 23, 42, .14); overflow: hidden; }
+    .ak-strip { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 10px 14px 8px; }
+    .ak-tray { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .ak-tray.is-rival { align-items: flex-end; text-align: right; }
+    .ak-tray__label { font-size: 12.5px; font-weight: 800; color: #8a6a3c; white-space: nowrap; }
+    .ak-tray__label b { margin-left: 4px; font-size: 15px; font-weight: 900; color: var(--color-midnight-navy); font-variant-numeric: tabular-nums; }
+    .ak-tray__dots { display: flex; flex-wrap: wrap; gap: 3px; }
+    .ak-tray.is-rival .ak-tray__dots { justify-content: flex-end; }
+    .ak-dot { width: 13px; height: 13px; border-radius: 50%; transition: opacity .3s, transform .3s; }
+    .ak-dot.is-black { background: radial-gradient(circle at 35% 30%, #6b6b6b, #1a1a1a 55%, #000); }
+    .ak-dot.is-white { background: radial-gradient(circle at 35% 30%, #fff, #eeebe3 55%, #c4bfb3); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
+    .ak-dot.is-lost { opacity: .22; transform: scale(.72); }
+    .ak-count { display: flex; flex-direction: column; align-items: center; min-width: 64px; }
+    .ak-count b { font-size: 22px; font-weight: 900; line-height: 1; color: var(--color-midnight-navy); font-variant-numeric: tabular-nums; }
+    .ak-count small { margin-top: 2px; font-size: 11.5px; font-weight: 700; color: #8a6a3c; white-space: nowrap; }
+
+    .ak-board { display: block; width: 100%; aspect-ratio: 1 / 1; background: var(--ak-table); touch-action: none; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    .ak-board.is-live { cursor: grab; }
+    .ak-board.is-drag { cursor: grabbing; }
+
+    /* 끝 — 판 위에 찍는 도장 */
+    .ak-stamp { position: absolute; bottom: 10px; right: 14px; z-index: 2; display: grid; place-items: center; width: 100px; height: 100px; border-radius: 50%; border: 4px double currentColor; color: #dc2626; background: rgba(255, 250, 240, .7); transform: rotate(-13deg); text-align: center; pointer-events: none; }
+    .ak-stamp b { display: block; font-size: 19px; font-weight: 900; letter-spacing: -.02em; line-height: 1.1; }
+    .ak-stamp small { display: block; margin-top: 3px; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .ak-stamp.is-lose { color: #64748b; }
+    .ak-stamp.is-draw { color: #7c3aed; }
+    .ak-stamp.is-fresh { animation: ak-stamp .42s cubic-bezier(.2, .9, .3, 1.25) both; }
+    @keyframes ak-stamp { from { opacity: 0; transform: rotate(-13deg) scale(2.1); } to { opacity: 1; transform: rotate(-13deg) scale(1); } }
+
+    .ak-say { min-height: 22px; padding: 10px 16px 12px; text-align: center; font-size: 14px; font-weight: 700; color: #57534e; word-break: keep-all; }
+    .ak-say.is-go { color: var(--ak-wood-ink); }
+    .ak-say.is-done { display: flex; flex-direction: column; justify-content: center; min-height: 112px; padding: 6px 132px 12px 22px; text-align: left; }
+    .ak-say.is-done b { font-size: 18px; font-weight: 900; color: var(--color-midnight-navy); }
+    .ak-say.is-done small { margin-top: 3px; font-size: 13px; font-weight: 700; color: #8a6a3c; }
+    .ak .gk__bar { max-width: var(--ak-w); align-items: stretch; }
+    .ak .gk__bar .hk-btn { min-height: 46px; }
+    .ak-snd { display: inline-grid; place-items: center; flex-shrink: 0; width: 46px; height: 46px; padding: 0; border: 1px solid var(--border-default); border-radius: 12px; background: var(--surface-card, #fff); color: var(--color-midnight-navy); cursor: pointer; }
+    .ak-snd.is-off { color: var(--text-muted); background: var(--color-mist); }
+    .ak-snd svg { width: 20px; height: 20px; }
+    @media (max-width: 640px) {
+      .ak, .ak.is-over { --ak-w: 560px; }
+      .ak-strip { gap: 6px; padding: 8px 10px 6px; }
+      .ak-dot { width: 11px; height: 11px; }
+      .ak-count { min-width: 52px; }
+      .ak-count b { font-size: 19px; }
+      .ak-stamp { bottom: 8px; right: 10px; width: 84px; height: 84px; }
+      .ak-stamp b { font-size: 16px; }
+      .ak-say { padding: 8px 10px 10px; font-size: 13.5px; }
+      .ak-say.is-done { min-height: 100px; padding: 6px 104px 12px 16px; }
+      .ak-say.is-done b { font-size: 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) { .ak-stamp.is-fresh { animation-duration: 1ms; } .ak-dot { transition: none; } }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 사내 알까기 — 도전 → 수락 → 번갈아 내 알 하나를 튕긴다. 상대 알을 모두 판 밖으로 밀어내면 승
+    // 좌표 · 알 번호 · 샷 기록은 서버(backend/app/services/versus_alkkagi.py)와 같다:
+    //   판 0..1000(x 오른쪽, y 아래쪽) · 알 0..6 은 흑(먼저, 아래 줄), 7..13 은 백(나중, 위 줄)
+    //   샷 기록 {seq, by, stone, before, ids, frames, out, hits} — frames 는 1/fps 초마다 ids 순서로 [x, y, ...]
+    // 물리는 서버만 판정한다. 화면은 서버가 남긴 프레임을 사이사이 보간해서 다시 보여 줄 뿐이다.
+    const { esc, closedNote, due, fail } = HKMatch;
+    const GAME = "alkkagi";
+    const SIZE = 1000, RADIUS = 36, PER_SIDE = 7, MAX_SHOTS = 60; // 서버 기본값 — 대국 화면은 서버가 보낸 값을 쓴다
+    const PAD = 34; // 판 둘레 탁자 — 떨어지는 알이 판 밖에서 작아지며 사라지는 자리
+    const VIEW = SIZE + 2 * PAD;
+    const GRID = 30; // 바깥 줄이 판 가장자리에서 떨어진 거리
+    const MAX_PULL = 240, MIN_PULL = 26; // 당긴 길이(판 좌표) — 최대에서 세기 1, 이보다 짧으면 취소
+    const PICK = RADIUS * 1.8; // 알을 잡는 거리 — 손가락으로도 넉넉하게
+    const TAIL = 8; // 떨어진 알이 사라지는 프레임 수(서버 TAIL_FRAMES 와 같음)
+    const HOW_KEY = "hk-alkkagi-how"; // 「이렇게 해요」를 처음 한 번은 펼쳐 둔다
+    const BOT_LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    const sfx = (name, arg) => { try { if (window.HKSound) HKSound.play(name, arg); } catch (_) { /* 소리는 부가 기능 */ } };
+    const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
+
+    let root = null, open = { open: true, opensAt: null }, match = null, timer = 0, sending = false;
+    let waiter = null; // 서버에서 상대 샷을 기다리는 요청
+    let endFx = false; // 방금 끝난 판 — 도장 · 소리
+    const seen = {}; // 판마다 이 화면에서 다시 보여 준 마지막 샷 번호
+
+    // 판 그림 상태
+    let cv = null, ctx = null, scale = 1, boardLayer = null, layerW = 0;
+    let disp = []; // 알 번호마다 {x, y, s(크기 비율), gone} 또는 null — 서버 좌표
+    let shotNo = 0; // 점수 줄에 보이는 튕긴 횟수(다시 보기 동안은 그 샷 번호)
+    let drag = null; // {stone, x, y} — 잡은 알 · 손가락 위치(화면 쪽 판 좌표)
+    let hover = null; // 마우스가 가리키는 내 알
+    let cur = null; // 다시 보여 주는 중인 샷 {shot, t0, last, done}
+    let replaying = false, replayToken = 0;
+    let anim = 0;
+
+    function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
+
+    // ---------- 좌표 ----------
+    const N = () => (match && match.perSide) || PER_SIDE;
+    const R = () => (match && match.radius) || RADIUS;
+    const owner = (id) => (id < N() ? 0 : 1);
+    const mySeat = () => (match && match.mySeat) || 0;
+    const flip = () => mySeat() === 1; // 내가 백(위쪽)이면 판을 180도 돌려 내가 늘 아래에서 본다
+    const toScreen = (x, y) => (flip() ? [SIZE - x, SIZE - y] : [x, y]);
+    const colorOf = (seat) => (seat === 0 ? "black" : "white");
+    const rivalWord = () => (match && match.bot ? "컴퓨터" : "상대");
+    function staticDisp(m) {
+      const out = [];
+      (m.stones || []).forEach(([id, , x, y, on]) => { out[id] = on ? { x, y, s: 1 } : null; });
+      return out;
+    }
+    function leftOf(seat) { return disp.reduce((k, p, id) => k + (p && !p.gone && owner(id) === seat ? 1 : 0), 0); }
+
+    // ---------- 판 그리기 ----------
+    function rand(seed) { // 나뭇결이 늘 같게 — 씨앗 있는 난수
+      let a = seed >>> 0;
+      return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    }
+    function makeBoardLayer() {
+      const c = document.createElement("canvas");
+      c.width = cv.width; c.height = cv.height;
+      const g = c.getContext("2d");
+      // 탁자
+      const tb = g.createRadialGradient(c.width / 2, c.height / 2, c.width * 0.2, c.width / 2, c.height / 2, c.width * 0.75);
+      tb.addColorStop(0, "#4a413a"); tb.addColorStop(1, "#26211d");
+      g.fillStyle = tb; g.fillRect(0, 0, c.width, c.height);
+      g.setTransform(scale, 0, 0, scale, PAD * scale, PAD * scale);
+      // 판 그림자 · 나무
+      g.save(); g.shadowColor = "rgba(0,0,0,.5)"; g.shadowBlur = 18 * scale; g.shadowOffsetY = 6 * scale;
+      g.fillStyle = "#c9964f"; roundRect(g, 0, 0, SIZE, SIZE, 10); g.fill(); g.restore();
+      g.save(); roundRect(g, 0, 0, SIZE, SIZE, 10); g.clip();
+      const wood = g.createLinearGradient(0, 0, SIZE, SIZE);
+      wood.addColorStop(0, "#ecc683"); wood.addColorStop(0.5, "#e2b36a"); wood.addColorStop(1, "#d6a35a");
+      g.fillStyle = wood; g.fillRect(0, 0, SIZE, SIZE);
+      const rnd = rand(20261111);
+      for (let i = 0; i < 70; i++) { // 가로로 흐르는 나뭇결
+        const y0 = rnd() * SIZE, amp = 4 + rnd() * 14, len = 140 + rnd() * 260, ph = rnd() * 6.28;
+        g.strokeStyle = `rgba(${130 + rnd() * 30 | 0},${80 + rnd() * 20 | 0},${30 + rnd() * 10 | 0},${0.05 + rnd() * 0.1})`;
+        g.lineWidth = 1 + rnd() * 3;
+        g.beginPath();
+        for (let x = -10; x <= SIZE + 10; x += 20) { const y = y0 + Math.sin(x / len + ph) * amp; if (x < 0) g.moveTo(x, y); else g.lineTo(x, y); }
+        g.stroke();
+      }
+      const vig = g.createRadialGradient(SIZE / 2, SIZE / 2, SIZE * 0.35, SIZE / 2, SIZE / 2, SIZE * 0.75);
+      vig.addColorStop(0, "rgba(255,240,200,0)"); vig.addColorStop(1, "rgba(90,50,10,.18)");
+      g.fillStyle = vig; g.fillRect(0, 0, SIZE, SIZE);
+      g.restore();
+      // 19줄 격자 · 화점
+      const step = (SIZE - 2 * GRID) / 18;
+      g.strokeStyle = "rgba(45,28,10,.72)"; g.lineWidth = 1.7;
+      g.beginPath();
+      for (let k = 0; k < 19; k++) {
+        const v = GRID + k * step;
+        g.moveTo(GRID, v); g.lineTo(SIZE - GRID, v);
+        g.moveTo(v, GRID); g.lineTo(v, SIZE - GRID);
+      }
+      g.stroke();
+      g.lineWidth = 3; g.strokeRect(GRID, GRID, SIZE - 2 * GRID, SIZE - 2 * GRID);
+      g.fillStyle = "rgba(45,28,10,.85)";
+      [3, 9, 15].forEach((a) => [3, 9, 15].forEach((b) => { g.beginPath(); g.arc(GRID + a * step, GRID + b * step, 6.5, 0, Math.PI * 2); g.fill(); }));
+      // 판 가장자리 — 여기를 넘으면 떨어진다
+      g.strokeStyle = "rgba(90,55,20,.55)"; g.lineWidth = 4; roundRect(g, 2, 2, SIZE - 4, SIZE - 4, 9); g.stroke();
+      return c;
+    }
+    function roundRect(g, x, y, w, h, r) {
+      g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+    }
+    function drawStone(x, y, seat, s, alpha) {
+      const r = R() * s;
+      if (r <= 0.5) return;
+      ctx.globalAlpha = alpha;
+      const sh = ctx.createRadialGradient(x + 4, y + 7, r * 0.3, x + 4, y + 7, r * 1.15); // 그림자
+      sh.addColorStop(0, "rgba(0,0,0,.42)"); sh.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(x + 4, y + 7, r * 1.15, 0, Math.PI * 2); ctx.fill();
+      const g = ctx.createRadialGradient(x - r * 0.38, y - r * 0.42, r * 0.08, x, y, r);
+      if (seat === 0) { g.addColorStop(0, "#777"); g.addColorStop(0.32, "#2b2b2b"); g.addColorStop(1, "#050505"); }
+      else { g.addColorStop(0, "#ffffff"); g.addColorStop(0.55, "#f1eee7"); g.addColorStop(1, "#c3beb2"); }
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      if (seat === 1) { ctx.strokeStyle = "rgba(0,0,0,.18)"; ctx.lineWidth = 1.5; ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    }
+    function powerColor(p) { return `hsl(${Math.round(130 - 125 * p)}, 82%, ${p > 0.85 ? 48 : 44}%)`; }
+    function draw() {
+      if (!ctx || !cv.width) return;
+      if (!boardLayer || layerW !== cv.width) { boardLayer = makeBoardLayer(); layerW = cv.width; }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(boardLayer, 0, 0);
+      ctx.setTransform(scale, 0, 0, scale, PAD * scale, PAD * scale);
+      const live = ready() && !drag;
+      // 내 차례 — 내 알 둘레에 옅은 고리(잡을 수 있는 알)
+      if (live) {
+        disp.forEach((p, id) => {
+          if (!p || p.gone || owner(id) !== mySeat()) return;
+          const [x, y] = toScreen(p.x, p.y);
+          ctx.strokeStyle = id === hover ? "rgba(255,214,102,.95)" : "rgba(255,236,170,.6)";
+          ctx.lineWidth = id === hover ? 6 : 4;
+          ctx.beginPath(); ctx.arc(x, y, R() + 7, 0, Math.PI * 2); ctx.stroke();
+        });
+      }
+      // 알 — 떨어지는 알은 작아지며 흐려진다
+      disp.forEach((p, id) => {
+        if (!p) return;
+        const [x, y] = toScreen(p.x, p.y);
+        drawStone(x, y, owner(id), p.s, p.gone ? Math.max(0, p.alpha) : 1);
+      });
+      // 마지막으로 튕긴 알 — 작은 점
+      const last = !cur && match && match.shots && match.shots.length ? match.shots[match.shots.length - 1] : null;
+      if (last && disp[last.stone] && !disp[last.stone].gone && !drag) {
+        const p = disp[last.stone], [x, y] = toScreen(p.x, p.y);
+        ctx.fillStyle = "#ef4444"; ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.fill();
+      }
+      if (drag) drawAim();
+    }
+    function aimOf() {
+      const p = disp[drag.stone];
+      if (!p) return null;
+      const [sx, sy] = toScreen(p.x, p.y);
+      const dx = drag.x - sx, dy = drag.y - sy, len = Math.hypot(dx, dy);
+      const pull = Math.min(len, MAX_PULL);
+      return { sx, sy, dx, dy, len, pull, power: pull / MAX_PULL, ok: len >= MIN_PULL };
+    }
+    function drawAim() {
+      const a = aimOf();
+      if (!a) return;
+      const { sx, sy, len, pull, power, ok } = a;
+      const r = R();
+      if (len > 1) { // 고무줄 — 당긴 쪽
+        const ux = a.dx / len, uy = a.dy / len;
+        ctx.setLineDash([10, 10]); ctx.strokeStyle = "rgba(255,255,255,.75)"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(sx + ux * pull, sy + uy * pull); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "rgba(255,255,255,.85)"; ctx.beginPath(); ctx.arc(sx + ux * pull, sy + uy * pull, 9, 0, Math.PI * 2); ctx.fill();
+      }
+      if (!ok) { // 너무 짧다 — 놓으면 취소
+        ctx.setLineDash([6, 8]); ctx.strokeStyle = "rgba(255,255,255,.7)"; ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.arc(sx, sy, r + 12, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+        return;
+      }
+      const ux = -a.dx / len, uy = -a.dy / len, col = powerColor(power);
+      // 날아갈 방향 화살표 — 길이는 세기만큼
+      const x0 = sx + ux * (r + 10), y0 = sy + uy * (r + 10), L = 70 + 330 * power;
+      const x1 = x0 + ux * L, y1 = y0 + uy * L;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "rgba(0,0,0,.25)"; ctx.lineWidth = 14; ctx.beginPath(); ctx.moveTo(x0, y0 + 3); ctx.lineTo(x1, y1 + 3); ctx.stroke();
+      ctx.strokeStyle = col; ctx.lineWidth = 10; ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1 - ux * 12, y1 - uy * 12); ctx.stroke();
+      const hx = -uy, hy = ux;
+      ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x1 + ux * 16, y1 + uy * 16); ctx.lineTo(x1 - ux * 18 + hx * 20, y1 - uy * 18 + hy * 20); ctx.lineTo(x1 - ux * 18 - hx * 20, y1 - uy * 18 - hy * 20); ctx.closePath(); ctx.fill();
+      ctx.lineCap = "butt";
+      // 세기 게이지 — 알 둘레 고리 + 숫자
+      ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = 8;
+      ctx.beginPath(); ctx.arc(sx, sy, r + 14, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = col; ctx.beginPath(); ctx.arc(sx, sy, r + 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * power); ctx.stroke();
+      const ty = sy - r - 40 < 20 ? sy + r + 52 : sy - r - 34;
+      ctx.font = "900 34px system-ui, -apple-system, sans-serif"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 7; ctx.strokeStyle = "rgba(30,20,10,.75)"; ctx.strokeText(`${Math.round(power * 100)}%`, sx, ty);
+      ctx.fillStyle = "#fff"; ctx.fillText(`${Math.round(power * 100)}%`, sx, ty);
+    }
+    function kick() { if (!anim) anim = requestAnimationFrame(loop); }
+    function loop(now) {
+      anim = 0;
+      if (cur) stepReplay(now);
+      draw();
+      if (cur) kick();
+    }
+    function setupCanvas() {
+      cv = document.getElementById("ak-board");
+      if (!cv) { ctx = null; return; }
+      ctx = cv.getContext("2d");
+      sizeCanvas();
+      cv.addEventListener("pointerdown", onDown);
+      cv.addEventListener("pointermove", onMove);
+      cv.addEventListener("pointerup", onUp);
+      cv.addEventListener("pointercancel", () => cancelDrag());
+      cv.addEventListener("pointerleave", () => { if (!drag && hover != null) { hover = null; draw(); } });
+    }
+    function sizeCanvas() {
+      if (!cv) return;
+      const w = cv.clientWidth || 320, dpr = Math.min(2.5, window.devicePixelRatio || 1);
+      const px = Math.round(w * dpr);
+      if (cv.width !== px) { cv.width = px; cv.height = px; }
+      scale = cv.width / VIEW;
+      draw();
+    }
+
+    // ---------- 다시 보기 ----------
+    // 샷 하나의 f 번째 프레임(실수 — 사이는 보간) 때 알 위치
+    function shotPos(shot, f) {
+      const fr = shot.frames, last = fr.length - 1;
+      const i = Math.max(0, Math.min(last, Math.floor(f))), j = Math.min(last, i + 1), u = Math.max(0, Math.min(1, f - i));
+      const pos = (shot.before || []).map((p) => (p ? { x: p[0], y: p[1], s: 1 } : null));
+      shot.ids.forEach((id, k) => {
+        const a = fr[i], b = fr[j];
+        pos[id] = { x: a[2 * k] + (b[2 * k] - a[2 * k]) * u, y: a[2 * k + 1] + (b[2 * k + 1] - a[2 * k + 1]) * u, s: 1 };
+      });
+      (shot.out || []).forEach(([id, at]) => {
+        if (f < at || !pos[id]) return;
+        const s = 1 - (f - at) / TAIL; // 떨어진 뒤 TAIL 프레임 동안 작아지며 흐려진다
+        pos[id] = s > 0 ? { ...pos[id], s: 0.4 + 0.6 * s, alpha: s, gone: true } : null;
+      });
+      return pos;
+    }
+    function stepReplay(now) {
+      const { shot } = cur, fps = (match && match.fps) || 30;
+      const f = ((now - cur.t0) / 1000) * fps, end = shot.frames.length - 1;
+      const fi = Math.floor(Math.min(f, end));
+      (shot.hits || []).forEach((h) => { if (h > cur.last && h <= fi) sfx("tap"); });
+      let dropped = false;
+      (shot.out || []).forEach(([, at]) => { if (at > cur.last && at <= fi) dropped = true; });
+      if (dropped) sfx("drop");
+      cur.last = fi;
+      disp = shotPos(shot, Math.min(f, end));
+      if (dropped) setStrip();
+      if (f >= end) { const done = cur.done; cur = null; done(); }
+    }
+    function playShot(shot) {
+      return new Promise((done) => {
+        disp = shotPos(shot, 0);
+        cur = { shot, t0: performance.now(), last: 0, done };
+        kick();
+      });
+    }
+    function cancelReplay() {
+      replayToken++;
+      replaying = false;
+      if (cur) { const done = cur.done; cur = null; done(); }
+    }
+    // 새 샷들을 순서대로 다시 보여 준다 — 끝까지 보여 줬으면 true(중간에 다른 판으로 가면 false)
+    async function replay(shots, lead) {
+      const token = ++replayToken, id = match.id;
+      replaying = true;
+      const alive = () => token === replayToken && match && match.id === id;
+      if (lead) await sleep(lead);
+      for (let k = 0; k < shots.length; k++) {
+        if (!alive()) return false;
+        const shot = shots[k], prev = shots[k - 1];
+        if (prev) {
+          if (prev.by === "me" && shot.by === "rival") { setSay(match.bot ? "컴퓨터가 생각 중…" : "상대가 튕겼어요."); await sleep(match.bot ? 650 : 400); }
+          else await sleep(350);
+          if (!alive()) return false;
+        }
+        disp = (shot.before || []).map((p) => (p ? { x: p[0], y: p[1], s: 1 } : null));
+        shotNo = shot.seq;
+        setStrip();
+        setSay(shot.by === "me" ? "튕겼어요!" : match.bot ? "컴퓨터가 튕겼어요." : "상대가 튕긴 알이에요.");
+        sfx("whoosh");
+        await playShot(shot);
+        if (!alive()) return false;
+        seen[id] = Math.max(seen[id] || 0, shot.seq);
+      }
+      await sleep(250);
+      if (!alive()) return false;
+      replaying = false;
+      return true;
+    }
+    // 새로 볼 샷이 있으면 보여 주고, 끝나면 서버가 준 최종 위치로 맞춘다
+    function run(fresh, lead = 0) {
+      cancelReplay();
+      if (!fresh.length) { disp = staticDisp(match); shotNo = match.shotCount || 0; paintMatch(); schedulePoll(); return; }
+      replaying = true;
+      disp = (fresh[0].before || []).map((p) => (p ? { x: p[0], y: p[1], s: 1 } : null));
+      shotNo = fresh[0].seq - 1;
+      paintMatch();
+      const id = match.id;
+      replay(fresh, lead).then((ok) => {
+        if (!ok || !match || match.id !== id) return;
+        disp = staticDisp(match);
+        shotNo = match.shotCount || 0;
+        paintMatch();
+        schedulePoll();
+      });
+    }
+
+    // ---------- 화면 ----------
+    function statusText() {
+      if (match.status === "DONE") return { win: "이겼어요", lose: "졌어요", draw: "비겼어요" }[match.result] || "끝났어요";
+      if (match.status === "ACTIVE") return match.myTurn ? "내 차례" : `${rivalWord()} 차례`;
+      if (match.status === "PENDING") return match.incoming ? "받은 도전" : "수락 기다리는 중";
+      return match.status === "DECLINED" ? "취소된 도전" : "만료된 도전";
+    }
+    const canPlay = () => !!(match && match.status === "ACTIVE" && match.myTurn && open.open);
+    const ready = () => canPlay() && !sending && !replaying;
+    function sayText() {
+      if (match.status === "PENDING") return match.incoming ? "수락하면 바로 시작해요. 먼저 하는 사람(흑)은 무작위로 정해요." : "상대가 수락하면 바로 시작해요.";
+      if (match.status !== "ACTIVE") return "이 도전은 끝났어요.";
+      if (!open.open) return `${open.opensAt || ""}부터 튕길 수 있어요.`;
+      if (!match.myTurn) return match.bot ? "컴퓨터가 생각 중…" : "상대가 튕기면 바로 보여요.";
+      if (sending) return match.bot ? "튕기는 중… 컴퓨터도 곧 튕겨요." : "튕기는 중…";
+      if (drag) {
+        const a = aimOf();
+        if (!a || !a.ok) return "조금 더 당겨요. 이대로 놓으면 취소돼요.";
+        return `세기 ${Math.round(a.power * 100)}% · 놓으면 튕겨요`;
+      }
+      return "내 알을 눌러 뒤로 당겼다 놓아요. 당긴 반대쪽으로 날아가요.";
+    }
+    function setSay(text) {
+      const say = document.getElementById("ak-say");
+      if (!say || match.status === "DONE") return;
+      say.textContent = text != null ? text : sayText();
+      say.classList.toggle("is-go", text == null && ready());
+    }
+    function counts() { return { me: leftOf(mySeat()), rival: leftOf(1 - mySeat()) }; }
+    function finalCounts() { return { me: match.myLeft || 0, rival: match.rivalLeft || 0 }; }
+    function doneTitle() {
+      const { me, rival } = finalCounts(), r = match.result;
+      if (match.endReason === "RESIGN") return r === "win" ? `${rivalWord()}가 기권했어요` : "기권했어요";
+      if (match.endReason === "TIMEOUT") return r === "win" ? `${rivalWord()}의 시간이 다 됐어요` : "시간이 다 됐어요";
+      if (r === "draw") return `알 ${me} : ${rival}, 비겼어요`;
+      if (match.endReason === "COUNT") return r === "win" ? `알을 더 많이 남겨 이겼어요` : `${rivalWord()}가 알을 더 많이 남겼어요`;
+      if (r === "win") return rival === 0 ? "상대 알을 모두 떨어뜨렸어요" : "이겼어요";
+      return me === 0 ? "내 알이 모두 떨어졌어요" : "졌어요";
+    }
+    function doneNote() {
+      const { me, rival } = finalCounts();
+      const why = ["RESIGN", "TIMEOUT"].includes(match.endReason) ? "" : `${HKMatch.reason(match)} · `;
+      return `${why}${match.shotCount || 0}번 튕김 · 알 ${me} : ${rival}`;
+    }
+    const SND_ON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
+    const SND_OFF = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6"/><path d="m22 9-6 6"/></svg>`;
+    function soundBtn() {
+      if (!window.HKSound) return "";
+      const off = HKSound.isMuted();
+      return `<button type="button" class="ak-snd ${off ? "is-off" : ""}" id="ak-snd" aria-pressed="${off ? "false" : "true"}" aria-label="${off ? "소리 켜기" : "소리 끄기"}" title="${off ? "소리 켜기" : "소리 끄기"}">${off ? SND_OFF : SND_ON}</button>`;
+    }
+    function barHtml() {
+      const s = match.status, hasShots = !!(match.shots && match.shots.length);
+      const again = `<button type="button" class="hk-btn hk-btn--secondary gk__place" id="ak-replay" ${hasShots && !replaying && !sending ? "" : "disabled"}>방금 샷 다시 보기</button>`;
+      if (s === "ACTIVE") return `${again}<button type="button" class="hk-btn hk-btn--secondary" id="ak-resign" ${open.open ? "" : "disabled"}>기권</button>${soundBtn()}`;
+      const list = `<a class="hk-btn hk-btn--secondary gk__place" href="#" style="text-align:center;text-decoration:none">대국 목록</a>`;
+      if (s === "DONE") {
+        const more = match.bot ? "한 판 더" : match.opponent && match.opponent.id ? "다시 도전" : "";
+        return `${list}${more ? `<button type="button" class="hk-btn hk-btn--primary gk__place" id="ak-again" ${open.open ? "" : "disabled"}>${more}</button>` : ""}${soundBtn()}`;
+      }
+      if (s === "PENDING" && match.incoming) {
+        return `<button type="button" class="hk-btn hk-btn--primary gk__place" id="ak-accept" ${open.open ? "" : "disabled"}>수락하고 시작</button>
+          <button type="button" class="hk-btn hk-btn--secondary" id="ak-decline">거절</button>`;
+      }
+      if (s === "PENDING") return `${list}<button type="button" class="hk-btn hk-btn--secondary" id="ak-decline">도전 취소</button>`;
+      return list;
+    }
+    function trayHtml(who) {
+      const seat = who === "me" ? mySeat() : 1 - mySeat(), n = N(), left = leftOf(seat), col = colorOf(seat);
+      const dots = Array.from({ length: n }, (_, k) => `<i class="ak-dot is-${col} ${k >= left ? "is-lost" : ""}"></i>`).join("");
+      return `<div class="ak-tray is-${who}"><span class="ak-tray__label">${who === "me" ? "내 알" : `${esc(rivalWord())} 알`}<b data-left="${who}">${left}</b></span><span class="ak-tray__dots" data-tray="${who}">${dots}</span></div>`;
+    }
+    function stripHtml() {
+      return `<div class="ak-strip">${trayHtml("me")}<div class="ak-count"><b data-shots>${shotNo}</b><small>/ ${match.maxShots || MAX_SHOTS}번 튕김</small></div>${trayHtml("rival")}</div>`;
+    }
+    function setStrip() {
+      if (!root) return;
+      ["me", "rival"].forEach((who) => {
+        const seat = who === "me" ? mySeat() : 1 - mySeat(), left = leftOf(seat);
+        const b = root.querySelector(`[data-left="${who}"]`);
+        if (b) b.textContent = left;
+        root.querySelectorAll(`[data-tray="${who}"] .ak-dot`).forEach((d, k) => d.classList.toggle("is-lost", k >= left));
+      });
+      const s = root.querySelector("[data-shots]");
+      if (s) s.textContent = shotNo;
+    }
+    function stampHtml() {
+      if (match.status !== "DONE") return "";
+      const { me, rival } = finalCounts(), text = { win: "이겼어요", lose: "아쉬워요", draw: "비겼어요" }[match.result] || "끝";
+      return `<div class="ak-stamp is-${esc(match.result || "draw")} ${endFx ? "is-fresh" : ""}" aria-hidden="true"><div><b>${text}</b><small>${me} : ${rival}</small></div></div>`;
+    }
+    function paintMatch() {
+      const playing = match.status === "ACTIVE" || match.status === "DONE";
+      const over = match.status === "DONE" && !replaying;
+      const note = match.status === "ACTIVE" ? `${match.shotCount || 0}번 튕김 · 이번 차례 ${due(match.deadlineAt)}`
+        : match.status === "PENDING" ? `도전장 · ${due(match.deadlineAt)}` : "";
+      const colorName = (seat) => (seat === 0 ? "흑 · 먼저" : "백 · 나중");
+      const sub = playing && match.mySeat != null ? { me: colorName(mySeat()), rival: colorName(1 - mySeat()) } : {};
+      const { me, rival } = counts();
+      const label = playing ? `알까기 판 — 내 알 ${me}개, ${rivalWord()} 알 ${rival}개` : "알까기 판";
+      root.innerHTML = `<div class="gk ak ${over ? "is-over" : ""}">
+          <a class="gk__back" href="#">‹ 대국 목록</a>
+          ${closedNote(open)}
+          ${HKMatch.versus(match, statusText(), sub)}
+          <div class="ak-table">
+            ${playing ? stripHtml() : ""}
+            <canvas class="ak-board ${ready() ? "is-live" : ""}" id="ak-board" role="img" aria-label="${esc(label)}"></canvas>
+            ${over ? `<div class="ak-say is-done" id="ak-say"><b>${esc(doneTitle())}</b><small>${esc(doneNote())}</small></div>${stampHtml()}`
+              : `<div class="ak-say ${ready() ? "is-go" : ""}" id="ak-say" aria-live="polite">${esc(replaying ? "" : sayText())}</div>`}
+          </div>
+          <div class="gk__bar" id="ak-bar">${barHtml()}</div>
+          ${note ? `<div class="gk__due">${esc(note)}</div>` : ""}
+        </div>`;
+      if (!playing) disp = [];
+      setupCanvas();
+      if (over && endFx) {
+        sfx({ win: "win", lose: "lose" }[match.result] || "success");
+        endFx = false;
+      }
+    }
+
+    // ---------- 조작(새총) ----------
+    function boardPoint(e) {
+      const r = cv.getBoundingClientRect(), k = VIEW / r.width;
+      return { x: (e.clientX - r.left) * k - PAD, y: (e.clientY - r.top) * k - PAD };
+    }
+    function stoneAt(pt) {
+      let best = null, bd = PICK;
+      disp.forEach((p, id) => {
+        if (!p || p.gone || owner(id) !== mySeat()) return;
+        const [x, y] = toScreen(p.x, p.y), d = Math.hypot(x - pt.x, y - pt.y);
+        if (d < bd) { bd = d; best = id; }
+      });
+      return best;
+    }
+    function onDown(e) {
+      if (!ready() || drag) return;
+      const pt = boardPoint(e), id = stoneAt(pt);
+      if (id == null) return;
+      e.preventDefault();
+      try { cv.setPointerCapture(e.pointerId); } catch (_) { /* 그만 */ }
+      drag = { stone: id, x: pt.x, y: pt.y, pid: e.pointerId };
+      cv.classList.add("is-drag");
+      sfx("select");
+      setSay();
+      draw();
+    }
+    function onMove(e) {
+      if (drag) {
+        if (e.pointerId !== drag.pid) return;
+        const pt = boardPoint(e);
+        drag.x = pt.x; drag.y = pt.y;
+        setSay();
+        draw();
+        return;
+      }
+      if (e.pointerType !== "mouse" || !ready()) return;
+      const id = stoneAt(boardPoint(e));
+      if (id !== hover) { hover = id; draw(); }
+    }
+    function cancelDrag() {
+      if (!drag) return;
+      drag = null;
+      if (cv) cv.classList.remove("is-drag");
+      setSay();
+      draw();
+    }
+    function onUp(e) {
+      if (!drag || e.pointerId !== drag.pid) return;
+      const a = aimOf(), stone = drag.stone;
+      drag = null;
+      cv.classList.remove("is-drag");
+      if (!a || !a.ok || !ready()) { setSay(); draw(); return; }
+      // 화면 방향(당긴 반대쪽) → 서버 방향. 판을 돌려 보고 있으면 180도 되돌린다
+      let ang = Math.atan2(-a.dy, -a.dx) + (flip() ? Math.PI : 0);
+      ang = Math.atan2(Math.sin(ang), Math.cos(ang));
+      const power = Math.max(0.05, Math.min(1, Math.round(a.power * 1000) / 1000));
+      commit(stone, Math.round(ang * 1e5) / 1e5, power);
+    }
+    async function commit(stone, angle, power) {
+      if (!ready()) return;
+      const id = match.id, seq = match.seq;
+      sending = true; hover = null;
+      stopPoll();
+      sfx("tap");
+      setSay();
+      draw();
+      const bar = document.getElementById("ak-bar");
+      if (bar) bar.querySelectorAll("button").forEach((b) => { if (b.id === "ak-replay") b.disabled = true; });
+      let next;
+      try { next = await HKApi.matchMove(id, { data: { stone, angle, power } }, seq); }
+      catch (err) {
+        sending = false;
+        sfx("invalid");
+        fail(err);
+        if (match && match.id === id) showMatch(id);
+        return;
+      }
+      sending = false;
+      if (!match || match.id !== id) return;
+      applyNext(next);
+      if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+    }
+    // 서버가 준 판으로 바꾼다 — 아직 안 본 샷이 있으면 차례로 보여 준 뒤 최종 위치로
+    function applyNext(next, lead = 0) {
+      endFx = endFx || (match.status === "ACTIVE" && next.status === "DONE");
+      if (match.status === "PENDING" && next.status === "ACTIVE") sfx("go"); // 도전을 받아 줬다 — 바로 시작
+      drag = null;
+      match = next;
+      const from = seen[next.id] || 0;
+      run((next.shots || []).filter((s) => s.seq > from), lead);
+    }
+
+    // ---------- 기다리기 · 열기 ----------
+    // 서버에서 판이 바뀔 때까지 기다린다 — 상대가 튕기는 즉시 돌아와 바로 보여 준다. 화면이 보일 때만.
+    // 컴퓨터전은 내 요청 안에서 컴퓨터가 바로 튕겨 기다릴 일이 없다
+    function schedulePoll(delay = 0) {
+      stopPoll();
+      if (!match || ["DONE", "DECLINED", "EXPIRED"].includes(match.status) || match.bot || sending || replaying) return;
+      timer = setTimeout(async () => {
+        timer = 0;
+        if (document.hidden || !match) return; // 다시 보이면 visibilitychange 에서 판을 새로 연다
+        const id = match.id, ctl = new AbortController();
+        waiter = ctl;
+        let next;
+        try { next = await HKApi.matchWait(id, match.seq, match.status, ctl.signal); }
+        catch (_) {
+          if (waiter === ctl) { waiter = null; schedulePoll(3000); } // 잠깐 끊기면 3초 뒤 다시
+          return;
+        }
+        if (waiter !== ctl || !match || match.id !== id) return; // 그새 내가 튕겼거나 다른 판으로 감
+        waiter = null;
+        if (drag || sending) { schedulePoll(1000); return; } // 당기는 중에는 판을 바꾸지 않는다 — 놓은 뒤 다시
+        if (next.seq !== match.seq || next.status !== match.status) applyNext(next);
+        else { match = next; schedulePoll(1000); } // 그대로 돌아왔으면 잠깐 쉬고 다시
+      }, delay);
+    }
+    async function showMatch(id) {
+      stopPoll(); cancelReplay(); drag = null; hover = null;
+      let next;
+      try { [next, open] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
+      catch (e) { fail(e); location.hash = ""; return; }
+      if (next.game !== GAME) { location.href = `/games/${next.game}#m${id}`; return; }
+      try { localStorage.setItem(HOW_KEY, "1"); } catch (_) { /* 저장 못 해도 그만 */ }
+      const shots = next.shots || [];
+      let fresh = [], lead = 0;
+      if (seen[id] != null) fresh = shots.filter((s) => s.seq > seen[id]);
+      else if (next.status === "ACTIVE" && next.myTurn && shots.length && shots[shots.length - 1].by === "rival") {
+        // 처음 열었으면 상대가 마지막에 튕긴 샷(들)을 다시 보여 준다
+        let k = shots.length;
+        while (k > 0 && shots[k - 1].by === "rival") k--;
+        fresh = shots.slice(k);
+        lead = 350;
+      }
+      seen[id] = fresh.length ? fresh[0].seq - 1 : (shots.length ? shots[shots.length - 1].seq : 0);
+      endFx = false;
+      match = next;
+      run(fresh, lead);
+    }
+    async function showLobby() {
+      stopPoll(); cancelReplay(); match = null; drag = null;
+      open = await HKMatch.lobby(root, GAME, {
+        title: "사내 알까기",
+        lead: "바둑판 위 내 알을 튕겨 상대 알을 판 밖으로 밀어내요. 동료에게 도전장을 보내거나 컴퓨터와 해 봐요. 끝나면 오늘 도장을 받아요.",
+        intro: howHtml(),
+        bot: BOT_LEVELS,
+        labels: { bot: "컴퓨터와 하기" },
+        rankNote: "기권·시간 초과는 6번 이상 튕긴 판만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요",
+        rowNote: (m) => `알 ${m.myLeft ?? 0} : ${m.rivalLeft ?? 0} · ${due(m.deadlineAt)}`,
+        resultNote: (m) => `${HKMatch.reason(m)}${m.myLeft != null ? ` · 알 ${m.myLeft} : ${m.rivalLeft}` : ""}`,
+      });
+      if (match) return; // 그새 대국 화면으로 갔다
+      // 둘이서 하는 게임 모음(함께하기)으로 가는 길
+      root.querySelector(".gk__back")?.insertAdjacentHTML("afterend", `<a class="gk__back" href="/together" style="margin-left:14px">함께하기 ›</a>`);
+      const how = root.querySelector(".ak-how");
+      if (how) how.addEventListener("toggle", () => { if (!how.open) try { localStorage.setItem(HOW_KEY, "1"); } catch (_) { /* 그만 */ } });
+    }
+    // 「이렇게 해요」 — 처음 온 사람에게는 펼쳐 둔다
+    function howHtml() {
+      let first = true;
+      try { first = !localStorage.getItem(HOW_KEY); } catch (_) { /* 그대로 */ }
+      // 그림: 흑 알을 뒤로 당겨(점선) 화살표 쪽으로 튕기면 백 알이 판 밖으로 밀려나는 모습
+      const pic = `<svg class="ak-how__pic" viewBox="0 0 240 150" aria-hidden="true">
+          <defs>
+            <radialGradient id="akh-b" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#777"/><stop offset=".35" stop-color="#2b2b2b"/><stop offset="1" stop-color="#050505"/></radialGradient>
+            <radialGradient id="akh-w" cx="35%" cy="30%" r="70%"><stop offset="0" stop-color="#fff"/><stop offset=".6" stop-color="#f1eee7"/><stop offset="1" stop-color="#c3beb2"/></radialGradient>
+            <linearGradient id="akh-wood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ecc683"/><stop offset="1" stop-color="#d6a35a"/></linearGradient>
+          </defs>
+          <rect width="240" height="150" fill="#3a332d"/>
+          <rect x="10" y="22" width="190" height="120" rx="5" fill="url(#akh-wood)"/>
+          <g stroke="rgba(45,28,10,.55)" stroke-width="1">
+            <path d="M22 34H200M22 56H200M22 78H200M22 100H200M22 122H200M22 34V142M47 34V142M72 34V142M97 34V142M122 34V142M147 34V142M172 34V142M197 34V142"/>
+          </g>
+          <path d="M70 128 52 140" stroke="#fff" stroke-width="2.5" stroke-dasharray="4 4" stroke-linecap="round"/>
+          <circle cx="52" cy="140" r="3.5" fill="#fff"/>
+          <path d="M84 110 132 66" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
+          <path d="M141 58 124 64 134 74z" fill="#f59e0b"/>
+          <circle cx="160" cy="44" r="11" fill="url(#akh-w)" stroke="rgba(0,0,0,.18)"/>
+          <circle cx="196" cy="16" r="8" fill="url(#akh-w)" opacity=".55"/>
+          <path d="M176 32 188 22" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+          <circle cx="72" cy="122" r="12" fill="url(#akh-b)"/>
+          <circle cx="130" cy="122" r="12" fill="url(#akh-b)"/>
+          <circle cx="104" cy="44" r="11" fill="url(#akh-w)" stroke="rgba(0,0,0,.18)"/>
+        </svg>`;
+      return `<details class="ak-how" ${first ? "open" : ""}><summary>이렇게 해요 <small>1분이면 알아요</small></summary>
+          <div class="ak-how__body">${pic}
+            <div>
+              <ol>
+                <li>차례마다 <b>내 알 하나</b>를 눌러 뒤로 당겼다 놓아요. 당긴 반대쪽으로 날아가요.</li>
+                <li>길게 당길수록 세게 나가요.</li>
+                <li>상대 알을 판 밖으로 밀어내요. 알의 가운데가 판을 벗어나면 떨어진 거예요.</li>
+                <li>상대 알을 <b>모두 떨어뜨리면</b> 이겨요. 60번 튕길 때까지 안 끝나면 알이 더 많이 남은 쪽이 이겨요.</li>
+                <li>한 번 튕기는 데 24시간까지 기다려요. 넘기면 시간 초과로 져요.</li>
+              </ol>
+              <div class="ak-how__tip">너무 세게 치면 내 알도 같이 떨어질 수 있어요. 비스듬히 맞히면 상대 알이 옆으로 튀어요.</div>
+            </div>
+          </div>
+        </details>`;
+    }
+
+    function route() {
+      const m = /^#m(\d+)$/.exec(location.hash);
+      if (m) showMatch(Number(m[1])); else showLobby();
+    }
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div id="gk-root"></div>`,
+      afterMount: () => {
+        root = document.getElementById("gk-root");
+        if (window.HKSound && HKSound.onChange) HKSound.onChange(() => { const b = document.getElementById("ak-snd"); if (b) b.outerHTML = soundBtn(); });
+        root.addEventListener("click", async (e) => {
+          const t = e.target.closest("button, a");
+          if (!t) return;
+          if (t.id === "ak-snd") { HKSound.toggle(); if (!HKSound.isMuted()) sfx("select"); return; }
+          if (t.id === "ak-replay") {
+            if (!match || replaying || sending || !(match.shots || []).length) return;
+            const shots = match.shots, k = Math.max(0, shots.length - (match.bot && shots.length >= 2 ? 2 : 1));
+            const keepSeen = seen[match.id];
+            seen[match.id] = shots[k].seq - 1;
+            run(shots.slice(k));
+            seen[match.id] = Math.max(keepSeen || 0, seen[match.id]);
+            return;
+          }
+          if (t.id === "ak-resign") {
+            if (!(await HKUI.confirmDialog("기권할까요?", "이 판은 패배로 끝나요.", { confirmLabel: "기권" }))) return;
+            const id = match && match.id;
+            try { const r = await HKApi.matchResign(id); if (match && match.id === id) applyNext(r); } catch (err) { fail(err); }
+            return;
+          }
+          if (t.id === "ak-accept" || t.id === "ak-decline") {
+            const id = match.id;
+            t.disabled = true;
+            try {
+              const r = await (t.id === "ak-accept" ? HKApi.matchAccept(id) : HKApi.matchDecline(id));
+              if (match && match.id === id) applyNext(r);
+            } catch (err) { fail(err); if (match && match.id === id) showMatch(id); }
+            return;
+          }
+          if (t.id === "ak-again") {
+            t.disabled = true;
+            try {
+              if (match.bot) { const m = await HKApi.matchBot(match.bot, GAME); location.hash = `m${m.id}`; }
+              else { await HKApi.matchCreate(match.opponent.id, GAME); HKUI.toast("도전장을 보냈어요"); location.hash = ""; }
+            } catch (err) { fail(err); t.disabled = false; }
+            return;
+          }
+          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
+          await HKMatch.act(t, GAME, showLobby);
+        });
+        window.addEventListener("hashchange", route);
+        window.addEventListener("resize", () => { if (cv && document.body.contains(cv)) sizeCanvas(); });
+        window.addEventListener("keydown", (e) => { if (e.key === "Escape" && drag) cancelDrag(); });
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && match && !sending && !replaying && !drag) showMatch(match.id); });
+        route();
+      },
+    });
+  </script>
+</body>
+</html>

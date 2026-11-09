@@ -13,9 +13,9 @@
   <script src="/_shared/api.js"></script>
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/play.js"></script>
-  <script src="/_shared/series-art.js"></script>
   <script src="/_shared/coop-story.js"></script>
   <script src="/_shared/mgmt-art.js"></script>
+  <script src="/_shared/retro-art.js"></script>
   <script src="/_shared/raid.js"></script>
 </head>
 <body>
@@ -28,6 +28,8 @@
       snake: "액션", stack: "액션", coffee: "액션", mines: "퍼즐", promote: "퍼즐", nightshift: "액션", gomoku: "대전", chess: "대전", escape: "협동", kitchen: "협동", words: "협동", maze: "협동", clown: "액션", milk: "액션", theater: "액션", trial: "액션", silent: "액션", parade: "액션", finale: "액션",
       baseball: "대전", boxes: "대전", quizduel: "대전", gostop: "대전", memory: "대전", soccer: "대전", volley: "대전",
       sketch: "협동", sync: "협동", spotdiff: "협동", bounce: "액션", dodge: "액션",
+      fighter: "레트로", vitamin: "레트로", jumper: "레트로", paperjet: "레트로",
+      watersort: "퍼즐", rummy: "대전", alkkagi: "대전",
     };
     const esc = (t) => HKUI.escapeHtml(t);
     // 게임 그림 — 서버가 그림을 한 달 동안 캐시하므로, 그림을 바꾸면 여기 숫자를 올려 새 그림을 받게 한다
@@ -149,16 +151,6 @@
       return order[((n % order.length) + order.length) % order.length];
     }
 
-    // 게임 찾기의 기본 순서 — 벽돌 깨기를 점심 블록 앞에 둔다 (나머지는 그대로)
-    function gridOrder(games) {
-      const list = games.filter((g) => g.key !== "bricks");
-      const bricks = games.find((g) => g.key === "bricks");
-      if (!bricks) return games;
-      const at = list.findIndex((g) => g.key === "blocks");
-      list.splice(at < 0 ? 0 : at, 0, bricks);
-      return list;
-    }
-
     // 게임 모음 — 제목 · 이번 주 대표 게임 · 게임 찾기(검색칸 + 분류 칩 + 결과)
     function collectionHtml(games, allGames) {
       const lead = weeklyLead(games);
@@ -182,7 +174,7 @@
     // ── 게임 찾기 ──────────────────────────────────────────
     // 검색칸(제목 · 장르 · 설명 · 초성)과 분류 칩으로 모든 게임을 고른다. 흐르는 타일 · 「모든 게임 보기」 자리를 대신한다
     // 분류는 GENRE 를 따른다 — 이 순서로, 이 환경에 게임이 있는 분류만 칩을 보인다 (장르가 없으면 기타)
-    const FIND_CATS = [["puzzle", "퍼즐"], ["action", "액션"], ["shooting", "슈팅"], ["casual", "캐주얼"], ["quiz", "퀴즈"], ["lang", "어학"], ["versus", "대전"], ["coop", "협동"], ["etc", "기타"]];
+    const FIND_CATS = [["puzzle", "퍼즐"], ["action", "액션"], ["retro", "레트로"], ["shooting", "슈팅"], ["casual", "캐주얼"], ["quiz", "퀴즈"], ["lang", "어학"], ["versus", "대전"], ["coop", "협동"], ["etc", "기타"]];
     // 분류를 가로지르는 묶음 — 오늘의 도전(모두 같은 판) · 꿀알바 시리즈(1화 심야 편의점 + 시리즈 페이지에서만 고르는 2~8화)
     const FIND_SETS = [["daily", "오늘의 도전", "sparkles"], ["series", "꿀알바 시리즈", "moon"]];
     const FIND_SUGGEST = ["puzzle", "quiz", "action"]; // 찾는 게임이 없을 때 권하는 분류
@@ -201,10 +193,10 @@
     // 꿀알바 시리즈(1~8화)는 「꿀알바 시리즈」 칩에서만 보인다 — 전체 · 분류 · 오늘의 도전에는 넣지 않는다
     const inFindCat = (it, cat) => cat === "series" ? it.series : !it.series && (cat === "all" || (cat === "daily" ? it.daily : it.cat === cat));
 
-    // 찾기 목록 — 아케이드 게임(기본 순서) 뒤에 시리즈 2~8화. 비교용 글자는 미리 만들어 둔다
+    // 찾기 목록 — 아케이드 게임(서버 순서 = 최근에 만든 게임부터) 뒤에 시리즈 2~8화. 비교용 글자는 미리 만들어 둔다
     function findIndex(games, allGames) {
       const series = SERIES_ONLY.map((k) => allGames.find((g) => g.key === k)).filter(Boolean);
-      return gridOrder(games).concat(series).map((g) => {
+      return games.concat(series).map((g) => {
         const genre = GENRE[g.key] || "기타";
         const cat = (FIND_CATS.find(([, name]) => name === genre) || ["etc"])[0];
         const isSeries = SERIES_EPISODES.includes(g.key);
@@ -570,12 +562,9 @@
       root.querySelectorAll(".hk-aa-wall").forEach((el) => io.observe(el));
     }
 
-    // 꿀알바 시리즈 입구 — 시리즈 게임은 시리즈 페이지에서만 고른다 (1화 심야 편의점은 아케이드에도 있다)
+    // 꿀알바 시리즈 2~8화 — 게임 찾기의 「꿀알바 시리즈」 칩에서만 보인다 (1화 심야 편의점은 다른 분류에도 있다)
     const SERIES_ONLY = ["clown", "milk", "theater", "trial", "silent", "parade", "finale"];
     const SERIES_EPISODES = ["nightshift", ...SERIES_ONLY]; // 시리즈 1~8화 — 게임 찾기의 「꿀알바 시리즈」 묶음
-    function seriesHtml() {
-      return `<a class="hk-aa-series" href="/series"><canvas class="hk-aa-series__art" width="${HKSeriesArt.width}" height="${HKSeriesArt.height}" aria-hidden="true"></canvas><small>새 시리즈 · 게임 8편</small><b>꿀알바 시리즈</b><span>밤에만 여는 인력사무소의 구인 공고 보러 가기 ›</span></a>`;
-    }
 
     // 매니지먼트 입구 — 매일 조금씩 키우는 게임 모음 /manage. 게임마다 그림 하나(mgmt-art.js)
     function manageHtml() {
@@ -589,9 +578,21 @@
         </a>`;
     }
 
-    // 입구 배너 셋 — 함께하기 · 매니지먼트 · 꿀알바 시리즈를 한 줄에 3등분해서 모두 보여 준다 (휴대폰 · 좁은 화면은 위아래로)
+    // 레트로 오락실 입구 — 옛날 오락실풍 횡스크롤 게임 모음 /retro. 게임마다 작은 픽셀 그림(retro-art.js)
+    function retroHtml() {
+      const A = window.HKRetroArt;
+      const tiles = A ? A.keys.map((k) => `<span class="rt-entry__tile">${A.shot(k)}</span>`).join("") : "";
+      return `<a class="rt-entry" href="/retro">
+          <span class="rt-entry__copy"><small>새 카테고리 · 옛날 오락실풍 횡스크롤</small><b>레트로 오락실</b>
+            <span>동전 하나로 버티던 그 시절처럼. 때리고, 쏘고, 뛰고, 날아서 끝판왕까지. 점수는 사내 순위에 올라가요.</span>
+            <span class="rt-entry__go">레트로 오락실 가기 ›</span></span>
+          ${tiles ? `<span class="rt-entry__day" aria-hidden="true">${tiles}</span>` : ""}
+        </a>`;
+    }
+
+    // 입구 배너 셋 — 함께하기 · 매니지먼트 · 레트로 오락실을 한 줄에 3등분 (휴대폰 · 좁은 화면은 위아래로). 꿀알바 시리즈는 게임 찾기 「꿀알바 시리즈」 칩에서
     function trioHtml() {
-      return `<div class="hk-aa-wrap" id="aa-together"><div class="hk-aa-trio">${togetherHtml()}${manageHtml()}${seriesHtml()}</div></div>`;
+      return `<div class="hk-aa-wrap" id="aa-together"><div class="hk-aa-trio">${togetherHtml()}${manageHtml()}${retroHtml()}</div></div>`;
     }
 
     // 맨 위로 — 한 화면쯤 내려가면 오른쪽 아래에 나타난다
@@ -628,27 +629,11 @@
         </a>`;
     }
 
-    // 입구 배경 — 시리즈 페이지와 같은 밤골목 그림. 화면에 보일 때만 움직인다
-    function animateSeriesEntrance(root) {
-      const art = root.querySelector(".hk-aa-series__art");
-      if (!art) return;
-      HKSeriesArt.drawScene(art, 0, { title: false });
-      let raf = 0, lastDraw = 0, seen = false;
-      const loop = (t) => {
-        raf = 0;
-        if (t - lastDraw > 80) { lastDraw = t; HKSeriesArt.drawScene(art, t, { title: false }); }
-        if (seen && !document.hidden) raf = requestAnimationFrame(loop);
-      };
-      const wake = () => { if (seen && !document.hidden && !raf) raf = requestAnimationFrame(loop); };
-      if (window.IntersectionObserver) new IntersectionObserver(([en]) => { seen = en.isIntersecting; wake(); }).observe(art);
-      document.addEventListener("visibilitychange", wake);
-    }
-
     // 대전 알림 — 내 차례이거나 받은 도전이 있으면 도장판 바로 아래 알림 칸(#aa-notices)에 띄운다
-    // [게임 key, 이름, 「…러 가기」] — 실시간 경기(축구 · 배구)의 「내 차례」는 아직 들어가지 않은 경기
+    // [게임 key, 이름, 「…러 가기」] — 최근에 만든 게임부터. 실시간 경기(축구 · 배구)의 「내 차례」는 아직 들어가지 않은 경기
     const MATCH_NOTICE = [
-      ["chess", "체스", "두러"], ["gomoku", "오목", "두러"], ["baseball", "숫자 야구"], ["boxes", "칸 따먹기"], ["quizduel", "1:1 퀴즈", "풀러"],
-      ["gostop", "고스톱", "치러"], ["memory", "도형 짝맞추기"], ["soccer", "헤딩 축구"], ["volley", "옥상 배구"],
+      ["rummy", "타일 러미", "두러"], ["alkkagi", "알까기", "두러"], ["volley", "옥상 배구"], ["soccer", "헤딩 축구"], ["memory", "도형 짝맞추기"],
+      ["gostop", "고스톱", "치러"], ["quizduel", "1:1 퀴즈", "풀러"], ["boxes", "칸 따먹기"], ["baseball", "숫자 야구"], ["chess", "체스", "두러"], ["gomoku", "오목", "두러"],
     ];
     async function matchNotice(root) {
       const box = root.querySelector("#aa-notices"); // 도장판 바로 아래 알림 칸 (꿀알바 입구는 자주 묻는 질문 위로 옮겼다)
@@ -813,7 +798,6 @@
           body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + `<div class="hk-aa-wrap" id="aa-notices"></div>` + trioHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + collectionHtml(games, allGames) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
           bindFind(body);
-          animateSeriesEntrance(body);
           bindHof(body);
           matchNotice(body);
           if (window.HKRaid) HKRaid.renderWidget(document.getElementById("aa-raid")).catch(() => null);
@@ -832,7 +816,7 @@
           const a = e.target.closest("[data-scroll]");
           if (!a) return;
           e.preventDefault();
-          // 지금 플레이 · 맨 아래 게임 고르기 → 배너 영역(함께하기 · 매니지먼트 · 꿀알바 시리즈)부터
+          // 지금 플레이 · 맨 아래 게임 고르기 → 배너 영역(함께하기 · 매니지먼트 · 레트로 오락실)부터
           // 위에 붙어 있는 머리(메뉴 줄)에 가리지 않게 그 높이 + 16px 만큼 띄운다
           const to = document.getElementById(a.dataset.scroll || "aa-games") || document.getElementById("aa-games");
           if (!to) return;

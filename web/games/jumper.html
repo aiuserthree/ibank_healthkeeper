@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>점심 원정대 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/jumper.js"></script>
+  <style>
+    /* 점심 원정대 — 레트로 오락실 플랫폼 점프 액션 */
+    /* 가로로 긴 화면이라 공통 창(세로 비율)을 이 게임만 가운데 영역 가득 넓힌다 (비타민 특공대와 같은 방식) — 흰 카드 테두리 없이 어두운 판 */
+    .hk-pf .hk-play-frame.jp-wide { width: 100% !important; height: 100% !important; max-width: 1240px; background: #140c2a; border-color: #140c2a; box-shadow: none; }
+    /* 눕힌 휴대폰은 창을 화면 폭에 가득 (게임이 body 에 jp-land 를 붙인다) */
+    .jp-land .hk-pf .hk-play-frame { width: 100% !important; padding: 2px; }
+    .jp-land .hk-pf .hk-pf__main { padding: 2px !important; }
+    .jp-page .hk-play-stage, .jp-page .hk-play-frame { touch-action: none; }
+    .jp { --jp-w: 768px; position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 0; border-radius: 16px; background: radial-gradient(120% 90% at 50% 0%, #2b2350 0%, #1a1033 55%, #140c2a 100%); color: #fff6e0; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; font-family: "Galmuri11", system-ui, sans-serif; }
+    .hk-pf .hk-play-stage > .jp { flex: 1 1 auto; justify-content: center; }
+    .jp-hud { width: var(--jp-w); max-width: 100%; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 10px; border-radius: 10px; background: rgba(20, 12, 42, .72); box-shadow: inset 0 0 0 1px rgba(255, 246, 224, .28), 0 2px 0 rgba(0, 0, 0, .25); font-size: 13px; line-height: 1; white-space: nowrap; }
+    .jp-hud__i { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
+    .jp-hud small { font-family: "Galmuri9", "Galmuri11", sans-serif; font-size: 10px; color: #b9b6e6; }
+    .jp-hud b { font-family: "GalmuriMono11", "Galmuri11", monospace; font-weight: 400; font-size: 13px; color: #fff6e0; letter-spacing: .02em; text-shadow: 1px 1px 0 #140c2a; }
+    .jp-hud__score b { color: #ffd65a; }
+    .jp-hud b.is-pop { animation: jpPop .22s steps(3); }
+    @keyframes jpPop { 0% { transform: translateY(-3px); } 100% { transform: none; } }
+    .jp-hud .is-hurry b { color: #ff7aa0; animation: jpBlink .5s steps(1) infinite; }
+    @keyframes jpBlink { 50% { opacity: .35; } }
+    .jp-tk, .jp-life { display: inline-block; width: 18px; height: 14px; background: center / contain no-repeat; image-rendering: pixelated; }
+    .jp-life { width: 20px; height: 18px; }
+    .jp-screen { position: relative; line-height: 0; border-radius: 6px; overflow: hidden; box-shadow: 0 0 0 2px #140c2a, 0 0 0 3px rgba(255, 246, 224, .22), 0 10px 30px rgba(10, 6, 30, .55); touch-action: none; }
+    .jp-cv { display: block; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; background: #140c2a; }
+    .jp-toast { position: absolute; left: 50%; bottom: 12%; transform: translate(-50%, 6px); padding: 6px 12px; border-radius: 8px; background: rgba(20, 12, 42, .82); box-shadow: inset 0 0 0 1px rgba(255, 246, 224, .35); color: #fff6e0; font: 12px/1.3 "Galmuri11", sans-serif; white-space: nowrap; opacity: 0; transition: opacity .15s, transform .15s; pointer-events: none; }
+    .jp-toast.is-on { opacity: 1; transform: translate(-50%, 0); }
+    .jp-help { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; max-width: var(--jp-w); font: 11px/1.6 "Galmuri9", "Galmuri11", sans-serif; color: #b9b6e6; }
+    .jp-help kbd, .jp-card kbd { display: inline-block; min-width: 16px; margin: 0 1px; padding: 0 4px; border-radius: 3px; background: #2b2350; box-shadow: inset 0 -2px 0 #140c2a, 0 0 0 1px rgba(255, 246, 224, .3); color: #fff6e0; font: 10px/1.7 "Galmuri9", sans-serif; text-align: center; }
+    .jp.is-touch .jp-help { display: none; }
+    /* 휴대폰 조작판 — 유리 느낌 */
+    .jp-pad { display: none; width: var(--jp-w); max-width: 100%; box-sizing: border-box; justify-content: space-between; align-items: flex-end; padding: 4px 6px 2px; touch-action: none; }
+    .jp.is-touch .jp-pad { display: flex; }
+    .jp-btn { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; box-sizing: border-box; border-radius: 16px; background: rgba(43, 35, 80, .78); box-shadow: inset 0 0 0 1px rgba(255, 246, 224, .3), inset 0 -4px 0 rgba(10, 6, 30, .5); color: #c8fff0; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    .jp-btn svg { width: 30px; height: 30px; image-rendering: pixelated; }
+    .jp-btn small { font: 10px/1 "Galmuri9", sans-serif; color: #b9b6e6; }
+    /* 세로 휴대폰 — 게임 화면은 위, 조작판은 엄지가 닿는 아래 */
+    .jp.is-touch:not(.is-land) { justify-content: flex-start; }
+    .jp.is-touch:not(.is-land) .jp-pad { margin-top: auto; padding-bottom: 8px; }
+    .jp-pad__dir { display: grid; grid-template-columns: 74px 74px; grid-template-rows: 74px 46px; gap: 8px 10px; }
+    .jp-pad__dir [data-k="l"] { grid-column: 1; grid-row: 1; }
+    .jp-pad__dir [data-k="r"] { grid-column: 2; grid-row: 1; }
+    .jp-pad__dir [data-k="down"] { grid-column: 1 / 3; grid-row: 2; justify-self: center; width: 90px; height: 46px; }
+    .jp-pad__act { position: relative; width: 180px; height: 128px; }
+    .jp-btn--a { position: absolute; right: 0; top: 0; width: 96px; height: 96px; border-radius: 50%; background: rgba(15, 127, 134, .55); color: #fff6e0; }
+    .jp-btn--b { position: absolute; left: 0; bottom: 0; width: 74px; height: 74px; border-radius: 50%; background: rgba(176, 40, 58, .5); color: #fff6e0; }
+    .jp-btn.is-down { transform: translateY(2px); background: rgba(92, 240, 210, .45); box-shadow: inset 0 0 0 1px rgba(200, 255, 240, .8), inset 0 2px 0 rgba(10, 6, 30, .5); }
+    .jp-btn--b.is-down { background: rgba(255, 122, 90, .6); }
+    @media (max-height: 700px) { .jp-pad__dir { grid-template-columns: 62px 62px; grid-template-rows: 62px 40px; } .jp-pad__act { width: 156px; height: 108px; } .jp-btn--a { width: 80px; height: 80px; } .jp-btn--b { width: 62px; height: 62px; } }
+    /* 눕힌 휴대폰 — 조작판을 게임 화면 위에 반투명으로 겹친다 */
+    .jp.is-land { gap: 4px; padding: 4px 0; }
+    .jp.is-land .jp-hud { position: absolute; z-index: 3; top: 8px; left: 50%; transform: translateX(-50%); width: calc(var(--jp-w) - 16px); padding: 4px 8px; background: rgba(20, 12, 42, .5); }
+    .jp.is-land .jp-pad { position: fixed; z-index: 30; left: max(10px, env(safe-area-inset-left)); right: max(10px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); width: auto; pointer-events: none; padding: 0; }
+    .jp.is-land .jp-pad__dir { display: flex; align-items: flex-end; gap: 8px; }
+    .jp.is-land .jp-pad__dir [data-k="down"] { width: 48px; height: 48px; }
+    .jp.is-land .jp-pad__act { position: static; display: flex; align-items: flex-end; gap: 10px; width: auto; height: auto; }
+    .jp.is-land .jp-btn--a, .jp.is-land .jp-btn--b { position: static; }
+    .jp.is-land .jp-btn--dir { width: 60px; height: 60px; }
+    .jp.is-land .jp-btn--a { width: 74px; height: 74px; }
+    .jp.is-land .jp-btn--b { width: 60px; height: 60px; }
+    .jp.is-land .jp-btn { pointer-events: auto; background: rgba(43, 35, 80, .36); }
+    .jp.is-land .jp-btn--a { background: rgba(15, 127, 134, .34); }
+    .jp.is-land .jp-btn--b { background: rgba(176, 40, 58, .3); }
+    .jp.is-land .jp-btn small { display: none; }
+    .jp.has-over .jp-pad { visibility: hidden; }
+    /* 안내 카드 */
+    .jp-over { position: absolute; inset: 0; z-index: 5; display: flex; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; overflow-y: auto; border-radius: 16px; }
+    .jp-over[hidden] { display: none; }
+    .jp-over[data-where="center"] { background: rgba(20, 12, 42, .5); }
+    .jp-over[data-where="bottom"] { align-items: flex-end; padding-bottom: 18px; }
+    .jp:not(.is-touch) .jp-over[data-where="bottom"] { padding-bottom: 52px; } /* PC 는 아래 안내 줄을 가리지 않게 */
+    .jp-card { width: 100%; max-width: 340px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 16px 16px 14px; border-radius: 12px; background: rgba(26, 16, 51, .94); box-shadow: inset 0 0 0 1px rgba(255, 246, 224, .35), 0 0 0 2px #140c2a, 0 14px 40px rgba(10, 6, 30, .6); text-align: center; color: #fff6e0; }
+    .jp-card--title { max-width: 300px; padding: 10px 14px 8px; background: rgba(26, 16, 51, .78); }
+    .jp-card--title .jp-go { margin: 6px 0 2px; }
+    .jp-card--title p { margin: 0 0 4px; }
+    .jp-card__tag { display: inline-block; padding: 2px 8px; border-radius: 4px; background: #ff2e63; color: #fff6e0; font: 10px/1.5 "Galmuri9", sans-serif; letter-spacing: .1em; }
+    .jp-card h2 { margin: 8px 0 6px; font: 22px/1.2 "Galmuri14", "Galmuri11", sans-serif; color: #ffd65a; text-shadow: 2px 2px 0 #140c2a; }
+    .jp-card p { margin: 0 0 8px; font: 12px/1.6 "Galmuri11", sans-serif; color: #e8e4ff; word-break: keep-all; }
+    .jp-card__big { margin: 6px 0 4px; font: 30px/1.1 "GalmuriMono11", "Galmuri11", monospace; color: #ffd65a; letter-spacing: .06em; text-shadow: 2px 2px 0 #140c2a, 0 0 12px rgba(255, 214, 90, .45); }
+    .jp-card__sub { font-size: 11px !important; color: #b9b6e6 !important; }
+    .jp-card__keys { font-size: 11px !important; color: #c8fff0 !important; line-height: 1.9 !important; }
+    .jp.is-touch .jp-k-pc, .jp:not(.is-touch) .jp-k-ph { display: none; }
+    .jp-blink { font: 14px/1.4 "Galmuri11", sans-serif !important; color: #fff6e0 !important; animation: jpBlink 1s steps(1) infinite; }
+    .jp-go { display: block; width: 100%; margin: 8px 0 4px; padding: 11px; border: 0; border-radius: 10px; background: linear-gradient(#19c2b0, #0f7f86); box-shadow: inset 0 0 0 1px rgba(200, 255, 240, .6), inset 0 -4px 0 #0b4152, 0 3px 0 #140c2a; color: #fff6e0; font: 16px/1.2 "Galmuri11", sans-serif; text-shadow: 1px 1px 0 #0b4152; cursor: pointer; }
+    .jp-go:hover { filter: brightness(1.08); }
+    .jp-go:active { transform: translateY(2px); box-shadow: inset 0 0 0 1px rgba(200, 255, 240, .6), inset 0 -2px 0 #0b4152, 0 1px 0 #140c2a; }
+    .jp-go:focus-visible { outline: 2px solid #ffd65a; outline-offset: 2px; }
+    /* 판이 끝나면 play.js 가 「다시 하기」 옆에 「그만하기」를 붙인다 — 한 줄로 */
+    .jp-card .hk-quit-wrap { display: flex; gap: 8px; margin-top: 8px; }
+    .jp-card .hk-quit-wrap > * { flex: 1 1 0; width: auto; margin: 0; }
+    .jp-card .hk-quit-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: linear-gradient(#45407a, #2b2350); box-shadow: inset 0 0 0 1px rgba(255, 246, 224, .35), inset 0 -4px 0 #1a1033, 0 3px 0 #140c2a; }
+    @media (max-width: 480px) {
+      .jp { padding: 6px 0; gap: 6px; border-radius: 12px; }
+      .jp-hud { padding: 5px 7px; font-size: 12px; }
+      .jp-hud small { display: none; }
+      .jp-hud b { font-size: 12px; }
+      .jp-card h2 { font-size: 19px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  HKPlay.mountGame({
+    key: "jumper",
+    setup(stage, ctx) { window.JumperGame.setup(stage, ctx); },
+  });
+  </script>
+</body>
+</html>

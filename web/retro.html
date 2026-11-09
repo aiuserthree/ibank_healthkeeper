@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/assets/logo-mark.svg">
+  <title>헬스키퍼 — 레트로 오락실 · 옛날 오락실풍 횡스크롤 게임</title>
+  <meta name="description" content="동전 하나로 버티던 그 시절 오락실처럼. 때리고, 쏘고, 뛰고, 나는 횡스크롤 게임 모음. 점수는 사내 순위에 올라가요.">
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/retro-art.js"></script>
+  <style>
+    /* 레트로 오락실 — 옛날 오락실풍 횡스크롤 게임 모음. 매니지먼트 · 함께하기와 같은 큰 글씨 소개 + 게임 카드, 밤 오락실 네온 톤 */
+    .rt { color: #0f172a; background: #fff; overflow-x: clip; }
+    .rt a:hover { text-decoration: none; }
+    .rt-wrap { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
+    .rt-hero { position: relative; overflow: hidden; isolation: isolate; padding: 54px 0 60px; color: #fff;
+      background: radial-gradient(45% 80% at 0% 0%, rgba(219, 39, 119, .42), transparent 62%), radial-gradient(45% 70% at 100% 100%, rgba(56, 189, 248, .35), transparent 60%),
+        linear-gradient(120deg, #12082e 0%, #1e1b4b 50%, #0b1338 100%); }
+    /* 브라운관 줄무늬 */
+    .rt-hero::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(255, 255, 255, .035) 0 1px, transparent 1px 4px); }
+    .rt-hero__in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 44px; }
+    .rt-back { display: inline-flex; align-items: center; min-height: 40px; margin-bottom: 12px; font-size: 14px; font-weight: 700; color: rgba(255, 255, 255, .7); text-decoration: none; }
+    .rt-back:hover { color: #fff; }
+    .rt-kicker { font-size: 14px; font-weight: 800; color: #f9a8d4; }
+    .rt h1.rt-title { margin: 8px 0 0; font-size: clamp(46px, 6.4vw, 86px); line-height: 1; font-weight: 900; letter-spacing: -0.04em; color: #fff; text-shadow: 0 0 18px rgba(236, 72, 153, .65), 0 0 2px #fff; }
+    .rt-lead { margin: 18px 0 0; font-size: clamp(21px, 2.3vw, 28px); line-height: 1.32; font-weight: 800; letter-spacing: -0.02em; word-break: keep-all; }
+    .rt-desc { max-width: 520px; margin: 12px 0 0; font-size: 16px; line-height: 1.7; font-weight: 500; color: rgba(255, 255, 255, .78); word-break: keep-all; }
+    .rt-hours { display: flex; align-items: center; gap: 8px; margin-top: 18px; font-size: 13.5px; font-weight: 600; color: rgba(255, 255, 255, .66); word-break: keep-all; }
+    .rt-coin { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; padding: 8px 14px; border: 2px solid #facc15; border-radius: 10px; font-size: 14px; font-weight: 900; letter-spacing: .04em; color: #facc15; animation: rt-blink 1.2s steps(2, start) infinite; }
+    @keyframes rt-blink { to { visibility: hidden; } }
+    @media (prefers-reduced-motion: reduce) { .rt-coin { animation: none; } }
+    .rt-hero__art { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .rt-hero__art span { position: relative; overflow: hidden; aspect-ratio: 3 / 4; border-radius: 14px; box-shadow: 0 16px 36px rgba(0, 0, 0, .45), 0 0 0 2px rgba(255, 255, 255, .08); }
+    .rt-hero__art span:nth-child(even) { transform: translateY(18px); }
+    .rt-hero__art svg { display: block; width: 100%; height: 100%; }
+
+    .rt-sec { padding: 52px 0 8px; }
+    .rt-sec h2 { margin: 0; font-size: clamp(26px, 3vw, 36px); font-weight: 900; letter-spacing: -0.03em; }
+    .rt-sec > .rt-wrap > p { margin: 8px 0 0; font-size: 16px; color: #475569; word-break: keep-all; }
+    .rt-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 24px; }
+    .rt-card { display: flex; flex-direction: column; overflow: hidden; border-radius: 22px; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 10px 30px rgba(15, 23, 42, .06); color: inherit; text-decoration: none; transition: transform .2s ease, box-shadow .2s ease; }
+    .rt-card:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(15, 23, 42, .12); }
+    .rt-card__art { position: relative; aspect-ratio: 2 / 1; overflow: hidden; background: var(--rt-deep); }
+    .rt-card__art svg, .rt-card__art img { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; }
+    .rt-card__art img { image-rendering: auto; }
+    .rt-card__genre { position: absolute; left: 12px; top: 12px; z-index: 1; padding: 4px 10px; border-radius: 999px; background: rgba(15, 23, 42, .78); color: #fff; font-size: 12.5px; font-weight: 800; }
+    .rt-card__body { display: flex; flex-direction: column; gap: 6px; flex: 1; padding: 18px 20px 20px; }
+    .rt-card__body b { font-size: 22px; font-weight: 900; letter-spacing: -0.02em; }
+    .rt-card__body p { margin: 0; font-size: 14.5px; line-height: 1.55; color: #475569; word-break: keep-all; }
+    .rt-card__foot { display: flex; flex-direction: column; gap: 12px; margin-top: auto; padding-top: 8px; }
+    .rt-card__me { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 9px 12px; border-radius: 12px; background: #f1f5f9; font-size: 13.5px; font-weight: 700; color: #334155; word-break: keep-all; }
+    .rt-card__me span { display: inline-flex; align-items: center; gap: 5px; }
+    .rt-card__go { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; border-radius: 999px; background: var(--rt-main); color: #fff; font-size: 15.5px; font-weight: 800; }
+
+    .rt-keys { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 22px; }
+    .rt-keys div { padding: 18px; border-radius: 18px; background: #f8fafc; }
+    .rt-keys i { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: #fff; color: #be185d; box-shadow: 0 2px 8px rgba(15, 23, 42, .06); }
+    .rt-keys b { display: block; margin-top: 10px; font-size: 16px; font-weight: 800; }
+    .rt-keys span { display: block; margin-top: 4px; font-size: 14px; line-height: 1.6; color: #475569; word-break: keep-all; }
+    .rt-keys kbd { display: inline-block; min-width: 22px; padding: 0 6px; border: 1px solid #cbd5e1; border-bottom-width: 2px; border-radius: 6px; background: #fff; font: 700 12px/20px inherit; text-align: center; color: #0f172a; }
+    .rt-notes { margin: 18px 0 64px; padding: 0 0 0 18px; font-size: 14px; line-height: 1.8; color: #475569; word-break: keep-all; }
+    .rt-loading { display: flex; justify-content: center; padding: 60px 0; }
+
+    @media (max-width: 900px) {
+      .rt-hero__in { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+      .rt-cards, .rt-keys { grid-template-columns: minmax(0, 1fr); }
+    }
+    @media (max-width: 640px) {
+      .rt-wrap { padding: 0 16px; }
+      .rt-hero { padding: 28px 0 40px; }
+      .rt-hero__art { gap: 7px; }
+      .rt-hero__art span { border-radius: 10px; }
+      .rt-sec { padding-top: 36px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 레트로 오락실 — 옛날 오락실풍 횡스크롤 게임 모음. 게임 목록 · 내 최고 기록 · 오늘 1위는 아케이드 게임 목록(HKApi.playGames)에서 가져온다(순서도 그대로 = 최근에 만든 게임부터)
+    const RETRO = { fighter: "벨트스크롤 격투", vitamin: "런앤건 슈팅", jumper: "점프 액션", paperjet: "비행 슈팅" };
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div class="rt" id="rt-root"><div class="rt-loading"><span class="hk-spin"></span></div></div>`,
+      afterMount: async () => {
+        const root = document.getElementById("rt-root");
+        const esc = (s) => HKUI.escapeHtml(String(s ?? ""));
+        let games = [], status = { open: true };
+        try {
+          const [all, st] = await Promise.all([HKApi.playGames(), HKApi.playStatus().catch(() => ({ open: true }))]);
+          games = all.filter((g) => RETRO[g.key]);
+          status = st;
+        } catch (e) {
+          root.innerHTML = `<div class="rt-wrap" style="padding:48px 16px">${HKUI.alertBox("danger", "불러오기 실패", esc(e.message || "목록을 불러오지 못했어요."))}</div>`;
+          return;
+        }
+        const A = window.HKRetroArt;
+        const card = (g) => {
+          const t = A.tone(g.key);
+          const me = [
+            g.myBest != null ? `<span>${HKUI.icon("trophy", 15, "currentColor")}내 최고 ${esc(HKPlay.formatScore(g, g.myBest))}</span>` : `<span>${HKUI.icon("sparkles", 15, "currentColor")}아직 기록이 없어요</span>`,
+            g.todayTop ? `<span>${HKUI.icon("crown", 15, "currentColor")}오늘 1위 ${esc(g.todayTop.name)}</span>` : "",
+          ].join("");
+          return `<a class="rt-card" href="/games/${g.key}" data-play style="--rt-deep:${t.deep};--rt-main:${t.main}">
+              <span class="rt-card__art">${A.scene(g.key, "meet")}<img src="/assets/lounge/${g.key}.jpg" alt="" loading="lazy" onerror="this.remove()"><span class="rt-card__genre">${esc(RETRO[g.key])}</span></span>
+              <span class="rt-card__body"><b>${esc(g.title)}</b><p>${esc(g.desc)}</p>
+                <span class="rt-card__foot"><span class="rt-card__me">${me}</span><span class="rt-card__go">한 판 하기 ${HKUI.icon("arrow-right", 16, "currentColor")}</span></span></span>
+            </a>`;
+        };
+        root.innerHTML = `
+          <div class="rt-hero"><div class="rt-wrap rt-hero__in">
+            <div>
+              <a class="rt-back" href="/arcade">‹ 아케이드</a>
+              <div class="rt-kicker">새 카테고리 · 옛날 오락실풍 횡스크롤 게임</div>
+              <h1 class="rt-title">레트로 오락실</h1>
+              <p class="rt-lead">동전 하나로 버티던<br>그 시절 오락실처럼.</p>
+              <p class="rt-desc">오른쪽으로, 오른쪽으로. 때리고, 쏘고, 뛰고, 날아서 끝판왕까지 가요. 이어 하기는 없어요 — 목숨이 다하면 그 판의 점수가 사내 순위에 올라가요.</p>
+              <div class="rt-hours">${HKUI.icon("clock-3", 15, "currentColor")}점심시간 · 퇴근 후 · 출근 전 · 주말에 열려요.</div>
+              <span class="rt-coin" aria-hidden="true">INSERT COIN</span>
+            </div>
+            <div class="rt-hero__art" aria-hidden="true">${games.map((g) => `<span>${A.shot(g.key)}</span>`).join("")}</div>
+          </div></div>
+          <div class="rt-sec"><div class="rt-wrap">
+            <h2>무엇부터 할까요?</h2>
+            <p>장르가 모두 달라요. 손에 맞는 것부터 한 판 해 보세요.</p>
+            <div class="rt-cards">${games.map(card).join("")}</div>
+          </div></div>
+          <div class="rt-sec"><div class="rt-wrap">
+            <h2>이렇게 조작해요</h2>
+            <div class="rt-keys">
+              <div><i>${HKUI.icon("keyboard", 20, "currentColor")}</i><b>PC 키보드</b><span>방향키(또는 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>)로 움직이고, <kbd>Z</kbd>·<kbd>X</kbd>·<kbd>C</kbd>(또는 <kbd>J</kbd>·<kbd>K</kbd>·<kbd>L</kbd>)로 공격 · 점프 · 특수 기술. <kbd>Esc</kbd>는 잠깐 쉬기. 게임마다 자세한 조작은 시작 화면에 있어요.</span></div>
+              <div><i>${HKUI.icon("smartphone", 20, "currentColor")}</i><b>휴대폰</b><span>왼쪽 아래 방향 패드, 오른쪽 아래 단추로 해요. 여러 단추를 같이 눌러도 돼요. 가로로 돌리면 화면이 더 커져요.</span></div>
+            </div>
+            <ul class="rt-notes">
+              <li>목숨이 다 떨어지거나 끝판왕을 물리치면 그 판이 끝나고, 점수가 바로 사내 순위에 올라가요.</li>
+              <li>이어 하기는 없어요. 처음부터 다시 도전해 기록을 갈아 치워 보세요.</li>
+              <li>한 판을 마치면 아케이드 참여 도장도 찍혀요.</li>
+            </ul>
+          </div></div>`;
+        HKUI.refreshIcons(root);
+        // 업무 시간 — 카드를 누르면 안내 (그사이 열렸으면 그대로 들어간다)
+        root.addEventListener("click", async (e) => {
+          const a = e.target.closest("a[data-play]");
+          if (!a || status.open) return;
+          e.preventDefault();
+          status = await HKApi.playStatus().catch(() => status);
+          if (status.open) return void (location.href = a.getAttribute("href"));
+          HKUI.confirmDialog("지금은 업무 시간이라 쉬어요", `점심시간(11:30~13:00) · 18:00 이후 · 9:00 이전 · 주말에 할 수 있어요.${status.opensAt ? ` ${status.opensAt}에 다시 열려요.` : ""}`, { confirmLabel: "확인", hideCancel: true }).catch(() => null);
+        });
+      },
+    });
+  </script>
+</body>
+</html>

@@ -1287,7 +1287,7 @@ async def send_test_chat_to_member(
 
 # ── 대전 게임(오목 · 체스) ─────────────────────────────────────────
 
-MATCH_GAME_NAME = {"gomoku": "오목", "chess": "체스", "baseball": "숫자 야구", "boxes": "칸 따먹기", "quizduel": "1:1 퀴즈", "gostop": "고스톱", "memory": "도형 짝맞추기", "soccer": "헤딩 축구", "volley": "배구"}
+MATCH_GAME_NAME = {"gomoku": "오목", "chess": "체스", "baseball": "숫자 야구", "boxes": "칸 따먹기", "quizduel": "1:1 퀴즈", "gostop": "고스톱", "memory": "도형 짝맞추기", "soccer": "헤딩 축구", "volley": "배구", "rummy": "타일 러미", "alkkagi": "알까기"}
 
 
 def match_page_url(game: str, match_id: Optional[int] = None) -> str:
@@ -1334,7 +1334,7 @@ def _match_first_line(game: str, turn: str) -> str:
         return "둘 다 대전 화면에 들어오면 바로 경기가 시작돼요."
     if game == "baseball":
         return f"숫자를 정한 뒤 첫 공격은 {turn}."
-    first = {"chess": "첫 수(백)는", "gomoku": "첫 수(흑)는", "boxes": "첫 선은", "gostop": "첫 패는", "memory": "첫 카드는"}
+    first = {"chess": "첫 수(백)는", "gomoku": "첫 수(흑)는", "boxes": "첫 선은", "gostop": "첫 패는", "memory": "첫 카드는", "rummy": "첫 차례는", "alkkagi": "첫 알은"}
     return f"{first.get(game, '첫 차례는')} {turn}."
 
 

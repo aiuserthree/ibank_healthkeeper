@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <!-- 한글 픽셀 글꼴 「갈무리」(OFL) — 못 받으면 기본 글꼴로 그린다 -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/fighter.js"></script>
+  <style>
+    /* 스트레스 파이터 — 오락실 화면(어두운 판) · 머리 표시 · 아래 칸 · 휴대폰 패드 */
+    .hk-pf .hk-play-stage > .ft { flex: 1 1 auto; margin: 0; min-height: 0; }
+    /* 가로로 긴 화면 — 공통 창을 가운데 영역 가득, 흰 카드 테두리 · 그림자 없이 어두운 판으로 */
+    .hk-pf .hk-play-frame.ft-wide { width: 100% !important; height: 100% !important; max-width: 1240px; padding: 0; background: #140c2a; border-color: transparent; box-shadow: none; }
+    .hk-play-stage, .hk-play-frame { touch-action: none; }
+    .ft {
+      --ink: #140c2a; --cream: #fff6e0; --line: rgba(255, 246, 224, .22); --glass: rgba(255, 246, 224, .05);
+      position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; box-sizing: border-box;
+      width: 100%; padding: 8px; border-radius: 14px; background: radial-gradient(120% 80% at 50% 0%, #2a1d55 0%, #1a1033 55%, #140c2a 100%);
+      color: var(--cream); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+      font-family: Galmuri11, "Apple SD Gothic Neo", Pretendard, sans-serif;
+    }
+    .ft[data-mode="port"] { justify-content: flex-start; padding: 4px 4px 0; }
+    .ft[data-mode="land"] { padding: 2px; }
+    .ft-top, .ft-screen { width: var(--cw, 384px); max-width: 100%; box-sizing: border-box; flex-shrink: 0; }
+    /* 머리 표시 */
+    .ft-top { padding: 6px 10px 5px; border: 1px solid var(--line); border-bottom: 0; border-radius: 10px 10px 0 0; background: linear-gradient(180deg, rgba(42, 29, 85, .95), rgba(20, 12, 42, .95)); box-shadow: inset 0 1px 0 rgba(255, 246, 224, .18); }
+    .ft-hud { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
+    .ft-me { display: flex; align-items: center; gap: 7px; min-width: 0; }
+    .ft-face { width: 34px; height: 34px; flex-shrink: 0; image-rendering: pixelated; border: 1px solid var(--line); border-radius: 6px; background: linear-gradient(180deg, #3a2d70, #231a4a); }
+    .ft-me__info { flex: 1; min-width: 0; max-width: 300px; display: flex; flex-direction: column; gap: 3px; }
+    .ft-me__name { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 1; }
+    .ft-me__name b { font-weight: 700; color: #fff6e0; }
+    .ft-lives { display: inline-flex; gap: 3px; }
+    .ft-lives i { width: 9px; height: 8px; background: #ff4f9a; clip-path: polygon(0 25%, 25% 0, 50% 25%, 75% 0, 100% 25%, 100% 50%, 50% 100%, 0 50%); filter: drop-shadow(0 0 3px rgba(255, 79, 154, .7)); }
+    .ft-bar { position: relative; display: block; height: 8px; border: 1px solid rgba(255, 246, 224, .45); border-radius: 2px; background: #241a46; overflow: hidden; box-shadow: inset 0 1px 0 rgba(0, 0, 0, .4); }
+    .ft-bar i, .ft-bar b { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; }
+    .ft-bar b { background: #fff6e0; transition: width .55s ease .18s; }
+    .ft-bar i { background: linear-gradient(180deg, #d8ff8a 0 35%, #7be05a 35% 100%); }
+    .ft-bar.is-low i { background: linear-gradient(180deg, #ffb26b 0 35%, #ff5a5a 35% 100%); animation: ft-low .5s steps(2) infinite; }
+    @keyframes ft-low { 50% { filter: brightness(1.35); } }
+    .ft-time { display: flex; flex-direction: column; align-items: center; line-height: 1; }
+    .ft-time small, .ft-score small { font-family: Galmuri9, Galmuri11, sans-serif; font-size: 10px; color: #b8a8e0; letter-spacing: .06em; }
+    .ft-time canvas, .ft-score canvas { display: block; width: var(--w); height: var(--h); image-rendering: pixelated; margin-top: 2px; }
+    .ft-score { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; min-width: 0; }
+    .ft-score canvas.bump { animation: ft-bump .18s steps(2); }
+    @keyframes ft-bump { 50% { transform: translateY(-2px); } }
+    .ft-sub { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 5px; min-height: 14px; font-size: 12px; }
+    .ft-stage { color: #ffd166; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0 6px rgba(255, 209, 102, .45); }
+    .ft-foe { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 52%; }
+    .ft-foe[hidden] { display: none; }
+    .ft-foe b { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ffd1e6; }
+    .ft-foe .ft-bar { flex: 1; min-width: 50px; height: 7px; }
+    .ft-foe .ft-bar i { background: linear-gradient(180deg, #ffb3d1 0 35%, #ff4f9a 35% 100%); }
+    .ft-foe.is-boss b::before { content: "BOSS "; color: #ff5a76; }
+    .ft-foe.is-boss .ft-bar i { background: linear-gradient(180deg, #ffb26b 0 35%, #ff3b5c 35% 100%); }
+    /* 게임 화면 */
+    .ft-screen { position: relative; line-height: 0; border: 1px solid var(--line); border-top: 0; border-radius: 0 0 10px 10px; overflow: hidden; background: #140c2a; box-shadow: 0 10px 30px rgba(10, 4, 30, .5), 0 0 0 1px rgba(0, 0, 0, .3); }
+    .ft-canvas { display: block; width: var(--cw, 384px); height: var(--ch, 240px); margin: 0 auto; image-rendering: pixelated; image-rendering: crisp-edges; touch-action: none; }
+    /* PC 키 안내 */
+    .ft-keys { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 8px; width: var(--cw, 384px); max-width: 100%; flex-shrink: 0; font-size: 12px; color: #d9cff5; }
+    .ft-keys span { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; }
+    .ft kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border: 1px solid rgba(255, 246, 224, .4); border-bottom-width: 2px; border-radius: 4px; background: rgba(255, 246, 224, .08); font: 700 11px/1 Galmuri11, sans-serif; color: #fff6e0; }
+    .ft[data-mode="port"] .ft-keys, .ft[data-mode="land"] .ft-keys { display: none; }
+    /* 아래 칸 (시작 · 일시정지 · 결과) */
+    .ft-panel { width: var(--cw, 384px); max-width: 100%; margin-top: 10px; box-sizing: border-box; }
+    .ft-panel[hidden] { display: none; }
+    .ft[data-mode="port"] .ft-panel { flex: 1 1 auto; min-height: 0; overflow-y: auto; margin-top: 6px; padding-bottom: 8px; }
+    .ft[data-mode="pc"] .ft-panel, .ft[data-mode="land"] .ft-panel { position: absolute; left: var(--pl, 0); top: var(--pt, 0); width: var(--pw, 100%); height: var(--ph, 100%); z-index: 6; display: flex; align-items: center; justify-content: center; margin: 0; padding: 12px; overflow: hidden; pointer-events: none; }
+    .ft[data-mode="pc"] .ft-panel[hidden], .ft[data-mode="land"] .ft-panel[hidden] { display: none; }
+    .ft[data-mode="pc"] .ft-panel > .ft-card, .ft[data-mode="land"] .ft-panel > .ft-card { pointer-events: auto; width: min(600px, 100%); max-height: 100%; overflow-y: auto; box-sizing: border-box; background: rgba(20, 12, 42, .9); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+    .ft[data-mode="pc"] .ft-panel.is-title { align-items: flex-end; }
+    .ft[data-mode="pc"] .ft-panel.is-title > .ft-card { max-height: 60%; }
+    .ft[data-mode="pc"] .ft-panel > .ft-card.is-small { width: min(420px, 100%); }
+    .ft-card { padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: linear-gradient(180deg, rgba(58, 45, 112, .55), rgba(26, 16, 51, .85)); box-shadow: inset 0 1px 0 rgba(255, 246, 224, .14); text-align: center; }
+    .ft[data-mode="land"] .ft-card { background: rgba(20, 12, 42, .94); }
+    .ft-card h2 { margin: 2px 0 6px; font: 400 15px/1.3 Galmuri14, Galmuri11, sans-serif; font-size: 22px; color: #ffd166; text-shadow: 0 2px 0 #5a1a3a, 0 0 10px rgba(255, 209, 102, .4); }
+    .ft-card p { margin: 0 0 10px; font-size: 12px; line-height: 1.6; color: #e6dcff; word-break: keep-all; }
+    .ft-card p b { color: #ffd166; }
+    .ft-lead { font-size: 12px; }
+    .ft-pick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .ft-hero { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--glass); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .ft-hero canvas { width: 48px; height: 60px; flex-shrink: 0; image-rendering: pixelated; }
+    .ft-hero__txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .ft-hero b { font-size: 12px; font-weight: 700; }
+    .ft-hero small { font-size: 10px; font-family: Galmuri9, Galmuri11, sans-serif; color: #c9bce8; }
+    .ft-stat { display: flex; align-items: center; gap: 4px; font-size: 10px; font-family: Galmuri9, Galmuri11, sans-serif; color: #b8a8e0; }
+    .ft-dots { display: inline-flex; gap: 2px; margin-left: auto; }
+    .ft-dots i { width: 6px; height: 6px; background: #3a2d70; }
+    .ft-dots i.on { background: #ffd166; box-shadow: 0 0 4px rgba(255, 209, 102, .6); }
+    .ft-hero.is-on[data-hero="mint"] { border-color: #2ee6c0; background: rgba(46, 230, 192, .1); box-shadow: 0 0 0 1px #2ee6c0, 0 0 14px rgba(46, 230, 192, .35); }
+    .ft-hero.is-on[data-hero="gom"] { border-color: #ff7a2a; background: rgba(255, 122, 42, .1); box-shadow: 0 0 0 1px #ff7a2a, 0 0 14px rgba(255, 122, 42, .35); }
+    .ft-go { width: 100%; padding: 11px; border: 1px solid rgba(255, 246, 224, .55); border-radius: 6px; background: linear-gradient(180deg, #ff7fb2 0 45%, #ff4f9a 45% 100%); box-shadow: 0 3px 0 #7a1f4a, 0 0 18px rgba(255, 79, 154, .35); color: #fff6e0; font: 700 12px/1 Galmuri11, sans-serif; font-size: 15px; text-shadow: 0 1px 0 #7a1f4a; cursor: pointer; }
+    .ft-go:active { transform: translateY(2px); box-shadow: 0 1px 0 #7a1f4a; }
+    .ft-go:focus-visible { outline: 2px solid #ffd166; outline-offset: 2px; }
+    .ft-sub-btn { width: 100%; padding: 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--glass); color: #e6dcff; font: 700 12px/1 Galmuri11, sans-serif; cursor: pointer; }
+    .ft-actions { display: flex; flex-direction: column; gap: 8px; }
+    .ft-actions .hk-quit-wrap { width: 100%; }
+    .ft-big { margin: 4px 0 12px; font: 400 30px/1 Galmuri14, sans-serif; color: #fff6e0; text-shadow: 0 2px 0 #5a1a3a, 0 0 12px rgba(255, 209, 102, .5); }
+    .ft-card.is-small { max-width: 420px; margin: 0 auto; }
+    .ft-how { margin-top: 10px; text-align: left; border-top: 1px solid var(--line); padding-top: 8px; }
+    .ft-how summary { font-size: 12px; font-weight: 700; color: #ffd166; cursor: pointer; list-style: none; }
+    .ft-how summary::-webkit-details-marker { display: none; }
+    .ft-how summary::before { content: "▸ "; }
+    .ft-how[open] summary::before { content: "▾ "; }
+    .ft-how__list { margin: 6px 0 0; padding: 0; list-style: none; font-family: "Apple SD Gothic Neo", Pretendard, sans-serif; font-size: 12.5px; line-height: 1.6; color: #e6dcff; word-break: keep-all; }
+    .ft-how__list li { padding: 2px 0; }
+    .ft-how__list b { font-family: Galmuri11, sans-serif; color: #fff6e0; margin-right: 4px; }
+    .ft-how__touch { margin: 6px 0 0 !important; font-family: "Apple SD Gothic Neo", Pretendard, sans-serif; font-size: 12.5px !important; }
+    /* 휴대폰 패드 — 반투명 유리 · 픽셀 아이콘 */
+    .ft-pad { display: none; touch-action: none; }
+    .ft[data-mode="port"]:not(.has-panel) .ft-pad { display: flex; flex: 1 1 auto; width: 100%; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px calc(env(safe-area-inset-bottom, 0px) + 12px); box-sizing: border-box; }
+    .ft[data-mode="land"]:not(.has-panel) .ft-pad { display: flex; position: absolute; z-index: 4; left: 0; right: 0; bottom: 6px; align-items: flex-end; justify-content: space-between; padding: 0 calc(env(safe-area-inset-right, 0px) + 8px) 0 calc(env(safe-area-inset-left, 0px) + 8px); pointer-events: none; }
+    .ft[data-mode="land"] .ft-pad > * { pointer-events: auto; opacity: .82; }
+    .ft { --dp: clamp(124px, 36vw, 156px); --ba: clamp(72px, 21vw, 88px); --bj: clamp(62px, 18vw, 74px); --bs: clamp(52px, 15vw, 62px); }
+    .ft[data-mode="land"] { --dp: clamp(104px, 22vh, 128px); --ba: 66px; --bj: 56px; --bs: 48px; }
+    .ft-dpad { position: relative; width: var(--dp); height: var(--dp); flex-shrink: 0; border-radius: 50%; border: 1px solid rgba(255, 246, 224, .35); background: radial-gradient(circle at 35% 30%, rgba(255, 246, 224, .12), rgba(20, 12, 42, .55) 70%); box-shadow: inset 0 1px 0 rgba(255, 246, 224, .25), 0 6px 18px rgba(0, 0, 0, .35); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); touch-action: none; -webkit-tap-highlight-color: transparent; }
+    .ft-dpad i { position: absolute; width: 0; height: 0; border: 7px solid transparent; }
+    .ft-dpad i.is-u { left: 50%; top: 8px; transform: translateX(-50%); border-bottom-color: rgba(255, 246, 224, .55); border-top-width: 0; }
+    .ft-dpad i.is-d { left: 50%; bottom: 8px; transform: translateX(-50%); border-top-color: rgba(255, 246, 224, .55); border-bottom-width: 0; }
+    .ft-dpad i.is-l { top: 50%; left: 8px; transform: translateY(-50%); border-right-color: rgba(255, 246, 224, .55); border-left-width: 0; }
+    .ft-dpad i.is-r { top: 50%; right: 8px; transform: translateY(-50%); border-left-color: rgba(255, 246, 224, .55); border-right-width: 0; }
+    .ft-dpad__knob { position: absolute; left: 28%; top: 28%; width: 44%; height: 44%; border-radius: 50%; border: 1px solid rgba(255, 246, 224, .6); background: radial-gradient(circle at 35% 30%, #5a4a9a, #2a1d55); box-shadow: 0 3px 8px rgba(0, 0, 0, .45), inset 0 1px 0 rgba(255, 246, 224, .35); pointer-events: none; transition: transform .04s linear; }
+    .ft-dpad.is-on .ft-dpad__knob { background: radial-gradient(circle at 35% 30%, #6fe8d0, #1f8f80); }
+    .ft-btns { display: grid; grid-template-columns: auto auto; grid-template-areas: ". sp" "jmp atk"; align-items: center; justify-items: center; gap: 8px 10px; touch-action: none; }
+    .ft-btn { display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 246, 224, .45); background: radial-gradient(circle at 35% 30%, rgba(255, 246, 224, .16), rgba(20, 12, 42, .6) 70%); box-shadow: inset 0 1px 0 rgba(255, 246, 224, .3), 0 4px 0 rgba(0, 0, 0, .35); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); touch-action: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .ft-btn svg { width: 46%; height: 46%; }
+    .ft-btn svg path { fill: currentColor; }
+    .ft-btn svg path.hi { fill: #fff6e0; }
+    .ft-btn.is-atk { grid-area: atk; width: var(--ba); height: var(--ba); color: #ff4f9a; box-shadow: inset 0 0 0 2px rgba(255, 79, 154, .55), 0 4px 0 rgba(0, 0, 0, .35), 0 0 16px rgba(255, 79, 154, .3); }
+    .ft-btn.is-jmp { grid-area: jmp; width: var(--bj); height: var(--bj); color: #6fd3e8; box-shadow: inset 0 0 0 2px rgba(111, 211, 232, .5), 0 4px 0 rgba(0, 0, 0, .35); }
+    .ft-btn.is-sp { grid-area: sp; width: var(--bs); height: var(--bs); color: #ffd166; box-shadow: inset 0 0 0 2px rgba(255, 209, 102, .5), 0 4px 0 rgba(0, 0, 0, .35); }
+    .ft-btn.is-down { transform: translateY(3px) scale(.93); filter: brightness(1.5); }
+    /* 휴대폰 가로 — 위 막대를 얇게, 창을 화면 폭 가득 */
+    @media (pointer: coarse) and (orientation: landscape) {
+      .hk-pf .hk-play-frame { width: 100% !important; padding: 2px; }
+      .ft-top { padding: 3px 8px; }
+      .ft-hud { gap: 6px; }
+      .ft-face { width: 24px; height: 24px; }
+      .ft-sub { display: none; }
+    }
+    @media (max-height: 520px) and (pointer: coarse) {
+      .hk-pf__bar { height: 42px; }
+      .hk-pf__title small, .hk-pf__back span { display: none; }
+      .hk-pf__tools .hk-play-sound span { display: none; }
+      .hk-pf__tools .hk-play-sound { padding: 6px 9px; }
+      .hk-pf .hk-pf__main { padding: 2px !important; }
+    }
+    @media (max-width: 380px) { .ft-pick { grid-template-columns: 1fr; } }
+    @media (prefers-reduced-motion: reduce) { .ft-bar b { transition: none; } .ft-score canvas.bump { animation: none; } }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  HKPlay.mountGame({
+    key: "fighter",
+    setup(stage, ctx) { HKFighter.mount(stage, ctx); },
+  });
+  </script>
+</body>
+</html>

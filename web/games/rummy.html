@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>헬스키퍼 — 타일 러미</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    /* 타일 러미 — 밝은 나무 판 위에 크림색 타일. 색 네 가지는 모양 표시(● ◆ ■ ▲)로도 구분한다 */
+    :root {
+      --rm-c0: #dc2626; --rm-c1: #2563eb; --rm-c2: #ea580c; --rm-c3: #1f2937;
+      --rm-tile: #fffaf0; --rm-tile-edge: #e7dcc3; --rm-board: #f8f4ea; --rm-board-edge: #e6dcc6; --rm-rack: #c9a77a; --rm-rack-dark: #a8845a;
+      --rm-sel: #2563eb; --rm-new: #f59e0b; --rm-bad: #e11d48; --rm-ok: #16a34a;
+    }
+    .rm { --tt: 34px; } /* 판 타일 폭 */
+
+    /* 목록 — 이렇게 해요 */
+    .rm-how { margin: 0 0 20px; border: 1px solid #eadfc6; border-radius: 14px; background: #fffdf7; overflow: hidden; }
+    .rm-how > summary { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 16px; font-size: 15px; font-weight: 800; cursor: pointer; list-style: none; user-select: none; }
+    .rm-how > summary::-webkit-details-marker { display: none; }
+    .rm-how > summary::after { content: ""; width: 8px; height: 8px; margin-left: auto; border-right: 2px solid #94a3b8; border-bottom: 2px solid #94a3b8; transform: rotate(45deg); transition: transform .2s; }
+    .rm-how[open] > summary::after { transform: rotate(-135deg); }
+    .rm-how > summary small { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .rm-how__body { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; align-items: center; padding: 4px 18px 18px; }
+    .rm-how__pic { display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 12px 8px; border-radius: 12px; background: var(--rm-board); }
+    .rm-how__pic .rm-set { padding: 4px; }
+    .rm-how__pic small { font-size: 11.5px; font-weight: 700; color: #8a7d5c; }
+    .rm-how ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.65; color: var(--color-midnight-navy); word-break: keep-all; }
+    .rm-how ol li + li { margin-top: 3px; }
+    .rm-how ol b { color: #9a3412; }
+    .rm-how__tip { margin-top: 10px; padding: 9px 12px; border-radius: 10px; background: #fef9c3; font-size: 13px; line-height: 1.55; color: #713f12; word-break: keep-all; }
+    @media (max-width: 640px) {
+      .rm-how__body { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 0 14px 16px; }
+    }
+
+    /* 타일 */
+    .rm-t { position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; box-sizing: border-box;
+      width: var(--tt); aspect-ratio: 3 / 4; border-radius: 6px; background: linear-gradient(#fffdf8, var(--rm-tile)); border: 1px solid var(--rm-tile-edge);
+      box-shadow: 0 2px 0 #dccfb2, 0 3px 6px rgba(80, 60, 20, .12); user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+      transition: transform .12s, box-shadow .12s; }
+    .rm-t b { font-size: calc(var(--tt) * .54); font-weight: 900; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+    .rm-t i { display: block; width: calc(var(--tt) * .2); height: calc(var(--tt) * .2); margin-top: calc(var(--tt) * .08); background: currentColor; }
+    .rm-t.c0 { color: var(--rm-c0); } .rm-t.c0 i { border-radius: 50%; }
+    .rm-t.c1 { color: var(--rm-c1); } .rm-t.c1 i { transform: rotate(45deg) scale(.86); }
+    .rm-t.c2 { color: var(--rm-c2); } .rm-t.c2 i { border-radius: 1px; transform: scale(.9); }
+    .rm-t.c3 { color: var(--rm-c3); } .rm-t.c3 i { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+    .rm-t.is-joker svg { display: block; width: 88%; height: auto; }
+    .rm-t.is-live { cursor: pointer; touch-action: none; }
+    .rm-t.is-live:hover { transform: translateY(-2px); }
+    .rm-t.is-sel { transform: translateY(-5px); border-color: var(--rm-sel); box-shadow: 0 0 0 2px var(--rm-sel), 0 6px 12px rgba(37, 99, 235, .3); }
+    .rm-t.is-placed::after { content: ""; position: absolute; top: 3px; right: 3px; width: 5px; height: 5px; border-radius: 50%; background: var(--rm-sel); opacity: .7; }
+    .rm-t.is-new { box-shadow: 0 0 0 2px var(--rm-new), 0 3px 8px rgba(245, 158, 11, .35); }
+    .rm-t.is-pop { animation: rm-pop .5s cubic-bezier(.3, 1.5, .5, 1) both, rm-glow 1.1s ease-in-out .5s 2; }
+    @keyframes rm-pop { from { transform: translateY(-14px) scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes rm-glow { 50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, .55), 0 3px 10px rgba(245, 158, 11, .4); } }
+    .rm-t.is-dim { opacity: .7; }
+    .rm-t.is-ghost { opacity: .3; }
+
+    /* 판 */
+    .rm-board { position: relative; border: 1px solid var(--rm-board-edge); border-radius: 16px; background:
+        radial-gradient(circle at 20% 0, rgba(255, 255, 255, .7), transparent 60%), var(--rm-board); box-shadow: inset 0 1px 0 #fff, 0 8px 22px rgba(80, 60, 20, .08); }
+    .rm-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 14px 0; font-size: 12.5px; font-weight: 700; color: #8a7d5c; }
+    .rm-info b { color: var(--color-midnight-navy); font-variant-numeric: tabular-nums; }
+    .rm-info .rm-pool { display: inline-flex; align-items: center; gap: 6px; }
+    .rm-info .rm-pool::before { content: ""; width: 14px; height: 16px; border-radius: 3px; background: repeating-linear-gradient(180deg, #d6c7a6 0 3px, #efe5cf 3px 5px); box-shadow: 0 1px 0 #bfae88; }
+    .rm-table { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 10px 12px; min-height: 120px; padding: 12px 14px 14px; }
+    .rm-set { position: relative; display: inline-flex; flex-wrap: wrap; gap: 3px; max-width: 100%; padding: 5px; border: 2px solid transparent; border-radius: 10px; background: rgba(255, 255, 255, .55); transition: border-color .15s, background .15s; }
+    .rm-set.is-bad { border-color: var(--rm-bad); background: #fff1f2; }
+    .rm-set.is-fresh.is-ok { border-color: rgba(22, 163, 74, .45); background: #f0fdf4; }
+    .rm-set.is-drop { cursor: pointer; border-style: dashed; border-color: #93c5fd; }
+    .rm-set.is-over, .rm-new.is-over, .rm-rack.is-over { border-color: var(--rm-sel) !important; background: #eff6ff !important; }
+    .rm-set__v { position: absolute; top: -9px; right: -6px; padding: 1px 6px; border-radius: 999px; background: var(--rm-ok); color: #fff; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; pointer-events: none; }
+    .rm-set.is-bad .rm-set__v { background: var(--rm-bad); }
+    .rm-slot { display: inline-grid; place-items: center; width: var(--tt); aspect-ratio: 3 / 4; box-sizing: border-box; border: 2px dashed #93c5fd; border-radius: 6px; color: var(--rm-sel); font-size: 18px; font-weight: 800; cursor: pointer; background: rgba(239, 246, 255, .7); }
+    .rm-new { display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 96px; min-height: calc(var(--tt) * 4 / 3 + 14px); padding: 0 12px; box-sizing: border-box;
+      border: 2px dashed #cdbf9f; border-radius: 10px; color: #8a7d5c; font-size: 13px; font-weight: 800; cursor: pointer; background: transparent; }
+    .rm-new.is-on { border-color: #93c5fd; color: var(--rm-sel); background: rgba(239, 246, 255, .6); }
+    .rm-empty { align-self: center; font-size: 13.5px; font-weight: 700; color: #a3967a; }
+
+    /* 말 한 줄 · 도구 */
+    .rm-say { min-height: 22px; margin: 10px 2px 0; text-align: center; font-size: 14px; font-weight: 700; color: #57534e; word-break: keep-all; }
+    .rm-say.is-go { color: #1d4ed8; }
+    .rm-say .rm-t { --tt: 20px; vertical-align: -9px; margin: 0 2px; }
+    .rm-think::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: rm-dots 1.2s steps(4, end) infinite; }
+    @keyframes rm-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+    .rm-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 8px; }
+    .rm-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 12px; border: 1px solid var(--border-default); border-radius: 999px; background: var(--surface-card, #fff); color: var(--color-midnight-navy); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .rm-chip:disabled { opacity: .45; cursor: default; }
+    .rm-chip.is-blue { border-color: #93c5fd; color: #1d4ed8; background: #eff6ff; }
+    .rm-chip svg { width: 15px; height: 15px; }
+    .rm-sum { margin-left: auto; padding: 6px 11px; border-radius: 999px; background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rm-sum.is-ok { background: #dcfce7; color: #166534; }
+
+    /* 내 손패 받침대 — 2줄까지(타일이 아주 많으면 3줄) */
+    .rm-rack { position: relative; display: grid; grid-template-columns: repeat(var(--cols, 10), minmax(0, 54px)); justify-content: center; gap: 6px 4px; padding: 10px 10px 14px; border: 2px solid transparent; border-radius: 14px;
+      background: linear-gradient(#d8bb90, var(--rm-rack)); box-shadow: inset 0 -6px 0 var(--rm-rack-dark), 0 6px 14px rgba(80, 50, 10, .18); min-height: 64px; }
+    .rm-rack .rm-t { width: 100%; --tt: min(52px, calc((min(100vw, 760px) - 64px) / var(--cols, 10))); }
+    .rm-rack .rm-t.is-got { box-shadow: 0 0 0 2px #22c55e, 0 3px 8px rgba(34, 197, 94, .35); }
+    .rm-rack__empty { grid-column: 1 / -1; align-self: center; text-align: center; font-size: 13px; font-weight: 700; color: #fff8e8; }
+    .rm-rival { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #f8fafc; border: 1px solid var(--border-default); }
+    .rm-rival h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--text-secondary); }
+    .rm-rival div { display: flex; flex-wrap: wrap; gap: 3px; }
+
+    .rm-done { margin: 12px 0 0; padding: 14px 16px; border-radius: 14px; background: #fffbeb; border: 1px solid #fde68a; text-align: center; }
+    .rm-done.is-lose { background: #f8fafc; border-color: var(--border-default); }
+    .rm-done.is-draw { background: #eef2ff; border-color: #c7d2fe; }
+    .rm-done b { display: block; font-size: 18px; font-weight: 900; color: var(--color-midnight-navy); }
+    .rm-done small { display: block; margin-top: 4px; font-size: 13px; font-weight: 700; color: #8a7d5c; }
+    .rm-pending { padding: 24px 16px; border-radius: 16px; background: var(--rm-board); text-align: center; font-size: 14.5px; font-weight: 700; color: #57534e; }
+    .rm .gk__bar { max-width: none; }
+    .rm .gk__bar .hk-btn { min-height: 46px; }
+    .rm-ghost { position: fixed; z-index: 1000; display: flex; gap: 3px; pointer-events: none; transform: translate(-50%, -60%) rotate(-3deg); filter: drop-shadow(0 8px 12px rgba(0, 0, 0, .25)); }
+    .rm-ghost .rm-t { --tt: 40px; }
+    .rm-snd { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 0; margin-left: 2px; border: 1px solid var(--border-default); border-radius: 50%; background: var(--surface-card, #fff); color: var(--color-midnight-navy); cursor: pointer; }
+    .rm-snd.is-off { color: var(--text-muted); background: var(--color-mist); }
+    .rm-snd svg { width: 17px; height: 17px; }
+
+    @media (max-width: 640px) {
+      .rm { --tt: 27px; }
+      .rm-table { gap: 8px; padding: 10px 8px 12px; min-height: 96px; }
+      .rm-set { gap: 2px; padding: 4px; }
+      .rm-info { padding: 8px 10px 0; }
+      .rm-rack { gap: 5px 3px; padding: 8px 6px 12px; }
+      .rm-rack .rm-t { --tt: min(46px, calc((100vw - 48px) / var(--cols, 10))); }
+      .rm-chip { min-height: 34px; padding: 0 10px; font-size: 12.5px; }
+      .rm-sum { font-size: 12.5px; padding: 5px 9px; }
+      .rm-new { min-width: 84px; font-size: 12.5px; }
+      .rm .gk__bar { flex-wrap: wrap; }
+      .rm .gk__bar .rm-go { flex: 1 1 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .rm-t, .rm-t.is-pop { animation: none; transition: none; }
+      .rm-think::after { animation: none; content: "…"; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    // 타일 러미 — 동료에게 도전 → 수락 → 번갈아 내기, 또는 컴퓨터와. 손 타일을 먼저 다 내면 승.
+    // 규칙 · 판정은 서버 엔진(backend/app/services/versus_rummy.py). 이 화면은 서버가 보낸 판(rm)을 그리고,
+    // 내 차례에는 판을 이 화면에서 다시 짠 뒤 「내려놓기」로 판 전체를 보낸다(서버가 다시 검사한다).
+    // 타일 번호 0~105: 색 = (번호 % 52) / 13 (0 빨강 · 1 파랑 · 2 주황 · 3 검정), 숫자 = 번호 % 13 + 1, 104 · 105 는 조커.
+    // 묶음 검사(shape · meld · order)는 서버의 _shape · _meld · _order 와 같은 규칙이다.
+    const { esc, closedNote, due, fail } = HKMatch;
+    const GAME = "rummy";
+    const OPEN_GOAL = 30;
+    const HOW_KEY = "hk-rummy-how"; // 「이렇게 해요」를 본 적 있으면 접어 둔다
+    const SORT_KEY = "hk-rummy-sort"; // 손패 정렬(숫자순 · 색순)
+    const SEEN_KEY = "hk-rummy-seen"; // 판마다 마지막으로 본 seq — 상대가 둔 것을 처음 열 때 보여 준다
+    const BOT_LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    const COLOR_NAME = ["빨강", "파랑", "주황", "검정"];
+    const store = { get: (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (_) { /* 저장 못 해도 그만 */ } } };
+    const sfx = (name, arg) => { try { if (window.HKSound) HKSound.play(name, arg); } catch (_) { /* 소리는 부가 기능 */ } };
+    const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
+
+    // ---------- 타일 · 묶음(서버와 같은 규칙) ----------
+    const isJoker = (t) => t >= 104;
+    const colorOf = (t) => Math.floor((t % 52) / 13);
+    const numOf = (t) => (t % 13) + 1;
+    const tileName = (t) => (isJoker(t) ? "조커" : `${COLOR_NAME[colorOf(t)]} ${numOf(t)}`);
+    // 묶음으로 읽는 방법 — ["group", 숫자] 또는 ["run", 시작 숫자]. 둘 다 되면 숫자 합이 큰 쪽. 안 되면 null
+    function shape(tiles) {
+      const n = tiles.length;
+      if (n < 3 || n > 13) return null;
+      const reals = tiles.filter((t) => !isJoker(t));
+      if (!reals.length || n - reals.length > 2) return null;
+      const nums = reals.map(numOf), cols = reals.map(colorOf);
+      let best = null;
+      if (n <= 4 && new Set(nums).size === 1 && new Set(cols).size === cols.length) best = [nums[0] * n, ["group", nums[0]]];
+      if (new Set(cols).size === 1 && new Set(nums).size === nums.length) {
+        const lo = Math.min(...nums), hi = Math.max(...nums), s = Math.min(lo, 14 - n);
+        if (s >= Math.max(1, hi - n + 1)) {
+          const v = n * s + (n * (n - 1)) / 2;
+          if (!best || v > best[0]) best = [v, ["run", s]];
+        }
+      }
+      return best ? best[1] : null;
+    }
+    function meld(tiles) {
+      const sh = shape(tiles);
+      if (!sh) return null;
+      const n = tiles.length;
+      return sh[0] === "group" ? sh[1] * n : n * sh[1] + (n * (n - 1)) / 2;
+    }
+    function order(tiles) {
+      const sh = shape(tiles);
+      const jokers = tiles.filter(isJoker).sort((a, b) => a - b), reals = tiles.filter((t) => !isJoker(t));
+      if (!sh) return [...reals.sort((a, b) => colorOf(a) - colorOf(b) || numOf(a) - numOf(b) || a - b), ...jokers];
+      if (sh[0] === "group") return [...reals.sort((a, b) => colorOf(a) - colorOf(b) || a - b), ...jokers];
+      const at = {}; reals.forEach((t) => { at[numOf(t)] = t; });
+      const out = [];
+      for (let k = sh[1]; k < sh[1] + tiles.length; k++) out.push(at[k] != null ? at[k] : jokers.shift());
+      return out;
+    }
+    const leftScore = (hand) => hand.reduce((s, t) => s + (isJoker(t) ? 30 : numOf(t)), 0);
+
+    // 조커 — 고깔모자를 쓴 웃는 얼굴(오리지널 그림)
+    const JOKER_SVG = `<svg viewBox="0 0 40 50" aria-hidden="true">
+        <path d="M20 2 L28.5 17 H11.5 Z" fill="#2563eb"/><path d="M20 2 L24.2 9.5 H15.8 Z" fill="#dc2626"/><path d="M13.6 13.3 H26.4 L28.5 17 H11.5 Z" fill="#ea580c"/>
+        <circle cx="20" cy="2.6" r="2.2" fill="#facc15" stroke="#1f2937" stroke-width="1"/>
+        <circle cx="20" cy="30" r="12.5" fill="#fde047" stroke="#1f2937" stroke-width="1.6"/>
+        <circle cx="15.4" cy="27.6" r="1.7" fill="#1f2937"/><circle cx="24.6" cy="27.6" r="1.7" fill="#1f2937"/>
+        <circle cx="12.6" cy="32.2" r="2" fill="#fb7185" opacity=".55"/><circle cx="27.4" cy="32.2" r="2" fill="#fb7185" opacity=".55"/>
+        <path d="M14.6 32.4 Q20 38.4 25.4 32.4" fill="none" stroke="#1f2937" stroke-width="1.7" stroke-linecap="round"/>
+        <path d="M5 45 l1.4 -3 l1.4 3 l-1.4 3 z M33 44 l1.2 -2.6 l1.2 2.6 l-1.2 2.6 z" fill="#1f2937" opacity=".8"/>
+      </svg>`;
+    function tileHtml(t, cls = "") {
+      const name = tileName(t);
+      if (isJoker(t)) return `<span class="rm-t is-joker ${cls}" data-t="${t}" role="img" aria-label="${name}">${JOKER_SVG}</span>`;
+      return `<span class="rm-t c${colorOf(t)} ${cls}" data-t="${t}" role="img" aria-label="${name}"><b>${numOf(t)}</b><i></i></span>`;
+    }
+
+    // ---------- 상태 ----------
+    let root = null, open = { open: true, opensAt: null }, match = null, timer = 0, waiter = null, sending = false, gen = 0;
+    let base = null; // 이번 차례가 시작될 때의 판 {table, hand}
+    let work = null; // 이 화면에서 다시 짜는 판 {table, hand}
+    let sel = new Set(); // 고른 타일
+    let hl = new Set(), pop = false; // 상대가 방금 낸 타일(강조) · 이번 그리기에서 튀어나오게
+    let gotTile = null; // 내가 방금 가져온 타일
+    let note = ""; // 상대가 한 일 한 줄(HTML)
+    let thinking = false; // 컴퓨터가 생각 중(내가 둔 요청을 기다리는 중)
+    let lastLevel = "normal";
+    let sortMode = store.get(SORT_KEY) === "color" ? "color" : "num";
+    function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
+    const rm = () => (match && match.rm) || null;
+    const rivalWord = () => (match && match.bot ? "컴퓨터" : "상대");
+    const canPlay = () => !!(match && match.status === "ACTIVE" && match.myTurn && open.open && !sending && rm());
+    function seenMap() { try { return JSON.parse(store.get(SEEN_KEY) || "{}") || {}; } catch (_) { return {}; } }
+    function markSeen() {
+      if (!match) return;
+      const s = seenMap(); s[match.id] = match.seq;
+      const keys = Object.keys(s); if (keys.length > 40) keys.slice(0, keys.length - 40).forEach((k) => delete s[k]);
+      store.set(SEEN_KEY, JSON.stringify(s));
+    }
+
+    // ---------- 판 다시 짜기 ----------
+    function resetWork() {
+      const g = rm();
+      base = g ? { table: g.table.map((s) => [...s]), hand: [...g.hand] } : { table: [], hand: [] };
+      work = { table: base.table.map((s) => [...s]), hand: [...base.hand] };
+      sel = new Set();
+    }
+    const baseTable = () => new Set(base.table.flat()); // 이번 차례 시작 때 판에 있던 타일
+    const baseHand = () => new Set(base.hand);
+    const opened = () => !!(rm() && rm().opened);
+    // 이 타일을 옮길 수 있는지 — 내 손에서 온 타일은 언제나, 판에 있던 타일은 등록한 뒤에만(손으로는 못 가져온다)
+    const movable = (t) => baseHand().has(t) || opened();
+    // 판에 있던 타일이 든 묶음 — 등록 전에는 건드릴 수 없다
+    const touchesBase = (s) => { const bt = baseTable(); return s.some((t) => bt.has(t)); };
+    const setOpenable = (i) => opened() || !touchesBase(work.table[i]);
+    function placed() { const bh = baseHand(); return work.table.flat().filter((t) => bh.has(t)); }
+    function changed() { return JSON.stringify(work.table) !== JSON.stringify(base.table) || work.hand.length !== base.hand.length; }
+    // 등록 전 — 손 타일로만 만든 새 묶음들의 합(올바른 묶음만)
+    function openSum() { return work.table.filter((s) => !touchesBase(s)).reduce((n, s) => n + (meld(s) || 0), 0); }
+    function baseKept() {
+      const rest = work.table.map((s) => [...s].sort((a, b) => a - b).join(","));
+      return base.table.every((s) => { const k = [...s].sort((a, b) => a - b).join(","); const i = rest.indexOf(k); if (i < 0) return false; rest.splice(i, 1); return true; });
+    }
+    function check() {
+      const bad = work.table.some((s) => meld(s) == null);
+      const n = placed().length;
+      const sum = openSum();
+      if (!n) return { ok: false, why: changed() ? "손에서 타일을 1장 이상 내려놓아야 해요." : "" };
+      if (bad) return { ok: false, why: "빨간 테두리 묶음을 맞춰 주세요." };
+      if (!opened() && !baseKept()) return { ok: false, why: "처음 내려놓을 때는 판의 묶음을 건드릴 수 없어요." };
+      if (!opened() && sum < OPEN_GOAL) return { ok: false, why: `처음에는 합 ${OPEN_GOAL} 이상이어야 해요. ${OPEN_GOAL - sum} 더 필요해요.` };
+      return { ok: true, why: "" };
+    }
+    function moveTo(ids, target) {
+      if (!canPlay()) return false;
+      const bh = baseHand();
+      let list = ids.filter((t) => movable(t));
+      if (target === "hand") list = list.filter((t) => bh.has(t)); // 판에 있던 타일은 손으로 못 가져온다
+      if (typeof target === "number" && !setOpenable(target)) { HKUI.toast("처음 내려놓을 때는 판의 묶음에 붙일 수 없어요", "info"); return false; }
+      if (!list.length) { sfx("invalid"); return false; }
+      const keep = new Set(list);
+      work.hand = work.hand.filter((t) => !keep.has(t));
+      work.table = work.table.map((s) => s.filter((t) => !keep.has(t))); // 빈 묶음은 아래에서 지운다 — 그때까지 번호(target)는 그대로
+      if (target === "hand") work.hand.push(...list);
+      else if (target === "new") work.table.push([...list]);
+      else if (work.table[target]) work.table[target].push(...list);
+      work.table = work.table.filter((s) => s.length).map((s) => (meld(s) != null ? order(s) : s));
+      sel = new Set();
+      hl = new Set(); gotTile = null; note = "";
+      sfx("tap");
+      return true;
+    }
+
+    // ---------- 그리기 ----------
+    function sortHand(hand) {
+      const key = sortMode === "color"
+        ? (t) => (isJoker(t) ? 9999 + t : colorOf(t) * 100 + numOf(t) + (t >= 52 ? 0.5 : 0))
+        : (t) => (isJoker(t) ? 9999 + t : numOf(t) * 10 + colorOf(t) + (t >= 52 ? 0.5 : 0));
+      return [...hand].sort((a, b) => key(a) - key(b));
+    }
+    function statusText() {
+      if (match.status === "DONE") return { win: "이겼어요", lose: "졌어요", draw: "비겼어요" }[match.result] || "끝났어요";
+      if (match.status === "ACTIVE") return match.myTurn ? "내 차례" : `${rivalWord()} 차례`;
+      if (match.status === "PENDING") return match.incoming ? "받은 도전" : "수락 기다리는 중";
+      return match.status === "DECLINED" ? "취소된 도전" : "만료된 도전";
+    }
+    function sayHtml() {
+      const g = rm();
+      if (thinking) return `<span class="rm-think">${match.bot ? "컴퓨터가 생각 중" : "보내는 중"}</span>`;
+      if (match.status !== "ACTIVE" || !g) return "";
+      if (!open.open) return esc(`${open.opensAt || ""}부터 둘 수 있어요.`);
+      if (!match.myTurn) return note || esc(match.bot ? "컴퓨터 차례예요." : "상대가 두면 바로 보여요.");
+      if (sel.size) {
+        const fromTable = [...sel].some((t) => !baseHand().has(t));
+        return esc(`${sel.size}장 골랐어요. 놓을 묶음이나 「새 묶음」을 눌러요.${fromTable ? "" : " 끌어다 놓아도 돼요."}`);
+      }
+      const c = check();
+      if (c.why) return esc(c.why);
+      if (c.ok) return esc("좋아요! 「내려놓기」를 눌러요.");
+      if (note) return note;
+      if (gotTile != null) return `가져온 타일 ${tileHtml(gotTile)} — 이제 ${esc(rivalWord())} 차례예요.`;
+      if (!g.opened) return esc(`내 타일로 합 ${OPEN_GOAL} 이상 묶음을 만들어 처음 내려놓아요. 못 만들면 한 장 가져와요.`);
+      return esc(g.pool ? "타일을 눌러 고르고 묶음에 놓아요. 낼 게 없으면 한 장 가져와요." : "더미가 비었어요. 낼 게 없으면 넘겨요.");
+    }
+    function setHtml(s, i, live) {
+      const v = meld(s), bh = baseHand(), fresh = s.some((t) => bh.has(t));
+      const target = live && sel.size && setOpenable(i);
+      const locked = live && !opened() && touchesBase(s);
+      const cls = `rm-set ${v == null ? "is-bad" : "is-ok"} ${fresh ? "is-fresh" : ""} ${target ? "is-drop" : ""}`;
+      const tiles = s.map((t) => {
+        const c = [];
+        if (live && !locked && movable(t)) c.push("is-live");
+        if (sel.has(t)) c.push("is-sel");
+        if (bh.has(t)) c.push("is-placed");
+        if (hl.has(t)) c.push("is-new", pop ? "is-pop" : "");
+        if (locked) c.push("is-dim");
+        return tileHtml(t, c.join(" "));
+      }).join("");
+      const badge = live && fresh && !opened() && !touchesBase(s) ? `<span class="rm-set__v">${v == null ? "×" : v}</span>` : "";
+      return `<div class="${cls}" data-drop="${i}">${tiles}${target ? `<span class="rm-slot" data-drop="${i}" aria-label="여기에 놓기">+</span>` : ""}${badge}</div>`;
+    }
+    function tableHtml() {
+      const live = canPlay();
+      const sets = work.table.map((s, i) => setHtml(s, i, live)).join("");
+      const add = live ? `<button type="button" class="rm-new ${sel.size ? "is-on" : ""}" data-drop="new">+ 새 묶음</button>` : "";
+      const empty = !work.table.length ? `<span class="rm-empty">${live ? "아직 판이 비어 있어요." : "판이 비어 있어요."}</span>` : "";
+      return `<div class="rm-table" id="rm-table">${sets}${empty}${add}</div>`;
+    }
+    function rackHtml() {
+      const live = canPlay(), hand = sortHand(work.hand);
+      const rows = hand.length <= 20 ? 2 : 3, cols = Math.max(9, Math.ceil(hand.length / rows));
+      const tiles = hand.map((t) => tileHtml(t, [live ? "is-live" : "", sel.has(t) ? "is-sel" : "", t === gotTile ? "is-got" : ""].join(" "))).join("");
+      return `<div class="rm-rack" id="rm-rack" data-drop="hand" style="--cols:${cols}" aria-label="내 손패 ${hand.length}장">${tiles || `<span class="rm-rack__empty">손에 남은 타일이 없어요</span>`}</div>`;
+    }
+    const SND_ON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
+    const SND_OFF = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6"/><path d="m22 9-6 6"/></svg>`;
+    function soundBtn() {
+      if (!window.HKSound) return "";
+      const off = HKSound.isMuted();
+      return `<button type="button" class="rm-snd ${off ? "is-off" : ""}" id="rm-snd" aria-pressed="${off ? "false" : "true"}" aria-label="${off ? "소리 켜기" : "소리 끄기"}" title="${off ? "소리 켜기" : "소리 끄기"}">${off ? SND_OFF : SND_ON}</button>`;
+    }
+    function toolsHtml() {
+      const live = canPlay(), g = rm();
+      const back = live && [...sel].some((t) => baseHand().has(t) && !work.hand.includes(t));
+      const sum = live && !g.opened ? openSum() : null;
+      return `<div class="rm-tools">
+          ${live ? `<button type="button" class="rm-chip" data-act="reset" ${changed() ? "" : "disabled"}>처음대로</button>` : ""}
+          <button type="button" class="rm-chip" data-act="sort">정렬: ${sortMode === "num" ? "숫자순" : "색순"}</button>
+          ${back ? `<button type="button" class="rm-chip is-blue" data-act="back">↩ 손으로</button>` : ""}
+          ${live && sel.size ? `<button type="button" class="rm-chip" data-act="unsel">고르기 취소</button>` : ""}
+          ${soundBtn()}
+          ${sum != null ? `<span class="rm-sum ${sum >= OPEN_GOAL ? "is-ok" : ""}">내려놓은 합 ${sum} / ${OPEN_GOAL}</span>` : ""}
+        </div>`;
+    }
+    function barHtml() {
+      const s = match.status, g = rm();
+      if (s === "ACTIVE") {
+        const live = canPlay(), c = live ? check() : { ok: false };
+        const pool = g ? g.pool : 1;
+        return `<button type="button" class="hk-btn hk-btn--primary gk__place rm-go" data-act="play" ${live && c.ok ? "" : "disabled"}>내려놓기</button>
+          <button type="button" class="hk-btn hk-btn--secondary gk__place" data-act="${pool ? "draw" : "pass"}" ${live ? "" : "disabled"}>${pool ? "한 장 가져오기" : "넘기기"}</button>
+          <button type="button" class="hk-btn hk-btn--secondary" data-act="resign" ${open.open && !sending ? "" : "disabled"}>기권</button>`;
+      }
+      const list = `<a class="hk-btn hk-btn--secondary gk__place" href="#" style="text-align:center;text-decoration:none">대국 목록</a>`;
+      if (s === "DONE") {
+        const again = match.bot ? "한 판 더" : match.opponent && match.opponent.id ? "다시 도전" : "";
+        return `${list}${again ? `<button type="button" class="hk-btn hk-btn--primary gk__place" data-act="again" ${open.open ? "" : "disabled"}>${again}</button>` : ""}`;
+      }
+      if (s === "PENDING" && match.incoming) {
+        return `<button type="button" class="hk-btn hk-btn--primary gk__place" data-act="accept" ${open.open ? "" : "disabled"}>수락하고 시작</button>
+          <button type="button" class="hk-btn hk-btn--secondary" data-act="decline">거절</button>`;
+      }
+      if (s === "PENDING") return `${list}<button type="button" class="hk-btn hk-btn--secondary" data-act="decline">도전 취소</button>`;
+      return list;
+    }
+    function doneHtml() {
+      const g = rm(), r = match.result, rw = rivalWord();
+      let title = { win: "이겼어요!", lose: "아쉽게 졌어요", draw: "비겼어요" }[r] || "끝났어요";
+      if (match.endReason === "OUT") title = r === "win" ? "타일을 모두 내려놓아 이겼어요!" : `${rw}가 타일을 모두 내려놓았어요`;
+      else if (match.endReason === "LOWEST") title = r === "win" ? "남은 숫자 합이 더 적어 이겼어요" : `${rw}의 남은 숫자 합이 더 적어요`;
+      else if (match.endReason === "RESIGN") title = r === "win" ? `${rw}가 기권했어요` : "기권했어요";
+      else if (match.endReason === "TIMEOUT") title = r === "win" ? `${rw}의 시간이 다 됐어요` : "시간이 다 됐어요";
+      const e = g && g.end;
+      const sub = e ? `남은 숫자 합 — 나 ${e.left} · ${rw} ${e.rivalLeft}${e.left || e.rivalLeft ? " (조커는 30)" : ""}` : HKMatch.reason(match);
+      return `<div class="rm-done is-${esc(r || "draw")}"><b>${esc(title)}</b><small>${esc(sub)}</small></div>`;
+    }
+    function paintHead() {
+      const head = document.getElementById("rm-head"), g = rm();
+      if (!head || !match) return;
+      const side = (n, op) => `손 ${n}장${op ? "" : " · 등록 전"}`;
+      head.innerHTML = HKMatch.versus(match, statusText(), g ? { me: side(work ? work.hand.length : g.hand.length, g.opened), rival: side(g.rivalHand, g.rivalOpened) } : {});
+    }
+    function paint() {
+      const g = rm(), s = match.status;
+      const dueNote = s === "ACTIVE" ? `이번 차례 ${due(match.deadlineAt)}` : s === "PENDING" ? `도전장 · ${due(match.deadlineAt)}` : "";
+      let body;
+      if (!g) {
+        body = `<div class="rm-pending">${esc(s === "PENDING" ? (match.incoming ? "도전장을 받았어요. 수락하면 바로 시작해요. 먼저 할 사람은 무작위로 정해요." : "상대가 수락하면 바로 시작해요.") : "이 도전은 끝났어요.")}</div>`;
+      } else {
+        const info = `<div class="rm-info"><span class="rm-pool">더미 <b>${g.pool}</b>장</span><span>${esc(rivalWord())} 손 <b>${g.rivalHand}</b>장${g.rivalOpened ? "" : " · 아직 등록 전"}</span>${!g.pool && g.passes ? `<span>넘김 ${g.passes}번 — 둘 다 넘기면 끝나요</span>` : ""}</div>`;
+        const rival = s === "DONE" && g.rivalHandCards ? `<div class="rm-rival"><h3>${esc(rivalWord())} 손에 남은 타일 ${g.rivalHandCards.length}장</h3><div style="--tt:28px">${g.rivalHandCards.map((t) => tileHtml(t)).join("") || "<small>없어요</small>"}</div></div>` : "";
+        body = `<div class="rm-board">${info}${tableHtml()}</div>
+          ${s === "DONE" ? doneHtml() : `<div class="rm-say ${canPlay() ? "is-go" : ""}" id="rm-say" aria-live="polite">${sayHtml()}</div>`}
+          ${toolsHtml()}
+          ${rackHtml()}
+          ${rival}`;
+      }
+      root.innerHTML = `<div class="gk rm">
+          <a class="gk__back" href="#">‹ 대국 목록</a>
+          ${closedNote(open)}
+          <div id="rm-head"></div>
+          ${body}
+          <div class="gk__bar">${barHtml()}</div>
+          ${dueNote ? `<div class="gk__due">${esc(dueNote)}</div>` : ""}
+        </div>`;
+      paintHead();
+      pop = false;
+    }
+
+    // ---------- 고르기 · 끌어다 놓기 ----------
+    let press = null; // 누르고 있는 타일 {t, x, y, id, drag, ghost}
+    let dragEnd = 0; // 끌어다 놓은 시각 — 바로 뒤따르는 click 은 무시한다
+    function toggle(t) {
+      if (!canPlay() || !movable(t)) return;
+      const inLocked = work.table.some((s, i) => s.includes(t) && !setOpenable(i));
+      if (inLocked) { HKUI.toast("처음 내려놓을 때는 판의 묶음을 건드릴 수 없어요", "info"); return; }
+      if (sel.has(t)) sel.delete(t); else sel.add(t);
+      hl = new Set(); note = "";
+      sfx("select");
+      paint();
+    }
+    function dropAt(x, y) {
+      const el = document.elementFromPoint(x, y);
+      const d = el && el.closest("[data-drop]");
+      if (!d) return null;
+      const v = d.dataset.drop;
+      return v === "new" || v === "hand" ? v : Number(v);
+    }
+    function markOver(target) {
+      root.querySelectorAll(".is-over").forEach((x) => x.classList.remove("is-over"));
+      if (target == null) return;
+      const el = target === "new" ? root.querySelector(".rm-new") : target === "hand" ? document.getElementById("rm-rack") : root.querySelector(`.rm-set[data-drop="${target}"]`);
+      if (el) el.classList.add("is-over");
+    }
+    function onDown(e) {
+      const el = e.target.closest(".rm-t.is-live");
+      if (!el || !canPlay() || (e.pointerType === "mouse" && e.button !== 0)) return;
+      press = { t: Number(el.dataset.t), x: e.clientX, y: e.clientY, id: e.pointerId, drag: false, ghost: null };
+    }
+    function onMove(e) {
+      if (!press || e.pointerId !== press.id) return;
+      if (!press.drag) {
+        if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < 8) return;
+        // 끌기 시작 — 고른 타일을 끌면 고른 것 모두, 아니면 그 한 장
+        const ids = sel.has(press.t) ? [...sel] : [press.t];
+        if (!ids.every(movable)) { press = null; return; }
+        press.drag = true;
+        press.ids = ids;
+        const g = document.createElement("div");
+        g.className = "rm-ghost";
+        g.innerHTML = ids.map((t) => tileHtml(t)).join("");
+        document.body.appendChild(g);
+        press.ghost = g;
+        ids.forEach((t) => root.querySelectorAll(`.rm-t[data-t="${t}"]`).forEach((x) => x.classList.add("is-ghost")));
+      }
+      e.preventDefault();
+      press.ghost.style.left = `${e.clientX}px`;
+      press.ghost.style.top = `${e.clientY}px`;
+      markOver(dropAt(e.clientX, e.clientY));
+    }
+    function onUp(e) {
+      if (!press || e.pointerId !== press.id) return;
+      const p = press; press = null;
+      if (!p.drag) { toggle(p.t); return; }
+      dragEnd = performance.now();
+      p.ghost.remove();
+      const target = dropAt(e.clientX, e.clientY);
+      markOver(null);
+      if (target != null && moveTo(p.ids, target)) paint();
+      else paint();
+    }
+    function onCancel() {
+      if (!press) return;
+      if (press.ghost) press.ghost.remove();
+      press = null;
+      markOver(null);
+      paint();
+    }
+
+    // ---------- 보내기 ----------
+    async function send(data) {
+      if (!canPlay()) return;
+      const g0 = gen, id = match.id, seq = match.seq;
+      stopPoll();
+      sending = true; thinking = true; note = ""; hl = new Set(); gotTile = null; sel = new Set();
+      paint();
+      const t0 = performance.now();
+      let next;
+      try { next = await HKApi.matchMove(id, { data }, seq); }
+      catch (err) {
+        if (g0 !== gen) return;
+        sending = false; thinking = false;
+        sfx("invalid"); fail(err);
+        paint();
+        return;
+      }
+      if (g0 !== gen) return;
+      if (next.bot) await sleep(Math.max(0, 650 - (performance.now() - t0))); // 컴퓨터가 잠깐 생각하는 듯
+      if (g0 !== gen) return;
+      sending = false; thinking = false;
+      if (data.type === "play") sfx("drop"); else if (data.type === "draw") sfx("tap");
+      applyNext(next, seq);
+      if (next.stamp && next.stamp.new) HKUI.toast(`오늘 도장을 받았어요 (${next.stamp.count}/${next.stamp.goal})`);
+    }
+    // 서버가 준 판으로 바꾼다 — 내가 마지막으로 본 seq 뒤의 행동(상대 · 컴퓨터가 낸 타일 · 가져오기)을 보여 준다
+    function applyNext(next, since) {
+      const wasActive = match && match.status === "ACTIVE";
+      match = next;
+      const g = rm();
+      note = ""; hl = new Set(); gotTile = null; pop = false;
+      if (g) {
+        const fresh = (g.log || []).filter((e) => e.v > since);
+        fresh.forEach((e) => {
+          if (e.me && e.t === "draw" && e.got != null) gotTile = e.got;
+          if (!e.me) {
+            const who = esc(rivalWord());
+            if (e.t === "play") { (e.new || []).forEach((t) => hl.add(t)); note = `${who}가 ${e.new.length}장 내려놓았어요${e.open ? " (첫 등록)" : ""}. 새 타일은 노란 테두리예요.`; }
+            else if (e.t === "draw") note = `${who}가 한 장 가져왔어요.`;
+            else if (e.t === "pass") note = `${who}가 넘겼어요.`;
+          }
+        });
+        if (hl.size) pop = true;
+        if (!fresh.some((e) => !e.me)) note = "";
+        if (note && fresh.some((e) => !e.me)) setTimeout(() => sfx(hl.size ? "pop" : "tap"), 120);
+      }
+      if (wasActive && match.status === "DONE") setTimeout(() => sfx({ win: "win", lose: "lose" }[match.result] || "success"), 200);
+      else if (match.status === "ACTIVE" && match.myTurn && note) setTimeout(() => sfx("select"), 420);
+      resetWork();
+      paint();
+      markSeen();
+      schedulePoll();
+    }
+
+    // ---------- 기다리기 · 열기 ----------
+    // 서버에서 판이 바뀔 때까지 기다린다 — 상대가 두는 즉시 돌아와 바로 그린다. 화면이 보일 때만.
+    // 내 차례에도 기다린다 — 그사이 상대가 기권하면 바로 끝난 판으로 바꾼다. 컴퓨터전은 내 요청 안에서 컴퓨터가 바로 두어 기다릴 일이 없다
+    function schedulePoll(delay = 0) {
+      stopPoll();
+      if (!match || ["DONE", "DECLINED", "EXPIRED"].includes(match.status) || match.bot || sending) return;
+      const g0 = gen;
+      timer = setTimeout(async () => {
+        timer = 0;
+        if (document.hidden || !match || g0 !== gen) return;
+        const id = match.id, ctl = new AbortController();
+        waiter = ctl;
+        let next;
+        try { next = await HKApi.matchWait(id, match.seq, match.status, ctl.signal); }
+        catch (_) { if (waiter === ctl) { waiter = null; schedulePoll(3000); } return; }
+        if (waiter !== ctl || g0 !== gen || !match || match.id !== id) return;
+        waiter = null;
+        if (next.seq !== match.seq || next.status !== match.status) {
+          if (match.status === "PENDING" && next.status === "ACTIVE") sfx("go");
+          applyNext(next, match.seq);
+        } else { match = { ...next }; schedulePoll(1000); } // 그대로 돌아왔으면 잠깐 쉬고 다시(내가 짜던 판은 그대로)
+      }, delay);
+    }
+    async function showMatch(id) {
+      stopPoll(); gen++; sending = false; thinking = false; press = null;
+      const g0 = gen;
+      store.set(HOW_KEY, "1");
+      let next, o;
+      try { [next, o] = await Promise.all([HKApi.matchDetail(id), HKApi.playStatus().catch(() => ({ open: true }))]); }
+      catch (e) { if (g0 === gen) { fail(e); location.hash = ""; } return; }
+      if (g0 !== gen) return;
+      if (next.game !== GAME) { location.href = `/games/${next.game}#m${id}`; return; }
+      open = o;
+      if (next.bot) lastLevel = next.bot;
+      const seen = seenMap()[id];
+      match = null;
+      // 처음 여는 판이면 마지막 행동 하나, 본 적 있으면 그 뒤의 행동들을 보여 준다
+      const log = (next.rm && next.rm.log) || [];
+      const since = seen != null ? Math.min(seen, next.seq) : (log.length ? log[log.length - 1].v - 1 : next.seq);
+      applyNext(next, since);
+    }
+    async function showLobby() {
+      stopPoll(); gen++; match = null; sending = false; thinking = false;
+      const g0 = gen;
+      const o = await HKMatch.lobby(root, GAME, {
+        title: "타일 러미",
+        lead: "숫자 타일을 같은 수끼리, 이어지는 수끼리 묶어 내려놓아요. 손에 든 타일을 먼저 다 내면 이겨요. 동료에게 도전장을 보내거나 컴퓨터와 해 봐요. 대국이 끝나면 오늘 도장을 받아요.",
+        intro: howHtml(),
+        bot: BOT_LEVELS,
+        labels: { bot: "컴퓨터와 하기" },
+        botNote: "바로 시작해요. 처음이면 「쉬움」부터 해 보세요. 컴퓨터전은 순위에 넣지 않아요.",
+        rankNote: "기권·시간 초과는 둘이 합쳐 6번 이상 둔 판만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요",
+        rankEmpty: "아직 끝난 대국이 없어요",
+        rowNote: (m) => `${m.rm ? `내 손 ${m.rm.hand}장 · 상대 ${m.rm.rivalHand}장 · ` : ""}${due(m.deadlineAt)}`,
+        resultNote: (m) => `${HKMatch.reason(m)}${m.rm ? ` · 남은 타일 ${m.rm.hand} : ${m.rm.rivalHand}` : ""}`,
+      });
+      if (g0 !== gen) return; // 그새 대국 화면으로 갔다
+      open = o;
+      root.querySelector(".gk__back")?.insertAdjacentHTML("afterend", `<a class="gk__back" href="/together" style="margin-left:14px">함께하기 ›</a>`);
+      const how = root.querySelector(".rm-how");
+      if (how) how.addEventListener("toggle", () => { if (!how.open) store.set(HOW_KEY, "1"); });
+    }
+    // 「이렇게 해요」 — 처음 온 사람에게는 펼쳐 둔다
+    function howHtml() {
+      const first = store.get(HOW_KEY) !== "1";
+      const T = (c, n) => c * 13 + n - 1;
+      const pic = `<div class="rm-how__pic" style="--tt:28px" aria-hidden="true">
+          <div class="rm-set is-ok">${[T(0, 7), T(1, 7), T(3, 7)].map((t) => tileHtml(t)).join("")}</div><small>같은 수 · 다른 색</small>
+          <div class="rm-set is-ok">${[T(2, 4), T(2, 5), 104, T(2, 7)].map((t) => tileHtml(t)).join("")}</div><small>같은 색 · 이어지는 수 (조커는 6 대신)</small>
+        </div>`;
+      return `<details class="rm-how" ${first ? "open" : ""}><summary>이렇게 해요 <small>처음이면 1분만</small></summary>
+          <div class="rm-how__body">${pic}
+            <div>
+              <ol>
+                <li>처음에 <b>14장씩</b> 받아요. 내 차례에는 묶음을 내려놓거나, 더미에서 <b>한 장 가져와요</b>.</li>
+                <li>묶음은 <b>같은 숫자 · 다른 색 3~4장</b>, 또는 <b>같은 색 · 이어지는 숫자 3장 이상</b>이에요(13 다음에 1은 안 돼요). 웃는 얼굴 <b>조커</b>는 아무 타일 대신이에요.</li>
+                <li>처음 내려놓을 때는 내 타일만으로 <b>숫자 합 30 이상</b>. 그다음부터는 판의 묶음에 붙이거나 다시 짜 맞춰도 돼요. 판에 있던 타일은 판에 남아야 해요.</li>
+                <li>손 타일을 <b>먼저 다 내면</b> 이겨요. 더미가 바닥나고 둘 다 넘기면 남은 숫자 합이 적은 쪽이 이겨요(조커는 30).</li>
+              </ol>
+              <div class="rm-how__tip">타일을 눌러 고른 뒤(여러 장 가능) 놓을 묶음이나 「새 묶음」을 누르면 옮겨져요. 끌어다 놓아도 돼요. 한 번 두는 데 24시간까지 기다려요.</div>
+            </div>
+          </div>
+        </details>`;
+    }
+
+    function route() {
+      const m = /^#m(\d+)$/.exec(location.hash);
+      window.scrollTo(0, 0);
+      if (m) showMatch(Number(m[1])); else showLobby();
+    }
+    HKMember.mountPage({
+      active: "lounge",
+      auth: true,
+      render: () => `<div id="rm-root"></div>`,
+      afterMount: () => {
+        root = document.getElementById("rm-root");
+        if (window.HKSound && HKSound.onChange) HKSound.onChange(() => { const b = document.getElementById("rm-snd"); if (b) b.outerHTML = soundBtn(); });
+        root.addEventListener("pointerdown", onDown);
+        window.addEventListener("pointermove", onMove, { passive: false });
+        window.addEventListener("pointerup", onUp);
+        window.addEventListener("pointercancel", onCancel);
+        root.addEventListener("click", async (e) => {
+          if (e.target.closest(".rm-t") || performance.now() - dragEnd < 300) return; // 타일은 pointerdown · pointerup 이 맡는다
+          const t = e.target.closest("button, a, [data-drop]");
+          if (!t) return;
+          if (t.id === "rm-snd") { HKSound.toggle(); if (!HKSound.isMuted()) sfx("select"); return; }
+          const drop = t.dataset.drop;
+          if (drop != null && !t.dataset.act && match) {
+            if (!sel.size || !canPlay()) return;
+            if (moveTo([...sel], drop === "new" || drop === "hand" ? drop : Number(drop))) paint();
+            return;
+          }
+          const act = t.dataset.act;
+          if (act) {
+            e.preventDefault();
+            if (act === "sort") { sortMode = sortMode === "num" ? "color" : "num"; store.set(SORT_KEY, sortMode); sfx("swap"); return paint(); }
+            if (act === "reset") { work = { table: base.table.map((s) => [...s]), hand: [...base.hand] }; sel = new Set(); sfx("swap"); return paint(); }
+            if (act === "unsel") { sel = new Set(); return paint(); }
+            if (act === "back") { if (moveTo([...sel], "hand")) paint(); return; }
+            if (act === "play") {
+              const c = check();
+              if (!c.ok) { if (c.why) HKUI.toast(c.why, "info"); return; }
+              return send({ type: "play", table: work.table.map((s) => [...s]) });
+            }
+            if (act === "draw" || act === "pass") {
+              if (!canPlay()) return;
+              if (changed() && !(await HKUI.confirmDialog(act === "draw" ? "한 장 가져올까요?" : "넘길까요?", "옮겨 둔 타일은 처음대로 돌아가요.", { confirmLabel: act === "draw" ? "가져오기" : "넘기기" }))) return;
+              return send({ type: act });
+            }
+            if (act === "resign") {
+              if (!match || match.status !== "ACTIVE") return;
+              const g0 = gen, id = match.id;
+              if (!(await HKUI.confirmDialog("기권할까요?", "이 판은 패배로 끝나요.", { confirmLabel: "기권" })) || g0 !== gen) return;
+              try { stopPoll(); const r = await HKApi.matchResign(id); if (g0 === gen) applyNext(r, r.seq); } catch (err) { fail(err); }
+              return;
+            }
+            if (act === "accept" || act === "decline") {
+              const g0 = gen, id = match.id;
+              t.disabled = true;
+              try {
+                const r = await (act === "accept" ? HKApi.matchAccept(id) : HKApi.matchDecline(id));
+                if (g0 === gen) { if (act === "accept") sfx("go"); applyNext(r, r.seq); }
+              } catch (err) { fail(err); if (g0 === gen) showMatch(id); }
+              return;
+            }
+            if (act === "again") {
+              t.disabled = true;
+              try {
+                if (match.bot) { const m = await HKApi.matchBot(match.bot || lastLevel, GAME); location.hash = `m${m.id}`; }
+                else { await HKApi.matchCreate(match.opponent.id, GAME); HKUI.toast("도전장을 보냈어요"); location.hash = ""; }
+              } catch (err) { fail(err); t.disabled = false; }
+              return;
+            }
+            return;
+          }
+          if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; return; }
+          if (t.dataset.bot) lastLevel = t.dataset.bot;
+          await HKMatch.act(t, GAME, showLobby);
+        });
+        window.addEventListener("hashchange", route);
+        window.addEventListener("keydown", (e) => {
+          if (!match || document.querySelector(".hk-dialog__overlay")) return;
+          if (e.key === "Escape" && sel.size) { sel = new Set(); paint(); }
+        });
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && match && !sending && !(work && changed())) showMatch(match.id); });
+        route();
+      },
+    });
+  </script>
+</body>
+</html>

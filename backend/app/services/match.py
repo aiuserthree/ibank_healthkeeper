@@ -88,7 +88,7 @@ from app.services.game import _give_stamp, ensure_open, game_visible
 GOMOKU = "gomoku"
 CHESS = "chess"
 CLASSIC_GAMES = (GOMOKU, CHESS)  # 이 파일이 직접 두는 게임
-ENGINE_GAMES = ("baseball", "boxes", "quizduel", "gostop", "memory", "soccer", "volley")  # 대전 엔진 — app/services/versus_<키>.py
+ENGINE_GAMES = ("baseball", "boxes", "quizduel", "gostop", "memory", "soccer", "volley", "rummy", "alkkagi")  # 대전 엔진 — app/services/versus_<키>.py
 MATCH_GAMES = (*CLASSIC_GAMES, *ENGINE_GAMES)
 BOARD = 15
 ACCEPT_HOURS = 24  # 받은 도전을 기다리는 시간
