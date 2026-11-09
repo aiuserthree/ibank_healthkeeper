@@ -12,16 +12,22 @@ window.HKRoutes = {
   lounge: "/arcade",
 };
 
-// 본문 안의 「아케이드」 링크(‹ 아케이드 · 공격하러 가기 · 아케이드로 …)를 누르면 아케이드가 배너 영역부터 보이게 표시를 남긴다.
-// 위쪽 메뉴(GNB · 게임 화면 위 막대 — 모두 <header>)와 휴대폰 메뉴 서랍의 「아케이드」는 표시하지 않는다 — 그때는 아케이드 맨 위부터.
+// 「아케이드」 단추(게임 화면 위 「‹ 아케이드」 · 모음 페이지 본문 「‹ 아케이드」 · 공격하러 가기 · 아케이드로 …)를 누르면
+// 아케이드가 배너 영역부터 보이게 표시를 남긴다. 사이트 맨 위 메뉴(GNB, .hk-site-header)와 휴대폰 메뉴 서랍(#hk-drawer)의
+// 「아케이드」만 표시하지 않는다 — 그때는 아케이드 맨 위부터. (게임 화면에서 나가기 확인 창을 거쳐 나갈 때는 play.js goQuit 이 남긴다)
 document.addEventListener("click", (e) => {
   const a = e.target && e.target.closest && e.target.closest("a[href]");
-  if (!a || a.closest("header, #hk-drawer")) return;
+  if (!a || a.closest(".hk-site-header, #hk-drawer")) return;
   let path = "";
   try { const u = new URL(a.href, location.href); if (u.origin === location.origin && !u.hash) path = u.pathname; } catch (_) { return; }
   if (path !== "/arcade" && path !== "/arcade.html") return;
   try { sessionStorage.setItem("hk-aa-land", String(Date.now())); } catch (_) { /* 표시 못 남겨도 아케이드는 열린다 */ }
 }, true);
+// 확인 창을 거친 뒤 코드로 아케이드에 갈 때(게임 화면 「‹ 아케이드」 → 「그만할까요?」 → 나가기) — 표시를 새로 남기고 간다
+window.HKGoArcade = () => {
+  try { sessionStorage.setItem("hk-aa-land", String(Date.now())); } catch (_) { /* 표시 못 남겨도 아케이드는 열린다 */ }
+  location.href = "/arcade";
+};
 
 /**
  * 라운지(게임) 노출 시간 — 메뉴는 게임 가능 시간(점심·퇴근 후·출근 전·주말), 메인 배너는 점심시간에만.

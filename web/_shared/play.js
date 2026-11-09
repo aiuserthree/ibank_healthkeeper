@@ -599,7 +599,12 @@ window.HKPlay = (function () {
     const SERIES_JOBS = [["nightshift", "심야 편의점"], ["clown", "광대를 놓치지 마"], ["milk", "새벽 우유 배달"], ["theater", "심야 극장 안내"], ["trial", "신약 시험 보조"], ["silent", "조용한 공사장"], ["parade", "야간 퍼레이드"], ["finale", "마지막 축제"]];
     const SERIES = SERIES_JOBS.some(([k]) => k === key);
     let leaveTo = null; // 게임 중 왼쪽 목록에서 다른 회차를 고르면 나간 뒤 그 게임으로 간다
-    function goQuit() { location.href = leaveTo || (SERIES ? "/series" : HKRoutes.lounge); }
+    function goQuit() {
+      const to = leaveTo || (SERIES ? "/series" : HKRoutes.lounge);
+      // 게임에서 아케이드로 나가면 아케이드는 배너 영역부터(arcade.html landOnBanner)
+      if (to === HKRoutes.lounge) { try { sessionStorage.setItem("hk-aa-land", String(Date.now())); } catch (_) { /* 표시 못 해도 나갈 수는 있다 */ } }
+      location.href = to;
+    }
     // 상단 「꿀알바 시리즈」 — 옆 버튼과 같은 높이로, 번진 곳 없이 또렷한 점만 찍는다
     function paintSeriesWord(c) {
       const t = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
