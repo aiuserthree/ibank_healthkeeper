@@ -595,26 +595,47 @@
     }
 
     // 게임 · 모음 페이지(레트로 오락실 · 매니지먼트 · 함께하기 · 꿀알바 시리즈 · 부서 대항 레이드)에서 아케이드로 돌아오면 맨 위가 아니라 배너 영역(함께하기 · 매니지먼트 · 레트로 오락실)부터 보여 준다.
-    // 게임 찾기 분류(#aa-games?cat=…)가 주소에 있으면 그쪽이 먼저 — 그대로 둔다
-    function landOnBanner() {
-      if (location.hash) return;
-      let from = "";
-      try { const r = new URL(document.referrer); if (r.origin === location.origin) from = r.pathname; } catch (_) { return; }
-      if (!/^\/(games\/|retro|manage|together|series|raid)/.test(from)) return;
-      const go = () => {
-        const to = document.getElementById("aa-together");
-        if (!to) return;
-        const head = document.querySelector("header");
-        const headH = head && getComputedStyle(head).position === "sticky" ? Math.max(0, head.getBoundingClientRect().bottom) : 0;
-        window.scrollTo({ top: Math.max(0, to.getBoundingClientRect().top + window.scrollY - headH - 16), behavior: "instant" });
-      };
-      requestAnimationFrame(() => requestAnimationFrame(go));
-      // 위쪽 그림이 늦게 그려져 자리가 밀려도 한 번 더 맞춘다(그사이 사람이 움직였으면 그대로)
+    //  · 링크로 오면 이전 페이지(referrer)로, 브라우저 뒤로 가기로 오면 아케이드에서 마지막으로 누른 링크(sessionStorage)로 판단한다
+    //  · 배너 위 알림(받은 도전 · 내 차례)이 늦게 떠 자리가 밀려도 2.5초 동안은 따라가 맞춘다 — 그사이 사람이 움직이면 그대로
+    //  · 게임 찾기 분류(#aa-games?cat=…)가 주소에 있으면 그쪽이 먼저 — 그대로 둔다
+    const BANNER_FROM = /^\/(games\/|retro|manage|together|series|raid)/;
+    const LEFT_KEY = "hk-aa-left";
+    document.addEventListener("click", (e) => {
+      const a = e.target && e.target.closest && e.target.closest("a[href]");
+      if (!a) return;
+      try { const u = new URL(a.href, location.href); if (u.origin === location.origin) sessionStorage.setItem(LEFT_KEY, u.pathname); } catch (_) { /* 기억 못 해도 된다 */ }
+    }, true);
+    const leftTo = () => { try { return sessionStorage.getItem(LEFT_KEY) || ""; } catch (_) { return ""; } };
+    function bannerY() {
+      const to = document.getElementById("aa-together");
+      if (!to) return null;
+      const head = document.querySelector("header");
+      const headH = head && getComputedStyle(head).position === "sticky" ? Math.max(0, head.getBoundingClientRect().bottom) : 0;
+      return Math.max(0, to.getBoundingClientRect().top + window.scrollY - headH - 16);
+    }
+    function settleOnBanner() {
       let moved = false;
       const stop = () => { moved = true; };
-      ["wheel", "touchstart", "keydown"].forEach((t) => addEventListener(t, stop, { once: true, passive: true }));
-      setTimeout(() => { if (!moved) go(); }, 450);
+      ["wheel", "touchstart", "keydown", "mousedown"].forEach((t) => addEventListener(t, stop, { once: true, passive: true }));
+      const until = performance.now() + 2500;
+      const tick = () => {
+        if (moved || performance.now() > until) return;
+        const y = bannerY();
+        if (y != null && Math.abs(scrollY - y) > 2) window.scrollTo({ top: y, behavior: "instant" });
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(() => requestAnimationFrame(tick));
     }
+    function landOnBanner() {
+      if (location.hash) return;
+      const nav = (performance.getEntriesByType && performance.getEntriesByType("navigation")[0]) || {};
+      let from = "";
+      if (nav.type === "back_forward") from = leftTo(); // 뒤로 가기 — 아케이드에서 눌러 나갔던 곳
+      else { try { const r = new URL(document.referrer); if (r.origin === location.origin) from = r.pathname; } catch (_) { return; } }
+      if (BANNER_FROM.test(from)) settleOnBanner();
+    }
+    // 뒤로 가기로 저장해 둔 화면 그대로 돌아온 경우(bfcache) — 페이지를 다시 그리지 않으니 여기서 맞춘다
+    addEventListener("pageshow", (e) => { if (e.persisted && !location.hash && BANNER_FROM.test(leftTo())) settleOnBanner(); });
 
     // 맨 위로 — 한 화면쯤 내려가면 오른쪽 아래에 나타난다
     function bindTop() {
