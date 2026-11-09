@@ -1304,7 +1304,8 @@
       else items.push(`<button type="button" class="cv-jobc is-idle" data-act="idleBuild"><span class="cv-jobc__ic">${ic("hammer", 17)}</span><span class="cv-jobc__tx"><b>건설<span class="cv-long"> 비었어요</span></b><small>칸을 골라요</small></span></button>`);
     }
     if (s.res) items.push(`<button type="button" class="cv-jobc" data-act="tab" data-tab="research" style="--c:var(--c-idea)"><span class="cv-jobc__ic">${ic(RES[s.res.k].icon, 17)}</span><span class="cv-jobc__tx"><b>${RES[s.res.k].name}</b><small data-rems="r"></small></span><i class="cv-jobc__bar"><i data-bar="r"></i></i></button>`);
-    else items.push(`<button type="button" class="cv-jobc is-idle" data-act="tab" data-tab="research"><span class="cv-jobc__ic">${ic("lightbulb", 17)}</span><span class="cv-jobc__tx"><b>아이디어<span class="cv-long"> 회의 쉬는 중</span></b><small>걸어 둬요</small></span></button>`);
+    else if (ideaOpen()) items.push(`<button type="button" class="cv-jobc is-idle" data-act="tab" data-tab="research"><span class="cv-jobc__ic">${ic("lightbulb", 17)}</span><span class="cv-jobc__tx"><b>아이디어<span class="cv-long"> 회의 쉬는 중</span></b><small>걸어 둬요</small></span></button>`);
+    else if (C.eraNeeds(s)) items.push(`<button type="button" class="cv-jobc" data-act="tab" data-tab="research"><span class="cv-jobc__ic">${ic("circle-check", 17)}</span><span class="cv-jobc__tx"><b>아이디어<span class="cv-long"> 모두 냄</span></b><small>다음 단계로</small></span></button>`);
     el.innerHTML = items.join("");
     HKUI.refreshIcons(el);
   }
@@ -1315,7 +1316,7 @@
       let dot = "";
       if (k === "events" && s.cards.length) dot = `<span class="mgx-dot">${s.cards.length}</span>`;
       if (k === "company" && !C.canEraUp(s)) dot = `<span class="mgx-dot">!</span>`;
-      if (k === "research" && !s.res) dot = `<span class="mgx-dot cv-dot-s"></span>`;
+      if (k === "research" && ideaOpen()) dot = `<span class="mgx-dot cv-dot-s"></span>`; // 걸 수 있는 아이디어가 있을 때만
       return `<button type="button" role="tab" aria-selected="${tab === k}" class="mgx-tab cv-tab" data-act="tab" data-tab="${k}">${ic(i, 22)}<span>${l}</span>${dot}</button>`;
     }).join("");
     HKUI.refreshIcons(el);
@@ -1617,11 +1618,36 @@
     });
     return { keys, tier, x, rows: rows.length };
   }
+  // 지금 단계에서 걸 수 있는 아이디어(먼저 낼 아이디어를 다 낸 것)가 하나라도 있는지 — 없으면 쉬는 표시 · 빨간 점을 띄우지 않는다
+  const ideaOpen = () => !s.res && RES_KEYS.some((k) => C.resState(s, k) === "open");
+  // 이 단계 아이디어를 다 냈을 때 — 다음 단계로 가려면 남은 일
+  function ideaDoneHtml() {
+    const needs = C.eraNeeds(s), R = C.rates(s);
+    let tx, act = "";
+    if (needs) {
+      const left = needs.filter((n) => !n.ok);
+      if (!left.length) {
+        tx = `다음 단계 <b>${ro(ERAS[s.era + 1].name)}</b> 올라갈 수 있어요. 올라가면 새 아이디어가 열려요.`;
+        act = `<button type="button" class="mgx-btn is-gold cv-rnow__go" data-act="tab" data-tab="company">${ic("rocket", 16)}다음 단계로</button>`;
+      } else {
+        const staffLeft = left.find((n) => n.cur);
+        const full = staffLeft && R.growth <= 0;
+        tx = `다음 단계 <b>${ro(ERAS[s.era + 1].name)}</b> 올라가면 새 아이디어가 열려요. 남은 조건: ${left.map((n) => `<b>${n.label}</b>${n.cur ? `(지금 ${n.cur})` : ""}`).join(" · ")}`
+          + (full ? `<br>${ic("users", 13)} 직원 자리가 가득 찼어요. <b>주택가 땅을 사거나</b> 내 주택가에 <b>사택</b>을 지으면 직원이 늘어요.` : staffLeft ? `<br>${ic("user-plus", 13)} 직원은 시간이 지나면 저절로 늘어요.` : "");
+        act = `<button type="button" class="mgx-btn cv-rnow__go" data-act="tab" data-tab="${full ? "map" : "company"}">${ic(full ? "map" : "building-2", 16)}${full ? "동네에서 자리 늘리기" : "회사에서 보기"}</button>`;
+      }
+    } else {
+      tx = s.fin ? "오피스 타운이 완성됐어요. 다음 이야기는 다음 업데이트에서 열려요." : `이제 본사 자리에 랜드마크 <b>새 사옥</b>을 지으면 오피스 타운 완성이에요.`;
+    }
+    return `<div class="mgx-card cv-rnow is-idle">${bic("circle-check", "var(--mg-accent)", 24)}<div class="cv-rnow__tx"><div class="cv-rnow__t">이 단계 아이디어를 모두 냈어요</div><small>${tx}</small>${act}</div></div>`;
+  }
   function researchHtml() {
     let now;
     if (s.res) {
       const X = RES[s.res.k];
       now = `<div class="mgx-card cv-rnow">${bic(X.icon, "var(--c-idea)", 24)}<div class="cv-rnow__tx"><div class="cv-rnow__t">「${X.name}」 회의 중<small data-rem="r"></small></div><div class="mgx-bar" style="--bar:var(--c-idea)"><i data-bar="r"></i></div><small>${X.opens}</small></div></div>`;
+    } else if (!ideaOpen()) {
+      now = ideaDoneHtml();
     } else {
       now = `<div class="mgx-card cv-rnow is-idle">${bic("lightbulb", "#a3abc2", 24)}<div class="cv-rnow__tx"><div class="cv-rnow__t">아이디어 회의가 쉬고 있어요</div><small>빛나는 동그라미를 눌러 다음 회의를 걸어 두세요. 일하는 동안엔 <b>오래 걸리는 회의</b>가 좋아요.</small></div></div>`;
     }
