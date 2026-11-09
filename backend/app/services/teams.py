@@ -1043,7 +1043,7 @@ async def enqueue_open_notice_broadcast(
     site_url = open_notice_site_url()
     send_date = notice_date or now_kst().date()
     notice = await recent_pinned_notice(db, send_date)
-    health = await recent_health_notice(db, send_date)
+    # 건강 정보 소개는 팀즈 오픈 안내에 붙이지 않는다(2026-11-09 요청) — 건강 정보 게시판에서만 본다
     for member in members:
         body = render_open_notice_body(
             name=member.name,
@@ -1054,7 +1054,6 @@ async def enqueue_open_notice_broadcast(
             site_url=site_url,
             notice_date=send_date,
             notice=notice,
-            health=health,
         )
         msg = await enqueue_teams_message(
             db,
