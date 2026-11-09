@@ -87,7 +87,7 @@ window.HKRetroArt = (function () {
     },
   };
   const W = 16, H = 20;
-  const keys = ["fighter", "vitamin", "jumper", "paperjet"]; // 게임 목록(game.py)과 같은 순서
+  const keys = ["paperjet", "fighter", "vitamin", "jumper"]; // 게임 목록(game.py)과 같은 순서 — 종이비행기 편대를 맨 앞에
 
   function scene(key, fit = "slice") {
     const a = ART[key];
