@@ -38,7 +38,9 @@ def stretch_tip_for(day: date) -> tuple[str, str]:
 
 
 # 예약하기 화면에서 롤링되는 개수 (web/_shared/fun-stats.js STRETCH_ROLL_COUNT)
-STRETCH_ROLL_COUNT = 3
+STRETCH_ROLL_COUNT = 5
+# 탈락 · 재신청 안내 메일에 나란히 넣는 개수 — 화면 롤링의 앞에서부터(메일이 너무 길어지지 않게)
+MAIL_STRETCH_COUNT = 3
 
 
 def stretch_roll_indexes(day: date, count: int = STRETCH_ROLL_COUNT) -> list[int]:

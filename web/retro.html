@@ -128,7 +128,7 @@
             </div>
             <div class="rt-hero__art" aria-hidden="true">${games.map((g) => `<span>${A.shot(g.key)}</span>`).join("")}</div>
           </div></div>
-          <div class="rt-sec"><div class="rt-wrap">
+          <div class="rt-sec" id="rt-games"><div class="rt-wrap">
             <h2>무엇부터 할까요?</h2>
             <p>장르가 모두 달라요. 손에 맞는 것부터 한 판 해 보세요.</p>
             <div class="rt-cards">${games.map(card).join("")}</div>
@@ -146,6 +146,23 @@
             </ul>
           </div></div>`;
         HKUI.refreshIcons(root);
+        // /retro#rt-games(게임 화면 「레트로 보기」)로 오면 게임 고르는 칸으로 — 그림이 늦게 떠 자리가 밀려도 2.5초 동안은 따라 맞춘다(그사이 사람이 움직이면 그대로)
+        let jump = null;
+        try { jump = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1))); } catch (_) { jump = null; }
+        if (jump) {
+          let moved = false;
+          ["wheel", "touchstart", "keydown", "mousedown"].forEach((t) => addEventListener(t, () => { moved = true; }, { once: true, passive: true }));
+          const until = performance.now() + 2500;
+          const tick = () => {
+            if (moved || performance.now() > until) return;
+            const head = document.querySelector("header");
+            const headH = head && getComputedStyle(head).position === "sticky" ? Math.max(0, head.getBoundingClientRect().bottom) : 0;
+            const y = Math.max(0, jump.getBoundingClientRect().top + scrollY - headH + 24);
+            if (Math.abs(scrollY - y) > 2) window.scrollTo({ top: y, behavior: "instant" });
+            requestAnimationFrame(tick);
+          };
+          tick();
+        }
         // 업무 시간 — 카드를 누르면 안내 (그사이 열렸으면 그대로 들어간다)
         root.addEventListener("click", async (e) => {
           const a = e.target.closest("a[data-play]");

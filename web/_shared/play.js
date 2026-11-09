@@ -598,6 +598,8 @@ window.HKPlay = (function () {
     // 꿀알바 시리즈 게임 — 게임을 나가면 아케이드 대신 시리즈 공고판으로 돌아간다
     const SERIES_JOBS = [["nightshift", "심야 편의점"], ["clown", "광대를 놓치지 마"], ["milk", "새벽 우유 배달"], ["theater", "심야 극장 안내"], ["trial", "신약 시험 보조"], ["silent", "조용한 공사장"], ["parade", "야간 퍼레이드"], ["finale", "마지막 축제"]];
     const SERIES = SERIES_JOBS.some(([k]) => k === key);
+    // 레트로 오락실 게임 — 머리에 「레트로 보기」(레트로 오락실의 게임 고르는 칸 /retro#rt-games 으로)
+    const RETRO = ["paperjet", "fighter", "vitamin", "jumper"].includes(key);
     let leaveTo = null; // 게임 중 왼쪽 목록에서 다른 회차를 고르면 나간 뒤 그 게임으로 간다
     function goQuit() {
       const to = leaveTo || (SERIES ? "/series" : HKRoutes.lounge);
@@ -689,7 +691,7 @@ window.HKPlay = (function () {
           </div>
           <div data-lboard style="flex:1;min-height:0;overflow-y:auto"><div style="text-align:center;padding:24px"><span class="hk-spin"></span></div></div>
           <div class="hk-dialog__actions" style="margin-top:12px">
-            <button type="button" class="hk-btn hk-btn--primary" data-leave-go>${leaveTo ? "고른 회차로 가기" : SERIES ? "꿀알바 목록으로 나가기" : "아케이드로 나가기"}</button>
+            <button type="button" class="hk-btn hk-btn--primary" data-leave-go>${leaveTo ? (leaveTo.startsWith("/retro") ? "레트로 오락실로 가기" : "고른 회차로 가기") : SERIES ? "꿀알바 목록으로 나가기" : "아케이드로 나가기"}</button>
           </div>
         </div>`;
       const box = overlay.querySelector("[data-lboard]");
@@ -871,6 +873,7 @@ window.HKPlay = (function () {
         const dailyDone = !!(meta.dailyOnce && meta.playedToday);
         playedVariants = meta.playedVariants || [];
         document.getElementById("hk-play-head").innerHTML = `<a class="hk-pf__back" href="${HKRoutes.lounge}" aria-label="아케이드로">${HKUI.icon("chevron-left", 20, "currentColor")}<span>아케이드</span></a>
+          ${RETRO ? `<a class="hk-pf__back hk-pf__vs" id="hk-pf-retro" href="/retro#rt-games" aria-label="레트로 오락실 게임 보기">${HKUI.icon("joystick", 18, "currentColor")}<span>레트로 보기</span></a>` : ""}
           <span class="hk-pf__icon" style="${tintStyle(key)}">${HKUI.icon(meta.icon || "gamepad-2", 18, "#fff")}</span>
           <div class="hk-pf__title"><b>${HKUI.escapeHtml(meta.title)}</b><small>${HKUI.escapeHtml(meta.desc || "")}</small></div>
           <div class="hk-pf__tools">
@@ -888,6 +891,7 @@ window.HKPlay = (function () {
         document.querySelectorAll(".hk-pf__back, #hk-pf-series").forEach((a) => a.addEventListener("click", (e) => {
           if (!playingNow) return;
           e.preventDefault();
+          leaveTo = a.id === "hk-pf-retro" ? a.getAttribute("href") : null; // 「레트로 보기」는 나간 뒤 레트로 오락실로
           askLeave();
         }));
         document.querySelectorAll(".hk-pf__side a").forEach((a) => a.addEventListener("click", (e) => {

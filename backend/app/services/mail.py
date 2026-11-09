@@ -187,12 +187,12 @@ def coupon_block_html(line_html: str) -> str:
 
 
 def stretch_list_html(day: date) -> str:
-    """오늘의 1분 스트레칭 — 예약하기 화면에서 롤링되는 3개를 메일에 나란히.
+    """오늘의 1분 스트레칭 — 예약하기 화면에서 롤링되는 것 가운데 앞의 MAIL_STRETCH_COUNT(3)개를 메일에 나란히.
     그림은 Outlook 호환을 위해 PNG data URI."""
-    from app.services.stretch_tips import STRETCH_TIPS, stretch_image_name, stretch_roll_indexes
+    from app.services.stretch_tips import MAIL_STRETCH_COUNT, STRETCH_TIPS, stretch_image_name, stretch_roll_indexes
 
     rows = []
-    for n, index in enumerate(stretch_roll_indexes(day)):
+    for n, index in enumerate(stretch_roll_indexes(day, MAIL_STRETCH_COUNT)):
         title, body = STRETCH_TIPS[index]
         image = EMAIL_ASSETS_DIR / stretch_image_name(index)
         img = (

@@ -46,7 +46,7 @@ window.HKFun = (function () {
   const milestones = HKUI.USAGE_BADGES;
   const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-  const STRETCH_ROLL_COUNT = 3;
+  const STRETCH_ROLL_COUNT = 5; // 하루에 돌아가며 보여 주는 개수(backend stretch_tips.STRETCH_ROLL_COUNT 와 같게)
   const STRETCH_ROLL_MS = 5000;
 
   /** 오늘의 스트레칭부터 순서대로 N개 — 첫 번째가 팀즈 오픈 안내에 나가는 것과 같다. */
