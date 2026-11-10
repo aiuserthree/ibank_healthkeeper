@@ -1381,7 +1381,7 @@ window.HKFarm = (function () {
         HKFx.confetti({ x: from.x, y: from.y, n: 24 });
       }
     }
-    else if (a === "expand") { const o = S.open; await expand(); if (S.open > o) spendFx(m0 - S.money); }
+    else if (a === "expand") { const o = S.open; await expand(); if (S.open > o) { spendFx(m0 - S.money); window.HKMgmtTop && HKMgmtTop(); } } // 넓힌 밭을 바로 보게 맨 위로
     else if (a === "claim") { claimDaily(); flyCoins(from, S.money - m0); }
     else if (a === "help") help();
     else if (a === "more") moreMenu();

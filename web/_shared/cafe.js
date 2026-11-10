@@ -1711,7 +1711,7 @@ window.HKCafe = (function () {
         if (hire(S, id)) { payFx(b, cost); HKUI.toast(`${jo(st.name, "이/가")} 함께 일하게 됐어요`); changed(true); HKFx.confetti({ ...pt(b), n: 30, colors: CONFETTI }); }
       } else if (act === "deco") {
         const d = DECO_BY[id];
-        if (buyDeco(S, id)) { payFx(b, d.cost); const at = S.deco.place.indexOf(id); HKUI.toast(at >= 0 ? `${jo(d.name, "을/를")} ${at + 1}번 자리에 놓았어요` : `${jo(d.name, "을/를")} 샀어요 · 자리를 골라 놓아요`); changed(true); }
+        if (buyDeco(S, id)) { payFx(b, d.cost); window.HKMgmtTop && HKMgmtTop(); const at = S.deco.place.indexOf(id); HKUI.toast(at >= 0 ? `${jo(d.name, "을/를")} ${at + 1}번 자리에 놓았어요` : `${jo(d.name, "을/를")} 샀어요 · 자리를 골라 놓아요`); changed(true); }
       } else if (act === "spot") openSpot(+b.dataset.i);
       else if (act === "claim") {
         const o = claimOrder(S, id);

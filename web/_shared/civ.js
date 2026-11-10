@@ -1936,12 +1936,12 @@
       popTiles.add(i);
       const ok = run(C.expand(s, i), `${eul(C.typeOf(s, i).name)} 샀어요`);
       popTiles.clear();
-      if (ok) { hudAnim(snap); HKFx.confetti(Object.assign(stagePt(i), { n: 22 })); }
+      if (ok) { hudAnim(snap); window.HKMgmtTop && HKMgmtTop(); HKFx.confetti(Object.assign(stagePt(i), { n: 22 })); } // 산 땅을 바로 보게 맨 위로
       return;
     }
     if (a === "build") {
       const k = d.k;
-      if (run(C.build(s, +d.i, k), `${eul(BLD[k].name)} 짓기 시작했어요`)) hudAnim(snap);
+      if (run(C.build(s, +d.i, k), `${eul(BLD[k].name)} 짓기 시작했어요`)) { hudAnim(snap); window.HKMgmtTop && HKMgmtTop(); } // 짓는 건물을 바로 보게 맨 위로
       return;
     }
     if (a === "research") {
