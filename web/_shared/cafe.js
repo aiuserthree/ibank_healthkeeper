@@ -413,6 +413,14 @@ window.HKCafe = (function () {
     s.deco.place[spot] = id || null;
     return true;
   }
+  // 재배치 — a 자리의 물건을 b 자리로(비었으면 옮기고, 있으면 서로 바꾼다). 공짜 · 바로. "move" | "swap" | false
+  function swapDeco(s, a, b) {
+    const open = (i) => !!SPOTS[i] && s.grade >= SPOTS[i].g;
+    if (a === b || !open(a) || !open(b) || !s.deco.place[a]) return false;
+    const p = s.deco.place, was = p[b];
+    p[b] = p[a]; p[a] = was || null;
+    return was ? "swap" : "move";
+  }
   function claimOrder(s, oid) {
     const o = s.orders.list.find((x) => x.id === oid);
     if (!o || o.claimed || !orderDone(o)) return null;
@@ -425,7 +433,7 @@ window.HKCafe = (function () {
     facCapAt, menuSlotsAt, buildSlotsAt, staffNeed, staffSlots, dayKey, kstHour,
     blank, rates, rep, capOf, facSum, upCost, upTime, facBlock, menuOk, itemPrice, itemPrep, staffLv, decoRep,
     newLog, advance, checkGrade, summary, won, num, orderText, orderProg, orderDone,
-    collect, startUpgrade, toggleMenu, bestMenu, hire, buyDeco, placeDeco, claimOrder, menuSlotsFree,
+    collect, startUpgrade, toggleMenu, bestMenu, hire, buyDeco, placeDeco, swapDeco, claimOrder, menuSlotsFree,
   };
 
   // ══ 옥상 디오라마(canvas) ═════════════════════════════════════
@@ -1221,6 +1229,8 @@ window.HKCafe = (function () {
     sun: `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><circle cx="12" cy="12" r="4.4" fill="#ffd23f"/><g stroke="#ffd23f" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5.3 5.3L7 7M17 17l1.7 1.7M5.3 18.7L7 17M17 7l1.7-1.7"/></g></svg>`,
     moon: `<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z" fill="#ffe7a3"/></svg>`,
     plus: `<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>`,
+    move: `<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18"/><path d="M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/></g></svg>`,
+    lock: `<svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="currentColor"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="2.2"/></svg>`,
   };
   const TABG = {
     fac: `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="M3 20.5h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".45"/><path d="M14.5 3l6.5 6.5-2.6 2.6-1.7-1.7-7.9 7.9a2.1 2.1 0 0 1-3-3l7.9-7.9-1.7-1.7z" fill="currentColor"/></svg>`,
@@ -1299,6 +1309,7 @@ window.HKCafe = (function () {
     root.innerHTML = topBar(false) + `<div class="cf-loading"><span class="hk-spin"></span></div>`;
     HKUI.refreshIcons(root);
     let store = null, S = null, scene = null, tab = "fac", sig = "", lastSave = 0, modalOpen = 0, cashLock = 0, hudH = 0, spotSig = "";
+    let moving = false, moveSrc = -1; // 재배치 모드 · 고른 자리(-1 = 아직 안 고름)
     let liveLog = newLog();
     const thumbs = {};
     const $ = (id) => root.querySelector("#" + id);
@@ -1328,7 +1339,7 @@ window.HKCafe = (function () {
 
     HKMgmt.open("cafe", {
       blank: () => blank(Date.now()),
-      onStale: (st) => { S = fresh(st); store.state = S; sig = ""; HKUI.toast("다른 창에서 바꾼 내용으로 다시 불러왔어요", "info"); renderAll(); },
+      onStale: (st) => { S = fresh(st); store.state = S; sig = ""; HKUI.toast("다른 창에서 바꾼 내용으로 다시 불러왔어요", "info"); renderAll(); if (moving) paintMove(); },
       onClosed: (opens) => { if (scene) scene.destroy(); closed(opens); },
     }).then((st) => {
       store = st;
@@ -1380,6 +1391,8 @@ window.HKCafe = (function () {
               <div class="cf-spots-layer" id="cf-spots"></div>
               <div class="mgx-pill is-dark cf-clock" id="cf-clock"></div>
               <button type="button" class="cf-limit" id="cf-limit" data-act="limit"></button>
+              <button type="button" class="mgx-movebtn cf-movebtn" id="cf-movebtn" data-act="move" aria-pressed="false">${G.move}<span>재배치</span></button>
+              <div class="mgx-movebar cf-movebar" id="cf-movebar" role="status" aria-live="polite" hidden></div>
             </div>
           </div>
           <div class="cf-side">
@@ -1406,7 +1419,7 @@ window.HKCafe = (function () {
         info,
         hudSpace: () => { const h = $("cf-hud"); return h ? h.offsetTop + h.offsetHeight + 4 : 0; },
         onLayout: () => { spotSig = ""; placeOverlays(); },
-        onPick: (id) => goFac(id),
+        onPick: (id) => { if (!moving) goFac(id); },
       });
       hudH = $("cf-hud").offsetHeight;
       sig = "";
@@ -1485,9 +1498,10 @@ window.HKCafe = (function () {
       if (!scene || !S) return;
       const [rx, ry] = scene.toCss(1.75, 5.9, 50); const rd = $("cf-ready"); rd.style.left = rx.toFixed(0) + "px"; rd.style.top = ry.toFixed(0) + "px";
       const hasLoose = S.deco.owned.some((id) => !S.deco.place.includes(id));
-      const key = JSON.stringify([tab, S.grade, S.deco.place, hasLoose, Math.round(scene.toCss(0, 0)[0]), Math.round(scene.toCss(10, 10)[1])]);
+      const key = JSON.stringify([tab, S.grade, S.deco.place, hasLoose, moving, moveSrc, Math.round(scene.toCss(0, 0)[0]), Math.round(scene.toCss(10, 10)[1])]);
       if (key === spotSig) return;
       spotSig = key;
+      if (moving) { $("cf-spots").innerHTML = SPOTS.map(movePin).join(""); return; }
       $("cf-spots").innerHTML = SPOTS.map((sp, i) => {
         const open = S.grade >= sp.g, id = S.deco.place[i];
         if (!open) return "";
@@ -1496,6 +1510,59 @@ window.HKCafe = (function () {
         const [x, y] = scene.toCss(SPOT_G[i][0] + (id ? 0.55 : 0), SPOT_G[i][1] + (id ? 0.55 : 0), id ? 0 : 8);
         return `<button type="button" class="cf-spot-pin${id ? " is-filled" : ""}" data-act="spot" data-i="${i}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px" aria-label="${i + 1}번 자리 ${esc(sp.name)}">${id ? `<b>${i + 1}</b>` : G.plus}</button>`;
       }).join("");
+    }
+    // 재배치 중 핀 — 열린 자리는 모두(물건 있는 곳은 번호, 빈 곳은 「+」), 잠긴 자리는 흐린 자물쇠
+    function movePin(sp, i) {
+      const open = S.grade >= sp.g, id = S.deco.place[i];
+      const [x, y] = scene.toCss(SPOT_G[i][0] + (id ? 0.55 : 0), SPOT_G[i][1] + (id ? 0.55 : 0), id ? 0 : 8);
+      const at = `style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px"`;
+      if (!open) return `<button type="button" class="cf-spot-pin is-move is-locked" data-act="spot" data-i="${i}" aria-disabled="true" ${at} aria-label="${i + 1}번 자리 ${esc(sp.name)} · 등급 ${sp.g}에 열려요">${G.lock}</button>`;
+      const cls = moveSrc < 0 ? (id ? " is-pickable" : " is-idle") : i === moveSrc ? " is-move-src" : " is-move-ok";
+      const what = id ? `「${esc(DECO_BY[id].name)}」` : "비어 있어요";
+      return `<button type="button" class="cf-spot-pin is-move${id ? " is-filled" : ""}${cls}" data-act="spot" data-i="${i}" ${at} aria-pressed="${i === moveSrc}" aria-label="${i + 1}번 자리 ${esc(sp.name)} · ${what}">${id ? `<b>${i + 1}</b>` : G.plus}</button>`;
+    }
+    // 재배치 안내 막대 · 단추 모양
+    function paintMove() {
+      root.classList.toggle("is-moving", moving);
+      const btn = $("cf-movebtn"), bar = $("cf-movebar");
+      if (!btn || !bar) return;
+      btn.classList.toggle("is-on", moving); btn.setAttribute("aria-pressed", String(moving));
+      bar.hidden = !moving;
+      if (!moving) { bar.innerHTML = ""; return; }
+      if (moveSrc >= 0 && !S.deco.place[moveSrc]) moveSrc = -1;
+      const id = moveSrc >= 0 ? S.deco.place[moveSrc] : null;
+      bar.innerHTML = id
+        ? `<span>「${esc(DECO_BY[id].name)}」${jo(DECO_BY[id].name, "을/를").slice(-1)} 놓을 자리를 눌러요 · 물건이 있으면 서로 바꿔요</span><button type="button" class="is-ghost" data-act="moveCancel">취소</button><button type="button" data-act="moveDone" data-esc-close>다 했어요</button>`
+        : `<span>옮길 물건을 눌러요</span><button type="button" data-act="moveDone" data-esc-close>다 했어요</button>`;
+    }
+    function startMove() {
+      if (!S.deco.place.some((id) => id)) { HKUI.toast("옮길 꾸미기 물건이 아직 없어요 · 꾸미기 탭에서 사서 놓아요", "info"); return; }
+      const more = document.querySelector(".cf-more"); if (more) more.remove();
+      moving = true; moveSrc = -1; spotSig = ""; paintMove(); placeOverlays();
+    }
+    function endMove() {
+      if (!moving) return;
+      moving = false; moveSrc = -1; spotSig = ""; paintMove(); placeOverlays();
+    }
+    function pickMove(i) {
+      const sp = SPOTS[i]; if (!sp) return;
+      if (moveSrc >= 0 && !S.deco.place[moveSrc]) moveSrc = -1; // 다른 창에서 바뀌었으면 고른 것 풀기
+      if (S.grade < sp.g) { HKUI.toast(`${i + 1}번 자리는 등급 ${sp.g}에 열려요`, "info"); return; }
+      if (moveSrc < 0) { // 옮길 물건 고르기
+        if (!S.deco.place[i]) { HKUI.toast("물건이 있는 자리를 먼저 눌러요", "info"); return; }
+        moveSrc = i;
+      } else if (i === moveSrc) moveSrc = -1; // 다시 누르면 풀기
+      else {
+        const a = moveSrc, A = DECO_BY[S.deco.place[a]].name, B = S.deco.place[i] ? DECO_BY[S.deco.place[i]].name : null;
+        const res = swapDeco(S, a, i);
+        if (!res) return;
+        moveSrc = -1;
+        HKUI.toast(res === "swap" ? `「${A}」${jo(A, "과/와").slice(-1)} 「${B}」 자리를 바꿨어요` : `「${A}」${jo(A, "을/를").slice(-1)} ${i + 1}번 자리로 옮겼어요`);
+        changed(false);
+        const [gx, gy] = SPOT_G[i], [x, y] = scene.toCss(gx, gy, 20), r = $("cf-stage").getBoundingClientRect();
+        HKFx.confetti({ x: r.left + x, y: r.top + y, n: 18, colors: CONFETTI });
+      }
+      spotSig = ""; paintMove(); placeOverlays();
     }
     // 패널 안 실시간 글자 — 남은 공사 시간 · 주문 진행 · 알바생 일한 시간
     function liveFields() {
@@ -1659,6 +1726,7 @@ window.HKCafe = (function () {
     // ── 행동 ──
     function changed(big) { sig = ""; summary(S); if (big) store.saveNow(); else store.dirty(); renderAll(); scene && scene.redraw(); }
     function setTab(t, scroll) {
+      endMove();
       tab = t; sig = ""; renderAll();
       if (scroll !== false && innerWidth < 960) { const p = $("cf-panel"); const y = p.getBoundingClientRect().top; if (y > innerHeight * 0.62) scrollTo({ top: scrollY + y - 70, behavior: "smooth" }); } // 아래로만 — 위로는 올리지 않는다
     }
@@ -1682,11 +1750,24 @@ window.HKCafe = (function () {
       return n;
     }
     async function onClick(e) {
+      if (moving) { // 재배치 중 — 장면 위에선 핀 · 안내 막대 · 재배치 단추만, 장면 밖을 누르면 모드를 끄고 원래대로
+        const st = $("cf-stage"), mb = e.target.closest("[data-act]");
+        if (st && st.contains(e.target)) {
+          if (!mb || !st.contains(mb)) return;
+          const a = mb.dataset.act;
+          if (a === "spot") pickMove(+mb.dataset.i);
+          else if (a === "moveCancel") { moveSrc = -1; spotSig = ""; paintMove(); placeOverlays(); }
+          else if (a === "moveDone" || a === "move") endMove();
+          return;
+        }
+        endMove();
+      }
       const tb = e.target.closest("[data-tab]");
       if (tb && root.contains(tb)) { setTab(tb.dataset.tab); return; }
       const b = e.target.closest("[data-act]");
       if (!b || b.disabled || !root.contains(b)) return;
       const act = b.dataset.act, id = b.dataset.id;
+      if (act === "move") { startMove(); return; }
       advance(S, store.now(), liveLog);
       if (act === "collect") {
         const n = doCollect(b);
@@ -1759,7 +1840,7 @@ window.HKCafe = (function () {
       try {
         await store.reset();
         S = store.state = blank(store.now()); advance(S, store.now()); await store.saveNow();
-        liveLog = newLog(); tab = "fac"; sig = ""; spotSig = "";
+        liveLog = newLog(); tab = "fac"; sig = ""; spotSig = ""; moving = false; moveSrc = -1; root.classList.remove("is-moving");
         if (scene) scene.destroy();
         root.removeEventListener("click", onClick);
         build(); showTutorial();

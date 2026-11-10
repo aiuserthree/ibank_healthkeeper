@@ -442,6 +442,33 @@
     return null;
   }
 
+  // 재배치 — 다 지은 건물을 다른 내 땅으로 옮기거나(빈 땅) 서로 바꾼다(건물 있는 땅). 공짜 · 기운 안 듦 · 즉시.
+  //   칸 번호로 묶인 상태는 s.bld 뿐(짓는 중 s.builds 칸은 옮길 것도 놓을 곳도 될 수 없다). 어울리는 땅 보너스는 rates() 가 칸 종류로 다시 계산한다.
+  function canMoveFrom(s, i) {
+    if (i === HQ) return "본사는 옮길 수 없어요";
+    if (!owned(s, i)) return "내 땅의 건물만 옮길 수 있어요";
+    if (building(s, i)) return "짓고 있는 건물은 옮길 수 없어요";
+    if (!s.bld[i]) return "빈 땅이에요 — 옮길 건물을 먼저 눌러요";
+    return null;
+  }
+  function canMove(s, from, to) {
+    const why = canMoveFrom(s, from); if (why) return why;
+    if (to === from) return "같은 자리예요";
+    if (to === HQ) return "본사 자리에는 놓을 수 없어요";
+    if (!owned(s, to)) return "내 땅에만 놓을 수 있어요";
+    if (building(s, to)) return "짓고 있는 칸에는 놓을 수 없어요";
+    return null;
+  }
+  function move(s, from, to) {
+    const why = canMove(s, from, to); if (why) return why;
+    const a = s.bld[from], b = s.bld[to];
+    s.bld[to] = a;
+    if (b) s.bld[from] = b; else delete s.bld[from];
+    summarize(s);
+    return null;
+  }
+  const fitsAt = (s, i, k) => !!(BLD[k] && BLD[k].fit && BLD[k].fit.includes(typeOf(s, i).k));
+
   function resState(s, k) {
     const X = RES[k];
     if (s.done.includes(k)) return "done";
@@ -525,7 +552,7 @@
     H, MIN, MAX_AWAY, AP_MAX, AP_SEC, AP, HEX, N, HQ, NB, idxOf, migrate, TILES, TYPE_BY_KEY, ERAS, BLD, RES, RES_KEYS, POL, PERKS, CARDS,
     repTileAt, hasPerk, blank, rates, advance, catchUp, newLog, grantCards, summarize, dayKey,
     owned, typeOf, isFrontier, ownedCount, expandCost, slotsOf, buildSlots, building, buildTime, buildCost, resTime,
-    canExpand, expand, bldLock, canBuild, build, resState, canResearch, research, polLock, canPolicy, setPolicy,
+    canExpand, expand, bldLock, canBuild, build, canMoveFrom, canMove, move, fitsAt, resState, canResearch, research, polLock, canPolicy, setPolicy,
     eraNeeds, canEraUp, eraUp, cardFx, canCard, chooseCard,
   };
   G.CivCore = CivCore;
@@ -1117,6 +1144,7 @@
   // ── 상태 · 화면 ───────────────────────────────────────────────────
   let store = null, s = null, host = null, root = null, tab = "map", sel = HQ, polSlot = -1, lastSig = "", lastSave = 0, timer = 0;
   const fresh = new Set(), popTiles = new Set();
+  let moving = false, moveSrc = -1; // 재배치 모드 · 고른 건물 칸(-1 이면 아직 안 고름)
   const countUntil = {};
   const modalChain = { p: Promise.resolve() };
   const enqueue = (fn) => { modalChain.p = modalChain.p.then(() => new Promise((res) => { try { fn(res); } catch (_) { res(); } })); };
@@ -1174,6 +1202,7 @@
   }
 
   function onStale(st) {
+    moving = false; moveSrc = -1;
     s = fixState(st) || C.blank(store.now());
     store.state = s;
     C.catchUp(s, store.now());
@@ -1243,7 +1272,8 @@
             <button type="button" class="mgx-pill cv-pill cv-pill--ap" data-act="pill" data-k="ap" style="--pill:var(--c-ap)" aria-label="기운"><span class="mgx-pill__ic">${ic("zap", 15)}</span><span class="cv-pill__tx"><b data-l="ap"></b><small data-l="apnext"></small></span></button>
           </div>
           <div class="cv-jobs" id="cv-jobs"></div>
-          <div class="cv-zoom"><button type="button" class="mgx-icon" data-act="zoom" data-z="in" aria-label="크게">${ic("plus", 20)}</button><button type="button" class="mgx-icon" data-act="zoom" data-z="out" aria-label="작게">${ic("minus", 20)}</button><button type="button" class="mgx-icon" data-act="zoom" data-z="fit" aria-label="한눈에 보기">${ic("scan", 19)}</button></div>
+          <div class="mgx-movebar cv-movebar" id="cv-movebar" role="status" aria-live="polite" hidden></div>
+          <div class="cv-zoom"><button type="button" class="mgx-movebtn cv-movebtn" id="cv-movebtn" data-act="move" aria-pressed="false">${ic("move", 16)}<span>재배치</span></button><button type="button" class="mgx-icon" data-act="zoom" data-z="in" aria-label="크게">${ic("plus", 20)}</button><button type="button" class="mgx-icon" data-act="zoom" data-z="out" aria-label="작게">${ic("minus", 20)}</button><button type="button" class="mgx-icon" data-act="zoom" data-z="fit" aria-label="한눈에 보기">${ic("scan", 19)}</button></div>
         </div>
         <div class="mgx-dock cv-dock" id="cv-dock" role="tablist"></div>
         <div class="cv-panel" id="cv-panel"></div>
@@ -1259,10 +1289,12 @@
   function renderAll() {
     if (!root || !s) return;
     lastSig = sig();
+    if (tab !== "map") { moving = false; moveSrc = -1; } // 재배치는 동네 탭에서만
     root.classList.toggle("is-sub", tab !== "map");
     const era = $("#cv-era"); if (era) era.innerHTML = `${ic("flag", 12)}${s.era < ERAS.length - 1 ? ERAS[s.era].name : s.fin ? "완성!" : "마지막 단계"}`; // 마지막 단계 이름은 게임 이름과 같아서
     paintSky();
     drawMap();
+    drawMove();
     drawJobs();
     drawDock();
     drawPanel();
@@ -1293,6 +1325,7 @@
   function drawMap() {
     const cam = $("#cv-cam"); if (!cam || !s) return;
     cam.innerHTML = mapInner();
+    markMove();
     drawBubs();
   }
   function drawJobs() {
@@ -1436,7 +1469,7 @@
       if (!pts.has(e.pointerId)) return;
       pts.delete(e.pointerId);
       if (pts.size === 0) {
-        if (!moved && start && start.tile >= 0 && e.type === "pointerup") pickTile(start.tile);
+        if (!moved && start && start.tile >= 0 && e.type === "pointerup") (moving ? moveTap(start.tile) : pickTile(start.tile));
         start = null; pinch = null; st.classList.remove("is-drag");
       } else if (pts.size === 1) {
         const [p] = [...pts.values()];
@@ -1856,9 +1889,82 @@
     });
     root.addEventListener("keydown", (e) => {
       const t = e.target.closest && e.target.closest("[data-tile]");
-      if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); pickTile(+t.dataset.tile); }
+      if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); if (moving) moveTap(+t.dataset.tile); else pickTile(+t.dataset.tile); }
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || !moving) return;
+      if (document.querySelector(".cv-ov, .mgx-sheet-wrap, .hk-modal-backdrop")) return; // 열린 창이 먼저 닫힌다
+      stopMove();
     });
   }
+
+  // ── 재배치 모드 — 건물 칸을 눌러 고르고, 놓을 내 땅을 누르면 옮긴다(건물이 있으면 서로 바꿈). 공짜 · 즉시 ──
+  const wa = (w) => `${w}${bat(w) ? "과" : "와"}`;
+  const movables = () => HEX.map((h, i) => i).filter((i) => !C.canMoveFrom(s, i));
+  function startMove() {
+    if (tab !== "map") return;
+    if (!movables().length) { HKUI.toast("옮길 건물이 아직 없어요", "info"); return; }
+    moving = true; moveSrc = -1;
+    markMove(); drawMove();
+  }
+  function stopMove() {
+    if (!moving) return;
+    moving = false; moveSrc = -1;
+    markMove(); drawMove();
+  }
+  // 칸 모양 — 고른 건물 · 놓을 수 있는 땅 · (아직 안 골랐으면) 옮길 수 있는 건물
+  function markMove() {
+    if (!root || !s) return;
+    if (moveSrc >= 0 && C.canMoveFrom(s, moveSrc)) moveSrc = -1; // 다른 창에서 바뀌었으면 고른 것을 푼다
+    root.querySelectorAll(".cv-tile[data-tile]").forEach((g) => {
+      const i = +g.dataset.tile;
+      g.classList.toggle("is-move-src", moving && i === moveSrc);
+      g.classList.toggle("is-move-ok", moving && moveSrc >= 0 && !C.canMove(s, moveSrc, i));
+      g.classList.toggle("is-move-can", moving && moveSrc < 0 && !C.canMoveFrom(s, i));
+    });
+  }
+  function drawMove() {
+    if (!root) return;
+    root.classList.toggle("is-moving", moving);
+    root.classList.toggle("has-move-src", moving && moveSrc >= 0);
+    const btn = $("#cv-movebtn");
+    if (btn) { btn.classList.toggle("is-on", moving); btn.setAttribute("aria-pressed", String(moving)); }
+    const bar = $("#cv-movebar"); if (!bar) return;
+    bar.hidden = !moving;
+    if (!moving) { bar.innerHTML = ""; return; }
+    const done = `<button type="button" data-act="moveDone">다 했어요</button>`;
+    bar.innerHTML = moveSrc >= 0
+      ? `<span><b>「${BLD[s.bld[moveSrc]].name}」${bat(BLD[s.bld[moveSrc]].name) ? "을" : "를"} 놓을 땅을 눌러요</b><small><i> · </i>건물이 있으면 서로 바꿔요</small></span><button type="button" class="is-ghost" data-act="moveCancel">취소</button>${done}`
+      : `<span><b>옮길 건물을 눌러요</b></span>${done}`;
+  }
+  function moveTap(i) {
+    if (moveSrc < 0) {
+      const why = C.canMoveFrom(s, i);
+      if (why) { HKUI.toast(why, "info"); return; }
+      moveSrc = i;
+    } else if (i === moveSrc) {
+      moveSrc = -1;
+    } else {
+      const from = moveSrc, a = s.bld[from], b = s.bld[i];
+      const why = C.move(s, from, i);
+      if (why) { HKUI.toast(why, "info"); return; }
+      // 칸 번호로 묶인 화면 상태(완공 말풍선)도 같이 옮긴다
+      const fa = fresh.has(from), fb = fresh.has(i);
+      fresh.delete(from); fresh.delete(i);
+      if (fa) fresh.add(i);
+      if (fb && b) fresh.add(from);
+      moveSrc = -1;
+      store.saveNow();
+      popTiles.add(i); if (b) popTiles.add(from);
+      renderAll();
+      const fit = C.fitsAt(s, i, a) || (b && C.fitsAt(s, from, b));
+      const na = `「${BLD[a].name}」`;
+      HKUI.toast((b ? `${wa(na)} 「${BLD[b].name}」 자리를 바꿨어요` : `${eul(na)} 옮겼어요`) + (fit ? " · 어울리는 땅 보너스" : ""));
+      return;
+    }
+    markMove(); drawMove();
+  }
+
   function pickTile(i) {
     if (tab !== "map") { tab = "map"; sel = i; renderAll(); return; }
     const prev = root.querySelector(".cv-tile.is-sel");
@@ -1891,6 +1997,15 @@
     setTimeout(() => act("card", btn.dataset, null, { x: r.left + r.width / 2, y: r.top + r.height / 2 }), reduce() ? 0 : 720);
   }
   function act(a, d, el, at) {
+    if (a === "move") { if (moving) stopMove(); else startMove(); return; }
+    if (a === "moveDone") { stopMove(); return; }
+    if (a === "moveCancel") { moveSrc = -1; markMove(); drawMove(); return; }
+    if (moving) {
+      // 재배치 중에는 장면 위 말풍선 · 진행 칩과 칸으로 가는 길을 막는다(확대 · 도움말 · 알약 · 판 단추는 그대로). 탭을 바꾸면 모드가 꺼진다
+      if (el && el.closest(".cv-bubs, .cv-jobs")) return;
+      if (["goTile", "idleBuild", "goFront", "fresh"].includes(a)) return;
+      if (a === "tab") stopMove();
+    }
     if (a === "tab") {
       if (tab === d.tab && innerWidth >= 960) return;
       tab = d.tab; polSlot = -1; renderAll(); // 화면은 그 자리 그대로(위로 올리지 않는다)
@@ -2151,7 +2266,7 @@
       s = C.blank(store.now());
       store.state = s;
       await store.saveNow();
-      tab = "map"; sel = HQ; polSlot = -1; fresh.clear();
+      tab = "map"; sel = HQ; polSlot = -1; fresh.clear(); moving = false; moveSrc = -1;
       Object.assign(cam, townCam());
       renderAll();
       applyCam();
