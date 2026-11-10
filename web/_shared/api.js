@@ -47,6 +47,7 @@ window.HKApi = (function () {
     playGames: () => request("/play/games"),
     playStatus: () => request("/play/status"),
     playLeaderboard: (game, period, variant) => request(`/play/${encodeURIComponent(game)}/leaderboard?period=${encodeURIComponent(period || "today")}${variant ? `&variant=${encodeURIComponent(variant)}` : ""}`),
+    playStage: (game) => request(`/play/${encodeURIComponent(game)}/stage`, { method: "POST" }), // 판 중간 도장(통통 짐볼 스테이지 통과)
     playStart: (game, variant) => request(`/play/${encodeURIComponent(game)}/start${variant ? `?variant=${encodeURIComponent(variant)}` : ""}`, { method: "POST" }),
     playRun: (game, fresh) => request(`/play/${encodeURIComponent(game)}/run${fresh ? "?fresh=1" : ""}`, { method: "POST" }),
     playStamps: () => request("/play/stamps"),

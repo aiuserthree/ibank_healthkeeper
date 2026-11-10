@@ -456,6 +456,17 @@ async def submit_score(
     return {"data": await game_service.submit_score(db, redis, member, game, body.score, body.token, body.variant)}
 
 
+@router.post("/{game}/stage")
+async def stage_clear(
+    game: str,
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis_client),
+    member: Member = Depends(get_current_active_member),
+):
+    """판 중간 도장 — 한 판이 긴 게임(통통 짐볼)에서 스테이지 하나를 통과했을 때."""
+    return {"data": await game_service.stage_stamp(db, redis, member, game)}
+
+
 @router.post("/{game}/start")
 async def start(
     game: str,

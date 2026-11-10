@@ -13,6 +13,7 @@
  *     onRestart(fn) — 판이 끝난 뒤 스페이스를 누르면 부른다 (처음 상태로 되돌리는 함수)
  *     onPause(fn)   — 게임 중 Esc 를 누르면 부른다 (게임의 일시정지 함수 — 플레이 중이 아니면 아무것도 안 하게).
  *                     일시정지 화면에는 "계속하기" 글자가 든 버튼을 두면 Esc·스페이스로 이어 하기가 된다
+ *     stageStamp()  → Promise — 판 중간 도장(한 판이 긴 게임이 스테이지 하나를 통과했을 때). 오늘 첫 도장이면 알림
  *     onLeaveNote(fn) — 나가기 확인 창 안내 말(fn() → 글 또는 null). 중간 저장되는 게임이 「이어 할 수 있어요」를 알릴 때
  *     formatScore(n)
  *     sfx(name, arg) — 효과음 (HKSound 이름 목록 참고). 소리 켜고 끄기는 공통 버튼이 맡는다
@@ -511,7 +512,8 @@ window.HKPlay = (function () {
     const armRun = (fresh) => HKApi.playRun(key, fresh).catch(() => {});
     let playingNow = false;
     let scoreFn = null; // 게임이 알려 주는 지금 점수 (뒤로 가기 → 기록 남기고 나가기)
-    let leaveNoteFn = null; // 게임이 알려 주는 나가기 안내 — 중간 저장이 되는 게임(통통 짐볼)은 "기록 안 됨" 대신 이 말
+    let leaveNoteFn = null;
+    let stampedToday = false; // 판 중간 도장(stageStamp) — 오늘 찍었으면 더 묻지 않는다 // 게임이 알려 주는 나가기 안내 — 중간 저장이 되는 게임(통통 짐볼)은 "기록 안 됨" 대신 이 말
     function setPlaying(on) {
       // 휴대폰 머리의 일시정지 버튼은 판이 도는 동안만
       document.querySelector(".hk-pf")?.classList.toggle("is-playing", on);
@@ -964,6 +966,17 @@ window.HKPlay = (function () {
           onScore: (fn) => { scoreFn = fn; },
           // 나가기 확인 창의 안내 말 — fn() 이 글을 돌려주면 「끝까지 해야 기록이 남아요」 대신 보인다(중간 저장되는 게임)
           onLeaveNote: (fn) => { leaveNoteFn = fn; },
+          // 판 중간 도장 — 한 판이 긴 게임(통통 짐볼)이 스테이지 하나를 통과했을 때 부른다. 오늘 이미 찍었으면 서버에 묻지 않는다
+          stageStamp: async () => {
+            if (stampedToday) return null;
+            try {
+              const st = await HKApi.playStage(key);
+              if (st && st.today) stampedToday = true;
+              if (st && st.new) { HKSound.play("coin"); HKUI.toast(`오늘 도장 쾅! · 도장 ${Math.min(st.count, st.goal)}/${st.goal}`); }
+              stampToast(st);
+              return st;
+            } catch (_) { return null; }
+          },
           begin: async () => {
             if (!game.dailyOnce) return true;
             try {

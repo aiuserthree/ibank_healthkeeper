@@ -42,6 +42,8 @@ class Game:
     min_score: int = 0
     # 명예의 전당에서 갈래 기록을 함께 겨룰지 — 코스마다 길이 · 난이도가 다른 게임(통통 짐볼)은 기본 판(1코스)만 센다
     hall_mix_variants: bool = True
+    # 판 중간 도장 — 한 판이 긴 게임(통통 짐볼 · 코스 10스테이지)은 스테이지 하나를 통과해도 그날 도장(stage_stamp)
+    stage_stamp: bool = False
 
 
 # 게임 순서 = 아케이드 · 순위 · 명예의 전당에 보이는 순서. 최근에 만든 게임이 맨 위 — 새 게임은 맨 위에 넣는다
@@ -56,7 +58,7 @@ GAMES: dict[str, Game] = {
         Game("alkkagi", "사내 알까기", "MINI", "내 알을 튕겨 상대 알을 판 밖으로 · 턴제 대전", "disc", "승", 1_000_000),
         Game("watersort", "물병 색 맞추기", "MINI", "같은 색끼리 한 병에 모으기 · 3분 동안 몇 단계나", "flask-conical", "점", 1_000_000),
         Game("dodge", "업무 폭탄 피하기", "MINI", "사방에서 날아오는 메일·회의 초대 피하기 · 1분 버티면 칼퇴", "mail-warning", "time", 3600),
-        Game("bounce", "통통 짐볼", "MINI", "저절로 튀는 짐볼을 좌우로만 굴려 헬스키퍼실까지 · 3코스 30스테이지", "circle-dot", "점", 100_000, lower_better=True, min_score=100, variants=("c2", "c3"), hall_mix_variants=False),
+        Game("bounce", "통통 짐볼", "MINI", "저절로 튀는 짐볼을 좌우로만 굴려 헬스키퍼실까지 · 3코스 30스테이지", "circle-dot", "점", 100_000, lower_better=True, min_score=100, variants=("c2", "c3"), hall_mix_variants=False, stage_stamp=True),
         Game("spotdiff", "틀린 그림 찾기", "MINI", "사진 한 장씩 나눠 보고 말로 맞춰 다른 곳 찾기 · 3분 · 협동", "scan-search", "곳", 1000),
         Game("sync", "통하는 사이", "QUIZ", "같은 질문에 몰래 답하고 서로의 답 예상하기 · 10문제 · 협동", "heart-handshake", "점", 100),
         Game("sketch", "화이트보드 그림 퀴즈", "QUIZ", "한 명은 그리고 한 명은 맞히기 · 3분 동안 몇 점이나 · 협동", "pencil", "점", 1000),
@@ -528,6 +530,28 @@ async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -
         await db.commit()
     st = await stamp_status(db, member, today)
     return {"new": new, "count": st["count"], "goal": st["goal"], "coupon": issued, "today": st["today"], "pending": st["pending"], "done": st["done"]}
+
+
+async def stage_stamp(db: AsyncSession, redis: Redis, member: Member, key: str) -> dict:
+    """판 중간 도장 — stage_stamp 게임(통통 짐볼)은 스테이지 하나를 통과하면 그날 도장을 찍는다.
+
+    점수 제출과 같은 꼼수 막기: 게임 화면에서 판을 시작한 기록(run)이 있어야 한다. 그 기록은 지우지 않는다(마지막 완주 제출이 쓴다).
+    """
+    game = get_game(key)
+    if not game.stage_stamp:
+        raise_app_error("NOT_FOUND", 404)
+    ensure_open(grace=True)
+    rate_key = f"hk:game:rate:{member.id}"
+    count = await redis.incr(rate_key)
+    if count == 1:
+        await redis.expire(rate_key, 60)
+    if count > SUBMIT_PER_MINUTE:
+        raise_app_error("TOO_MANY_REQUESTS", 429)
+    today = today_kst()
+    if not await redis.get(_run_key(member, key)):
+        st = await stamp_status(db, member, today)
+        return {"new": False, "count": st["count"], "goal": st["goal"], "coupon": False, "today": st["today"], "short": True}
+    return await _give_stamp(db, member, key, today)
 
 
 def _daily_key(game: Game, member: Member, day: date, variant: str = "") -> str:
