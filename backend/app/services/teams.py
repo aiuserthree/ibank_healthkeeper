@@ -256,40 +256,19 @@ def _open_notice_arcade_html() -> str:
     )
 
 
-# 함께하기(대전 · 협동) · 부서 대항 레이드 오픈 안내 — 이 날짜의 예약 오픈 안내에 한 번만 덧붙인다
+# 새 게임 소식(함께하기 · 부서 대항 레이드 · 매니지먼트) — 이 날짜의 예약 오픈 안내에 한 번만, 짧게 덧붙인다
+# (2026-11-10 요청으로 줄임 — 게임마다 길게 소개하던 두 덩어리를 한 덩어리 · 링크 하나로)
 OPEN_NOTICE_TOGETHER_DATE = date(2026, 11, 11)
 
 
 def _open_notice_together_html() -> str:
-    base = get_settings().app_base_url.rstrip("/")
-    together_url, raid_url = f"{base}/together", f"{base}/raid"
+    arcade_url = f"{get_settings().app_base_url.rstrip('/')}/arcade"
     return (
         f"<p>&nbsp;</p>"
-        f"<p><strong>🤝 동료와 함께하는 게임 · 부서 대항 레이드 오픈</strong><br>"
-        f"<b>함께하기</b> — 동료에게 도전장을 보내 1:1 대전(헤딩 축구 · 옥상 배구 · 오목 · 체스 · 고스톱 · 숫자 야구 등)을 하거나, "
-        f"둘이서 협동 게임(야근 사무실 탈출 · 점심 분식집 · 화이트보드 그림 퀴즈 등)을 할 수 있어요.<br>"
-        f'<a href="{together_url}">{together_url}</a><br>'
-        f"<b>부서 대항 레이드</b> — 아케이드에서 게임을 하면 우리 부서 보스에게 피해가 들어가요. "
-        f"매주 월요일 새 보스가 나오고, 부서원 절반 이상이 함께해야 쓰러뜨릴 수 있어요. "
-        f"다른 부서 직원과 대전 · 협동하면 두 부서 모두 피해가 더 커요.<br>"
-        f'<a href="{raid_url}">{raid_url}</a><br>'
-        f"게임은 업무 시간(평일 09:00~11:30 · 13:00~18:00)에는 쉬고, 점심시간 · 퇴근 후 · 주말에 열려요.</p>"
-    )
-
-
-# 매니지먼트(매일 키우는 게임) 오픈 안내 — 함께하기 안내와 같은 날(11/11) 예약 오픈 안내에 한 번만 덧붙인다
-OPEN_NOTICE_MANAGE_DATE = date(2026, 11, 11)
-
-
-def _open_notice_manage_html() -> str:
-    manage_url = f"{get_settings().app_base_url.rstrip('/')}/manage"
-    return (
-        f"<p>&nbsp;</p>"
-        f"<p><strong>🏙️ 매일 조금씩 키우는 「매니지먼트」 게임 오픈</strong><br>"
-        f"<b>오피스 타운</b>(회사 동네 꾸미기) · <b>옥상 쉼터 카페</b> · <b>옥상 텃밭</b> — "
-        f"처음부터 다시 하지 않는 한 내 판이 그대로 저장돼요.<br>"
-        f"출근 전에 건설 · 씨앗을 걸어 두면 업무 시간에도 계속 진행되고(최대 8시간), 점심 · 퇴근 후에 들러 거두면 돼요.<br>"
-        f'<a href="{manage_url}">{manage_url}</a></p>'
+        f"<p><strong>🎮 아케이드 새 소식</strong><br>"
+        f"동료와 겨루는 <b>함께하기</b>, 부서끼리 힘을 모으는 <b>부서 대항 레이드</b>, 매일 키우는 <b>매니지먼트</b>가 열렸어요. "
+        f"점심시간 · 퇴근 후 · 주말에 한 판 해 보세요.<br>"
+        f'<a href="{arcade_url}">{arcade_url}</a></p>'
     )
 
 
@@ -314,8 +293,6 @@ def render_open_notice_body(
     arcade_html = _open_notice_arcade_html() if notice_date == OPEN_NOTICE_ARCADE_DATE else ""
     if notice_date == OPEN_NOTICE_TOGETHER_DATE:
         arcade_html = _open_notice_together_html()
-    if notice_date == OPEN_NOTICE_MANAGE_DATE:
-        arcade_html += _open_notice_manage_html()
     notice_html = ""
     if notice is not None:
         notice_url = notice_page_url(notice.id)
