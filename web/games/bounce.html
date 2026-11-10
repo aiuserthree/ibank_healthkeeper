@@ -51,6 +51,8 @@
     .bb-keys kbd, .bb-help kbd { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 5px; border: 1px solid #cbd5e1; background: #fff; font: 700 11px/1.6 inherit; text-align: center; color: #0b3558; }
     .bb-best { margin: 10px 0 0; font-size: 13px; color: #64748b; }
     .bb-best b { color: #be123c; }
+    .bb-saved { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 12px 0 0; padding: 9px 12px; border-radius: 12px; background: #f0f9ff; color: #0369a1; font-size: 13px; font-weight: 700; }
+    .bb-saved b { color: #be123c; }
     .bb-new { display: flex; align-items: center; gap: 10px; margin: 8px 0 0; padding: 8px 10px; border-radius: 12px; background: #f8fafc; border: 1px solid #e2e8f0; text-align: left; }
     .bb-new canvas { flex-shrink: 0; width: 44px; height: 44px; border-radius: 10px; }
     .bb-new div { font-size: 12.5px; line-height: 1.45; color: #475569; word-break: keep-all; }
@@ -1198,6 +1200,30 @@
       let roll = 0, squash = 0, squashKind = "normal", blinkT = 2;
       let particles = [], floats = [];
       const tileAnim = new Map(); // 트램펄린이 눌린 시각
+
+      // ───────────────────────── 중간 저장 — 정식 도전을 하다 나가도 그 자리(스테이지 안 공 위치 · 튐 · 시간까지)에서 이어 한다. 이 기기에만
+      //  스테이지 시작 화면 · 일시정지(Esc · 화면 숨김 · 뒤로 가기 포함) · 페이지를 닫을 때 저장하고, 완주하거나 「이 판 그만두기」·새로 시작하면 지운다
+      const RKEY = "hk-bounce-run-v1";
+      function saveRun() {
+        if (mode !== "run" || !run) return;
+        if (!["intro", "play", "dying", "paused"].includes(state)) return; // 통과 장면(cleared) 중에는 앞 저장 그대로
+        let at = null;
+        if (state !== "intro") {
+          const w = { ...world, broken: [...world.broken], lit: [...world.lit], cp: { ...world.cp } };
+          delete w.lv;
+          at = { w, t: Math.round(stageTime * 100) / 100 };
+        }
+        try { localStorage.setItem(RKEY, JSON.stringify({ v: 1, course: run.course.no, stages: run.stages, si, at, savedAt: Date.now() })); } catch (_) { /* 저장 못 해도 게임은 계속 */ }
+      }
+      function loadRun() {
+        let o = null;
+        try { o = JSON.parse(localStorage.getItem(RKEY) || "null"); } catch (_) { o = null; }
+        if (!o || o.v !== 1 || !Array.isArray(o.stages)) return null;
+        const c = COURSES.find((x) => x.no === o.course);
+        if (!c || !(o.si >= c.from && o.si <= c.to)) return null;
+        return { ...o, c };
+      }
+      function clearRun() { try { localStorage.removeItem(RKEY); } catch (_) { /* 없음 */ } }
       let camX = 0, camY = 0, lookX = 0;
       let W = 360, H = 480, dpr = 1, TS = 32, viewW = 11, viewH = 14;
       let padCoverPx = 0; // 판 아래를 가리는 버튼 높이 (눕힌 휴대폰)
@@ -1501,6 +1527,8 @@
         const best = courseBest(course);
         const cleared = store.cleared;
         const locked = COURSES.find((c) => !courseOpen(c));
+        const saved = loadRun();
+        const savedScore = saved ? (() => { let b = 0, f = 0; for (const s of saved.stages) { b += s.b; f += s.f; } if (saved.at && saved.at.w) { b += saved.at.w.bounces || 0; f += saved.at.w.falls || 0; } return stageScore(b, f); })() : 0;
         showOver(`<div class="bb-card">
           <img class="bb-logo" src="${LOGO}" alt="">
           <h2>통통 짐볼</h2>
@@ -1513,7 +1541,9 @@
             <dt class="k-ph">휴대폰</dt><dd class="k-ph">아래 왼쪽·오른쪽 버튼을 누르고 있기 · 두 버튼 같이 = 브레이크</dd>
           </dl>
           ${best ? `<div class="bb-best">${course.no}코스 내 최고 <b>${best.s.toLocaleString("ko-KR")}점</b> · ${fmtTime(best.t)}</div>` : ""}
-          ${btn("hk-btn--primary", "run", "play", "정식 도전 시작")}
+          ${saved ? `<div class="bb-saved">${HKUI.icon("save", 15, "currentColor")} 저장한 판 · ${COURSES.length > 1 ? `${saved.c.no}코스 ` : ""}${saved.si - saved.c.from + 1}/${saved.c.to - saved.c.from + 1} 스테이지 · 지금까지 <b>${savedScore.toLocaleString("ko-KR")}점</b></div>
+            ${btn("hk-btn--primary", "resumerun", "play", "이어 하기")}
+            ${btn("hk-btn--secondary", "run", "rotate-ccw", `${course.no === saved.c.no ? "" : `${course.no}코스 `}새로 시작 · 저장한 판은 지워져요`)}` : btn("hk-btn--primary", "run", "play", "정식 도전 시작")}
           ${btn("hk-btn--secondary", "select", "list", cleared ? `스테이지 연습 · ${cleared}/${N} 통과` : "스테이지 연습")}
         </div>`);
         draw(1);
@@ -1568,7 +1598,7 @@
           <p>${HKUI.escapeHtml(s.intro)}</p>
           <div data-items></div>
           ${r && !first ? `<div class="bb-total">지금까지 <b>${stageScore(r.b, r.f).toLocaleString("ko-KR")}점</b> · ${fmtTime(r.t)}</div>` : ""}
-          ${first ? `<div class="bb-total">${COURSES.length > 1 ? `${run.course.no}코스 ` : ""}${run.course.to - run.course.from + 1}개 스테이지를 이어서 가요 · 중간에 나가면 기록이 안 남아요</div>` : ""}
+          ${first ? `<div class="bb-total">${COURSES.length > 1 ? `${run.course.no}코스 ` : ""}${run.course.to - run.course.from + 1}개 스테이지를 이어서 가요 · 중간에 나가도 저장돼서 이어 할 수 있어요</div>` : ""}
           ${btn("hk-btn--primary", "begin", "play", mode === "practice" ? "연습 시작" : "스테이지 시작")}
           ${mode === "practice" ? btn("hk-btn--secondary", "select", "list", "스테이지 고르기") : ""}
         </div>`);
@@ -1584,6 +1614,7 @@
           box.appendChild(row);
         }
         draw(1);
+        saveRun();
       }
 
       // 스테이지 연습 — 코스 칸으로 10개씩 나눠 보여 준다 (30개를 한 번에 늘어놓으면 휴대폰에서 너무 길다)
@@ -1621,13 +1652,14 @@
         pausedFrom = state;
         state = "paused";
         held.clear();
+        saveRun();
         showOver(`<div class="bb-card">
           <span class="bb-no">${stageCount(si).pre}${stageCount(si).at} / ${stageCount(si).of} 스테이지</span>
           <h2>잠시 멈췄어요</h2>
-          <p>${mode === "run" ? "정식 도전 중이에요. 시간도 함께 멈춰 있어요." : "연습 중이에요."}</p>
+          <p>${mode === "run" ? "정식 도전 중이에요. 시간도 함께 멈춰 있어요.<br>지금 자리까지 저장됐어요 · 나갔다 와도 이어 할 수 있어요." : "연습 중이에요."}</p>
           ${btn("hk-btn--primary", "resume", "play", "계속하기")}
           ${btn("hk-btn--secondary", "giveup", "flag", `${world.cpIndex >= 0 ? "정수기로" : "처음 자리로"} 돌아가기 · +${FALL_COST}점`)}
-          ${btn("hk-btn--secondary", "home", "log-out", mode === "run" ? "그만두고 처음 화면으로" : "처음 화면으로")}
+          ${mode === "run" ? btn("hk-btn--secondary", "savehome", "save", "저장하고 처음 화면으로") + btn("hk-btn--secondary", "quit", "x", "이 판 그만두기 · 저장 지우기") : btn("hk-btn--secondary", "home", "log-out", "처음 화면으로")}
         </div>`);
       }
       function resume() {
@@ -1665,6 +1697,7 @@
 
       function finishRun() {
         state = "done";
+        clearRun();
         const r = runTotals();
         const total = Math.min(MAX_SCORE, stageScore(r.b, r.f));
         // 위 점수 줄도 결과 카드와 같은 값으로 (마지막 0.25초 사이 갱신이 빠질 수 있어서)
@@ -1702,13 +1735,42 @@
       function startRun() {
         if (!courseOpen(course)) course = COURSES[0];
         mode = "run";
+        clearRun();
         run = { course, stages: [] };
         showCourseBoard(course);
         showIntro(course.from);
       }
 
+      // 저장한 판 이어 하기 — 스테이지 시작 화면에서 저장했으면 그 스테이지 소개부터, 스테이지 안이면 그 자리에서 멈춘 채로
+      function resumeRun() {
+        const o = loadRun();
+        if (!o) { showReady(); return; }
+        mode = "run"; course = o.c;
+        run = { course: o.c, stages: o.stages };
+        showCourseBoard(o.c);
+        if (!o.at) { showIntro(o.si); return; }
+        loadStage(o.si);
+        const w = o.at.w || {};
+        Object.assign(world, w, { lv: LEVELS[o.si], broken: new Set(w.broken || []), lit: new Set(w.lit || []), cp: { ...(w.cp || lv.start) } });
+        if (world.state !== "live") E.place(world); // 떨어지던 중이었으면 정수기(또는 처음 자리)에서
+        stageTime = Number(o.at.t) || 0;
+        snapCamera(); updateHud();
+        state = "paused"; pausedFrom = "play";
+        showOver(`<div class="bb-card">
+          <span class="bb-no">${stageCount(si).pre}${stageCount(si).at} / ${stageCount(si).of} 스테이지</span>
+          <h2>저장한 곳에서 이어 해요</h2>
+          <p>${HKUI.escapeHtml(STAGES[si].name)} · 멈췄던 자리 그대로예요. 준비되면 계속해요.</p>
+          ${btn("hk-btn--primary", "resume", "play", "계속하기")}
+          ${btn("hk-btn--secondary", "savehome", "chevron-left", "처음 화면으로")}
+        </div>`);
+        draw(1);
+      }
+
       const GO = {
         run: () => startRun(),
+        resumerun: () => resumeRun(),
+        savehome: () => { saveRun(); run = null; showReady(); },
+        quit: () => { clearRun(); run = null; showReady(); },
         select: () => { pickCourse = mode === "practice" ? courseOf(si) : courseOf(Math.min(openUpTo(), N) - 1); showSelect(); },
         home: () => { run = null; showReady(); },
         course: (b) => {
@@ -1730,6 +1792,8 @@
       };
       ctx.onRestart(() => startRun());
       ctx.onPause(() => pause());
+      ctx.onLeaveNote?.(() => (mode === "run" && run ? "지금 자리까지 이 기기에 저장돼요. 다음에 들어와 「이어 하기」로 계속할 수 있어요." : null));
+      addEventListener("pagehide", () => saveRun());
 
       // ───────────────────────── 매 프레임
       function update(dt) {

@@ -13,6 +13,7 @@
  *     onRestart(fn) — 판이 끝난 뒤 스페이스를 누르면 부른다 (처음 상태로 되돌리는 함수)
  *     onPause(fn)   — 게임 중 Esc 를 누르면 부른다 (게임의 일시정지 함수 — 플레이 중이 아니면 아무것도 안 하게).
  *                     일시정지 화면에는 "계속하기" 글자가 든 버튼을 두면 Esc·스페이스로 이어 하기가 된다
+ *     onLeaveNote(fn) — 나가기 확인 창 안내 말(fn() → 글 또는 null). 중간 저장되는 게임이 「이어 할 수 있어요」를 알릴 때
  *     formatScore(n)
  *     sfx(name, arg) — 효과음 (HKSound 이름 목록 참고). 소리 켜고 끄기는 공통 버튼이 맡는다
  *   }
@@ -510,6 +511,7 @@ window.HKPlay = (function () {
     const armRun = (fresh) => HKApi.playRun(key, fresh).catch(() => {});
     let playingNow = false;
     let scoreFn = null; // 게임이 알려 주는 지금 점수 (뒤로 가기 → 기록 남기고 나가기)
+    let leaveNoteFn = null; // 게임이 알려 주는 나가기 안내 — 중간 저장이 되는 게임(통통 짐볼)은 "기록 안 됨" 대신 이 말
     function setPlaying(on) {
       // 휴대폰 머리의 일시정지 버튼은 판이 도는 동안만
       document.querySelector(".hk-pf")?.classList.toggle("is-playing", on);
@@ -642,11 +644,13 @@ window.HKPlay = (function () {
       // 시작하자마자 나가며 기록만 남기는 걸 막는다 — 30초가 안 됐으면 기록 남기기는 없이
       const tooShort = now != null && (Date.now() - runStartAt) / 1000 < SAVE_MIN_SEC;
       if (tooShort) now = null;
+      let leaveNote = null;
+      try { leaveNote = leaveNoteFn ? leaveNoteFn() : null; } catch (_) { leaveNote = null; }
       const overlay = document.createElement("div");
       overlay.className = "hk-dialog__overlay";
       overlay.innerHTML = `<div class="hk-dialog" role="dialog">
           <div class="hk-dialog__title">게임을 그만할까요?</div>
-          <div class="hk-dialog__body">${now != null ? `지금까지 <b>${formatScore(game, now)}</b>이에요. 이 점수를 기록에 남기고 나갈 수 있어요.` : tooShort ? `시작한 지 ${SAVE_MIN_SEC}초가 안 돼서 기록을 남길 수 없어요. 지금 나가면 이번 판은 기록되지 않아요.` : "이 게임은 끝까지 해야 기록이 남아요. 지금 나가면 이번 판은 기록되지 않아요."}</div>
+          <div class="hk-dialog__body">${now != null ? `지금까지 <b>${formatScore(game, now)}</b>이에요. 이 점수를 기록에 남기고 나갈 수 있어요.` : tooShort ? `시작한 지 ${SAVE_MIN_SEC}초가 안 돼서 기록을 남길 수 없어요. 지금 나가면 이번 판은 기록되지 않아요.` : (leaveNote || "이 게임은 끝까지 해야 기록이 남아요. 지금 나가면 이번 판은 기록되지 않아요.")}</div>
           <div class="hk-dialog__actions" style="flex-wrap:wrap">
             <button type="button" class="hk-btn hk-btn--secondary" data-leave="stay">계속하기</button>
             <button type="button" class="hk-btn hk-btn--secondary" data-leave="out">그냥 나가기</button>
@@ -958,6 +962,8 @@ window.HKPlay = (function () {
           playedVariants: () => playedVariants.slice(),
           // 지금 점수 — 게임 중 뒤로 가기에서 '기록 남기고 나가기'에 쓴다 (없으면 그냥 나가기만)
           onScore: (fn) => { scoreFn = fn; },
+          // 나가기 확인 창의 안내 말 — fn() 이 글을 돌려주면 「끝까지 해야 기록이 남아요」 대신 보인다(중간 저장되는 게임)
+          onLeaveNote: (fn) => { leaveNoteFn = fn; },
           begin: async () => {
             if (!game.dailyOnce) return true;
             try {
