@@ -106,7 +106,7 @@ window.HKFx = (function () {
   return { float, fly, bump, confetti, count };
 })();
 
-// 단추를 눌러도 보던 자리 그대로 — 매니지먼트 게임에서는 「맨 위로」 단추(data-scroll-top)만 화면을 위로 올린다.
+// 단추를 눌러도 보던 자리 그대로 — 매니지먼트 게임에서는 「맨 위로」 단추(data-scroll-top)와 휴대폰 아래 탭 막대만 화면을 위로 올린다.
 // 어떤 단추를 누른 뒤에든(레벨 올리기 · 고용 · 진열 · 도구 · 건설 · 탭 …) 화면이 위로 올라가면 바로 원래 자리로 되돌린다.
 //  · 탭을 바꿔 내용이 짧아지면 페이지가 짧아져 브라우저가 위로 당긴다 — 그만큼 페이지 끝에 빈 칸(spacer)을 덧대 그 자리에 머문다.
 //    빈 칸은 사람이 위로 스크롤하는 만큼 줄어들어 사라진다(되튀지 않게).
@@ -130,15 +130,28 @@ window.HKFx = (function () {
     if (scrollY < guard.y - 2) window.scrollTo({ top: guard.y, behavior: "instant" });
     requestAnimationFrame(check);
   };
+  // 휴대폰(960px 아래)의 아래 고정 탭 막대(.mgx-dock)로 탭을 바꾸면 늘 맨 위에서 시작한다(PC 에서는 탭 막대가 위에 있어 그대로 둔다)
+  let topUntil = 0;
+  const toTop = () => {
+    if (performance.now() > topUntil) return;
+    if (scrollY > 0) window.scrollTo({ top: 0, behavior: "instant" });
+    requestAnimationFrame(toTop);
+  };
   document.addEventListener("click", (e) => {
     const t = e.target;
+    if (t && t.closest && innerWidth < 960 && t.closest(".mgx-dock [role='tab'], .mgx-dock .mgx-tab")) {
+      guard = null; setPad(0);
+      topUntil = performance.now() + 400; // 탭이 바뀌며 아래로 내려 보여 주는 움직임이 있어도 맨 위로
+      setTimeout(toTop, 0); requestAnimationFrame(toTop);
+      return;
+    }
     if (!t || !t.closest || t.closest("[data-scroll-top]") || scrollY < 4) return;
     if (!t.closest("button, a, [data-act], [role='tab'], [data-tab]")) return;
     guard = { y: scrollY, until: performance.now() + 1500 };
     setTimeout(check, 0);
     requestAnimationFrame(check);
   }, true);
-  ["wheel", "touchmove", "keydown"].forEach((ev) => addEventListener(ev, () => { guard = null; }, { passive: true, capture: true }));
+  ["wheel", "touchmove", "keydown"].forEach((ev) => addEventListener(ev, () => { guard = null; topUntil = 0; }, { passive: true, capture: true }));
   // 덧댄 빈 칸 — 위로 스크롤하는 만큼 줄인다
   addEventListener("scroll", () => { if (pad && !guard) setPad(Math.min(pad, scrollY + innerHeight - natural())); }, { passive: true });
 })();
