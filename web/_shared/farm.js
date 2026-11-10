@@ -445,6 +445,7 @@ window.HKFarm = (function () {
   let lastStripSig = "", lastPropSig = "", lastMoney = null, lastLv = null, lastTodaySig = ""; // 화면 다시 그리기 판단용
   const queue = []; // 보여 줄 팝업들 (() => Promise)
   let newDex = []; // 이번 행동에서 처음 거둔 작물 — commit 때 팝업 하나로 묶는다
+  let mv = null, lastMoveSig = ""; // 재배치 모드 — null 꺼짐 · { src: 고른 칸(-1 아직) }
   const plotOpen = (i) => PLOT_ORDER.indexOf(i) < S.open;
   const nextPlotIdx = () => (S.open < 25 ? PLOT_ORDER[S.open] : -1);
   const nextPlotReq = () => (S.open < 25 ? PLOT_REQ[S.open - 9] : null);
@@ -621,6 +622,23 @@ window.HKFarm = (function () {
     S.plots[i] = null;
     if (S.autos.includes(i) && S.money >= c.seed) plant(i, p.k, true);
     return q;
+  }
+
+  // 재배치 — 작물이 있는 열린 칸(from)을 다른 열린 칸(to)으로. 빈 칸이면 옮기고, 작물이 있으면 서로 바꾼다.
+  // 자라던 진행(p · d)과 자동 다시 심기(S.autos)는 작물을 따라간다. 공짜 · 즉시. 못 하면 이유 글, 되면 null
+  function movePlot(from, to) {
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || from > 24 || to < 0 || to > 24) return "옮길 수 없는 칸이에요";
+    if (from === to) return "같은 칸이에요";
+    if (!plotOpen(from) || !plotOpen(to)) return "열린 칸으로만 옮길 수 있어요";
+    if (!S.plots[from]) return "작물이 있는 칸을 먼저 골라요";
+    const a = S.plots[from], b = S.plots[to];
+    S.plots[to] = a;
+    S.plots[from] = b || null;
+    const autoA = S.autos.includes(from), autoB = S.autos.includes(to);
+    S.autos = S.autos.filter((x) => x !== from && x !== to);
+    if (autoA) S.autos.push(to);
+    if (autoB) S.autos.push(from);
+    return null;
   }
 
   async function onPlot(i) {
@@ -958,6 +976,7 @@ window.HKFarm = (function () {
               <svg class="fm-cloud is-3" viewBox="0 0 120 40"><path d="M14 34 Q2 34 4 24 Q6 15 18 17 Q22 4 38 6 Q52 0 62 12 Q76 6 84 18 Q100 14 104 26 Q116 26 114 34Z" fill="#fff"/></svg>
               <svg class="fm-birds" viewBox="0 0 60 24"><g stroke="#334155" stroke-width="2" fill="none" stroke-linecap="round"><path class="fm-wing" d="M2 10 Q7 4 12 10 Q17 4 22 10"/><path class="fm-wing" d="M24 18 Q28 13 32 18 Q36 13 40 18"/><path class="fm-wing" d="M40 6 Q44 1 48 6 Q52 1 56 6"/></g></svg>
             </div>
+            <div class="mgx-movebar fm-movebar" id="fm-movebar" role="status" hidden></div>
             <div class="mgx-hud fm-hud" id="fm-hud">
               <div class="mgx-pill fm-pill" id="fm-pill-lv" role="img"><span class="fm-ring"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="#fff"/><circle cx="18" cy="18" r="13.5" fill="none" stroke="#e3efe2" stroke-width="4"/><circle id="fm-lvring" cx="18" cy="18" r="13.5" fill="none" stroke="#22b35e" stroke-width="4" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="100" transform="rotate(-90 18 18)"/></svg><b id="fm-lvnum"></b></span><span class="fm-pill__txt"><small>레벨</small><em id="fm-xp"></em></span></div>
               <div class="mgx-pill fm-pill" id="fm-pill-money"><span class="fm-pill__art">${coinSvg(26)}</span><b id="fm-money"></b></div>
@@ -971,6 +990,7 @@ window.HKFarm = (function () {
                 <g id="fm-props"></g>
               </svg>
               <div class="fm-overlay" id="fm-overlay"></div>
+              <button type="button" class="mgx-movebtn fm-movebtn" id="fm-movebtn" data-act="move" aria-pressed="false">${ic("move", 16)}<span>재배치</span></button>
               <i class="fm-butterfly" aria-hidden="true"><i><svg viewBox="0 0 24 20"><g class="fm-wings"><path d="M12 10 Q4 -2 1 5 Q0 11 12 10Z" fill="#f9a8d4"/><path d="M12 10 Q20 -2 23 5 Q24 11 12 10Z" fill="#f472b6"/><path d="M12 10 Q5 18 4 14 Q4 10 12 10Z" fill="#fbcfe8"/><path d="M12 10 Q19 18 20 14 Q20 10 12 10Z" fill="#f9a8d4"/></g><path d="M12 5 V15" stroke="#3b2a20" stroke-width="1.6" stroke-linecap="round"/></svg></i></i>
             </div>
           </div>
@@ -986,6 +1006,7 @@ window.HKFarm = (function () {
         </div>
       </div>`;
     lastSky = ""; lastBarSig = ""; lastTabSig = ""; lastStripSig = ""; lastPropSig = ""; lastMoney = null; lastLv = null; lastTodaySig = "";
+    mv = null; lastMoveSig = ""; root.classList.remove("is-moving");
     refresh();
     HKUI.refreshIcons(root);
   }
@@ -1090,6 +1111,7 @@ window.HKFarm = (function () {
       if (old.startsWith("-1:") && sig.startsWith("0:")) { g.classList.add("is-fresh"); setTimeout(() => g.classList.remove("is-fresh"), 600); }
     });
     if (changed) drawOverlay();
+    drawMove();
   }
   // 장면 위 HTML — 다 자란 칸 말풍선 · 넓히기 표
   function drawOverlay() {
@@ -1117,6 +1139,74 @@ window.HKFarm = (function () {
     const el = root.querySelector("#fm-overlay");
     el.innerHTML = h;
     HKUI.refreshIcons(el);
+  }
+  // ── 재배치 모드 ── 「재배치」 → 작물 칸 고르기(.is-move-src) → 놓을 칸(.is-move-ok) 누르기. 모드는 「다 했어요」 · Esc · 탭 바꾸기에서 꺼진다
+  const cropName = (i) => (S.plots[i] ? CROP[S.plots[i].k].n : "");
+  const pj = (w, a, b) => jo(w, a, b).slice(w.length); // 조사만
+  function moveMark(i) { // 화단 윗면을 두르는 마름모(보드 좌표) — 고른 칸 · 놓을 수 있는 칸 강조
+    const [cx, cy] = cellFloor(i), t = cy - BOX.h, ax = BOX.ax + 7, ay = BOX.ay + 4;
+    return `<polygon class="fm-mvmark" points="${P([[cx, t - ay], [cx + ax, t], [cx, t + ay], [cx - ax, t]])}"/>`;
+  }
+  function drawMove() {
+    if (!root || !S) return;
+    const btn = root.querySelector("#fm-movebtn"), bar = root.querySelector("#fm-movebar");
+    if (!btn || !bar) return;
+    if (mv && mv.src >= 0 && (!plotOpen(mv.src) || !S.plots[mv.src])) mv.src = -1; // 고른 작물이 사라졌으면(모두 거두기 등) 다시 고르기
+    const on = !!mv, src = on ? mv.src : -1;
+    root.classList.toggle("is-moving", on);
+    root.querySelectorAll("#fm-cells .fm-cell").forEach((g) => {
+      const i = +g.dataset.i, isSrc = src === i, ok = src >= 0 && i !== src && plotOpen(i);
+      g.classList.toggle("is-move-src", isSrc);
+      g.classList.toggle("is-move-ok", ok);
+      const m = g.querySelector(".fm-mvmark");
+      if (!(isSrc || ok)) { if (m) m.remove(); return; }
+      if (m) return;
+      const hit = g.querySelector(".fm-lift > .fm-hit");
+      if (hit) hit.insertAdjacentHTML("afterend", moveMark(i));
+    });
+    const sig = on ? `${src}:${cropName(src)}` : "off";
+    if (sig === lastMoveSig) return;
+    lastMoveSig = sig;
+    btn.classList.toggle("is-on", on);
+    btn.setAttribute("aria-pressed", String(on));
+    bar.hidden = !on;
+    if (!on) { bar.innerHTML = ""; return; }
+    const done = `<button type="button" data-act="moveDone">다 했어요</button>`;
+    bar.innerHTML = src < 0
+      ? `<span>옮길 작물을 눌러요</span>${done}`
+      : `<span>「${cropName(src)}」${pj(cropName(src), "을", "를")} 옮길 칸을 눌러요 · 작물이 있으면 서로 바꿔요</span><button type="button" class="is-ghost" data-act="moveCancel">취소</button>${done}`;
+  }
+  function moveOn() {
+    if (!PLOT_ORDER.slice(0, S.open).some((i) => S.plots[i])) { HKUI.toast("옮길 작물이 아직 없어요", "info"); return; }
+    mv = { src: -1 };
+    drawMove();
+  }
+  function moveOff() {
+    if (!mv) return;
+    mv = null;
+    drawMove();
+  }
+  function moveTap(i) {
+    if (!mv || !plotOpen(i)) return;
+    if (mv.src < 0) {
+      if (!S.plots[i]) { HKUI.toast("작물이 있는 칸을 먼저 골라요", "info"); return; }
+      mv.src = i;
+      drawMove();
+      return;
+    }
+    if (i === mv.src) { mv.src = -1; drawMove(); return; }
+    const from = mv.src, a = cropName(from), b = cropName(i);
+    const why = movePlot(from, i);
+    if (why) { HKUI.toast(why, "danger"); return; }
+    mv.src = -1;
+    HKUI.toast(b ? `「${a}」${pj(a, "과", "와")} 「${b}」 자리를 바꿨어요` : `「${a}」${pj(a, "을", "를")} 옮겼어요`);
+    // 같은 작물 · 같은 단계끼리 바꾸면 칸 그림 표시(sig)가 그대로라 다시 그리지 않으니, 두 칸을 새로 그리게 한다(남은 시간 알약도)
+    for (const k of [from, i]) { const g = root.querySelector(`#fm-cells [data-i="${k}"]`); if (g) delete g.dataset.sig; }
+    commit();
+    for (const k of b ? [from, i] : [i]) {
+      const g = root.querySelector(`#fm-cells [data-i="${k}"]`);
+      if (g) { g.classList.add("is-fresh"); setTimeout(() => g.classList.remove("is-fresh"), 600); }
+    }
   }
   function drawProps(force) {
     const sig = `${S.tools.can}|${S.tools.auto}|${S.tools.shed}|${Math.round(Math.min(1, invTotal() / cap()) * 9)}|${invTotal() >= cap()}|${Object.keys(S.inv).join()}|${invTotal()}|${dexCount()}|${S.orders.filter((o) => o.items).length}|${S.orders.filter(canDeliver).length}`;
@@ -1334,6 +1424,15 @@ window.HKFarm = (function () {
     if (!b || b.disabled || !root.contains(b)) return;
     const a = b.dataset.act;
     const m0 = S.money, from = ptOf(b);
+    if (a === "move") { if (mv) moveOff(); else moveOn(); return; }
+    if (a === "moveDone") { moveOff(); return; }
+    if (a === "moveCancel") { if (mv) { mv.src = -1; drawMove(); } return; }
+    if (mv) {
+      // 재배치 중에는 칸의 원래 동작(심기 · 거두기 · 칸 모달 · 넓히기) · 말풍선 · 장면 소품을 막는다
+      if (a === "plot") { if (b.closest("#fm-cells")) moveTap(+b.dataset.i); return; }
+      if (b.closest("#fm-props")) return;
+      if (a === "tab") moveOff(); // 탭을 바꾸면 모드를 끄고 원래대로 탭을 연다
+    }
     if (a === "plot") {
       const i = +b.dataset.i, st = plotOpen(i) ? plotState(i) : null;
       if (st && st.stage === 3) {
@@ -1402,7 +1501,7 @@ window.HKFarm = (function () {
       store = await HKMgmt.open(KEY, {
         blank,
         onStale: (st) => { S = fix(st); advance(store.now()); ensureDaily(store.now()); ensureOrders(); build(); HKUI.toast("다른 창에서 바뀐 내용을 불러왔어요"); },
-        onClosed: (opensAt) => { clearInterval(tickTimer); S = null; showMessage(HKMgmt.closedHtml(opensAt, TITLE)); },
+        onClosed: (opensAt) => { clearInterval(tickTimer); S = null; mv = null; root.classList.remove("is-moving"); showMessage(HKMgmt.closedHtml(opensAt, TITLE)); },
       });
     } catch (e) {
       if (e && e.closed) { showMessage(HKMgmt.closedHtml(e.opensAt, TITLE)); return; }
@@ -1420,6 +1519,7 @@ window.HKFarm = (function () {
     summary();
     root.addEventListener("click", onClick);
     root.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", (e) => { if (mv && e.key === "Escape" && !e.isComposing && !document.querySelector(".fm-ov")) moveOff(); });
     // 화면이 안 보이면 장면 움직임도 멈춘다
     document.addEventListener("visibilitychange", () => root.classList.toggle("is-paused", document.hidden));
     build();
@@ -1433,5 +1533,5 @@ window.HKFarm = (function () {
 
   // 시험용 통로는 로컬(localhost · 127.0.0.1)에서만
   const local = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  return { mount, CROPS, ...(local ? { _debug: () => ({ store, S }) } : {}) };
+  return { mount, CROPS, ...(local ? { _debug: () => ({ store, S, movePlot }) } : {}) };
 })();
