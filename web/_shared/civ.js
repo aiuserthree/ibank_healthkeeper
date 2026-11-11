@@ -1579,12 +1579,15 @@
       if (!C.canEraUp(s)) out += `<button type="button" class="mgx-btn is-gold is-lg is-wide cv-bigbtn" data-act="tab" data-tab="company">${ic("rocket", 20)}다음 단계로 갈 수 있어요</button>`;
       return wrap(out) + mapHint();
     }
-    let out = head("내 땅", "is-good") + `<p class="cv-desc">${T.desc}</p>${base ? `<div class="cv-fxs">${base}</div>` : ""}`;
+    // 건물이 있으면 건물이 주인공 — 머리에 건물, 땅(칸 종류)은 아래 작은 칸으로
     if (s.bld[i]) {
       const B = BLD[s.bld[i]], fit = (B.fit || []).includes(T.k);
-      out += `<div class="cv-built">${bic(B.icon, BCOL[s.bld[i]], 22)}<div><div class="cv-built__nm">${B.name}${fit ? `<span class="cv-fit">${ic("sparkles", 11)}어울려요</span>` : ""}</div><div class="cv-fxs">${fxChips(B)}${fit ? fxBonusChips(B.bonus) : ""}</div><small>${B.desc}</small></div></div>`;
-      return wrap(out) + mapHint();
+      let bo = `<div class="cv-th">${bic(B.icon, BCOL[s.bld[i]], 26, "is-lg")}<div class="cv-th__tx"><div class="cv-th__name cv-th__name--bld">${B.name}${fit ? `<span class="cv-fit">${ic("sparkles", 11)}어울려요</span>` : ""}</div><div class="cv-th__sub">${T.name} · ${where}</div></div><span class="mgx-chip is-good">내 땅</span></div>`;
+      bo += `<p class="cv-desc">${B.desc}</p><div class="cv-fxs">${fxChips(B)}${fit ? fxBonusChips(B.bonus) : ""}</div>`;
+      bo += `<div class="cv-built is-land">${bic(T.icon, TCOL[T.k], 18, "is-sm")}<div><div class="cv-built__nm">${T.name}<span class="cv-built__tag">땅</span></div>${base ? `<div class="cv-fxs is-sm">${base}</div>` : ""}<small>${T.desc}</small></div></div>`;
+      return wrap(bo) + mapHint();
     }
+    let out = head("내 땅", "is-good") + `<p class="cv-desc">${T.desc}</p>${base ? `<div class="cv-fxs">${base}</div>` : ""}`;
     if (b) return wrap(out + progHtml(i, b)) + mapHint();
     const keys = Object.keys(BLD).filter((k) => !BLD[k].hqOnly);
     const open = keys.filter((k) => !C.bldLock(s, k));
