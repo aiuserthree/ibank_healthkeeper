@@ -129,6 +129,7 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
     person_plays: Counter = Counter()
     person_days: dict[int, set[date]] = defaultdict(set)
     person_games: dict[int, Counter] = defaultdict(Counter)
+    person_game_last: dict[int, dict[str, date]] = defaultdict(dict)
     kind_plays: Counter = Counter()
     for game, day, hour, who in plays:
         kind = _kind(game)
@@ -143,13 +144,18 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
             person_plays[mid] += 1
             person_days[mid].add(day)
             person_games[mid][game] += 1
+            if day > person_game_last[mid].get(game, date.min):
+                person_game_last[mid][game] = day
 
     # 도장 — 점수가 남지 않은 연습 판으로 받은 날도 참여로 센다
+    # 한 사람의 게임 목록에는 연습 판으로 도장만 받은 게임도 0판으로 넣는다
+    person_game_stamps: dict[int, Counter] = defaultdict(Counter)
     for mid, day, game in stamps:
         day_members[day].add(mid)
         person_days[mid].add(day)
-        if not person_games[mid]:
-            person_games[mid][game] += 0
+        person_game_stamps[mid][game] += 1
+        if day > person_game_last[mid].get(game, date.min):
+            person_game_last[mid][game] = day
     players = set(person_days)
     stamp_by_member = Counter(mid for mid, _, _ in stamps)
 
@@ -198,6 +204,21 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
         if not m:
             continue
         fav, fav_n = person_games[mid].most_common(1)[0] if person_games[mid] else ("", 0)
+        if not fav and person_game_stamps[mid]:
+            fav = person_game_stamps[mid].most_common(1)[0][0]
+        # 이 사람이 기간에 한 게임 전부 — 판 많은 순
+        games = [
+            {
+                "key": k,
+                "title": title(k),
+                "kind": _kind(k),
+                "plays": person_games[mid].get(k, 0),
+                "stamps": person_game_stamps[mid].get(k, 0),
+                "last": person_game_last[mid][k].isoformat(),
+            }
+            for k in set(person_games[mid]) | set(person_game_stamps[mid])
+        ]
+        games.sort(key=lambda g: (-g["plays"], -g["stamps"], g["title"]))
         people.append(
             {
                 "id": mid,
@@ -210,6 +231,7 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
                 "favorite": title(fav) if fav else "",
                 "favoritePlays": fav_n,
                 "last": max(person_days[mid]).isoformat(),
+                "games": games,
             }
         )
     people.sort(key=lambda p: (-p["plays"], -p["days"], p["name"]))

@@ -58,12 +58,29 @@
     .ar-tip { position: fixed; z-index: 50; pointer-events: none; background: var(--color-midnight-navy); color: #fff; font-size: 12.5px; line-height: 1.55; padding: 8px 10px; border-radius: 8px; box-shadow: 0 6px 18px rgba(11, 53, 88, .25); white-space: nowrap; }
     .ar-tip b { font-weight: 700; }
     .ar-more { display: block; width: 100%; margin-top: 10px; }
+    /* 사람별 — 줄을 누르면 그 사람이 한 게임 전부 */
+    .ar-person { cursor: pointer; }
+    .ar-person:hover td { background: var(--color-fog); }
+    .ar-person td:first-child { position: relative; }
+    .ar-caret { display: inline-block; transition: transform .15s; color: var(--text-muted); margin-right: 4px; vertical-align: -2px; }
+    .ar-person.is-open .ar-caret { transform: rotate(90deg); }
+    .ar-person.is-open td { background: var(--color-fog); border-bottom-color: transparent; }
+    .ar-games td { background: var(--color-fog); padding: 4px 10px 14px 34px; white-space: normal; }
+    .ar-glist { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 6px; }
+    .ar-g { display: flex; align-items: center; gap: 8px; background: var(--surface-default, #fff); border-radius: 8px; padding: 7px 10px; font-size: 13px; min-width: 0; }
+    .ar-g__t { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ar-g__n { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ar-g__d { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .ar-g.is-practice .ar-g__n { font-weight: 600; color: var(--text-muted); }
     @media (max-width: 1100px) { .ar-kpis { grid-template-columns: 1fr 1fr; } .ar-grid2 { grid-template-columns: 1fr; } }
     @media (max-width: 560px) {
       .ar-kpis { grid-template-columns: 1fr; }
       .ar-period__dates { margin-left: 0; }
       .ar-cols { height: 150px; }
       .ar-tools input { width: 100%; }
+      /* 표가 옆으로 넘쳐도 펼친 게임 목록은 화면 폭에 붙여 둔다 */
+      .ar-games td { padding-left: 10px; }
+      .ar-glist { grid-template-columns: 1fr; position: sticky; left: 10px; width: calc(100vw - 94px); }
     }
   </style>
 </head>
@@ -93,6 +110,7 @@
     let [from, to] = presetRange(preset).map(iso);
     let data = null;
     let gameKind = "all", peopleQ = "", peopleSort = "plays", peopleAll = false;
+    const peopleOpen = new Set(); // 게임 목록을 펼친 사람
 
     // ── 막대 위 말풍선 (마우스 · 손가락 모두)
     const tip = document.createElement("div");
@@ -190,11 +208,19 @@
         </div>`;
     }
 
-    const PEOPLE_COLS = [["name", "이름"], ["department", "부서"], ["plays", "끝까지 한 판"], ["days", "한 날"], ["stamps", "도장"], ["favorite", "가장 많이 한 게임"], ["last", "마지막"]];
+    const PEOPLE_COLS = [["name", "이름"], ["department", "부서"], ["plays", "끝까지 한 판"], ["days", "한 날"], ["stamps", "도장"], ["gameCount", "한 게임"], ["favorite", "가장 많이 한 게임"], ["last", "마지막"]];
+    const gameCount = (p) => (p.games || []).length;
+    // 그 사람이 한 게임 전부 — 판 많은 순, 연습 판으로 도장만 받은 게임은 「연습 · 도장 N」
+    function personGames(p) {
+      const list = p.games || [];
+      if (!list.length) return `<span style="color:var(--text-muted);font-size:13px">게임 기록이 없어요</span>`;
+      return `<div class="ar-glist">${list.map((g) => `<div class="ar-g${g.plays ? "" : " is-practice"}"><span class="ar-tag">${KIND[g.kind] || ""}</span><span class="ar-g__t" title="${esc(g.title)}">${esc(g.title)}</span><span class="ar-g__n">${g.plays ? `${num(g.plays)}판` : `연습 · 도장 ${num(g.stamps)}`}</span><span class="ar-g__d">${md(g.last)}</span></div>`).join("")}</div>`;
+    }
     function peopleRows() {
       const q = peopleQ.trim().toLowerCase();
       const list = data.people.filter((p) => !q || `${p.name} ${p.department || ""} ${p.position || ""}`.toLowerCase().includes(q));
       const k = peopleSort;
+      if (k === "gameCount") { list.sort((a, b) => gameCount(b) - gameCount(a) || b.plays - a.plays); return list; }
       list.sort((a, b) => (typeof a[k] === "number" ? b[k] - a[k] : String(k === "last" ? b[k] : a[k] || "").localeCompare(String(k === "last" ? a[k] : b[k] || ""), "ko")) || b.plays - a.plays);
       return list;
     }
@@ -202,11 +228,11 @@
       const list = peopleRows();
       const shown = peopleAll ? list : list.slice(0, 30);
       const max = Math.max(0, ...list.map((p) => p.plays));
-      const rows = shown.map((p, i) => `<tr><td class="num" style="color:var(--text-muted)">${i + 1}</td><td><b style="font-weight:600">${esc(p.name)}</b>${p.position ? ` <span style="font-size:12px;color:var(--text-secondary)">${esc(p.position)}</span>` : ""}</td><td>${esc(p.department || "-")}</td><td style="width:22%">${inbar(p.plays, max, num(p.plays))}</td><td class="num">${p.days}일</td><td class="num">${p.stamps}개</td><td>${esc(p.favorite || "-")}${p.favoritePlays ? ` <span style="font-size:12px;color:var(--text-muted)">${p.favoritePlays}판</span>` : ""}</td><td class="num">${md(p.last)}</td></tr>`).join("");
-      const head = PEOPLE_COLS.map(([k, l]) => `<th data-sort="${k}" class="${["plays", "days", "stamps", "last"].includes(k) && k !== "plays" ? "num" : ""}">${l}${peopleSort === k ? " ↓" : ""}</th>`).join("");
-      return `<div class="ar-h"><h2>사람별 <span style="font-size:13px;font-weight:600;color:var(--text-secondary)">${num(list.length)}명</span></h2>
+      const rows = shown.map((p, i) => { const open = peopleOpen.has(p.id); return `<tr class="ar-person${open ? " is-open" : ""}" data-pid="${p.id}" title="눌러서 한 게임 모두 보기"><td class="num" style="color:var(--text-muted)">${i + 1}</td><td><span class="ar-caret">›</span><b style="font-weight:600">${esc(p.name)}</b>${p.position ? ` <span style="font-size:12px;color:var(--text-secondary)">${esc(p.position)}</span>` : ""}</td><td>${esc(p.department || "-")}</td><td style="width:22%">${inbar(p.plays, max, num(p.plays))}</td><td class="num">${num(p.days)}일</td><td class="num">${num(p.stamps)}개</td><td class="num">${num(gameCount(p))}개</td><td>${esc(p.favorite || "-")}${p.favoritePlays ? ` <span style="font-size:12px;color:var(--text-muted)">${num(p.favoritePlays)}판</span>` : ""}</td><td class="num">${md(p.last)}</td></tr>${open ? `<tr class="ar-games"><td colspan="9">${personGames(p)}</td></tr>` : ""}`; }).join("");
+      const head = PEOPLE_COLS.map(([k, l]) => `<th data-sort="${k}" class="${["days", "stamps", "gameCount", "last"].includes(k) ? "num" : ""}">${l}${peopleSort === k ? " ↓" : ""}</th>`).join("");
+      return `<div class="ar-h"><h2>사람별 <span style="font-size:13px;font-weight:600;color:var(--text-secondary)">${num(list.length)}명</span></h2><p style="flex:1">이름을 누르면 그 사람이 한 게임을 모두 보여요</p>
             <div class="ar-tools"><input class="hk-input" id="ar-q" placeholder="이름 · 부서 찾기" value="${esc(peopleQ)}"><button type="button" class="hk-btn hk-btn--secondary hk-btn--sm" id="ar-csv">${HKUI.icon("download", 15, "currentColor")} CSV</button></div></div>
-          <div class="ar-scroll"><table class="ar-table"><thead><tr><th class="num">#</th>${head}</tr></thead><tbody>${rows || `<tr><td colspan="8" style="color:var(--text-muted)">${peopleQ ? "찾는 사람이 없어요" : "이 기간에 끝까지 한 판이 없어요"}</td></tr>`}</tbody></table></div>
+          <div class="ar-scroll"><table class="ar-table"><thead><tr><th class="num">#</th>${head}</tr></thead><tbody>${rows || `<tr><td colspan="9" style="color:var(--text-muted)">${peopleQ ? "찾는 사람이 없어요" : "이 기간에 끝까지 한 판이 없어요"}</td></tr>`}</tbody></table></div>
           ${list.length > 30 ? `<button type="button" class="hk-btn hk-btn--ghost hk-btn--sm ar-more" id="ar-more">${peopleAll ? "30명만 보기" : `${num(list.length)}명 모두 보기`}</button>` : ""}`;
     }
     function paintPeople() {
@@ -219,6 +245,7 @@
       const q = document.getElementById("ar-q");
       q.oninput = () => { peopleQ = q.value; paintPeople(); };
       if (focus) { q.focus(); q.setSelectionRange(pos, pos); }
+      box.querySelectorAll("[data-pid]").forEach((tr) => (tr.onclick = () => { const id = Number(tr.dataset.pid); peopleOpen.has(id) ? peopleOpen.delete(id) : peopleOpen.add(id); paintPeople(); }));
       box.querySelectorAll("[data-sort]").forEach((th) => (th.onclick = () => { peopleSort = th.dataset.sort; paintPeople(); }));
       const more = document.getElementById("ar-more");
       if (more) more.onclick = () => { peopleAll = !peopleAll; paintPeople(); };
@@ -226,8 +253,8 @@
     }
     function downloadCsv() {
       const cell = (v) => `"${String(v == null ? "" : v).replace(/"/g, '""')}"`;
-      const lines = [["이름", "직급", "부서", "끝까지 한 판", "한 날", "도장", "가장 많이 한 게임", "그 게임 판 수", "마지막"].map(cell).join(",")];
-      peopleRows().forEach((p) => lines.push([p.name, p.position, p.department, p.plays, p.days, p.stamps, p.favorite, p.favoritePlays, p.last].map(cell).join(",")));
+      const lines = [["이름", "직급", "부서", "끝까지 한 판", "한 날", "도장", "한 게임 수", "가장 많이 한 게임", "그 게임 판 수", "마지막", "한 게임 전부"].map(cell).join(",")];
+      peopleRows().forEach((p) => lines.push([p.name, p.position, p.department, p.plays, p.days, p.stamps, gameCount(p), p.favorite, p.favoritePlays, p.last, (p.games || []).map((g) => `${g.title} ${g.plays ? `${g.plays}판` : `연습(도장 ${g.stamps})`}`).join(" / ")].map(cell).join(",")));
       const blob = new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
