@@ -158,6 +158,8 @@
     "+": [0, 4, 4, 31, 4, 4, 0], "*": [0, 17, 10, 4, 10, 17, 0], ">": [8, 4, 2, 1, 2, 4, 8], "/": [1, 2, 2, 4, 8, 8, 16],
     ",": [0, 0, 0, 0, 12, 4, 8], "=": [0, 0, 31, 0, 31, 0, 0], " ": [0, 0, 0, 0, 0, 0, 0],
   };
+  // 천 단위 쉼표 — 0으로 채운 점수도 자릿수 그대로 (00,001,234)
+  const comma = (v) => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const txtCache = new Map();
   function cacheGet(key, make) {
     let c = txtCache.get(key);
@@ -209,11 +211,17 @@
   }
   function fontCanvas(str, color, scale, outline) {
     return cacheGet(`f|${str}|${color}|${scale}|${outline}`, () => {
-      const mw = str.length * 6 - 1, mh = 7;
-      const mask = new Uint8Array(mw * mh);
-      for (let i = 0; i < str.length; i++) {
-        const gl = FONT[str[i]] || FONT[" "];
-        for (let y = 0; y < 7; y++) for (let x = 0; x < 5; x++) if (gl[y] & (16 >> x)) mask[y * mw + i * 6 + x] = 1;
+      // 쉼표는 좁게(3칸) — 0으로 채운 점수에 쉼표가 들어가도 좁은 HUD 칸에 맞게
+      const adv = (ch) => (ch === "," ? 3 : 6);
+      let mw = -1;
+      for (const ch of str) mw += adv(ch);
+      const mh = 7;
+      const mask = new Uint8Array(Math.max(1, mw) * mh);
+      let ox = 0;
+      for (const ch of str) {
+        const gl = FONT[ch] || FONT[" "], sx = ch === "," ? -1 : 0;
+        for (let y = 0; y < 7; y++) for (let x = 0; x < 5; x++) if (gl[y] & (16 >> x) && x + sx >= 0) mask[y * mw + ox + x + sx] = 1;
+        ox += adv(ch);
       }
       return maskToCanvas(mask, mw, mh, color, outline, 1, scale);
     });
@@ -1627,7 +1635,7 @@
     function addScore(n, x, y) {
       S.score = Math.min(9999999, S.score + n);
       S.bump = 0.15;
-      if (x != null) popText(x, y, String(n), C.gold[3], true);
+      if (x != null) popText(x, y, comma(n), C.gold[3], true);
     }
 
     // ── 탄 · 충돌 ──
@@ -2404,7 +2412,7 @@
           case "case": R(x, y - 1, 2, 1, C.gold[3]); R(x, y - 1, 1, 1, C.gold[4]); break;
           case "after": g.globalAlpha = (f.life / f.max) * 0.5; spr(SPR.core[0], x, y, false, true); g.globalAlpha = 1; break;
           case "confetti": R(x, y, Math.floor(f.t * 6) % 2 ? 3 : 1, 2, f.col); break;
-          case "text": if (/^[0-9]+$/.test(f.str)) ft(f.str, x, y - 4, f.col, 1, "c"); else kt(f.str, x, y, 10, f.col, "c"); break;
+          case "text": if (/^[0-9,]+$/.test(f.str)) ft(f.str, x, y - 4, f.col, 1, "c"); else kt(f.str, x, y, 10, f.col, "c"); break;
           case "warnmark": if (Math.floor(f.life * 12) % 2) { R(x - 8, y - 8, 16, 16, C.red[2]); R(x - 8, y - 8, 16, 1, C.red[3]); ft("!", x, y - 4, CREAM, 1, "c", null); light(f.x, f.y, 16, C.red[2], 0.9); } break;
         }
       }
@@ -2417,7 +2425,7 @@
     function drawHUD() {
       panel(3, 3, 76, 25);
       ft("1P", 6, 6, C.teal[3]);
-      ft(String(S.score).padStart(8, "0"), 20, 6 - (S.bump > 0 ? 1 : 0), S.bump > 0 ? C.gold[4] : CREAM);
+      ft(comma(String(S.score).padStart(8, "0")), 20, 6 - (S.bump > 0 ? 1 : 0), S.bump > 0 ? C.gold[4] : CREAM);
       for (let i = 0; i < S.lives; i++) {
         const x = 7 + i * 10, y = 17;
         R(x, y, 8, 4, C.teal[2]); R(x, y, 8, 1, C.teal[3]); R(x + 1, y + 4, 6, 4, C.skin[3]); R(x + 4, y + 3, 4, 1, C.gold[3]); R(x + 5, y + 5, 1, 1, INK);
@@ -2500,9 +2508,9 @@
       g.drawImage(lightSweep(c, t * 1.2), Math.round(W / 2 - c.width / 2), 52);
       light(camX + W / 2, 60, 70, C.gold[3], 0.35); flushLights(camX);
       kt(`${S.def.name} 되찾았어요`, W / 2, 82, 12, C.virus[4], "c");
-      if (t > 0.6) { kt("남은 시간", 112, 104, 12, CREAM, "c"); ft(`${tl.time} * 50`, 204, 101, CREAM, 1, "c"); ft("+" + tl.shown, 300, 101, C.gold[4], 1, "c"); }
+      if (t > 0.6) { kt("남은 시간", 112, 104, 12, CREAM, "c"); ft(`${tl.time} * 50`, 204, 101, CREAM, 1, "c"); ft("+" + comma(tl.shown), 300, 101, C.gold[4], 1, "c"); }
       if (t > 1) { kt("구한 동료", 112, 122, 12, CREAM, "c"); ft(String(S.rescued), 204, 119, CREAM, 1, "c"); }
-      if (tl.added) ft("SCORE " + String(S.score).padStart(8, "0"), W / 2, 140, S.bump > 0 ? C.gold[4] : CREAM, 1, "c");
+      if (tl.added) ft("SCORE " + comma(String(S.score).padStart(8, "0")), W / 2, 140, S.bump > 0 ? C.gold[4] : CREAM, 1, "c");
     }
     // 엔딩 — 노을 옥상에서 대원과 구한 동료들이 기뻐한다
     function drawEndingWorld() {
@@ -2522,7 +2530,7 @@
       const l1 = type("바이러스 로봇 군단을 모두 물리쳤어요!", 0.4), l2 = type("회사에 건강한 하루가 돌아왔어요", 2.2);
       if (l1) kt(l1, W / 2, 42, 12, C.gold[4], "c");
       if (l2) kt(l2, W / 2, 60, 12, CREAM, "c");
-      if (t > 3.2) { kt("남은 목숨", 128, 84, 12, CREAM, "c"); ft(`${S.lives} * 20000`, 210, 81, CREAM, 1, "c"); ft("+" + S.endShown, 304, 81, C.gold[4], 1, "c"); }
+      if (t > 3.2) { kt("남은 목숨", 128, 84, 12, CREAM, "c"); ft(`${S.lives} * 20,000`, 210, 81, CREAM, 1, "c"); ft("+" + comma(S.endShown), 304, 81, C.gold[4], 1, "c"); }
       if (t > 5.2) { kt("수고했어요, 비타민 특공대!", W / 2, 110, 15, C.virus[4], "c", C.virus[0]); light(S.camX + W / 2, 110, 70, C.virus[3], 0.3); flushLights(S.camX); }
     }
     // 타이틀 — 광장 배경이 천천히 흐르고, 큰 도트 로고에 빛이 지나간다

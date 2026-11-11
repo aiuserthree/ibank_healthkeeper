@@ -548,6 +548,7 @@
     // 판에 실린 최근 행동(gs.log)을 한 단계씩 다시 보여 준다(낸 패 → 뒤집은 패 → 먹은 패 → 가져온 피).
     // 상대 차례는 gs.replay(그 차례가 시작될 때의 판)에서 다시 볼 수 있다. 한 번 낼 때마다 기한은 24시간.
     const GAME = "gostop";
+    const fmtN = (n) => Number(n).toLocaleString("ko-KR"); // 화면에 보이는 점수에 천 단위 쉼표
     const { esc, closedNote, due, fail } = HKMatch;
     const PC_KEYS = matchMedia("(hover: hover) and (pointer: fine)").matches;
     const HOW_KEY = "hk-gostop-how"; // 「이렇게 해요」를 본 적 있으면 접어 둔다
@@ -664,7 +665,7 @@
         rankNote: "기권·시간 초과는 둘이 합쳐 10차례 이상 친 판만 세고, 같은 상대에게 하루에 거둔 승은 1승으로 쳐요. 나가리는 무승부예요.",
         rankEmpty: "아직 끝난 판이 없어요",
         rowNote: (m) => `${m.gs ? `나 ${m.gs.score[0]}점 · 상대 ${m.gs.score[1]}점 · ` : ""}${due(m.deadlineAt)}`,
-        resultNote: (m) => `${HKMatch.reason(m)}${m.gs && m.gs.points ? ` · ${m.gs.points}점` : ""}`,
+        resultNote: (m) => `${HKMatch.reason(m)}${m.gs && m.gs.points ? ` · ${fmtN(m.gs.points)}점` : ""}`,
       });
       if (g !== gen) return; // 기다리는 사이 판을 열었다
       open = o;
@@ -876,7 +877,7 @@
         if (k === "stop") {
           // 패를 내거나 고른 행동 끝에 바로 스톱 — 더 칠 차례가 없어 고를 묻지 않았다(고 · 스톱 창에서 고른 스톱은 단계가 하나뿐)
           const auto = e.s.some((y) => y[0] !== "stop");
-          banner("스톱!", { sub: auto ? `${x[1]}점 · 더 칠 차례가 없어 바로 스톱` : `${x[1]}점` });
+          banner("스톱!", { sub: auto ? `${fmtN(x[1])}점 · 더 칠 차례가 없어 바로 스톱` : `${fmtN(x[1])}점` });
           sfx("success");
           if (!(await step(900))) return false;
           continue;
@@ -1011,7 +1012,7 @@
       modal.innerHTML = `<div class="gs-card" role="dialog" aria-label="고 또는 스톱">
           <h2>${H.score(g.pile).total}점 났어요!</h2>
           <div class="gs-big">고? 스톱?</div>
-          <p><b>스톱</b>하면 지금 이겨요 — <b>${pv.points}점</b>${pv.mults.length ? ` (${esc(pv.mults.join(" · "))} ×${2 ** pv.mults.length})` : ""}.<br>
+          <p><b>스톱</b>하면 지금 이겨요 — <b>${fmtN(pv.points)}점</b>${pv.mults.length ? ` (${esc(pv.mults.join(" · "))} ×${2 ** pv.mults.length})` : ""}.<br>
             <b>고</b>하면 계속 쳐요(${next}고 ${next <= 2 ? `+${next}점` : `×${2 ** (next - 2)}`}). 그사이 ${rivalWho()}가 먼저 7점을 내 스톱하면 고박으로 져요.</p>
           <div class="gs-odds"><span>${rivalWho()} ${rs}점</span><span>더미 ${g.deck}장 남음</span></div>
           <div class="gs-card__btns">
@@ -1036,7 +1037,7 @@
       // 계산식 — 고 점수를 더한 뒤 곱하므로, 곱하기가 있으면 덧셈을 괄호로 묶는다. 예: (9 + 1) × 2 = 20점
       const muls = [...(e.go >= 3 ? [2 ** (e.go - 2)] : []), ...(e.mults || []).map(() => 2)];
       const sum = e.go ? `${e.base} + ${Math.min(e.go, 2)}` : `${e.base}`;
-      const formula = `${e.go && muls.length ? `(${sum})` : sum}${muls.map((x) => ` × ${x}`).join("")} = ${e.points}점`;
+      const formula = `${e.go && muls.length ? `(${sum})` : sum}${muls.map((x) => ` × ${x}`).join("")} = ${fmtN(e.points)}점`;
       return `<div class="gs-rows">${html}</div>${e.go || (e.mults || []).length ? `<div class="gs-formula">${esc(formula)}</div>` : ""}`;
     }
     function openResult() {
@@ -1049,7 +1050,7 @@
       if (e && e.nagari) body = `<p>더미가 다 떨어질 때까지 아무도 스톱하지 못했어요 — <b>나가리</b>(무승부)예요.</p>`;
       else if (e && e.points) {
         const mine = e.winner === "me";
-        body = `<div class="gs-big">${e.points}점</div><p>${mine ? "내가" : `${rivalWho()}가`} 스톱했어요</p>${breakdown(e, mine ? g.pile : g.rivalPile)}`;
+        body = `<div class="gs-big">${fmtN(e.points)}점</div><p>${mine ? "내가" : `${rivalWho()}가`} 스톱했어요</p>${breakdown(e, mine ? g.pile : g.rivalPile)}`;
       } else if (match.endReason === "RESIGN") body = `<p>${r === "win" ? `${rivalWho()}가 기권했어요.` : "기권했어요."}</p>`;
       else if (match.endReason === "TIMEOUT") body = `<p>${r === "win" ? `${rivalWho()}의 시간이 다 됐어요.` : "낼 시간이 다 됐어요."}</p>`;
       else body = `<p>${HKMatch.reason(match) ? `${esc(HKMatch.reason(match))} — ` : ""}판이 끝났어요.</p>`;

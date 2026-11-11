@@ -682,13 +682,13 @@ window.HKRaid = (function () {
     const need = Math.max(0, Number(row.needMore) || 0);
     const max = Number(row.todayMax) || 0;
     const capped = max > 0 && (Number(row.today) || 0) >= max;
-    if (need > 0 && started(row) && remainHp(row) <= 1) return `보스가 체력 1로 버티고 있어요. 동료 ${need}명이 더 공격하면 쓰러져요!`;
+    if (need > 0 && started(row) && remainHp(row) <= 1) return `보스가 체력 1로 버티고 있어요. 동료 ${num(need)}명이 더 공격하면 쓰러져요!`;
     if (capped) {
       const days = Number(rules && rules.bossDays) || 0;
       return `오늘 깎을 몫은 다 깎았어요${days ? `(보스는 하루에 체력의 1/${days}까지만 깎여요)` : ""}. ${st && st.open === false ? "게임이 열리면" : "지금"} 공격해도 참여 인원에는 들어가요.`;
     }
-    if (need > 0) return `쓰러뜨리려면 동료 ${need}명이 더 공격해야 해요. 아직 안 한 동료 ${rest}명에게 한 판 권해 보세요.`;
-    return rest > 0 ? `아직 공격 안 한 동료 ${rest}명 — 한 판씩만 해도 훨씬 빨라져요.` : `부서원 모두 공격에 나섰어요! 오늘도 한 판씩 이어 가요.`;
+    if (need > 0) return `쓰러뜨리려면 동료 ${num(need)}명이 더 공격해야 해요. 아직 안 한 동료 ${num(rest)}명에게 한 판 권해 보세요.`;
+    return rest > 0 ? `아직 공격 안 한 동료 ${num(rest)}명 — 한 판씩만 해도 훨씬 빨라져요.` : `부서원 모두 공격에 나섰어요! 오늘도 한 판씩 이어 가요.`;
   }
 
   // 보스 아래 — 우리 부서 vs 보스 (부서가 없으면 지금 1위 부서)

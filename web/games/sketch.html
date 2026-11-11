@@ -877,11 +877,12 @@
       const left = w.end - now();
       return `<div class="sk-chips">
           <span class="sk-chip is-clock ${left <= 30 ? "is-low" : ""}" id="sk-clock" role="timer" aria-label="남은 시간">⏱ <b>${clockText(left)}</b></span>
-          <span class="sk-chip is-score" id="sk-score">점수 <b>${w.score}</b></span>
+          <span class="sk-chip is-score" id="sk-score">점수 <b>${fmtN(w.score)}</b></span>
           <span class="sk-chip">맞힘 <b>${w.right}</b></span>
           ${w.streak >= 2 ? `<span class="sk-chip is-fire">🔥 <b>${w.streak}</b>연속</span>` : ""}
         </div>${role}`;
     }
+    const fmtN = (n) => Number(n || 0).toLocaleString("ko-KR"); // 화면에 보이는 점수 천 단위 쉼표
     function clockText(left) { const s = Math.max(0, Math.round(left)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; }
     function hintLeft() { return Math.max(0, Math.ceil(w.hintAt - now())); }
     function peekHtml() {
@@ -1249,7 +1250,7 @@
       if (w.reason === "time" && w.word) {
         rows.push(`<li class="is-last"><span class="sk-mark">!</span><span class="sk-list__txt"><b>${esc(w.word)}</b><small>시간이 다 됐어요 · ${w.role === "draw" ? "내 그림" : `${esc(mate())}님 그림`}</small></span><em class="sk-pts">0</em></li>`);
       }
-      return `<section class="er-card sk-album"><h2>${HKUI.icon("list-checks", 16, "currentColor")} 지나간 낱말<small>${w.right}개 맞힘 · ${w.score}점</small></h2>
+      return `<section class="er-card sk-album"><h2>${HKUI.icon("list-checks", 16, "currentColor")} 지나간 낱말<small>${w.right}개 맞힘 · ${fmtN(w.score)}점</small></h2>
           ${rows.length ? `<ul class="sk-list">${rows.join("")}</ul>` : `<div class="sk-nolist">이번 판에는 기록이 없어요</div>`}</section>`;
     }
     function drawArt(canvas, a, minPx) {
@@ -1373,8 +1374,8 @@
       },
       rankTitle: "그림 퀴즈 점수 순위",
       rankNote: "같은 두 사람은 가장 높은 한 판만 올라요.",
-      rankText: (x) => `${Number(x.score || 0)}점`,
-      recentText: (r) => (r.status === "CLEAR" ? [`${Number(r.score || 0)}점`, Number(r.score) > 0 ? "is-clear" : "is-fail"] : ["포기", "is-fail"]),
+      rankText: (x) => `${fmtN(x.score)}점`,
+      recentText: (r) => (r.status === "CLEAR" ? [`${fmtN(r.score)}점`, Number(r.score) > 0 ? "is-clear" : "is-fail"] : ["포기", "is-fail"]),
       failTitle: "그만뒀어요",
       quick: ["준비됐어요!", "그림 실력 기대해요", "천천히 해요", "한 판 더?"],
       remain: () => null, // 위 막대 시계 대신 무대 안의 시계 칩(⏱)을 쓴다 — 보드와 한 화면에 보이게
@@ -1513,7 +1514,7 @@
         return score >= GREAT ? "great" : right > 0 ? "ok" : "fail";
       },
       stats: () => (w ? [
-        { label: "점수", value: `${w.score}점` },
+        { label: "점수", value: `${fmtN(w.score)}점` },
         { label: "맞힌 낱말", value: `${w.right}개` },
         { label: "최고 연속", value: `${w.best}개` },
         { label: "넘긴 낱말", value: `${w.passed}개` },
@@ -1528,7 +1529,7 @@
             <div class="sk-end__wb">
               <h2>${head}</h2>
               <p>${esc(line)}</p>
-              <div class="sk-end__score"><b>${score}</b><span>점</span><svg viewBox="0 0 160 14" aria-hidden="true"><path d="M4 9c30-6 60-7 90-4s46 3 62-1" stroke="#dc2626" stroke-width="4" fill="none" stroke-linecap="round"/></svg></div>
+              <div class="sk-end__score"><b>${fmtN(score)}</b><span>점</span><svg viewBox="0 0 160 14" aria-hidden="true"><path d="M4 9c30-6 60-7 90-4s46 3 62-1" stroke="#dc2626" stroke-width="4" fill="none" stroke-linecap="round"/></svg></div>
               ${w ? `<p class="sk-end__sub">${w.right}개 맞힘 · 최고 ${w.best}연속 · 넘김 ${w.passed}개</p>` : ""}
               ${w && w.reason === "time" && w.word ? `<p class="sk-end__last">마지막 낱말은 「${esc(w.word)}」${wasJosa(w.word)}</p>` : ""}
             </div>
@@ -1539,7 +1540,7 @@
       failEnd: (ctx, again) => `<div class="er-end sk-end is-zero">
           <span class="sk-end__ep">본관 소회의실</span>
           <div class="sk-end__wb"><h2>그만뒀어요</h2>
-            ${w && w.right > 0 ? `<div class="sk-end__score"><b>${w.score}</b><span>점</span></div><p class="sk-end__sub">그만둘 때까지 ${w.right}개를 맞혔어요</p>` : "<p>다음엔 끝까지 같이 그려 봐요.</p>"}</div>
+            ${w && w.right > 0 ? `<div class="sk-end__score"><b>${fmtN(w.score)}</b><span>점</span></div><p class="sk-end__sub">그만둘 때까지 ${w.right}개를 맞혔어요</p>` : "<p>다음엔 끝까지 같이 그려 봐요.</p>"}</div>
           <div class="sk-end__mc">${face()}<p><b>${MA}</b>괜찮아요! 보드마커는 그대로 둘게요. 다음에 또 와요.</p></div>
           <div class="er-actions">${again}<a class="hk-btn hk-btn--secondary" href="#" style="text-decoration:none">목록</a></div>
         </div>`,

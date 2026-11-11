@@ -1337,7 +1337,7 @@
       if (!n || n < 10 || n % 10 !== 0 || n === rallyShown) return;
       rallyShown = n;
       sfx("combo", Math.min(10, n / 10 + 2));
-      banner = { text: `랠리 ${n}!`, color: "#7c3aed", t: 0, small: 1 };
+      banner = { text: `랠리 ${n.toLocaleString("ko-KR")}!`, color: "#7c3aed", t: 0, small: 1 };
     }
 
     function finish() {
@@ -1514,7 +1514,7 @@
       const LV = { easy: "쉬움", normal: "보통", hard: "어려움" };
       hudText(`${mode === "cpu" ? `${LV[level]} · ` : ""}${S.target}점 선승`, cx, top + 11 * hs, 11.5 * hs, "rgba(15,23,42,.62)", "center", 700);
       if (S.phase !== "wait" && S.phase !== "count") {
-        hudText(`이번 랠리 ${S.rally}회${mode === "cpu" ? ` · 최고 ${best0}회` : ""}`, cx, top + 30 * hs, 13.5 * hs, "#ffffff", "center", 800, "rgba(15,23,42,.55)");
+        hudText(`이번 랠리 ${S.rally.toLocaleString("ko-KR")}회${mode === "cpu" ? ` · 최고 ${best0.toLocaleString("ko-KR")}회` : ""}`, cx, top + 30 * hs, 13.5 * hs, "#ffffff", "center", 800, "rgba(15,23,42,.55)");
       }
       // 가운데 큰 글자
       const midY = oy + H * scale * 0.36;

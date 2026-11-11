@@ -617,6 +617,7 @@
 <script>
 (function(){
   'use strict';
+  function fmtN(n){ return Number(n || 0).toLocaleString('ko-KR'); } // 화면에 보이는 계단 수 천 단위 쉼표
 
   // ---------- DOM ----------
   var canvas = document.getElementById('game');
@@ -949,7 +950,7 @@
   };
 
   function showBestLabels(){
-    elStartBest.textContent = best > 0 ? '최고 기록  ' + best + ' 계단' : '';
+    elStartBest.textContent = best > 0 ? '최고 기록  ' + fmtN(best) + ' 계단' : '';
   }
   showBestLabels();
 
@@ -1019,7 +1020,7 @@
 
   function setScoreDisplay(){
     if(score !== lastShownScore){
-      elScore.textContent = String(score);
+      elScore.textContent = fmtN(score);
       lastShownScore = score;
     }
   }
@@ -1080,7 +1081,7 @@
       }
     }
     if(score > 1000 && score % 500 === 0){
-      showToast('심우주 ' + score);
+      showToast('심우주 ' + fmtN(score));
       sndMilestone();
       if(!reduceMotion) flashA = 0.25;
     }
@@ -1137,9 +1138,9 @@
     state = 'over';
     var isRecord = score > best;
     if(isRecord){ best = score; saveBest(best); }
-    elFinal.textContent = String(score);
+    elFinal.textContent = fmtN(score);
     elOverLabel.textContent = score >= 100 ? '별에 가까워졌다' : '여기까지 올랐다';
-    elOverBest.textContent = '최고 기록  ' + best + ' 계단';
+    elOverBest.textContent = '최고 기록  ' + fmtN(best) + ' 계단';
     elNewRecord.classList.toggle('hidden', !isRecord);
     showBestLabels();
     elOver.classList.remove('hidden');
@@ -1528,7 +1529,7 @@
     ctx.beginPath(); ctx.arc(gx, cy3, r, 0, 6.29); ctx.stroke();
 
     var label = (pl.self ? '나 ' : '') + (pl.weekTop ? '👑 ' : '')
-      + String(pl.name || '').slice(0, 8) + ' ' + pl.best
+      + String(pl.name || '').slice(0, 8) + ' ' + fmtN(pl.best)
       + (pl.passedAt && !passing ? ' ✓' : '');
     ctx.font = '700 12.5px -apple-system, "Apple SD Gothic Neo", sans-serif';
     ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
@@ -1803,6 +1804,7 @@
  */
 (function(){
   'use strict';
+  function fmtN(n){ return Number(n || 0).toLocaleString('ko-KR'); } // 화면에 보이는 계단 수 천 단위 쉼표
   function $(id){ return document.getElementById(id); }
   var elLogin = $('msLogin'), elNote = $('loginNote'), elChip = $('profileChip'),
       elTarget = $('targetChip'), elStartLb = $('startLb'), elStartRows = $('startLbRows'),
@@ -1948,7 +1950,7 @@
       if(!ok){
         var lk = document.createElement('span');
         lk.className = 'lock';
-        lk.textContent = sk.s + '↑';
+        lk.textContent = fmtN(sk.s) + '↑';
         b.appendChild(lk);
       }
       ['pointerdown', 'click'].forEach(function(t){
@@ -1966,7 +1968,7 @@
     var nextLock = null;
     api.list.forEach(function(sk){ if(!api.unlocked(sk) && !nextLock) nextLock = sk; });
     elSkinName.textContent = (sel ? sel.name : '치즈냥이')
-      + (nextLock ? '  ·  다음 해금 ' + nextLock.s + '계단 (' + nextLock.name + ')' : '  ·  전부 해금!');
+      + (nextLock ? '  ·  다음 해금 ' + fmtN(nextLock.s) + '계단 (' + nextLock.name + ')' : '  ·  전부 해금!');
   }
   window.__renderSkins = renderSkins;
   ['pointerdown', 'click'].forEach(function(t){
@@ -2064,7 +2066,7 @@
       row.appendChild(box2);
       var sc = document.createElement('span');
       sc.className = 'sc';
-      sc.textContent = String(val);
+      sc.textContent = fmtN(val);
       row.appendChild(sc);
       container.appendChild(row);
     });
@@ -2076,8 +2078,8 @@
     if(!me || !myRank || !myBest){ elMyRank.hidden = true; return; }
     elMyRank.hidden = false;
     var t = window.__titleFor ? window.__titleFor(myBest) : '';
-    var txt = '내 순위 ' + myRank + '위 · 최고 ' + myBest + '계단';
-    if(myWeekRank) txt += '  |  이번 주 ' + myWeekRank + '위 (' + myWeekBest + ')';
+    var txt = '내 순위 ' + myRank + '위 · 최고 ' + fmtN(myBest) + '계단';
+    if(myWeekRank) txt += '  |  이번 주 ' + myWeekRank + '위 (' + fmtN(myWeekBest) + ')';
     elMyRank.textContent = txt + (t ? '  · ' + t : '');
   }
 
@@ -2100,11 +2102,11 @@
     }else{
       elTarget.appendChild(avatarEl(next));
       var t1 = document.createElement('span');
-      t1.textContent = String(next.name).slice(0, 8) + ' ' + next.best;
+      t1.textContent = String(next.name).slice(0, 8) + ' ' + fmtN(next.best);
       elTarget.appendChild(t1);
       var t2 = document.createElement('span');
       t2.className = 'up';
-      t2.textContent = '▲ ' + (next.best - st.score) + '계단';
+      t2.textContent = '▲ ' + fmtN(next.best - st.score) + '계단';
       elTarget.appendChild(t2);
     }
     elTarget.classList.add('show');

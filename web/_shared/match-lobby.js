@@ -80,7 +80,7 @@ window.HKMatch = (function () {
         <button type="button" class="hk-btn hk-btn--secondary" data-decline="${m.id}">거절</button></span></div>`).join("");
     const sent = d.sent.map((m) => `<div class="gk__row">${person(m.opponent, `수락 기다리는 중 · ${due(m.deadlineAt)}`)}<span class="gk__btns"><button type="button" class="hk-btn hk-btn--secondary" data-decline="${m.id}">취소</button></span></div>`).join("");
     const r = d.ranking;
-    const rank = r.top.map((x) => `<div class="gk__row ${r.me && r.me.id === x.id ? "gk__me" : ""}"><span class="gk__rank">${x.rank}</span>${person(x)}<span class="gk__tag">${x.wins}승 ${x.losses}패</span></div>`).join("");
+    const rank = r.top.map((x) => `<div class="gk__row ${r.me && r.me.id === x.id ? "gk__me" : ""}"><span class="gk__rank">${x.rank}</span>${person(x)}<span class="gk__tag">${Number(x.wins || 0).toLocaleString("ko-KR")}승 ${Number(x.losses || 0).toLocaleString("ko-KR")}패</span></div>`).join("");
     const botSec = bot && bot.length ? `<section class="gk__sec"><h2>${esc(L.bot)}</h2>
           <div class="gk__levels">${bot.map(([k, t]) => `<button type="button" class="hk-btn hk-btn--secondary" data-bot="${esc(k)}" ${open.open ? "" : "disabled"}>${esc(t)}</button>`).join("")}</div>
           <div class="gk__due">${esc(botNote)}</div>

@@ -432,6 +432,7 @@
 
         const correctPoints = () => results.reduce((s, r, i) => s + (r.ok ? STEPS[qs[i][4]].pts + r.sec * PER_SEC : 0), 0);
         const totalScore = () => Math.max(0, correctPoints() - hintsTotal * HINT_COST);
+        const fmt = (n) => Number(n).toLocaleString("ko-KR");
 
         function stopLoops() {
           cancelAnimationFrame(raf);
@@ -502,7 +503,7 @@
             return `<span class="gm-cs__dot ${cls}"></span>`;
           }).join("");
           stage.innerHTML = `<div class="gm-cs">
-            <div class="gm-cs__top"><b>${idx + 1} / ${COUNT}</b><span class="gm-cs__dots">${dots}</span><span class="gm-cs__score" data-score>${totalScore()}점</span></div>
+            <div class="gm-cs__top"><b>${idx + 1} / ${COUNT}</b><span class="gm-cs__dots">${dots}</span><span class="gm-cs__score" data-score>${fmt(totalScore())}점</span></div>
             <div class="gm-cs__timer" data-timer><i></i></div>
             <div class="gm-cs__body">
               <div class="gm-cs__meta"><span class="gm-cs__tags"><span class="gm-cs__step is-${lv}">${STEPS[lv].name} ${STEPS[lv].pts}</span><span class="gm-cs__cat">${HKUI.icon("tag", 13, "currentColor")} ${esc(cat)}</span></span><span>남은 시간 <span class="gm-cs__sec" data-sec>${LIMIT}</span>초</span></div>
@@ -567,7 +568,7 @@
           ctx.sfx("tick");
           renderTiles();
           updateHintBtn();
-          stage.querySelector("[data-score]").textContent = `${totalScore()}점`;
+          stage.querySelector("[data-score]").textContent = `${fmt(totalScore())}점`;
           stage.querySelector("[data-input]").focus({ preventScroll: true });
         }
 
@@ -673,10 +674,10 @@
               <span class="gm-cs__date">${formatDate(ctx.today)} · 오늘의 ${COUNT}문제</span>
               <div class="gm-cs__sum-big">${okCount}<small> / ${COUNT} 정답</small></div>
               <div class="gm-cs__calc">
-                <span>정답 ${okCount}개 (단계별 100·130·160)</span><b>${base}</b>
-                <span>남은 시간 보너스</span><b>+${timeBonus}</b>
-                <span>글자 힌트 ${hintsTotal}번 × 30</span><b>−${hintsTotal * HINT_COST}</b>
-                <span class="is-total">합계</span><b class="is-total">${score}점</b>
+                <span>정답 ${okCount}개 (단계별 100·130·160)</span><b>${fmt(base)}</b>
+                <span>남은 시간 보너스</span><b>+${fmt(timeBonus)}</b>
+                <span>글자 힌트 ${hintsTotal}번 × 30</span><b>−${fmt(hintsTotal * HINT_COST)}</b>
+                <span class="is-total">합계</span><b class="is-total">${fmt(score)}점</b>
               </div>
               <ul class="gm-cs__list">${qs.map((q, i) => `<li>
                 ${HKUI.icon(results[i].ok ? "circle-check" : "circle-x", 20, results[i].ok ? "#e0508a" : "#94a3b8")}

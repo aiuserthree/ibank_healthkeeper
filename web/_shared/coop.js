@@ -68,6 +68,7 @@ window.HKCoop = (function () {
   const { esc, ava, closedNote, due, fail } = HKMatch;
   const mmss = (s) => { s = Math.max(0, Math.round(s)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
   const won = (n) => `${Number(n || 0).toLocaleString("ko-KR")}원`;
+  const nf = (n) => Number(n || 0).toLocaleString("ko-KR"); // 보여 주는 수 — 1,234
   const mini = (p) => `<span class="er-team">${ava(p)}<b>${esc(p.name)}</b></span>`;
   const TIERS = ["great", "ok", "fail"];
   // 성공한 판인지 — coop-story.js 가 없을 때만 쓰는 같은 규칙(HKCoopStory.cleared · 서버 series() 의 cleared)
@@ -132,10 +133,10 @@ window.HKCoop = (function () {
       if (s.best != null) { try { best = game.rankText({ score: s.best, sec: s.best }); } catch (_) { best = ch ? ch.best(s.best) : String(s.best); } }
       const cell = (label, value, on) => `<div class="er-my__cell ${on ? "is-on" : ""}"><b>${esc(value)}</b><small>${esc(label)}</small></div>`;
       return `<div class="er-my" aria-label="내 기록">
-          ${cell("해 본 판", `${s.played || 0}판`, s.played)}
-          ${cell("성공", `${s.cleared || 0}번`, s.cleared)}
+          ${cell("해 본 판", `${nf(s.played)}판`, s.played)}
+          ${cell("성공", `${nf(s.cleared)}번`, s.cleared)}
           ${cell(ch ? ch.bestLabel : "최고 기록", best, s.best != null)}
-          ${cell("함께한 동료", `${s.partners || 0}명`, s.partners)}
+          ${cell("함께한 동료", `${nf(s.partners)}명`, s.partners)}
         </div>`;
     }
     // 이번 화 이야기 — 앞 화 끝 장면 · 나오는 사람 · 이야기 미리 보기 · 앞뒤 화
@@ -297,7 +298,7 @@ window.HKCoop = (function () {
       let list = [];
       try { list = (game.stats && game.stats(ctx)) || []; } catch (_) { list = []; }
       if (!list.length) return "";
-      return `<div class="er-stats">${list.map((s) => `<div class="er-stat"><b>${esc(String(s.value ?? ""))}</b><small>${esc(s.label || "")}</small></div>`).join("")}</div>`;
+      return `<div class="er-stats">${list.map((s) => `<div class="er-stat"><b>${esc(typeof s.value === "number" ? nf(s.value) : String(s.value ?? ""))}</b><small>${esc(s.label || "")}</small></div>`).join("")}</div>`;
     }
     // 끝 화면 아래 — 끝 이야기(컷신) · 다음 화 예고 · 다시 하기 · 다음 화
     function storyEndHtml(card, again) {

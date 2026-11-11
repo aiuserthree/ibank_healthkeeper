@@ -304,6 +304,7 @@
     // 사진 판(.sp-stage)은 한 번 만들어 계속 쓴다 — 방 화면을 통째로 다시 그려도 새 자리로 옮겨 붙이기만 하고,
     // 움직이던 표시는 시작 시각(data-t0)으로 애니메이션 지연을 다시 맞춰 끊기지 않게 이어 간다.
     const { esc } = HKMatch;
+    const fmtN = (n) => Number(n || 0).toLocaleString("ko-KR"); // 화면에 보이는 점수 천 단위 쉼표
     let room = null, z = null, offset = 0, tickFor = null, coop = null;
     let mode = "tap", busyTap = false, busyPing = false, pingAt = 0, lastBeep = null, scrollSoon = false;
     const now = () => (Date.now() + offset) / 1000;
@@ -1217,7 +1218,7 @@
     }
     function msgInfo() {
       // 다 찾음 — 맞대 보는 3초 동안은 이 알림이 먼저(사진 위를 가리지 않게 배너 대신 여기에 띄운다)
-      if (z.pause != null && !z.over) return { kind: "clear", ic: "🎉", text: `${z.total}곳 다 찾았어요! +${z.clearBonus}점`, sub: `${mate()}님 사진과 맞대 봐요` };
+      if (z.pause != null && !z.over) return { kind: "clear", ic: "🎉", text: `${z.total}곳 다 찾았어요! +${fmtN(z.clearBonus)}점`, sub: `${mate()}님 사진과 맞대 봐요` };
       const c = (room.chat || []).filter((m) => !m.me).slice(-1)[0];
       if (c && Date.now() + offset - Date.parse(c.t) < 8000) return { kind: "say", ic: "💬", who: mate(), text: c.text };
       const pin = localMsg && now() - localMsg.t < 4 ? localMsg : null;
@@ -1267,7 +1268,7 @@
           <span class="sp-hud__end">
             <span class="sp-time${left <= 10 ? " is-last" : left < 30 ? " is-low" : ""}" id="sp-time" title="남은 시간"><b>${HKCoop.mmss(left)}</b>${minus}</span>
             <span class="sp-miss${blink ? " is-blink" : ""}" title="틀린 횟수"${blink ? ` style="animation-delay:${-Math.round(mAge)}ms"` : ""}>✕ <b>${z.misses}</b></span>
-            <span class="sp-score"><b>${z.score}</b>점</span>
+            <span class="sp-score"><b>${fmtN(z.score)}</b>점</span>
           </span>
         </div>`;
     }
@@ -1398,7 +1399,7 @@
           ${ch ? `<div class="sp-end__ep">${esc(ch.time)} · ${esc(ch.place)}</div>` : ""}
           <h2>시간 끝!</h2>
           <p>${esc(say)}</p>
-          <div class="sp-end__big"><b>${score}</b>점</div>
+          <div class="sp-end__big"><b>${fmtN(score)}</b>점</div>
           ${z ? `<p class="sp-end__sub">다른 곳 ${z.foundTotal}개 · 사진 ${z.cleared}장</p>` : ""}
         </div>`;
     }
@@ -1437,8 +1438,8 @@
       },
       rankTitle: "틀린 그림 점수 순위",
       rankNote: "찾은 곳 1점 · 사진 한 장을 다 찾으면 3점 더. 같은 두 사람은 가장 좋은 한 판만 올라요.",
-      rankText: (x) => `${Number(x.score || 0)}점`,
-      recentText: (r) => (r.status === "CLEAR" ? (Number(r.score) > 0 ? [`${r.score}점`, "is-clear"] : ["0점", "is-fail"]) : ["그만둠", "is-fail"]),
+      rankText: (x) => `${fmtN(x.score)}점`,
+      recentText: (r) => (r.status === "CLEAR" ? (Number(r.score) > 0 ? [`${fmtN(r.score)}점`, "is-clear"] : ["0점", "is-fail"]) : ["그만둠", "is-fail"]),
       failTitle: "그만뒀어요",
       get quick() { return quickList(); }, // 장소에 따라 「책상 · 조리대 · 탁자 위」
       remain: () => (z ? z.end - now() : null),

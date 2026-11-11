@@ -1236,6 +1236,7 @@
       const backTo = () => (world.cpIndex >= 0 ? "정수기로" : "처음 자리로"); // R 두 번·일시정지에서 돌아갈 곳
       const fmtTime = (s) => { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
       const stageScore = (b, f) => b + f * FALL_COST;
+      const fmtN = (n) => Number(n || 0).toLocaleString("ko-KR"); // 화면에 보이는 횟수 천 단위 쉼표
       const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
       const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -1324,7 +1325,7 @@
         let b = world.bounces, f = world.falls, t = stageTime;
         if (mode === "run") { const r = runTotals(); b += r.b; f += r.f; t += r.t; }
         hud.score.textContent = stageScore(b, f).toLocaleString("ko-KR");
-        hud.detail.textContent = `튐 ${b} · 떨어짐 ${f}`;
+        hud.detail.textContent = `튐 ${fmtN(b)} · 떨어짐 ${fmtN(f)}`;
         hud.time.textContent = fmtTime(t);
       }
 
@@ -1631,8 +1632,8 @@
               const i = c.from + k;
               const b = store.stage[i];
               const lock = i >= open;
-              return `<button type="button" class="bb-sel" data-go="pick" data-i="${i}" ${lock ? "disabled" : ""}${b && !lock ? ` title="최고 ${b.s}점 · ${fmtTime(b.t)}"` : ""}>
-                <span class="bb-sel__top"><i>${i + 1}스테이지</i><small>${lock ? "잠김" : b ? `${b.s}점 · ${fmtTime(b.t)}` : "기록 없음"}</small></span><b>${HKUI.escapeHtml(s.name)}</b></button>`;
+              return `<button type="button" class="bb-sel" data-go="pick" data-i="${i}" ${lock ? "disabled" : ""}${b && !lock ? ` title="최고 ${fmtN(b.s)}점 · ${fmtTime(b.t)}"` : ""}>
+                <span class="bb-sel__top"><i>${i + 1}스테이지</i><small>${lock ? "잠김" : b ? `${fmtN(b.s)}점 · ${fmtTime(b.t)}` : "기록 없음"}</small></span><b>${HKUI.escapeHtml(s.name)}</b></button>`;
             }).join("")}
           </div>
           ${btn("hk-btn--secondary", "home", "chevron-left", "처음 화면으로")}
@@ -1677,7 +1678,7 @@
         if (better(s, store.stage[si])) store.stage[si] = s;
         saveStore();
         ctx.stageStamp?.(); // 스테이지 하나 통과 = 그날 도장(정식 도전 · 연습 모두)
-        const line = `${si + 1}스테이지 통과 · 튐 ${rec.b} · 떨어짐 ${rec.f} · ${fmtTime(rec.t)}`;
+        const line = `${si + 1}스테이지 통과 · 튐 ${fmtN(rec.b)} · 떨어짐 ${fmtN(rec.f)} · ${fmtTime(rec.t)}`;
         if (mode === "run") {
           run.stages.push({ ...rec, i: si });
           if (si < run.course.to) showIntro(si + 1, line);
@@ -1687,9 +1688,9 @@
         state = "done";
         showOver(`<div class="bb-card">
           <span class="bb-no">연습 · ${si + 1} / ${N} 스테이지</span>
-          <div class="bb-big">${s.s}<small>점</small></div>
-          <div class="bb-sub">튐 ${rec.b} · 떨어짐 ${rec.f} · ${fmtTime(rec.t)}</div>
-          <p>${store.stage[si] === s ? "이 스테이지 내 최고 기록이에요!" : `이 스테이지 최고 ${store.stage[si].s}점 · ${fmtTime(store.stage[si].t)}`}</p>
+          <div class="bb-big">${fmtN(s.s)}<small>점</small></div>
+          <div class="bb-sub">튐 ${fmtN(rec.b)} · 떨어짐 ${fmtN(rec.f)} · ${fmtTime(rec.t)}</div>
+          <p>${store.stage[si] === s ? "이 스테이지 내 최고 기록이에요!" : `이 스테이지 최고 ${fmtN(store.stage[si].s)}점 · ${fmtTime(store.stage[si].t)}`}</p>
           ${btn("hk-btn--primary", "again", "rotate-ccw", "다시 하기")}
           ${si + 1 < N ? btn("hk-btn--secondary", "next", "chevron-right", "다음 스테이지") : ""}
           ${btn("hk-btn--secondary", "select", "list", "스테이지 고르기")}
@@ -1703,7 +1704,7 @@
         const total = Math.min(MAX_SCORE, stageScore(r.b, r.f));
         // 위 점수 줄도 결과 카드와 같은 값으로 (마지막 0.25초 사이 갱신이 빠질 수 있어서)
         hud.score.textContent = total.toLocaleString("ko-KR");
-        hud.detail.textContent = `튐 ${r.b} · 떨어짐 ${r.f}`;
+        hud.detail.textContent = `튐 ${fmtN(r.b)} · 떨어짐 ${fmtN(r.f)}`;
         hud.time.textContent = fmtTime(r.t);
         store = loadStore();
         const c = run.course;
@@ -1717,9 +1718,9 @@
           <span class="bb-no">${COURSES.length > 1 ? `${c.no}코스 ` : ""}정식 도전 완주</span>
           <h2>헬스키퍼실 도착!</h2>
           <div class="bb-big">${total.toLocaleString("ko-KR")}<small>점</small></div>
-          <div class="bb-sub">튐 ${r.b} · 떨어짐 ${r.f} (+${r.f * FALL_COST}) · ${fmtTime(r.t)}<span data-newbest></span></div>
+          <div class="bb-sub">튐 ${fmtN(r.b)} · 떨어짐 ${fmtN(r.f)} (+${fmtN(r.f * FALL_COST)}) · ${fmtTime(r.t)}<span data-newbest></span></div>
           <table class="bb-table"><thead><tr><th style="text-align:left">스테이지</th><th>튐</th><th>떨어짐</th><th>시간</th></tr></thead><tbody>
-            ${run.stages.map((s) => `<tr><td><i>${s.i + 1}</i>${HKUI.escapeHtml(STAGES[s.i].name)}</td><td>${s.b}</td><td>${s.f}</td><td>${fmtTime(s.t)}</td></tr>`).join("")}
+            ${run.stages.map((s) => `<tr><td><i>${s.i + 1}</i>${HKUI.escapeHtml(STAGES[s.i].name)}</td><td>${fmtN(s.b)}</td><td>${fmtN(s.f)}</td><td>${fmtTime(s.t)}</td></tr>`).join("")}
           </tbody></table>
           ${btn("hk-btn--primary", "run", "rotate-ccw", "다시 하기")}
           ${btn("hk-btn--secondary", "select", "list", "스테이지 연습")}

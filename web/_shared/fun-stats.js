@@ -1,5 +1,6 @@
 /** 숫자로 보는 헬스키퍼 — 서비스 소개·예약하기 공용 섹션 */
 window.HKFun = (function () {
+  const nf = (n) => Number(n || 0).toLocaleString("ko-KR"); // 보여 주는 수 — 1,234
   const COUPON_NOTICE_ID = 1; // 「[새 기능] 무적 쿠폰과 배지 등급 혜택을 소개합니다」 공지
   const stretchTips = [
     ["목 옆 늘리기", "오른손으로 머리 왼쪽을 감싸 오른쪽으로 천천히 당겨 15초. 반대쪽도 똑같이.",
@@ -169,7 +170,7 @@ window.HKFun = (function () {
   }
 
   // value: 막대와 숫자에 쓸 값 (기본은 이용 횟수) · sub: 이름 옆 작은 글씨 · badge: 「우리 부서」 표시 (좁은 1인당 목록은 색으로만)
-  function deptRows(rows, value = (r) => r.uses, label = (r) => `${r.uses}회`, sub = () => "", badge = true) {
+  function deptRows(rows, value = (r) => r.uses, label = (r) => `${nf(r.uses)}회`, sub = () => "", badge = true) {
     const max = Math.max(1, ...rows.map(value));
     return `<ol class="hk-rank-list">${rows.map((r) => `
       <li class="hk-rank-row${r.isMine ? " hk-rank-row--me" : ""}">
@@ -207,7 +208,7 @@ window.HKFun = (function () {
     const mine = board.mine;
     let mineLine;
     if (mine) {
-      mineLine = `우리 부서는 <b style="color:var(--color-signal-blue)">${mine.rank}위</b> · ${mine.uses}회 <span style="color:var(--text-muted)">(전체 ${board.total}개 부서)</span>`;
+      mineLine = `우리 부서는 <b style="color:var(--color-signal-blue)">${nf(mine.rank)}위</b> · ${nf(mine.uses)}회 <span style="color:var(--text-muted)">(전체 ${nf(board.total)}개 부서)</span>`;
     } else if (board.soloDepartment) {
       mineLine = `우리 부서는 한 명이라 부서 대항전에서 빠져요.`;
     } else if (board.myDepartment) {
@@ -221,7 +222,7 @@ window.HKFun = (function () {
       <div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border-default);font-size:14px;color:var(--color-midnight-navy);display:flex;align-items:center;gap:8px">${HKUI.icon("users-round", 16, "var(--color-slate-blue)")}<span>${mineLine}</span></div>
       ${(board.perCapita || []).length ? `<div class="hk-dept-per">
         <div class="hk-dept-per__head"><b>1인당 이용 TOP 3</b><span>부서 이용 횟수 ÷ 회원 수</span></div>
-        ${deptRows(board.perCapita, (r) => r.perCapita, (r) => `${r.perCapita.toFixed(1)}회`, (r) => ` <span class="hk-dept-per__n">${r.members}명</span>`, false)}
+        ${deptRows(board.perCapita, (r) => r.perCapita, (r) => `${r.perCapita.toFixed(1)}회`, (r) => ` <span class="hk-dept-per__n">${nf(r.members)}명</span>`, false)}
       </div>` : ""}
     </div>`;
   }
@@ -301,7 +302,7 @@ window.HKFun = (function () {
         ${me.yearTopPercent ? `<span class="hk-badge hk-badge--neutral" style="margin-left:auto">올해 이용자 중 상위 ${me.yearTopPercent}%</span>` : ""}
       </div>
       <div class="hk-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span data-width="${pct}%"></span></div>
-      <div style="font-size:13px;color:var(--text-secondary);margin-top:8px">${next ? `다음 배지 <b style="color:var(--color-midnight-navy)">${next[1]}</b>까지 ${next[0] - total}회 남았어요` : "모든 배지를 모았어요. 진정한 헬스키퍼 마스터!"}</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-top:8px">${next ? `다음 배지 <b style="color:var(--color-midnight-navy)">${next[1]}</b>까지 ${nf(next[0] - total)}회 남았어요` : "모든 배지를 모았어요. 진정한 헬스키퍼 마스터!"}</div>
       ${couponLine(profile?.coupons)}
       <div style="margin-top:14px;padding:12px 14px;border-radius:8px;background:var(--color-mist);font-size:14px;color:var(--color-midnight-navy);line-height:1.55;display:flex;gap:10px;align-items:flex-start">
         ${HKUI.icon("hourglass", 17, "var(--color-slate-blue)", "margin-top:2px;flex-shrink:0")}<span>${waitLine} <a href="${R.reserve}" style="color:var(--color-signal-blue);font-weight:600;text-decoration:none;white-space:nowrap">예약하기 →</a></span>

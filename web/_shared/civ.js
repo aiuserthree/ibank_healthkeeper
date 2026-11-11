@@ -398,7 +398,7 @@
 
   function summarize(s) {
     s.summary = {
-      line: s.fin ? `${ERAS[s.era].name} 완성 · 직원 ${s.staff}명` : `${ERAS[s.era].name} · 직원 ${s.staff}명`,
+      line: s.fin ? `${ERAS[s.era].name} 완성 · 직원 ${Number(s.staff || 0).toLocaleString("ko-KR")}명` : `${ERAS[s.era].name} · 직원 ${Number(s.staff || 0).toLocaleString("ko-KR")}명`,
       level: 1 + s.done.length + (s.fin ? 1 : 0),
     };
   }
@@ -1766,7 +1766,7 @@
         <div style="--c:var(--c-idea)">${ic("lightbulb", 16)}<b data-l="irate"></b><small>아이디어</small></div>
         <div style="--c:var(--c-rep)">${ic("heart", 16)}<b data-l="rrate"></b><small>인기</small></div></div></div>
       <div class="cv-cpair">
-        <div class="mgx-card cv-ccard">${head("users", "직원")}<div class="cv-big"><b>${s.staff}</b><span>/ ${R.cap}명</span></div>
+        <div class="mgx-card cv-ccard">${head("users", "직원")}<div class="cv-big"><b>${num(s.staff)}</b><span>/ ${num(R.cap)}명</span></div>
           <div class="mgx-bar" style="--bar:var(--c-ap)"><i data-grow="1"></i></div><p class="cv-small">${growTx}</p></div>
         <div class="mgx-card cv-ccard">${head("smile", "분위기")}<div class="cv-big"><b>${R.morale}</b><span>/ 100</span></div>
           <div class="mgx-bar" style="--bar:var(--c-mor)"><i style="width:${R.morale}%"></i></div><p class="cv-small">생산 ×${R.prod.toFixed(2)}</p></div>
@@ -2164,7 +2164,7 @@
     if (log.money >= 1) rows.push(["wallet", "var(--c-money)", "자금", log.money, (v) => `+${won(v)}`]);
     if (log.ideas >= 1) rows.push(["lightbulb", "var(--c-idea)", "아이디어", log.ideas, (v) => `+${num(v)}`]);
     if (log.rep >= 1) rows.push(["heart", "var(--c-rep)", "인기", log.rep, (v) => `+${num(v)}`]);
-    if (log.staff) rows.push(["users", "var(--c-ap)", "새 직원", log.staff, (v) => `+${Math.round(v)}명`]);
+    if (log.staff) rows.push(["users", "var(--c-ap)", "새 직원", log.staff, (v) => `+${num(Math.round(v))}명`]);
     if (log.ap) rows.push(["zap", "var(--c-ap)", "기운", log.ap, (v) => `+${Math.round(v)}`]);
     const ends = [
       ...log.builds.map((k) => [BLD[k].icon, BCOL[k], `${eul(BLD[k].name)} 다 지었어요`]),

@@ -1408,7 +1408,7 @@
   }
   const roomOf = (W, x) => W.map.rooms.find((r) => x >= r[0] * TS && x < (r[1] + 1) * TS) || W.map.rooms[0];
   const emit = (W, type, d = {}) => W.ev.push({ type, ...d });
-  function addScore(W, pts, x, y) { emit(W, "score", { pts, x, y }); W.floats.push({ x, y, text: String(pts), t: 0 }); }
+  function addScore(W, pts, x, y) { emit(W, "score", { pts, x, y }); W.floats.push({ x, y, text: comma(pts), t: 0 }); }
   function puff(W, x, y, n, cols, sp = 60, life = 0.5, g = 200, size = 1) {
     for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = sp * (0.4 + Math.random() * 0.8); W.fx.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - sp * 0.4, t: 0, life: life * (0.6 + Math.random() * 0.7), col: cols[i % cols.length], g, s: size + (Math.random() < 0.3 ? 1 : 0) }); }
   }
@@ -1864,7 +1864,9 @@
   // ───────────────────────── 그리기
   const FONT = { s: '"Galmuri9", "Galmuri11", system-ui, sans-serif', m: '"Galmuri11", system-ui, sans-serif', l: '"Galmuri14", "Galmuri11", system-ui, sans-serif', n: '"GalmuriMono11", "Galmuri11", ui-monospace, monospace' };
   // 작은 숫자 글꼴 (3×5) — 점수 떠오름
-  const DIG = { 0: "111101101101111", 1: "010110010010111", 2: "111001111100111", 3: "111001111001111", 4: "101101111001001", 5: "111100111001111", 6: "111100111101111", 7: "111001010010010", 8: "111101111101111", 9: "111101111001111", U: "101101101101111", P: "111101111100100", "+": "000010111010000" };
+  const DIG = { 0: "111101101101111", 1: "010110010010111", 2: "111001111100111", 3: "111001111001111", 4: "101101111001001", 5: "111100111001111", 6: "111100111101111", 7: "111001010010010", 8: "111101111101111", 9: "111101111001111", U: "101101101101111", P: "111101111100100", "+": "000010111010000", ",": "000000000010100" };
+  // 천 단위 쉼표 — 0으로 채운 점수도 자릿수 그대로 (00,001,234)
+  const comma = (v) => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   function digits(g, text, x, y, col, shadow = "#140c2a") {
     const w = text.length * 4 - 1; x = Math.round(x - w / 2); y = Math.round(y);
     [[shadow, 1], [col, 0]].forEach(([c, o]) => { g.fillStyle = c; [...text].forEach((ch, i) => { const m = DIG[ch]; if (!m) return; for (let k = 0; k < 15; k++) if (m[k] === "1") g.fillRect(x + i * 4 + (k % 3) + o, y + ((k / 3) | 0) + o, 1, 1); }); });
@@ -2263,7 +2265,7 @@
 
     stage.innerHTML = `<div class="jp">
       <div class="jp-hud" aria-live="off">
-        <span class="jp-hud__i jp-hud__score"><small>점수</small><b data-h="score">00000000</b></span>
+        <span class="jp-hud__i jp-hud__score"><small>점수</small><b data-h="score">00,000,000</b></span>
         <span class="jp-hud__i"><i class="jp-tk"></i><b data-h="tickets">×00</b></span>
         <span class="jp-hud__i"><small>월드</small><b data-h="world">1-1</b></span>
         <span class="jp-hud__i" data-h="timebox"><small>시간</small><b data-h="time">300</b></span>
@@ -2462,7 +2464,7 @@
     function updateHud(force) {
       if (!G) return;
       if (force) Object.keys(last).forEach((k) => delete last[k]);
-      if (setH("score", String(Math.min(99999999, G.score)).padStart(8, "0"))) { hud.score.classList.remove("is-pop"); void hud.score.offsetWidth; hud.score.classList.add("is-pop"); }
+      if (setH("score", comma(String(Math.min(99999999, G.score)).padStart(8, "0")))) { hud.score.classList.remove("is-pop"); void hud.score.offsetWidth; hud.score.classList.add("is-pop"); }
       setH("tickets", "×" + String(G.tickets).padStart(2, "0"));
       setH("world", MAPS[si].id);
       const tm = Math.max(0, Math.ceil(W ? W.time : 300));
@@ -2630,8 +2632,8 @@
         <div class="jp-card__tag">${clear ? "ALL CLEAR" : "GAME OVER"}</div>
         <h2>${clear ? "점심 원정 성공!" : "게임 오버"}</h2>
         <p>${clear ? `구내식당에 도착했어요 · 남은 목숨 보너스 ${(ending ? ending.bonus : 0).toLocaleString("ko-KR")}점` : `WORLD ${MAPS[G.reached].id} · ${HKUI.escapeHtml(MAPS[G.reached].name)}까지 왔어요`}</p>
-        <div class="jp-card__big">${String(score).padStart(8, "0")}</div>
-        <p class="jp-card__sub">식권 ${G.tickets}장 · 내 최고 ${best.toLocaleString("ko-KR")}점${isBest && score > 0 ? " · 새 기록!" : ""}</p>
+        <div class="jp-card__big">${comma(String(score).padStart(8, "0"))}</div>
+        <p class="jp-card__sub">식권 ${G.tickets.toLocaleString("ko-KR")}장 · 내 최고 ${best.toLocaleString("ko-KR")}점${isBest && score > 0 ? " · 새 기록!" : ""}</p>
         <button type="button" class="jp-go" data-go="start">다시 하기</button>
       </div>`, "center");
       if (!G.submitted) { G.submitted = true; Promise.resolve(ctx.submit(score)).catch(() => {}); }
@@ -2771,7 +2773,7 @@
       RND.text(g, "스테이지 클리어!", VW / 2, 66, { size: 15, font: "l", col: "#ffd65a", glow: "#ffb86b" });
       RND.text(g, `남은 시간 ${String(tally.time).padStart(3, "0")} × 50`, VW / 2, 92, { size: 12, font: "m", col: "#fff6e0" });
       RND.text(g, `+${tally.add.toLocaleString("ko-KR")}`, VW / 2, 110, { size: 12, font: "n", col: "#c6ff7a" });
-      RND.text(g, `점수 ${String(G.score).padStart(8, "0")}`, VW / 2, 132, { size: 10, font: "s", col: "#ffe0a3" });
+      RND.text(g, `점수 ${comma(String(G.score).padStart(8, "0"))}`, VW / 2, 132, { size: 10, font: "s", col: "#ffe0a3" });
     }
     function drawGameOver(t) {
       const k = Math.min(1, sceneT / 0.8);

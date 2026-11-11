@@ -40,8 +40,10 @@
   const F3 = {
     "0": "111101101101111", "1": "010110010010111", "2": "111001111100111", "3": "111001111001111", "4": "101101111001001",
     "5": "111100111001111", "6": "111100111101111", "7": "111001010010010", "8": "111101111101111", "9": "111101111001111",
-    "+": "000010111010000", "*": "000101010101000", " ": "000000000000000",
+    "+": "000010111010000", "*": "000101010101000", ",": "000000000010100", " ": "000000000000000",
   };
+  // 천 단위 쉼표 — 0으로 채운 점수도 자릿수 그대로 (00,001,234)
+  const comma = (v) => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   function pixW(str, sc, small) { return str.length * (small ? 4 : 6) * sc - sc; }
   function pix(g, str, x, y, sc, col, shadow, small) {
     const font = small ? F3 : F5, gw = small ? 3 : 5, gh = small ? 5 : 7, adv = (gw + 1) * sc;
@@ -1278,7 +1280,7 @@
     // ───────── 점수 · 효과
     function addScore(n, at, col) {
       S.score = Math.min(9999999, S.score + n);
-      if (at && n >= 50) S.pops.push({ x: at.x, y: at.y, z: (at.z || 0) + Math.min(at.h || 30, 40) + 4, txt: String(n), t: 0, col: col || "#ffe066" });
+      if (at && n >= 50) S.pops.push({ x: at.x, y: at.y, z: (at.z || 0) + Math.min(at.h || 30, 40) + 4, txt: comma(n), t: 0, col: col || "#ffe066" });
     }
     function popText(at, txt, col) { S.pops.push({ x: at.x, y: at.y, z: (at.z || 0) + 48, ko: txt, t: 0, col: col || "#ffffff" }); }
     function fx(k, x, y, z, o) { if (S.fx.length < 220) S.fx.push(Object.assign({ k, x, y, z, vx: 0, vy: 0, vz: 0, t: 0, life: 0.4, c: "#fff", g: 0 }, o || {})); }
@@ -2488,11 +2490,11 @@
           drawPT(g, ptext(L.label, 12, "#fff6e0", "#140c2a"), x0 + 14, y, 1);
           const a = `${String(L.n - L.shown).padStart(2, " ")}*${L.mul}`;
           pix(g, a, VW / 2 - 16, y - 4, 1, "#9fd8ff", "#140c2a");
-          const v = String(L.shown * L.mul);
+          const v = comma(L.shown * L.mul);
           pix(g, v, x0 + w - 14 - pixW(v, 1), y - 4, 1, "#ffd166", "#140c2a");
         });
         R(g, "rgba(255,246,224,.25)", x0 + 12, 140, w - 24, 1);
-        const sc = String(S.score).padStart(8, "0");
+        const sc = comma(String(S.score).padStart(8, "0"));
         drawPT(g, ptext("점수", 12, "#fff6e0", "#140c2a"), x0 + 14, 156, 1);
         pix(g, sc, x0 + w - 14 - pixW(sc, 2), 149, 2, "#ffd166", "#5a1a3a");
       }
@@ -2504,7 +2506,7 @@
           const E = S.endBonus;
           glassPanel(VW / 2 - 92, 110, 184, 24);
           drawPT(g, ptext(`남은 목숨 ${E.n}개`, 12, "#ffe3ec", "#1a1033"), VW / 2 - 6, 122, 1, "r");
-          const v = `+${E.shown * 10000}`;
+          const v = `+${comma(E.shown * 10000)}`;
           pix(g, v, VW / 2 + 6, 118, 1, "#ffd166", "#1a1033");
         }
         for (let k = 0; k < 14; k++) { const x = (k * 53 + Math.floor(t * 40) * (k % 3 + 1)) % VW, y = (k * 37 + Math.floor(t * 30)) % 120; if ((k + Math.floor(t * 8)) % 4) R(g, k % 2 ? "#ffe0a3" : "#ffb3d1", x, y, 2, 2); }
@@ -2753,7 +2755,7 @@
     function hud() {
       const sc = mode === "land" ? 2 : 2;
       const p = S ? S.p : null;
-      const score = String(S ? S.score : 0).padStart(8, "0");
+      const score = comma(String(S ? S.score : 0).padStart(8, "0"));
       if (hudCache.score !== score || hudCache.sc !== sc) { if (hudCache.score && S) { cvScore.classList.remove("bump"); void cvScore.offsetWidth; cvScore.classList.add("bump"); } hudCache.score = score; pixCanvas(cvScore, score, "#ffd166", sc); }
       const time = String(S ? Math.max(0, S.time) : 99).padStart(2, "0");
       const tcol = S && S.time <= 10 ? "#ff8787" : "#ffffff";

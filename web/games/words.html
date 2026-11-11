@@ -267,6 +267,7 @@
     // 말해 봐 맞혀 봐 — 2인 협동(협동 시리즈 2화). 한 사람이 제시어를 설명(금지어 X)하고 다른 사람이 맞힌다. 낱말마다 역할이 바뀐다.
     // 방 공용(목록 · 대기실 · 끝 화면 · 실시간)은 /_shared/coop.js, 이야기는 /_shared/coop-story.js. 점수 · 금지어 검사는 서버(word_game.py)가 정한다.
     const { esc } = HKMatch;
+    const fmtN = (n) => Number(n || 0).toLocaleString("ko-KR"); // 화면에 보이는 점수 천 단위 쉼표
     const S = window.HKCoopStory || null;
     const MA = "마 팀장님";
     const GREAT = 8; // 이만큼 맞히면 끝 이야기 「최고예요」
@@ -373,7 +374,7 @@
       const hot = w.streak >= from, ready = w.streak === from - 1;
       const tip = w.hint && w.streak ? "초성이라 끊겨요" : hot ? `보너스 +${w.rule.bonus} 중!` : ready ? "다음 정답 +1" : `${from}연속부터 +1`;
       return `<div class="wd-board">
-          <div class="wd-score ${fresh.bump ? "is-bump" : ""}"><small>점수</small><b>${w.score}<i>점</i></b><span>맞힘 ${w.right} · 넘김 ${w.passed}</span></div>
+          <div class="wd-score ${fresh.bump ? "is-bump" : ""}"><small>점수</small><b>${fmtN(w.score)}<i>점</i></b><span>맞힘 ${w.right} · 넘김 ${w.passed}</span></div>
           <div class="wd-clock ${left <= 30 ? "is-low" : ""} ${left <= 10 ? "is-last" : ""}" id="wd-clock" role="timer" aria-label="남은 시간"><b id="wd-clock-t">${clockText(left)}</b><i><span id="wd-clock-bar" style="transform:scaleX(${Math.max(0, Math.min(1, left / 180))})"></span></i><small>남은 시간</small></div>
           <div class="wd-streak ${hot ? "is-hot" : ready ? "is-ready" : ""}"><small class="wd-lab">연속 정답</small><div class="wd-flames">${flames(w.streak)}</div><b>${w.streak}연속</b><em>${tip}</em></div>
         </div>`;
@@ -462,7 +463,7 @@
             <span class="wd-log__meta">${w.last.me ? "내가 설명" : `${esc(mate())}님 설명`} · ${w.last.reason === "time" ? "시간이 다 됐어요" : "그만뒀어요"}</span>
             ${w.last.clues.length ? `<div class="wd-log__clues">${w.last.clues.map((c) => `<q>${esc(c)}</q>`).join(" · ")}</div>` : ""}</div><em class="wd-pts">0</em></li>`);
       }
-      return `<div class="er-card"><h2>${HKUI.icon("list-checks", 16, "currentColor")} 낱말 기록<small>${w.right}개 맞힘 · ${w.score}점</small></h2>
+      return `<div class="er-card"><h2>${HKUI.icon("list-checks", 16, "currentColor")} 낱말 기록<small>${w.right}개 맞힘 · ${fmtN(w.score)}점</small></h2>
           ${rows.length ? `<ol class="wd-log">${rows.join("")}</ol>` : `<div class="wd-empty">이번 판에는 기록이 없어요</div>`}</div>`;
     }
     function endMc(tier) {
@@ -717,8 +718,8 @@
       },
       rankTitle: "점수 순위",
       rankNote: "같은 두 사람은 가장 높은 점수의 한 판만 올라요.",
-      rankText: (x) => `${Number(x.score || 0)}점`,
-      recentText: (r) => (r.status === "CLEAR" ? (Number(r.score) > 0 ? [`${r.score}점`, "is-clear"] : ["0점", "is-fail"]) : ["포기", "is-fail"]),
+      rankText: (x) => `${fmtN(x.score)}점`,
+      recentText: (r) => (r.status === "CLEAR" ? (Number(r.score) > 0 ? [`${fmtN(r.score)}점`, "is-clear"] : ["0점", "is-fail"]) : ["포기", "is-fail"]),
       failTitle: "그만뒀어요",
       quick: ["준비됐어요!", "주제 바꿀까요?", "천천히 해요", "좋아요!", "한 판 더?"],
       remain: () => null, // 위 막대 시계 대신 무대의 큰 시계를 쓴다
@@ -786,7 +787,7 @@
         return !ok ? "fail" : w.right >= GREAT ? "great" : "ok";
       },
       stats: () => (w ? [
-        { label: "점수", value: `${w.score}점` },
+        { label: "점수", value: `${fmtN(w.score)}점` },
         { label: "맞힌 낱말", value: `${w.right}개` },
         { label: "최고 연속", value: `${w.best}연속` },
         { label: "넘긴 낱말", value: `${w.passed}개` },
@@ -797,7 +798,7 @@
         return `<div class="er-end wd-end ${score ? "" : "is-zero"}"><div class="wd-end__bulbs" aria-hidden="true"></div>
             <span class="wd-end__ep">팀 워크숍 낱말 대회 · 결과 발표</span>
             <h2>${score ? "시간 끝!" : "아쉬워요!"}</h2>
-            <div class="wd-end__score"><b>${score}</b><span>점</span></div>
+            <div class="wd-end__score"><b>${fmtN(score)}</b><span>점</span></div>
             ${w ? `<p class="wd-end__sub">낱말 ${w.right}개 맞힘 · 최고 ${w.best}연속</p>` : ""}
             <div class="wd-end__mc">${face()}<p><b>${MA}</b>${esc(endMc(tier))}</p></div>
             ${w ? bestHtml() : ""}
@@ -806,7 +807,7 @@
       failEnd: () => `<div class="er-end wd-end is-zero"><div class="wd-end__bulbs" aria-hidden="true"></div>
           <span class="wd-end__ep">팀 워크숍 낱말 대회</span>
           <h2>그만뒀어요</h2>
-          ${w ? `<div class="wd-end__score"><b>${w.score}</b><span>점</span></div><p class="wd-end__sub">그만둘 때까지 낱말 ${w.right}개를 맞혔어요</p>` : ""}
+          ${w ? `<div class="wd-end__score"><b>${fmtN(w.score)}</b><span>점</span></div><p class="wd-end__sub">그만둘 때까지 낱말 ${w.right}개를 맞혔어요</p>` : ""}
           <div class="wd-end__mc">${face()}<p><b>${MA}</b>괜찮아요! 다음엔 끝까지 같이 가 봐요.</p></div>
         </div>`,
       tick: (ctx) => {

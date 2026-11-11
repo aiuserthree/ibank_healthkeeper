@@ -48,6 +48,7 @@
 window.HKCoopStory = (function () {
   const esc = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const won = (n) => `${Number(n || 0).toLocaleString("ko-KR")}원`;
+  const nf = (n) => Number(n || 0).toLocaleString("ko-KR"); // 보여 주는 수 — 1,234
   const mmss = (s) => { s = Math.max(0, Math.round(s || 0)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
 
   // ── 시리즈 · 등장인물 ──────────────────────────────────────
@@ -121,7 +122,7 @@ window.HKCoopStory = (function () {
       logline: "오후 팀 워크숍 낱말 대회! 금지어를 피해 설명하고, 동기의 설명으로 정답을 맞혀요.",
       facts: ["3분", "번갈아 설명 · 맞히기"],
       palette: { accent: "#8b5cf6", glow: "#c4b5fd", strong: "#6d28d9", soft: "#f5f3ff", deep: "#2e1065", ink: "#4c1d95", sky: ["#f1ebff", "#d8cbff"] },
-      bestLabel: "최고 점수", best: (n) => `${Number(n || 0)}점`,
+      bestLabel: "최고 점수", best: (n) => `${nf(n)}점`,
       goal: "3분 동안 하나라도 맞히기",
       tier: (r) => (!cleared(r) ? "fail" : Number(r.score) >= 16 ? "great" : "ok"),
       prologue: [
@@ -199,7 +200,7 @@ window.HKCoopStory = (function () {
       logline: "퇴근길 지하주차장이 정전됐어요. 한 명은 관리실 CCTV로, 한 명은 손전등 키링을 들고 차를 찾아요.",
       facts: ["3분", "CCTV · 손전등"],
       palette: { accent: "#facc15", glow: "#fde047", strong: "#a16207", soft: "#fefce8", deep: "#020617", ink: "#713f12", sky: ["#0d1426", "#020617"] },
-      bestLabel: "최고 기록", best: (n) => `${Number(n || 0)}층`,
+      bestLabel: "최고 기록", best: (n) => `${nf(n)}층`,
       goal: "3분 동안 한 층이라도 빠져나가기",
       tier: (r) => (!cleared(r) ? "fail" : Number(r.score) >= 3 ? "great" : "ok"),
       prologue: [
@@ -246,7 +247,7 @@ window.HKCoopStory = (function () {
       logline: "워크숍 뒤 커피 한 잔. 사내 소식지 새 코너에 불려 나간 둘, 같은 질문에 몰래 답하고 서로의 답을 맞혀요.",
       facts: ["5분 · 10문제", "몰래 고르고 함께 공개"],
       palette: { accent: "#65a30d", glow: "#bef264", strong: "#4d7c0f", soft: "#f7fee7", deep: "#1a2e05", ink: "#365314", sky: ["#f7fee7", "#d9f99d"] },
-      bestLabel: "최고 통함", best: (n) => `${Number(n || 0)}점 · ${Math.round((Number(n || 0) * 100) / 30)}%`,
+      bestLabel: "최고 통함", best: (n) => `${nf(n)}점 · ${Math.round((Number(n || 0) * 100) / 30)}%`,
       goal: "5분 동안 한 번이라도 통하기",
       // 통함 지수(점수 ÷ 30) 70% 이상(21점) great · 한 번이라도 통했으면(점수 > 0 — 시리즈 「성공」) ok · 0점이면 fail
       tier: (r) => (!cleared(r) ? "fail" : Number(r.score) >= 21 ? "great" : "ok"),
@@ -288,7 +289,7 @@ window.HKCoopStory = (function () {
       logline: "보고서 회의를 하러 간 소회의실. 마 팀장님이 신입 교육에 쓸 그림 퀴즈를 먼저 풀어 달래요. 글자는 쓰면 반칙!",
       facts: ["3분", "번갈아 그리기 · 맞히기"],
       palette: { accent: "#0d9488", glow: "#5eead4", strong: "#0f766e", soft: "#f0fdfa", deep: "#042f2e", ink: "#134e4a", sky: ["#ecfeff", "#ccfbf1"] },
-      bestLabel: "최고 점수", best: (n) => `${Number(n || 0)}점`,
+      bestLabel: "최고 점수", best: (n) => `${nf(n)}점`,
       goal: "3분 동안 하나라도 맞히기",
       // 하나라도 맞히면 ok · 20점(이어 맞히기로 6~7개쯤) 넘게 모으면 great
       tier: (r) => (!cleared(r) ? "fail" : Number(r.score) >= 20 ? "great" : "ok"),
@@ -330,7 +331,7 @@ window.HKCoopStory = (function () {
       logline: "보고서 마지막 장만 남은 밤. 보안 시스템이 아침에 찍은 사진과 지금이 달라요. 한 장씩 나눠 보고 바뀐 곳을 찾아요.",
       facts: ["3분", "서로 다른 사진"],
       palette: { accent: "#e11d48", glow: "#fda4af", strong: "#be123c", soft: "#fff1f2", deep: "#4c0519", ink: "#881337", sky: ["#fff1f2", "#fecdd3"] },
-      bestLabel: "최고 점수", best: (n) => `${Number(n || 0)}점`,
+      bestLabel: "최고 점수", best: (n) => `${nf(n)}점`,
       goal: "3분 동안 다른 곳 하나라도 찾기",
       // 세 장(24점)을 다 찾으면 great · 한 곳이라도 찾았으면(점수 > 0 — 시리즈 「성공」) ok · 하나도 못 찾으면 fail
       tier: (r) => (!cleared(r) ? "fail" : Number(r.score) >= 24 ? "great" : "ok"),

@@ -367,6 +367,8 @@ window.HKPlay = (function () {
     };
   }
 
+  // 사람에게 보여 주는 수 — 천 단위 쉼표(1,234)
+  const nf = (n) => Number(n || 0).toLocaleString("ko-KR");
   function formatScore(game, n) {
     if (n == null) return "-";
     if (game?.unit === "centi") {
@@ -399,7 +401,7 @@ window.HKPlay = (function () {
       </li>`;
     const meOutside = data.me && !data.rows.some((r) => r.self);
     return `<ol class="hk-play-board__list">${data.rows.map(row).join("")}</ol>
-      ${meOutside ? `<div class="hk-play-board__me">내 순위 <b>${data.me.rank}위</b> · ${formatScore(game, data.me.score)}</div>` : ""}`;
+      ${meOutside ? `<div class="hk-play-board__me">내 순위 <b>${nf(data.me.rank)}위</b> · ${formatScore(game, data.me.score)}</div>` : ""}`;
   }
 
   function deptRowsHtml(data, game) {
@@ -410,7 +412,7 @@ window.HKPlay = (function () {
       .map(
         (d) => `<li class="hk-play-row${d.isMine ? " is-me" : ""}">
           <span class="hk-play-row__rank${d.rank <= 3 ? ` is-top${d.rank}` : ""}">${d.rank}</span>
-          <span class="hk-play-row__who"><b>${HKUI.escapeHtml(d.name)}</b><small>${d.players}명 참가</small></span>
+          <span class="hk-play-row__who"><b>${HKUI.escapeHtml(d.name)}</b><small>${nf(d.players)}명 참가</small></span>
           <span class="hk-play-row__score">${formatScore(game, d.score)}</span>
         </li>`
       )
@@ -438,8 +440,8 @@ window.HKPlay = (function () {
     const title = !result.counted ? "연습 기록" : result.newBest ? "새 최고 기록!" : "기록을 남겼어요";
     const iconName = !result.counted ? "dumbbell" : result.newBest ? "party-popper" : "flag";
     const ranks = [];
-    if (result.todayRank) ranks.push(`오늘 <b>${result.todayRank}위</b>`);
-    if (result.weekRank) ranks.push(`이번 주 <b>${result.weekRank}위</b>`);
+    if (result.todayRank) ranks.push(`오늘 <b>${nf(result.todayRank)}위</b>`);
+    if (result.weekRank) ranks.push(`이번 주 <b>${nf(result.weekRank)}위</b>`);
     const el = document.createElement("div");
     el.className = `hk-play-result${result.newBest && result.counted ? " is-best" : ""}`;
     el.setAttribute("role", "status");
@@ -685,8 +687,8 @@ window.HKPlay = (function () {
     function showLeaveResult(overlay, result) {
       stampToast(result.stamp);
       const ranks = [];
-      if (result.todayRank) ranks.push(`오늘 <b>${result.todayRank}위</b>`);
-      if (result.weekRank) ranks.push(`이번 주 <b>${result.weekRank}위</b>`);
+      if (result.todayRank) ranks.push(`오늘 <b>${nf(result.todayRank)}위</b>`);
+      if (result.weekRank) ranks.push(`이번 주 <b>${nf(result.weekRank)}위</b>`);
       const title = !result.counted ? "연습 기록이에요" : result.newBest ? "새 최고 기록!" : "기록을 남겼어요";
       overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:420px;width:calc(100% - 32px);max-height:min(640px, 85dvh);display:flex;flex-direction:column">
           <div class="hk-dialog__title">${title} · ${formatScore(game, result.score)}</div>
@@ -834,7 +836,7 @@ window.HKPlay = (function () {
       try {
         const data = await HKApi.playLeaderboard(key, period === "dept" ? "week" : period, variant);
         game = data.game;
-        document.getElementById("hk-play-count").textContent = `${variantLabel ? `${variantLabel} · ` : ""}${period === "dept" ? "" : `${data.players}명`}`;
+        document.getElementById("hk-play-count").textContent = `${variantLabel ? `${variantLabel} · ` : ""}${period === "dept" ? "" : `${nf(data.players)}명`}`;
         body.innerHTML = period === "dept" ? deptRowsHtml(data, game) : boardRowsHtml(data, game);
         HKUI.refreshIcons(body);
       } catch (e) {

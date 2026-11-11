@@ -43,8 +43,10 @@ window.HKPaperJet = (function () {
   const F3 = {
     "0": [7, 5, 5, 5, 7], "1": [2, 6, 2, 2, 7], "2": [7, 1, 7, 4, 7], "3": [7, 1, 7, 1, 7], "4": [5, 5, 7, 1, 1],
     "5": [7, 4, 7, 1, 7], "6": [7, 4, 7, 5, 7], "7": [7, 1, 2, 2, 2], "8": [7, 5, 7, 5, 7], "9": [7, 5, 7, 1, 7],
-    x: [0, 5, 2, 5, 0], "+": [0, 2, 7, 2, 0], "!": [2, 2, 2, 0, 2],
+    x: [0, 5, 2, 5, 0], "+": [0, 2, 7, 2, 0], "!": [2, 2, 2, 0, 2], ",": [0, 0, 0, 2, 4],
   };
+  // 천 단위 쉼표 — 0으로 채운 점수도 자릿수 그대로 (00,001,234)
+  const comma = (v) => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   function glyphs(g, str, x, y, s, color, font, gw, gh, adv) {
     const two = Array.isArray(color);
     for (let i = 0; i < str.length; i++) {
@@ -676,7 +678,7 @@ window.HKPaperJet = (function () {
     stage.innerHTML = `
       <div class="pj">
         <div class="pj-hud">
-          <div class="pj-hud__score"><small>점수</small><b data-score>00000000</b></div>
+          <div class="pj-hud__score"><small>점수</small><b data-score>00,000,000</b></div>
           <div class="pj-hud__stat"><small>스테이지</small><span class="pj-stage" data-stage>1</span></div>
           <div class="pj-hud__stat"><small>목숨</small><span class="pj-icons" data-lives></span></div>
           <div class="pj-hud__stat"><small>폭탄</small><span class="pj-icons" data-bombs></span></div>
@@ -1533,7 +1535,7 @@ window.HKPaperJet = (function () {
       const pts = e.pts * mult;
       addScore(pts);
       S.kills++;
-      popup(e.x, e.y - 6, mult > 1 ? `${pts}x${mult}` : `${pts}`, mult > 1 ? "#ffd166" : CREAM);
+      popup(e.x, e.y - 6, mult > 1 ? `${comma(pts)}x${mult}` : comma(pts), mult > 1 ? "#ffd166" : CREAM);
       const big = e.type === "fan" || e.type === "snake" || e.type === "turret";
       if (big) S.hitStop = Math.max(S.hitStop || 0, 0.03);
       boom(e.x, e.y, big ? 2 : 1);
@@ -1547,7 +1549,7 @@ window.HKPaperJet = (function () {
         if (gr.killed + gr.lost >= gr.n && gr.lost === 0) {
           const bonus = gr.n >= 5 ? 1000 : 500;
           addScore(bonus);
-          popup(e.x, e.y - 14, `+${bonus}`, "#9cf59a");
+          popup(e.x, e.y - 14, `+${comma(bonus)}`, "#9cf59a");
           note("편대 전멸 보너스!", e.x, e.y - 20, "#9cf59a");
           ctx.sfx("coin");
           dropItem(e.x, e.y, gr.drop || needItem());
@@ -1698,10 +1700,10 @@ window.HKPaperJet = (function () {
     function takeItem(kind, x, y) {
       ctx.sfx("powerup");
       let text = "";
-      if (kind === "red") { if (S.weapon < 4) { S.weapon++; text = `무기 ${S.weapon}단계!`; } else { addScore(1000); text = "무기 최고 · +1000"; } }
-      else if (kind === "blue") { if (S.options < 2) { S.options++; text = S.options === 2 ? "종이학 둘째 합류!" : "종이학 합류!"; } else { addScore(1000); text = "종이학 가득 · +1000"; } }
-      else if (kind === "green") { if (!S.shield) { S.shield = true; text = "방패!"; } else { addScore(1000); text = "방패 있음 · +1000"; } }
-      else { if (S.bombs < 5) { S.bombs++; text = "클립 폭탄 +1"; } else { addScore(1000); text = "폭탄 가득 · +1000"; } }
+      if (kind === "red") { if (S.weapon < 4) { S.weapon++; text = `무기 ${S.weapon}단계!`; } else { addScore(1000); text = "무기 최고 · +1,000"; } }
+      else if (kind === "blue") { if (S.options < 2) { S.options++; text = S.options === 2 ? "종이학 둘째 합류!" : "종이학 합류!"; } else { addScore(1000); text = "종이학 가득 · +1,000"; } }
+      else if (kind === "green") { if (!S.shield) { S.shield = true; text = "방패!"; } else { addScore(1000); text = "방패 있음 · +1,000"; } }
+      else { if (S.bombs < 5) { S.bombs++; text = "클립 폭탄 +1"; } else { addScore(1000); text = "폭탄 가득 · +1,000"; } }
       note(text, x, y - 10, ITEMS[kind].l);
       for (let i = 0; i < 12; i++) { const a = rnd(0, TAU); part(x, y, Math.cos(a) * 70, Math.sin(a) * 70, 0.4, ITEMS[kind].c, 4); }
       hud(true);
@@ -1813,7 +1815,7 @@ window.HKPaperJet = (function () {
       addScore(bonus);
       boom(B.x + p.ox, B.y + p.oy, 2);
       ctx.sfx("explode"); S.shake = Math.max(S.shake, 3);
-      popup(B.x + p.ox, B.y + p.oy - 10, `+${bonus}`, "#ffd166");
+      popup(B.x + p.ox, B.y + p.oy - 10, `+${comma(bonus)}`, "#ffd166");
       note(`${p.name} 파괴! +${bonus.toLocaleString("ko-KR")}`, B.x + p.ox - 40, B.y + p.oy - 16, "#ffd166");
     }
     function bossDefeated(B) {
@@ -1821,7 +1823,7 @@ window.HKPaperJet = (function () {
       for (const p of B.parts) p.alive = false;
       const bonus = 15000 * (S.stage + 1);
       addScore(bonus);
-      popup(B.x, B.y - 30, `+${bonus}`, "#ffd166");
+      popup(B.x, B.y - 30, `+${comma(bonus)}`, "#ffd166");
       for (const b of ES) b.on = false;
       for (const e of EN) if (e.on) { e.on = false; boom(e.x, e.y, 1); }
       for (const h of HZ) if (h.on && h.type === "bolt") h.on = false;
@@ -2584,8 +2586,11 @@ window.HKPaperJet = (function () {
       if (!force && key === hudCache) return;
       hudCache = key;
       const s = String(S.score).padStart(8, "0"), lead = s.match(/^0*/)[0].length;
-      const zeros = Math.min(lead, 7);
-      elScore.innerHTML = `<i>${s.slice(0, zeros)}</i>${s.slice(zeros)}`;
+      const zeros = Math.min(lead, 7), f = comma(s);
+      let cut = 0;
+      for (let d = 0; d < zeros; cut++) if (f[cut] !== ",") d++;
+      if (zeros && f[cut] === ",") cut++;
+      elScore.innerHTML = `<i>${f.slice(0, cut)}</i>${f.slice(cut)}`;
       if (S.score !== lastScore) { if (S.score - lastScore >= 100) { elScore.classList.remove("is-bump"); void elScore.offsetWidth; elScore.classList.add("is-bump"); } lastScore = S.score; }
       elStage.textContent = `${S.stage + 1}/4`;
       elLives.innerHTML = Array.from({ length: Math.max(0, S.lives) }, () => PLANE_SVG(SHIPS[S.ship].icon)).join("") || "<em>-</em>";
@@ -2595,7 +2600,7 @@ window.HKPaperJet = (function () {
       btnBomb.disabled = S.bombs <= 0;
     }
     function hudReset() {
-      elScore.innerHTML = "<i>0000000</i>0"; elStage.textContent = "1/4";
+      elScore.innerHTML = "<i>00,000,00</i>0"; elStage.textContent = "1/4";
       elLives.innerHTML = PLANE_SVG(SHIPS[shipSel].icon).repeat(3);
       elBombs.innerHTML = CLIP_SVG.repeat(SHIPS[shipSel].bombs);
       elWeapon.innerHTML = `<span class="pj-pips"><i class="is-on"></i><i></i><i></i><i></i></span>`;
@@ -2716,7 +2721,7 @@ window.HKPaperJet = (function () {
       const score = S.score;
       setPanel(`<div class="pj-card">
           <h3>${cleared ? "퇴근 성공!" : "게임 오버"}</h3>
-          <p>${cleared ? "네 스테이지를 모두 깼어요" : `스테이지 ${S.stage + 1} · ${STAGES[S.stage].name}까지 날았어요`} · 격추 ${S.kills}</p>
+          <p>${cleared ? "네 스테이지를 모두 깼어요" : `스테이지 ${S.stage + 1} · ${STAGES[S.stage].name}까지 날았어요`} · 격추 ${S.kills.toLocaleString("ko-KR")}</p>
           <div class="pj-big">${score.toLocaleString("ko-KR")}점</div>
           <div class="pj-row"><button type="button" class="pj-go" data-act="start">다시 하기</button></div>
           <button type="button" class="pj-sub" data-act="title">기체 바꾸기</button>

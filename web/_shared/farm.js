@@ -672,7 +672,7 @@ window.HKFarm = (function () {
     const v = await modal(`<div class="fm-timer"><svg class="fm-timer__ring" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="52" fill="none" stroke="#e3efe2" stroke-width="10"/><circle cx="60" cy="60" r="52" fill="none" stroke="#22b35e" stroke-width="10" stroke-linecap="round" pathLength="100" stroke-dasharray="100" stroke-dashoffset="${f1(100 - frac * 100)}" transform="rotate(-90 60 60)" data-ring="${p.p}" data-rd="${p.d}"/></svg>${planterSvg(p.k, st.stage, "fm-planter fm-timer__art")}</div>
       <div class="fm-modal__title is-center">${c.n} <span class="mgx-chip">${stageName}</span></div>
       <p class="fm-sub is-center"><b class="fm-bigtime" data-cd="${p.p + p.d}">${dur(st.left)}</b> 뒤에 거둘 수 있어요<br>다 자라도 시들지 않으니 편할 때 거두세요.</p>
-      <ul class="fm-list"><li><span class="fm-li-ico">${cropIco(p.k)}</span><span>거두면 ${c.n} <b>${yieldOf(p.k)}개</b> · 경험치 ${c.xp}</span></li>
+      <ul class="fm-list"><li><span class="fm-li-ico">${cropIco(p.k)}</span><span>거두면 ${c.n} <b>${yieldOf(p.k)}개</b> · 경험치 ${num(c.xp)}</span></li>
       ${S.tools.auto ? `<li><span class="fm-li-ico">${ic("refresh-cw", 18)}</span><span>자동 다시 심기 ${isAuto ? "<b>켜짐</b>" : "꺼짐"} · ${S.autos.length}/${autoMax()}칸</span></li>` : ""}</ul>
       <div class="fm-modal__btns">${autoRow}<button type="button" class="mgx-btn is-white is-lg" data-m="pull">${ic("shovel", 18)} 뽑기</button></div>`, "is-sheet");
     if (v === "auto") {
@@ -856,7 +856,7 @@ window.HKFarm = (function () {
     return modal(`<div class="fm-stickers">${list.slice(0, 4).map((k, j) => `<span class="fm-sticker" style="--r:${[-8, 6, -3, 9][j]}deg">${cropIco(k)}</span>`).join("")}</div>
       <div class="fm-modal__title is-center">${one ? `도감에 ${jo(one.n, "이", "가")} 올랐어요` : `도감에 ${list.length}종이 올랐어요`}</div>
       <p class="fm-sub is-center">처음 거둔 작물은 경험치를 더 받아요 · 도감 ${after}/${CROPS.length}</p>
-      <ul class="fm-list">${list.map((k) => `<li>${cropIco(k)}<span><b>${CROP[k].n}</b> — 경험치 +${10 + CROP[k].xp}</span></li>`).join("")}
+      <ul class="fm-list">${list.map((k) => `<li>${cropIco(k)}<span><b>${CROP[k].n}</b> — 경험치 +${num(10 + CROP[k].xp)}</span></li>`).join("")}
       ${miles.map((m) => `<li class="is-warn"><span class="fm-li-ico">${ic("award", 18)}</span><span>도감 ${m.n}종 보너스 — <b>${m.txt}</b> (계속 적용돼요)</span></li>`).join("")}</ul>
       <div class="fm-modal__btns"><button type="button" class="mgx-btn is-lg is-wide" data-m="ok">좋아요</button></div>`);
   }
@@ -1249,7 +1249,7 @@ window.HKFarm = (function () {
       <div class="fm-quest__crop">${cropIco(d.crop)}<span><small>오늘의 작물</small><b>${c.n}</b><em>${won(unitPrice(d.crop))} · 2배</em></span></div>
       <div class="fm-quest__task ${d.claimed ? "is-claimed" : done ? "is-done" : ""}">
         <span class="fm-quest__txt"><small>오늘의 텃밭 일</small><b>${dailyText(d)}</b>
-        ${d.claimed ? `<em>받았어요. 내일 또 새 일이 와요.</em>` : `<span class="mgx-bar ${done ? "is-full" : ""}"><i style="--v:${f1((d.prog / d.task.n) * 100)}%"></i></span><em>${num(d.prog)}/${num(d.task.n)} · ${coinSvg(12)} ${num(d.money)} · ${starSvg(12)} ${d.xp}</em>`}</span>
+        ${d.claimed ? `<em>받았어요. 내일 또 새 일이 와요.</em>` : `<span class="mgx-bar ${done ? "is-full" : ""}"><i style="--v:${f1((d.prog / d.task.n) * 100)}%"></i></span><em>${num(d.prog)}/${num(d.task.n)} · ${coinSvg(12)} ${num(d.money)} · ${starSvg(12)} ${num(d.xp)}</em>`}</span>
         ${d.claimed ? `<span class="fm-quest__ok">${ic("check", 18)}</span>` : `<button type="button" class="mgx-btn is-sm ${done ? "is-gold" : ""}" data-act="claim" ${done ? "" : "disabled"}>받기</button>`}
       </div>`;
     HKUI.refreshIcons(el);
@@ -1288,7 +1288,7 @@ window.HKFarm = (function () {
         <b class="fm-pack__n">${c.n}</b>
         <span class="fm-pack__time">${ic("clock", 12)} ${dur(lock ? c.t : growTime(c.k))}</span>
         <span class="fm-pack__row"><span>${coinSvg(14)}<b>${num(c.seed)}</b></span><span class="fm-pack__yield">${lock ? c.y : yieldOf(c.k)}개 × ${won(lock ? c.p : unitPrice(c.k))}</span></span>
-        <span class="fm-pack__xp">${starSvg(12)} 경험치 ${c.xp}</span>
+        <span class="fm-pack__xp">${starSvg(12)} 경험치 ${num(c.xp)}</span>
         ${lock ? `<span class="fm-pack__lock">${ic("lock", 14)} 레벨 ${c.lv}</span>` : on ? `<span class="fm-pack__check">${ic("check", 16)}</span>` : ""}
       </button>`;
     }).join("") + `</div>`;
@@ -1318,7 +1318,7 @@ window.HKFarm = (function () {
       return `<div class="fm-memo ${ok ? "is-ok" : ""}" style="--tilt:${tilts[si % 3]}deg;--paper:${papers[si % 3]}"><span class="fm-memo__tape"></span>
         <div class="fm-memo__who">${faceSvg(o)}<div><b>${esc(o.dept)} ${esc(o.name)}</b><p>“${esc(o.line)}”</p></div></div>
         <div class="fm-memo__items">${o.items.map((it) => { const have = S.inv[it.k] || 0, done = have >= it.n; return `<span class="fm-need ${done ? "is-ok" : ""}">${cropIco(it.k)}<span><b>${CROP[it.k].n} ${it.n}</b><em>${Math.min(have, it.n)}/${it.n}</em></span>${done ? `<i>${ic("check", 12)}</i>` : ""}</span>`; }).join("")}</div>
-        <div class="fm-memo__foot"><div class="fm-memo__reward"><span>${coinSvg(16)} ${won(o.money)}</span><span>${starSvg(15)} ${o.xp}</span></div>
+        <div class="fm-memo__foot"><div class="fm-memo__reward"><span>${coinSvg(16)} ${won(o.money)}</span><span>${starSvg(15)} ${num(o.xp)}</span></div>
           <button type="button" class="mgx-btn is-white is-sm" data-act="skip" data-i="${si}">넘기기</button><button type="button" class="mgx-btn is-sm" data-act="deliver" data-i="${si}" ${ok ? "" : "disabled"}>드리기</button></div></div>`;
     }).join("");
   }
