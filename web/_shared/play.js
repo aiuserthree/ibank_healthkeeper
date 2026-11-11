@@ -70,8 +70,9 @@ window.HKSound = (function () {
     if (!ac) {
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
-      // 아이폰 무음 스위치가 켜져 있어도 게임 소리는 나게 (사파리 16.4+ — 없으면 그냥 넘어감)
-      try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (_) {}
+      // '배경음'으로 — '음악 재생(playback)'이면 아이폰이 사이트를 음악 앱처럼 잠금화면 · 제어 센터에
+      // 「재생 중」으로 띄운다. 대신 무음 모드에서는 게임 소리가 안 나고, 듣던 음악은 멈추지 않는다
+      try { if (navigator.audioSession) navigator.audioSession.type = "ambient"; } catch (_) {}
       ac = new AC();
       master = ac.createGain();
       master.gain.value = 0.32;

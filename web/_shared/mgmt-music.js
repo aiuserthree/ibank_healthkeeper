@@ -87,7 +87,8 @@ window.HKMgmtMusic = (function () {
       if (ac) return ac;
       const AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) return null;
-      try { if (navigator.audioSession) navigator.audioSession.type = "playback"; } catch (_) { /* 없음 */ }
+      // '배경음'으로 — 잠금화면에 「재생 중」으로 뜨지 않게(무음 모드에서는 안 들림)
+      try { if (navigator.audioSession) navigator.audioSession.type = "ambient"; } catch (_) { /* 없음 */ }
       ac = new AC();
       // 전체: 부드럽게 깎는 저역 필터(로파이) → 압축 → 작은 음량
       const lp = ac.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 4200; lp.Q.value = 0.4;
