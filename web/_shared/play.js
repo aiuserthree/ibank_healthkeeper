@@ -435,21 +435,29 @@ window.HKPlay = (function () {
     HKSound.play(result.counted && result.newBest ? "win" : "success");
     document.querySelector(".hk-play-result")?.remove();
     clearTimeout(resultTimer);
-    // 좁은 화면은 순위표가 바로 열리니 결과 띠는 띄우지 않는다
-    if (!window.matchMedia("(min-width: 900px)").matches) return;
-    const title = !result.counted ? "연습 기록" : result.newBest ? "새 최고 기록!" : "기록을 남겼어요";
+    // 오늘의 도전 두 번째 판부터(연습) — 순위에 안 들어간다는 걸 휴대폰에서도 크게 알린다
+    const practice = isPractice(game, result);
+    // 좁은 화면은 순위표가 바로 열리니 결과 띠는 띄우지 않는다 (연습 판만 띄움)
+    if (!practice && !window.matchMedia("(min-width: 900px)").matches) return;
+    const title = practice ? "연습 판이라 순위에 안 들어가요" : !result.counted ? "연습 기록" : result.newBest ? "새 최고 기록!" : "기록을 남겼어요";
     const iconName = !result.counted ? "dumbbell" : result.newBest ? "party-popper" : "flag";
     const ranks = [];
     if (result.todayRank) ranks.push(`오늘 <b>${nf(result.todayRank)}위</b>`);
     if (result.weekRank) ranks.push(`이번 주 <b>${nf(result.weekRank)}위</b>`);
     const el = document.createElement("div");
-    el.className = `hk-play-result${result.newBest && result.counted ? " is-best" : ""}`;
+    el.className = `hk-play-result${result.newBest && result.counted ? " is-best" : ""}${practice ? " is-practice" : ""}`;
     el.setAttribute("role", "status");
-    el.innerHTML = `<span class="hk-play-result__icon" style="${tintStyle(game.key)}">${HKUI.icon(iconName, 20, "#fff")}</span>
+    el.innerHTML = (practice
+      ? `<span class="hk-play-result__icon">${HKUI.icon("dumbbell", 22, "#fff")}</span>
+      <div class="hk-play-result__text">
+        <b>${title}</b>
+        <span>이번 판 <b>${formatScore(game, result.score)}</b> · 오늘의 도전은 그날 처음 시작한 판만 순위에 들어가요</span>
+        ${result.todayRank ? `<span>오늘 순위는 첫 판 기록으로 <b>${nf(result.todayRank)}위</b>예요</span>` : ""}`
+      : `<span class="hk-play-result__icon" style="${tintStyle(game.key)}">${HKUI.icon(iconName, 20, "#fff")}</span>
       <div class="hk-play-result__text">
         <b>${title} · ${formatScore(game, result.score)}</b>
-        <span>${ranks.join(" · ") || (result.counted ? "순위를 불러오는 중이에요" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.best != null && !result.newBest ? ` · 내 최고 ${formatScore(game, result.best)}` : ""}</span>
-        ${result.stamp ? `<span class="hk-play-result__stamp${result.stamp.new ? " is-new" : ""}">${HKUI.icon("stamp", 13, "currentColor")} ${result.stamp.new ? "오늘 도장 쾅!" : result.stamp.today ? "오늘 도장은 이미 찍었어요" : result.stamp.pending ? "도장판이 꽉 찼어요" : "게임 화면에서 시작한 판만 도장이 찍혀요"} · ${result.stamp.pending ? `도장 <b>${result.stamp.goal}개 완성</b> · 쿠폰은 다음 달 1일에` : `도장 <b>${result.stamp.count}/${result.stamp.goal}</b>`}</span>` : ""}
+        <span>${ranks.join(" · ") || (result.counted ? "순위를 불러오는 중이에요" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.best != null && !result.newBest ? ` · 내 최고 ${formatScore(game, result.best)}` : ""}</span>`) +
+      `${result.stamp ? `<span class="hk-play-result__stamp${result.stamp.new ? " is-new" : ""}">${HKUI.icon("stamp", 13, "currentColor")} ${result.stamp.new ? "오늘 도장 쾅!" : result.stamp.today ? "오늘 도장은 이미 찍었어요" : result.stamp.pending ? "도장판이 꽉 찼어요" : "게임 화면에서 시작한 판만 도장이 찍혀요"} · ${result.stamp.pending ? `도장 <b>${result.stamp.goal}개 완성</b> · 쿠폰은 다음 달 1일에` : `도장 <b>${result.stamp.count}/${result.stamp.goal}</b>`}</span>` : ""}
       </div>
       <button type="button" class="hk-play-result__close" aria-label="닫기" data-esc-close>${HKUI.icon("x", 16, "currentColor")}</button>`;
     const close = () => {
@@ -479,8 +487,33 @@ window.HKPlay = (function () {
     (document.querySelector(".hk-pf") || document.body).appendChild(el);
     HKUI.refreshIcons(el);
     requestAnimationFrame(() => el.classList.add("is-in"));
-    // 예전 7초는 길어서 다음 판을 가렸다 — 3초 뒤 저절로 사라짐
-    resultTimer = setTimeout(close, 3000);
+    // 예전 7초는 길어서 다음 판을 가렸다 — 3초 뒤 저절로 사라짐 (연습 판 안내는 읽을 수 있게 8초)
+    resultTimer = setTimeout(close, practice ? 8000 : 3000);
+  }
+
+  // 오늘의 도전 게임에서 저장은 됐지만 순위에 안 들어간 판(그날 두 번째 시작부터) — 저장 실패와는 다르다
+  const isPractice = (game, result) => !!(game && game.dailyOnce && result && !result.counted && !result.failed);
+
+  // 오늘의 도전을 다시 시작할 때 — 판을 시작하기 전에 연습 판이라 순위에 안 남는다고 먼저 알리고, 확인하면 시작
+  function askPractice(game) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement("div");
+      overlay.className = "hk-dialog__overlay hk-practice-ask";
+      overlay.innerHTML = `<div class="hk-dialog" role="alertdialog" aria-labelledby="hk-practice-t" style="max-width:380px;width:calc(100% - 32px);text-align:center">
+          <span class="hk-practice-ask__icon">${HKUI.icon("dumbbell", 28, "#fff")}</span>
+          <div class="hk-dialog__title" id="hk-practice-t" style="font-size:20px">이번 판은 연습이에요</div>
+          <div class="hk-dialog__body" style="margin-bottom:16px">오늘의 도전은 그날 <b>처음 시작한 판만</b> 순위에 들어가요.<br>오늘은 이미 시작했던 도전이라, 이번 판은 끝까지 해도<br><b>순위 기록에 남지 않아요.</b> (참여 도장은 찍혀요)</div>
+          <div class="hk-dialog__actions" style="justify-content:center"><button type="button" class="hk-btn hk-btn--primary" data-ok style="min-width:160px">알겠어요, 연습 시작</button></div>
+        </div>`;
+      document.body.appendChild(overlay);
+      HKUI.refreshIcons(overlay);
+      const btn = overlay.querySelector("[data-ok]");
+      const done = () => { overlay.remove(); document.removeEventListener("keydown", onKey, true); resolve(); };
+      const onKey = (e) => { if (e.key === "Enter" || e.key === " " || e.key === "Escape") { e.preventDefault(); e.stopPropagation(); done(); } };
+      btn.onclick = done;
+      document.addEventListener("keydown", onKey, true);
+      setTimeout(() => btn.focus({ preventScroll: true }), 0);
+    });
   }
 
   // 도장으로 쿠폰을 받으면 한 번 더 크게 알려 준다
@@ -690,8 +723,10 @@ window.HKPlay = (function () {
       if (result.todayRank) ranks.push(`오늘 <b>${nf(result.todayRank)}위</b>`);
       if (result.weekRank) ranks.push(`이번 주 <b>${nf(result.weekRank)}위</b>`);
       const title = !result.counted ? "연습 기록이에요" : result.newBest ? "새 최고 기록!" : "기록을 남겼어요";
+      const practice = isPractice(game, result);
       overlay.innerHTML = `<div class="hk-dialog" role="dialog" style="max-width:420px;width:calc(100% - 32px);max-height:min(640px, 85dvh);display:flex;flex-direction:column">
           <div class="hk-dialog__title">${title} · ${formatScore(game, result.score)}</div>
+          ${practice ? `<div class="hk-practice-box">${HKUI.icon("dumbbell", 18, "currentColor")}<span><b>연습 판이라 순위에 안 들어가요</b><br>오늘의 도전은 그날 처음 시작한 판만 순위에 들어가요</span></div>` : ""}
           <div class="hk-dialog__body" style="margin-bottom:10px">${ranks.join(" · ") || (result.counted ? "" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.stamp && result.stamp.new ? `${ranks.length ? " · " : ""}오늘 도장 쾅!` : ""}</div>
           <div class="hk-play-tabs" role="tablist" style="margin-bottom:8px">
             <button type="button" class="hk-play-tab is-active" data-lp="today">오늘</button>
@@ -986,8 +1021,8 @@ window.HKPlay = (function () {
               const r = await HKApi.playStart(key, variant);
               dailyToken = r.token;
               if (!r.ranked) {
-                if (!ctx.dailyDone) HKUI.toast("오늘 이미 시작했던 도전이라 이번 판은 연습으로 기록돼요");
                 ctx.dailyDone = true;
+                await askPractice(game);
               }
               return !!r.ranked;
             } catch (_) {
@@ -1005,7 +1040,7 @@ window.HKPlay = (function () {
               dailyToken = null;
             } catch (e) {
               HKUI.toast(e.message || "기록을 저장하지 못했어요", "danger");
-              result = { counted: false, score: value, best: null };
+              result = { counted: false, failed: true, score: value, best: null };
             }
             if (result.counted && game.dailyOnce) {
               ctx.dailyDone = true;
