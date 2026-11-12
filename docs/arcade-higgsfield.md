@@ -29,10 +29,13 @@ const hk = (msg) => { if (inHK) window.parent.postMessage(msg, HK); };
 window.addEventListener("message", (e) => {
   if (e.origin !== HK) return;
   if (e.data?.type === "hk:hello") document.documentElement.classList.add("in-hk"); // 자체 순위 · 로그인 숨기기
-  if (e.data?.type === "hk:pause") pauseGame();
+  if (e.data?.type === "hk:pause") pauseGame();   // 멈출 때 hk({ type: "hk:paused" })
+  if (e.data?.type === "hk:resume") resumeGame(); // 다시 움직일 때 hk({ type: "hk:resumed" }) — 게임 안 덮개로 이어 할 때도
   if (e.data?.type === "hk:restart") restartGame();
 });
 hk({ type: "hk:ready" });
+// 게임 창 안 Esc 는 헬스키퍼가 멈춤/이어 하기를 정한다
+window.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.repeat) hk({ type: "hk:esc" }); });
 // 판 시작:      hk({ type: "hk:start" });
 // 지금 점수(선택): hk({ type: "hk:live", score });
 // 판 끝:        hk({ type: "hk:score", score });   // 0 이상 정수, 한 판에 한 번

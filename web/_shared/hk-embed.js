@@ -11,7 +11,11 @@
  *   parent.postMessage({ type: "hk:score", score: 1234 }, "https://healthkeeper.ibank.co.kr"); // 판 끝 — 이 점수가 순위에 올라간다
  * 헬스키퍼가 게임에 보내는 것:
  *   { type: "hk:hello" }   — 창을 띄우면(게임이 hk:ready 를 보내면) 한 번. 게임은 이걸 받으면 「헬스키퍼 안」으로 보고 자체 순위 · 로그인을 숨긴다
- *   { type: "hk:pause" }   — 일시정지(나가기 확인 창 등)
+ *   { type: "hk:pause" }   — 일시정지(나가기 확인 창 · Esc · 일시정지 버튼)
+ *   { type: "hk:resume" }  — 이어 하기(멈춰 있을 때 Esc · 일시정지 버튼)
+ * 게임이 알려 주면 좋은 것(Esc 로 이어 하기가 되려면 필요):
+ *   { type: "hk:paused" } / { type: "hk:resumed" } — 게임이 멈췄다 · 다시 움직인다(게임 안 덮개를 눌러 이어 할 때도)
+ *   { type: "hk:esc" }     — 게임 창 안에서 Esc 를 눌렀다(헬스키퍼가 멈춤/이어 하기를 정한다)
  *   { type: "hk:restart" } — 다시 하기
  *
  * 지켜 둔 것
@@ -35,6 +39,7 @@ window.HKEmbed = (() => {
         const loading = stage.querySelector(".hk-embed__load");
         const send = (msg) => { try { frame.contentWindow.postMessage(msg, origin); } catch (_) {} };
         let running = false; // 판 시작(hk:start) 뒤 점수(hk:score) 전까지
+        let paused = false; // 게임이 멈춰 있는지 — Esc 가 멈춤인지 이어 하기인지 가른다
         let live = 0, liveOn = false;
         const toScore = (v) => (typeof v === "number" && Number.isFinite(v) && v >= 0 ? Math.round(v) : null);
 
@@ -43,6 +48,9 @@ window.HKEmbed = (() => {
           if (e.origin !== origin || e.source !== frame.contentWindow) return;
           const m = e.data && typeof e.data === "object" ? e.data : {};
           if (m.type === "hk:ready") return send({ type: "hk:hello" });
+          if (m.type === "hk:paused") { paused = true; return; }
+          if (m.type === "hk:resumed") { paused = false; return; }
+          if (m.type === "hk:esc") return ctx.togglePause ? ctx.togglePause() : null;
           if (m.type === "hk:start") {
             running = true; live = 0;
             ctx.started();
@@ -63,8 +71,9 @@ window.HKEmbed = (() => {
             await ctx.submit(v);
           }
         });
-        ctx.onPause(() => send({ type: "hk:pause" }));
-        ctx.onRestart(() => { running = false; live = 0; send({ type: "hk:restart" }); });
+        ctx.onPause(() => { paused = true; send({ type: "hk:pause" }); });
+        if (ctx.onResume) ctx.onResume(() => { if (!paused) return false; paused = false; send({ type: "hk:resume" }); return true; });
+        ctx.onRestart(() => { running = false; live = 0; paused = false; send({ type: "hk:restart" }); });
       },
     });
   }

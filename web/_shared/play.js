@@ -294,6 +294,11 @@ window.HKPlay = (function () {
     rummy: ["#9a3412", "#f59e0b"],
     alkkagi: ["#1f2937", "#a16207"],
     watersort: ["#0e7490", "#a855f7"],
+    kitsune: ["#7c2d12", "#f97316"],
+    eggfarm: ["#a16207", "#facc15"],
+    herorush: ["#1d4ed8", "#ef4444"],
+    traffic: ["#2b3350", "#3ecf6e"],
+    suncrown: ["#1a1c2c", "#f2c230"],
     screwout: ["#92400e", "#f59e0b"],
     boltup: ["#475569", "#22c55e"],
     soccer: ["#166534", "#84cc16"],
@@ -566,9 +571,12 @@ window.HKPlay = (function () {
       showRankBtn(false);
     }
     // 일시정지 — Esc 와 같다 (이미 일시정지 화면이면 이어 하기)
+    // 끼워 넣은 게임(창 안)은 「계속하기」 버튼이 바깥에서 안 보이니, 게임이 알려 준 멈춤 상태로 이어 하기를 부른다(ctx.onResume)
+    let resumeFn = null;
     function togglePause() {
       const resume = visibleButton(RESUME_TEXT);
       if (resume) resume.click();
+      else if (resumeFn && resumeFn()) return;
       else pauseFns.forEach((fn) => fn());
     }
         function visibleButton(re) {
@@ -592,10 +600,8 @@ window.HKPlay = (function () {
           // 순위표가 열려 있으면 먼저 닫는다
           const board = document.querySelector(".hk-pf .hk-play-board");
           if (board && board.classList.contains("is-open")) { openBoard(false); return; }
-          // 입력창에 있어도 Esc 는 일시정지·이어 하기
-          const resume = visibleButton(RESUME_TEXT);
-          if (resume) resume.click();
-          else pauseFns.forEach((fn) => fn());
+          // 입력창에 있어도 Esc 는 일시정지·이어 하기 (끼워 넣은 게임도 — togglePause 가 이어 하기를 먼저 본다)
+          togglePause();
           return;
         }
         if (e.code !== "Space") {
@@ -989,6 +995,9 @@ window.HKPlay = (function () {
           },
           // 버튼 없이 시작하는 게임(예: iframe 안의 게임)이 새 판 시작을 알릴 때
           started: () => setPlaying(true),
+          // 멈춰 있으면 이어 하고 true — Esc · 일시정지 버튼이 이걸 먼저 부른다(끼워 넣은 게임)
+          onResume: (fn) => { resumeFn = fn; },
+          togglePause: () => togglePause(),
           // 갈래 고르기 — 순위표와 하루 첫 판 판정이 그 갈래로 바뀐다 (label 은 순위표 머리에 보임)
           setVariant: (v, label) => {
             variant = v || ""; variantLabel = variant ? label || "" : "";
