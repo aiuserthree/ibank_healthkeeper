@@ -295,7 +295,6 @@ window.HKPlay = (function () {
     alkkagi: ["#1f2937", "#a16207"],
     watersort: ["#0e7490", "#a855f7"],
     screwout: ["#92400e", "#f59e0b"],
-    screwmatch: ["#334155", "#ef4444"],
     boltup: ["#475569", "#22c55e"],
     soccer: ["#166534", "#84cc16"],
     volley: ["#0ea5e9", "#ff7a3d"],
