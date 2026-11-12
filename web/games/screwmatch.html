@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>나사 매치 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-sm { --gm-a: #334155; --gm-b: #ef4444; --gm-ink: #1e293b; --gm-soft: #64748b; --gm-chip: #f1f5f9; --S: 34px;
+      position: relative; display: flex; flex-direction: column; gap: 8px; color: var(--gm-ink); outline: none;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    /* 1. 점수 줄 */
+    .gm-sm__bar { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+    .gm-sm__chip { display: inline-flex; align-items: center; gap: 5px; padding: 7px 11px; border-radius: 12px; background: var(--gm-chip); color: var(--gm-ink); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-sm__chip b { font-size: 16px; }
+    .gm-sm__gap { flex: 1; }
+    .gm-sm__chip--time b { font-size: 18px; min-width: 40px; text-align: right; }
+    .gm-sm__chip--time.is-low { background: #fee2e2; color: #b91c1c; }
+    .gm-sm__time { position: relative; height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+    .gm-sm__time i { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--gm-a), var(--gm-b)); transition: width .2s linear; }
+    .gm-sm__time.is-low i { background: linear-gradient(90deg, #dc2626, #fb923c); }
+    .gm-sm__meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--gm-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-sm__meta b { color: var(--gm-ink); }
+    .gm-sm__meta .is-warn b { color: #c2410c; }
+    .gm-sm__meta .is-full b { color: #dc2626; }
+    /* 2. 작업대 */
+    .gm-sm__board { position: relative; width: 100%; height: 420px; border-radius: 16px; overflow: hidden; touch-action: none; border: 1px solid #d5dde7;
+      background: radial-gradient(circle, rgba(100, 116, 139, .16) 1.4px, transparent 1.8px) 0 0 / 16px 16px, linear-gradient(180deg, #eef2f7 0%, #e6ebf2 100%); }
+    .gm-sm__top { position: absolute; left: 0; right: 0; top: 0; z-index: 60; pointer-events: none;
+      background: linear-gradient(180deg, #f8fafc, #eef2f7); border-bottom: 1px solid #d5dde7; }
+    .gm-sm__shelf { position: absolute; left: 6px; right: 6px; height: 7px; border-radius: 3px; background: linear-gradient(180deg, #c8a27a, #a47b52); box-shadow: 0 2px 3px rgba(15, 23, 42, .15); }
+    /* 공구함 */
+    .gm-sm__box { position: absolute; z-index: 70; pointer-events: none; }
+    .gm-sm__box.is-in { animation: sm-box-in .34s cubic-bezier(.3, 1.3, .5, 1) both; }
+    .gm-sm__box.is-out, .gm-sm__lid.is-out { animation: sm-box-out .34s ease-in forwards; }
+    @keyframes sm-box-in { from { transform: translateX(26px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+    @keyframes sm-box-out { from { transform: none; opacity: 1; } to { transform: translateY(-34px) scale(.92); opacity: 0; } }
+    .gm-sm__hdl { position: absolute; box-sizing: border-box; border: 3.5px solid rgba(15, 23, 42, .5); border-bottom: 0; border-radius: 10px 10px 0 0; }
+    .gm-sm__body { position: absolute; left: 0; right: 0; bottom: 0; box-sizing: border-box; border-radius: 9px; border: 2px solid rgba(15, 23, 42, .32);
+      background: linear-gradient(180deg, rgba(255, 255, 255, .28), rgba(255, 255, 255, 0) 40%, rgba(0, 0, 0, .12)), var(--c); box-shadow: 0 3px 6px rgba(15, 23, 42, .18); }
+    .gm-sm__body::before { content: ""; position: absolute; left: 5px; right: 5px; top: 4px; height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .35); }
+    .gm-sm__badge { position: absolute; border-radius: 50%; background: rgba(255, 255, 255, .92); display: flex; align-items: center; justify-content: center; box-shadow: inset 0 -1px 2px rgba(0, 0, 0, .2); }
+    .gm-sm__badge svg { width: 66%; height: 66%; fill: var(--c); }
+    .gm-sm__badge.is-light svg { fill: var(--k); }
+    .gm-sm__sock { position: absolute; border-radius: 50%; background: radial-gradient(circle at 50% 40%, rgba(15, 23, 42, .55), rgba(15, 23, 42, .32) 70%); box-shadow: inset 0 2px 3px rgba(0, 0, 0, .35), 0 1px 0 rgba(255, 255, 255, .3); }
+    .gm-sm__lid { position: absolute; z-index: 74; pointer-events: none; box-sizing: border-box; border-radius: 9px; border: 2px solid rgba(15, 23, 42, .4);
+      background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0) 0 10px, rgba(0, 0, 0, .06) 10px 12px), linear-gradient(180deg, rgba(255, 255, 255, .2), rgba(0, 0, 0, .2)), var(--c);
+      display: flex; align-items: center; justify-content: center; animation: sm-lid .22s cubic-bezier(.3, 1.5, .5, 1) both; }
+    .gm-sm__lid svg { width: 40%; height: 70%; max-width: 34px; fill: none; stroke: #fff; stroke-width: 3.2; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .3)); }
+    @keyframes sm-lid { from { transform: translateY(-14px) scaleY(.4); opacity: 0; } to { transform: none; opacity: 1; } }
+    .gm-sm__next { position: absolute; z-index: 70; pointer-events: none; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--gm-soft); }
+    .gm-sm__mini { position: relative; box-sizing: border-box; border-radius: 6px; border: 1.5px solid rgba(15, 23, 42, .3); background: var(--c); display: flex; align-items: center; justify-content: center; }
+    .gm-sm__mini::before { content: ""; position: absolute; left: 30%; right: 30%; top: -5px; height: 5px; box-sizing: border-box; border: 2px solid rgba(15, 23, 42, .4); border-bottom: 0; border-radius: 4px 4px 0 0; }
+    .gm-sm__mini span { width: 62%; height: 62%; max-width: 20px; max-height: 20px; border-radius: 50%; background: rgba(255, 255, 255, .92); display: flex; align-items: center; justify-content: center; }
+    .gm-sm__mini svg { width: 72%; height: 72%; fill: var(--c); }
+    .gm-sm__mini.is-light svg { fill: var(--k); }
+    .gm-sm__mini.is-second { opacity: .6; transform: scale(.86); }
+    /* 판 */
+    .gm-sm__plate { position: absolute; box-sizing: border-box; border: 2px solid rgba(30, 41, 59, .42); background: var(--pc); pointer-events: auto;
+      box-shadow: 0 3px 7px rgba(15, 23, 42, .16), inset 0 1px 0 rgba(255, 255, 255, .55); }
+    .gm-sm__plate::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: linear-gradient(160deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, 0) 45%); }
+    .gm-sm__plate.is-fall { pointer-events: none; animation: sm-fall .52s ease-in forwards; }
+    @keyframes sm-fall { from { transform: none; opacity: 1; } to { transform: translateY(46px) rotate(7deg) scale(.94); opacity: 0; } }
+    .gm-sm__plate.is-wiggle { animation: sm-wiggle .26s; }
+    @keyframes sm-wiggle { 0%, 100% { transform: none; } 30% { transform: translateX(-3px); } 70% { transform: translateX(3px); } }
+    .gm-sm__hole { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(15, 23, 42, .55) 0 34%, rgba(15, 23, 42, .18) 36% 62%, transparent 64%); }
+    /* 대기칸 */
+    .gm-sm__tray { position: absolute; z-index: 60; pointer-events: none; box-sizing: border-box; border-radius: 14px; background: linear-gradient(180deg, #475569, #334155); border: 2px solid #1e293b; box-shadow: inset 0 2px 4px rgba(0, 0, 0, .35); transition: border-color .2s, box-shadow .2s; }
+    .gm-sm__tray.is-warn { border-color: #f59e0b; }
+    .gm-sm__tray.is-full { border-color: #ef4444; box-shadow: inset 0 2px 4px rgba(0, 0, 0, .35), 0 0 0 3px rgba(239, 68, 68, .3); }
+    .gm-sm__slot { position: absolute; border-radius: 50%; background: radial-gradient(circle at 50% 40%, rgba(0, 0, 0, .5), rgba(0, 0, 0, .28) 70%); box-shadow: inset 0 2px 3px rgba(0, 0, 0, .45), 0 1px 0 rgba(255, 255, 255, .12); }
+    .gm-sm__slot.is-extra { background: transparent; box-shadow: none; border: 2px dashed rgba(253, 224, 71, .85); box-sizing: border-box; }
+    .gm-sm__traylbl { position: absolute; z-index: 61; font-size: 10.5px; font-weight: 800; color: #475569; pointer-events: none; letter-spacing: .02em; }
+    /* 나사 */
+    .gm-sm__s { position: absolute; left: 0; top: 0; width: var(--S); height: var(--S); padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer; transform-origin: 50% 50%;
+      transition: transform .27s cubic-bezier(.25, .8, .35, 1); -webkit-tap-highlight-color: transparent; }
+    .gm-sm__s:focus { outline: none; }
+    .gm-sm__hd { position: absolute; inset: 0; border-radius: 50%; box-sizing: border-box; border: 1.5px solid rgba(15, 23, 42, .4); display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 34% 28%, rgba(255, 255, 255, .62), rgba(255, 255, 255, 0) 46%), radial-gradient(circle at 50% 50%, transparent 58%, rgba(0, 0, 0, .18) 60%, rgba(0, 0, 0, .1) 100%), var(--c);
+      box-shadow: 0 2px 3px rgba(15, 23, 42, .35), inset 0 -2px 2px rgba(0, 0, 0, .2); transition: filter .2s; }
+    .gm-sm__hd svg { width: 58%; height: 58%; fill: var(--k); filter: drop-shadow(0 1px 0 rgba(255, 255, 255, .25)); pointer-events: none; }
+    .gm-sm__s.is-blocked { cursor: default; }
+    .gm-sm__s.is-blocked .gm-sm__hd { filter: saturate(.55) brightness(.9); }
+    .gm-sm__s.is-spin .gm-sm__hd { animation: sm-spin .3s ease-out; }
+    @keyframes sm-spin { 0% { transform: rotate(0) scale(1); } 40% { transform: rotate(-200deg) scale(1.18); } 100% { transform: rotate(-360deg) scale(1); } }
+    .gm-sm__s.is-gone .gm-sm__hd { animation: sm-box-out .34s ease-in forwards; }
+    .gm-sm__s.is-shake .gm-sm__hd { animation: sm-wiggle .26s; }
+    @media (hover: hover) and (pointer: fine) { .gm-sm__s:not(.is-blocked):hover .gm-sm__hd { filter: brightness(1.08); box-shadow: 0 0 0 3px rgba(255, 255, 255, .85), 0 3px 6px rgba(15, 23, 42, .35); } }
+    .gm-sm__spark { position: absolute; z-index: 92; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; pointer-events: none; background: #fde047; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: sm-spark .6s ease-out forwards; }
+    @keyframes sm-spark { 0% { transform: translate(0, 0) scale(.4); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.3) rotate(90deg); opacity: 0; } }
+    .gm-sm__float { position: absolute; z-index: 95; left: 50%; pointer-events: none; transform: translate(-50%, -50%); padding: 6px 14px; border-radius: 999px; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); color: #fff; font-weight: 800; font-size: 15px; white-space: nowrap; box-shadow: 0 6px 14px rgba(51, 65, 85, .28); animation: sm-float 1.1s ease-out forwards; }
+    .gm-sm__float.is-plain { background: #334155; font-size: 13px; box-shadow: none; animation-duration: 1.8s; }
+    .gm-sm__float.is-tiny { padding: 2px 8px; font-size: 12px; background: #0f172a; animation-duration: .9s; }
+    @keyframes sm-float { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 15% { opacity: 1; transform: translate(-50%, -55%) scale(1.05); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -120%) scale(1); } }
+    /* 막힘 창 */
+    .gm-sm__panel { position: absolute; z-index: 96; left: 50%; transform: translate(-50%, -50%); width: min(300px, calc(100% - 28px)); box-sizing: border-box; padding: 14px 14px 12px; border-radius: 16px; background: #fff; box-shadow: 0 12px 30px rgba(15, 23, 42, .28); text-align: center; animation: sm-pop .22s ease-out both; }
+    .gm-sm__panel[hidden] { display: none; }
+    @keyframes sm-pop { from { opacity: 0; transform: translate(-50%, -44%) scale(.94); } to { opacity: 1; transform: translate(-50%, -50%); } }
+    .gm-sm__panel h3 { margin: 0 0 4px; font-size: 17px; color: #b91c1c; }
+    .gm-sm__panel p { margin: 0 0 10px; font-size: 13px; line-height: 1.5; color: var(--gm-soft); word-break: keep-all; }
+    .gm-sm__pbtns { display: flex; flex-direction: column; gap: 6px; }
+    .gm-sm__pbtn { height: 40px; border: 0; border-radius: 11px; background: var(--gm-chip); color: var(--gm-a); font-size: 14px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .gm-sm__pbtn.is-main { background: var(--gm-a); color: #fff; }
+    /* 3. 아래 단추 */
+    .gm-sm__tools { display: flex; gap: 6px; }
+    .gm-sm__tool { flex: 1; min-width: 0; height: 44px; padding: 0 8px; border: 0; border-radius: 12px; background: var(--gm-chip); color: var(--gm-a); font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; white-space: nowrap; }
+    .gm-sm__tool small { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--gm-a); color: #fff; font-size: 12px; font-weight: 800; }
+    @media (hover: hover) { .gm-sm__tool:hover:not(:disabled) { background: #e2e8f0; } }
+    .gm-sm__tool:active:not(:disabled) { transform: scale(.97); }
+    .gm-sm__tool:disabled { opacity: .45; cursor: default; }
+    .gm-sm__tool.is-nudge { animation: sm-nudge .9s ease-in-out 2; }
+    @keyframes sm-nudge { 0%, 100% { box-shadow: 0 0 0 0 rgba(51, 65, 85, 0); } 50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, .35); } }
+    @media (max-width: 380px) { .gm-sm__tool { font-size: 13px; padding: 0 5px; gap: 3px; } .gm-sm__tool svg { display: none; } }
+    .gm-sm__help { margin: 0; font-size: 12.5px; color: var(--gm-soft); text-align: center; }
+    @media (pointer: coarse), (max-width: 640px) { .gm-sm__help { display: none; } }
+    /* 덮개 — 시작 · 일시정지 · 끝 */
+    .gm-sm__cover { position: absolute; inset: 0; z-index: 120; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; box-sizing: border-box; text-align: center; color: #fff; overflow-y: auto;
+      background: linear-gradient(140deg, #334155 0%, #7a3b4a 62%, #ef4444 100%); }
+    .gm-sm__cover[hidden] { display: none; }
+    .gm-sm__cover h2 { margin: 0; color: #fff; font-size: 24px; line-height: 1.3; word-break: keep-all; }
+    .gm-sm__cover p { margin: 0; font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .92); word-break: keep-all; }
+    .gm-sm__cover .gm-sm__keys { font-size: 12.5px; color: rgba(255, 255, 255, .8); }
+    .gm-sm__cover .gm-sm__big { font-size: 34px; font-weight: 800; line-height: 1.2; }
+    .gm-sm__how { width: 100%; max-width: 350px; box-sizing: border-box; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .14); text-align: left; }
+    .gm-sm__how b { display: block; margin-bottom: 4px; font-size: 13px; color: #fff; }
+    .gm-sm__how ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, .92); word-break: keep-all; }
+    .gm-sm__go { border: 0; padding: 12px 34px; border-radius: 14px; background: #fff; color: var(--gm-a); font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; }
+    @media (hover: hover) { .gm-sm__go:hover { background: #f1f5f9; } }
+    .gm-sm__demo { position: relative; width: 196px; height: 96px; flex-shrink: 0; }
+    .gm-sm__demo .gm-sm__s { cursor: default; transition: none; z-index: 75; }
+    .gm-sm__demo .gm-sm__plate { pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "screwmatch",
+      setup(stage, ctx) {
+        // ── 퍼즐 엔진 (화면과 무관 — node 검사용으로 이 구간만 떼어 쓴다) ── SM-CORE-START
+        const R = 5;                 // 나사 반지름 (판 좌표 — 판 영역은 가로 100 × 세로 110)
+        const AW = 100, AH = 110;
+        const BUF = 5;               // 대기칸
+        const BOX_CAP = 3;           // 공구함 한 개에 3칸
+        const N_COLORS = 8;
+        const INSET = 7.5;           // 판 가장자리에서 나사 가운데까지
+        // 단계마다 — 공구함 수(나사 = 공구함 × 3) · 색 수 · 「먼저 풀면 대기칸으로 가는 나사」 비율 · 정답 길에서 대기칸에 함께 머무는 최대 수 · 판 하나가 덮는 나사 수 · 정답 순서가 「방금 드러난 나사」를 먼저 고르는 비율
+        function levelSpec(lv) {
+          return {
+            boxes: Math.min(10, 3 + lv),
+            colors: Math.min(N_COLORS, 2 + lv),
+            decoy: Math.min(0.85, 0.2 + 0.1 * lv),
+            hold: lv <= 1 ? 3 : lv <= 3 ? 4 : 5,
+            cover: lv <= 1 ? 1 : lv <= 3 ? 2 : lv <= 6 ? 3 : 4,
+            dig: Math.min(0.95, 0.3 + 0.1 * lv),
+          };
+        }
+        const ri = (rnd, a, b) => a + Math.floor(rnd() * (b - a + 1));
+        const pick = (rnd, arr) => arr[Math.floor(rnd() * arr.length)];
+        function shuffle(rnd, a) {
+          for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+          return a;
+        }
+
+        // 판 모양 하나 — 나사 k개(1~4) 자리는 판 가운데 기준
+        function plateShape(rnd, k) {
+          const E = INSET;
+          const opts = [];
+          if (k === 1) opts.push("tab", "disc");
+          if (k === 2) opts.push("barH", "barV", "sq", "disc", "rect");
+          if (k === 3) opts.push("barH", "barV", "sq", "disc", "rect");
+          if (k === 4) opts.push("sq", "rect", "rect");
+          const kind = pick(rnd, opts);
+          let w, h, shape = "rect", pts = [];
+          const corners = (w, h) => [[-(w / 2 - E), -(h / 2 - E)], [w / 2 - E, -(h / 2 - E)], [w / 2 - E, h / 2 - E], [-(w / 2 - E), h / 2 - E]];
+          if (kind === "tab") { w = h = 18; pts = [[0, 0]]; }
+          else if (kind === "barH") { w = ri(rnd, 50, 70); h = 16; pts = [[-(w / 2 - E), 0], [w / 2 - E, 0]]; if (k === 3) pts.push([0, 0]); }
+          else if (kind === "barV") { w = 16; h = ri(rnd, 46, 62); pts = [[0, -(h / 2 - E)], [0, h / 2 - E]]; if (k === 3) pts.push([0, 0]); }
+          else if (kind === "sq") {
+            w = h = ri(rnd, 30, 38);
+            const c = corners(w, h);
+            if (k === 2) pts = rnd() < 0.5 ? [c[0], c[2]] : [c[1], c[3]];
+            else if (k === 3) { const skip = ri(rnd, 0, 3); pts = c.filter((_, i) => i !== skip); }
+            else pts = c;
+          } else if (kind === "rect") {
+            const wide = rnd() < 0.5;
+            w = wide ? ri(rnd, 42, 54) : ri(rnd, 26, 32);
+            h = wide ? ri(rnd, 26, 32) : ri(rnd, 42, 54);
+            const c = corners(w, h);
+            if (k === 2) pts = rnd() < 0.5 ? [c[0], c[2]] : [c[1], c[3]];
+            else if (k === 3) { const skip = ri(rnd, 0, 3); pts = c.filter((_, i) => i !== skip); }
+            else pts = c;
+          } else { // disc
+            shape = "disc";
+            w = h = k === 1 ? 22 : ri(rnd, 32, 38);
+            const rr = w / 2 - E;
+            const a0 = rnd() * Math.PI * 2;
+            for (let i = 0; i < k; i++) {
+              if (k === 1) { pts.push([0, 0]); break; }
+              const a = a0 + (i / k) * Math.PI * 2;
+              pts.push([Math.cos(a) * rr, Math.sin(a) * rr]);
+            }
+          }
+          return { shape, w, h, pts };
+        }
+        // 판 가장자리에서 점까지 거리 (안이면 0)
+        function distTo(pl, x, y) {
+          if (pl.shape === "disc") return Math.max(0, Math.hypot(x - pl.x, y - pl.y) - pl.w / 2);
+          const dx = Math.max(Math.abs(x - pl.x) - pl.w / 2, 0), dy = Math.max(Math.abs(y - pl.y) - pl.h / 2, 0);
+          return Math.hypot(dx, dy);
+        }
+
+        // 판 놓기 — 아래(먼저 놓은 판)부터 위로. 나사끼리 겹치지 않고, 덮는 나사는 확실히 덮고 안 덮는 나사는 확실히 비켜 간다
+        function genLayout(spec, rnd) {
+          const N = spec.boxes * BOX_CAP;
+          for (let attempt = 0; attempt < 80; attempt++) {
+            const plates = [], screws = [];
+            let remain = N, ok = true;
+            while (remain > 0) {
+              const roll = rnd();
+              let k = roll < 0.08 ? 1 : roll < 0.45 ? 2 : roll < 0.78 ? 3 : 4;
+              k = Math.min(k, remain);
+              let placed = null;
+              for (let kk = k; kk >= 1 && !placed; kk--) placed = placePlate(plates, screws, kk, spec, rnd);
+              if (!placed) { ok = false; break; }
+              const pi = plates.length;
+              placed.z = pi;
+              placed.screws = [];
+              plates.push(placed);
+              for (const [dx, dy] of placed.pts) {
+                placed.screws.push(screws.length);
+                screws.push({ x: placed.x + dx, y: placed.y + dy, p: pi, c: -1 });
+              }
+              remain -= placed.pts.length;
+            }
+            if (!ok) continue;
+            // 판 무리를 판 영역 가운데로 옮긴다
+            let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+            for (const q of plates) { x0 = Math.min(x0, q.x - q.w / 2); x1 = Math.max(x1, q.x + q.w / 2); y0 = Math.min(y0, q.y - q.h / 2); y1 = Math.max(y1, q.y + q.h / 2); }
+            const mx = (AW - x1 - x0) / 2, my = (AH - y1 - y0) / 2;
+            for (const q of plates) { q.x += mx; q.y += my; }
+            for (const s of screws) { s.x += mx; s.y += my; }
+            const coverBy = screws.map((s) => {
+              const out = [];
+              for (let j = s.p + 1; j < plates.length; j++) if (distTo(plates[j], s.x, s.y) < R) out.push(j);
+              return out;
+            });
+            // 처음부터 풀 수 있는 나사가 너무 적으면 다시
+            const free0 = coverBy.filter((c) => !c.length).length;
+            if (free0 < Math.min(4, N)) continue;
+            return { plates, screws, coverBy };
+          }
+          return null;
+        }
+        function placePlate(plates, screws, k, spec, rnd) {
+          const target = ri(rnd, 0, spec.cover);
+          let best = null, bestScore = -1e9;
+          for (let t = 0; t < 160; t++) {
+            const sh = plateShape(rnd, k);
+            const x = sh.w / 2 + 1 + rnd() * (AW - sh.w - 2);
+            const y = sh.h / 2 + 1 + rnd() * (AH - sh.h - 2);
+            const pl = { ...sh, x, y };
+            let bad = false, covered = 0;
+            for (const [dx, dy] of sh.pts) {
+              for (const s of screws) if (Math.hypot(s.x - x - dx, s.y - y - dy) < 2 * R + 1.8) { bad = true; break; }
+              if (bad) break;
+            }
+            if (bad) continue;
+            for (const s of screws) {
+              const d = distTo(pl, s.x, s.y);
+              if (d === 0) covered++;
+              else if (d < R * 1.2) { bad = true; break; } // 반쯤 걸친 나사는 헷갈린다
+            }
+            if (bad) continue;
+            // 판이 전부 덮여 버리는 아래 판이 생기지 않게 — 아래 판 나사가 모두 덮이면 감점
+            let buried = 0;
+            for (const q of plates) if (q.screws.length && q.screws.every((sid) => distTo(pl, screws[sid].x, screws[sid].y) === 0 || isCoveredNow(plates, screws, sid))) buried++;
+            const cx = Math.abs(x - AW / 2) / AW, cy = Math.abs(y - AH / 2) / AH;
+            const score = -Math.abs(covered - target) * 2 - buried * 1.5 - (cx + cy) * 1.2 + rnd() * 0.8;
+            if (score > bestScore) { bestScore = score; best = pl; }
+          }
+          return best;
+        }
+        function isCoveredNow(plates, screws, sid) {
+          const s = screws[sid];
+          for (let j = s.p + 1; j < plates.length; j++) if (distTo(plates[j], s.x, s.y) < R) return true;
+          return false;
+        }
+
+        // 풀 수 있는 순서 하나 — 덮이지 않은 나사를 하나씩. dig 만큼은 「방금 드러난 나사」를 먼저 골라서,
+        // 처음부터 보이는 나사 몇 개는 나중 공구함 색이 된다(서둘러 풀면 대기칸만 찬다)
+        function randomOrder(lay, rnd, dig = 0) {
+          const n = lay.screws.length;
+          const st = { loc: new Int8Array(n), alive: new Uint8Array(lay.plates.length).fill(1), left: lay.plates.map((p) => p.screws.length) };
+          const seenAt = new Array(n).fill(-1);
+          const order = [];
+          while (order.length < n) {
+            const free = [];
+            for (let i = 0; i < n; i++) if (!st.loc[i] && freeIn(lay, st, i)) { free.push(i); if (seenAt[i] < 0) seenAt[i] = order.length; }
+            let sid;
+            if (rnd() < dig) {
+              const top = Math.max(...free.map((i) => seenAt[i]));
+              sid = pick(rnd, free.filter((i) => seenAt[i] === top));
+            } else sid = pick(rnd, free);
+            st.loc[sid] = 1;
+            const p = lay.screws[sid].p;
+            if (!--st.left[p]) st.alive[p] = 0;
+            order.push(sid);
+          }
+          return order;
+        }
+        function freeIn(lay, st, sid) {
+          const cb = lay.coverBy[sid];
+          for (let i = 0; i < cb.length; i++) if (st.alive[cb[i]]) return false;
+          return true;
+        }
+        // 공구함 줄 — 이웃한 두 공구함은 되도록 다른 색, 고른 색은 모두 한 번 이상
+        function makeQueue(B, C, rnd) {
+          const palette = shuffle(rnd, [...Array(N_COLORS).keys()]).slice(0, C);
+          let best = null;
+          for (let t = 0; t < 60; t++) {
+            const q = palette.slice();
+            while (q.length < B) q.push(pick(rnd, palette));
+            shuffle(rnd, q);
+            let rep = 0;
+            for (let i = 1; i < q.length; i++) if (q[i] === q[i - 1]) rep++;
+            if (!best || rep < best.rep) best = { q, rep };
+            if (!rep) break;
+          }
+          return best.q;
+        }
+        // 정해 둔 순서를 따라 나사마다 공구함을 정한다 — 대부분 지금 공구함 색, 가끔(decoy) 나중 공구함 색(대기칸에서 기다린다)
+        function assignColors(lay, order, spec, rnd) {
+          const B = spec.boxes;
+          const Q = makeQueue(B, spec.colors, rnd);
+          const need = new Array(B).fill(BOX_CAP);
+          const active = [0, B > 1 ? 1 : -1];
+          let next = 2;
+          let buf = []; // 대기칸에서 기다리는 나사의 공구함 번호
+          const boxOf = new Array(order.length);
+          const close = (k) => {
+            const slot = active.indexOf(k);
+            for (;;) {
+              const a = next < B ? next++ : -1;
+              active[slot] = a;
+              if (a < 0) return;
+              buf = buf.filter((x) => x !== a);
+              if (need[a] > 0) return;
+            }
+          };
+          for (const sid of order) {
+            let k = -1;
+            if (buf.length < spec.hold && rnd() < spec.decoy) {
+              const ac = active.filter((a) => a >= 0).map((a) => Q[a]);
+              const cands = [];
+              for (let j = next; j < Math.min(B, next + 3 + Math.floor(B / 2)); j++) if (need[j] > 0 && !ac.includes(Q[j])) cands.push(j);
+              if (cands.length) k = pick(rnd, cands);
+            }
+            if (k < 0) {
+              const act = active.filter((a) => a >= 0 && need[a] > 0);
+              if (!act.length) return null;
+              k = pick(rnd, act);
+            }
+            boxOf[sid] = k;
+            need[k]--;
+            if (active.includes(k)) { if (!need[k]) close(k); }
+            else buf.push(k);
+          }
+          lay.screws.forEach((s, i) => { s.c = Q[boxOf[i]]; });
+          return Q;
+        }
+
+        // ── 판 상태와 한 수 ──
+        function initState(P) {
+          const boxes = [P.queue.length > 0 ? { k: 0, fill: [], closed: false } : null, P.queue.length > 1 ? { k: 1, fill: [], closed: false } : null];
+          return { loc: new Int8Array(P.screws.length), alive: new Uint8Array(P.plates.length).fill(1), left: P.plates.map((p) => p.screws.length),
+            buf: [], boxes, next: Math.min(2, P.queue.length), pts: 0, stored: 0 };
+        }
+        function cloneState(s) {
+          return { loc: s.loc.slice(), alive: s.alive.slice(), left: s.left.slice(), buf: s.buf.slice(),
+            boxes: s.boxes.map((b) => (b ? { k: b.k, fill: b.fill.slice(), closed: b.closed } : null)), next: s.next, pts: s.pts, stored: s.stored };
+        }
+        const isFree = (P, s, sid) => s.loc[sid] === 0 && freeIn(P, s, sid);
+        // 같은 색 공구함 중 빈칸이 있는 것 — 더 많이 찬 쪽 먼저
+        function boxFor(P, s, c) {
+          let b = -1;
+          s.boxes.forEach((bx, i) => {
+            if (!bx || bx.closed || bx.fill.length >= BOX_CAP || P.queue[bx.k] !== c) return;
+            if (b < 0 || bx.fill.length > s.boxes[b].fill.length) b = i;
+          });
+          return b;
+        }
+        // 나사 하나 풀기 → 중간 모습(frames)과 끝 상태. 못 풀면 { err }
+        function step(P, st, sid, cap = BUF) {
+          if (!isFree(P, st, sid)) return { err: "blocked" };
+          const c = P.screws[sid].c;
+          const b = boxFor(P, st, c);
+          if (b < 0 && st.buf.length >= cap) return { err: "full" };
+          const s = cloneState(st);
+          const frames = [];
+          s.loc[sid] = b >= 0 ? 2 : 1;
+          const p = P.screws[sid].p;
+          const fell = !--s.left[p];
+          if (fell) s.alive[p] = 0;
+          if (b >= 0) { s.boxes[b].fill.push(sid); s.pts += 10; s.stored++; } else s.buf.push(sid);
+          frames.push({ st: cloneState(s), kind: b >= 0 ? "box" : "buf", fell, sid });
+          let cur = b;
+          while (cur >= 0 && s.boxes[cur] && s.boxes[cur].fill.length >= BOX_CAP) {
+            s.boxes[cur].closed = true;
+            s.pts += 30;
+            frames.push({ st: cloneState(s), kind: "lid", slot: cur });
+            for (const x of s.boxes[cur].fill) s.loc[x] = 3;
+            if (s.next < P.queue.length) {
+              s.boxes[cur] = { k: s.next++, fill: [], closed: false };
+              frames.push({ st: cloneState(s), kind: "swap", slot: cur });
+              const col = P.queue[s.boxes[cur].k];
+              const pulled = [];
+              for (const x of s.buf) if (P.screws[x].c === col && s.boxes[cur].fill.length < BOX_CAP) { s.boxes[cur].fill.push(x); s.loc[x] = 2; pulled.push(x); s.pts += 10; s.stored++; }
+              if (pulled.length) {
+                s.buf = s.buf.filter((x) => !pulled.includes(x));
+                frames.push({ st: cloneState(s), kind: "pull", slot: cur, n: pulled.length });
+              }
+            } else {
+              s.boxes[cur] = null;
+              frames.push({ st: cloneState(s), kind: "swap", slot: cur });
+              cur = -1;
+            }
+          }
+          return { frames, final: s };
+        }
+        const isWon = (s) => s.loc.every((v) => v === 3);
+        // 바로 공구함에 들어가는 나사가 있는지
+        function hasDirect(P, s) {
+          for (let i = 0; i < P.screws.length; i++) if (isFree(P, s, i) && boxFor(P, s, P.screws[i].c) >= 0) return true;
+          return false;
+        }
+        const isStuck = (P, s, cap = BUF) => !isWon(s) && s.buf.length >= cap && !hasDirect(P, s);
+
+        // 새 단계 — 판을 놓고, 풀 순서를 먼저 정한 뒤 그 순서로 풀리게 색을 입힌다. 그 순서를 실제 규칙으로 끝까지 돌려 확인
+        function makePuzzle(level, rnd = Math.random) {
+          const spec = levelSpec(level);
+          for (let tries = 1; ; tries++) {
+            const lay = genLayout(spec, rnd);
+            if (!lay) continue;
+            const order = randomOrder(lay, rnd, spec.dig);
+            const queue = assignColors(lay, order, spec, rnd);
+            if (!queue) continue;
+            const P = { level, plates: lay.plates, screws: lay.screws, coverBy: lay.coverBy, queue, order, colors: new Set(queue).size };
+            // 확인 — 정답 길을 그대로 둬 본다 (대기칸 5칸)
+            let s = initState(P), ok = true, maxBuf = 0;
+            for (const sid of order) {
+              const r = step(P, s, sid, BUF);
+              if (r.err) { ok = false; break; }
+              s = r.final;
+              maxBuf = Math.max(maxBuf, s.buf.length);
+            }
+            if (!ok || !isWon(s) || maxBuf > spec.hold) continue;
+            // 처음부터 공구함 두 개에 들어갈 나사가 하나도 안 보이면 너무 답답하다
+            if (!hasDirect(P, initState(P))) continue;
+            P.tries = tries;
+            return P;
+          }
+        }
+
+        // 풀이 탐색(검사용) — 바로 들어가는 수는 늘 이득이라 먼저 다 두고, 대기칸으로 보낼 나사만 갈래를 나눈다
+        function solve(P, st0, cap = BUF, limit = 30000) {
+          const seen = new Set();
+          let nodes = 0, aborted = false;
+          const path = [];
+          function greedy(s) {
+            for (let moved = true; moved;) {
+              moved = false;
+              for (let i = 0; i < P.screws.length; i++) {
+                if (isFree(P, s, i) && boxFor(P, s, P.screws[i].c) >= 0) { s = step(P, s, i, cap).final; path.push(i); moved = true; }
+              }
+            }
+            return s;
+          }
+          function key(s) {
+            return `${Array.from(s.loc).join("")}|${s.buf.map((x) => P.screws[x].c).sort().join("")}|${s.boxes.map((b) => (b ? `${b.k}.${b.fill.length}` : "-")).join(",")}`;
+          }
+          function dfs(s) {
+            const mark = path.length;
+            s = greedy(s);
+            if (isWon(s)) return true;
+            const k = key(s);
+            if (seen.has(k) || ++nodes > limit) { if (nodes > limit) aborted = true; path.length = mark; return false; }
+            seen.add(k);
+            if (s.buf.length < cap) {
+              for (let i = 0; i < P.screws.length; i++) {
+                if (!isFree(P, s, i)) continue;
+                const r = step(P, s, i, cap);
+                if (r.err) continue;
+                path.push(i);
+                if (dfs(r.final)) return true;
+                path.pop();
+                if (aborted) break;
+              }
+            }
+            path.length = mark;
+            return false;
+          }
+          const ok = dfs(cloneState(st0));
+          return { ok, moves: ok ? path.slice() : null, nodes, aborted };
+        }
+        // ── 퍼즐 엔진 끝 ── SM-CORE-END
+
+        // ── 상수 ───────────────────────────────────────────────
+        const TIME_LIMIT = 180;          // 3분
+        const UNDO_PER_STAGE = 3;
+        const MAX_SCORE = 1_000_000;
+        const CLEAR_MS = 1150;           // 단계를 깬 뒤 다음 단계까지
+        const WAIT = { box: 280, buf: 260, lid: 240, swap: 330, pull: 280 };
+        // 8색 — 색마다 나사 머리 홈 모양이 다르다. [이름, 색, 홈 색, 홈 이름]
+        const COLORS = [
+          ["빨강", "#e5484d", "#ffffff", "일자"],
+          ["파랑", "#2f6bff", "#ffffff", "십자"],
+          ["노랑", "#f5c518", "#5b4300", "별"],
+          ["초록", "#1f9d55", "#ffffff", "육각"],
+          ["보라", "#8b5cf6", "#ffffff", "사각"],
+          ["주황", "#f97316", "#431407", "삼각"],
+          ["하늘", "#38bdf8", "#083344", "고리"],
+          ["분홍", "#f472b6", "#500724", "Y자"],
+        ];
+        const LIGHT = [false, false, true, false, false, true, true, true]; // 밝은 색 — 공구함 이름표 홈을 진하게
+        // 홈 모양 (24×24) — 일자 · 십자 · 별 · 육각 · 사각 · 삼각 · 고리 · Y자
+        const SHAPES = [
+          `<rect x="3" y="9.4" width="18" height="5.2" rx="1.3"/>`,
+          `<path d="M9.5 3h5v6.5H21v5h-6.5V21h-5v-6.5H3v-5h6.5z"/>`,
+          `<path d="M12 2.5l2.7 5.9 6.4.6-4.8 4.3 1.4 6.3L12 16.4l-5.7 3.2 1.4-6.3L2.9 9l6.4-.6z"/>`,
+          `<path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z"/>`,
+          `<rect x="5.2" y="5.2" width="13.6" height="13.6" rx="1.2"/>`,
+          `<path d="M12 3.5 21 19H3z"/>`,
+          `<path fill-rule="evenodd" d="M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17zm0 4.4a4.1 4.1 0 1 0 0 8.2 4.1 4.1 0 0 0 0-8.2z"/>`,
+          `<path d="M10.4 3h3.2v8.1l6.9 4-1.6 2.8L12 13.9l-6.9 4-1.6-2.8 6.9-4z"/>`,
+        ].map((p) => `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`);
+        const CHECK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`;
+        // 판 색 — 나사 색과 헷갈리지 않게 차분한 반투명 아크릴 · 나무 · 철판
+        const TONES = ["rgba(148,163,184,.8)", "rgba(214,186,150,.82)", "rgba(165,196,190,.8)", "rgba(196,188,214,.8)", "rgba(203,213,225,.82)", "rgba(222,196,168,.82)", "rgba(176,190,206,.8)"];
+        const fmt = (n) => n.toLocaleString("ko-KR");
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+        const screwName = (c) => `${COLORS[c][0]} ${COLORS[c][3]} 나사`;
+
+        // ── 화면 ───────────────────────────────────────────────
+        stage.innerHTML = `<div class="gm-sm" tabindex="0">
+          <div class="gm-sm__bar">
+            <span class="gm-sm__chip">${HKUI.icon("star", 15, "currentColor")}<b data-score>0</b></span>
+            <span class="gm-sm__chip">${HKUI.icon("wrench", 15, "currentColor")}<span data-level>1단계</span></span>
+            <span class="gm-sm__gap"></span>
+            <span class="gm-sm__chip gm-sm__chip--time" data-timechip>${HKUI.icon("timer", 15, "currentColor")}<b data-time>3:00</b></span>
+          </div>
+          <div class="gm-sm__time" data-timebar><i></i></div>
+          <div class="gm-sm__meta"><span>담은 나사 <b data-stored>0</b>/<b data-total>0</b> · 남은 공구함 <b data-boxes>0</b></span><span><b data-colors>3</b>가지 색</span></div>
+          <div class="gm-sm__board" data-board></div>
+          <div class="gm-sm__tools">
+            <button type="button" class="gm-sm__tool" data-undo>${HKUI.icon("undo-2", 16, "currentColor")} 되돌리기 <small data-undos>3</small></button>
+            <button type="button" class="gm-sm__tool" data-extra>${HKUI.icon("plus", 16, "currentColor")} 대기칸 +1</button>
+            <button type="button" class="gm-sm__tool" data-reset>${HKUI.icon("rotate-ccw", 16, "currentColor")} 처음부터</button>
+          </div>
+          <p class="gm-sm__help">위에 아무것도 없는 나사를 눌러 풀어요 · Z 되돌리기 · Esc 쉬기 · 도움을 안 쓰고 깨면 깔끔 보너스</p>
+          <div class="gm-sm__cover" data-cover></div>
+        </div>`;
+        const root = stage.querySelector(".gm-sm");
+        const boardEl = root.querySelector("[data-board]");
+        const cover = root.querySelector("[data-cover]");
+        const scoreEl = root.querySelector("[data-score]");
+        const levelEl = root.querySelector("[data-level]");
+        const timeEl = root.querySelector("[data-time]");
+        const timeChip = root.querySelector("[data-timechip]");
+        const timeBar = root.querySelector("[data-timebar]");
+        const storedEl = root.querySelector("[data-stored]");
+        const totalEl = root.querySelector("[data-total]");
+        const boxesEl = root.querySelector("[data-boxes]");
+        const colorsEl = root.querySelector("[data-colors]");
+        const undoBtn = root.querySelector("[data-undo]");
+        const undosEl = root.querySelector("[data-undos]");
+        const extraBtn = root.querySelector("[data-extra]");
+        const resetBtn = root.querySelector("[data-reset]");
+        HKUI.refreshIcons(root);
+
+        // ── 상태 ───────────────────────────────────────────────
+        let state = "ready";   // ready · play · pause · over
+        let level = 1, base = 0, cleared = 0, storedAll = 0;
+        let P = null;          // 이번 단계 퍼즐
+        let st = null;         // 지금 판 상태
+        let history = [];
+        let undoLeft = UNDO_PER_STAGE, undoUsed = false, extraUsed = false;
+        let clearing = false, stuckShown = false;
+        let clearTimer = 0, nextTimer = 0, nextP = null;
+        let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, rafId = 0, lastSec = 0;
+        let G = null;          // 자리 계산 결과
+        const plateEls = new Map(), screwEls = new Map(), boxEls = new Map(), lidEls = new Map();
+        let nextEl = null, trayEl = null, trayLbl = null, panelEl = null;
+        let slotEls = [];
+        const seq = { timers: [], final: null, done: null };
+        const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
+        const cap = () => BUF + (extraUsed ? 1 : 0);
+        const score = () => Math.min(MAX_SCORE, base + (st ? st.pts : 0));
+
+        // ── 그림 조각 ───────────────────────────────────────────
+        const headHtml = (c) => `<span class="gm-sm__hd" style="--c:${COLORS[c][1]};--k:${COLORS[c][2]}">${SHAPES[c]}</span>`;
+        function miniHtml(c, second) {
+          return `<div class="gm-sm__mini${LIGHT[c] ? " is-light" : ""}${second ? " is-second" : ""}" style="--c:${COLORS[c][1]};--k:${COLORS[c][2]};width:${G.miniW}px;height:${G.miniH}px" title="${COLORS[c][0]} 공구함"><span>${SHAPES[c]}</span></div>`;
+        }
+
+        // ── 자리 계산 — 위: 공구함 둘 + 다음 · 가운데: 판 · 아래: 대기칸 ──
+        function fit() {
+          flushSeq();
+          const room = HKPlay.roomFor(stage, boardEl);
+          const H = clamp(room, 380, 780);
+          boardEl.style.height = `${H}px`;
+          const W = boardEl.clientWidth || 340;
+          const pad = 8, gap = 8;
+          const topH = clamp(Math.round(W * 0.25), 88, 126);
+          const prevW = clamp(Math.round(W * 0.14), 50, 70);
+          const boxW = Math.min(Math.floor((W - pad * 2 - prevW - gap * 2) / 2), 170);
+          const boxH = Math.min(topH - 18, Math.round(boxW * 0.6));
+          const hdlH = Math.round(boxH * 0.2);
+          const bodyH = boxH - hdlH;
+          const rowW = boxW * 2 + gap * 2 + prevW;
+          const x0 = (W - rowW) / 2;
+          const by = Math.round((topH - 10 - boxH) / 2) + 2;
+          const bufH = clamp(Math.round(W * 0.15), 56, 76);
+          const lblH = 15;
+          const trayY = H - pad - bufH;
+          const zy0 = topH + 6, zy1 = trayY - lblH - 4;
+          const zoneW = W - pad * 2, zoneH = zy1 - zy0;
+          const s = Math.min(zoneW / AW, zoneH / AH);
+          const S = Math.round(2 * R * s);
+          const badge = Math.round(Math.min(bodyH * 0.5, boxW * 0.2));
+          const sockArea = boxW - (badge + 12) - 6;
+          const sb = Math.min(S, Math.floor(sockArea / 3.25), Math.floor(bodyH * 0.72));
+          const boxes = [0, 1].map((b) => {
+            const x = x0 + b * (boxW + gap);
+            const socks = [0, 1, 2].map((j) => ({ x: x + badge + 12 + (sockArea / 3) * (j + 0.5), y: by + hdlH + bodyH / 2 }));
+            return { x, y: by, w: boxW, h: boxH, hdlH, bodyH, badge, socks };
+          });
+          G = { W, H, pad, topH, s, S, zx: (W - AW * s) / 2, zy: zy0 + (zoneH - AH * s) / 2, boxes, sb,
+            next: { x: x0 + boxW * 2 + gap * 2, y: by - 2, w: prevW, h: boxH + 4 },
+            miniW: Math.round(prevW * 0.7), miniH: Math.round(Math.min(boxH * 0.33, prevW * 0.5)),
+            tray: { x: pad, y: trayY, w: W - pad * 2, h: bufH }, lblY: trayY - lblH };
+          root.style.setProperty("--S", `${S}px`);
+          buildBoard();
+        }
+        function trayLayout() {
+          const n = cap();
+          const t = G.tray;
+          const sq = Math.min(G.S, Math.floor(t.h * 0.7), Math.floor((t.w - 16) / (6 * 1.22)));
+          const sp = Math.min((t.w - 16) / n, sq * 1.6);
+          const x0 = t.x + t.w / 2 - (sp * (n - 1)) / 2;
+          G.sq = sq;
+          G.slots = [...Array(n)].map((_, i) => ({ x: x0 + sp * i, y: t.y + t.h / 2 }));
+        }
+        // 판(작업대)을 새로 — 고정 부분(위 띠 · 대기칸)을 그리고 물건은 지금 상태로
+        function buildBoard() {
+          boardEl.innerHTML = "";
+          plateEls.clear(); screwEls.clear(); boxEls.clear(); lidEls.clear();
+          const top = document.createElement("div");
+          top.className = "gm-sm__top";
+          top.style.height = `${G.topH}px`;
+          top.innerHTML = `<i class="gm-sm__shelf" style="top:${G.boxes[0].y + G.boxes[0].h - 2}px"></i>`;
+          boardEl.appendChild(top);
+          nextEl = document.createElement("div");
+          nextEl.className = "gm-sm__next";
+          nextEl.style.cssText = `left:${G.next.x}px;top:${G.next.y}px;width:${G.next.w}px;height:${G.next.h}px`;
+          boardEl.appendChild(nextEl);
+          trayLbl = document.createElement("div");
+          trayLbl.className = "gm-sm__traylbl";
+          trayLbl.style.cssText = `left:${G.tray.x + 6}px;top:${G.lblY}px`;
+          boardEl.appendChild(trayLbl);
+          trayEl = document.createElement("div");
+          trayEl.className = "gm-sm__tray";
+          trayEl.style.cssText = `left:${G.tray.x}px;top:${G.tray.y}px;width:${G.tray.w}px;height:${G.tray.h}px`;
+          boardEl.appendChild(trayEl);
+          panelEl = document.createElement("div");
+          panelEl.className = "gm-sm__panel";
+          panelEl.hidden = true;
+          panelEl.style.top = `${G.zy + (AH * G.s) / 2}px`;
+          boardEl.appendChild(panelEl);
+          drawTray();
+          if (st) render(st, { instant: true });
+          if (stuckShown) showStuck();
+        }
+        function drawTray() {
+          trayLayout();
+          slotEls.forEach((e) => e.remove());
+          slotEls = G.slots.map((p, i) => {
+            const e = document.createElement("i");
+            e.className = `gm-sm__slot${i >= BUF ? " is-extra" : ""}`;
+            const d = G.sq + 6;
+            e.style.cssText = `left:${p.x - G.tray.x - d / 2 - 2}px;top:${p.y - G.tray.y - d / 2 - 2}px;width:${d}px;height:${d}px`;
+            trayEl.appendChild(e);
+            return e;
+          });
+        }
+
+        // ── 그리기 — 물건마다 DOM 하나를 두고 자리만 옮긴다(옮길 때 미끄러지듯) ──
+        function makePlate(i) {
+          const pl = P.plates[i];
+          const el = document.createElement("div");
+          el.className = "gm-sm__plate";
+          el.dataset.p = i;
+          const s = G.s;
+          const w = pl.w * s, h = pl.h * s;
+          el.style.cssText = `left:${G.zx + (pl.x - pl.w / 2) * s}px;top:${G.zy + (pl.y - pl.h / 2) * s}px;width:${w}px;height:${h}px;z-index:${10 + pl.z * 2};--pc:${TONES[pl.z % TONES.length]};border-radius:${pl.shape === "disc" ? "50%" : `${Math.round(3.6 * s)}px`}`;
+          const hd = G.S * 0.86;
+          el.innerHTML = pl.screws.map((sid) => {
+            const sc = P.screws[sid];
+            return `<i class="gm-sm__hole" style="left:${(sc.x - pl.x + pl.w / 2) * s - hd / 2 - 2}px;top:${(sc.y - pl.y + pl.h / 2) * s - hd / 2 - 2}px;width:${hd}px;height:${hd}px"></i>`;
+          }).join("");
+          return el;
+        }
+        function makeScrew(sid) {
+          const c = P.screws[sid].c;
+          const el = document.createElement("button");
+          el.type = "button";
+          el.tabIndex = -1;
+          el.className = "gm-sm__s";
+          el.dataset.sid = sid;
+          el.innerHTML = headHtml(c);
+          return el;
+        }
+        function makeBox(k, b) {
+          const g = G.boxes[b];
+          const c = P.queue[k];
+          const el = document.createElement("div");
+          el.className = "gm-sm__box";
+          el.style.cssText = `left:${g.x}px;top:${g.y}px;width:${g.w}px;height:${g.h}px;--c:${COLORS[c][1]};--k:${COLORS[c][2]}`;
+          const hw = g.w * 0.36;
+          const socks = g.socks.map((p) => `<i class="gm-sm__sock" style="left:${p.x - g.x - G.sb * 0.56}px;top:${p.y - g.y - (g.h - g.bodyH) - G.sb * 0.56}px;width:${G.sb * 1.12}px;height:${G.sb * 1.12}px"></i>`).join("");
+          el.innerHTML = `<i class="gm-sm__hdl" style="left:${(g.w - hw) / 2}px;top:0;width:${hw}px;height:${g.hdlH + 4}px"></i>
+            <div class="gm-sm__body" style="height:${g.bodyH}px">
+              <span class="gm-sm__badge${LIGHT[c] ? " is-light" : ""}" style="left:6px;top:${(g.bodyH - 4 - g.badge) / 2}px;width:${g.badge}px;height:${g.badge}px">${SHAPES[c]}</span>${socks}
+            </div>`;
+          el.setAttribute("aria-label", `${COLORS[c][0]} 공구함`);
+          return el;
+        }
+        function makeLid(k, b) {
+          const g = G.boxes[b];
+          const c = P.queue[k];
+          const el = document.createElement("div");
+          el.className = "gm-sm__lid";
+          el.style.cssText = `left:${g.x - 1}px;top:${g.y + g.hdlH - 1}px;width:${g.w + 2}px;height:${g.bodyH + 2}px;--c:${COLORS[c][1]}`;
+          el.innerHTML = CHECK;
+          return el;
+        }
+        // 나사 자리 — 판 위 · 공구함 칸 · 대기칸
+        function screwPos(s, sid) {
+          const loc = s.loc[sid];
+          if (loc === 0) {
+            const sc = P.screws[sid];
+            return { x: G.zx + sc.x * G.s, y: G.zy + sc.y * G.s, k: 1, z: 11 + P.plates[sc.p].z * 2, slot: "p" };
+          }
+          if (loc === 1) {
+            const i = s.buf.indexOf(sid);
+            const p = G.slots[Math.min(i, G.slots.length - 1)];
+            return { x: p.x, y: p.y, k: G.sq / G.S, z: 72, slot: `b${i}` };
+          }
+          for (let b = 0; b < 2; b++) {
+            const bx = s.boxes[b];
+            const j = bx ? bx.fill.indexOf(sid) : -1;
+            if (j >= 0) { const p = G.boxes[b].socks[j]; return { x: p.x, y: p.y, k: G.sb / G.S, z: 72, slot: `x${b}.${j}` }; }
+          }
+          return null;
+        }
+        function render(s, opt = {}) {
+          const instant = !!opt.instant;
+          // 판
+          P.plates.forEach((pl, i) => {
+            const el = plateEls.get(i);
+            if (s.alive[i]) {
+              if (!el) { const e = makePlate(i); plateEls.set(i, e); boardEl.appendChild(e); }
+            } else if (el) {
+              plateEls.delete(i);
+              if (instant) el.remove();
+              else { el.classList.add("is-fall"); setTimeout(() => el.remove(), 560); }
+            }
+          });
+          // 공구함
+          const want = new Set();
+          s.boxes.forEach((bx, b) => {
+            if (!bx) return;
+            want.add(bx.k);
+            if (!boxEls.has(bx.k)) {
+              const e = makeBox(bx.k, b);
+              if (!instant) e.classList.add("is-in");
+              boxEls.set(bx.k, e);
+              boardEl.appendChild(e);
+            }
+            const lid = lidEls.get(bx.k);
+            if (bx.closed && !lid) { const e = makeLid(bx.k, b); lidEls.set(bx.k, e); boardEl.appendChild(e); }
+            else if (!bx.closed && lid) { lid.remove(); lidEls.delete(bx.k); }
+          });
+          for (const [k, el] of [...boxEls]) {
+            if (want.has(k)) continue;
+            boxEls.delete(k);
+            const lid = lidEls.get(k);
+            lidEls.delete(k);
+            [el, lid].forEach((e) => {
+              if (!e) return;
+              if (instant) { e.remove(); return; }
+              e.classList.remove("is-in");
+              e.classList.add("is-out");
+              setTimeout(() => e.remove(), 380);
+            });
+          }
+          // 나사
+          const moved = [];
+          for (let sid = 0; sid < P.screws.length; sid++) {
+            let el = screwEls.get(sid);
+            if (s.loc[sid] === 3) {
+              if (el) {
+                screwEls.delete(sid);
+                if (instant) el.remove();
+                else { el.classList.add("is-gone"); setTimeout(() => el.remove(), 380); }
+              }
+              continue;
+            }
+            const pos = screwPos(s, sid);
+            if (!pos) continue;
+            const fresh = !el;
+            if (fresh) { el = makeScrew(sid); screwEls.set(sid, el); boardEl.appendChild(el); }
+            const tf = `translate(${(pos.x - G.S / 2).toFixed(1)}px, ${(pos.y - G.S / 2).toFixed(1)}px) scale(${pos.k.toFixed(3)})`;
+            const wasSlot = el.dataset.slot;
+            if (fresh || instant) {
+              el.style.transition = "none";
+              moved.push(el);
+              el.style.zIndex = pos.z;
+            } else if (wasSlot !== pos.slot) {
+              // 날아가는 동안은 맨 위에
+              clearTimeout(el._zt);
+              el.style.zIndex = 90;
+              const z = pos.z;
+              el._zt = setTimeout(() => { el.style.zIndex = z; }, 260);
+              if (wasSlot === "p") {
+                el.classList.remove("is-spin");
+                void el.offsetWidth;
+                el.classList.add("is-spin");
+              }
+            }
+            el.style.transform = tf;
+            el.dataset.slot = pos.slot;
+            const blocked = s.loc[sid] === 0 && !freeIn(P, s, sid);
+            el.classList.toggle("is-blocked", blocked);
+            el.setAttribute("aria-label", `${screwName(P.screws[sid].c)}${blocked ? " · 위에 판이 덮고 있어요" : ""}`);
+          }
+          if (moved.length) {
+            void boardEl.offsetWidth;
+            moved.forEach((e) => { e.style.transition = ""; });
+          }
+          // 다음 공구함
+          const nx = [P.queue[s.next], P.queue[s.next + 1]].filter((c) => c !== undefined);
+          const more = P.queue.length - s.next - nx.length;
+          nextEl.innerHTML = `<span>다음</span>${nx.length ? nx.map((c, i) => miniHtml(c, i > 0)).join("") : "<span>없음</span>"}${more > 0 ? `<span>+${fmt(more)}</span>` : ""}`;
+          // 대기칸
+          const n = s.buf.length, cp = cap();
+          trayEl.classList.toggle("is-full", n >= cp);
+          trayEl.classList.toggle("is-warn", n === cp - 1);
+          trayLbl.textContent = `대기칸 ${n}/${cp}`;
+          drawHud(s);
+        }
+
+        // ── 차례로 보여 주기 — 한 수의 중간 모습을 시간차로. 다음 수를 누르면 바로 끝 모습으로 ──
+        function play(frames, done) {
+          flushSeq();
+          let t = 0;
+          seq.final = frames[frames.length - 1].st;
+          seq.done = done;
+          frames.forEach((f, i) => {
+            const apply = () => { render(f.st); frameFx(f); };
+            if (i === 0) apply();
+            else seq.timers.push(setTimeout(apply, t));
+            t += WAIT[f.kind] || 260;
+          });
+          seq.timers.push(setTimeout(() => { seq.timers = []; seq.final = null; const d = seq.done; seq.done = null; if (d) d(); }, t - 120));
+        }
+        function flushSeq() {
+          if (!seq.timers.length && !seq.done) return;
+          seq.timers.forEach(clearTimeout);
+          seq.timers = [];
+          if (seq.final) render(seq.final);
+          seq.final = null;
+          const d = seq.done;
+          seq.done = null;
+          if (d) d();
+        }
+        function frameFx(f) {
+          if (f.kind === "box") sfx("drop");
+          else if (f.kind === "buf") sfx("tap");
+          else if (f.kind === "lid") { sfx("coin"); sparks(f.slot); tinyFloat(f.slot, "+60"); }
+          else if (f.kind === "swap") sfx("whoosh");
+          else if (f.kind === "pull") sfx("drop");
+          if (f.fell) setTimeout(() => sfx("pop"), 80);
+        }
+        function sparks(b) {
+          const g = G.boxes[b];
+          for (let k = 0; k < 8; k++) {
+            const sp = document.createElement("i");
+            sp.className = "gm-sm__spark";
+            const ang = (k / 8) * Math.PI * 2;
+            const r = g.w * (0.35 + Math.random() * 0.2);
+            sp.style.cssText = `left:${g.x + g.w / 2}px;top:${g.y + g.h / 2}px;--dx:${(Math.cos(ang) * r).toFixed(1)}px;--dy:${(Math.sin(ang) * r * 0.6).toFixed(1)}px;animation-delay:${k * 18}ms`;
+            boardEl.appendChild(sp);
+            setTimeout(() => sp.remove(), 800);
+          }
+        }
+        function tinyFloat(b, text) {
+          const g = G.boxes[b];
+          const f = document.createElement("div");
+          f.className = "gm-sm__float is-tiny";
+          f.textContent = text;
+          f.style.cssText = `left:${g.x + g.w / 2}px;top:${g.y + g.h + 10}px`;
+          boardEl.appendChild(f);
+          setTimeout(() => f.remove(), 950);
+        }
+        function floatText(text, plain, yFrac = 0.45) {
+          const f = document.createElement("div");
+          f.className = `gm-sm__float${plain ? " is-plain" : ""}`;
+          f.textContent = text;
+          f.style.top = `${G.zy + AH * G.s * yFrac}px`;
+          boardEl.appendChild(f);
+          setTimeout(() => f.remove(), plain ? 1900 : 1200);
+        }
+        function shakeEl(el) {
+          if (!el) return;
+          const cls = el.classList.contains("gm-sm__plate") ? "is-wiggle" : "is-shake";
+          el.classList.remove(cls);
+          void el.offsetWidth;
+          el.classList.add(cls);
+          setTimeout(() => el.classList.remove(cls), 300);
+        }
+
+        // ── 점수 줄 ─────────────────────────────────────────────
+        function drawHud(s = st) {
+          scoreEl.textContent = fmt(score());
+          levelEl.textContent = `${level}단계`;
+          if (P && s) {
+            storedEl.textContent = fmt(s.stored);
+            totalEl.textContent = fmt(P.screws.length);
+            const left = (P.queue.length - s.next) + s.boxes.filter((b) => b && !b.closed).length;
+            boxesEl.textContent = fmt(left);
+            colorsEl.textContent = fmt(P.colors);
+          }
+          undosEl.textContent = undoLeft;
+          const live = state === "play" && !clearing;
+          undoBtn.disabled = !live || !undoLeft || !history.length;
+          extraBtn.disabled = !live || extraUsed;
+          resetBtn.disabled = !live || !history.length;
+          drawTime();
+        }
+        function drawTime() {
+          const sec = Math.ceil(timeLeftMs / 1000);
+          timeEl.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+          timeBar.firstElementChild.style.width = `${clamp((timeLeftMs / (TIME_LIMIT * 1000)) * 100, 0, 100)}%`;
+          timeBar.classList.toggle("is-low", sec <= 20);
+          timeChip.classList.toggle("is-low", sec <= 20);
+        }
+
+        // ── 단계 ───────────────────────────────────────────────
+        function loadLevel() {
+          flushSeq();
+          P = nextP && nextP.level === level ? nextP.p : makePuzzle(level);
+          prepareNext();
+          st = initState(P);
+          history = [];
+          undoLeft = UNDO_PER_STAGE;
+          undoUsed = false;
+          extraUsed = false;
+          stuckShown = false;
+          if (G) buildBoard();
+          drawHud();
+        }
+        // 다음 단계는 미리 만들어 둔다 (나사가 많은 단계는 만드는 데 0.1초쯤 걸려서, 넘어갈 때 멈칫하지 않게)
+        function prepareNext() {
+          clearTimeout(nextTimer);
+          const want = level + 1;
+          nextP = null;
+          nextTimer = setTimeout(() => { nextP = { level: want, p: makePuzzle(want) }; }, 400);
+        }
+        // 단계 점수 — 단계 × 100, 도움(되돌리기 · 대기칸 +1)을 안 썼으면 깔끔 보너스 단계 × 50
+        function stageClear() {
+          clearing = true;
+          const clear = level * 100;
+          const bonus = !undoUsed && !extraUsed ? level * 50 : 0;
+          base = Math.min(MAX_SCORE, base + st.pts + clear + bonus);
+          storedAll += st.stored;
+          st.pts = 0;
+          cleared++;
+          drawHud();
+          sfx("powerup");
+          floatText(`${level}단계 완료! +${fmt(clear + bonus)}`);
+          if (bonus) setTimeout(() => floatText(`도움 없이 깔끔 보너스 +${fmt(bonus)}`, true, 0.62), 200);
+          clearTimeout(clearTimer);
+          clearTimer = setTimeout(() => {
+            if (state !== "play" && state !== "pause") return;
+            level++;
+            clearing = false;
+            loadLevel();
+            sfx("whoosh");
+          }, CLEAR_MS);
+        }
+        function afterMove() {
+          if (state !== "play" || clearing) return;
+          if (isWon(st)) { stageClear(); return; }
+          if (isStuck(P, st, cap())) { stuckShown = true; showStuck(); sfx("fail"); }
+        }
+        function showStuck() {
+          if (!panelEl) return;
+          const canUndo = undoLeft > 0 && history.length > 0;
+          const canExtra = !extraUsed;
+          panelEl.innerHTML = `<h3>대기칸이 꽉 찼어요</h3>
+            <p>${canUndo || canExtra ? "도움을 쓰거나 이 단계를 다시 해요." : "이 단계를 다시 해요."} 시간은 그대로 흘러요.</p>
+            <div class="gm-sm__pbtns">
+              ${canExtra ? `<button type="button" class="gm-sm__pbtn" data-p="extra">${HKUI.icon("plus", 16, "currentColor")} 대기칸 +1 (보너스 없음)</button>` : ""}
+              ${canUndo ? `<button type="button" class="gm-sm__pbtn" data-p="undo">${HKUI.icon("undo-2", 16, "currentColor")} 되돌리기 (${undoLeft})</button>` : ""}
+              <button type="button" class="gm-sm__pbtn is-main" data-p="retry">${HKUI.icon("rotate-ccw", 16, "currentColor")} 이 단계 다시</button>
+            </div>`;
+          HKUI.refreshIcons(panelEl);
+          panelEl.hidden = false;
+          panelEl.querySelectorAll("[data-p]").forEach((b) => {
+            b.onclick = (e) => {
+              e.stopPropagation();
+              const a = b.dataset.p;
+              if (a === "extra") useExtra();
+              else if (a === "undo") undo();
+              else restartStage(true);
+            };
+          });
+          drawHud();
+        }
+        function hideStuck() {
+          stuckShown = false;
+          if (panelEl) panelEl.hidden = true;
+        }
+
+        // ── 조작 ───────────────────────────────────────────────
+        function tapScrew(sid) {
+          if (state !== "play" || clearing) return;
+          flushSeq();
+          if (stuckShown || clearing) return;
+          const r = step(P, st, sid, cap());
+          if (r.err) {
+            shakeEl(screwEls.get(sid));
+            sfx("invalid");
+            if (r.err === "full") floatText("대기칸이 꽉 찼어요 · 같은 색 공구함에 들어갈 나사를 찾아요", true, 0.85);
+            return;
+          }
+          history.push(st);
+          st = r.final;
+          play(r.frames, afterMove);
+          drawHud();
+        }
+        function tapPlate(pi, x, y) {
+          if (state !== "play" || clearing || stuckShown) return;
+          // 덮인 나사 근처를 눌렀으면 알려 준다
+          let near = -1, best = 1e9;
+          for (let sid = 0; sid < P.screws.length; sid++) {
+            if (st.loc[sid] !== 0) continue;
+            const sc = P.screws[sid];
+            const d = Math.hypot(G.zx + sc.x * G.s - x, G.zy + sc.y * G.s - y);
+            if (d < G.S * 0.6 && d < best) { best = d; near = sid; }
+          }
+          if (near < 0) return;
+          shakeEl(plateEls.get(pi));
+          sfx("invalid");
+          floatText("위에 판이 덮고 있어요 · 위 판 나사부터 풀어요", true, 0.85);
+        }
+        function undo() {
+          if (state !== "play" || clearing || !undoLeft || !history.length) return;
+          flushSeq();
+          st = history.pop();
+          undoLeft--;
+          undoUsed = true;
+          hideStuck();
+          render(st);
+          sfx("whoosh");
+          drawHud();
+        }
+        function useExtra() {
+          if (state !== "play" || clearing || extraUsed) return;
+          flushSeq();
+          extraUsed = true;
+          hideStuck();
+          drawTray();
+          render(st, { instant: true });
+          sfx("powerup");
+          floatText("대기칸이 한 칸 늘었어요 · 이번 단계 깔끔 보너스 없음", true, 0.85);
+          drawHud();
+        }
+        function restartStage(fromStuck) {
+          if (state !== "play" || clearing || !history.length) return;
+          flushSeq();
+          st = initState(P);
+          history = [];
+          undoLeft = UNDO_PER_STAGE;
+          undoUsed = false;
+          extraUsed = false;
+          hideStuck();
+          buildBoard();
+          sfx("whoosh");
+          floatText(fromStuck ? "이 단계를 다시 해요 · 시간은 그대로 흘러요" : "이 단계를 처음부터 해요 · 시간은 그대로 흘러요", true);
+          drawHud();
+        }
+
+        // ── 시간 ───────────────────────────────────────────────
+        function loop() {
+          if (state !== "play") return;
+          const t = performance.now();
+          timeLeftMs -= clamp(t - lastTick, 0, 250);
+          lastTick = t;
+          const sec = Math.ceil(timeLeftMs / 1000);
+          if (sec !== lastSec) {
+            lastSec = sec;
+            if (sec >= 1 && sec <= 5) sfx("countdown");
+          }
+          if (timeLeftMs <= 0) {
+            timeLeftMs = 0;
+            gameOver();
+            return;
+          }
+          drawTime();
+          rafId = requestAnimationFrame(loop);
+        }
+
+        // ── 판 흐름 ─────────────────────────────────────────────
+        function start() {
+          if (state !== "ready") return;
+          state = "play";
+          lastSec = Math.ceil(timeLeftMs / 1000);
+          sfx("go");
+          showCover("none");
+          lastTick = performance.now();
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        function pause() {
+          if (state !== "play") return;
+          flushSeq();
+          state = "pause";
+          cancelAnimationFrame(rafId);
+          ctx.sfx("select");
+          showCover("pause");
+          drawHud();
+        }
+        function resume() {
+          if (state !== "pause") return;
+          state = "play";
+          showCover("none");
+          lastTick = performance.now();
+          sfx("go");
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+          if (!clearing && st && isWon(st)) afterMove();
+        }
+        function gameOver() {
+          clearTimeout(clearTimer);
+          flushSeq();
+          ctx.sfx(cleared ? "win" : "lose");
+          state = "over";
+          cancelAnimationFrame(rafId);
+          hideStuck();
+          drawHud();
+          const final = clamp(Math.round(score()), 0, MAX_SCORE);
+          showCover("over");
+          ctx.submit(final);
+        }
+        function again() {
+          if (state !== "over") return;
+          ctx.sfx("tap");
+          reset();
+        }
+        function reset() {
+          cancelAnimationFrame(rafId);
+          clearTimeout(clearTimer);
+          flushSeq();
+          state = "ready";
+          level = 1;
+          base = 0;
+          cleared = 0;
+          storedAll = 0;
+          clearing = false;
+          timeLeftMs = TIME_LIMIT * 1000;
+          loadLevel();
+          showCover("ready");
+        }
+
+        // ── 덮개 ───────────────────────────────────────────────
+        function demoHtml() {
+          // 시작 화면 그림 — 공구함(빨강 2개 담김) · 판 위 나사 · 날아가는 나사
+          const S = 26;
+          const scr = (c, x, y, extra = "") => `<span class="gm-sm__s" style="--S:${S}px;transform:translate(${x}px,${y}px)${extra}">${headHtml(c)}</span>`;
+          const sock = (x) => `<i class="gm-sm__sock" style="left:${x - 11}px;top:10px;width:22px;height:22px"></i>`;
+          return `<div class="gm-sm__demo" aria-hidden="true">
+            <div class="gm-sm__box" style="left:0;top:4px;width:96px;height:52px;--c:${COLORS[0][1]}">
+              <i class="gm-sm__hdl" style="left:31px;top:0;width:34px;height:14px"></i>
+              <div class="gm-sm__body" style="height:42px">
+                <span class="gm-sm__badge" style="left:5px;top:10px;width:20px;height:20px">${SHAPES[0]}</span>${sock(37)}${sock(59)}${sock(81)}
+              </div>
+            </div>
+            ${scr(0, 26, 22, " scale(.8)")}${scr(0, 48, 22, " scale(.8)")}
+            <div class="gm-sm__plate" style="left:104px;top:40px;width:88px;height:30px;border-radius:8px;--pc:${TONES[1]}"></div>
+            <div class="gm-sm__plate" style="left:132px;top:16px;width:34px;height:76px;border-radius:8px;--pc:${TONES[0]}"></div>
+            ${scr(3, 107, 42)}${scr(1, 136, 20)}${scr(2, 136, 62)}
+            ${scr(0, 92, 0, " rotate(-40deg)")}
+          </div>`;
+        }
+        function showCover(kind) {
+          if (kind === "none") {
+            cover.hidden = true;
+            return;
+          }
+          cover.hidden = false;
+          if (kind === "ready") {
+            cover.innerHTML = `${demoHtml()}
+              <h2>나사 매치</h2>
+              <p>나사를 풀어 같은 색 공구함에<br>3개씩 담아요.</p>
+              <div class="gm-sm__how"><b>이렇게 해요</b><ol>
+                <li>위에 아무것도 없는 나사를 눌러요. 판에 덮인 나사는 흐리게 보여요.</li>
+                <li>같은 색 공구함에 빈칸이 있으면 그리로, 없으면 아래 대기칸(5칸)으로 가요.</li>
+                <li>공구함이 3칸 차면 닫히고 다음 공구함이 와요. 대기칸에 같은 색이 있으면 알아서 옮겨 가요.</li>
+                <li>대기칸이 꽉 차 막히면 그 단계를 다시 해요. 3분 동안 단계를 깰수록 점수가 쌓여요.</li>
+              </ol></div>
+              <p class="gm-sm__keys">색마다 나사 홈 모양이 달라요(일자 · 십자 · 별 · 육각 …) · 되돌리기 단계마다 ${UNDO_PER_STAGE}번 · 대기칸 +1 한 번<br>도움을 안 쓰고 깨면 깔끔 보너스 · Z 되돌리기 · Esc 쉬기</p>
+              <button type="button" class="gm-sm__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
+          } else if (kind === "pause") {
+            cover.innerHTML = `<h2>잠깐 쉬는 중</h2><p>시간이 멈춰 있어요. 판은 가려 둘게요.</p>
+              <p class="gm-sm__keys">${level}단계 · ${fmt(score())}점</p>
+              <button type="button" class="gm-sm__go" data-go>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
+          } else {
+            const total = storedAll + (st ? st.stored : 0);
+            cover.innerHTML = `<h2>시간 끝!</h2><div class="gm-sm__big">${fmt(score())}점</div>
+              <p>${cleared ? `${fmt(cleared)}단계를 깼어요 · 담은 나사 ${fmt(total)}개` : `담은 나사 ${fmt(total)}개 · 다음엔 한 단계라도 깨 봐요`}</p>
+              <button type="button" class="gm-sm__go" data-go>${HKUI.icon("rotate-ccw", 18, "currentColor")} 다시 하기</button>`;
+          }
+          HKUI.refreshIcons(cover);
+          const go = cover.querySelector("[data-go]");
+          if (go) go.onclick = () => (state === "ready" ? start() : state === "pause" ? resume() : again());
+        }
+
+        // ── 입력 ───────────────────────────────────────────────
+        boardEl.addEventListener("pointerdown", (e) => {
+          if (!e.isPrimary || e.button > 0) return;
+          if (e.target.closest(".gm-sm__panel")) return;
+          const s = e.target.closest(".gm-sm__s");
+          if (s && s.dataset.sid !== undefined) {
+            e.preventDefault();
+            const sid = Number(s.dataset.sid);
+            if (st && st.loc[sid] === 0) tapScrew(sid);
+            return;
+          }
+          const pl = e.target.closest(".gm-sm__plate");
+          if (pl) {
+            e.preventDefault();
+            const r = boardEl.getBoundingClientRect();
+            tapPlate(Number(pl.dataset.p), e.clientX - r.left, e.clientY - r.top);
+          }
+        });
+        undoBtn.addEventListener("click", undo);
+        extraBtn.addEventListener("click", useExtra);
+        resetBtn.addEventListener("click", () => restartStage(false));
+        document.addEventListener("keydown", (e) => {
+          if (e.target && e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          if (state !== "play") return;
+          if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); return; }
+          if (e.code === "KeyZ" || e.code === "Backspace") {
+            e.preventDefault();
+            if (!e.repeat) undo();
+          }
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+        let rt = 0;
+        window.addEventListener("resize", () => {
+          clearTimeout(rt);
+          rt = setTimeout(fit, 80);
+        });
+
+        ctx.onScore && ctx.onScore(() => Math.round(score()));
+        ctx.onRestart(reset);
+        ctx.onPause(pause);
+        reset();
+        requestAnimationFrame(fit);
+      },
+    });
+  </script>
+</body>
+</html>

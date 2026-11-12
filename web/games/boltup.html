@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>볼트 업 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-bu { --gm-a: #475569; --gm-b: #22c55e; --gm-ink: #1e293b; --gm-soft: #64748b; --gm-chip: #f1f5f9;
+      --nw: 48px; --nh: 19px;
+      position: relative; display: flex; flex-direction: column; gap: 8px; color: var(--gm-ink); outline: none;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    /* 1. 점수 줄 */
+    .gm-bu__bar { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+    .gm-bu__chip { display: inline-flex; align-items: center; gap: 5px; padding: 7px 11px; border-radius: 12px; background: var(--gm-chip); color: var(--gm-ink); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-bu__chip b { font-size: 16px; }
+    .gm-bu__gap { flex: 1; }
+    .gm-bu__chip--time b { font-size: 18px; min-width: 40px; text-align: right; }
+    .gm-bu__chip--time.is-low { background: #fee2e2; color: #b91c1c; }
+    .gm-bu__time { position: relative; height: 8px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
+    .gm-bu__time i { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--gm-a), var(--gm-b)); transition: width .2s linear; }
+    .gm-bu__time.is-low i { background: linear-gradient(90deg, #dc2626, #fb923c); }
+    .gm-bu__meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--gm-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-bu__meta b { color: var(--gm-ink); }
+    .gm-bu__meta .is-hid b { color: #b45309; }
+    /* 2. 작업대 — 구멍 뚫린 공구 벽 */
+    .gm-bu__board { position: relative; width: 100%; height: 360px; border-radius: 16px; overflow: hidden; touch-action: none; border: 1px solid #d5dde7;
+      background: radial-gradient(circle at 50% 50%, rgba(71, 85, 105, .16) 0 1.8px, rgba(71, 85, 105, 0) 2.3px) 9px 9px / 20px 20px, linear-gradient(180deg, #f4f7fa 0%, #e6ebf1 100%); }
+    .gm-bu__layer { position: absolute; inset: 0; }
+    .gm-bu__layer--top { pointer-events: none; }
+    .gm-bu__rail { position: absolute; height: 9px; border-radius: 4px; pointer-events: none;
+      background: linear-gradient(180deg, #a3b1c2 0%, #7b8a9e 55%, #5d6b7e 100%); box-shadow: 0 3px 5px rgba(15, 23, 42, .14); }
+    .gm-bu__b { position: absolute; padding: 0; margin: 0; border: 0; background: transparent; cursor: pointer; -webkit-tap-highlight-color: transparent; z-index: 1; }
+    .gm-bu__b:focus { outline: none; }
+    .gm-bu__wob { position: absolute; inset: 0; }
+    .gm-bu__wob.is-shake { animation: bu-shake .28s; }
+    @keyframes bu-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-5px); } 50% { transform: translateX(4px); } 80% { transform: translateX(-2px); } }
+    /* 볼트 기둥 — 비스듬한 나사산 줄무늬, 위는 머리 없이 둥글게 끝 */
+    .gm-bu__rod { position: absolute; border-radius: 45% 45% 2px 2px / 5px 5px 2px 2px;
+      background: linear-gradient(90deg, rgba(15, 23, 42, .38), rgba(255, 255, 255, .55) 36%, rgba(255, 255, 255, .08) 62%, rgba(15, 23, 42, .42)),
+        repeating-linear-gradient(-18deg, #eef2f6 0 1.6px, #94a3b8 1.6px 3.2px, #cbd5e1 3.2px 4.6px); }
+    .gm-bu__b.is-sel .gm-bu__rod { box-shadow: 0 0 0 2px rgba(34, 197, 94, .75), 0 0 10px rgba(34, 197, 94, .45); }
+    /* 바닥 받침 — 옆에서 본 육각 와셔 */
+    .gm-bu__plate { position: absolute; clip-path: polygon(7% 0, 93% 0, 100% 34%, 100% 100%, 0 100%, 0 34%);
+      background: linear-gradient(90deg, rgba(255, 255, 255, .35) 0 48%, rgba(255, 255, 255, .7) 48% 52%, rgba(0, 0, 0, .08) 52%), linear-gradient(180deg, #cbd5e1, #8796a8); }
+    .gm-bu__b.is-done .gm-bu__plate { background: linear-gradient(90deg, rgba(255, 255, 255, .35) 0 48%, rgba(255, 255, 255, .7) 48% 52%, rgba(0, 0, 0, .08) 52%), linear-gradient(180deg, #86efac, #16a34a); }
+    .gm-bu__num { position: absolute; left: 0; right: 0; bottom: 0; display: none; text-align: center; font-size: 11px; font-weight: 700; color: #94a3b8; line-height: 14px; }
+    @media (hover: hover) and (pointer: fine) { .gm-bu.has-nums .gm-bu__num { display: block; } }
+    /* 너트 — 옆에서 본 육각 너트: 위아래 깎인 사다리꼴 면 + 가운데 모서리 빛 */
+    .gm-bu__nut { position: absolute; left: 0; top: 0; z-index: 3; width: var(--nw); height: var(--nh); pointer-events: none; will-change: transform;
+      filter: drop-shadow(0 1.5px 1px rgba(15, 23, 42, .3)); }
+    .gm-bu__nut.is-up { z-index: 6; filter: drop-shadow(0 4px 4px rgba(15, 23, 42, .3)) drop-shadow(0 0 2.5px rgba(34, 197, 94, .95)); }
+    .gm-bu__nut.is-fly { z-index: 7; }
+    .gm-bu__face { position: absolute; inset: 0; display: block; clip-path: polygon(8% 0, 92% 0, 100% 22%, 100% 78%, 92% 100%, 8% 100%, 0 78%, 0 22%);
+      background-color: var(--c);
+      background-image: linear-gradient(180deg, rgba(255, 255, 255, .5) 0 20%, rgba(255, 255, 255, 0) 20% 80%, rgba(0, 0, 0, .32) 80%),
+        linear-gradient(90deg, rgba(255, 255, 255, .55) 0 3%, rgba(255, 255, 255, .2) 3% 48%, rgba(255, 255, 255, .7) 48% 52%, rgba(0, 0, 0, .06) 52% 96%, rgba(0, 0, 0, .3) 96%);
+      background-size: 100% 100%, var(--nw) 100%; background-repeat: no-repeat, repeat-x; background-position: 0 0, 0 0; }
+    .gm-bu__nut.is-hid .gm-bu__face { background-image: linear-gradient(180deg, rgba(255, 255, 255, .5) 0 20%, rgba(255, 255, 255, 0) 20% 80%, rgba(0, 0, 0, .32) 80%),
+        linear-gradient(90deg, rgba(255, 255, 255, .55) 0 3%, rgba(255, 255, 255, .2) 3% 48%, rgba(255, 255, 255, .7) 48% 52%, rgba(0, 0, 0, .06) 52% 96%, rgba(0, 0, 0, .3) 96%),
+        repeating-linear-gradient(135deg, rgba(255, 255, 255, .16) 0 3px, rgba(255, 255, 255, 0) 3px 7px);
+      background-size: 100% 100%, var(--nw) 100%, 100% 100%; background-repeat: no-repeat, repeat-x, no-repeat; background-position: 0 0, 0 0, 0 0; }
+    /* 돌리는 연출 — 면이 옆으로 흘러 너트가 도는 것처럼 */
+    .gm-bu__nut.is-spin .gm-bu__face { animation: bu-spin var(--spin, 170ms) linear infinite; }
+    .gm-bu__nut.is-spin.is-rev .gm-bu__face { animation-direction: reverse; }
+    @keyframes bu-spin { from { background-position: 0 0, 0 0, 0 0; } to { background-position: 0 0, calc(var(--nw) * -1) 0, 0 0; } }
+    .gm-bu__nut svg { position: absolute; left: 50%; top: 50%; width: calc(var(--nh) * .74); height: calc(var(--nh) * .74); transform: translate(-50%, -50%); fill: var(--s); stroke: var(--o, rgba(15, 23, 42, .45)); stroke-width: 2.2px; stroke-linejoin: round; paint-order: stroke; overflow: visible; pointer-events: none; }
+    .gm-bu__nut.is-pop > * { animation: bu-pop .42s cubic-bezier(.3, 1.6, .5, 1); }
+    @keyframes bu-pop { 0% { transform: scale(1); } 35% { transform: scale(1.18, 1.3); } 100% { transform: scale(1); } }
+    .gm-bu__nut.is-pop svg { animation: bu-pop-s .42s cubic-bezier(.3, 1.6, .5, 1); }
+    @keyframes bu-pop-s { 0% { transform: translate(-50%, -50%) scale(.2); } 60% { transform: translate(-50%, -50%) scale(1.25); } 100% { transform: translate(-50%, -50%) scale(1); } }
+    .gm-bu__nut.is-shake > * { animation: bu-shake .28s; }
+    /* 완성 캡 — 둥근 머리 캡 너트(놋쇠) */
+    .gm-bu__cap { position: absolute; z-index: 4; display: none; pointer-events: none; filter: drop-shadow(0 2px 2px rgba(15, 23, 42, .3)); }
+    .gm-bu__cap::before { content: ""; position: absolute; left: 10%; right: 10%; top: 0; height: 58%; border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+      background: radial-gradient(circle at 36% 30%, #fff7d6 0 12%, #f4cf68 34%, #c9932b 80%); }
+    .gm-bu__cap::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 46%; clip-path: polygon(6% 0, 94% 0, 100% 30%, 100% 100%, 0 100%, 0 30%);
+      background: linear-gradient(90deg, rgba(255, 255, 255, .45) 0 46%, rgba(255, 255, 255, .85) 46% 54%, rgba(0, 0, 0, .14) 54%), linear-gradient(180deg, #f0c75e, #b7832a); }
+    .gm-bu__cap.is-on { display: block; }
+    .gm-bu__cap.is-drop { animation: bu-cap .42s cubic-bezier(.3, 1.5, .5, 1) both; }
+    @keyframes bu-cap { 0% { transform: translateY(calc(var(--nh) * -1.6)) rotate(-25deg); opacity: 0; } 55% { opacity: 1; } 100% { transform: none; opacity: 1; } }
+    .gm-bu__spark { position: absolute; z-index: 8; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; pointer-events: none; background: #fde047; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: bu-spark .6s ease-out forwards; }
+    @keyframes bu-spark { 0% { transform: translate(0, 0) scale(.4); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.3) rotate(90deg); opacity: 0; } }
+    .gm-bu__float { position: absolute; z-index: 9; left: 50%; pointer-events: none; transform: translate(-50%, -50%); padding: 6px 14px; border-radius: 999px; background: linear-gradient(135deg, var(--gm-a), #16a34a); color: #fff; font-weight: 800; font-size: 15px; white-space: nowrap; box-shadow: 0 6px 14px rgba(22, 101, 52, .28); animation: bu-float 1.1s ease-out forwards; }
+    .gm-bu__float.is-plain { background: #334155; font-size: 13px; box-shadow: none; animation-duration: 1.9s; }
+    @keyframes bu-float { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 15% { opacity: 1; transform: translate(-50%, -55%) scale(1.05); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -120%) scale(1); } }
+    /* 3. 아래 단추 */
+    .gm-bu__tools { display: flex; gap: 8px; }
+    .gm-bu__tool { flex: 1; min-width: 0; height: 44px; padding: 0 8px; border: 0; border-radius: 12px; background: var(--gm-chip); color: var(--gm-a); font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 5px; cursor: pointer; white-space: nowrap; }
+    .gm-bu__tool small { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--gm-a); color: #fff; font-size: 12px; font-weight: 800; }
+    .gm-bu__tool span { display: inline-flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
+    .gm-bu__tool em { font-style: normal; font-size: 11px; font-weight: 700; color: #b45309; }
+    @media (hover: hover) { .gm-bu__tool:hover:not(:disabled) { background: #e2e8f0; } }
+    .gm-bu__tool:active:not(:disabled) { transform: scale(.97); }
+    .gm-bu__tool:disabled { opacity: .45; cursor: default; }
+    .gm-bu__tool.is-nudge { animation: bu-nudge .9s ease-in-out 2; }
+    @keyframes bu-nudge { 0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); } 50% { box-shadow: 0 0 0 4px rgba(34, 197, 94, .45); } }
+    .gm-bu__help { margin: 0; font-size: 12.5px; color: var(--gm-soft); text-align: center; }
+    @media (pointer: coarse), (max-width: 640px) { .gm-bu__help { display: none; } }
+    @media (max-width: 400px) { .gm-bu__tool { font-size: 13px; gap: 4px; padding: 0 6px; } }
+    /* 덮개 — 시작 · 일시정지 · 끝 */
+    .gm-bu__cover { position: absolute; inset: 0; z-index: 20; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; box-sizing: border-box; text-align: center; color: #fff; overflow-y: auto;
+      background: linear-gradient(140deg, #334155 0%, #475569 50%, #15803d 100%); }
+    .gm-bu__cover[hidden] { display: none; }
+    .gm-bu__cover h2 { margin: 0; color: #fff; font-size: 24px; line-height: 1.3; word-break: keep-all; }
+    .gm-bu__cover p { margin: 0; font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .92); word-break: keep-all; }
+    .gm-bu__cover .gm-bu__keys { font-size: 12.5px; color: rgba(255, 255, 255, .78); }
+    .gm-bu__cover .gm-bu__big { font-size: 34px; font-weight: 800; line-height: 1.2; }
+    .gm-bu__how { width: 100%; max-width: 350px; box-sizing: border-box; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .14); text-align: left; }
+    .gm-bu__how b { display: block; margin-bottom: 4px; font-size: 13px; color: #fff; }
+    .gm-bu__how ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, .92); word-break: keep-all; }
+    .gm-bu__go { border: 0; padding: 12px 34px; border-radius: 14px; background: #fff; color: #15803d; font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; }
+    @media (hover: hover) { .gm-bu__go:hover { background: #f0fdf4; } }
+    .gm-bu__demo { position: relative; width: 156px; height: 104px; flex-shrink: 0; }
+    .gm-bu__demo .gm-bu__nut, .gm-bu__demo .gm-bu__cap { position: absolute; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "boltup",
+      setup(stage, ctx) {
+        // ── 퍼즐 엔진 (화면과 무관 — node 검사용으로 이 구간만 떼어 쓴다) ── BU-CORE-START
+        // 볼트 = 너트 번호 배열(아래 → 위). 너트 번호 = 색 번호(0~9), 가려진 너트는 색 번호 + 16
+        const CAP = 4;             // 볼트 하나에 너트 4개
+        const MAX_COLORS = 10;
+        const HID = 16;
+        const SEARCH_LIMIT = 8000; // 한 번 섞을 때 해법 탐색 상한(상태 수) — 넘으면 다시 섞는다
+        const GEN_TRIES = 60;
+        // 1·2단계 3색, 3·4단계 4색 … 15단계부터 10색
+        const colorsFor = (lv) => Math.min(MAX_COLORS, 3 + Math.floor((lv - 1) / 2));
+        // 3의 배수 단계는 「덜 찬 볼트 여럿 + 빈 볼트 1개」, 나머지는 「꽉 찬 볼트 + 빈 볼트 2개」(빈 자리 수는 같다)
+        const spareFor = (lv) => (lv % 3 === 0 ? 1 : 2);
+        // 가려진 너트 — 4단계부터 짝수 단계에 (4단계 2개, 6단계 3개 …)
+        const hiddenFor = (lv, n) => (lv >= 4 && lv % 2 === 0 ? Math.min(n + 1, 2 + Math.floor((lv - 4) / 2)) : 0);
+        const colOf = (v) => v & 15;
+        const isHid = (v) => v >= HID;
+        const LET = "abcdefghijklmnop", LETH = "ABCDEFGHIJKLMNOP";
+
+        // 맨 위에서 같은 너트가 몇 개 이어지나 — 가려진 너트는 색을 모르니 묶음에 들지 않는다
+        function topRun(b) {
+          const n = b.length;
+          if (!n) return 0;
+          const c = b[n - 1];
+          let k = 1;
+          while (k < n && b[n - 1 - k] === c) k++;
+          return k;
+        }
+        // 같은 색 4개로 꽉 차면 완성 (가려진 너트도 실제 색으로 — 완성되면 다 드러난다)
+        const isDone = (b) => b.length === CAP && b.every((v) => colOf(v) === colOf(b[0]));
+        const isSolved = (bs) => bs.every((b) => b.length === 0 || isDone(b));
+        // 받는 볼트가 비었거나, 맨 위 색이 같고 자리가 남을 때만 (완성된 볼트는 못 건드린다)
+        function canMove(bs, i, j) {
+          if (i === j) return false;
+          const s = bs[i], d = bs[j];
+          if (!s.length || isDone(s) || d.length >= CAP) return false;
+          return !d.length || d[d.length - 1] === s[s.length - 1];
+        }
+        // 맨 위 묶음을 들어가는 만큼 통째로 — 새 판(두 볼트만 복사), 옮긴 개수, 새로 드러난 너트가 있는지
+        function applyMove(bs, i, j) {
+          const n = Math.min(topRun(bs[i]), CAP - bs[j].length);
+          const out = bs.slice();
+          const s = bs[i].slice();
+          let d = bs[j].concat(s.splice(s.length - n, n));
+          let revealed = false;
+          if (s.length && isHid(s[s.length - 1])) { s[s.length - 1] -= HID; revealed = true; }
+          if (isDone(d)) d = d.map(colOf);
+          out[i] = s;
+          out[j] = d;
+          return { state: out, n, revealed };
+        }
+        const boltKey = (b) => { let s = ""; for (const v of b) s += isHid(v) ? LETH[colOf(v)] : LET[v]; return s; };
+        // 볼트 순서를 무시한 상태 열쇠
+        const canonKey = (bs) => bs.map(boltKey).sort().join("|");
+        const exactKey = (bs) => bs.map(boltKey).join("|");
+        // 남은 수의 하한 — 한 번 옮길 때 (실제 색) 덩어리 수는 많아야 1개 준다
+        function chunks(bs) {
+          let n = 0;
+          for (const b of bs) for (let k = 0; k < b.length; k++) if (k === 0 || colOf(b[k]) !== colOf(b[k - 1])) n++;
+          return n;
+        }
+        // 해 볼 만한 수 — 좋은 수부터 (볼트 하나를 채우는 수 > 같은 색 위로 통째 > 일부만 > 빈 볼트)
+        function listMoves(bs) {
+          const out = [];
+          for (let i = 0; i < bs.length; i++) {
+            const s = bs[i];
+            if (!s.length || isDone(s)) continue;
+            const run = topRun(s);
+            const c = s[s.length - 1];
+            const whole = run === s.length;         // 한 색만 든 볼트
+            let emptyTried = false;
+            for (let j = 0; j < bs.length; j++) {
+              if (j === i) continue;
+              const d = bs[j];
+              if (d.length >= CAP) continue;
+              let p;
+              if (!d.length) {
+                if (whole || emptyTried) continue;  // 한 색 볼트를 빈 볼트로 옮기는 건 제자리, 빈 볼트는 하나만 보면 된다
+                emptyTried = true;
+                p = 6;
+              } else {
+                if (d[d.length - 1] !== c) continue;
+                const dWhole = topRun(d) === d.length;
+                if (whole && dWhole && (s.length > d.length || (s.length === d.length && i < j))) continue;
+                const room = CAP - d.length;
+                if (room >= run) p = dWhole ? (d.length + run === CAP ? 0 : 1) : (whole ? 2 : 3);
+                else p = dWhole ? 4 : 5;
+              }
+              out.push([p, i, j]);
+            }
+          }
+          out.sort((a, b) => a[0] - b[0]);
+          return out;
+        }
+        // 해법 탐색 — 깊이 우선 + 본 상태 기억(볼트 순서 무시). 가려진 너트도 실제 색으로 둔 채, 드러나는 규칙까지 그대로 따라 한다
+        function solve(start, limit = SEARCH_LIMIT) {
+          const seen = new Set();
+          const path = [];
+          let nodes = 0, aborted = false;
+          function dfs(bs) {
+            if (isSolved(bs)) return true;
+            const key = canonKey(bs);
+            if (seen.has(key)) return false;
+            if (++nodes > limit) { aborted = true; return false; }
+            seen.add(key);
+            for (const [, i, j] of listMoves(bs)) {
+              path.push([i, j]);
+              if (dfs(applyMove(bs, i, j).state)) return true;
+              path.pop();
+              if (aborted) return false;
+            }
+            return false;
+          }
+          const ok = dfs(start);
+          return { moves: ok ? shorten(start, path) : null, nodes, aborted };
+        }
+        // 찾은 해의 돌아가는 길 줄이기 — 한 수로 더 뒤 상태에 갈 수 있으면 건너뛴다
+        function shorten(start, moves) {
+          const states = [start];
+          for (const [i, j] of moves) states.push(applyMove(states[states.length - 1], i, j).state);
+          const at = new Map();
+          states.forEach((s, k) => at.set(exactKey(s), k));
+          const out = [];
+          let k = 0;
+          while (k < states.length - 1) {
+            let best = k + 1, bestMove = moves[k];
+            const far = at.get(exactKey(states[k]));
+            if (far > k) { k = far; continue; }
+            const s = states[k];
+            for (let i = 0; i < s.length; i++) for (let j = 0; j < s.length; j++) {
+              if (!canMove(s, i, j)) continue;
+              const t = at.get(exactKey(applyMove(s, i, j).state));
+              if (t !== undefined && t > best) { best = t; bestMove = [i, j]; }
+            }
+            out.push(bestMove);
+            k = best;
+          }
+          return out;
+        }
+        // 새 단계 만들기 — 섞고, 가리고, 풀리는지 확인하고, 처음부터 완성된 볼트가 있으면 다시
+        function makePuzzle(level, rnd = Math.random) {
+          const n = colorsFor(level);
+          const spare = spareFor(level);
+          const hid = hiddenFor(level, n);
+          let tries = 0;
+          for (;;) {
+            tries++;
+            const pool = [];
+            for (let c = 0; c < n; c++) for (let k = 0; k < CAP; k++) pool.push(c);
+            for (let a = pool.length - 1; a > 0; a--) {
+              const b = Math.floor(rnd() * (a + 1));
+              [pool[a], pool[b]] = [pool[b], pool[a]];
+            }
+            let lens;
+            if (spare === 2) lens = Array(n).fill(CAP);
+            else {
+              // 볼트 n+1개에 너트를 나눠 꽂는다 — 빈 자리 4칸을 이리저리(볼트마다 2개 이상은 남게)
+              lens = Array(n + 1).fill(CAP);
+              let cut = CAP;
+              while (cut > 0) { const k = Math.floor(rnd() * (n + 1)); if (lens[k] > 2) { lens[k]--; cut--; } }
+            }
+            const bolts = [];
+            let p = 0;
+            for (const L of lens) { bolts.push(pool.slice(p, p + L)); p += L; }
+            for (let e = 0; e < spare; e++) bolts.push([]);
+            if (bolts.some(isDone)) continue;
+            if (hid) {
+              // 맨 위가 아닌 너트 중에서 고른다 — 맨 위는 늘 보인다
+              const spots = [];
+              bolts.forEach((b, i) => { for (let k = 0; k < b.length - 1; k++) spots.push([i, k]); });
+              for (let a = spots.length - 1; a > 0; a--) {
+                const b = Math.floor(rnd() * (a + 1));
+                [spots[a], spots[b]] = [spots[b], spots[a]];
+              }
+              spots.slice(0, hid).forEach(([i, k]) => { bolts[i][k] += HID; });
+            }
+            const res = solve(bolts);
+            const deep = !res.moves && tries >= GEN_TRIES ? solve(bolts, 200000) : null; // 거의 없는 일 — 상한을 크게 늘려 끝까지 찾는다
+            const moves = res.moves || (deep && deep.moves);
+            if (moves) {
+              const par = Math.max(moves.length, chunks(bolts) - n);
+              return { bolts, colors: n, hidden: hid, spare, par, solution: moves, tries };
+            }
+          }
+        }
+        // ── 퍼즐 엔진 끝 ── BU-CORE-END
+
+        // ── 상수 ───────────────────────────────────────────────
+        const TIME_LIMIT = 180;          // 3분
+        const UNDO_PER_STAGE = 3;
+        const MAX_SCORE = 1_000_000;
+        const T_LIFT = 180, T_FLY = 200, T_DOWN = 220; // 너트 애니메이션 — 돌려 빼기 · 옮기기 · 돌려 끼우기
+        const CLEAR_MS = 950;            // 단계를 푼 뒤 다음 단계까지
+        // 10색 — 색만으로 가리지 않게 너트 옆면에 기호를 하나씩. [이름, 색, 기호 색, 기호 테두리]
+        const COLORS = [
+          ["빨강", "#e5484d", "#fff", "rgba(110,10,15,.6)"],
+          ["파랑", "#2f6bff", "#fff", "rgba(10,25,90,.6)"],
+          ["노랑", "#f5c518", "#4a3200", "rgba(255,248,210,.9)"],
+          ["초록", "#16a34a", "#fff", "rgba(5,60,25,.6)"],
+          ["보라", "#8b5cf6", "#fff", "rgba(45,15,110,.6)"],
+          ["주황", "#f97316", "#fff", "rgba(120,45,0,.6)"],
+          ["하늘", "#38bdf8", "#082f49", "rgba(225,245,255,.9)"],
+          ["분홍", "#f472b6", "#fff", "rgba(120,15,70,.6)"],
+          ["갈색", "#8b5a35", "#fff", "rgba(50,25,8,.6)"],
+          ["남색", "#1e3a8a", "#fff", "rgba(5,10,40,.6)"],
+        ];
+        const HID_COLOR = "#7b8796";
+        // 기호 (24×24) — 동그라미 · 줄 · 별 · 십자 · 세모 · 점 · 마름모 · 하트 · 엑스 · 달
+        const SHAPES = [
+          `<path fill-rule="evenodd" d="M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zm0 4.4a4.6 4.6 0 1 0 0 9.2 4.6 4.6 0 0 0 0-9.2z"/>`,
+          `<path d="M4 4h3.6v16H4zm6.2 0h3.6v16h-3.6zm6.2 0H20v16h-3.6z"/>`,
+          `<path d="M12 1.8l3 6.4 7 .8-5.2 4.7 1.5 6.9L12 17.1l-6.3 3.5 1.5-6.9L2 9l7-.8z"/>`,
+          `<path d="M9 2.5h6v6.5h6.5v6H15v6.5H9V15H2.5V9H9z"/>`,
+          `<path d="M12 2.5 22.5 21h-21z"/>`,
+          `<circle cx="12" cy="12" r="6.2"/>`,
+          `<path d="M12 1.5 22 12 12 22.5 2 12z"/>`,
+          `<path d="M12 21.5s-9.5-5.6-9.5-12.2A5.2 5.2 0 0 1 12 6.2a5.2 5.2 0 0 1 9.5 3.1c0 6.6-9.5 12.2-9.5 12.2z"/>`,
+          `<path d="M12 8.4 17.4 3 21 6.6 15.6 12l5.4 5.4-3.6 3.6-5.4-5.4L6.6 21 3 17.4 8.4 12 3 6.6 6.6 3z"/>`,
+          `<path d="M15.5 2a10 10 0 1 0 6.5 16.6A8.2 8.2 0 0 1 15.5 2z"/>`,
+        ].map((p) => `<svg viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`);
+        const QMARK = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c4.3 0 7.3 2.5 7.3 6.1 0 2.6-1.5 4-3.4 5.1-1.5.9-1.9 1.4-1.9 2.6v.6H9.6v-.9c0-2.3.9-3.5 2.8-4.6 1.4-.8 2-1.4 2-2.5 0-1.2-1-2-2.5-2-1.6 0-2.7.9-2.8 2.5H4.6c.1-4.2 3.2-6.9 7.4-6.9zM9.4 18.4h4.8v3.6H9.4z"/></svg>`;
+        const fmt = (n) => n.toLocaleString("ko-KR");
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+        // ── 화면 ───────────────────────────────────────────────
+        stage.innerHTML = `<div class="gm-bu" tabindex="0">
+          <div class="gm-bu__bar">
+            <span class="gm-bu__chip">${HKUI.icon("star", 15, "currentColor")}<b data-score>0</b></span>
+            <span class="gm-bu__chip">${HKUI.icon("bolt", 15, "currentColor")}<span data-level>1단계</span></span>
+            <span class="gm-bu__gap"></span>
+            <span class="gm-bu__chip gm-bu__chip--time" data-timechip>${HKUI.icon("timer", 15, "currentColor")}<b data-time>3:00</b></span>
+          </div>
+          <div class="gm-bu__time" data-timebar><i></i></div>
+          <div class="gm-bu__meta"><span>이번 단계 <b data-moves>0</b>수 · 목표 <b data-par>0</b>수</span><span data-kinds><b data-colors>3</b>가지 색</span></div>
+          <div class="gm-bu__board" data-board><div class="gm-bu__layer" data-static></div><div class="gm-bu__layer gm-bu__layer--top" data-nuts></div><div class="gm-bu__layer gm-bu__layer--top" data-caps></div></div>
+          <div class="gm-bu__tools">
+            <button type="button" class="gm-bu__tool" data-undo>${HKUI.icon("undo-2", 16, "currentColor")} 되돌리기 <small data-undos>3</small></button>
+            <button type="button" class="gm-bu__tool" data-extra>${HKUI.icon("plus", 16, "currentColor")} <span><b data-extratext>빈 볼트 +1</b><em data-extranote>이 단계 점수 ½</em></span></button>
+            <button type="button" class="gm-bu__tool" data-reset>${HKUI.icon("rotate-ccw", 16, "currentColor")} 처음부터</button>
+          </div>
+          <p class="gm-bu__help">볼트를 눌러 너트를 빼고, 끼울 볼트를 눌러요 · 숫자키 1~0 볼트 고르기 · Z 되돌리기 · B 빈 볼트 · Esc 쉬기</p>
+          <div class="gm-bu__cover" data-cover></div>
+        </div>`;
+        const root = stage.querySelector(".gm-bu");
+        const boardEl = root.querySelector("[data-board]");
+        const staticEl = root.querySelector("[data-static]");
+        const nutsEl = root.querySelector("[data-nuts]");
+        const capsEl = root.querySelector("[data-caps]");
+        const cover = root.querySelector("[data-cover]");
+        const scoreEl = root.querySelector("[data-score]");
+        const levelEl = root.querySelector("[data-level]");
+        const timeEl = root.querySelector("[data-time]");
+        const timeChip = root.querySelector("[data-timechip]");
+        const timeBar = root.querySelector("[data-timebar]");
+        const movesEl = root.querySelector("[data-moves]");
+        const parEl = root.querySelector("[data-par]");
+        const kindsEl = root.querySelector("[data-kinds]");
+        const undoBtn = root.querySelector("[data-undo]");
+        const undosEl = root.querySelector("[data-undos]");
+        const extraBtn = root.querySelector("[data-extra]");
+        const extraText = root.querySelector("[data-extratext]");
+        const extraNote = root.querySelector("[data-extranote]");
+        const resetBtn = root.querySelector("[data-reset]");
+        HKUI.refreshIcons(root);
+
+        // ── 상태 ───────────────────────────────────────────────
+        let state = "ready";   // ready · play · pause · over
+        let level = 1, score = 0, solvedCount = 0;
+        let puzzle = null;     // { start, colors, hidden, par }
+        let bolts = [];        // 지금 볼트들 — 볼트 = 너트 배열(아래 → 위), 너트 = { id, v } (고치지 않고 늘 새로 만든다)
+        let history = [];      // 되돌리기용 이전 상태들
+        let undoLeft = UNDO_PER_STAGE;
+        let extraUsed = false; // 이 단계에서 빈 볼트를 더 썼나
+        let sel = -1, selRun = 0;
+        let clearing = false;
+        let hidTipShown = false;
+        let nextPuzzle = null, nextTimer = 0, clearTimer = 0;
+        let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, rafId = 0, lastSec = 0;
+        let els = [];          // 볼트 단추
+        let caps = [];         // 볼트마다 캡
+        let geo = [];          // 볼트 자리 { x(가운데), plate(받침 위 끝 = 맨 아래 너트 바닥), tip(기둥 끝) } — 판 기준 px
+        let dim = { nw: 48, nh: 19, lift: 26 };
+        const nutEls = new Map(); // 너트 id → 그림
+        let animTimers = [];   // 진행 중인 애니메이션 타이머 (빠른 다음 조작이면 바로 끝 모습으로)
+        let animEnd = null;
+        const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
+        const ints = (bs = bolts) => bs.map((b) => b.map((x) => x.v));
+        const snap = () => bolts.map((b) => b.slice());
+
+        // ── 너트 그리기 ─────────────────────────────────────────
+        function nutLook(el, v) {
+          if (el._v === v) return;
+          el._v = v;
+          const h = isHid(v), c = colOf(v);
+          el.classList.toggle("is-hid", h);
+          el.style.setProperty("--c", h ? HID_COLOR : COLORS[c][1]);
+          el.style.setProperty("--s", h ? "#fff" : COLORS[c][2]);
+          el.style.setProperty("--o", h ? "rgba(15,23,42,.55)" : COLORS[c][3]);
+          el.innerHTML = `<i class="gm-bu__face"></i>${h ? QMARK : SHAPES[c]}`;
+        }
+        function nutEl(nut) {
+          let el = nutEls.get(nut.id);
+          if (!el) {
+            el = document.createElement("div");
+            el.className = "gm-bu__nut";
+            nutEls.set(nut.id, el);
+            nutsEl.appendChild(el);
+          }
+          nutLook(el, nut.v);
+          return el;
+        }
+        // 너트가 있을 자리 — 고른 볼트의 맨 위 묶음은 기둥 끝 위로 돌려 빼 둔다
+        function nutPos(i, k, len) {
+          const g = geo[i];
+          const x = g.x - dim.nw / 2;
+          if (i === sel && k >= len - selRun) return { x, y: g.tip - dim.lift + (len - 1 - k) * dim.nh, up: true };
+          return { x, y: g.plate - (k + 1) * dim.nh, up: false };
+        }
+        function place(el, p, ms, spin) {
+          el.style.transition = ms ? `transform ${ms}ms cubic-bezier(.33,.75,.4,1)` : "none";
+          el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)`;
+          el.classList.toggle("is-up", !!p.up);
+          if (spin && ms) {
+            el.classList.add("is-spin");
+            el.classList.toggle("is-rev", spin < 0);
+            el.style.setProperty("--spin", `${Math.round(ms / 1.6)}ms`);
+          } else if (!ms) el.classList.remove("is-spin", "is-rev");
+        }
+        // 모든 너트를 지금 상태 자리로 — spinIds 에 든 너트만 돌리며 (1 빼기, -1 끼우기)
+        function layout(ms = 0, spinIds = null, dir = 1) {
+          const live = new Set();
+          bolts.forEach((b, i) => b.forEach((nut, k) => {
+            live.add(nut.id);
+            place(nutEl(nut), nutPos(i, k, b.length), ms, spinIds && spinIds.has(nut.id) ? dir : 0);
+          }));
+          for (const [id, el] of nutEls) if (!live.has(id)) { el.remove(); nutEls.delete(id); }
+          if (ms && spinIds) after(ms, () => spinIds.forEach((id) => { const el = nutEls.get(id); if (el) el.classList.remove("is-spin", "is-rev"); }));
+        }
+        function after(ms, fn) { const t = setTimeout(() => { animTimers = animTimers.filter((x) => x !== t); fn(); }, ms); animTimers.push(t); }
+        // 애니메이션 중간에 다음 조작이 오면 — 남은 일을 바로 끝내고 끝 모습으로
+        function finishAll() {
+          animTimers.forEach(clearTimeout);
+          animTimers = [];
+          const end = animEnd;
+          animEnd = null;
+          if (end) end();
+          if (geo.length === bolts.length) layout(0);
+          drawBolts();
+        }
+        function boltLabel(i, b) {
+          if (!b.length) return `${i + 1}번 볼트 · 비어 있음`;
+          return `${i + 1}번 볼트 · 아래부터 ${b.map((x) => (isHid(x.v) ? "가려진 너트" : COLORS[colOf(x.v)][0])).join(", ")}${isDone(b.map((x) => x.v)) ? " · 완성" : ""}`;
+        }
+        function drawBolts() {
+          els.forEach((el, i) => {
+            const b = bolts[i] || [];
+            const done = isDone(b.map((x) => x.v));
+            el.classList.toggle("is-done", done);
+            el.classList.toggle("is-sel", i === sel);
+            el.setAttribute("aria-label", boltLabel(i, b));
+            if (caps[i]) caps[i].classList.toggle("is-on", done);
+          });
+        }
+
+        // ── 볼트 놓기 — 판 크기에 맞춰 줄 수를 고른다(너트가 가장 커지게) ──
+        function fit() {
+          finishAll();
+          const n = bolts.length || 5;
+          const room = HKPlay.roomFor(stage, boardEl);
+          const H = clamp(room, 220, 640);
+          boardEl.style.height = `${H}px`;
+          const W = boardEl.clientWidth || 320;
+          const hasNums = n <= 10;
+          root.classList.toggle("has-nums", hasNums);
+          const numH = hasNums && matchMedia("(hover: hover) and (pointer: fine)").matches ? 14 : 0;
+          const padX = 6, padY = 6, RAIL = 9;
+          const fixed = RAIL + numH + 14;
+          // 한 줄 높이 ≈ 너트 폭 × 2.7 (받침 + 너트 4개 + 기둥 끝 + 빼 둔 너트 자리)
+          const K = 0.2 + 0.4 * (CAP + 0.55 + 1.4);
+          let best = null;
+          for (let rows = 1; rows <= 3; rows++) {
+            const cols = Math.ceil(n / rows);
+            const slotW = (W - padX * 2) / cols;
+            const slotH = (H - padY * 2) / rows;
+            const w = Math.min(slotW * 0.8, (slotH - fixed) / K, 80);
+            const sc = rows === 3 ? w * 0.9 : w;
+            if (!best || sc > best.sc + 0.01) best = { rows, cols, slotW, slotH, w, sc };
+          }
+          const { rows, slotW } = best;
+          const nw = Math.max(22, Math.floor(best.w / 2) * 2);
+          const nh = Math.round(nw * 0.4);
+          const rw = Math.max(6, Math.round(nw * 0.3));
+          const ph = Math.max(5, Math.round(nw * 0.2));
+          const pw = Math.round(nw * 1.12);
+          const tipLen = Math.max(5, Math.round(nh * 0.55));
+          const lift = Math.round(nh * 1.4);
+          dim = { nw, nh, lift };
+          root.style.setProperty("--nw", `${nw}px`);
+          root.style.setProperty("--nh", `${nh}px`);
+          // 볼트가 판보다 한참 작으면 줄 높이를 볼트에 맞춰 줄이고 판 가운데에 모은다
+          const content = ph + CAP * nh + tipLen + lift + 8;
+          const slotH = Math.min(best.slotH, content + fixed + 22);
+          const perRow = [];
+          let left = n;
+          for (let r = 0; r < rows; r++) { const c = Math.ceil(left / (rows - r)); perRow.push(c); left -= c; }
+          geo = [];
+          staticEl.innerHTML = "";
+          capsEl.innerHTML = "";
+          caps = [];
+          const blockH = slotH * rows;
+          const y0 = (H - blockH) / 2;
+          const cw = Math.round(nw * 0.72), chh = Math.round(nh * 1.15);
+          let idx = 0;
+          perRow.forEach((cnt, r) => {
+            const rowW = cnt * slotW;
+            const x0 = (W - rowW) / 2;
+            const sy = y0 + r * slotH;
+            const railTop = sy + slotH - numH - 4 - RAIL;
+            const plate = railTop - ph;
+            const tip = plate - CAP * nh - tipLen;
+            const rail = document.createElement("div");
+            rail.className = "gm-bu__rail";
+            rail.style.cssText = `left:${x0 + slotW * 0.08}px;width:${rowW - slotW * 0.16}px;top:${railTop}px`;
+            staticEl.appendChild(rail);
+            for (let c = 0; c < cnt; c++, idx++) {
+              const sx = x0 + c * slotW;
+              geo[idx] = { x: sx + slotW / 2, plate, tip };
+              const el = document.createElement("button");
+              el.type = "button";
+              el.className = "gm-bu__b";
+              el.tabIndex = -1;
+              el.dataset.i = idx;
+              el.style.cssText = `left:${sx}px;top:${sy}px;width:${slotW}px;height:${slotH}px`;
+              el.innerHTML = `<span class="gm-bu__wob"><span class="gm-bu__rod" style="left:${(slotW - rw) / 2}px;top:${tip - sy}px;width:${rw}px;height:${CAP * nh + tipLen + Math.round(ph / 2)}px"></span><span class="gm-bu__plate" style="left:${(slotW - pw) / 2}px;top:${plate - sy}px;width:${pw}px;height:${ph}px"></span></span><small class="gm-bu__num">${(idx + 1) % 10}</small>`;
+              els[idx] = el;
+              staticEl.appendChild(el);
+              const cap = document.createElement("i");
+              cap.className = "gm-bu__cap";
+              cap.style.cssText = `left:${geo[idx].x - cw / 2}px;top:${plate - CAP * nh - chh + 2}px;width:${cw}px;height:${chh}px`;
+              caps[idx] = cap;
+              capsEl.appendChild(cap);
+            }
+          });
+          els.length = n;
+          layout(0);
+          drawBolts();
+        }
+
+        // ── 효과 ───────────────────────────────────────────────
+        function capOn(j) {
+          const cap = caps[j];
+          if (!cap) return;
+          cap.classList.add("is-on");
+          cap.classList.remove("is-drop");
+          void cap.offsetWidth;
+          cap.classList.add("is-drop");
+          setTimeout(() => cap.classList.remove("is-drop"), 460);
+          const g = geo[j];
+          const cy = g.plate - CAP * dim.nh - dim.nh * 0.4;
+          for (let k = 0; k < 7; k++) {
+            const sp = document.createElement("i");
+            sp.className = "gm-bu__spark";
+            const ang = (k / 7) * Math.PI * 2 - Math.PI / 2;
+            const r = dim.nw * (0.7 + Math.random() * 0.4);
+            sp.style.cssText = `left:${g.x}px;top:${cy}px;--dx:${(Math.cos(ang) * r).toFixed(1)}px;--dy:${(Math.sin(ang) * r).toFixed(1)}px;animation-delay:${k * 20}ms`;
+            boardEl.appendChild(sp);
+            setTimeout(() => sp.remove(), 800);
+          }
+        }
+        function popNut(id) {
+          const el = nutEls.get(id);
+          if (!el) return;
+          el.classList.remove("is-pop");
+          void el.offsetWidth;
+          el.classList.add("is-pop");
+          setTimeout(() => el.classList.remove("is-pop"), 460);
+        }
+        function shake(i) {
+          const w = els[i] && els[i].querySelector(".gm-bu__wob");
+          if (!w) return;
+          const list = [w, ...(bolts[i] || []).map((x) => nutEls.get(x.id)).filter(Boolean)];
+          list.forEach((e) => { e.classList.remove("is-shake"); void e.offsetWidth; e.classList.add("is-shake"); });
+          setTimeout(() => list.forEach((e) => e.classList.remove("is-shake")), 300);
+        }
+        function floatText(text, plain, yFrac = 0.4) {
+          const f = document.createElement("div");
+          f.className = `gm-bu__float${plain ? " is-plain" : ""}`;
+          f.textContent = text;
+          f.style.top = `${boardEl.clientHeight * yFrac}px`;
+          boardEl.appendChild(f);
+          setTimeout(() => f.remove(), plain ? 2000 : 1200);
+        }
+
+        // ── 점수 줄 ─────────────────────────────────────────────
+        function hiddenLeft() {
+          let k = 0;
+          for (const b of bolts) for (const x of b) if (isHid(x.v)) k++;
+          return k;
+        }
+        function drawHud() {
+          scoreEl.textContent = fmt(score);
+          levelEl.textContent = `${fmt(level)}단계`;
+          movesEl.textContent = fmt(history.length);
+          parEl.textContent = fmt(puzzle ? puzzle.par : 0);
+          const colors = puzzle ? puzzle.colors : colorsFor(level);
+          const hl = hiddenLeft();
+          kindsEl.classList.toggle("is-hid", hl > 0);
+          kindsEl.innerHTML = `<b>${fmt(colors)}</b>가지 색${hl ? ` · 물음표 <b>${fmt(hl)}</b>개` : ""}`;
+          undosEl.textContent = fmt(undoLeft);
+          const live = state === "play" && !clearing;
+          undoBtn.disabled = !live || !undoLeft || !history.length;
+          resetBtn.disabled = !live || !history.length;
+          extraBtn.disabled = !live || extraUsed;
+          extraText.textContent = extraUsed ? "빈 볼트 씀" : "빈 볼트 +1";
+          extraNote.textContent = extraUsed ? "이 단계 점수 ½" : "쓰면 점수 ½";
+          drawTime();
+        }
+        function drawTime() {
+          const sec = Math.ceil(timeLeftMs / 1000);
+          timeEl.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+          timeBar.firstElementChild.style.width = `${clamp((timeLeftMs / (TIME_LIMIT * 1000)) * 100, 0, 100)}%`;
+          timeBar.classList.toggle("is-low", sec <= 20);
+          timeChip.classList.toggle("is-low", sec <= 20);
+        }
+
+        // ── 단계 ───────────────────────────────────────────────
+        let nutSeq = 0;
+        const toNuts = (bs) => bs.map((b) => b.map((v) => ({ id: ++nutSeq, v })));
+        function prepareNext() {
+          clearTimeout(nextTimer);
+          const want = level + 1;
+          nextPuzzle = null;
+          nextTimer = setTimeout(() => { nextPuzzle = { level: want, p: makePuzzle(want) }; }, 120);
+        }
+        function loadLevel() {
+          finishAll();
+          const p = nextPuzzle && nextPuzzle.level === level ? nextPuzzle.p : makePuzzle(level);
+          bolts = toNuts(p.bolts);
+          puzzle = { start: snap(), colors: p.colors, hidden: p.hidden, par: p.par };
+          history = [];
+          undoLeft = UNDO_PER_STAGE;
+          extraUsed = false;
+          sel = -1;
+          nutEls.forEach((el) => el.remove());
+          nutEls.clear();
+          boardEl.querySelectorAll(".gm-bu__float").forEach((f) => f.remove());
+          els = [];
+          fit();
+          drawHud();
+          prepareNext();
+          if (p.hidden && !hidTipShown && state === "play") {
+            hidTipShown = true;
+            setTimeout(() => { if (state === "play") floatText("물음표 너트는 위를 치우면 색이 보여요", true, 0.18); }, 350);
+          }
+        }
+        // 단계 점수 — 단계 × 100 + 수 절약 보너스(목표 수에 가까울수록, 목표의 두 배를 넘으면 0). 빈 볼트를 더 쓰면 절반
+        function stagePoints(lv, moves, par, extra) {
+          const base = lv * 100;
+          const bonus = Math.round(base * clamp((2 * par - moves) / par, 0, 1));
+          const total = extra ? Math.round((base + bonus) / 2) : base + bonus;
+          return { base, bonus, total };
+        }
+        function stageClear(delay) {
+          clearing = true;
+          const { bonus, total } = stagePoints(level, history.length, puzzle.par, extraUsed);
+          score = Math.min(MAX_SCORE, score + total);
+          solvedCount++;
+          drawHud();
+          setTimeout(() => { if (state === "play" || state === "pause") sfx("powerup"); }, delay);
+          setTimeout(() => floatText(`${fmt(level)}단계 완료! +${fmt(total)}`), delay);
+          if (extraUsed) setTimeout(() => floatText("빈 볼트를 더 써서 점수 절반", true, 0.56), delay + 200);
+          else if (bonus) setTimeout(() => floatText(`${fmt(history.length)}수 · 절약 보너스 +${fmt(bonus)}`, true, 0.56), delay + 200);
+          clearTimeout(clearTimer);
+          clearTimer = setTimeout(() => {
+            if (state !== "play" && state !== "pause") return;
+            level++;
+            clearing = false;
+            loadLevel();
+            sfx("whoosh");
+          }, CLEAR_MS + delay);
+        }
+
+        // ── 조작 ───────────────────────────────────────────────
+        function liftedIds() {
+          const b = bolts[sel] || [];
+          return new Set(b.slice(b.length - selRun).map((x) => x.id));
+        }
+        function tap(i) {
+          if (state !== "play" || clearing || i < 0 || i >= bolts.length) return;
+          if (animTimers.length) finishAll();
+          const iv = ints();
+          if (sel < 0) {
+            const b = iv[i];
+            if (!b.length || isDone(b)) { shake(i); sfx("invalid"); return; }
+            sel = i;
+            selRun = topRun(b);
+            sfx("select");
+            layout(T_LIFT, liftedIds(), 1);
+            drawBolts();
+            return;
+          }
+          if (sel === i) {
+            const ids = liftedIds();
+            sel = -1;
+            sfx("tap");
+            layout(T_LIFT, ids, -1);
+            drawBolts();
+            return;
+          }
+          if (!canMove(iv, sel, i)) {
+            shake(i);
+            sfx("invalid");
+            return;
+          }
+          move(sel, i);
+        }
+        function move(i, j) {
+          const before = ints();
+          const n = Math.min(topRun(before[i]), CAP - before[j].length);
+          const restIds = liftedIds();
+          history.push(snap());
+          // 묶음을 순서 그대로 옮긴다 (색이 같아 겉으로는 같다)
+          const s = bolts[i].slice();
+          const movedNuts = s.splice(s.length - n, n);
+          movedNuts.forEach((x) => restIds.delete(x.id));
+          let d = bolts[j].concat(movedNuts);
+          let revealed = null;
+          if (s.length && isHid(s[s.length - 1].v)) {
+            const t = s[s.length - 1];
+            revealed = t.id;
+            s[s.length - 1] = { id: t.id, v: t.v - HID };
+          }
+          const done = isDone(d.map((x) => x.v));
+          const opened = done ? d.filter((x) => isHid(x.v)).map((x) => x.id) : [];
+          if (done) d = d.map((x) => (isHid(x.v) ? { id: x.id, v: colOf(x.v) } : x));
+          bolts[i] = s;
+          bolts[j] = d;
+          sel = -1;
+          // 1) 옮기는 너트는 받는 볼트 위로 날아가고, 못 들어간 나머지는 제 볼트로 돌려 끼운다
+          const movedIds = new Set(movedNuts.map((x) => x.id));
+          bolts.forEach((b, bi) => b.forEach((nut, k) => {
+            const el = nutEl(nut);
+            if (movedIds.has(nut.id)) {
+              const g = geo[j];
+              el.classList.add("is-fly");
+              place(el, { x: g.x - dim.nw / 2, y: g.tip - dim.lift + (b.length - 1 - k) * dim.nh, up: true }, T_FLY, 0);
+            } else if (restIds.has(nut.id)) place(el, nutPos(bi, k, b.length), T_DOWN, -1);
+          }));
+          drawBolts();
+          if (caps[j]) caps[j].classList.remove("is-on"); // 캡은 너트가 다 내려간 뒤에
+          if (revealed) popNut(revealed);
+          sfx("swap");
+          // 2) 받는 볼트로 돌려 끼우기
+          after(T_FLY, () => {
+            movedIds.forEach((id) => { const el = nutEls.get(id); if (el) el.classList.remove("is-fly"); });
+            layout(T_DOWN, movedIds, -1);
+            if (caps[j]) caps[j].classList.remove("is-on");
+          });
+          const land = () => {
+            drawBolts();
+            if (done) {
+              capOn(j);
+              opened.forEach(popNut);
+              if (!isSolved(ints())) sfx("coin");
+            } else sfx("drop");
+          };
+          animEnd = land;
+          after(T_FLY + T_DOWN, () => { animEnd = null; land(); animTimers = []; });
+          drawHud();
+          if (isSolved(ints())) { stageClear(T_FLY + T_DOWN); return; }
+          // 더 옮길 곳이 없으면 알려 준다
+          const now = ints();
+          let any = false;
+          for (let a = 0; a < now.length && !any; a++) for (let b = 0; b < now.length; b++) if (canMove(now, a, b)) { any = true; break; }
+          if (!any) {
+            setTimeout(() => {
+              if (state !== "play" || clearing) return;
+              const tool = undoLeft ? undoBtn : !extraUsed ? extraBtn : resetBtn;
+              floatText(undoLeft ? "더 옮길 곳이 없어요 · 되돌리기를 써요" : !extraUsed ? "더 옮길 곳이 없어요 · 빈 볼트를 하나 더 써요" : "더 옮길 곳이 없어요 · 처음부터 해 봐요", true);
+              tool.classList.remove("is-nudge");
+              void tool.offsetWidth;
+              tool.classList.add("is-nudge");
+            }, T_FLY + T_DOWN + 80);
+          }
+        }
+        function undo() {
+          if (state !== "play" || clearing || !undoLeft || !history.length) return;
+          finishAll();
+          bolts = history.pop();
+          undoLeft--;
+          sel = -1;
+          layout(T_DOWN);
+          drawBolts();
+          sfx("whoosh");
+          drawHud();
+        }
+        function restartStage() {
+          if (state !== "play" || clearing || !history.length) return;
+          finishAll();
+          bolts = puzzle.start.map((b) => b.slice());
+          history = [];
+          sel = -1;
+          layout(T_DOWN + 60);
+          drawBolts();
+          sfx("whoosh");
+          floatText("이 단계를 처음부터 해요 · 시간은 그대로 흘러요", true);
+          drawHud();
+        }
+        // 빈 볼트 하나 더 — 단계마다 한 번, 이 단계 점수는 절반. 되돌리기 · 처음부터 해도 빈 볼트는 남는다
+        function addBolt() {
+          if (state !== "play" || clearing || extraUsed) return;
+          finishAll();
+          extraUsed = true;
+          bolts.push([]);
+          history = history.map((h) => h.concat([[]]));
+          puzzle.start = puzzle.start.concat([[]]);
+          fit();
+          sfx("pop");
+          floatText("빈 볼트를 하나 더 꽂았어요 · 이 단계 점수는 절반", true, 0.2);
+          drawHud();
+        }
+
+        // ── 시간 ───────────────────────────────────────────────
+        function loop() {
+          if (state !== "play") return;
+          const t = performance.now();
+          timeLeftMs -= clamp(t - lastTick, 0, 250);
+          lastTick = t;
+          const sec = Math.ceil(timeLeftMs / 1000);
+          if (sec !== lastSec) {
+            lastSec = sec;
+            if (sec >= 1 && sec <= 5) sfx("countdown");
+          }
+          if (timeLeftMs <= 0) {
+            timeLeftMs = 0;
+            gameOver();
+            return;
+          }
+          drawTime();
+          rafId = requestAnimationFrame(loop);
+        }
+
+        // ── 판 흐름 ─────────────────────────────────────────────
+        function start() {
+          if (state !== "ready") return;
+          state = "play";
+          lastSec = Math.ceil(timeLeftMs / 1000);
+          sfx("go");
+          showCover("none");
+          lastTick = performance.now();
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "pause";
+          cancelAnimationFrame(rafId);
+          finishAll();
+          if (sel >= 0) { sel = -1; layout(0); drawBolts(); }
+          ctx.sfx("select");
+          showCover("pause");
+          drawHud();
+        }
+        function resume() {
+          if (state !== "pause") return;
+          state = "play";
+          showCover("none");
+          lastTick = performance.now();
+          sfx("go");
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        function gameOver() {
+          // 단계를 막 풀어 점수가 들어간 뒤라면 그대로 — 넘어가는 중인 다음 단계만 멈춘다
+          clearTimeout(clearTimer);
+          ctx.sfx(solvedCount ? "win" : "lose");
+          state = "over";
+          cancelAnimationFrame(rafId);
+          finishAll();
+          if (sel >= 0) { sel = -1; layout(0); drawBolts(); }
+          drawHud();
+          const final = clamp(Math.round(score), 0, MAX_SCORE);
+          showCover("over");
+          ctx.submit(final);
+        }
+        function again() {
+          if (state !== "over") return;
+          ctx.sfx("tap");
+          reset();
+        }
+        function reset() {
+          cancelAnimationFrame(rafId);
+          clearTimeout(clearTimer);
+          state = "ready";
+          level = 1;
+          score = 0;
+          solvedCount = 0;
+          clearing = false;
+          hidTipShown = false;
+          timeLeftMs = TIME_LIMIT * 1000;
+          nextPuzzle = null;
+          loadLevel();
+          showCover("ready");
+        }
+
+        // ── 덮개 ───────────────────────────────────────────────
+        function demoHtml() {
+          // 시작 화면 그림 — 섞인 볼트 · 너트를 돌려 빼는 볼트 · 캡을 씌운 볼트 (판의 부품을 작게)
+          const nw = 32, nh = 13, rw = 10, ph = 6, pw = 36, tipLen = 7;
+          const plate = 92, tip = plate - CAP * nh - tipLen;
+          const list = [{ x: 24, b: [0, 1 + HID, 2, 1] }, { x: 78, b: [2, 0], up: 1 }, { x: 132, b: [1, 1, 1, 1], done: true }];
+          let h = "";
+          list.forEach(({ x, b, up, done }) => {
+            h += `<span style="position:absolute;left:${x - rw / 2}px;top:${tip}px;width:${rw}px;height:${CAP * nh + tipLen + 3}px" class="gm-bu__rod"></span>`;
+            h += `<span style="position:absolute;left:${x - pw / 2}px;top:${plate}px;width:${pw}px;height:${ph}px;${done ? "background:linear-gradient(180deg,#86efac,#16a34a)" : ""}" class="gm-bu__plate"></span>`;
+            b.forEach((v, k) => {
+              const lifted = up && k >= b.length - up;
+              const y = lifted ? tip - 18 : plate - (k + 1) * nh;
+              const hid = isHid(v), c = colOf(v);
+              h += `<span class="gm-bu__nut${hid ? " is-hid" : ""}${lifted ? " is-up" : ""}" style="--nw:${nw}px;--nh:${nh}px;--c:${hid ? HID_COLOR : COLORS[c][1]};--s:${hid ? "#fff" : COLORS[c][2]};--o:${hid ? "rgba(15,23,42,.55)" : COLORS[c][3]};transform:translate(${x - nw / 2}px,${y}px)"><i class="gm-bu__face"></i>${hid ? QMARK : SHAPES[c]}</span>`;
+            });
+            if (done) h += `<i class="gm-bu__cap is-on" style="left:${x - 12}px;top:${plate - CAP * nh - 15 + 2}px;width:24px;height:15px"></i>`;
+          });
+          return `<div class="gm-bu__demo" aria-hidden="true">${h}</div>`;
+        }
+        function showCover(kind) {
+          if (kind === "none") {
+            cover.hidden = true;
+            return;
+          }
+          cover.hidden = false;
+          if (kind === "ready") {
+            cover.innerHTML = `${demoHtml()}
+              <h2>볼트 업</h2>
+              <p>너트를 돌려 빼서 옮겨<br>볼트마다 한 가지 색 너트 4개를 채워요.</p>
+              <div class="gm-bu__how"><b>이렇게 해요</b><ol>
+                <li>볼트를 누르면 맨 위 너트(같은 색은 묶음째)가 빠져요. 끼울 볼트를 눌러요.</li>
+                <li>빈 볼트나 맨 위가 같은 색인 볼트에만, 자리가 남은 만큼 끼워져요.</li>
+                <li>물음표 너트는 위를 치우면 색이 보여요.</li>
+                <li>3분 동안 단계를 깰수록 점수가 쌓여요. 적은 수로 깨면 보너스!</li>
+              </ol></div>
+              <p class="gm-bu__keys">되돌리기는 단계마다 ${UNDO_PER_STAGE}번 · 빈 볼트 +1은 단계마다 한 번(그 단계 점수 절반)</p>
+              <button type="button" class="gm-bu__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
+          } else if (kind === "pause") {
+            cover.innerHTML = `<h2>잠깐 쉬는 중</h2><p>시간이 멈춰 있어요. 판은 가려 둘게요.</p>
+              <p class="gm-bu__keys">${fmt(level)}단계 · ${fmt(score)}점</p>
+              <button type="button" class="gm-bu__go" data-go>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
+          } else {
+            cover.innerHTML = `<h2>시간 끝!</h2><div class="gm-bu__big">${fmt(score)}점</div>
+              <p>${solvedCount ? `${fmt(solvedCount)}단계까지 깼어요` : "다음엔 한 단계라도 깨 봐요"}</p>
+              <button type="button" class="gm-bu__go" data-go>${HKUI.icon("rotate-ccw", 18, "currentColor")} 다시 하기</button>`;
+          }
+          HKUI.refreshIcons(cover);
+          const go = cover.querySelector("[data-go]");
+          if (go) go.onclick = () => (state === "ready" ? start() : state === "pause" ? resume() : again());
+        }
+
+        // ── 입력 ───────────────────────────────────────────────
+        boardEl.addEventListener("pointerdown", (e) => {
+          if (!e.isPrimary || e.button > 0) return;
+          const b = e.target.closest(".gm-bu__b");
+          if (!b) {
+            if (sel >= 0 && state === "play" && !clearing) {
+              if (animTimers.length) finishAll();
+              const ids = liftedIds();
+              sel = -1;
+              layout(T_LIFT, ids, -1);
+              drawBolts();
+            }
+            return;
+          }
+          e.preventDefault();
+          tap(Number(b.dataset.i));
+        });
+        undoBtn.addEventListener("click", undo);
+        resetBtn.addEventListener("click", restartStage);
+        extraBtn.addEventListener("click", addBolt);
+        document.addEventListener("keydown", (e) => {
+          if (e.target && e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          if (state !== "play") return;
+          if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); return; }
+          const m = /^(?:Digit|Numpad)(\d)$/.exec(e.code);
+          if (m) {
+            e.preventDefault();
+            if (!e.repeat) tap(m[1] === "0" ? 9 : Number(m[1]) - 1);
+          } else if (e.code === "KeyZ" || e.code === "Backspace") {
+            e.preventDefault();
+            if (!e.repeat) undo();
+          } else if (e.code === "KeyB") {
+            e.preventDefault();
+            if (!e.repeat) addBolt();
+          }
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+        let rt = 0;
+        window.addEventListener("resize", () => {
+          clearTimeout(rt);
+          rt = setTimeout(fit, 80);
+        });
+
+        // 게임 중 뒤로 가기 → '기록 남기고 나가기'에 쓰는 지금 점수
+        ctx.onScore && ctx.onScore(() => Math.round(score));
+        ctx.onRestart(reset);
+        ctx.onPause(pause);
+        reset();
+        requestAnimationFrame(fit);
+      },
+    });
+  </script>
+</body>
+</html>

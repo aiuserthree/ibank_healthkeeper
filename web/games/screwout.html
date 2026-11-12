@@ -1,0 +1,1004 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>나사 풀기 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <style>
+    .gm-so { --gm-a: #92400e; --gm-b: #f59e0b; --gm-ink: #3b1d06; --gm-soft: #78716c; --gm-chip: #fef3c7;
+      position: relative; display: flex; flex-direction: column; gap: 8px; color: var(--gm-ink); outline: none;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    /* 1. 점수 줄 */
+    .gm-so__bar { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+    .gm-so__chip { display: inline-flex; align-items: center; gap: 5px; padding: 7px 11px; border-radius: 12px; background: var(--gm-chip); color: var(--gm-ink); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-so__chip b { font-size: 16px; }
+    .gm-so__gap { flex: 1; }
+    .gm-so__chip--time b { font-size: 18px; min-width: 40px; text-align: right; }
+    .gm-so__chip--time.is-low { background: #fee2e2; color: #b91c1c; }
+    .gm-so__time { position: relative; height: 8px; border-radius: 999px; background: #e7e5e4; overflow: hidden; }
+    .gm-so__time i { position: absolute; inset: 0 auto 0 0; width: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--gm-a), var(--gm-b)); transition: width .2s linear; }
+    .gm-so__time.is-low i { background: linear-gradient(90deg, #dc2626, #fb923c); }
+    .gm-so__meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--gm-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .gm-so__meta b { color: var(--gm-ink); }
+    /* 2. 판 */
+    .gm-so__board { position: relative; width: 100%; height: 380px; border-radius: 16px; background: #efe4d2; overflow: hidden; touch-action: none; cursor: pointer; }
+    .gm-so__board svg { position: absolute; left: 0; top: 0; display: block; overflow: visible; }
+    .gm-so__fx { pointer-events: none; z-index: 2; }
+    .gm-so__plate { transition: transform .35s cubic-bezier(.3, 1.4, .5, 1); }
+    .gm-so__plate.is-swing { animation: so-swing .7s ease-out both; }
+    @keyframes so-swing { 0% { transform: rotate(0deg); } 35% { transform: rotate(calc(var(--tilt) * 2.2)); } 65% { transform: rotate(calc(var(--tilt) * .55)); } 100% { transform: rotate(var(--tilt)); } }
+    .gm-so__fall { animation: so-fall .78s cubic-bezier(.45, 0, .85, .55) forwards; }
+    @keyframes so-fall { 0% { transform: rotate(var(--tilt)); opacity: 1; } 25% { transform: translate(0, -6px) rotate(calc(var(--tilt) + var(--spin) * .15)); opacity: 1; } 100% { transform: translate(var(--fx), var(--fy)) rotate(var(--spin)); opacity: 0; } }
+    .gm-so__sw { transform-box: fill-box; transform-origin: 46% 42%; transition: transform .14s ease-out; }
+    .gm-so__sc.is-sel .gm-so__sw { transform: translateY(-4px) scale(1.2); }
+    .gm-so__sc.is-in { animation: so-fly .3s cubic-bezier(.25, .8, .4, 1) both; }
+    .gm-so__sc.is-in .gm-so__sw { animation: so-spin .5s ease-out both; }
+    @keyframes so-fly { 0% { transform: translate(var(--dx), calc(var(--dy) - 6px)); } 70% { transform: translate(0, -5px); } 100% { transform: none; } }
+    @keyframes so-spin { 0% { transform: rotate(-300deg) scale(1.2); } 60% { transform: rotate(-60deg) scale(1.12); } 100% { transform: none; } }
+    .gm-so__sel { fill: none; stroke: #f59e0b; stroke-width: 3; filter: drop-shadow(0 0 3px rgba(245, 158, 11, .7)); }
+    .gm-so__dest { fill: rgba(34, 197, 94, .16); stroke: #16a34a; stroke-width: 2.2; stroke-dasharray: 4 3; animation: so-dest 1.1s ease-in-out infinite; }
+    @keyframes so-dest { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+    .gm-so__bad { fill: rgba(220, 38, 38, .14); stroke: #dc2626; stroke-width: 3; transform-box: fill-box; transform-origin: center; animation: so-bad .55s ease-out forwards; }
+    @keyframes so-bad { 0% { transform: scale(.7); opacity: 1; } 30% { transform: translateX(-3px) scale(1.05); } 55% { transform: translateX(3px); opacity: 1; } 100% { transform: none; opacity: 0; } }
+    .gm-so__spark { position: absolute; z-index: 7; width: 8px; height: 8px; margin: -4px 0 0 -4px; pointer-events: none; background: #fde047; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: so-spark .65s ease-out forwards; }
+    @keyframes so-spark { 0% { transform: translate(0, 0) scale(.4); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.3) rotate(90deg); opacity: 0; } }
+    .gm-so__float { position: absolute; z-index: 8; left: 50%; pointer-events: none; transform: translate(-50%, -50%); padding: 6px 14px; border-radius: 999px; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); color: #fff; font-weight: 800; font-size: 15px; white-space: nowrap; box-shadow: 0 6px 14px rgba(146, 64, 14, .28); animation: so-float 1.1s ease-out forwards; }
+    .gm-so__float.is-plain { background: #44403c; font-size: 13px; box-shadow: none; animation-duration: 1.8s; white-space: normal; width: max-content; max-width: calc(100% - 32px); box-sizing: border-box; text-align: center; word-break: keep-all; line-height: 1.45; }
+    @keyframes so-float { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 15% { opacity: 1; transform: translate(-50%, -55%) scale(1.05); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -120%) scale(1); } }
+    /* 3. 아래 단추 */
+    .gm-so__tools { display: flex; gap: 8px; }
+    .gm-so__tool { flex: 1; height: 44px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--gm-chip); color: var(--gm-a); font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; white-space: nowrap; }
+    .gm-so__tool small { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--gm-a); color: #fff; font-size: 12px; font-weight: 800; }
+    @media (hover: hover) { .gm-so__tool:hover:not(:disabled) { background: #fde68a; } }
+    .gm-so__tool:active:not(:disabled) { transform: scale(.97); }
+    .gm-so__tool:disabled { opacity: .45; cursor: default; }
+    .gm-so__help { margin: 0; font-size: 12.5px; color: var(--gm-soft); text-align: center; }
+    @media (pointer: coarse), (max-width: 640px) { .gm-so__help { display: none; } }
+    /* 덮개 — 시작 · 일시정지 · 끝 */
+    .gm-so__cover { position: absolute; inset: 0; z-index: 20; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 18px; box-sizing: border-box; text-align: center; color: #fff; overflow-y: auto;
+      background: linear-gradient(140deg, #92400e 0%, #c2620c 55%, #f59e0b 100%); }
+    .gm-so__cover[hidden] { display: none; }
+    .gm-so__cover h2 { margin: 0; color: #fff; font-size: 24px; line-height: 1.3; word-break: keep-all; }
+    .gm-so__cover p { margin: 0; font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .94); word-break: keep-all; }
+    .gm-so__cover .gm-so__keys { font-size: 12.5px; color: rgba(255, 255, 255, .82); }
+    .gm-so__cover .gm-so__big { font-size: 34px; font-weight: 800; line-height: 1.2; }
+    .gm-so__how { width: 100%; max-width: 350px; box-sizing: border-box; padding: 10px 14px; border-radius: 14px; background: rgba(255, 255, 255, .15); text-align: left; }
+    .gm-so__how b { display: block; margin-bottom: 4px; font-size: 13px; color: #fff; }
+    .gm-so__how ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, .94); word-break: keep-all; }
+    .gm-so__go { border: 0; padding: 12px 34px; border-radius: 14px; background: #fff; color: var(--gm-a); font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; }
+    @media (hover: hover) { .gm-so__go:hover { background: #fffbeb; } }
+    .gm-so__demo { position: relative; flex-shrink: 0; width: 168px; height: 112px; }
+    .gm-so__demo svg { display: block; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    HKPlay.mountGame({
+      key: "screwout",
+      setup(stage, ctx) {
+        // ── 퍼즐 엔진 (화면과 무관 — node 검사용으로 이 구간만 떼어 쓴다) ── SO-CORE-START
+        // 판 = 격자 칸(점)을 덮는 막대 · 사각 · L자 · T자. 판에는 몇 자리에 구멍이 뚫려 있다.
+        // 한 자리 p 가 「열려 있다」 = 아직 남은 판 가운데 p 를 덮는 판이 모두 p 에 구멍이 뚫려 있다.
+        // 나사는 열린 자리에서만 뽑고, 열린 빈 구멍에만 박는다. 나사는 그 자리에 구멍이 뚫린 판을 모두 붙든다.
+        const MAX_HOLES = 30;      // 구멍 수 상한(비트 묶음)
+        const SEARCH_LIMIT = 10000;
+        const GEN_TRIES = 50;
+        // [판 수, 가로 점, 세로 점, 빈 구멍, 판 하나 나사 최대, 겹침 최소]
+        const LEVELS = [
+          [3, 4, 5, 5, 2, 1], [4, 4, 5, 4, 2, 1], [5, 5, 6, 4, 2, 1], [6, 5, 6, 4, 3, 1], [7, 5, 7, 3, 3, 2],
+          [8, 5, 7, 3, 3, 2], [9, 6, 7, 3, 3, 2], [10, 6, 8, 3, 3, 2], [11, 6, 8, 3, 3, 2], [12, 6, 8, 3, 3, 2],
+        ];
+        function cfgFor(lv) {
+          const t = LEVELS[Math.min(lv, LEVELS.length) - 1];
+          return { plates: t[0], cols: t[1], rows: t[2], empties: t[3], maxS: t[4], overlap: t[5], lv };
+        }
+        // 판 모양 — 칸 묶음 [c0, r0, c1, r1] (끝 포함). 돌리고 뒤집은 모양을 모두 만든다
+        const SHAPE_BASE = [
+          { segs: [[0, 0, 1, 0]], w: 3, from: 1 },          // 짧은 막대
+          { segs: [[0, 0, 2, 0]], w: 4, from: 1 },          // 막대
+          { segs: [[0, 0, 3, 0]], w: 2, from: 2 },          // 긴 막대
+          { segs: [[0, 0, 1, 1]], w: 2, from: 1 },          // 정사각
+          { segs: [[0, 0, 2, 1]], w: 1.5, from: 3 },        // 직사각
+          { segs: [[0, 0, 2, 0], [0, 0, 0, 1]], w: 2, from: 3 }, // L
+          { segs: [[0, 0, 1, 0], [0, 0, 0, 2]], w: 1.5, from: 4 }, // 긴 L
+          { segs: [[0, 0, 2, 0], [1, 0, 1, 1]], w: 1.2, from: 5 }, // T
+        ];
+        const SHAPES = (() => {
+          const out = [];
+          SHAPE_BASE.forEach((b, bi) => {
+            const seen = new Set();
+            for (let rot = 0; rot < 4; rot++) for (let flip = 0; flip < 2; flip++) {
+              let segs = b.segs.map((s) => {
+                let pts = [[s[0], s[1]], [s[2], s[3]]];
+                pts = pts.map(([c, r]) => {
+                  if (flip) c = -c;
+                  for (let k = 0; k < rot; k++) [c, r] = [-r, c];
+                  return [c, r];
+                });
+                return [Math.min(pts[0][0], pts[1][0]), Math.min(pts[0][1], pts[1][1]), Math.max(pts[0][0], pts[1][0]), Math.max(pts[0][1], pts[1][1])];
+              });
+              const mc = Math.min(...segs.map((s) => s[0])), mr = Math.min(...segs.map((s) => s[1]));
+              segs = segs.map((s) => [s[0] - mc, s[1] - mr, s[2] - mc, s[3] - mr]);
+              const key = segs.map((s) => s.join(",")).sort().join("|");
+              if (seen.has(key)) continue;
+              seen.add(key);
+              out.push({ segs, base: bi, w: b.w, from: b.from });
+            }
+          });
+          return out;
+        })();
+        const segPoints = (segs) => {
+          const set = new Set(), out = [];
+          for (const [c0, r0, c1, r1] of segs) for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) {
+            const k = `${c},${r}`;
+            if (!set.has(k)) { set.add(k); out.push([c, r]); }
+          }
+          return out;
+        };
+        const bitCount = (x) => { let n = 0; while (x) { x &= x - 1; n++; } return n; };
+
+        // 상태 = { s: 나사가 있는 구멍(비트), p: 남은 판(비트) }
+        const isOpen = (P, h, pl) => (P.block[h] & pl) === 0;
+        function applyMove(P, st, from, to) {
+          const s = (st.s & ~(1 << from)) | (1 << to);
+          let p = st.p;
+          for (let k = 0; k < P.plates.length; k++) if ((p >> k) & 1 && !(s & P.plateHoles[k])) p &= ~(1 << k);
+          return { s, p };
+        }
+        // 남은 판이 하나도 덮지 않는 구멍 — 서로 바꿔도 같은 자리
+        function freeMask(P, pl) {
+          let m = 0;
+          for (let h = 0; h < P.holes.length; h++) if (!((P.pin[h] | P.block[h]) & pl)) m |= 1 << h;
+          return m;
+        }
+        // 둘 수 있는 수 — 판을 떨어뜨리는 수 먼저
+        function listMoves(P, st) {
+          const out = [];
+          const free = freeMask(P, st.p);
+          const n = P.holes.length;
+          for (let a = 0; a < n; a++) {
+            if (!((st.s >> a) & 1) || (free >> a) & 1 || !isOpen(P, a, st.p)) continue; // 빈 자리 나사는 옮길 까닭이 없다
+            let freeTried = false;
+            for (let b = 0; b < n; b++) {
+              if ((st.s >> b) & 1 || !isOpen(P, b, st.p)) continue;
+              const isFree = (free >> b) & 1;
+              if (isFree) { if (freeTried) continue; freeTried = true; }
+              const nx = applyMove(P, st, a, b);
+              const drop = bitCount(st.p) - bitCount(nx.p);
+              out.push({ a, b, nx, pr: -drop * 4 + (isFree ? 0 : 1 + bitCount(P.pin[b] & st.p)) });
+            }
+          }
+          out.sort((x, y) => x.pr - y.pr);
+          return out;
+        }
+        // 모든 수를 고른 열쇠 — 빈 자리 구멍에 든 나사는 개수만
+        function stateKey(P, st) {
+          const free = freeMask(P, st.p);
+          return (st.s & ~free) * 131072 + bitCount(st.s & free) * 4096 + st.p;
+        }
+        // 가장 짧은 풀이 찾기(너비 우선). 상한을 넘으면 깊이 우선으로 아무 풀이나. 둘 다 못 찾으면 moves = null
+        function solve(P, start, limit = SEARCH_LIMIT, bfsOnly = false) {
+          if (!start.p) return { moves: [], nodes: 0, aborted: false };
+          const seen = new Map();
+          const k0 = stateKey(P, start);
+          seen.set(k0, null);
+          let frontier = [{ st: start, key: k0 }];
+          let nodes = 0, aborted = false;
+          while (frontier.length && !aborted) {
+            const next = [];
+            for (const { st, key } of frontier) {
+              for (const m of listMoves(P, st)) {
+                const k = stateKey(P, m.nx);
+                if (seen.has(k)) continue;
+                seen.set(k, { prev: key, a: m.a, b: m.b });
+                if (!m.nx.p) {
+                  const moves = [];
+                  let cur = k;
+                  while (seen.get(cur)) { const e = seen.get(cur); moves.push([e.a, e.b]); cur = e.prev; }
+                  return { moves: moves.reverse(), nodes, aborted: false, optimal: true };
+                }
+                if (++nodes > limit) { aborted = true; break; }
+                next.push({ st: m.nx, key: k });
+              }
+              if (aborted) break;
+            }
+            frontier = next;
+          }
+          if (!aborted) return { moves: null, nodes, aborted: false };
+          if (bfsOnly) return { moves: null, nodes, aborted: true };
+          // 너비 우선이 너무 넓으면 — 깊이 우선으로 아무 풀이나
+          const seen2 = new Set();
+          const path = [];
+          let n2 = 0, ab2 = false;
+          const dfs = (st) => {
+            if (!st.p) return true;
+            const k = stateKey(P, st);
+            if (seen2.has(k)) return false;
+            if (++n2 > limit) { ab2 = true; return false; }
+            seen2.add(k);
+            for (const m of listMoves(P, st)) {
+              path.push([m.a, m.b]);
+              if (dfs(m.nx)) return true;
+              path.pop();
+              if (ab2) return false;
+            }
+            return false;
+          };
+          const ok = dfs(start);
+          return { moves: ok ? path.slice() : null, nodes: nodes + n2, aborted: !ok && ab2, optimal: false };
+        }
+
+        // 새 단계 만들기 — 아래 판부터 하나씩 얹는다. 다 얹은 뒤 풀이를 찾아 확인하고, 못 풀면 다시
+        function buildOnce(cfg, rnd) {
+          const { cols, rows } = cfg;
+          const id = (c, r) => r * cols + c;
+          const covers = Array.from({ length: cols * rows }, () => []); // 그 점을 덮은 판 번호(아래 → 위)
+          const plates = [];
+          const screwAt = new Set();
+          const empty = new Set();
+          const isBlocked = (p) => covers[p].some((k) => !plates[k].holes.has(p));
+          const shapes = SHAPES.filter((s) => s.from <= cfg.lv);
+          const wSum = shapes.reduce((a, s) => a + s.w, 0);
+          const pickShape = () => { let x = rnd() * wSum; for (const s of shapes) { x -= s.w; if (x <= 0) return s; } return shapes[shapes.length - 1]; };
+          const screwN = () => {
+            const x = rnd();
+            if (cfg.maxS <= 2) return x < (cfg.lv <= 1 ? 0.5 : 0.35) ? 1 : 2;
+            const hi = cfg.lv >= 9 ? 0.4 : cfg.lv >= 6 ? 0.3 : 0.22;
+            return x < 0.28 ? 1 : x < 1 - hi ? 2 : 3;
+          };
+          for (let k = 0; k < cfg.plates; k++) {
+            let done = false;
+            const tie = k > 0 && rnd() < 0.8; // 판 대부분은 아래 판과 겹치게, 몇 장은 떨어진 자리에도(판이 한쪽에 몰리지 않게)
+            for (let t = 0; t < 80 && !done; t++) {
+              const sh = pickShape();
+              const pw = Math.max(...sh.segs.map((s) => s[2])) + 1, ph = Math.max(...sh.segs.map((s) => s[3])) + 1;
+              if (pw > cols || ph > rows) continue;
+              const oc = Math.floor(rnd() * (cols - pw + 1)), or = Math.floor(rnd() * (rows - ph + 1));
+              const segs = sh.segs.map((s) => [s[0] + oc, s[1] + or, s[2] + oc, s[3] + or]);
+              const pts = segPoints(segs).map(([c, r]) => id(c, r));
+              const over = pts.filter((p) => covers[p].length).length;
+              const overScrew = pts.filter((p) => screwAt.has(p)).length;
+              if (tie && t < 60) {
+                if (over < Math.min(cfg.overlap, pts.length - 1)) continue;
+                if (t < 40 && k >= 2 && !overScrew) continue; // 아래 판 나사 하나는 덮거나 함께 붙든다
+              }
+              // 새 나사 자리 — 아래에 판이 없는 점이 먼저. 아래 판이 덮은 점이면 그 판들에도 구멍을 뚫어 함께 붙든다(겹쳐 박힌 나사)
+              const free = pts.filter((p) => !covers[p].length && !empty.has(p) && !screwAt.has(p));
+              const thru = pts.filter((p) => covers[p].length && !empty.has(p) && !screwAt.has(p));
+              if (!free.length && !(thru.length && cfg.lv >= 3)) continue;
+              const want = screwN();
+              const pick = [];
+              const dist = (p, q) => Math.abs((p % cols) - (q % cols)) + Math.abs(Math.floor(p / cols) - Math.floor(q / cols));
+              while (pick.length < want) {
+                const useThru = cfg.lv >= 3 && thru.some((p) => !pick.includes(p)) && (!free.some((p) => !pick.includes(p)) || rnd() < (cfg.lv >= 6 ? 0.35 : 0.2));
+                const pool = (useThru ? thru : free).filter((p) => !pick.includes(p));
+                if (!pool.length) break;
+                // 이미 고른 나사와 먼 점(같으면 아무거나)
+                let best = pool[Math.floor(rnd() * pool.length)];
+                if (pick.length) {
+                  let bestD = -1;
+                  for (const p of pool) { const d = Math.min(...pick.map((q) => dist(p, q))) + rnd() * 0.5; if (d > bestD) { bestD = d; best = p; } }
+                }
+                pick.push(best);
+              }
+              if (!pick.length) continue;
+              const punched = pick.filter((p) => covers[p].length);
+              const holes = new Set(pick);
+              for (const p of pts) {
+                if (holes.has(p) || isBlocked(p)) continue;
+                if (screwAt.has(p) && rnd() < (cfg.lv >= 4 ? 0.28 : 0.15)) holes.add(p);      // 아래 판 나사를 함께 붙든다
+              }
+              plates.push({ segs, pts, holes, screws: pick.slice() });
+              for (const p of punched) for (const q of covers[p]) plates[q].holes.add(p);
+              for (const p of pts) covers[p].push(k);
+              for (const p of pick) screwAt.add(p);
+              done = true;
+            }
+            if (!done) return null;
+          }
+          // 빈 구멍 — 판을 다 얹은 뒤에 고른다. 첫 구멍은 처음부터 쓸 수 있게(덮은 판이 있으면 모두 뚫어 둔다),
+          // 나머지는 아래 판 몇 장만 뚫고 위 판이 가리기도 한다(위 판이 떨어져야 쓸 수 있는 구멍)
+          const spots = [];
+          for (let p = 0; p < cols * rows; p++) if (!screwAt.has(p)) spots.push(p);
+          for (let e = 0; e < cfg.empties && spots.length; e++) {
+            let pool = spots;
+            if (e === 0) { const minC = Math.min(...spots.map((p) => covers[p].length)); pool = spots.filter((p) => covers[p].length === minC); }
+            const p = pool[Math.floor(rnd() * pool.length)];
+            spots.splice(spots.indexOf(p), 1);
+            empty.add(p);
+            const cv = covers[p];
+            const open = e === 0 || rnd() < 0.45;
+            const cut = open ? cv.length : Math.floor(rnd() * cv.length); // 아래에서 cut 장까지 뚫는다
+            cv.forEach((k, i) => { if (i < cut) plates[k].holes.add(p); });
+          }
+          const holeIds = [...screwAt, ...empty].sort((a, b) => a - b);
+          if (holeIds.length > MAX_HOLES) return null;
+          const hIndex = new Map(holeIds.map((p, i) => [p, i]));
+          const P = {
+            cols, rows,
+            holes: holeIds.map((p) => ({ c: p % cols, r: Math.floor(p / cols) })),
+            plates: plates.map((pl) => ({ segs: pl.segs, pts: pl.pts.map((p) => ({ c: p % cols, r: Math.floor(p / cols) })), holes: [...pl.holes].map((p) => hIndex.get(p)).sort((a, b) => a - b) })),
+            pin: holeIds.map(() => 0), block: holeIds.map(() => 0), plateHoles: [],
+          };
+          plates.forEach((pl, k) => {
+            let m = 0;
+            for (const p of pl.pts) {
+              if (!hIndex.has(p)) continue;
+              const h = hIndex.get(p);
+              if (pl.holes.has(p)) { P.pin[h] |= 1 << k; m |= 1 << h; } else P.block[h] |= 1 << k;
+            }
+            P.plateHoles[k] = m;
+          });
+          let s = 0;
+          for (const p of screwAt) s |= 1 << hIndex.get(p);
+          P.start = { s, p: (1 << plates.length) - 1 };
+          return P;
+        }
+        // 단계 만들기 — step(ms) 를 부를 때마다 그 시간만큼 시도하고, 다 되면 단계를 돌려준다(못 끝냈으면 null)
+        function puzzleMaker(level, rnd = Math.random) {
+          const base = cfgFor(level);
+          let tries = 0;
+          return function step(budgetMs = Infinity) {
+            const t0 = Date.now();
+            for (;;) {
+              if (tries && Date.now() - t0 > budgetMs) return null;
+              tries++;
+              const late = tries % GEN_TRIES >= GEN_TRIES - 8; // 한 묶음 끝 무렵엔 조건을 늦춘다
+              // 자꾸 실패하면 판을 줄인다
+              const cfg = { ...base, plates: Math.max(2, base.plates - Math.floor(tries / (GEN_TRIES * 2))) };
+              const P = buildOnce(cfg, rnd);
+              if (!P) continue;
+              // 처음부터 가려진 나사가 어느 정도는 있어야 — 아니면 그냥 줍기
+              let locked = 0;
+              for (let h = 0; h < P.holes.length; h++) if ((P.start.s >> h) & 1 && !isOpen(P, h, P.start.p)) locked++;
+              const needLocked = cfg.plates >= 3 ? Math.min(Math.floor(cfg.plates / 2), 1 + Math.floor(cfg.plates / 3)) : 0;
+              if (locked < needLocked && !late) continue;
+              const res = solve(P, P.start, SEARCH_LIMIT, !late); // 너무 넓은 판은 버리고 새로(끝 무렵엔 아무 풀이나)
+              if (!res.moves) continue;
+              const screws = bitCount(P.start.s);
+              const extra = res.moves.length - screws;
+              // 5단계부터는 나사 하나를 잠깐 다른 구멍에 맡겨 둬야 풀리는 판만
+              if (!late && (!res.optimal || extra < (level >= 5 ? 1 : 0))) continue;
+              // 가장 짧은 풀이를 못 찾았으면(드묾) 찾은 풀이보다 조금 짧게 잡는다 — 보너스가 너무 쉽지 않게
+              P.par = res.optimal ? Math.max(res.moves.length, screws) : Math.max(screws + 1, Math.round(res.moves.length * 0.75));
+              P.solution = res.moves;
+              P.tries = tries;
+              P.level = level;
+              P.optimal = res.optimal;
+              return P;
+            }
+          };
+        }
+        const makePuzzle = (level, rnd) => puzzleMaker(level, rnd)();
+        // ── 퍼즐 엔진 끝 ── SO-CORE-END
+
+        // ── 상수 ───────────────────────────────────────────────
+        const TIME_LIMIT = 180;          // 3분
+        const UNDO_PER_STAGE = 3;
+        const MAX_SCORE = 1_000_000;
+        const FALL_MS = 780;             // 판이 떨어지는 시간
+        const CLEAR_MS = 1100;           // 단계를 푼 뒤 다음 단계까지
+        const GEN_SLICE = 18;            // 다음 단계를 미리 만들 때 한 번에 쓰는 시간(ms) — 판이 멈칫하지 않게 나눠서
+        // 판 12가지 — 색만으로 가리지 않게 결 무늬를 하나씩. [이름, 판 색, 테두리, 무늬 색, 무늬]
+        const LOOKS = [
+          ["원목", "#deb07a", "#94622f", "rgba(120,70,20,.42)", 0],
+          ["빨강", "#f07171", "#b42323", "rgba(255,255,255,.42)", 1],
+          ["파랑", "#5f92f1", "#1d4ed8", "rgba(255,255,255,.45)", 2],
+          ["초록", "#4fc48c", "#15803d", "rgba(255,255,255,.4)", 3],
+          ["보라", "#a98cfa", "#6d28d9", "rgba(255,255,255,.42)", 4],
+          ["노랑", "#fcd34d", "#b45309", "rgba(130,80,0,.38)", 5],
+          ["청록", "#34d3bd", "#0f766e", "rgba(0,70,64,.34)", 6],
+          ["분홍", "#f7a8d2", "#be185d", "rgba(150,20,80,.36)", 7],
+          ["호두", "#a8774c", "#5b3a1e", "rgba(255,232,205,.36)", 8],
+          ["회색", "#a9b6c9", "#475569", "rgba(30,41,59,.34)", 9],
+          ["연두", "#c2ee6c", "#4d7c0f", "rgba(50,80,0,.36)", 10],
+          ["남색", "#8590f6", "#3730a3", "rgba(255,255,255,.42)", 11],
+        ];
+        // 결 무늬 (16×16 한 칸) — 나뭇결 · 사선 · 점 · 바둑 · 가로줄 · 고리 · 지그재그 · 더하기 · 세로 나뭇결 · 마름모 · 엇사선 · 점선
+        const GRAINS = [
+          (c) => `<path d="M0 3c3-1.5 5 1.5 8 0s5 1.5 8 0M0 9c3 1.2 5-1.2 8 0s5-1.2 8 0M0 14c3-1 5 1 8 0s5 1 8 0" fill="none" stroke="${c}" stroke-width="1.2"/>`,
+          (c) => `<path d="M-2 6L6-2M-2 14L14-2M6 18L18 6" stroke="${c}" stroke-width="2.2"/>`,
+          (c) => `<circle cx="4" cy="4" r="2" fill="${c}"/><circle cx="12" cy="12" r="2" fill="${c}"/>`,
+          (c) => `<path d="M0 8H16M8 0V16" stroke="${c}" stroke-width="1.5"/>`,
+          (c) => `<path d="M0 4H16M0 12H16" stroke="${c}" stroke-width="2.2"/>`,
+          (c) => `<circle cx="8" cy="8" r="4.2" fill="none" stroke="${c}" stroke-width="1.7"/>`,
+          (c) => `<path d="M0 10L4 6L8 10L12 6L16 10" fill="none" stroke="${c}" stroke-width="1.7"/>`,
+          (c) => `<path d="M8 4V12M4 8H12" stroke="${c}" stroke-width="2.2"/>`,
+          (c) => `<path d="M4 0c-1.5 3 1.5 5 0 8s1.5 5 0 8M11 0c1.2 3-1.2 5 0 8s-1.2 5 0 8" fill="none" stroke="${c}" stroke-width="1.2"/>`,
+          (c) => `<path d="M8 3L13 8L8 13L3 8Z" fill="none" stroke="${c}" stroke-width="1.5"/>`,
+          (c) => `<path d="M0 0L16 16M16 0L0 16" stroke="${c}" stroke-width="1.3"/>`,
+          (c) => `<path d="M1.5 5h5M9.5 13h5" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`,
+        ];
+        const fmt = (n) => n.toLocaleString("ko-KR");
+        const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+        const f1 = (v) => Math.round(v * 10) / 10;
+
+        // ── 화면 ───────────────────────────────────────────────
+        stage.innerHTML = `<div class="gm-so" tabindex="0">
+          <div class="gm-so__bar">
+            <span class="gm-so__chip">${HKUI.icon("star", 15, "currentColor")}<b data-score>0</b></span>
+            <span class="gm-so__chip">${HKUI.icon("drill", 15, "currentColor")}<span data-level>1단계</span></span>
+            <span class="gm-so__gap"></span>
+            <span class="gm-so__chip gm-so__chip--time" data-timechip>${HKUI.icon("timer", 15, "currentColor")}<b data-time>3:00</b></span>
+          </div>
+          <div class="gm-so__time" data-timebar><i></i></div>
+          <div class="gm-so__meta"><span>이번 단계 <b data-moves>0</b>수 · 목표 <b data-par>0</b>수</span><span>남은 판 <b data-left>0</b>장 · 빈 구멍 <b data-empty>0</b>개</span></div>
+          <div class="gm-so__board" data-board aria-label="나사 판"></div>
+          <div class="gm-so__tools">
+            <button type="button" class="gm-so__tool" data-undo>${HKUI.icon("undo-2", 16, "currentColor")} 되돌리기 <small data-undos>3</small></button>
+            <button type="button" class="gm-so__tool" data-reset>${HKUI.icon("rotate-ccw", 16, "currentColor")} 이 단계 다시</button>
+          </div>
+          <p class="gm-so__help">나사를 눌러 들고, 옮길 빈 구멍을 눌러요 · Z 되돌리기 · Esc 쉬기</p>
+          <div class="gm-so__cover" data-cover></div>
+        </div>`;
+        const root = stage.querySelector(".gm-so");
+        const boardEl = root.querySelector("[data-board]");
+        const cover = root.querySelector("[data-cover]");
+        const scoreEl = root.querySelector("[data-score]");
+        const levelEl = root.querySelector("[data-level]");
+        const timeEl = root.querySelector("[data-time]");
+        const timeChip = root.querySelector("[data-timechip]");
+        const timeBar = root.querySelector("[data-timebar]");
+        const movesEl = root.querySelector("[data-moves]");
+        const parEl = root.querySelector("[data-par]");
+        const leftEl = root.querySelector("[data-left]");
+        const emptyEl = root.querySelector("[data-empty]");
+        const undoBtn = root.querySelector("[data-undo]");
+        const undosEl = root.querySelector("[data-undos]");
+        const resetBtn = root.querySelector("[data-reset]");
+        HKUI.refreshIcons(root);
+
+        // ── 상태 ───────────────────────────────────────────────
+        let state = "ready";   // ready · play · pause · over
+        let level = 1, banked = 0, solvedCount = 0;
+        let puzzle = null;     // 엔진이 만든 단계
+        let looks = [];        // 판마다 [색 · 무늬]
+        let cur = null;        // { s: 나사 자리, p: 남은 판 }
+        let history = [];      // 되돌리기용 이전 상태들
+        let undoLeft = UNDO_PER_STAGE;
+        let sel = -1;          // 들어 올린 나사가 있는 구멍
+        let clearing = false;
+        let pending = null, pendingTimer = 0, clearTimer = 0;
+        let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, rafId = 0, lastSec = 0;
+        let geo = { W: 320, H: 380, s: 50, ox: 25, oy: 25 };
+        // 판 그림(다시 그릴 때마다 바뀜) · 떨어지는 판 · 반짝이 · 안내 말은 서로 다른 층 — 다시 그려도 애니메이션이 끊기지 않게
+        boardEl.innerHTML = `<div data-main style="position:absolute;inset:0"></div>`;
+        const mainHost = boardEl.firstElementChild;
+        const fxSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        fxSvg.setAttribute("class", "gm-so__fx");
+        boardEl.appendChild(fxSvg);
+        const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
+
+        const plateLeft = () => bitCount(cur ? cur.p : 0);
+        const emptyCount = () => (puzzle ? puzzle.holes.length - bitCount(cur.s) : 0);
+        const platePts = () => level * 10;
+        // 단계를 깨는 순간 그 단계 판 점수는 banked 로 옮겨 간다(clearing 동안 두 번 세지 않게)
+        const liveScore = () => Math.min(MAX_SCORE, banked + (puzzle && !clearing ? (puzzle.plates.length - plateLeft()) * platePts() : 0));
+
+        // ── 그리기 ─────────────────────────────────────────────
+        // 같은 그림 함수를 판 · 떨어지는 판 · 시작 화면 그림이 함께 쓴다. g = { W, H, s, ox, oy }
+        const holeXY = (P, h, g) => ({ x: g.ox + P.holes[h].c * g.s, y: g.oy + P.holes[h].r * g.s });
+        function plateRects(P, k, g) {
+          const pad = g.s * 0.37;
+          return P.plates[k].segs.map(([c0, r0, c1, r1]) => ({ x: g.ox + c0 * g.s - pad, y: g.oy + r0 * g.s - pad, w: (c1 - c0) * g.s + pad * 2, h: (r1 - r0) * g.s + pad * 2, rx: pad * 0.78 }));
+        }
+        function plateCenter(P, k, g) {
+          const pts = P.plates[k].pts;
+          return { x: g.ox + g.s * pts.reduce((a, p) => a + p.c, 0) / pts.length, y: g.oy + g.s * pts.reduce((a, p) => a + p.r, 0) / pts.length };
+        }
+        function plateDefs(P, k, g, pre, look) {
+          const hr = g.s * 0.215;
+          const [, , , gc, gi] = look;
+          const holes = P.plates[k].holes.map((h) => { const { x, y } = holeXY(P, h, g); return `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr)}" fill="#000"/>`; }).join("");
+          return `<pattern id="${pre}-g${k}" patternUnits="userSpaceOnUse" width="16" height="16" patternTransform="scale(${(g.s / 52).toFixed(3)})">${GRAINS[gi](gc)}</pattern>
+            <mask id="${pre}-m${k}" maskUnits="userSpaceOnUse" x="${-g.W}" y="${-g.H}" width="${g.W * 3}" height="${g.H * 3}"><rect x="${-g.W}" y="${-g.H}" width="${g.W * 3}" height="${g.H * 3}" fill="#fff"/>${holes}</mask>`;
+        }
+        // 판 하나 — 테두리 · 바탕 · 결 · 윗면 광 · 뚫린 구멍 테두리. tilt 는 매달린 나사 둘레로 기울기
+        function plateSvg(P, k, g, pre, look, opt = {}) {
+          const hr = g.s * 0.215;
+          const [, col, edge] = look;
+          const rs = plateRects(P, k, g);
+          const R = (r, d, extra) => `<rect x="${f1(r.x - d)}" y="${f1(r.y - d)}" width="${f1(r.w + d * 2)}" height="${f1(r.h + d * 2)}" rx="${f1(r.rx + d)}" ${extra}/>`;
+          const body = rs.map((r) => R(r, 1.6, `fill="${edge}"`)).join("") + rs.map((r) => R(r, 0, `fill="${col}"`)).join("")
+            + rs.map((r) => R(r, 0, `fill="url(#${pre}-g${k})"`)).join("")
+            + rs.map((r) => `<rect x="${f1(r.x + 3)}" y="${f1(r.y + 2.5)}" width="${f1(Math.max(0, r.w - 6))}" height="${f1(Math.min(r.h * 0.4, g.s * 0.24))}" rx="${f1(r.rx * 0.7)}" fill="rgba(255,255,255,.24)"/>`).join("");
+          const rims = P.plates[k].holes.map((h) => { const { x, y } = holeXY(P, h, g); return `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr)}" fill="none" stroke="${edge}" stroke-width="2"/><circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr + 2.2)}" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1"/>`; }).join("");
+          const o = opt.origin || { x: 0, y: 0 };
+          const tilt = opt.tilt || 0;
+          const st = `transform-origin:${f1(o.x)}px ${f1(o.y)}px;--tilt:${tilt}deg;${tilt ? `transform:rotate(${tilt}deg);` : ""}${opt.style || ""}`;
+          return `<g class="gm-so__plate ${opt.cls || ""}" data-k="${k}" style="${st}"><g mask="url(#${pre}-m${k})" opacity=".93">${body}</g>${rims}</g>`;
+        }
+        function screwSvg(P, h, g, pre, opt = {}) {
+          const { x, y } = holeXY(P, h, g);
+          const r = g.s * 0.17;
+          const a = (h * 47) % 180;
+          return `<g class="gm-so__sc ${opt.cls || ""}" style="${opt.style || ""}"><g class="gm-so__sw">
+            <circle cx="${f1(x + r * 0.14)}" cy="${f1(y + r * 0.26)}" r="${f1(r * 1.04)}" fill="rgba(41,24,8,.32)"/>
+            <circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}" fill="url(#${pre}-metal)" stroke="#57534e" stroke-width="1.1"/>
+            <circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r * 0.76)}" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".9"/>
+            <g transform="rotate(${a} ${f1(x)} ${f1(y)})" fill="#44403c"><rect x="${f1(x - r * 0.56)}" y="${f1(y - r * 0.13)}" width="${f1(r * 1.12)}" height="${f1(r * 0.26)}" rx="${f1(r * 0.1)}"/><rect x="${f1(x - r * 0.13)}" y="${f1(y - r * 0.56)}" width="${f1(r * 0.26)}" height="${f1(r * 1.12)}" rx="${f1(r * 0.1)}"/></g>
+          </g></g>`;
+        }
+        const commonDefs = (pre) => `<radialGradient id="${pre}-metal" cx=".36" cy=".3" r=".85"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d6d3d1"/><stop offset="1" stop-color="#78716c"/></radialGradient>
+          <radialGradient id="${pre}-hole" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="#1c1917"/><stop offset=".75" stop-color="#292524"/><stop offset="1" stop-color="#57534e"/></radialGradient>`;
+        // 판이 하나만 남은 나사에 매달렸으면 그 나사 둘레로 살짝(가까운 구멍을 가리거나 드러내지 않을 만큼만)
+        function tiltOf(P, st, k, g) {
+          const pins = st.s & P.plateHoles[k];
+          if (bitCount(pins) !== 1 || P.plates[k].pts.length < 2) return null;
+          const h = 31 - Math.clz32(pins);
+          const pv = holeXY(P, h, g);
+          const c = plateCenter(P, k, g);
+          const far = Math.max(...P.plates[k].pts.map((p) => Math.hypot(g.ox + p.c * g.s - pv.x, g.oy + p.r * g.s - pv.y)), 1);
+          const max = Math.min(3.2, (Math.asin(Math.min(1, (g.s * 0.11) / far)) * 180) / Math.PI);
+          const dx = c.x - pv.x;
+          const deg = Math.abs(dx) < 1 ? max * 0.5 : Math.sign(dx) * max;
+          return { deg: Math.round(deg * 10) / 10, origin: pv };
+        }
+        // 판 전체 — 바탕 · 구멍 · (판, 그 판이 맨 위인 나사) 층마다 · 고른 나사 · 갈 수 있는 구멍
+        function boardSvg(P, st, g, pre, opt = {}) {
+          const hr = g.s * 0.215;
+          const lk = opt.looks;
+          let defs = commonDefs(pre);
+          for (let k = 0; k < P.plates.length; k++) if ((st.p >> k) & 1) defs += plateDefs(P, k, g, pre, lk[k]);
+          let out = "";
+          // 구멍
+          for (let h = 0; h < P.holes.length; h++) {
+            const { x, y } = holeXY(P, h, g);
+            out += `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr * 1.2)}" fill="#c9b79c"/><circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr * 1.2)}" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/><circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr)}" fill="url(#${pre}-hole)"/>`;
+          }
+          // 나사를 층별로
+          const slots = new Map();
+          for (let h = 0; h < P.holes.length; h++) {
+            if (!((st.s >> h) & 1)) continue;
+            const pinned = P.pin[h] & st.p;
+            const top = pinned ? 31 - Math.clz32(pinned) : -1;
+            let cls = h === opt.sel ? "is-sel" : "";
+            let style = "";
+            if (opt.fly && opt.fly.to === h) {
+              const a = holeXY(P, opt.fly.from, g), b = holeXY(P, h, g);
+              cls += " is-in";
+              style = `--dx:${f1(a.x - b.x)}px;--dy:${f1(a.y - b.y)}px`;
+            }
+            slots.set(top, (slots.get(top) || "") + screwSvg(P, h, g, pre, { cls, style }));
+          }
+          out += slots.get(-1) || "";
+          for (let k = 0; k < P.plates.length; k++) {
+            if (!((st.p >> k) & 1)) continue;
+            const t = tiltOf(P, st, k, g);
+            const swing = t && opt.prevPins && opt.prevPins[k] >= 2;
+            out += plateSvg(P, k, g, pre, lk[k], t ? { tilt: t.deg, origin: t.origin, cls: swing ? "is-swing" : "" } : {});
+            out += slots.get(k) || "";
+          }
+          // 고른 나사 · 넣을 수 있는 빈 구멍
+          if (opt.sel >= 0) {
+            const { x, y } = holeXY(P, opt.sel, g);
+            out += `<circle class="gm-so__sel" cx="${f1(x)}" cy="${f1(y - 4)}" r="${f1(g.s * 0.27)}"/>`;
+            for (let h = 0; h < P.holes.length; h++) {
+              if ((st.s >> h) & 1 || !isOpen(P, h, st.p)) continue;
+              const q = holeXY(P, h, g);
+              out += `<circle class="gm-so__dest" cx="${f1(q.x)}" cy="${f1(q.y)}" r="${f1(hr * 1.45)}"/>`;
+            }
+          }
+          const bg = opt.noBoard ? "" : `<rect x="1" y="1" width="${g.W - 2}" height="${g.H - 2}" rx="15" fill="url(#${pre}-bd)" stroke="#d6c4a6" stroke-width="2"/>
+            <rect x="1" y="1" width="${g.W - 2}" height="${g.H - 2}" rx="15" fill="url(#${pre}-bg)"/>`;
+          const bdefs = opt.noBoard ? "" : `<linearGradient id="${pre}-bd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4ead9"/><stop offset="1" stop-color="#e6d6bd"/></linearGradient>
+            <pattern id="${pre}-bg" patternUnits="userSpaceOnUse" width="90" height="40"><path d="M0 12c22-5 45 5 90 0M0 30c30 4 60-4 90 0" fill="none" stroke="rgba(150,110,60,.09)" stroke-width="1.4"/></pattern>`;
+          return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.W} ${g.H}" width="${g.W}" height="${g.H}"><defs>${defs}${bdefs}</defs>${bg}${out}</svg>`;
+        }
+
+        // ── 판 크기 ─────────────────────────────────────────────
+        function fit() {
+          const room = HKPlay.roomFor(stage, boardEl);
+          const H = clamp(room, 240, 660);
+          boardEl.style.height = `${H}px`;
+          const W = boardEl.clientWidth || 320;
+          const cols = puzzle ? puzzle.cols : 4, rows = puzzle ? puzzle.rows : 5;
+          const s = Math.min((W - 14) / (cols - 0.15), (H - 14) / (rows - 0.15), 88);
+          geo = { W, H, s, ox: (W - (cols - 1) * s) / 2, oy: (H - (rows - 1) * s) / 2 };
+          draw();
+        }
+        function draw(opt = {}) {
+          if (!puzzle) return;
+          mainHost.innerHTML = boardSvg(puzzle, cur, geo, "so", { looks, sel, fly: opt.fly, prevPins: opt.prevPins });
+          fxSvg.setAttribute("viewBox", `0 0 ${geo.W} ${geo.H}`);
+          fxSvg.setAttribute("width", geo.W);
+          fxSvg.setAttribute("height", geo.H);
+          boardEl.setAttribute("aria-label", `나사 판 · 남은 판 ${plateLeft()}장 · 빈 구멍 ${emptyCount()}개`);
+        }
+        // 떨어지는 판 — 위 그림판(fx)에 따로 그려 아래로 떨어뜨린다
+        function dropPlate(P, k, before) {
+          const pre = `sf${k}x${Date.now() % 100000}`;
+          const t = tiltOf(P, before, k, geo);
+          const c = plateCenter(P, k, geo);
+          const dir = t ? Math.sign(t.deg) || 1 : (c.x > geo.W / 2 ? 1 : -1);
+          const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+          const style = `--fx:${f1(dir * geo.s * 0.6)}px;--fy:${f1(geo.H - c.y + geo.s * 2)}px;--spin:${dir * (14 + Math.random() * 14)}deg`;
+          g.innerHTML = `<defs>${plateDefs(P, k, geo, pre, looks[k])}</defs>${plateSvg(P, k, geo, pre, looks[k], { tilt: t ? t.deg : 0, origin: t ? t.origin : c, cls: "gm-so__fall", style })}`;
+          fxSvg.appendChild(g);
+          setTimeout(() => g.remove(), FALL_MS + 60);
+        }
+        function badMark(h) {
+          if (!puzzle) return;
+          const { x, y } = holeXY(puzzle, h, geo);
+          const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          c.setAttribute("class", "gm-so__bad");
+          c.setAttribute("cx", f1(x));
+          c.setAttribute("cy", f1(y));
+          c.setAttribute("r", f1(geo.s * 0.3));
+          fxSvg.appendChild(c);
+          setTimeout(() => c.remove(), 600);
+        }
+        function sparks(x, y, n = 8) {
+          for (let k = 0; k < n; k++) {
+            const sp = document.createElement("i");
+            sp.className = "gm-so__spark";
+            const ang = (k / n) * Math.PI * 2 - Math.PI / 2;
+            const r = geo.s * (0.5 + Math.random() * 0.5);
+            sp.style.cssText = `left:${x}px;top:${y}px;--dx:${(Math.cos(ang) * r).toFixed(1)}px;--dy:${(Math.sin(ang) * r).toFixed(1)}px;animation-delay:${k * 18}ms`;
+            boardEl.appendChild(sp);
+            setTimeout(() => sp.remove(), 850);
+          }
+        }
+        function floatText(text, plain, yFrac = 0.42) {
+          const f = document.createElement("div");
+          f.className = `gm-so__float${plain ? " is-plain" : ""}`;
+          f.textContent = text;
+          f.style.top = `${boardEl.clientHeight * yFrac}px`;
+          boardEl.appendChild(f);
+          setTimeout(() => f.remove(), plain ? 1900 : 1200);
+          return f;
+        }
+        // 안내 말은 하나만 — 새 말이 오면 앞 말은 지운다
+        let hintEl = null;
+        function hint(text) {
+          if (hintEl) hintEl.remove();
+          hintEl = floatText(text, true, 0.5);
+        }
+
+        // ── 점수 줄 ─────────────────────────────────────────────
+        function drawHud() {
+          scoreEl.textContent = fmt(liveScore());
+          levelEl.textContent = `${fmt(level)}단계`;
+          movesEl.textContent = fmt(history.length);
+          parEl.textContent = fmt(puzzle ? puzzle.par : 0);
+          leftEl.textContent = fmt(plateLeft());
+          emptyEl.textContent = fmt(emptyCount());
+          undosEl.textContent = undoLeft;
+          undoBtn.disabled = state !== "play" || clearing || !undoLeft || !history.length;
+          resetBtn.disabled = state !== "play" || clearing || !history.length;
+          drawTime();
+        }
+        function drawTime() {
+          const sec = Math.ceil(timeLeftMs / 1000);
+          timeEl.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+          timeBar.firstElementChild.style.width = `${clamp((timeLeftMs / (TIME_LIMIT * 1000)) * 100, 0, 100)}%`;
+          timeBar.classList.toggle("is-low", sec <= 20);
+          timeChip.classList.toggle("is-low", sec <= 20);
+        }
+
+        // ── 단계 ───────────────────────────────────────────────
+        // 다음 단계는 조금씩 나눠 미리 만든다
+        function prepareNext() {
+          clearTimeout(pendingTimer);
+          const want = level + 1;
+          pending = { level: want, step: puzzleMaker(want), p: null };
+          const job = pending;
+          const tick = () => {
+            if (pending !== job || job.p) return;
+            job.p = job.step(GEN_SLICE);
+            if (!job.p) pendingTimer = setTimeout(tick, 30);
+          };
+          pendingTimer = setTimeout(tick, 200);
+        }
+        function shuffledLooks(n) {
+          const idx = LOOKS.map((_, i) => i);
+          for (let a = idx.length - 1; a > 0; a--) { const b = Math.floor(Math.random() * (a + 1)); [idx[a], idx[b]] = [idx[b], idx[a]]; }
+          return idx.slice(0, n).map((i) => LOOKS[i]);
+        }
+        function loadLevel() {
+          let p = null;
+          if (pending && pending.level === level) p = pending.p || pending.step(Infinity);
+          clearTimeout(pendingTimer);
+          if (!p) p = makePuzzle(level);
+          puzzle = p;
+          looks = shuffledLooks(puzzle.plates.length);
+          cur = { ...puzzle.start };
+          history = [];
+          undoLeft = UNDO_PER_STAGE;
+          sel = -1;
+          fxSvg.innerHTML = "";
+          fit();
+          drawHud();
+          prepareNext();
+        }
+        // 단계 점수 — 단계 × 100 + 수 절약 보너스(목표 수면 단계 × 100, 목표의 두 배를 넘으면 0). 판 하나 떨어질 때마다 단계 × 10 은 따로
+        function stagePoints(lv, moves, par) {
+          const base = lv * 100;
+          const bonus = Math.round(base * clamp((2 * par - moves) / par, 0, 1));
+          return { base, bonus };
+        }
+        function stageClear() {
+          clearing = true;
+          sel = -1;
+          const { base, bonus } = stagePoints(level, history.length, puzzle.par);
+          banked = Math.min(MAX_SCORE, banked + puzzle.plates.length * platePts() + base + bonus);
+          solvedCount++;
+          drawHud();
+          sfx("powerup");
+          setTimeout(() => {
+            floatText(`${fmt(level)}단계 완료! +${fmt(base + bonus)}`);
+            sparks(geo.W / 2, boardEl.clientHeight * 0.42, 10);
+          }, 380);
+          if (bonus) setTimeout(() => floatText(`${fmt(history.length)}수 · 절약 보너스 +${fmt(bonus)}`, true, 0.58), 580);
+          clearTimeout(clearTimer);
+          clearTimer = setTimeout(() => {
+            if (state !== "play" && state !== "pause") return;
+            level++;
+            clearing = false;
+            loadLevel();
+            sfx("whoosh");
+          }, CLEAR_MS + 380);
+        }
+
+        // ── 조작 ───────────────────────────────────────────────
+        function holeAt(clientX, clientY) {
+          if (!puzzle) return -1;
+          const r = boardEl.getBoundingClientRect();
+          const x = clientX - r.left, y = clientY - r.top;
+          let best = -1, bd = geo.s * 0.48;
+          for (let h = 0; h < puzzle.holes.length; h++) {
+            const q = holeXY(puzzle, h, geo);
+            const d = Math.hypot(q.x - x, q.y - y);
+            if (d < bd) { bd = d; best = h; }
+          }
+          return best;
+        }
+        function tapHole(h) {
+          if (state !== "play" || clearing || h < 0) return;
+          const P = puzzle;
+          if ((cur.s >> h) & 1) {
+            // 나사
+            if (!isOpen(P, h, cur.p)) { badMark(h); sfx("invalid"); hint("위에 다른 판이 덮고 있어요"); return; }
+            if (sel === h) { sel = -1; sfx("tap"); draw(); return; }
+            sel = h;
+            sfx("select");
+            draw();
+            return;
+          }
+          // 빈 구멍
+          if (sel < 0) { badMark(h); sfx("invalid"); hint("먼저 옮길 나사를 눌러요"); return; }
+          if (!isOpen(P, h, cur.p)) { badMark(h); sfx("invalid"); hint("판이 이 구멍을 덮고 있어요"); return; }
+          moveScrew(sel, h);
+        }
+        function moveScrew(a, b) {
+          const P = puzzle;
+          const before = cur;
+          const prevPins = P.plates.map((_, k) => bitCount(before.s & P.plateHoles[k]));
+          history.push(before);
+          cur = applyMove(P, before, a, b);
+          sel = -1;
+          const fallen = before.p & ~cur.p;
+          draw({ fly: { from: a, to: b }, prevPins });
+          sfx("drop");
+          let n = 0;
+          for (let k = 0; k < P.plates.length; k++) {
+            if (!((fallen >> k) & 1)) continue;
+            dropPlate(P, k, before);
+            n++;
+          }
+          if (n) {
+            setTimeout(() => sfx(n > 1 ? "combo" : "pop", n), 120);
+            const c = holeXY(P, a, geo);
+            sparks(c.x, c.y, 6);
+          }
+          drawHud();
+          // 옮긴 나사는 언제든 제자리로 되돌려 박을 수 있어서(뺀 자리는 계속 열려 있다) 막혀서 못 푸는 판은 생기지 않는다
+          if (!cur.p) stageClear();
+        }
+        function undo() {
+          if (state !== "play" || clearing || !undoLeft || !history.length) return;
+          cur = history.pop();
+          undoLeft--;
+          sel = -1;
+          fxSvg.innerHTML = "";
+          draw();
+          sfx("whoosh");
+          drawHud();
+        }
+        function restartStage() {
+          if (state !== "play" || clearing || !history.length) return;
+          cur = { ...puzzle.start };
+          history = [];
+          sel = -1;
+          fxSvg.innerHTML = "";
+          draw();
+          sfx("whoosh");
+          floatText("이 단계를 처음부터 해요 · 시간은 그대로 흘러요", true);
+          drawHud();
+        }
+
+        // ── 시간 ───────────────────────────────────────────────
+        function loop() {
+          if (state !== "play") return;
+          const t = performance.now();
+          timeLeftMs -= clamp(t - lastTick, 0, 250);
+          lastTick = t;
+          const sec = Math.ceil(timeLeftMs / 1000);
+          if (sec !== lastSec) {
+            lastSec = sec;
+            if (sec >= 1 && sec <= 5) sfx("countdown");
+          }
+          if (timeLeftMs <= 0) {
+            timeLeftMs = 0;
+            gameOver();
+            return;
+          }
+          drawTime();
+          rafId = requestAnimationFrame(loop);
+        }
+
+        // ── 판 흐름 ─────────────────────────────────────────────
+        function start() {
+          if (state !== "ready") return;
+          state = "play";
+          lastSec = Math.ceil(timeLeftMs / 1000);
+          sfx("go");
+          showCover("none");
+          lastTick = performance.now();
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        function pause() {
+          if (state !== "play") return;
+          state = "pause";
+          cancelAnimationFrame(rafId);
+          sel = -1;
+          draw();
+          ctx.sfx("select");
+          showCover("pause");
+          drawHud();
+        }
+        function resume() {
+          if (state !== "pause") return;
+          state = "play";
+          showCover("none");
+          lastTick = performance.now();
+          sfx("go");
+          drawHud();
+          rafId = requestAnimationFrame(loop);
+          root.focus({ preventScroll: true });
+        }
+        function gameOver() {
+          // 단계를 막 풀어 점수가 들어간 뒤라면 그대로 — 넘어가는 중인 다음 단계만 멈춘다
+          clearTimeout(clearTimer);
+          const dropped = clearing ? 0 : puzzle.plates.length - plateLeft();
+          ctx.sfx(solvedCount || dropped ? "win" : "lose");
+          state = "over";
+          cancelAnimationFrame(rafId);
+          sel = -1;
+          draw();
+          drawHud();
+          const final = clamp(Math.round(liveScore()), 0, MAX_SCORE);
+          showCover("over", { dropped, final });
+          ctx.submit(final);
+        }
+        function again() {
+          if (state !== "over") return;
+          ctx.sfx("tap");
+          reset();
+        }
+        function reset() {
+          cancelAnimationFrame(rafId);
+          clearTimeout(clearTimer);
+          state = "ready";
+          level = 1;
+          banked = 0;
+          solvedCount = 0;
+          clearing = false;
+          timeLeftMs = TIME_LIMIT * 1000;
+          pending = null;
+          loadLevel();
+          showCover("ready");
+        }
+
+        // ── 덮개 ───────────────────────────────────────────────
+        // 시작 화면 그림 — 가로 막대 위에 세로 막대가 얹혀 아래 판 나사 하나를 덮고 있다
+        function demoHtml() {
+          const P = {
+            cols: 4, rows: 3,
+            holes: [{ c: 0, r: 1 }, { c: 2, r: 1 }, { c: 2, r: 0 }, { c: 2, r: 2 }, { c: 1, r: 0 }],
+            plates: [{ segs: [[0, 1, 3, 1]], pts: [0, 1, 2, 3].map((c) => ({ c, r: 1 })), holes: [0, 1] },
+              { segs: [[2, 0, 2, 2]], pts: [0, 1, 2].map((r) => ({ c: 2, r })), holes: [2, 3] }],
+            pin: [1, 1, 2, 2, 0], block: [0, 2, 0, 0, 0], plateHoles: [0b11, 0b1100],
+          };
+          const g = { W: 168, H: 112, s: 40, ox: 24, oy: 16 };
+          return `<div class="gm-so__demo" aria-hidden="true">${boardSvg(P, { s: 0b1111, p: 0b11 }, g, "sd", { looks: [LOOKS[0], LOOKS[2]], sel: -1, noBoard: true })}</div>`;
+        }
+        function showCover(kind, info = {}) {
+          if (kind === "none") {
+            cover.hidden = true;
+            return;
+          }
+          cover.hidden = false;
+          if (kind === "ready") {
+            cover.innerHTML = `${demoHtml()}
+              <h2>나사 풀기</h2>
+              <p>판을 붙든 나사를 빈 구멍으로 옮겨<br>겹친 판을 모두 떨어뜨려요.</p>
+              <div class="gm-so__how"><b>이렇게 해요</b><ol>
+                <li>나사를 눌러 들고, 옮길 빈 구멍을 눌러요.</li>
+                <li>위에 다른 판이 덮은 나사는 못 뽑고, 판이 덮은 구멍에도 못 넣어요. 판에 구멍이 뚫린 자리는 돼요.</li>
+                <li>나사가 하나도 안 남은 판은 떨어져요. 다 떨어뜨리면 다음 단계!</li>
+                <li>3분 동안 판 하나에 +단계×10, 단계를 깨면 +단계×100, 적은 수로 깨면 보너스.</li>
+              </ol></div>
+              <p class="gm-so__keys">되돌리기는 단계마다 ${UNDO_PER_STAGE}번 · 이 단계 다시는 언제든(시간은 흘러요) · Z 되돌리기 · Esc 쉬기</p>
+              <button type="button" class="gm-so__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
+          } else if (kind === "pause") {
+            cover.innerHTML = `<h2>잠깐 쉬는 중</h2><p>시간이 멈춰 있어요. 판은 가려 둘게요.</p>
+              <p class="gm-so__keys">${fmt(level)}단계 · ${fmt(liveScore())}점</p>
+              <button type="button" class="gm-so__go" data-go>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
+          } else {
+            const parts = [];
+            if (solvedCount) parts.push(`${fmt(solvedCount)}단계를 깼어요`);
+            if (info.dropped) parts.push(`마지막 단계에서 판 ${fmt(info.dropped)}장을 떨어뜨렸어요`);
+            cover.innerHTML = `<h2>시간 끝!</h2><div class="gm-so__big">${fmt(info.final != null ? info.final : liveScore())}점</div>
+              <p>${parts.length ? parts.join("<br>") : "다음엔 판 하나라도 떨어뜨려 봐요"}</p>
+              <button type="button" class="gm-so__go" data-go>${HKUI.icon("rotate-ccw", 18, "currentColor")} 다시 하기</button>`;
+          }
+          HKUI.refreshIcons(cover);
+          const go = cover.querySelector("[data-go]");
+          if (go) go.onclick = () => (state === "ready" ? start() : state === "pause" ? resume() : again());
+        }
+
+        // ── 입력 ───────────────────────────────────────────────
+        boardEl.addEventListener("pointerdown", (e) => {
+          if (!e.isPrimary || e.button > 0) return;
+          if (state !== "play") return;
+          e.preventDefault();
+          const h = holeAt(e.clientX, e.clientY);
+          if (h < 0) {
+            if (sel >= 0) { sel = -1; draw(); }
+            return;
+          }
+          tapHole(h);
+        });
+        undoBtn.addEventListener("click", undo);
+        resetBtn.addEventListener("click", restartStage);
+        document.addEventListener("keydown", (e) => {
+          if (e.target && e.target.closest && e.target.closest("input, textarea, select, [contenteditable]")) return;
+          if (document.querySelector(".hk-dialog__overlay")) return;
+          if (state !== "play") return;
+          if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); return; }
+          if (e.code === "KeyZ" || e.code === "Backspace") {
+            e.preventDefault();
+            if (!e.repeat) undo();
+          }
+        });
+        document.addEventListener("visibilitychange", () => {
+          if (document.hidden) pause();
+        });
+        let rt = 0;
+        window.addEventListener("resize", () => {
+          clearTimeout(rt);
+          rt = setTimeout(fit, 80);
+        });
+        // 게임 중 뒤로 가기 → '기록 남기고 나가기'에 쓰는 지금 점수
+        ctx.onScore && ctx.onScore(() => Math.round(liveScore()));
+        ctx.onRestart(reset);
+        ctx.onPause(pause);
+        reset();
+        requestAnimationFrame(fit);
+      },
+    });
+  </script>
+</body>
+</html>
