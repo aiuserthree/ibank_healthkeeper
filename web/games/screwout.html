@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
   <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
-  <title>나사 풀기 — 아케이드</title>
+  <title>나사 풀기 3D — 아케이드</title>
   <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
   <link rel="stylesheet" href="/_shared/responsive.css">
   <link rel="stylesheet" href="/_shared/app.css">
@@ -12,6 +12,7 @@
   <script src="/_shared/api.js"></script>
   <script src="/_shared/member-shell.js"></script>
   <script src="/_shared/play.js"></script>
+  <script src="/_shared/jellyvs-three.js"></script>
   <style>
     .gm-so { --gm-a: #92400e; --gm-b: #f59e0b; --gm-ink: #3b1d06; --gm-soft: #78716c; --gm-chip: #fef3c7;
       position: relative; display: flex; flex-direction: column; gap: 8px; color: var(--gm-ink); outline: none;
@@ -28,31 +29,33 @@
     .gm-so__time.is-low i { background: linear-gradient(90deg, #dc2626, #fb923c); }
     .gm-so__meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; color: var(--gm-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .gm-so__meta b { color: var(--gm-ink); }
-    /* 2. 판 */
-    .gm-so__board { position: relative; width: 100%; height: 380px; border-radius: 16px; background: #efe4d2; overflow: hidden; touch-action: none; cursor: pointer; }
-    .gm-so__board svg { position: absolute; left: 0; top: 0; display: block; overflow: visible; }
-    .gm-so__fx { pointer-events: none; z-index: 2; }
-    .gm-so__plate { transition: transform .35s cubic-bezier(.3, 1.4, .5, 1); }
-    .gm-so__plate.is-swing { animation: so-swing .7s ease-out both; }
-    @keyframes so-swing { 0% { transform: rotate(0deg); } 35% { transform: rotate(calc(var(--tilt) * 2.2)); } 65% { transform: rotate(calc(var(--tilt) * .55)); } 100% { transform: rotate(var(--tilt)); } }
-    .gm-so__fall { animation: so-fall .78s cubic-bezier(.45, 0, .85, .55) forwards; }
-    @keyframes so-fall { 0% { transform: rotate(var(--tilt)); opacity: 1; } 25% { transform: translate(0, -6px) rotate(calc(var(--tilt) + var(--spin) * .15)); opacity: 1; } 100% { transform: translate(var(--fx), var(--fy)) rotate(var(--spin)); opacity: 0; } }
-    .gm-so__sw { transform-box: fill-box; transform-origin: 46% 42%; transition: transform .14s ease-out; }
-    .gm-so__sc.is-sel .gm-so__sw { transform: translateY(-4px) scale(1.2); }
-    .gm-so__sc.is-in { animation: so-fly .3s cubic-bezier(.25, .8, .4, 1) both; }
-    .gm-so__sc.is-in .gm-so__sw { animation: so-spin .5s ease-out both; }
-    @keyframes so-fly { 0% { transform: translate(var(--dx), calc(var(--dy) - 6px)); } 70% { transform: translate(0, -5px); } 100% { transform: none; } }
-    @keyframes so-spin { 0% { transform: rotate(-300deg) scale(1.2); } 60% { transform: rotate(-60deg) scale(1.12); } 100% { transform: none; } }
-    .gm-so__sel { fill: none; stroke: #f59e0b; stroke-width: 3; filter: drop-shadow(0 0 3px rgba(245, 158, 11, .7)); }
-    .gm-so__dest { fill: rgba(34, 197, 94, .16); stroke: #16a34a; stroke-width: 2.2; stroke-dasharray: 4 3; animation: so-dest 1.1s ease-in-out infinite; }
-    @keyframes so-dest { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
-    .gm-so__bad { fill: rgba(220, 38, 38, .14); stroke: #dc2626; stroke-width: 3; transform-box: fill-box; transform-origin: center; animation: so-bad .55s ease-out forwards; }
-    @keyframes so-bad { 0% { transform: scale(.7); opacity: 1; } 30% { transform: translateX(-3px) scale(1.05); } 55% { transform: translateX(3px); opacity: 1; } 100% { transform: none; opacity: 0; } }
+    /* 2. 판 — 공구 벽(타공판) + 작업대 */
+    .gm-so__board { position: relative; width: 100%; height: 380px; border-radius: 16px; overflow: hidden; touch-action: none; cursor: grab;
+      background:
+        radial-gradient(ellipse 72% 58% at 50% 44%, rgba(255, 244, 222, .95), rgba(255, 244, 222, 0) 72%),
+        linear-gradient(180deg, transparent 0, transparent 70%, rgba(110, 66, 28, .28) 70%, transparent 70.6%),
+        linear-gradient(180deg, transparent 0, transparent 70.4%, #d3a777 70.4%, #c08e5a 80%, #a8743f 100%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='180' viewBox='0 0 300 180'%3E%3Cg fill='none' stroke='%237c5a36' stroke-opacity='.13' stroke-width='5' stroke-linecap='round'%3E%3Cpath d='M30 26l40 40M24 32c-6-10 2-20 12-14M64 60c10 6 18-2 12-12'/%3E%3Cpath d='M250 20v62M242 20h16'/%3E%3Cpath d='M218 30c8-8 22-8 30 0'/%3E%3C/g%3E%3C/svg%3E") 0 0 / 300px 180px no-repeat,
+        radial-gradient(circle at 50% 50%, rgba(110, 76, 40, .2) 1.7px, transparent 2.3px) 0 0 / 22px 22px,
+        linear-gradient(180deg, #efe1c8 0%, #e5d1b0 70%); }
+    .gm-so__board.is-drag { cursor: grabbing; }
+    .gm-so__board canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+    .gm-so__no3d { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; font-size: 14px; line-height: 1.6; color: var(--gm-ink); word-break: keep-all; }
     .gm-so__spark { position: absolute; z-index: 7; width: 8px; height: 8px; margin: -4px 0 0 -4px; pointer-events: none; background: #fde047; clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); animation: so-spark .65s ease-out forwards; }
     @keyframes so-spark { 0% { transform: translate(0, 0) scale(.4); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.3) rotate(90deg); opacity: 0; } }
     .gm-so__float { position: absolute; z-index: 8; left: 50%; pointer-events: none; transform: translate(-50%, -50%); padding: 6px 14px; border-radius: 999px; background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); color: #fff; font-weight: 800; font-size: 15px; white-space: nowrap; box-shadow: 0 6px 14px rgba(146, 64, 14, .28); animation: so-float 1.1s ease-out forwards; }
     .gm-so__float.is-plain { background: #44403c; font-size: 13px; box-shadow: none; animation-duration: 1.8s; white-space: normal; width: max-content; max-width: calc(100% - 32px); box-sizing: border-box; text-align: center; word-break: keep-all; line-height: 1.45; }
     @keyframes so-float { 0% { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 15% { opacity: 1; transform: translate(-50%, -55%) scale(1.05); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -120%) scale(1); } }
+    /* 뒤쪽 면에 남은 판 — 돌려 보세요 */
+    .gm-so__turn { position: absolute; z-index: 6; pointer-events: none; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: rgba(68, 64, 60, .86); color: #fff; font-size: 13px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 12px rgba(41, 24, 8, .2); opacity: 0; transition: opacity .25s; }
+    .gm-so__turn.is-on { opacity: 1; animation: so-turn 1.4s ease-in-out infinite; }
+    .gm-so__turn i { font-style: normal; font-size: 16px; line-height: 1; }
+    .gm-so__turn.is-right { right: 10px; top: 50%; --tx: 0; --ty: -50%; --mx: 5px; --my: 0; }
+    .gm-so__turn.is-left { left: 10px; top: 50%; --tx: 0; --ty: -50%; --mx: -5px; --my: 0; }
+    .gm-so__turn.is-up { left: 50%; top: 10px; --tx: -50%; --ty: 0; --mx: 0; --my: -4px; }
+    .gm-so__turn.is-down { left: 50%; bottom: 10px; --tx: -50%; --ty: 0; --mx: 0; --my: 4px; }
+    .gm-so__turn { transform: translate(var(--tx, 0), var(--ty, 0)); }
+    @keyframes so-turn { 0%, 100% { transform: translate(var(--tx), var(--ty)); } 50% { transform: translate(calc(var(--tx) + var(--mx)), calc(var(--ty) + var(--my))); } }
     /* 3. 아래 단추 */
     .gm-so__tools { display: flex; gap: 8px; }
     .gm-so__tool { flex: 1; height: 44px; padding: 0 10px; border: 0; border-radius: 12px; background: var(--gm-chip); color: var(--gm-a); font-size: 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; white-space: nowrap; }
@@ -75,8 +78,9 @@
     .gm-so__how ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: rgba(255, 255, 255, .94); word-break: keep-all; }
     .gm-so__go { border: 0; padding: 12px 34px; border-radius: 14px; background: #fff; color: var(--gm-a); font-size: 16px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; margin-top: 2px; }
     @media (hover: hover) { .gm-so__go:hover { background: #fffbeb; } }
-    .gm-so__demo { position: relative; flex-shrink: 0; width: 168px; height: 112px; }
-    .gm-so__demo svg { display: block; }
+    .gm-so__demo { position: relative; flex-shrink: 0; width: 200px; height: 124px; }
+    .gm-so__demo canvas { display: block; width: 200px; height: 124px; }
+    @media (max-height: 700px) { .gm-so__demo { width: 160px; height: 100px; } .gm-so__demo canvas { width: 160px; height: 100px; } }
   </style>
 </head>
 <body>
@@ -86,20 +90,66 @@
       key: "screwout",
       setup(stage, ctx) {
         // ── 퍼즐 엔진 (화면과 무관 — node 검사용으로 이 구간만 떼어 쓴다) ── SO-CORE-START
-        // 판 = 격자 칸(점)을 덮는 막대 · 사각 · L자 · T자. 판에는 몇 자리에 구멍이 뚫려 있다.
-        // 한 자리 p 가 「열려 있다」 = 아직 남은 판 가운데 p 를 덮는 판이 모두 p 에 구멍이 뚫려 있다.
-        // 나사는 열린 자리에서만 뽑고, 열린 빈 구멍에만 박는다. 나사는 그 자리에 구멍이 뚫린 판을 모두 붙든다.
+        // 입체 물건 = 면 여러 개. 면마다 구멍 격자(점)가 있고, 그 위에 판(막대 · 사각 · L자 · T자)이 층층이 얹혀 있다.
+        // 판은 한 면에만 붙는다. 판에는 몇 자리에 구멍이 뚫려 있다.
+        // 한 자리 p 가 「열려 있다」 = 아직 남은 판 가운데 p 를 덮는 판(같은 면)이 모두 p 에 구멍이 뚫려 있다.
+        // 나사는 열린 자리에서만 뽑고, 열린 빈 구멍(어느 면이든)에만 박는다. 나사는 그 자리에 구멍이 뚫린 판을 모두 붙든다.
         const MAX_HOLES = 30;      // 구멍 수 상한(비트 묶음)
+        const MAX_PLATES = 16;     // 판 수 상한(상태 열쇠가 정확한 정수로 남게)
         const SEARCH_LIMIT = 10000;
         const GEN_TRIES = 50;
-        // [판 수, 가로 점, 세로 점, 빈 구멍, 판 하나 나사 최대, 겹침 최소]
+        // [판 수, 빈 구멍, 판 하나 나사 최대, 겹침 최소] — 2D 판과 같은 곡선
         const LEVELS = [
-          [3, 4, 5, 5, 2, 1], [4, 4, 5, 4, 2, 1], [5, 5, 6, 4, 2, 1], [6, 5, 6, 4, 3, 1], [7, 5, 7, 3, 3, 2],
-          [8, 5, 7, 3, 3, 2], [9, 6, 7, 3, 3, 2], [10, 6, 8, 3, 3, 2], [11, 6, 8, 3, 3, 2], [12, 6, 8, 3, 3, 2],
+          [3, 5, 2, 1], [4, 4, 2, 1], [5, 4, 2, 1], [6, 4, 3, 1], [7, 3, 3, 2],
+          [8, 3, 3, 2], [9, 3, 3, 2], [10, 3, 3, 2], [11, 3, 3, 2], [12, 3, 3, 2],
         ];
-        function cfgFor(lv) {
+        // ── 물건 ── 몸체 = 상자 [cx, cy, cz, 가로, 높이, 깊이, 재질(w 나무 · m 금속 · d 짙은 플라스틱 · g 밝은 플라스틱 · p 종이 · l 불빛)]
+        // 면 = { c: 가운데, n: 바깥 방향(+z 앞 · -z 뒤 · +x 오른쪽 · -x 왼쪽 · +y 위), w: 가로 점 수, h: 세로 점 수 } — 점 간격 1
+        function side(b, n) {
+          const [x, y, z, sx, sy, sz] = b;
+          if (n === "+z") return { c: [x, y, z + sz / 2], n, w: sx, h: sy };
+          if (n === "-z") return { c: [x, y, z - sz / 2], n, w: sx, h: sy };
+          if (n === "+x") return { c: [x + sx / 2, y, z], n, w: sz, h: sy };
+          if (n === "-x") return { c: [x - sx / 2, y, z], n, w: sz, h: sy };
+          return { c: [x, y + sy / 2, z], n, w: sx, h: sz };
+        }
+        const OBJECTS = (() => {
+          const o = {};
+          const cube = [0, 0, 0, 4, 4, 4, "w"];
+          o.cube = { name: "나무 상자", boxes: [cube], faces: ["+z", "+x", "+y", "-x", "-z"].map((n) => side(cube, n)) };
+          const fb = [0, 0, 0, 6, 3, 4, "w"];
+          o.filebox = { name: "서류 상자", boxes: [fb], faces: ["+z", "+x", "+y", "-z", "-x"].map((n) => side(fb, n)) };
+          const la = [1, -1, 0, 6, 2, 4, "w"], lb = [-1, 2, 0, 2, 4, 4, "w"];
+          o.lblock = { name: "L자 블록", boxes: [la, lb], faces: [
+            side(la, "+z"), side(lb, "+z"), { c: [2, 0, 0], n: "+y", w: 4, h: 4 }, side(lb, "+x"), side(la, "+x"),
+            side(lb, "+y"), { c: [-2, 1, 0], n: "-x", w: 4, h: 6 }, side(la, "-z"), side(lb, "-z")] };
+          const s1 = [0, 1, 0, 4, 2, 6, "w"], s2 = [0, 3, -1, 4, 2, 4, "w"], s3 = [0, 5, -2, 4, 2, 2, "w"];
+          o.stairs = { name: "계단", boxes: [s1, s2, s3], faces: [
+            side(s1, "+z"), { c: [0, 2, 2], n: "+y", w: 4, h: 2 }, side(s2, "+z"), { c: [0, 4, 0], n: "+y", w: 4, h: 2 }, side(s3, "+z"), side(s3, "+y"),
+            side(s1, "+x"), side(s2, "+x"), side(s3, "+x"), side(s1, "-x"), side(s2, "-x"), { c: [0, 3, -3], n: "-z", w: 4, h: 6 }] };
+          const seat = [0, 4.5, 0, 5, 1, 5, "w"], back = [0, 8.5, -3, 5, 5, 1, "w"];
+          o.chair = { name: "의자", boxes: [seat, back,
+            [-2, 2, -2, 0.5, 4, 0.5, "m"], [2, 2, -2, 0.5, 4, 0.5, "m"], [-2, 2, 2, 0.5, 4, 0.5, "m"], [2, 2, 2, 0.5, 4, 0.5, "m"],
+            [-1.8, 5.5, -3, 0.4, 1.2, 0.4, "m"], [1.8, 5.5, -3, 0.4, 1.2, 0.4, "m"]],
+            faces: [side(seat, "+y"), { c: [0, 8.5, -2.5], n: "+z", w: 5, h: 5 }, side(back, "-z")] };
+          const top = [0, 5.5, 0, 8, 1, 4, "w"], leg = [-3.5, 2.5, 0, 1, 5, 4, "w"], drw = [2.5, 2.5, 0, 3, 5, 4, "w"];
+          o.desk = { name: "책상", boxes: [top, leg, drw], faces: [side(top, "+y"), side(drw, "+z"), side(drw, "+x"), side(leg, "-x"), side(drw, "-z")] };
+          const pb = [0, 2, 0, 6, 4, 5, "g"], lid = [0, 4.3, 0, 6, 0.6, 5, "d"];
+          o.printer = { name: "프린터", boxes: [pb, lid, [0, 4.42, -3.4, 4.8, 0.16, 2, "d"], [0, 4.56, -3.7, 4.2, 0.06, 2.4, "p"], [2.3, 4.3, 2.52, 0.4, 0.22, 0.06, "l"],
+            [-2.6, -0.15, -2.1, 0.6, 0.3, 0.6, "d"], [2.6, -0.15, -2.1, 0.6, 0.3, 0.6, "d"], [-2.6, -0.15, 2.1, 0.6, 0.3, 0.6, "d"], [2.6, -0.15, 2.1, 0.6, 0.3, 0.6, "d"]],
+            faces: [side(pb, "+z"), { c: [0, 4.6, 0], n: "+y", w: 6, h: 5 }, side(pb, "+x"), side(pb, "-x"), side(pb, "-z")] };
+          const lk = [0, 4, 0, 4, 8, 4, "m"];
+          o.locker = { name: "사물함", boxes: [lk, [0, -0.15, 0, 3.6, 0.3, 3.6, "d"]], faces: ["+z", "+x", "+y", "-x", "-z"].map((n) => side(lk, n)) };
+          const scr = [0, 5, 0, 8, 5, 1, "d"];
+          o.monitor = { name: "모니터", boxes: [scr, [0, 1.6, -0.1, 1, 2.6, 0.5, "m"], [0, 0.15, 0.2, 4, 0.3, 2.6, "m"]], faces: [side(scr, "+z"), side(scr, "-z")] };
+          return o;
+        })();
+        const LEVEL_OBJ = ["cube", "cube", "filebox", "lblock", "stairs", "chair", "desk", "printer", "locker", "monitor"];
+        const LATE_OBJ = ["lblock", "stairs", "chair", "desk", "printer", "locker", "monitor"];
+        function cfgFor(lv, rnd = Math.random) {
           const t = LEVELS[Math.min(lv, LEVELS.length) - 1];
-          return { plates: t[0], cols: t[1], rows: t[2], empties: t[3], maxS: t[4], overlap: t[5], lv };
+          const key = lv <= LEVEL_OBJ.length ? LEVEL_OBJ[lv - 1] : LATE_OBJ[Math.floor(rnd() * LATE_OBJ.length)];
+          return { plates: t[0], empties: t[1], maxS: t[2], overlap: t[3], lv, objKey: key, faceLimit: lv <= 1 ? 3 : 0 };
         }
         // 판 모양 — 칸 묶음 [c0, r0, c1, r1] (끝 포함). 돌리고 뒤집은 모양을 모두 만든다
         const SHAPE_BASE = [
@@ -180,38 +230,48 @@
           out.sort((x, y) => x.pr - y.pr);
           return out;
         }
-        // 모든 수를 고른 열쇠 — 빈 자리 구멍에 든 나사는 개수만
+        // 모든 수를 고른 열쇠 — 빈 자리 구멍에 든 나사는 개수만 (구멍 30 · 판 16 까지 정확한 정수)
         function stateKey(P, st) {
           const free = freeMask(P, st.p);
-          return (st.s & ~free) * 131072 + bitCount(st.s & free) * 4096 + st.p;
+          return ((st.s & ~free) * 32 + bitCount(st.s & free)) * (1 << P.plates.length) + st.p;
         }
-        // 가장 짧은 풀이 찾기(너비 우선). 상한을 넘으면 깊이 우선으로 아무 풀이나. 둘 다 못 찾으면 moves = null
+        // 남은 판의 구멍에 박힌 나사 수 — 판이 떨어지려면 그 나사는 적어도 한 번씩 옮겨야 한다(풀이 길이의 아래 한계)
+        function lowerBound(P, st) {
+          let live = 0;
+          for (let k = 0; k < P.plates.length; k++) if ((st.p >> k) & 1) live |= P.plateHoles[k];
+          return bitCount(st.s & live);
+        }
+        // 가장 짧은 풀이 찾기 — 2D 판의 너비 우선을 「지금까지 수 + 아래 한계」가 작은 것부터 펼치게(A*) 바꿨다.
+        // 아래 한계는 한 수에 1 넘게 줄지 않아서 처음 찾은 풀이가 가장 짧다. 상한을 넘으면 깊이 우선으로 아무 풀이나. 둘 다 못 찾으면 moves = null
         function solve(P, start, limit = SEARCH_LIMIT, bfsOnly = false) {
           if (!start.p) return { moves: [], nodes: 0, aborted: false };
           const seen = new Map();
           const k0 = stateKey(P, start);
-          seen.set(k0, null);
-          let frontier = [{ st: start, key: k0 }];
+          seen.set(k0, { prev: null, g: 0 });
+          const buckets = [];
+          const push = (f, node) => { (buckets[f] = buckets[f] || []).push(node); };
+          push(lowerBound(P, start), { st: start, key: k0, g: 0 });
           let nodes = 0, aborted = false;
-          while (frontier.length && !aborted) {
-            const next = [];
-            for (const { st, key } of frontier) {
+          for (let f = 0; f < buckets.length && !aborted; f++) {
+            const bk = buckets[f];
+            while (bk && bk.length && !aborted) {
+              const { st, key, g } = bk.pop();
+              if (seen.get(key).g !== g) continue; // 더 짧은 길로 이미 왔다
               for (const m of listMoves(P, st)) {
                 const k = stateKey(P, m.nx);
-                if (seen.has(k)) continue;
-                seen.set(k, { prev: key, a: m.a, b: m.b });
+                const e = seen.get(k);
+                if (e && e.g <= g + 1) continue;
+                seen.set(k, { prev: key, a: m.a, b: m.b, g: g + 1 });
                 if (!m.nx.p) {
                   const moves = [];
                   let cur = k;
-                  while (seen.get(cur)) { const e = seen.get(cur); moves.push([e.a, e.b]); cur = e.prev; }
+                  while (seen.get(cur).prev !== null) { const x = seen.get(cur); moves.push([x.a, x.b]); cur = x.prev; }
                   return { moves: moves.reverse(), nodes, aborted: false, optimal: true };
                 }
                 if (++nodes > limit) { aborted = true; break; }
-                next.push({ st: m.nx, key: k });
+                push(g + 1 + lowerBound(P, m.nx), { st: m.nx, key: k, g: g + 1 });
               }
-              if (aborted) break;
             }
-            frontier = next;
           }
           if (!aborted) return { moves: null, nodes, aborted: false };
           if (bfsOnly) return { moves: null, nodes, aborted: true };
@@ -237,15 +297,13 @@
           return { moves: ok ? path.slice() : null, nodes: nodes + n2, aborted: !ok && ab2, optimal: false };
         }
 
-        // 새 단계 만들기 — 아래 판부터 하나씩 얹는다. 다 얹은 뒤 풀이를 찾아 확인하고, 못 풀면 다시
-        function buildOnce(cfg, rnd) {
-          const { cols, rows } = cfg;
-          const id = (c, r) => r * cols + c;
-          const covers = Array.from({ length: cols * rows }, () => []); // 그 점을 덮은 판 번호(아래 → 위)
-          const plates = [];
-          const screwAt = new Set();
-          const empty = new Set();
-          const isBlocked = (p) => covers[p].some((k) => !plates[k].holes.has(p));
+        // 한 면에 판 n 장 얹기 — 2D 판 만들기와 같은 규칙(아래 판부터, 겹치게, 새 나사 자리 · 겹쳐 박힌 나사)
+        // 점 번호 = 면 번호 × 256 + 줄 × 16 + 칸
+        function buildFace(fi, f, n, cfg, rnd, st) {
+          const cols = f.w, rows = f.h;
+          const id = (c, r) => fi * 256 + r * 16 + c;
+          const C = (p) => st.covers.get(p) || [];
+          const isBlocked = (p) => C(p).some((k) => !st.plates[k].holes.has(p));
           const shapes = SHAPES.filter((s) => s.from <= cfg.lv);
           const wSum = shapes.reduce((a, s) => a + s.w, 0);
           const pickShape = () => { let x = rnd() * wSum; for (const s of shapes) { x -= s.w; if (x <= 0) return s; } return shapes[shapes.length - 1]; };
@@ -255,9 +313,11 @@
             const hi = cfg.lv >= 9 ? 0.4 : cfg.lv >= 6 ? 0.3 : 0.22;
             return x < 0.28 ? 1 : x < 1 - hi ? 2 : 3;
           };
-          for (let k = 0; k < cfg.plates; k++) {
+          const dist = (p, q) => Math.abs((p & 15) - (q & 15)) + Math.abs(((p >> 4) & 15) - ((q >> 4) & 15));
+          for (let j = 0; j < n; j++) {
+            const k = st.plates.length;
             let done = false;
-            const tie = k > 0 && rnd() < 0.8; // 판 대부분은 아래 판과 겹치게, 몇 장은 떨어진 자리에도(판이 한쪽에 몰리지 않게)
+            const tie = j > 0 && rnd() < 0.8; // 판 대부분은 아래 판과 겹치게
             for (let t = 0; t < 80 && !done; t++) {
               const sh = pickShape();
               const pw = Math.max(...sh.segs.map((s) => s[2])) + 1, ph = Math.max(...sh.segs.map((s) => s[3])) + 1;
@@ -265,24 +325,21 @@
               const oc = Math.floor(rnd() * (cols - pw + 1)), or = Math.floor(rnd() * (rows - ph + 1));
               const segs = sh.segs.map((s) => [s[0] + oc, s[1] + or, s[2] + oc, s[3] + or]);
               const pts = segPoints(segs).map(([c, r]) => id(c, r));
-              const over = pts.filter((p) => covers[p].length).length;
-              const overScrew = pts.filter((p) => screwAt.has(p)).length;
+              const over = pts.filter((p) => C(p).length).length;
+              const overScrew = pts.filter((p) => st.screwAt.has(p)).length;
               if (tie && t < 60) {
                 if (over < Math.min(cfg.overlap, pts.length - 1)) continue;
-                if (t < 40 && k >= 2 && !overScrew) continue; // 아래 판 나사 하나는 덮거나 함께 붙든다
+                if (t < 40 && j >= 2 && !overScrew) continue; // 아래 판 나사 하나는 덮거나 함께 붙든다
               }
-              // 새 나사 자리 — 아래에 판이 없는 점이 먼저. 아래 판이 덮은 점이면 그 판들에도 구멍을 뚫어 함께 붙든다(겹쳐 박힌 나사)
-              const free = pts.filter((p) => !covers[p].length && !empty.has(p) && !screwAt.has(p));
-              const thru = pts.filter((p) => covers[p].length && !empty.has(p) && !screwAt.has(p));
+              const free = pts.filter((p) => !C(p).length && !st.screwAt.has(p));
+              const thru = pts.filter((p) => C(p).length && !st.screwAt.has(p));
               if (!free.length && !(thru.length && cfg.lv >= 3)) continue;
               const want = screwN();
               const pick = [];
-              const dist = (p, q) => Math.abs((p % cols) - (q % cols)) + Math.abs(Math.floor(p / cols) - Math.floor(q / cols));
               while (pick.length < want) {
                 const useThru = cfg.lv >= 3 && thru.some((p) => !pick.includes(p)) && (!free.some((p) => !pick.includes(p)) || rnd() < (cfg.lv >= 6 ? 0.35 : 0.2));
                 const pool = (useThru ? thru : free).filter((p) => !pick.includes(p));
                 if (!pool.length) break;
-                // 이미 고른 나사와 먼 점(같으면 아무거나)
                 let best = pool[Math.floor(rnd() * pool.length)];
                 if (pick.length) {
                   let bestD = -1;
@@ -291,61 +348,101 @@
                 pick.push(best);
               }
               if (!pick.length) continue;
-              const punched = pick.filter((p) => covers[p].length);
+              const punched = pick.filter((p) => C(p).length);
               const holes = new Set(pick);
               for (const p of pts) {
                 if (holes.has(p) || isBlocked(p)) continue;
-                if (screwAt.has(p) && rnd() < (cfg.lv >= 4 ? 0.28 : 0.15)) holes.add(p);      // 아래 판 나사를 함께 붙든다
+                if (st.screwAt.has(p) && rnd() < (cfg.lv >= 4 ? 0.28 : 0.15)) holes.add(p);      // 아래 판 나사를 함께 붙든다
               }
-              plates.push({ segs, pts, holes, screws: pick.slice() });
-              for (const p of punched) for (const q of covers[p]) plates[q].holes.add(p);
-              for (const p of pts) covers[p].push(k);
-              for (const p of pick) screwAt.add(p);
+              st.plates.push({ f: fi, segs, pts, holes });
+              for (const p of punched) for (const q of C(p)) st.plates[q].holes.add(p);
+              for (const p of pts) { if (!st.covers.has(p)) st.covers.set(p, []); st.covers.get(p).push(k); }
+              for (const p of pick) st.screwAt.add(p);
               done = true;
             }
-            if (!done) return null;
+            if (!done) return false;
           }
-          // 빈 구멍 — 판을 다 얹은 뒤에 고른다. 첫 구멍은 처음부터 쓸 수 있게(덮은 판이 있으면 모두 뚫어 둔다),
+          return true;
+        }
+        // 새 단계 만들기 — 판을 붙일 면을 고르고, 면마다 판을 얹고, 빈 구멍을 고른다
+        function buildOnce(cfg, rnd) {
+          const obj = OBJECTS[cfg.objKey];
+          const faces = cfg.faceLimit ? obj.faces.slice(0, cfg.faceLimit) : obj.faces;
+          const n = Math.min(cfg.plates, MAX_PLATES);
+          const cap = faces.map((f) => (f.w < 2 && f.h < 2 ? 0 : Math.max(1, Math.floor((f.w * f.h) / 3))));
+          const m = Math.min(faces.filter((_, i) => cap[i]).length, cfg.lv <= 1 ? 2 : Math.max(2, Math.ceil(n / 2)));
+          // 넓은 면이 잘 뽑히게(무게 = 넓이)
+          const order = faces.map((f, i) => ({ i, key: cap[i] ? -Math.log(1 - rnd()) / (f.w * f.h) : Infinity })).sort((a, b) => a.key - b.key).map((x) => x.i);
+          const act = order.slice(0, m);
+          const cnt = faces.map(() => 0);
+          act.forEach((i) => { cnt[i] = 1; });
+          for (let left = n - m; left > 0; left--) {
+            const cand = act.filter((i) => cnt[i] < cap[i]);
+            if (!cand.length) return null;
+            const ws = cand.map((i) => (faces[i].w * faces[i].h) / (cnt[i] + 1));
+            let x = rnd() * ws.reduce((a, b) => a + b, 0), pick = cand[cand.length - 1];
+            for (let q = 0; q < cand.length; q++) { x -= ws[q]; if (x <= 0) { pick = cand[q]; break; } }
+            cnt[pick]++;
+          }
+          const st = { plates: [], covers: new Map(), screwAt: new Set() };
+          for (const fi of act) if (!buildFace(fi, faces[fi], cnt[fi], cfg, rnd, st)) return null;
+          // 빈 구멍 — 판이 붙은 면에서. 첫 구멍은 처음부터 쓸 수 있게(덮은 판이 있으면 모두 뚫어 둔다),
           // 나머지는 아래 판 몇 장만 뚫고 위 판이 가리기도 한다(위 판이 떨어져야 쓸 수 있는 구멍)
+          const C = (p) => st.covers.get(p) || [];
           const spots = [];
-          for (let p = 0; p < cols * rows; p++) if (!screwAt.has(p)) spots.push(p);
+          for (const fi of act) for (let r = 0; r < faces[fi].h; r++) for (let c = 0; c < faces[fi].w; c++) {
+            const p = fi * 256 + r * 16 + c;
+            if (!st.screwAt.has(p)) spots.push(p);
+          }
+          const empty = new Set();
           for (let e = 0; e < cfg.empties && spots.length; e++) {
             let pool = spots;
-            if (e === 0) { const minC = Math.min(...spots.map((p) => covers[p].length)); pool = spots.filter((p) => covers[p].length === minC); }
+            // 5단계부터는 판 밑 자리(판에 구멍이 뚫린 자리)를 먼저 — 아무것도 안 덮인 빈 구멍은 늘 쓰는 주차 자리가 돼 너무 쉬워진다
+            const under = cfg.lv >= 5 && rnd() < (e === 0 ? 0.85 : 0.7) ? spots.filter((p) => C(p).length) : [];
+            if (under.length) pool = under;
+            if (e === 0) { const minC = Math.min(...pool.map((p) => C(p).length)); pool = pool.filter((p) => C(p).length === minC); }
             const p = pool[Math.floor(rnd() * pool.length)];
             spots.splice(spots.indexOf(p), 1);
             empty.add(p);
-            const cv = covers[p];
+            const cv = C(p);
             const open = e === 0 || rnd() < 0.45;
             const cut = open ? cv.length : Math.floor(rnd() * cv.length); // 아래에서 cut 장까지 뚫는다
-            cv.forEach((k, i) => { if (i < cut) plates[k].holes.add(p); });
+            cv.forEach((k, i) => { if (i < cut) st.plates[k].holes.add(p); });
           }
-          const holeIds = [...screwAt, ...empty].sort((a, b) => a - b);
+          const holeIds = [...st.screwAt, ...empty].sort((a, b) => a - b);
           if (holeIds.length > MAX_HOLES) return null;
           const hIndex = new Map(holeIds.map((p, i) => [p, i]));
+          const dec = (p) => ({ f: p >> 8, c: p & 15, r: (p >> 4) & 15 });
+          // 판 층 — 같은 면에서 아래 판과 겹치면 그 위 층
+          const layer = [];
+          st.plates.forEach((pl, k) => {
+            let L = 0;
+            for (let j = 0; j < k; j++) if (st.plates[j].f === pl.f && pl.pts.some((p) => st.plates[j].pts.includes(p))) L = Math.max(L, layer[j] + 1);
+            layer.push(L);
+          });
           const P = {
-            cols, rows,
-            holes: holeIds.map((p) => ({ c: p % cols, r: Math.floor(p / cols) })),
-            plates: plates.map((pl) => ({ segs: pl.segs, pts: pl.pts.map((p) => ({ c: p % cols, r: Math.floor(p / cols) })), holes: [...pl.holes].map((p) => hIndex.get(p)).sort((a, b) => a - b) })),
+            objKey: cfg.objKey, faces,
+            holes: holeIds.map(dec),
+            plates: st.plates.map((pl, k) => ({ f: pl.f, layer: layer[k], segs: pl.segs.map((s) => s.slice()), pts: pl.pts.map(dec), holes: [...pl.holes].map((p) => hIndex.get(p)).sort((a, b) => a - b) })),
             pin: holeIds.map(() => 0), block: holeIds.map(() => 0), plateHoles: [],
           };
-          plates.forEach((pl, k) => {
-            let m = 0;
+          st.plates.forEach((pl, k) => {
+            let mk = 0;
             for (const p of pl.pts) {
               if (!hIndex.has(p)) continue;
               const h = hIndex.get(p);
-              if (pl.holes.has(p)) { P.pin[h] |= 1 << k; m |= 1 << h; } else P.block[h] |= 1 << k;
+              if (pl.holes.has(p)) { P.pin[h] |= 1 << k; mk |= 1 << h; } else P.block[h] |= 1 << k;
             }
-            P.plateHoles[k] = m;
+            P.plateHoles[k] = mk;
           });
           let s = 0;
-          for (const p of screwAt) s |= 1 << hIndex.get(p);
-          P.start = { s, p: (1 << plates.length) - 1 };
+          for (const p of st.screwAt) s |= 1 << hIndex.get(p);
+          P.start = { s, p: (1 << st.plates.length) - 1 };
           return P;
         }
         // 단계 만들기 — step(ms) 를 부를 때마다 그 시간만큼 시도하고, 다 되면 단계를 돌려준다(못 끝냈으면 null)
         function puzzleMaker(level, rnd = Math.random) {
-          const base = cfgFor(level);
+          const base = cfgFor(level, rnd);
           let tries = 0;
           return function step(budgetMs = Infinity) {
             const t0 = Date.now();
@@ -385,42 +482,40 @@
         const TIME_LIMIT = 180;          // 3분
         const UNDO_PER_STAGE = 3;
         const MAX_SCORE = 1_000_000;
-        const FALL_MS = 780;             // 판이 떨어지는 시간
         const CLEAR_MS = 1100;           // 단계를 푼 뒤 다음 단계까지
-        const GEN_SLICE = 18;            // 다음 단계를 미리 만들 때 한 번에 쓰는 시간(ms) — 판이 멈칫하지 않게 나눠서
-        // 판 12가지 — 색만으로 가리지 않게 결 무늬를 하나씩. [이름, 판 색, 테두리, 무늬 색, 무늬]
+        const GEN_SLICE = 18;            // 다음 단계를 미리 만들 때 한 번에 쓰는 시간(ms) — 화면이 멈칫하지 않게 나눠서
+        // 판 12가지 — 색만으로 가리지 않게 결 무늬를 하나씩. [이름, 판 색, 테두리, 무늬 색, 무늬, 재질(0 나무 · 1 아크릴 · 2 금속)]
         const LOOKS = [
-          ["원목", "#deb07a", "#94622f", "rgba(120,70,20,.42)", 0],
-          ["빨강", "#f07171", "#b42323", "rgba(255,255,255,.42)", 1],
-          ["파랑", "#5f92f1", "#1d4ed8", "rgba(255,255,255,.45)", 2],
-          ["초록", "#4fc48c", "#15803d", "rgba(255,255,255,.4)", 3],
-          ["보라", "#a98cfa", "#6d28d9", "rgba(255,255,255,.42)", 4],
-          ["노랑", "#fcd34d", "#b45309", "rgba(130,80,0,.38)", 5],
-          ["청록", "#34d3bd", "#0f766e", "rgba(0,70,64,.34)", 6],
-          ["분홍", "#f7a8d2", "#be185d", "rgba(150,20,80,.36)", 7],
-          ["호두", "#a8774c", "#5b3a1e", "rgba(255,232,205,.36)", 8],
-          ["회색", "#a9b6c9", "#475569", "rgba(30,41,59,.34)", 9],
-          ["연두", "#c2ee6c", "#4d7c0f", "rgba(50,80,0,.36)", 10],
-          ["남색", "#8590f6", "#3730a3", "rgba(255,255,255,.42)", 11],
+          ["원목", "#deb07a", "#94622f", "rgba(120,70,20,.42)", 0, 0],
+          ["빨강", "#f07171", "#b42323", "rgba(255,255,255,.42)", 1, 1],
+          ["파랑", "#5f92f1", "#1d4ed8", "rgba(255,255,255,.45)", 2, 1],
+          ["초록", "#4fc48c", "#15803d", "rgba(255,255,255,.4)", 3, 1],
+          ["보라", "#a98cfa", "#6d28d9", "rgba(255,255,255,.42)", 4, 1],
+          ["노랑", "#fcd34d", "#b45309", "rgba(130,80,0,.38)", 5, 1],
+          ["청록", "#34d3bd", "#0f766e", "rgba(0,70,64,.34)", 6, 1],
+          ["분홍", "#f7a8d2", "#be185d", "rgba(150,20,80,.36)", 7, 1],
+          ["호두", "#a8774c", "#5b3a1e", "rgba(255,232,205,.36)", 8, 0],
+          ["회색", "#a9b6c9", "#475569", "rgba(30,41,59,.34)", 9, 2],
+          ["연두", "#c2ee6c", "#4d7c0f", "rgba(50,80,0,.36)", 10, 1],
+          ["남색", "#8590f6", "#3730a3", "rgba(255,255,255,.42)", 11, 1],
         ];
         // 결 무늬 (16×16 한 칸) — 나뭇결 · 사선 · 점 · 바둑 · 가로줄 · 고리 · 지그재그 · 더하기 · 세로 나뭇결 · 마름모 · 엇사선 · 점선
         const GRAINS = [
-          (c) => `<path d="M0 3c3-1.5 5 1.5 8 0s5 1.5 8 0M0 9c3 1.2 5-1.2 8 0s5-1.2 8 0M0 14c3-1 5 1 8 0s5 1 8 0" fill="none" stroke="${c}" stroke-width="1.2"/>`,
-          (c) => `<path d="M-2 6L6-2M-2 14L14-2M6 18L18 6" stroke="${c}" stroke-width="2.2"/>`,
-          (c) => `<circle cx="4" cy="4" r="2" fill="${c}"/><circle cx="12" cy="12" r="2" fill="${c}"/>`,
-          (c) => `<path d="M0 8H16M8 0V16" stroke="${c}" stroke-width="1.5"/>`,
-          (c) => `<path d="M0 4H16M0 12H16" stroke="${c}" stroke-width="2.2"/>`,
-          (c) => `<circle cx="8" cy="8" r="4.2" fill="none" stroke="${c}" stroke-width="1.7"/>`,
-          (c) => `<path d="M0 10L4 6L8 10L12 6L16 10" fill="none" stroke="${c}" stroke-width="1.7"/>`,
-          (c) => `<path d="M8 4V12M4 8H12" stroke="${c}" stroke-width="2.2"/>`,
-          (c) => `<path d="M4 0c-1.5 3 1.5 5 0 8s1.5 5 0 8M11 0c1.2 3-1.2 5 0 8s-1.2 5 0 8" fill="none" stroke="${c}" stroke-width="1.2"/>`,
-          (c) => `<path d="M8 3L13 8L8 13L3 8Z" fill="none" stroke="${c}" stroke-width="1.5"/>`,
-          (c) => `<path d="M0 0L16 16M16 0L0 16" stroke="${c}" stroke-width="1.3"/>`,
-          (c) => `<path d="M1.5 5h5M9.5 13h5" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`,
+          ["s", "M0 3c3-1.5 5 1.5 8 0s5 1.5 8 0M0 9c3 1.2 5-1.2 8 0s5-1.2 8 0M0 14c3-1 5 1 8 0s5 1 8 0", 1.2],
+          ["s", "M-2 6L6-2M-2 14L14-2M6 18L18 6", 2.2],
+          ["f", "M6 4a2 2 0 1 1-4 0a2 2 0 1 1 4 0M14 12a2 2 0 1 1-4 0a2 2 0 1 1 4 0"],
+          ["s", "M0 8H16M8 0V16", 1.5],
+          ["s", "M0 4H16M0 12H16", 2.2],
+          ["s", "M12.2 8a4.2 4.2 0 1 1-8.4 0a4.2 4.2 0 1 1 8.4 0", 1.7],
+          ["s", "M0 10L4 6L8 10L12 6L16 10", 1.7],
+          ["s", "M8 4V12M4 8H12", 2.2],
+          ["s", "M4 0c-1.5 3 1.5 5 0 8s1.5 5 0 8M11 0c1.2 3-1.2 5 0 8s-1.2 5 0 8", 1.2],
+          ["s", "M8 3L13 8L8 13L3 8Z", 1.5],
+          ["s", "M0 0L16 16M16 0L0 16", 1.3],
+          ["s", "M1.5 5h5M9.5 13h5", 2.2, "round"],
         ];
         const fmt = (n) => n.toLocaleString("ko-KR");
         const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-        const f1 = (v) => Math.round(v * 10) / 10;
 
         // ── 화면 ───────────────────────────────────────────────
         stage.innerHTML = `<div class="gm-so" tabindex="0">
@@ -432,16 +527,17 @@
           </div>
           <div class="gm-so__time" data-timebar><i></i></div>
           <div class="gm-so__meta"><span>이번 단계 <b data-moves>0</b>수 · 목표 <b data-par>0</b>수</span><span>남은 판 <b data-left>0</b>장 · 빈 구멍 <b data-empty>0</b>개</span></div>
-          <div class="gm-so__board" data-board aria-label="나사 판"></div>
+          <div class="gm-so__board" data-board aria-label="나사 물건"><div class="gm-so__turn" data-turn aria-hidden="true"><i>↻</i><span>돌려 보세요</span></div></div>
           <div class="gm-so__tools">
             <button type="button" class="gm-so__tool" data-undo>${HKUI.icon("undo-2", 16, "currentColor")} 되돌리기 <small data-undos>3</small></button>
             <button type="button" class="gm-so__tool" data-reset>${HKUI.icon("rotate-ccw", 16, "currentColor")} 이 단계 다시</button>
           </div>
-          <p class="gm-so__help">나사를 눌러 들고, 옮길 빈 구멍을 눌러요 · Z 되돌리기 · Esc 쉬기</p>
+          <p class="gm-so__help">끌어서 돌리고, 나사를 눌러 들고, 옮길 빈 구멍을 눌러요 · ← → 돌리기 · Z 되돌리기 · Esc 쉬기</p>
           <div class="gm-so__cover" data-cover></div>
         </div>`;
         const root = stage.querySelector(".gm-so");
         const boardEl = root.querySelector("[data-board]");
+        const turnEl = root.querySelector("[data-turn]");
         const cover = root.querySelector("[data-cover]");
         const scoreEl = root.querySelector("[data-score]");
         const levelEl = root.querySelector("[data-level]");
@@ -468,14 +564,7 @@
         let sel = -1;          // 들어 올린 나사가 있는 구멍
         let clearing = false;
         let pending = null, pendingTimer = 0, clearTimer = 0;
-        let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, rafId = 0, lastSec = 0;
-        let geo = { W: 320, H: 380, s: 50, ox: 25, oy: 25 };
-        // 판 그림(다시 그릴 때마다 바뀜) · 떨어지는 판 · 반짝이 · 안내 말은 서로 다른 층 — 다시 그려도 애니메이션이 끊기지 않게
-        boardEl.innerHTML = `<div data-main style="position:absolute;inset:0"></div>`;
-        const mainHost = boardEl.firstElementChild;
-        const fxSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-        fxSvg.setAttribute("class", "gm-so__fx");
-        boardEl.appendChild(fxSvg);
+        let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, lastSec = 0;
         const sfx = (name, arg) => { if (state === "play") ctx.sfx(name, arg); };
 
         const plateLeft = () => bitCount(cur ? cur.p : 0);
@@ -484,115 +573,675 @@
         // 단계를 깨는 순간 그 단계 판 점수는 banked 로 옮겨 간다(clearing 동안 두 번 세지 않게)
         const liveScore = () => Math.min(MAX_SCORE, banked + (puzzle && !clearing ? (puzzle.plates.length - plateLeft()) * platePts() : 0));
 
-        // ── 그리기 ─────────────────────────────────────────────
-        // 같은 그림 함수를 판 · 떨어지는 판 · 시작 화면 그림이 함께 쓴다. g = { W, H, s, ox, oy }
-        const holeXY = (P, h, g) => ({ x: g.ox + P.holes[h].c * g.s, y: g.oy + P.holes[h].r * g.s });
-        function plateRects(P, k, g) {
-          const pad = g.s * 0.37;
-          return P.plates[k].segs.map(([c0, r0, c1, r1]) => ({ x: g.ox + c0 * g.s - pad, y: g.oy + r0 * g.s - pad, w: (c1 - c0) * g.s + pad * 2, h: (r1 - r0) * g.s + pad * 2, rx: pad * 0.78 }));
+        // ════════════════════════════════════════════════════════
+        // ── 3D ── three.js r128 (전역 THREE)
+        // ════════════════════════════════════════════════════════
+        const T3 = window.THREE;
+        // 크기(점 간격 = 1)
+        const PAD = 0.37, CORNER = 0.27, PHOLE = 0.22;   // 판 가장자리 · 모서리 · 판 구멍
+        const PT = 0.07, PB = 0.016;                       // 판 두께 · 모서리 깎기
+        const Z0 = 0.012, LAYER = 0.19;                    // 첫 판 높이 · 층 간격
+        const HEAD_R = 0.19, HEAD_H = 0.075, LIFT = 0.48;  // 나사 머리 · 들어 올리는 높이
+        const PITCH_MIN = -0.32, PITCH_MAX = 1.08;
+        const SIDES = { "+z": [[1, 0, 0], [0, 1, 0], [0, 0, 1]], "-z": [[-1, 0, 0], [0, 1, 0], [0, 0, -1]], "+x": [[0, 0, -1], [0, 1, 0], [1, 0, 0]], "-x": [[0, 0, 1], [0, 1, 0], [-1, 0, 0]], "+y": [[1, 0, 0], [0, 0, -1], [0, 1, 0]] };
+        const faceLocal = (f, c, r) => [c - (f.w - 1) / 2, (f.h - 1) / 2 - r];
+
+        let R3 = null; // 3D 가 없으면 null — 판은 안내 글만
+        // 질감 · 재질 · 모양은 한 번만 만들어 모든 단계 · 시작 그림이 함께 쓴다
+        const TEX = {}, MAT = {}, GEO = {};
+        function canvasTex(size, draw, opt = {}) {
+          const c = document.createElement("canvas");
+          c.width = c.height = size;
+          draw(c.getContext("2d"), size);
+          const t = new T3.CanvasTexture(c);
+          t.encoding = opt.linear ? T3.LinearEncoding : T3.sRGBEncoding;
+          if (opt.repeat) t.wrapS = t.wrapT = T3.RepeatWrapping;
+          t.anisotropy = 4;
+          return t;
         }
-        function plateCenter(P, k, g) {
-          const pts = P.plates[k].pts;
-          return { x: g.ox + g.s * pts.reduce((a, p) => a + p.c, 0) / pts.length, y: g.oy + g.s * pts.reduce((a, p) => a + p.r, 0) / pts.length };
+        // 작은 무늬 난수 — 질감이 매번 같게
+        const texRnd = (seed) => () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+        function lookTex(look, i) {
+          const [, col, , gc, gi, kind] = look;
+          return canvasTex(128, (g, S) => {
+            g.fillStyle = col;
+            g.fillRect(0, 0, S, S);
+            const rr = texRnd(97 + i * 13);
+            // 재질 결 — 나무는 가는 결, 아크릴은 옅은 반점, 금속은 가는 가로 긁힘
+            for (let q = 0; q < (kind === 1 ? 50 : 140); q++) {
+              g.fillStyle = kind === 0 ? `rgba(90,50,10,${0.03 + rr() * 0.05})` : kind === 2 ? `rgba(255,255,255,${0.04 + rr() * 0.07})` : `rgba(255,255,255,${0.02 + rr() * 0.04})`;
+              if (kind === 1) g.fillRect(rr() * S, rr() * S, 2 + rr() * 6, 2 + rr() * 6);
+              else g.fillRect(0, rr() * S, S, kind === 0 ? 0.6 + rr() * 1.4 : 0.5);
+            }
+            const [type, d, lw, cap] = GRAINS[gi];
+            const path = new Path2D(d);
+            for (let ty = -1; ty <= 4; ty++) for (let tx = -1; tx <= 4; tx++) {
+              g.save();
+              g.translate(tx * 32, ty * 32);
+              g.scale(2, 2);
+              if (type === "f") { g.fillStyle = gc; g.fill(path); } else { g.strokeStyle = gc; g.lineWidth = lw; g.lineCap = cap || "butt"; g.stroke(path); }
+              g.restore();
+            }
+          }, { repeat: true });
         }
-        function plateDefs(P, k, g, pre, look) {
-          const hr = g.s * 0.215;
-          const [, , , gc, gi] = look;
-          const holes = P.plates[k].holes.map((h) => { const { x, y } = holeXY(P, h, g); return `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr)}" fill="#000"/>`; }).join("");
-          return `<pattern id="${pre}-g${k}" patternUnits="userSpaceOnUse" width="16" height="16" patternTransform="scale(${(g.s / 52).toFixed(3)})">${GRAINS[gi](gc)}</pattern>
-            <mask id="${pre}-m${k}" maskUnits="userSpaceOnUse" x="${-g.W}" y="${-g.H}" width="${g.W * 3}" height="${g.H * 3}"><rect x="${-g.W}" y="${-g.H}" width="${g.W * 3}" height="${g.H * 3}" fill="#fff"/>${holes}</mask>`;
+        function initAssets() {
+          // 판 재질 — 겉(무늬) · 옆(테두리 색)
+          MAT.looks = LOOKS.map((lk, i) => {
+            const map = lookTex(lk, i);
+            map.repeat.set(0.82, 0.82);
+            const kind = lk[5];
+            const rough = kind === 0 ? 0.72 : kind === 2 ? 0.36 : 0.3;
+            const metal = kind === 2 ? 0.55 : 0;
+            return [
+              new T3.MeshStandardMaterial({ map, roughness: rough, metalness: metal, envMapIntensity: kind === 2 ? 1 : 0.55 }),
+              new T3.MeshStandardMaterial({ color: new T3.Color(lk[2]).convertSRGBToLinear(), roughness: rough + 0.1, metalness: metal, envMapIntensity: 0.4 }),
+            ];
+          });
+          // 몸체 질감
+          const wood = canvasTex(256, (g, S) => {
+            g.fillStyle = "#e9d1a8"; g.fillRect(0, 0, S, S);
+            const rr = texRnd(7);
+            for (let q = 0; q < 70; q++) {
+              const y = rr() * S, a = 0.04 + rr() * 0.09, amp = 2 + rr() * 5, ph = rr() * 6;
+              g.strokeStyle = `rgba(${130 + rr() * 30},${80 + rr() * 20},30,${a})`;
+              g.lineWidth = 0.8 + rr() * 2.2;
+              g.beginPath();
+              for (let x = 0; x <= S; x += 8) g.lineTo(x, y + Math.sin(x / 40 + ph) * amp);
+              g.stroke();
+            }
+            g.fillStyle = "rgba(150,95,40,.12)";
+            g.beginPath(); g.ellipse(S * 0.7, S * 0.35, 9, 5, 0, 0, Math.PI * 2); g.fill();
+          }, { repeat: true });
+          const metal = canvasTex(256, (g, S) => {
+            g.fillStyle = "#b7c0ca"; g.fillRect(0, 0, S, S);
+            const rr = texRnd(11);
+            for (let q = 0; q < 260; q++) { g.fillStyle = rr() < 0.5 ? `rgba(255,255,255,${rr() * 0.12})` : `rgba(40,50,60,${rr() * 0.08})`; g.fillRect(0, rr() * S, S, 0.5 + rr()); }
+          }, { repeat: true });
+          const plastic = (base, dot) => canvasTex(128, (g, S) => {
+            g.fillStyle = base; g.fillRect(0, 0, S, S);
+            const rr = texRnd(23);
+            for (let q = 0; q < 500; q++) { g.fillStyle = dot; g.globalAlpha = rr() * 0.5; g.fillRect(rr() * S, rr() * S, 1, 1); }
+          }, { repeat: true });
+          MAT.body = {
+            w: new T3.MeshStandardMaterial({ map: wood, roughness: 0.82, envMapIntensity: 0.45 }),
+            m: new T3.MeshStandardMaterial({ map: metal, roughness: 0.42, metalness: 0.6, envMapIntensity: 1 }),
+            d: new T3.MeshStandardMaterial({ map: plastic("#3d4149", "#9aa3ad"), roughness: 0.55, envMapIntensity: 0.5 }),
+            g: new T3.MeshStandardMaterial({ map: plastic("#e9e5dc", "#8a8478"), roughness: 0.6, envMapIntensity: 0.5 }),
+            p: new T3.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, envMapIntensity: 0.4 }),
+            l: new T3.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 1.2 }),
+          };
+          // 나사 — 머리 윗면(십자 홈) · 옆 · 나사산
+          const cap = canvasTex(128, (g, S) => {
+            const gr = g.createRadialGradient(S * 0.38, S * 0.34, 4, S / 2, S / 2, S * 0.62);
+            gr.addColorStop(0, "#ffffff"); gr.addColorStop(0.45, "#dad7d3"); gr.addColorStop(1, "#7d7872");
+            g.fillStyle = gr; g.fillRect(0, 0, S, S);
+            g.strokeStyle = "rgba(255,255,255,.6)"; g.lineWidth = 2;
+            g.beginPath(); g.arc(S / 2, S / 2, S * 0.4, 0, Math.PI * 2); g.stroke();
+            const slot = (w, h) => { g.beginPath(); g.roundRect ? g.roundRect(S / 2 - w / 2, S / 2 - h / 2, w, h, 3) : g.rect(S / 2 - w / 2, S / 2 - h / 2, w, h); g.fill(); };
+            g.fillStyle = "rgba(255,255,255,.55)";
+            g.save(); g.translate(1.5, 1.5); slot(S * 0.62, S * 0.15); slot(S * 0.15, S * 0.62); g.restore();
+            g.fillStyle = "#3f3a35"; slot(S * 0.62, S * 0.15); slot(S * 0.15, S * 0.62);
+          });
+          const thread = canvasTex(64, (g, S) => {
+            g.fillStyle = "#b9b5ae"; g.fillRect(0, 0, S, S);
+            g.strokeStyle = "#6f6a63"; g.lineWidth = 6;
+            for (let q = -2; q < 4; q++) { g.beginPath(); g.moveTo(0, q * 22); g.lineTo(S, q * 22 + 18); g.stroke(); }
+          }, { repeat: true });
+          thread.repeat.set(1, 3);
+          MAT.headSide = new T3.MeshStandardMaterial({ color: 0xd9d6d1, roughness: 0.28, metalness: 0.85, envMapIntensity: 1.1 });
+          MAT.headCap = new T3.MeshStandardMaterial({ map: cap, roughness: 0.3, metalness: 0.75, envMapIntensity: 1.1 });
+          MAT.shaft = new T3.MeshStandardMaterial({ map: thread, roughness: 0.4, metalness: 0.8, envMapIntensity: 1 });
+          // 몸체 구멍 — 둥근 테 + 어두운 속
+          MAT.hole = new T3.MeshStandardMaterial({ map: canvasTex(64, (g, S) => {
+            g.clearRect(0, 0, S, S);
+            g.fillStyle = "rgba(120,85,45,.45)"; g.beginPath(); g.arc(S / 2, S / 2, S * 0.49, 0, Math.PI * 2); g.fill();
+            const gr = g.createRadialGradient(S / 2, S * 0.44, 1, S / 2, S / 2, S * 0.37);
+            gr.addColorStop(0, "#14110f"); gr.addColorStop(0.75, "#26211d"); gr.addColorStop(1, "#4a423b");
+            g.fillStyle = gr; g.beginPath(); g.arc(S / 2, S / 2, S * 0.37, 0, Math.PI * 2); g.fill();
+            g.strokeStyle = "rgba(255,255,255,.35)"; g.lineWidth = 1.5; g.beginPath(); g.arc(S / 2, S / 2, S * 0.47, 0, Math.PI * 2); g.stroke();
+          }), transparent: true, depthWrite: false, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+          MAT.dest = new T3.MeshBasicMaterial({ color: 0x22c55e, transparent: true, opacity: 0.85, depthWrite: false, side: T3.DoubleSide });
+          MAT.sel = new T3.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.95, depthWrite: false, side: T3.DoubleSide });
+          MAT.bad = new T3.MeshBasicMaterial({ color: 0xdc2626, transparent: true, opacity: 0.9, depthWrite: false, side: T3.DoubleSide });
+          MAT.spark = new T3.PointsMaterial({ size: 0.42, map: canvasTex(32, (g, S) => {
+            const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+            gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.3, "rgba(255,240,180,.85)"); gr.addColorStop(1, "rgba(255,200,80,0)");
+            g.fillStyle = gr; g.fillRect(0, 0, S, S);
+          }), vertexColors: true, transparent: true, depthWrite: false, blending: T3.AdditiveBlending, sizeAttenuation: true });
+          // 모양
+          GEO.head = new T3.CylinderGeometry(HEAD_R, HEAD_R * 1.04, HEAD_H, 22, 1);
+          GEO.head.rotateX(Math.PI / 2);
+          GEO.head.translate(0, 0, HEAD_H / 2);
+          GEO.shaft = new T3.CylinderGeometry(0.075, 0.05, 0.5, 10, 1);
+          GEO.shaft.rotateX(Math.PI / 2);
+          GEO.shaft.translate(0, 0, -0.25);
+          GEO.hole = new T3.CircleGeometry(0.3, 20);
+          GEO.ring = new T3.RingGeometry(0.25, 0.34, 28);
         }
-        // 판 하나 — 테두리 · 바탕 · 결 · 윗면 광 · 뚫린 구멍 테두리. tilt 는 매달린 나사 둘레로 기울기
-        function plateSvg(P, k, g, pre, look, opt = {}) {
-          const hr = g.s * 0.215;
-          const [, col, edge] = look;
-          const rs = plateRects(P, k, g);
-          const R = (r, d, extra) => `<rect x="${f1(r.x - d)}" y="${f1(r.y - d)}" width="${f1(r.w + d * 2)}" height="${f1(r.h + d * 2)}" rx="${f1(r.rx + d)}" ${extra}/>`;
-          const body = rs.map((r) => R(r, 1.6, `fill="${edge}"`)).join("") + rs.map((r) => R(r, 0, `fill="${col}"`)).join("")
-            + rs.map((r) => R(r, 0, `fill="url(#${pre}-g${k})"`)).join("")
-            + rs.map((r) => `<rect x="${f1(r.x + 3)}" y="${f1(r.y + 2.5)}" width="${f1(Math.max(0, r.w - 6))}" height="${f1(Math.min(r.h * 0.4, g.s * 0.24))}" rx="${f1(r.rx * 0.7)}" fill="rgba(255,255,255,.24)"/>`).join("");
-          const rims = P.plates[k].holes.map((h) => { const { x, y } = holeXY(P, h, g); return `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr)}" fill="none" stroke="${edge}" stroke-width="2"/><circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr + 2.2)}" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1"/>`; }).join("");
-          const o = opt.origin || { x: 0, y: 0 };
-          const tilt = opt.tilt || 0;
-          const st = `transform-origin:${f1(o.x)}px ${f1(o.y)}px;--tilt:${tilt}deg;${tilt ? `transform:rotate(${tilt}deg);` : ""}${opt.style || ""}`;
-          return `<g class="gm-so__plate ${opt.cls || ""}" data-k="${k}" style="${st}"><g mask="url(#${pre}-m${k})" opacity=".93">${body}</g>${rims}</g>`;
+        // 작업실 빛 반사(금속 · 아크릴 반짝임) — 따뜻한 위쪽 · 갈색 바닥 · 창 두 개
+        function makeEnv(renderer) {
+          const c = document.createElement("canvas");
+          c.width = 256; c.height = 128;
+          const g = c.getContext("2d");
+          const gr = g.createLinearGradient(0, 0, 0, 128);
+          gr.addColorStop(0, "#fff6e6"); gr.addColorStop(0.45, "#f1dcc0"); gr.addColorStop(0.55, "#9c7650"); gr.addColorStop(1, "#5a3e24");
+          g.fillStyle = gr; g.fillRect(0, 0, 256, 128);
+          g.fillStyle = "#ffffff";
+          g.fillRect(40, 18, 46, 30); g.fillRect(160, 22, 30, 22);
+          const t = new T3.CanvasTexture(c);
+          t.mapping = T3.EquirectangularReflectionMapping;
+          t.encoding = T3.sRGBEncoding;
+          const pm = new T3.PMREMGenerator(renderer);
+          const env = pm.fromEquirectangular(t).texture;
+          pm.dispose();
+          t.dispose();
+          return env;
         }
-        function screwSvg(P, h, g, pre, opt = {}) {
-          const { x, y } = holeXY(P, h, g);
-          const r = g.s * 0.17;
-          const a = (h * 47) % 180;
-          return `<g class="gm-so__sc ${opt.cls || ""}" style="${opt.style || ""}"><g class="gm-so__sw">
-            <circle cx="${f1(x + r * 0.14)}" cy="${f1(y + r * 0.26)}" r="${f1(r * 1.04)}" fill="rgba(41,24,8,.32)"/>
-            <circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r)}" fill="url(#${pre}-metal)" stroke="#57534e" stroke-width="1.1"/>
-            <circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(r * 0.76)}" fill="none" stroke="rgba(255,255,255,.55)" stroke-width=".9"/>
-            <g transform="rotate(${a} ${f1(x)} ${f1(y)})" fill="#44403c"><rect x="${f1(x - r * 0.56)}" y="${f1(y - r * 0.13)}" width="${f1(r * 1.12)}" height="${f1(r * 0.26)}" rx="${f1(r * 0.1)}"/><rect x="${f1(x - r * 0.13)}" y="${f1(y - r * 0.56)}" width="${f1(r * 0.26)}" height="${f1(r * 1.12)}" rx="${f1(r * 0.1)}"/></g>
-          </g></g>`;
+        function setupScene(renderer, withShadow) {
+          const scene = new T3.Scene();
+          scene.environment = makeEnv(renderer);
+          scene.add(new T3.HemisphereLight(0xfff3e0, 0x7a5a3a, 0.45));
+          const sun = new T3.DirectionalLight(0xffe0bc, 1.25);
+          sun.position.set(6, 11, 8);
+          if (withShadow) {
+            sun.castShadow = true;
+            sun.shadow.mapSize.set(1024, 1024);
+            sun.shadow.bias = -0.0006;
+            sun.shadow.normalBias = 0.025;
+            sun.shadow.radius = 4;
+          }
+          scene.add(sun, sun.target);
+          const fill = new T3.DirectionalLight(0xcfe0ff, 0.28);
+          fill.position.set(-7, 3, -5);
+          scene.add(fill);
+          return { scene, sun };
         }
-        const commonDefs = (pre) => `<radialGradient id="${pre}-metal" cx=".36" cy=".3" r=".85"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d6d3d1"/><stop offset="1" stop-color="#78716c"/></radialGradient>
-          <radialGradient id="${pre}-hole" cx=".5" cy=".42" r=".6"><stop offset="0" stop-color="#1c1917"/><stop offset=".75" stop-color="#292524"/><stop offset="1" stop-color="#57534e"/></radialGradient>`;
-        // 판이 하나만 남은 나사에 매달렸으면 그 나사 둘레로 살짝(가까운 구멍을 가리거나 드러내지 않을 만큼만)
-        function tiltOf(P, st, k, g) {
+        // 상자 모양을 재질별로 하나로 합친다(그리기 호출 줄이기). 결 크기는 상자 크기에 맞춘다
+        function bodyMeshes(obj, center) {
+          const by = {};
+          for (const b of obj.boxes) {
+            const [x, y, z, sx, sy, sz, m] = b;
+            let g;
+            if (Math.min(sx, sy, sz) >= 0.5) {
+              // 모서리를 둥글게 깎은 상자 — 둥근 사각을 깊이 방향으로 뽑는다(결은 크기에 맞춰 같은 밀도)
+              const bv = Math.min(0.07, Math.min(sx, sy, sz) * 0.12), rad = Math.min(0.12, Math.min(sx, sy) * 0.2);
+              g = new T3.ExtrudeGeometry(roundRect(-sx / 2 + bv, -sy / 2 + bv, sx - bv * 2, sy - bv * 2, rad), { depth: sz - bv * 2, bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelSegments: 2, curveSegments: 4 });
+              g.translate(0, 0, -sz / 2 + bv);
+              const uv = g.attributes.uv;
+              for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) / 4, uv.getY(i) / 4);
+            } else {
+              g = new T3.BoxGeometry(sx, sy, sz);
+              const uv = g.attributes.uv;
+              const dims = [[sz, sy], [sz, sy], [sx, sz], [sx, sz], [sx, sy], [sx, sy]];
+              for (let i = 0; i < uv.count; i++) { const d = dims[Math.floor(i / 4)]; uv.setXY(i, uv.getX(i) * d[0] / 4, uv.getY(i) * d[1] / 4); }
+              g = g.toNonIndexed();
+            }
+            g.translate(x - center.x, y - center.y, z - center.z);
+            g.clearGroups();
+            (by[m] = by[m] || []).push(g);
+          }
+          return Object.keys(by).map((m) => {
+            const mesh = new T3.Mesh(mergeGeos(by[m]), MAT.body[m]);
+            mesh.castShadow = m !== "l";
+            mesh.receiveShadow = true;
+            by[m].forEach((g) => g.dispose());
+            return mesh;
+          });
+        }
+        // 묶음 없는 모양 합치기(위치 · 법선 · uv, 재질 묶음은 번호별로 이어 붙인다)
+        function mergeGeos(geos) {
+          const parts = [];
+          let total = 0, groupsN = 1;
+          for (const g of geos) {
+            const gr = g.groups.length ? g.groups : [{ start: 0, count: g.attributes.position.count, materialIndex: 0 }];
+            for (const q of gr) { parts.push([g, q.start, q.count, q.materialIndex || 0]); total += q.count; groupsN = Math.max(groupsN, (q.materialIndex || 0) + 1); }
+          }
+          const out = new T3.BufferGeometry();
+          const names = ["position", "normal", "uv"];
+          const arrs = names.map((n) => new Float32Array(total * (n === "uv" ? 2 : 3)));
+          let off = 0;
+          for (let mi = 0; mi < groupsN; mi++) {
+            const start = off;
+            for (const [g, s, c, m] of parts) {
+              if (m !== mi) continue;
+              names.forEach((n, ni) => {
+                const a = g.attributes[n], sz = a.itemSize;
+                arrs[ni].set(a.array.subarray(s * sz, (s + c) * sz), off * sz);
+              });
+              off += c;
+            }
+            if (groupsN > 1) out.addGroup(start, off - start, mi);
+          }
+          names.forEach((n, ni) => out.setAttribute(n, new T3.BufferAttribute(arrs[ni], n === "uv" ? 2 : 3)));
+          out.computeBoundingSphere();
+          return out;
+        }
+        function roundRect(x, y, w, h, r) {
+          const s = new T3.Shape();
+          s.moveTo(x + r, y);
+          s.lineTo(x + w - r, y); s.absarc(x + w - r, y + r, r, -Math.PI / 2, 0, false);
+          s.lineTo(x + w, y + h - r); s.absarc(x + w - r, y + h - r, r, 0, Math.PI / 2, false);
+          s.lineTo(x + r, y + h); s.absarc(x + r, y + h - r, r, Math.PI / 2, Math.PI, false);
+          s.lineTo(x, y + r); s.absarc(x + r, y + r, r, Math.PI, Math.PI * 1.5, false);
+          return s;
+        }
+        // 판 하나 — 칸 묶음마다 둥근 사각을 뽑아 구멍을 뚫고 하나로 합친다. 면 좌표(z = 면에서 높이)
+        function plateGeometry(P, k) {
+          const pl = P.plates[k], f = P.faces[pl.f];
+          const hs = pl.holes.map((h) => faceLocal(f, P.holes[h].c, P.holes[h].r));
+          const geos = pl.segs.map(([c0, r0, c1, r1]) => {
+            const [xa, ya] = faceLocal(f, c0, r0), [xb, yb] = faceLocal(f, c1, r1);
+            const x0 = xa - PAD, x1 = xb + PAD, y1 = ya + PAD, y0 = yb - PAD;
+            const s = roundRect(x0, y0, x1 - x0, y1 - y0, CORNER);
+            for (const [hx, hy] of hs) {
+              if (hx < x0 || hx > x1 || hy < y0 || hy > y1) continue;
+              const p = new T3.Path();
+              p.absarc(hx, hy, PHOLE, 0, Math.PI * 2, true);
+              s.holes.push(p);
+            }
+            return new T3.ExtrudeGeometry(s, { depth: PT, bevelEnabled: true, bevelThickness: PB, bevelSize: PB, bevelSegments: 2, curveSegments: 10 });
+          });
+          const g = mergeGeos(geos);
+          geos.forEach((x) => x.dispose());
+          g.translate(0, 0, Z0 + pl.layer * LAYER + PB);
+          return g;
+        }
+
+        // 화면 하나(본 판 · 시작 그림) — 물건 · 나사 · 구멍 · 표시를 담는다
+        function makeView(scene, cap = MAX_HOLES) {
+          const pivot = new T3.Group();
+          const content = new T3.Group();
+          pivot.add(content);
+          scene.add(pivot);
+          const inst = (geo, mat, n) => { const m = new T3.InstancedMesh(geo, mat, n); m.count = 0; m.frustumCulled = false; content.add(m); return m; };
+          const V = {
+            scene, pivot, content, level: null, faceObjs: [], faceQ: [], faceM: [], plates: [], bodies: [], screws: [], R: 4,
+            holes: inst(GEO.hole, MAT.hole, cap),
+            heads: inst(GEO.head, [MAT.headSide, MAT.headCap, MAT.headSide], cap),
+            shafts: inst(GEO.shaft, MAT.shaft, cap),
+            dests: inst(GEO.ring, MAT.dest, cap),
+            selRing: new T3.Mesh(GEO.ring, MAT.sel),
+            badRing: new T3.Mesh(GEO.ring, MAT.bad),
+          };
+          V.heads.castShadow = true;
+          V.heads.instanceColor = new T3.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
+          V.selRing.visible = V.badRing.visible = false;
+          content.add(V.selRing, V.badRing);
+          return V;
+        }
+        function disposeLevel(V) {
+          if (!V.level) return;
+          V.level.traverse((o) => { if (o.geometry && !o.isInstancedMesh && o.geometry !== GEO.ring) o.geometry.dispose(); });
+          V.content.remove(V.level);
+          // 떨어지는 중인 판은 물건 밖(세상)에 있으니 따로
+          for (const pl of V.plates) { if (pl.fall) pl.mesh.geometry.dispose(); if (pl.holder.parent) pl.holder.parent.remove(pl.holder); }
+          V.level = null;
+          V.plates = [];
+        }
+        // 물건 짓기 — 몸체 · 면(좌표틀) · 판
+        function buildView(V, P, lks) {
+          disposeLevel(V);
+          const obj = OBJECTS[P.objKey];
+          const bb = new T3.Box3();
+          for (const [x, y, z, sx, sy, sz] of obj.boxes) bb.union(new T3.Box3(new T3.Vector3(x - sx / 2, y - sy / 2, z - sz / 2), new T3.Vector3(x + sx / 2, y + sy / 2, z + sz / 2)));
+          const center = bb.getCenter(new T3.Vector3());
+          V.R = bb.getSize(new T3.Vector3()).length() / 2 + 0.6;
+          const lvGroup = new T3.Group();
+          V.level = lvGroup;
+          V.content.add(lvGroup);
+          V.bodies = bodyMeshes(obj, center);
+          V.bodies.forEach((m) => lvGroup.add(m));
+          V.faceObjs = []; V.faceQ = []; V.faceM = []; V.faceN = [];
+          P.faces.forEach((f) => {
+            const [u, up, n] = SIDES[f.n].map((a) => new T3.Vector3(...a));
+            const o = new T3.Object3D();
+            o.quaternion.setFromRotationMatrix(new T3.Matrix4().makeBasis(u, up, n));
+            o.position.set(f.c[0] - center.x, f.c[1] - center.y, f.c[2] - center.z);
+            o.updateMatrix();
+            lvGroup.add(o);
+            V.faceObjs.push(o); V.faceQ.push(o.quaternion.clone()); V.faceM.push(o.matrix.clone()); V.faceN.push(n);
+          });
+          V.plates = P.plates.map((pl, k) => {
+            const lk = lks[k];
+            const mesh = new T3.Mesh(plateGeometry(P, k), MAT.looks[LOOKS.indexOf(lk)]);
+            mesh.castShadow = mesh.receiveShadow = true;
+            mesh.userData.k = k;
+            const holder = new T3.Group();
+            holder.add(mesh);
+            V.faceObjs[pl.f].add(holder);
+            const cx = pl.pts.reduce((a, p) => a + faceLocal(P.faces[pl.f], p.c, p.r)[0], 0) / pl.pts.length;
+            const cy = pl.pts.reduce((a, p) => a + faceLocal(P.faces[pl.f], p.c, p.r)[1], 0) / pl.pts.length;
+            return { k, mesh, holder, ang: 0, angV: 0, target: 0, pv: [cx, cy], center: [cx, cy], wig: 0, fall: null };
+          });
+          // 구멍(몸체 위)
+          const m4 = new T3.Matrix4(), tmp = new T3.Matrix4();
+          V.holes.count = P.holes.length;
+          P.holes.forEach((ho, h) => {
+            const f = P.faces[ho.f];
+            const [x, y] = faceLocal(f, ho.c, ho.r);
+            m4.copy(V.faceM[ho.f]).multiply(tmp.makeTranslation(x, y, 0.004));
+            V.holes.setMatrixAt(h, m4);
+          });
+          V.holes.instanceMatrix.needsUpdate = true;
+          V.P = P;
+          V.screws = [];
+        }
+        // 나사 높이 — 붙든 판 가운데 맨 위 판 윗면(없으면 몸체 면)
+        function topOf(P, mask) {
+          let z = 0;
+          for (let k = 0; k < P.plates.length; k++) if ((mask >> k) & 1) z = Math.max(z, Z0 + P.plates[k].layer * LAYER + PT + PB * 2);
+          return z;
+        }
+        const screwZ = (P, st, h) => topOf(P, P.pin[h] & st.p);
+        const holeTopZ = (P, st, h) => topOf(P, (P.pin[h] | P.block[h]) & st.p);
+        // 면 좌표 → 물건 좌표
+        const _v = new T3.Vector3(), _q = new T3.Quaternion(), _s = new T3.Vector3(1, 1, 1), _m = new T3.Matrix4(), _e = new T3.Euler();
+        function holePos(V, h, z, out = new T3.Vector3()) {
+          const P = V.P, ho = P.holes[h];
+          const [x, y] = faceLocal(P.faces[ho.f], ho.c, ho.r);
+          return out.set(x, y, z).applyMatrix4(V.faceM[ho.f]);
+        }
+        // 판이 하나 남은 나사에 매달렸으면 그 나사 둘레로 살짝(가까운 구멍을 가리거나 드러내지 않을 만큼만)
+        function tiltOf3(P, st, k) {
           const pins = st.s & P.plateHoles[k];
           if (bitCount(pins) !== 1 || P.plates[k].pts.length < 2) return null;
           const h = 31 - Math.clz32(pins);
-          const pv = holeXY(P, h, g);
-          const c = plateCenter(P, k, g);
-          const far = Math.max(...P.plates[k].pts.map((p) => Math.hypot(g.ox + p.c * g.s - pv.x, g.oy + p.r * g.s - pv.y)), 1);
-          const max = Math.min(3.2, (Math.asin(Math.min(1, (g.s * 0.11) / far)) * 180) / Math.PI);
-          const dx = c.x - pv.x;
-          const deg = Math.abs(dx) < 1 ? max * 0.5 : Math.sign(dx) * max;
-          return { deg: Math.round(deg * 10) / 10, origin: pv };
+          const f = P.faces[P.plates[k].f];
+          const pv = faceLocal(f, P.holes[h].c, P.holes[h].r);
+          const pts = P.plates[k].pts.map((p) => faceLocal(f, p.c, p.r));
+          const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
+          const far = Math.max(...pts.map((p) => Math.hypot(p[0] - pv[0], p[1] - pv[1])), 1);
+          const max = Math.min(5, (Math.asin(Math.min(1, 0.12 / far)) * 180) / Math.PI);
+          const dx = cx - pv[0];
+          const deg = Math.abs(dx) < 0.01 ? max * 0.5 : -Math.sign(dx) * max;
+          return { rad: (deg * Math.PI) / 180, pv };
         }
-        // 판 전체 — 바탕 · 구멍 · (판, 그 판이 맨 위인 나사) 층마다 · 고른 나사 · 갈 수 있는 구멍
-        function boardSvg(P, st, g, pre, opt = {}) {
-          const hr = g.s * 0.215;
-          const lk = opt.looks;
-          let defs = commonDefs(pre);
-          for (let k = 0; k < P.plates.length; k++) if ((st.p >> k) & 1) defs += plateDefs(P, k, g, pre, lk[k]);
-          let out = "";
-          // 구멍
-          for (let h = 0; h < P.holes.length; h++) {
-            const { x, y } = holeXY(P, h, g);
-            out += `<circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr * 1.2)}" fill="#c9b79c"/><circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr * 1.2)}" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.2"/><circle cx="${f1(x)}" cy="${f1(y)}" r="${f1(hr)}" fill="url(#${pre}-hole)"/>`;
+        // 나사 · 판을 상태에 맞춘다. instant = 움직임 없이 바로
+        function syncView(V, st, instant) {
+          const P = V.P;
+          // 나사 — 있던 나사는 그 자리에, 새 자리는 남은 나사로
+          const want = [];
+          for (let h = 0; h < P.holes.length; h++) if ((st.s >> h) & 1) want.push(h);
+          if (V.screws.length !== want.length || instant) V.screws = want.map((h) => ({ h, lift: 0, spin: (h * 0.83) % 6.28, fly: null, z: screwZ(P, st, h) }));
+          else {
+            const keep = new Set(want);
+            const free = V.screws.filter((s) => !keep.has(s.h) || V.screws.filter((x) => x.h === s.h).length > 1);
+            const have = new Set(V.screws.map((s) => s.h));
+            for (const h of want) if (!have.has(h)) { const s = free.shift(); if (s) { s.h = h; s.fly = null; s.lift = 0; } }
           }
-          // 나사를 층별로
-          const slots = new Map();
-          for (let h = 0; h < P.holes.length; h++) {
-            if (!((st.s >> h) & 1)) continue;
-            const pinned = P.pin[h] & st.p;
-            const top = pinned ? 31 - Math.clz32(pinned) : -1;
-            let cls = h === opt.sel ? "is-sel" : "";
-            let style = "";
-            if (opt.fly && opt.fly.to === h) {
-              const a = holeXY(P, opt.fly.from, g), b = holeXY(P, h, g);
-              cls += " is-in";
-              style = `--dx:${f1(a.x - b.x)}px;--dy:${f1(a.y - b.y)}px`;
+          for (const s of V.screws) s.z = screwZ(P, st, s.h);
+          // 판
+          for (const pl of V.plates) {
+            const alive = (st.p >> pl.k) & 1;
+            if (alive) {
+              if (pl.fall || pl.holder.parent !== V.faceObjs[P.plates[pl.k].f]) restorePlate(V, pl);
+              pl.holder.visible = true;
+              const t = tiltOf3(P, st, pl.k);
+              pl.target = t ? t.rad : 0;
+              if (t) pl.pv = t.pv;
+              if (instant) { pl.ang = pl.target; pl.angV = 0; }
+            } else if (!pl.fall) pl.holder.visible = false;
+          }
+        }
+        function restorePlate(V, pl) {
+          pl.fall = null;
+          V.faceObjs[V.P.plates[pl.k].f].add(pl.holder);
+          pl.holder.scale.set(1, 1, 1);
+          pl.holder.quaternion.identity();
+          pl.holder.position.set(0, 0, 0);
+          pl.ang = pl.angV = 0;
+        }
+        // 판 떨어뜨리기 — 물건에서 떼어 바깥(세상 좌표)으로, 면 바깥쪽 + 위로 튀어 오르며 돌다가 바닥에서 튕긴다
+        function dropPlate3(V, k) {
+          const pl = V.plates[k];
+          const nW = V.faceN[V.P.plates[k].f].clone().applyQuaternion(V.content.getWorldQuaternion(new T3.Quaternion()));
+          V.scene.attach(pl.holder);
+          const r = () => Math.random() - 0.5;
+          pl.fall = {
+            t: 0, bounced: 0,
+            v: new T3.Vector3(nW.x * 2.6 + r() * 1.2, 3.2 + Math.max(0, nW.y) * 1.5, nW.z * 2.6 + r() * 1.2),
+            w: new T3.Vector3(r(), r(), r()).normalize(), ws: 4 + Math.random() * 4,
+          };
+        }
+
+        // ── 본 화면 ──
+        let three = null;
+        const view = { yaw: -0.62, pitch: 0.4, vy: 0, vp: 0, shake: 0, intro: 0, pulse: 0 };
+        const QUAL = [{ pr: 2, sh: 1024 }, { pr: 1.5, sh: 1024 }, { pr: 1.25, sh: 512 }, { pr: 1, sh: 512 }, { pr: 1, sh: 0 }];
+        function init3d() {
+          if (!T3) return false;
+          let renderer;
+          try {
+            renderer = new T3.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+          } catch (_) { return false; }
+          initAssets();
+          renderer.outputEncoding = T3.sRGBEncoding;
+          renderer.toneMapping = T3.ACESFilmicToneMapping;
+          renderer.toneMappingExposure = 1.05;
+          renderer.shadowMap.enabled = true;
+          renderer.shadowMap.type = T3.PCFSoftShadowMap;
+          renderer.setClearColor(0x000000, 0);
+          boardEl.insertBefore(renderer.domElement, boardEl.firstChild);
+          const { scene, sun } = setupScene(renderer, true);
+          const camera = new T3.PerspectiveCamera(28, 1, 0.1, 200);
+          const blob = canvasTex(64, (g, S) => {
+            const gr = g.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+            gr.addColorStop(0, "rgba(60,35,12,.42)"); gr.addColorStop(0.55, "rgba(60,35,12,.2)"); gr.addColorStop(1, "rgba(60,35,12,0)");
+            g.fillStyle = gr; g.fillRect(0, 0, S, S);
+          });
+          const floor = new T3.Mesh(new T3.PlaneGeometry(1, 1), new T3.MeshBasicMaterial({ map: blob, transparent: true, depthWrite: false }));
+          floor.rotation.x = -Math.PI / 2;
+          floor.renderOrder = -1;
+          scene.add(floor);
+          // 반짝이 — 세상 좌표, 미리 만들어 둔 묶음
+          const NP = 160;
+          const pg = new T3.BufferGeometry();
+          pg.setAttribute("position", new T3.BufferAttribute(new Float32Array(NP * 3), 3));
+          pg.setAttribute("color", new T3.BufferAttribute(new Float32Array(NP * 3), 3));
+          const points = new T3.Points(pg, MAT.spark);
+          points.frustumCulled = false;
+          scene.add(points);
+          const parts = Array.from({ length: NP }, () => ({ life: 0, max: 1, p: new T3.Vector3(), v: new T3.Vector3(), c: new T3.Color() }));
+          three = { renderer, scene, sun, camera, floor, V: makeView(scene), points, parts, q: 0, dpr: window.devicePixelRatio || 1, dirty: true, frames: [], warm: 0, slow: 0, ray: new T3.Raycaster() };
+          applyQuality();
+          renderer.domElement.addEventListener("webglcontextlost", (e) => { e.preventDefault(); }, false);
+          return true;
+        }
+        function applyQuality() {
+          const q = QUAL[three.q];
+          three.renderer.setPixelRatio(Math.min(three.dpr, q.pr));
+          three.renderer.shadowMap.enabled = q.sh > 0;
+          three.sun.castShadow = q.sh > 0;
+          if (q.sh && three.sun.shadow.mapSize.x !== q.sh) {
+            three.sun.shadow.mapSize.set(q.sh, q.sh);
+            if (three.sun.shadow.map) { three.sun.shadow.map.dispose(); three.sun.shadow.map = null; }
+          }
+          // 그림자 켬/끔이 바뀌면 재질을 다시 엮어야 한다
+          three.scene.traverse((o) => { if (o.material) [].concat(o.material).forEach((m) => { m.needsUpdate = true; }); });
+          three.dirty = true;
+          resize3d();
+        }
+        function resize3d() {
+          if (!three) return;
+          const W = boardEl.clientWidth || 320, H = boardEl.clientHeight || 380;
+          three.renderer.setSize(W, H, false);
+          three.camera.aspect = W / H;
+          fitCamera();
+          three.dirty = true;
+        }
+        function fitCamera() {
+          const cam = three.camera, R = three.V.R;
+          const vf = (cam.fov * Math.PI) / 180;
+          const hf = 2 * Math.atan(Math.tan(vf / 2) * cam.aspect);
+          const D = (R / Math.sin(Math.min(vf, hf) / 2)) * 0.95;
+          three.camDist = D;
+          cam.near = Math.max(0.1, D - R * 3);
+          cam.far = D + R * 4;
+          cam.updateProjectionMatrix();
+          const s = three.sun;
+          s.shadow.camera.left = s.shadow.camera.bottom = -R * 1.05;
+          s.shadow.camera.right = s.shadow.camera.top = R * 1.05;
+          s.shadow.camera.near = 0.5;
+          s.shadow.camera.far = 40 + R * 4;
+          s.position.set(R * 0.9, R * 2.2, R * 1.3);
+          s.shadow.camera.updateProjectionMatrix();
+          three.floor.position.y = -R * 0.95;
+          three.floor.scale.set(R * 2.1, R * 2.1, 1);
+        }
+        // 그림자 · 깊이로 생기는 나사 머리 색(고른 나사 노랗게)
+        const COL_W = new T3.Color(1, 1, 1), COL_SEL = new T3.Color(1, 0.78, 0.35);
+        // 매 프레임 나사 · 판 · 반짝이 움직임. 움직이는 것이 있으면 true
+        function animate(V, dt, st, opt = {}) {
+          const P = V.P;
+          if (!P) return false;
+          let busy = false;
+          // 나사
+          const hs = V.heads, sh = V.shafts;
+          hs.count = sh.count = V.screws.length;
+          V.screws.forEach((s, i) => {
+            const isSel = s.h === opt.sel;
+            let pos, quat;
+            if (s.fly) {
+              s.fly.t = Math.min(1, s.fly.t + dt / s.fly.dur);
+              const t = s.fly.t, e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+              const b = holePos(V, s.h, s.z + LIFT * 0.8);
+              pos = s.fly.a.clone().lerp(b, e).addScaledVector(s.fly.bulge, Math.sin(Math.PI * t) * 0.9);
+              quat = s.fly.qa.clone().slerp(V.faceQ[P.holes[s.h].f], e);
+              s.spin += dt * 14;
+              s.lift = LIFT * 0.8;
+              if (t >= 1) s.fly = null;
+              busy = true;
+            } else {
+              const tgt = isSel ? LIFT : 0;
+              const prev = s.lift;
+              s.lift += (tgt - s.lift) * Math.min(1, dt * (tgt > s.lift ? 16 : 11));
+              if (Math.abs(tgt - s.lift) < 0.002) s.lift = tgt;
+              s.spin += (prev - s.lift) * 34 + (isSel ? dt * 1.6 : 0); // 오르내리면 돌아간다(나사처럼)
+              if (s.lift !== tgt || isSel) busy = true;
+              const bob = isSel ? Math.sin(performance.now() / 260) * 0.025 : 0;
+              pos = holePos(V, s.h, s.z + s.lift + bob);
+              quat = V.faceQ[P.holes[s.h].f];
             }
-            slots.set(top, (slots.get(top) || "") + screwSvg(P, h, g, pre, { cls, style }));
-          }
-          out += slots.get(-1) || "";
-          for (let k = 0; k < P.plates.length; k++) {
-            if (!((st.p >> k) & 1)) continue;
-            const t = tiltOf(P, st, k, g);
-            const swing = t && opt.prevPins && opt.prevPins[k] >= 2;
-            out += plateSvg(P, k, g, pre, lk[k], t ? { tilt: t.deg, origin: t.origin, cls: swing ? "is-swing" : "" } : {});
-            out += slots.get(k) || "";
-          }
-          // 고른 나사 · 넣을 수 있는 빈 구멍
-          if (opt.sel >= 0) {
-            const { x, y } = holeXY(P, opt.sel, g);
-            out += `<circle class="gm-so__sel" cx="${f1(x)}" cy="${f1(y - 4)}" r="${f1(g.s * 0.27)}"/>`;
-            for (let h = 0; h < P.holes.length; h++) {
-              if ((st.s >> h) & 1 || !isOpen(P, h, st.p)) continue;
-              const q = holeXY(P, h, g);
-              out += `<circle class="gm-so__dest" cx="${f1(q.x)}" cy="${f1(q.y)}" r="${f1(hr * 1.45)}"/>`;
+            _q.copy(quat).multiply(new T3.Quaternion().setFromAxisAngle(new T3.Vector3(0, 0, 1), s.spin));
+            _m.compose(pos, _q, _s);
+            hs.setMatrixAt(i, _m);
+            sh.setMatrixAt(i, _m);
+            hs.setColorAt(i, isSel ? COL_SEL : COL_W);
+          });
+          hs.instanceMatrix.needsUpdate = sh.instanceMatrix.needsUpdate = true;
+          if (hs.instanceColor) hs.instanceColor.needsUpdate = true;
+          // 판 — 매달린 판 흔들림(용수철) · 덮인 나사를 누르면 떨림 · 떨어지는 판
+          const floorY = three && V === three.V ? three.floor.position.y : -V.R;
+          for (const pl of V.plates) {
+            if (pl.fall) {
+              const f = pl.fall;
+              f.t += dt;
+              f.v.y -= 17 * dt;
+              pl.holder.position.addScaledVector(f.v, dt);
+              pl.holder.rotateOnWorldAxis(f.w, f.ws * dt);
+              if (pl.holder.position.y < floorY + 0.25 && f.v.y < 0) {
+                pl.holder.position.y = floorY + 0.25;
+                f.v.y *= -0.38; f.v.x *= 0.7; f.v.z *= 0.7; f.ws *= 0.55;
+                if (!f.bounced++) { sfx("land"); opt.onBounce && opt.onBounce(pl.holder.position); }
+              }
+              if (f.t > 1.05) { const s = Math.max(0.001, 1 - (f.t - 1.05) / 0.4); pl.holder.scale.setScalar(s); }
+              if (f.t > 1.45) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
+              busy = true;
+              continue;
             }
+            if (!pl.holder.visible) continue;
+            const acc = -150 * (pl.ang - pl.target) - 7 * pl.angV;
+            pl.angV += acc * dt;
+            pl.ang += pl.angV * dt;
+            if (Math.abs(pl.ang - pl.target) < 1e-4 && Math.abs(pl.angV) < 1e-3) { pl.ang = pl.target; pl.angV = 0; } else busy = true;
+            let wig = 0;
+            if (pl.wig > 0) { pl.wig = Math.max(0, pl.wig - dt); wig = Math.sin(pl.wig * 60) * 0.035 * (pl.wig / 0.4); busy = true; }
+            const a = pl.ang + wig, px = pl.ang ? pl.pv[0] : pl.center[0], py = pl.ang ? pl.pv[1] : pl.center[1];
+            const c = Math.cos(a), sn = Math.sin(a);
+            pl.holder.rotation.set(0, 0, a);
+            pl.holder.position.set(px - (c * px - sn * py), py - (sn * px + c * py), wig ? Math.abs(wig) * 0.6 : 0);
           }
-          const bg = opt.noBoard ? "" : `<rect x="1" y="1" width="${g.W - 2}" height="${g.H - 2}" rx="15" fill="url(#${pre}-bd)" stroke="#d6c4a6" stroke-width="2"/>
-            <rect x="1" y="1" width="${g.W - 2}" height="${g.H - 2}" rx="15" fill="url(#${pre}-bg)"/>`;
-          const bdefs = opt.noBoard ? "" : `<linearGradient id="${pre}-bd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4ead9"/><stop offset="1" stop-color="#e6d6bd"/></linearGradient>
-            <pattern id="${pre}-bg" patternUnits="userSpaceOnUse" width="90" height="40"><path d="M0 12c22-5 45 5 90 0M0 30c30 4 60-4 90 0" fill="none" stroke="rgba(150,110,60,.09)" stroke-width="1.4"/></pattern>`;
-          return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${g.W} ${g.H}" width="${g.W}" height="${g.H}"><defs>${defs}${bdefs}</defs>${bg}${out}</svg>`;
+          return busy;
+        }
+        function burst(pos, n, warm = true) {
+          if (!three) return;
+          let made = 0;
+          for (const p of three.parts) {
+            if (p.life > 0) continue;
+            p.life = p.max = 0.6 + Math.random() * 0.5;
+            p.p.copy(pos);
+            p.v.set(Math.random() - 0.5, Math.random() * 0.9 + 0.3, Math.random() - 0.5).normalize().multiplyScalar(2.5 + Math.random() * 3);
+            p.c.setHSL(warm ? 0.1 + Math.random() * 0.06 : Math.random(), 0.9, 0.62);
+            if (++made >= n) break;
+          }
+        }
+        function animParts(dt) {
+          const pos = three.points.geometry.attributes.position, col = three.points.geometry.attributes.color;
+          let any = false;
+          three.parts.forEach((p, i) => {
+            if (p.life > 0) {
+              p.life -= dt;
+              p.v.y -= 7 * dt;
+              p.p.addScaledVector(p.v, dt);
+              const a = Math.max(0, p.life / p.max);
+              pos.setXYZ(i, p.p.x, p.p.y, p.p.z);
+              col.setXYZ(i, p.c.r * a, p.c.g * a, p.c.b * a);
+              any = true;
+            } else { pos.setXYZ(i, 0, -999, 0); col.setXYZ(i, 0, 0, 0); }
+          });
+          pos.needsUpdate = col.needsUpdate = true;
+          return any;
+        }
+        // 물건 좌표 → 세상 좌표
+        const toWorld = (v) => v.applyMatrix4(three.V.content.matrixWorld);
+        // 구멍 · 나사를 화면 좌표로 — 보이는 면인지, 다른 몸체에 가리는지도
+        function screenOf(h, z) {
+          const V = three.V, P = V.P;
+          const w = toWorld(holePos(V, h, z));
+          const nW = V.faceN[P.holes[h].f].clone().applyQuaternion(V.content.getWorldQuaternion(_q));
+          const camPos = three.camera.position;
+          const toCam = camPos.clone().sub(w).normalize();
+          const facing = nW.dot(toCam);
+          const p = w.clone().project(three.camera);
+          const W = boardEl.clientWidth, H = boardEl.clientHeight;
+          const x = (p.x * 0.5 + 0.5) * W, y = (-p.y * 0.5 + 0.5) * H;
+          // 점 간격 1 이 화면에서 몇 픽셀인지
+          const ho = P.holes[h], f = P.faces[ho.f];
+          const [lx, ly] = faceLocal(f, ho.c, ho.r);
+          const w2 = toWorld(new T3.Vector3(lx + 1, ly, z).applyMatrix4(V.faceM[ho.f])).project(three.camera);
+          const ppu = Math.hypot((w2.x - p.x) * 0.5 * W, (w2.y - p.y) * 0.5 * H);
+          return { x, y, facing, w, ppu: Math.max(ppu, 8) };
+        }
+        function occluded(h, wpos) {
+          const V = three.V;
+          const cam = three.camera.position;
+          const dir = wpos.clone().sub(cam);
+          const dist = dir.length();
+          three.ray.set(cam, dir.normalize());
+          three.ray.far = dist;
+          const f = V.P.holes[h].f;
+          const objs = V.bodies.concat(V.plates.filter((pl) => !pl.fall && pl.holder.visible && V.P.plates[pl.k].f !== f).map((pl) => pl.mesh));
+          const hit = three.ray.intersectObjects(objs, false)[0];
+          return !!hit && hit.distance < dist - 0.12;
+        }
+        // 누른 자리에서 가장 가까운 구멍(나사 머리 · 구멍 윗면) — 손가락은 넉넉히
+        function pickHole(clientX, clientY, touch) {
+          if (!three || !puzzle) return -1;
+          const r = boardEl.getBoundingClientRect();
+          const x = clientX - r.left, y = clientY - r.top;
+          let best = -1, bestScore = Infinity;
+          for (let h = 0; h < puzzle.holes.length; h++) {
+            const scr = (cur.s >> h) & 1;
+            const z = scr ? screwZ(puzzle, cur, h) + HEAD_H + (h === sel ? LIFT : 0) : holeTopZ(puzzle, cur, h);
+            const q = screenOf(h, z);
+            if (q.facing < 0.1) continue;
+            const lim = Math.max(touch ? 30 : 22, q.ppu * (touch ? 0.62 : 0.5));
+            const d = Math.hypot(q.x - x, q.y - y);
+            if (d > lim) continue;
+            const sc = d / lim;
+            if (sc < bestScore && !occluded(h, q.w)) { bestScore = sc; best = h; }
+          }
+          return best;
         }
 
         // ── 판 크기 ─────────────────────────────────────────────
@@ -600,49 +1249,54 @@
           const room = HKPlay.roomFor(stage, boardEl);
           const H = clamp(room, 240, 660);
           boardEl.style.height = `${H}px`;
-          const W = boardEl.clientWidth || 320;
-          const cols = puzzle ? puzzle.cols : 4, rows = puzzle ? puzzle.rows : 5;
-          const s = Math.min((W - 14) / (cols - 0.15), (H - 14) / (rows - 0.15), 88);
-          geo = { W, H, s, ox: (W - (cols - 1) * s) / 2, oy: (H - (rows - 1) * s) / 2 };
-          draw();
+          resize3d();
         }
-        function draw(opt = {}) {
+        function draw() {
           if (!puzzle) return;
-          mainHost.innerHTML = boardSvg(puzzle, cur, geo, "so", { looks, sel, fly: opt.fly, prevPins: opt.prevPins });
-          fxSvg.setAttribute("viewBox", `0 0 ${geo.W} ${geo.H}`);
-          fxSvg.setAttribute("width", geo.W);
-          fxSvg.setAttribute("height", geo.H);
-          boardEl.setAttribute("aria-label", `나사 판 · 남은 판 ${plateLeft()}장 · 빈 구멍 ${emptyCount()}개`);
+          if (three) { three.dirty = true; drawDests(); }
+          boardEl.setAttribute("aria-label", `나사 물건 · ${OBJECTS[puzzle.objKey].name} · 남은 판 ${plateLeft()}장 · 빈 구멍 ${emptyCount()}개`);
         }
-        // 떨어지는 판 — 위 그림판(fx)에 따로 그려 아래로 떨어뜨린다
-        function dropPlate(P, k, before) {
-          const pre = `sf${k}x${Date.now() % 100000}`;
-          const t = tiltOf(P, before, k, geo);
-          const c = plateCenter(P, k, geo);
-          const dir = t ? Math.sign(t.deg) || 1 : (c.x > geo.W / 2 ? 1 : -1);
-          const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-          const style = `--fx:${f1(dir * geo.s * 0.6)}px;--fy:${f1(geo.H - c.y + geo.s * 2)}px;--spin:${dir * (14 + Math.random() * 14)}deg`;
-          g.innerHTML = `<defs>${plateDefs(P, k, geo, pre, looks[k])}</defs>${plateSvg(P, k, geo, pre, looks[k], { tilt: t ? t.deg : 0, origin: t ? t.origin : c, cls: "gm-so__fall", style })}`;
-          fxSvg.appendChild(g);
-          setTimeout(() => g.remove(), FALL_MS + 60);
+        // 고른 나사 표시 · 넣을 수 있는 빈 구멍(초록 고리)
+        function drawDests() {
+          const V = three.V, P = puzzle;
+          let n = 0;
+          if (sel >= 0) {
+            for (let h = 0; h < P.holes.length; h++) {
+              if ((cur.s >> h) & 1 || !isOpen(P, h, cur.p)) continue;
+              const ho = P.holes[h];
+              const [x, y] = faceLocal(P.faces[ho.f], ho.c, ho.r);
+              _m.copy(V.faceM[ho.f]).multiply(new T3.Matrix4().makeTranslation(x, y, holeTopZ(P, cur, h) + 0.012));
+              V.dests.setMatrixAt(n++, _m);
+            }
+            const ho = P.holes[sel];
+            const [x, y] = faceLocal(P.faces[ho.f], ho.c, ho.r);
+            V.selRing.matrixAutoUpdate = false;
+            V.selRing.matrix.copy(V.faceM[ho.f]).multiply(new T3.Matrix4().makeTranslation(x, y, screwZ(P, cur, sel) + 0.012));
+            V.selRing.visible = true;
+          } else V.selRing.visible = false;
+          V.dests.count = n;
+          V.dests.instanceMatrix.needsUpdate = true;
         }
         function badMark(h) {
-          if (!puzzle) return;
-          const { x, y } = holeXY(puzzle, h, geo);
-          const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-          c.setAttribute("class", "gm-so__bad");
-          c.setAttribute("cx", f1(x));
-          c.setAttribute("cy", f1(y));
-          c.setAttribute("r", f1(geo.s * 0.3));
-          fxSvg.appendChild(c);
-          setTimeout(() => c.remove(), 600);
+          if (!three || !puzzle) return;
+          const V = three.V, P = puzzle, ho = P.holes[h];
+          const [x, y] = faceLocal(P.faces[ho.f], ho.c, ho.r);
+          V.badRing.matrixAutoUpdate = false;
+          V.badRing.matrix.copy(V.faceM[ho.f]).multiply(new T3.Matrix4().makeTranslation(x, y, holeTopZ(P, cur, h) + 0.02));
+          V.badRing.visible = true;
+          three.badT = 0.55;
+          // 덮고 있는 판(맨 위)이 덜컥 떨린다
+          const blk = P.block[h] & cur.p;
+          if (blk) V.plates[31 - Math.clz32(blk)].wig = 0.4;
+          else if ((cur.s >> h) & 1) { const s = V.screws.find((x) => x.h === h); if (s) s.spin += 0.6; }
+          three.dirty = true;
         }
         function sparks(x, y, n = 8) {
           for (let k = 0; k < n; k++) {
             const sp = document.createElement("i");
             sp.className = "gm-so__spark";
             const ang = (k / n) * Math.PI * 2 - Math.PI / 2;
-            const r = geo.s * (0.5 + Math.random() * 0.5);
+            const r = 30 + Math.random() * 30;
             sp.style.cssText = `left:${x}px;top:${y}px;--dx:${(Math.cos(ang) * r).toFixed(1)}px;--dy:${(Math.sin(ang) * r).toFixed(1)}px;animation-delay:${k * 18}ms`;
             boardEl.appendChild(sp);
             setTimeout(() => sp.remove(), 850);
@@ -702,7 +1356,7 @@
         function shuffledLooks(n) {
           const idx = LOOKS.map((_, i) => i);
           for (let a = idx.length - 1; a > 0; a--) { const b = Math.floor(Math.random() * (a + 1)); [idx[a], idx[b]] = [idx[b], idx[a]]; }
-          return idx.slice(0, n).map((i) => LOOKS[i]);
+          return idx.slice(0, n).map((i) => LOOKS[i % LOOKS.length]);
         }
         function loadLevel() {
           let p = null;
@@ -715,8 +1369,18 @@
           history = [];
           undoLeft = UNDO_PER_STAGE;
           sel = -1;
-          fxSvg.innerHTML = "";
+          if (three) {
+            buildView(three.V, puzzle, looks);
+            syncView(three.V, cur, true);
+            // 새 물건은 처음 보는 쪽에서 — 앞 · 오른쪽 · 위가 보이게
+            view.yaw = -0.62; view.pitch = 0.4; view.vy = 0; view.vp = 0; view.intro = 1;
+            fitCamera();
+            three.warm = performance.now() + 1500;
+            three.frames.length = 0;
+          }
+          idleT = 0;
           fit();
+          draw();
           drawHud();
           prepareNext();
         }
@@ -733,10 +1397,12 @@
           banked = Math.min(MAX_SCORE, banked + puzzle.plates.length * platePts() + base + bonus);
           solvedCount++;
           drawHud();
+          draw();
           sfx("powerup");
           setTimeout(() => {
+            if (three) { view.pulse = 1; view.shake = Math.max(view.shake, 0.12); burst(new T3.Vector3(0, 0, 0), 46, false); }
             floatText(`${fmt(level)}단계 완료! +${fmt(base + bonus)}`);
-            sparks(geo.W / 2, boardEl.clientHeight * 0.42, 10);
+            sparks(boardEl.clientWidth / 2, boardEl.clientHeight * 0.42, 10);
           }, 380);
           if (bonus) setTimeout(() => floatText(`${fmt(history.length)}수 · 절약 보너스 +${fmt(bonus)}`, true, 0.58), 580);
           clearTimeout(clearTimer);
@@ -750,21 +1416,10 @@
         }
 
         // ── 조작 ───────────────────────────────────────────────
-        function holeAt(clientX, clientY) {
-          if (!puzzle) return -1;
-          const r = boardEl.getBoundingClientRect();
-          const x = clientX - r.left, y = clientY - r.top;
-          let best = -1, bd = geo.s * 0.48;
-          for (let h = 0; h < puzzle.holes.length; h++) {
-            const q = holeXY(puzzle, h, geo);
-            const d = Math.hypot(q.x - x, q.y - y);
-            if (d < bd) { bd = d; best = h; }
-          }
-          return best;
-        }
         function tapHole(h) {
           if (state !== "play" || clearing || h < 0) return;
           const P = puzzle;
+          idleT = 0;
           if ((cur.s >> h) & 1) {
             // 나사
             if (!isOpen(P, h, cur.p)) { badMark(h); sfx("invalid"); hint("위에 다른 판이 덮고 있어요"); return; }
@@ -782,25 +1437,37 @@
         function moveScrew(a, b) {
           const P = puzzle;
           const before = cur;
-          const prevPins = P.plates.map((_, k) => bitCount(before.s & P.plateHoles[k]));
           history.push(before);
           cur = applyMove(P, before, a, b);
           sel = -1;
           const fallen = before.p & ~cur.p;
-          draw({ fly: { from: a, to: b }, prevPins });
+          if (three) {
+            const V = three.V;
+            const s = V.screws.find((x) => x.h === a);
+            const from = holePos(V, a, (s ? s.z + s.lift : 0));
+            const fa = P.holes[a].f, fb = P.holes[b].f;
+            const bulge = V.faceN[fa].clone().add(V.faceN[fb]);
+            if (bulge.lengthSq() < 0.01) bulge.set(0, 1, 0);
+            bulge.normalize();
+            const dist = from.distanceTo(holePos(V, b, 0));
+            if (s) { s.h = b; s.fly = { t: 0, dur: clamp(0.2 + dist * 0.045, 0.22, 0.48), a: from, qa: V.faceQ[fa].clone(), bulge: bulge.multiplyScalar(Math.min(1.6, 0.3 + dist * 0.18)) }; }
+            syncView(V, cur, false);
+            let n = 0;
+            for (let k = 0; k < P.plates.length; k++) {
+              if (!((fallen >> k) & 1)) continue;
+              dropPlate3(V, k);
+              n++;
+            }
+            if (n) {
+              view.shake = Math.max(view.shake, 0.05 + n * 0.03);
+              burst(toWorld(holePos(V, a, 0.3)), 14 + n * 6);
+            }
+          }
+          draw();
           sfx("drop");
-          let n = 0;
-          for (let k = 0; k < P.plates.length; k++) {
-            if (!((fallen >> k) & 1)) continue;
-            dropPlate(P, k, before);
-            n++;
-          }
-          if (n) {
-            setTimeout(() => sfx(n > 1 ? "combo" : "pop", n), 120);
-            const c = holeXY(P, a, geo);
-            sparks(c.x, c.y, 6);
-          }
+          if (fallen) setTimeout(() => sfx(bitCount(fallen) > 1 ? "combo" : "pop", bitCount(fallen)), 120);
           drawHud();
+          idleT = 0;
           // 옮긴 나사는 언제든 제자리로 되돌려 박을 수 있어서(뺀 자리는 계속 열려 있다) 막혀서 못 푸는 판은 생기지 않는다
           if (!cur.p) stageClear();
         }
@@ -809,7 +1476,7 @@
           cur = history.pop();
           undoLeft--;
           sel = -1;
-          fxSvg.innerHTML = "";
+          if (three) syncView(three.V, cur, true);
           draw();
           sfx("whoosh");
           drawHud();
@@ -819,31 +1486,156 @@
           cur = { ...puzzle.start };
           history = [];
           sel = -1;
-          fxSvg.innerHTML = "";
+          if (three) syncView(three.V, cur, true);
           draw();
           sfx("whoosh");
           floatText("이 단계를 처음부터 해요 · 시간은 그대로 흘러요", true);
           drawHud();
         }
 
-        // ── 시간 ───────────────────────────────────────────────
-        function loop() {
-          if (state !== "play") return;
-          const t = performance.now();
-          timeLeftMs -= clamp(t - lastTick, 0, 250);
-          lastTick = t;
-          const sec = Math.ceil(timeLeftMs / 1000);
-          if (sec !== lastSec) {
-            lastSec = sec;
-            if (sec >= 1 && sec <= 5) sfx("countdown");
+        // ── 돌려 보세요 — 남은 판이 있는 면이 안 보이면 그쪽을 가리킨다 ──
+        let idleT = 0, turnT = 0;
+        function updateTurnHint(dt) {
+          turnT -= dt;
+          if (turnT > 0) return;
+          turnT = 0.25;
+          let on = false, dir = "right";
+          if (three && puzzle && state === "play" && !clearing && !drag.on) {
+            const V = three.V, P = puzzle;
+            const qW = V.content.getWorldQuaternion(new T3.Quaternion());
+            const camDir = three.camera.position.clone().normalize();
+            const live = new Set();
+            for (let k = 0; k < P.plates.length; k++) if ((cur.p >> k) & 1) live.add(P.plates[k].f);
+            let seen = false, hidden = null, hiddenDot = Infinity;
+            for (const f of live) {
+              const n = V.faceN[f].clone().applyQuaternion(qW);
+              const d = n.dot(camDir);
+              if (d > 0.2) seen = true;
+              else if (d < hiddenDot) { hiddenDot = d; hidden = n; }
+            }
+            if (hidden && (!seen || idleT > 5)) {
+              on = true;
+              const nc = hidden.clone().applyQuaternion(three.camera.quaternion.clone().invert());
+              if (Math.abs(nc.y) > Math.abs(nc.x) * 1.3) dir = nc.y > 0 ? "up" : "down";
+              else dir = nc.x >= 0 ? "right" : "left";
+            }
           }
-          if (timeLeftMs <= 0) {
-            timeLeftMs = 0;
-            gameOver();
-            return;
+          turnEl.className = `gm-so__turn is-${dir}${on ? " is-on" : ""}`;
+          turnEl.querySelector("i").textContent = { right: "↻", left: "↺", up: "↥", down: "↧" }[dir];
+        }
+
+        // ── 끌어서 돌리기 · 누르기 ──
+        const drag = { on: false, id: -1, x0: 0, y0: 0, x: 0, y: 0, t0: 0, moved: false, touch: false, lastT: 0 };
+        boardEl.addEventListener("pointerdown", (e) => {
+          if (!e.isPrimary || e.button > 0) return;
+          if (state !== "play" || !three) return;
+          e.preventDefault();
+          drag.on = true; drag.id = e.pointerId; drag.moved = false;
+          drag.x0 = drag.x = e.clientX; drag.y0 = drag.y = e.clientY;
+          drag.t0 = drag.lastT = performance.now();
+          drag.touch = e.pointerType === "touch" || e.pointerType === "pen";
+          view.vy = view.vp = 0;
+          try { boardEl.setPointerCapture(e.pointerId); } catch (_) { /* 무시 */ }
+        });
+        boardEl.addEventListener("pointermove", (e) => {
+          if (!drag.on || e.pointerId !== drag.id) return;
+          const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+          if (!drag.moved && Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) > (drag.touch ? 10 : 6)) { drag.moved = true; boardEl.classList.add("is-drag"); }
+          if (drag.moved) {
+            const now = performance.now(), dt = Math.max(1, now - drag.lastT) / 1000;
+            const k = 5.4 / Math.max(260, Math.min(boardEl.clientWidth, boardEl.clientHeight) * 1.6);
+            view.yaw += dx * k;
+            view.pitch = clamp(view.pitch + dy * k * 0.8, PITCH_MIN, PITCH_MAX);
+            // 손을 뗄 때 이어 돌 속도(부드럽게 평균)
+            view.vy = view.vy * 0.5 + ((dx * k) / dt) * 0.5;
+            view.vp = view.vp * 0.5 + ((dy * k * 0.8) / dt) * 0.5;
+            drag.lastT = now;
+            three.dirty = true;
+            idleT = 0;
           }
-          drawTime();
-          rafId = requestAnimationFrame(loop);
+          drag.x = e.clientX; drag.y = e.clientY;
+        });
+        const endDrag = (e) => {
+          if (!drag.on || e.pointerId !== drag.id) return;
+          drag.on = false;
+          boardEl.classList.remove("is-drag");
+          if (!drag.moved) {
+            view.vy = view.vp = 0;
+            if (e.type === "pointerup" && performance.now() - drag.t0 < 700) {
+              const h = pickHole(e.clientX, e.clientY, drag.touch);
+              if (h < 0) { if (sel >= 0) { sel = -1; draw(); } }
+              else tapHole(h);
+            }
+          } else if (performance.now() - drag.lastT > 90) { view.vy = view.vp = 0; }
+        };
+        boardEl.addEventListener("pointerup", endDrag);
+        boardEl.addEventListener("pointercancel", endDrag);
+
+        // ── 그리기 · 시간 (한 고리) ─────────────────────────────
+        let lastFrame = 0;
+        function frame() {
+          requestAnimationFrame(frame);
+          const now = performance.now();
+          const dt = Math.min(0.05, Math.max(0, (now - (lastFrame || now)) / 1000));
+          lastFrame = now;
+          // 시간 — 2D 판과 같은 셈
+          if (state === "play") {
+            timeLeftMs -= clamp(now - lastTick, 0, 250);
+            lastTick = now;
+            const sec = Math.ceil(timeLeftMs / 1000);
+            if (sec !== lastSec) {
+              lastSec = sec;
+              if (sec >= 1 && sec <= 5) sfx("countdown");
+            }
+            if (timeLeftMs <= 0) { timeLeftMs = 0; gameOver(); }
+            else drawTime();
+            idleT += dt;
+          }
+          if (demo && demo.on) renderDemo(dt);
+          if (!three || !puzzle) return;
+          let busy = three.dirty;
+          three.dirty = false;
+          // 돌리기 관성
+          if (!drag.on && (Math.abs(view.vy) > 0.002 || Math.abs(view.vp) > 0.002)) {
+            view.yaw += view.vy * dt;
+            view.pitch = clamp(view.pitch + view.vp * dt, PITCH_MIN, PITCH_MAX);
+            const damp = Math.exp(-dt * 3.6);
+            view.vy *= damp; view.vp *= damp;
+            busy = true;
+          }
+          if (view.intro > 0) { view.intro = Math.max(0, view.intro - dt * 1.8); busy = true; }
+          if (view.pulse > 0) { view.pulse = Math.max(0, view.pulse - dt * 1.6); busy = true; }
+          if (view.shake > 0) { view.shake = Math.max(0, view.shake - dt * 0.5); busy = true; }
+          const V = three.V;
+          // 새 물건은 작게 돌며 나타나고, 단계를 깨면 한 번 통 튄다
+          const ease = 1 - Math.pow(1 - view.intro, 3);
+          V.pivot.scale.setScalar(1 - view.intro * view.intro * 0.45 + Math.sin(view.pulse * Math.PI) * 0.07);
+          V.pivot.rotation.set(view.pitch, view.yaw - ease * 1.1 + view.pulse * view.pulse * 0.9, 0, "XYZ");
+          if (animate(V, dt, cur, { sel, onBounce: (p) => burst(p, 6) })) busy = true;
+          if (sel >= 0) { MAT.dest.opacity = 0.55 + Math.sin(now / 170) * 0.3; busy = true; }
+          if (three.badT > 0) { three.badT -= dt; MAT.bad.opacity = Math.max(0, three.badT / 0.55); if (three.badT <= 0) V.badRing.visible = false; busy = true; }
+          if (animParts(dt)) busy = true;
+          updateTurnHint(dt);
+          if (!busy) { three.frames.length = 0; return; }
+          const cam = three.camera, D = three.camDist;
+          const sh = view.shake;
+          cam.position.set(sh ? (Math.random() - 0.5) * sh : 0, sh ? (Math.random() - 0.5) * sh : 0, D);
+          cam.lookAt(0, 0, 0);
+          const t0 = performance.now();
+          three.renderer.render(three.scene, cam);
+          watchSpeed(now);
+          three.lastRenderMs = performance.now() - t0;
+        }
+        // 느리면 화질을 낮춘다(이어서 그리는 동안의 프레임 간격으로 판단)
+        function watchSpeed(now) {
+          const f = three.frames;
+          f.push(now);
+          if (f.length < 50) return;
+          const gap = (f[f.length - 1] - f[0]) / (f.length - 1);
+          f.length = 0;
+          if (now < three.warm) return;
+          three.slow = gap > 26 ? (three.slow || 0) + 1 : 0;
+          if (three.slow >= 2 && three.q < QUAL.length - 1) { three.q++; three.slow = 0; three.warm = now + 1500; applyQuality(); }
         }
 
         // ── 판 흐름 ─────────────────────────────────────────────
@@ -854,14 +1646,14 @@
           sfx("go");
           showCover("none");
           lastTick = performance.now();
+          idleT = 0;
           drawHud();
-          rafId = requestAnimationFrame(loop);
+          if (three) three.dirty = true;
           root.focus({ preventScroll: true });
         }
         function pause() {
           if (state !== "play") return;
           state = "pause";
-          cancelAnimationFrame(rafId);
           sel = -1;
           draw();
           ctx.sfx("select");
@@ -875,7 +1667,7 @@
           lastTick = performance.now();
           sfx("go");
           drawHud();
-          rafId = requestAnimationFrame(loop);
+          if (three) three.dirty = true;
           root.focus({ preventScroll: true });
         }
         function gameOver() {
@@ -884,7 +1676,6 @@
           const dropped = clearing ? 0 : puzzle.plates.length - plateLeft();
           ctx.sfx(solvedCount || dropped ? "win" : "lose");
           state = "over";
-          cancelAnimationFrame(rafId);
           sel = -1;
           draw();
           drawHud();
@@ -898,7 +1689,6 @@
           reset();
         }
         function reset() {
-          cancelAnimationFrame(rafId);
           clearTimeout(clearTimer);
           state = "ready";
           level = 1;
@@ -911,39 +1701,70 @@
           showCover("ready");
         }
 
-        // ── 덮개 ───────────────────────────────────────────────
-        // 시작 화면 그림 — 가로 막대 위에 세로 막대가 얹혀 아래 판 나사 하나를 덮고 있다
-        function demoHtml() {
-          const P = {
-            cols: 4, rows: 3,
-            holes: [{ c: 0, r: 1 }, { c: 2, r: 1 }, { c: 2, r: 0 }, { c: 2, r: 2 }, { c: 1, r: 0 }],
-            plates: [{ segs: [[0, 1, 3, 1]], pts: [0, 1, 2, 3].map((c) => ({ c, r: 1 })), holes: [0, 1] },
-              { segs: [[2, 0, 2, 2]], pts: [0, 1, 2].map((r) => ({ c: 2, r })), holes: [2, 3] }],
-            pin: [1, 1, 2, 2, 0], block: [0, 2, 0, 0, 0], plateHoles: [0b11, 0b1100],
-          };
-          const g = { W: 168, H: 112, s: 40, ox: 24, oy: 16 };
-          return `<div class="gm-so__demo" aria-hidden="true">${boardSvg(P, { s: 0b1111, p: 0b11 }, g, "sd", { looks: [LOOKS[0], LOOKS[2]], sel: -1, noBoard: true })}</div>`;
+        // ── 시작 화면 그림 — 작은 3D 상자가 천천히 돈다(따로 작은 그림판) ──
+        let demo = null;
+        function demoCanvas() {
+          if (!three) return null;
+          if (!demo) {
+            let renderer;
+            try { renderer = new T3.WebGLRenderer({ antialias: true, alpha: true }); } catch (_) { return null; }
+            renderer.outputEncoding = T3.sRGBEncoding;
+            renderer.toneMapping = T3.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.1;
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setClearColor(0x000000, 0);
+            const { scene } = setupScene(renderer, false);
+            const V = makeView(scene, 16);
+            // 늘 같은 그림 — 정해 둔 난수로 1단계 상자
+            const P = makePuzzle(1, texRnd(4242));
+            buildView(V, P, [LOOKS[2], LOOKS[0], LOOKS[3]]);
+            const st = { ...P.start };
+            syncView(V, st, true);
+            animate(V, 0.016, st, {});
+            const cam = new T3.PerspectiveCamera(30, 200 / 124, 0.1, 100);
+            cam.position.set(0, 0, V.R / Math.sin((30 * Math.PI) / 360) * 0.86);
+            cam.lookAt(0, 0, 0);
+            demo = { renderer, scene, V, cam, yaw: -0.5, on: false, acc: 0 };
+          }
+          return demo.renderer.domElement;
         }
+        function renderDemo(dt) {
+          demo.acc += dt;
+          if (demo.acc < 1 / 30) return;
+          demo.yaw += demo.acc * 0.55;
+          demo.acc = 0;
+          const el = demo.renderer.domElement, w = el.clientWidth, h = el.clientHeight;
+          if (!w) return;
+          if (demo.w !== w || demo.h !== h) { demo.renderer.setSize(w, h, false); demo.cam.aspect = w / h; demo.cam.updateProjectionMatrix(); demo.w = w; demo.h = h; }
+          demo.V.pivot.rotation.set(0.42, demo.yaw, 0, "XYZ");
+          demo.renderer.render(demo.scene, demo.cam);
+        }
+
+        // ── 덮개 ───────────────────────────────────────────────
         function showCover(kind, info = {}) {
+          if (demo) demo.on = false;
           if (kind === "none") {
             cover.hidden = true;
             return;
           }
           cover.hidden = false;
           if (kind === "ready") {
-            cover.innerHTML = `${demoHtml()}
-              <h2>나사 풀기</h2>
-              <p>판을 붙든 나사를 빈 구멍으로 옮겨<br>겹친 판을 모두 떨어뜨려요.</p>
+            cover.innerHTML = `<div class="gm-so__demo" aria-hidden="true"></div>
+              <h2>나사 풀기 3D</h2>
+              <p>입체 물건을 돌려 가며 판을 붙든 나사를<br>빈 구멍으로 옮겨 판을 모두 떨어뜨려요.</p>
               <div class="gm-so__how"><b>이렇게 해요</b><ol>
-                <li>나사를 눌러 들고, 옮길 빈 구멍을 눌러요.</li>
+                <li>화면을 끌면 물건이 돌아요. 뒤쪽 면에도 판이 있어요.</li>
+                <li>나사를 눌러 들고, 옮길 빈 구멍(어느 면이든)을 눌러요.</li>
                 <li>위에 다른 판이 덮은 나사는 못 뽑고, 판이 덮은 구멍에도 못 넣어요. 판에 구멍이 뚫린 자리는 돼요.</li>
                 <li>나사가 하나도 안 남은 판은 떨어져요. 다 떨어뜨리면 다음 단계!</li>
                 <li>3분 동안 판 하나에 +단계×10, 단계를 깨면 +단계×100, 적은 수로 깨면 보너스.</li>
               </ol></div>
               <p class="gm-so__keys">되돌리기는 단계마다 ${UNDO_PER_STAGE}번 · 이 단계 다시는 언제든(시간은 흘러요) · Z 되돌리기 · Esc 쉬기</p>
               <button type="button" class="gm-so__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
+            const c = demoCanvas();
+            if (c) { cover.querySelector(".gm-so__demo").appendChild(c); demo.on = true; demo.w = 0; }
           } else if (kind === "pause") {
-            cover.innerHTML = `<h2>잠깐 쉬는 중</h2><p>시간이 멈춰 있어요. 판은 가려 둘게요.</p>
+            cover.innerHTML = `<h2>잠깐 쉬는 중</h2><p>시간이 멈춰 있어요. 물건은 가려 둘게요.</p>
               <p class="gm-so__keys">${fmt(level)}단계 · ${fmt(liveScore())}점</p>
               <button type="button" class="gm-so__go" data-go>${HKUI.icon("play", 18, "currentColor")} 계속하기</button>`;
           } else {
@@ -960,17 +1781,6 @@
         }
 
         // ── 입력 ───────────────────────────────────────────────
-        boardEl.addEventListener("pointerdown", (e) => {
-          if (!e.isPrimary || e.button > 0) return;
-          if (state !== "play") return;
-          e.preventDefault();
-          const h = holeAt(e.clientX, e.clientY);
-          if (h < 0) {
-            if (sel >= 0) { sel = -1; draw(); }
-            return;
-          }
-          tapHole(h);
-        });
         undoBtn.addEventListener("click", undo);
         resetBtn.addEventListener("click", restartStage);
         document.addEventListener("keydown", (e) => {
@@ -981,7 +1791,11 @@
           if (e.code === "KeyZ" || e.code === "Backspace") {
             e.preventDefault();
             if (!e.repeat) undo();
+            return;
           }
+          // 화살표 — 물건 돌리기
+          const turn = { ArrowLeft: [-2.6, 0], ArrowRight: [2.6, 0], ArrowUp: [0, -1.8], ArrowDown: [0, 1.8] }[e.code];
+          if (turn && three) { e.preventDefault(); view.vy += turn[0]; view.vp += turn[1]; idleT = 0; }
         });
         document.addEventListener("visibilitychange", () => {
           if (document.hidden) pause();
@@ -995,8 +1809,16 @@
         ctx.onScore && ctx.onScore(() => Math.round(liveScore()));
         ctx.onRestart(reset);
         ctx.onPause(pause);
+        if (!init3d()) {
+          const msg = document.createElement("div");
+          msg.className = "gm-so__no3d";
+          msg.textContent = "이 기기에서는 3D 화면을 그릴 수 없어요. 다른 브라우저나 PC 에서 해 주세요.";
+          boardEl.appendChild(msg);
+        }
         reset();
         requestAnimationFrame(fit);
+        requestAnimationFrame(frame);
+        /*SO-TEST-HOOK*/
       },
     });
   </script>
