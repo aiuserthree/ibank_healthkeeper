@@ -42,6 +42,8 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 .wl .pb{position:absolute;left:10px;right:10px;bottom:5px;height:4px;border-radius:2px;background:rgba(14,49,82,.16);overflow:hidden}
 .wl .pb u{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,#4fb0ff,#6fdcc0);transition:width .2s}
 .wl.full{padding:4px 11px;font-size:13px;font-weight:900;color:#8a4500;background:linear-gradient(160deg,#fff6e6,#ffd9a6);animation:bob .6s ease-in-out infinite alternate}
+.wl.full.two{flex-direction:column;gap:1px;padding:5px 12px;text-align:center}
+.wl.full small{font-size:11.5px;font-weight:800;color:#a3600f}
 @keyframes bob{to{margin-top:-6px}}
 
 /* HUD */
@@ -4747,10 +4749,14 @@ function makePad(o) {
   p.label = makeLabel(o.cls); pads.push(p); return p;
 }
 function updatePads(dt, live) {
+  player.refuse = null;
   for (const p of pads) {
     p.mesh.visible = p.on; if (!p.on) { hideLabel(p.label); p.dwell = 0; continue; }
     const inside = live && !cine.on && Math.hypot(player.x - p.x, player.z - p.z) < p.r + .15;
     p.dwell = inside ? p.dwell + dt : 0; p.cool -= dt;
+    if (p.modeFn) { if (!inside) p.latch = null; p.mode = p.modeFn(); if (inside && !p.latch) p.latch = p.mode; } // 장작더미: 집터가 통나무를 더 안 받으면 지게 짐을 쌓아 두는 곳이 된다
+    // 통나무를 지고 섰는데 못 받는 곳이면 까닭을 말풍선으로 알려 준다(가만히 서 있기만 하면 고장 난 줄 안다)
+    if (inside && p.dwell > p.need && p.mode === 'give' && player.carried > 0 && p.pending <= 0 && !p.accepts() && p.why) player.refuse = p.why();
     if (inside && p.dwell > p.need && p.cool <= 0) {
       if (p.mode === 'give') {
         if (player.carried > 0 && p.accepts()) {
@@ -4788,6 +4794,8 @@ class Site {
       x: def.pad.x, z: def.pad.z, r: 1.3, cls: 'site',
       accepts: () => this.accepts(), onLog: () => { this.pile++; G.stats.delivered++; this.refresh(); },
       dropPos: o => this.pileTop(o),
+      // 지을 통나무가 다 모였으면(목수들이 아직 짓는 중) 더 받지 않는다 — 남는 통나무는 장작더미에 쌓아 둘 수 있다
+      why: () => this.state === 'active' ? ['통나무가 다 모였어요', stockOpen() ? '남는 통나무는 장작더미에 쌓아요' : '목수들이 다 지을 때까지 기다려요'] : null,
       html: () => `${ICON.hammer}<b>${def.name}</b><span>${this.total() + this.pad.pending}/${def.cost}</span><i class="pb"><u style="width:${Math.round(this.progress / def.cost * 100)}%"></u></i>`,
     });
   }
@@ -4849,10 +4857,26 @@ function makeStore(o) {
   st.top = out => out.set(o.x, .45 + Math.floor(Math.min(st.count, 24) / 4) * .26, o.z);
   st.add = n => { st.count = Math.min(st.cap, st.count + n); st.refresh(); if (st.count > 0) st.pad.on = true; };
   st.pad = makePad({ x: o.px, z: o.pz, r: 1.0, color: 0x35b98a, mode: 'take', stock: () => st.count, take: () => { st.count--; st.refresh(); }, takePos: out => st.top(out), html: () => `${ICON.log}<b>${o.name}</b><span>${st.count}</span>` });
+  if (o.store) { // 나무꾼처럼 나도 — 집터가 통나무를 더 안 받으면 지게 짐을 여기 쌓아 두고, 다시 받으면 가져간다
+    Object.assign(st.pad, {
+      // 동그라미에 들어설 때 정한 일(쌓기 · 가져가기)을 나갈 때까지 지킨다 — 쌓은 걸 그 자리에서 도로 집어 가거나, 집은 걸 도로 쌓지 않게
+      modeFn: () => {
+        const p = st.pad;
+        if (!p.latch) return player.carried > 0 && !siteWantsLogs() ? 'give' : 'take';
+        if (p.latch === 'give' && siteWantsLogs()) p.latch = 'take'; // 서 있는 동안 새 집터가 열리면 다시 가져간다
+        return p.latch === 'give' && player.carried <= 0 ? 'wait' : p.latch;
+      },
+      accepts: () => st.count + st.pad.pending < st.cap, onLog: () => st.add(1), dropPos: out => st.top(out),
+      why: () => ['장작더미가 가득 찼어요', '모닥불이나 작업장에 넣어요'],
+      html: () => st.pad.mode !== 'take' ? `${ICON.log}<b>${o.name}에 쌓기</b><span>${st.count + st.pad.pending}/${st.cap}</span>` : `${ICON.log}<b>${o.name}</b><span>${st.count}</span>`,
+    });
+  }
   st.col = { x: o.x, z: o.z, r: .85, on: true }; circles.push(st.col);
   return st;
 }
-const stock = makeStore({ x: -5.4, z: 4.8, px: -5.4, pz: 6.9, cap: 40, name: '장작더미' });
+const stock = makeStore({ x: -5.4, z: 4.8, px: -5.4, pz: 6.9, cap: 40, name: '장작더미', store: true });
+const stockOpen = () => stock.grp.visible && stock.count + stock.pad.pending < stock.cap; // 장작더미에 쌓아 둘 수 있나(나무꾼을 부른 뒤부터)
+const siteWantsLogs = () => { const s = activeSite(); return !!s && s.accepts(); };
 const millOut = makeStore({ x: -6.2, z: 11.2, px: -6.2, pz: 13.3, cap: 16, name: '제재소 통나무' });
 millOut.grp.visible = false; millOut.col.on = false; millOut.t = 0;
 stock.grp.visible = false; stock.col.on = false;
@@ -4863,6 +4887,7 @@ const firePad = makePad({
   accepts: () => fire.fuel + firePad.pending * .1 < .93,
   onLog: () => { fire.fuel = Math.min(1, fire.fuel + .1); sfx.feed(); puff(0, .9, 0, 8, [0xffb52e, 0xff7a1a, 0xffec8a], { glow: true, speed: 1.6, up: 4, g: 1, size: .12, life: 1 }); },
   dropPos: o => o.set(0, .7, 0),
+  why: () => ['불이 활활 타고 있어요', '약해지면 넣어 주세요'],
   html: () => `${ICON.flame}<b>장작 넣기</b><span>${Math.round(fire.fuel * 100)}%</span>`,
 });
 firePad.on = true;
@@ -4924,7 +4949,7 @@ function animChar(c, dt, o) {
 const player = { x: -2.6, z: 2.2, face: 2.4, carried: 0, incoming: 0, cap: 8, warmth: 100, moving: false, inWarm: true, frozenT: 0, r: .42, foot: 0, footSide: 1, coldWarned: false,
   swing: { on: false, t: 0, hit: false, tree: null, dur: .5 } };
 player.char = makeChar({ coat: C.red, hat: C.teal, accent: C.mustard, pants: C.navy, tool: 'axe', maxStack: 20 }); scene.add(player.char.g);
-const fullLabel = makeLabel('full'); setLabel(fullLabel, '지게가 꽉 찼어요');
+const fullLabel = makeLabel('full');
 // 발자국
 const FOOT_N = 44, footMesh = new THREE.InstancedMesh(new THREE.CircleGeometry(.5, 7).rotateX(-PI / 2), new THREE.MeshBasicMaterial({ color: 0xb4c8e2, transparent: true, opacity: .75, depthWrite: false }), FOOT_N);
 footMesh.frustumCulled = false; footMesh.renderOrder = 1; scene.add(footMesh);
@@ -4976,7 +5001,16 @@ function updatePlayer(dt, live) {
   }
   c.g.position.set(player.x, 0, player.z); c.g.rotation.y = player.face;
   animChar(c, dt, { moving: player.moving, swing: sw.on ? sw.t : -1, carry: player.carried, cheer, shiver: live && player.warmth < 25 && !player.moving && !sw.on });
-  if (live && !cine.on && player.carried >= player.cap) placeLabel(fullLabel, player.x, 2.4 + Math.floor(player.carried / 2) * .27, player.z, '-100%'); else hideLabel(fullLabel);
+  // 머리 위 말풍선 — 동그라미가 통나무를 못 받으면 그 까닭, 아니면 지게가 꽉 찼다는 것(내려놓을 곳이 없으면 그것도 함께)
+  let say = live && !cine.on ? player.refuse : null;
+  if (!say && live && !cine.on && player.carried >= player.cap) {
+    const why = siteWantsLogs() || fire.fuel < .7 ? '' : stockOpen() ? '장작더미에 쌓아 둘 수 있어요' : activeSite() ? '목수들이 짓는 중이에요' : '';
+    say = ['지게가 꽉 찼어요', why];
+  }
+  if (say) {
+    fullLabel.el.classList.toggle('two', !!say[1]); setLabel(fullLabel, say[1] ? `<b>${say[0]}</b><small>${say[1]}</small>` : say[0]);
+    placeLabel(fullLabel, player.x, 2.4 + Math.floor(player.carried / 2) * .27, player.z, '-100%');
+  } else hideLabel(fullLabel);
 }
 function updateWarmth(dt) {
   if (cine.on) return;
@@ -5097,7 +5131,7 @@ class Helper {
 function spawnBuilder() { const i = builders.length; const h = new Helper('builder', 3.6 + (i % 2) * 1.2, 2.9 + i * .5, BUILDER_LOOK[i % 3]); puff(h.x, .6, h.z, 8, 0xffffff, { speed: 2, size: .22 }); return h; }
 function spawnJack() {
   const h = new Helper('jack', cabinDoor.x + (jacks.length - 1) * .8, cabinDoor.z + .6, JACK_LOOK[jacks.length % 3]);
-  confetti(h.x, 1.5, h.z, 20); sfx.hire(); stock.grp.visible = true; stock.col.on = true; toast(`${ICON.helper} <b>나무꾼</b>이 왔어요! 알아서 나무를 베어 날라요 (+300점)`, 'good'); return h;
+  confetti(h.x, 1.5, h.z, 20); sfx.hire(); stock.grp.visible = true; stock.col.on = true; stock.pad.on = true; toast(`${ICON.helper} <b>나무꾼</b>이 왔어요! 알아서 나무를 베어 날라요 (+300점)`, 'good'); return h;
 }
 spawnBuilder(); spawnBuilder();
 
@@ -5150,6 +5184,8 @@ function score() {
 /* ---------- 목표(순서대로) ---------- */
 const padNeed = (cost, have) => Math.max(0, cost - have);
 function fetchOrDrop(pad, need) { // 통나무가 모자라면 가까운 나무를, 충분하면 내려놓을 곳을 가리킨다
+  // 다 모였으면(목수들이 짓는 중) 그 동그라미는 더 안 받으니, 짐을 지고 있으면 장작더미로 안내한다
+  if (need <= 0 && player.carried > 0 && pad.on && !pad.accepts() && stockOpen()) return { x: stock.pad.x, z: stock.pad.z, h: 2.6 };
   if (need <= 0 || player.carried >= Math.min(player.cap, need)) return { x: pad.x, z: pad.z, h: 2.6 };
   if (millOut.count >= 4 && player.carried < player.cap) return { x: millOut.pad.x, z: millOut.pad.z, h: 2.6 };
   if (stock.count >= 4 && player.carried < player.cap) return { x: stock.pad.x, z: stock.pad.z, h: 2.6 };
