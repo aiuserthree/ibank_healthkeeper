@@ -28,6 +28,8 @@ class MgmtGame:
     title: str
     desc: str
     icon: str
+    # 매니지먼트 목록(/manage)에 보일지 — 아케이드 게임이 이야기 모드 진행만 여기 저장할 때는 False
+    listed: bool = True
 
 
 MGMT_GAMES: dict[str, MgmtGame] = {
@@ -36,6 +38,8 @@ MGMT_GAMES: dict[str, MgmtGame] = {
         MgmtGame("civ", "오피스 타운", "빈 동네에 작은 회사를 차리고, 회사와 함께 커 가는 귀여운 회사 동네를 꾸며요", "building-2"),
         MgmtGame("cafe", "옥상 쉼터 카페", "옥상에 작은 카페를 차려 메뉴를 늘리고 손님을 모아요", "coffee"),
         MgmtGame("farm", "옥상 텃밭", "출근 전에 심고 점심 · 퇴근 후에 거둬 텃밭을 넓혀요", "sprout"),
+        # 아케이드 「햇살 농장 3D」의 이야기 모드 진행 — 매니지먼트 목록에는 안 보인다
+        MgmtGame("eggfarm", "햇살 농장 이야기", "햇살 농장 3D 이야기 모드 진행", "egg", listed=False),
     )
 }
 
@@ -81,6 +85,8 @@ async def list_games(db: AsyncSession, member: Member) -> list[dict]:
     }
     out = []
     for g in MGMT_GAMES.values():
+        if not g.listed:
+            continue
         r = rows.get(g.key)
         summary = (r.state or {}).get("summary") if r else None
         out.append(
