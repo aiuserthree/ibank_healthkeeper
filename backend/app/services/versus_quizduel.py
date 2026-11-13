@@ -155,12 +155,13 @@ def _all_done(st: dict) -> bool:
     return all(len(st["ans"][str(p)]) >= COUNT for p in st["p"])
 
 
-def _closing_soon(now: datetime) -> bool:
-    """15초(+여유) 안에 아케이드가 닫히는지 — 문을 닫는 순간 답을 못 보내 억울하게 틀리지 않게 새 문제를 열지 않는다."""
+def _closing_soon(now: datetime, member_id: Optional[int] = None) -> bool:
+    """15초(+여유) 안에 아케이드가 닫히는지 — 문을 닫는 순간 답을 못 보내 억울하게 틀리지 않게 새 문제를 열지 않는다.
+    문제를 여는 사람 기준(휴가인 사람은 그 쉬는 시간대가 끝날 때 닫힌다)."""
     try:
         from app.services.game import play_window
 
-        return not play_window(now + timedelta(milliseconds=LIMIT_MS + GRACE_MS))["open"]
+        return not play_window(now + timedelta(milliseconds=LIMIT_MS + GRACE_MS), member=member_id)["open"]
     except Exception:  # noqa: BLE001 — 시간 확인이 안 되면 막지 않는다(답할 때 ensure_open 이 다시 본다)
         return False
 
@@ -225,7 +226,7 @@ def act(m, member_id: int, data: dict, now: datetime) -> Optional[tuple]:
         if opened is not None and int(opened["k"]) == k:
             # 이미 열린 문제 — 판을 바꾸지 않는다(시간은 처음 연 때부터). 오류로 돌려 _v 가 오르지 않고 상대도 깨우지 않는다
             raise_app_error("QUIZ_OPEN")
-        if _closing_soon(now):
+        if _closing_soon(now, member_id):
             raise_app_error("QUIZ_CLOSING")
         until = st.get("until")
         if until and int(until) - now_ms < LIMIT_MS + GRACE_MS:  # 판 기한 전에 답할 시간이 없는 문제는 열지 않는다

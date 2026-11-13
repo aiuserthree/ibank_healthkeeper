@@ -17,7 +17,6 @@ from typing import Optional
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
 from app.core.errors import raise_app_error
 from app.core.time import KST, now_kst, today_kst
 from app.models import EscapeRoom, Member, MemberStatus, TeamsMessageType
@@ -33,7 +32,8 @@ ENGINES = {"kitchen": kitchen_game, "words": word_game, "maze": maze_game, "sket
 
 def _engine(room):
     return ENGINES.get(room.game)
-from app.services.game import CLOSED_WINDOWS, _give_stamp, ensure_open, game_visible, is_public_holiday
+from app.services.game import _give_stamp, ensure_open, game_visible
+from app.services.game import minutes_to_close as game_minutes_to_close
 from app.services.match import _person, _real_person
 
 KIND = "escape"
@@ -140,13 +140,11 @@ def _met(p: Puzzle, solved: set) -> bool:
     return all(k in solved for k in p.requires)
 
 
-def _minutes_to_close(now: datetime) -> Optional[int]:
-    """오늘 다음 닫히는 시각까지 남은 분 — 닫히지 않으면 None."""
-    if get_settings().debug or now.weekday() >= 5 or is_public_holiday(now.date()):
-        return None
-    minute = now.hour * 60 + now.minute
-    ahead = [start - minute for start, _ in CLOSED_WINDOWS if start > minute]
-    return min(ahead) if ahead else None
+def _minutes_to_close(now: datetime, *members) -> Optional[int]:
+    """오늘 다음 닫히는 시각까지 남은 분 — 닫히지 않으면 None. 두 사람 중 먼저 닫히는 쪽(휴가인 사람은 그 시간대 기준)."""
+    left = [game_minutes_to_close(now, m) for m in (members or (None,))]
+    left = [x for x in left if x is not None]
+    return min(left) if left else None
 
 
 # ── 화면을 열어 둔 사람 ────────────────────────────────────────
@@ -760,7 +758,7 @@ async def series(db: AsyncSession, member: Member) -> list:
 # ── 초대 · 수락 · 나가기 ───────────────────────────────────────
 
 async def invite(db: AsyncSession, member: Member, partner_id: int, room_key: str = DEFAULT_ROOM):
-    ensure_open()
+    ensure_open(member=member)
     if not _room_visible(room_key):
         raise_app_error("ESCAPE_NOT_FOUND", 404)
     await _sweep(db, member.id)
@@ -786,7 +784,7 @@ async def invite(db: AsyncSession, member: Member, partner_id: int, room_key: st
 
 
 async def accept(db: AsyncSession, member: Member, room_id: int):
-    ensure_open()
+    ensure_open(member=member)
     await _sweep(db, member.id)
     r = await _get(db, member, room_id, lock=True)
     if r.status != "PENDING" or r.guest_id != member.id:
@@ -880,7 +878,7 @@ async def ready(db: AsyncSession, member: Member, room_id: int, on: bool = True)
     r = await _get(db, member, room_id, lock=True)
     if r.status != "READY":
         raise_app_error("ESCAPE_NOT_READY")
-    ensure_open()
+    ensure_open(member=member)
     room, st = _room(r), _state(r)
     ready_ids = set(st.get("ready", []))
     if on:
@@ -889,7 +887,7 @@ async def ready(db: AsyncSession, member: Member, room_id: int, on: bool = True)
         ready_ids.discard(member.id)
     if {r.host_id, r.guest_id} <= ready_ids:
         now = now_kst()
-        left = _minutes_to_close(now)
+        left = _minutes_to_close(now, r.host_id, r.guest_id)
         if left is not None and left * 60 < room.limit_sec:
             raise_app_error("ESCAPE_CLOSING_SOON")
         r.status = "PLAYING"

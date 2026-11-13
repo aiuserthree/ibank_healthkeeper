@@ -104,6 +104,7 @@ window.HKApi = (function () {
     adminCoupons: () => request("/admin/coupons"),
     adminCouponStats: () => request("/admin/coupons/stats"),
     adminArcadeStats: (start, end) => request(`/admin/arcade/stats?${new URLSearchParams({ start, end })}`),
+    adminArcadeLeave: (date) => request(`/admin/arcade/leave${date ? `?${new URLSearchParams({ date })}` : ""}`),
     adminMemberCoupons: (memberId) => request(`/admin/coupons/members/${memberId}`),
     adminGrantCoupons: (memberId, count, note) =>
       request("/admin/coupons/grant", { method: "POST", body: JSON.stringify({ memberId, count, note }) }),

@@ -13,6 +13,8 @@ from app.database import AsyncSessionLocal, close_neo4j, close_redis
 from app.routers import admin, auth, health, play, realtime_ws, reservation
 from app.routers import raid
 from app.routers import mgmt
+from app.routers import internal
+from app.services import leave as leave_service
 from app.services import scheduler as sched
 
 logger = logging.getLogger(__name__)
@@ -107,6 +109,13 @@ def _schedule_jobs() -> None:
         id="j8_sync_public_holidays",
         replace_existing=True,
     )
+    # 휴가로 열리는 아케이드 — 일꾼마다 메모리에 든 어제 · 오늘 · 내일 휴가를 1분마다 다시 읽는다
+    scheduler.add_job(
+        _async_job("leave_cache", leave_service.job_refresh_cache),
+        CronTrigger(minute="*"),
+        id="j12_leave_cache",
+        replace_existing=True,
+    )
 
 
 @asynccontextmanager
@@ -136,6 +145,7 @@ async def lifespan(app: FastAPI):
             await sched.bootstrap_public_holidays(db)
         except Exception:
             logger.exception("Startup public holiday bootstrap failed")
+        await leave_service.job_refresh_cache(db)
     yield
     scheduler.shutdown(wait=False)
     await close_redis()
@@ -166,4 +176,5 @@ def create_app() -> FastAPI:
     app.include_router(realtime_ws.router, prefix="/api")  # 1:1 실시간 연결(웹소켓) /api/play/rt/{match_id}
     app.include_router(raid.router, prefix="/api")  # 부서 대항 레이드 /api/play/raid
     app.include_router(mgmt.router, prefix="/api")  # 매니지먼트 게임 저장 /api/play/mgmt
+    app.include_router(internal.router, prefix="/api")  # 그룹웨어 휴가 받기 /api/internal/leave-sync (사내망 프로그램)
     return app

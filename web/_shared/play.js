@@ -294,6 +294,8 @@ window.HKPlay = (function () {
     rummy: ["#9a3412", "#f59e0b"],
     alkkagi: ["#1f2937", "#a16207"],
     watersort: ["#0e7490", "#a855f7"],
+    bumpervs: ["#7c2d12", "#fb923c"],
+    jellyvs: ["#3b1d6e", "#ff7ac8"],
     vinyl: ["#1a1026", "#ff5e4d"],
     nightsquad: ["#141d42", "#ff9a3c"],
     frostcamp: ["#1e6fb8", "#8fd8ff"],
@@ -1094,6 +1096,12 @@ window.HKPlay = (function () {
           }, 60000);
           return;
         }
+        // 휴가로 열린 사람 — 위 막대에 짧게 한 줄 + 처음 한 번 알림
+        const leaveText = leaveNote(status);
+        if (leaveText) {
+          document.querySelector(".hk-pf__tools")?.insertAdjacentHTML("afterbegin", `<span class="hk-badge hk-badge--info hk-pf__leave" title="${HKUI.escapeHtml(leaveText)}">${HKUI.escapeHtml(leaveText)}</span>`);
+          HKUI.toast(leaveText, "info");
+        }
         // 시작·다시 하기·이어 하기 버튼을 누르면 게임 중으로 본다 (스페이스로 누르는 것도 여기로 온다)
         stage.addEventListener(
           "click",
@@ -1110,6 +1118,16 @@ window.HKPlay = (function () {
         fitStage(stage);
         bindDrawer();
     }
+  }
+
+  // 휴가로 열린 안내 — /play/status 가 reason "leave" 이면 「오늘 휴가라 14:00까지 열려 있어요」, 아니면 빈 글
+  // (휴가 · 반차 · 반반차 · 특별휴가인 사람은 그 쉬는 시간대에 업무 시간이어도 열린다. 끝나면 다른 사람과 똑같이 닫힌다)
+  function leaveNote(st) {
+    const lv = st && st.open && st.reason === "leave" && st.leave;
+    if (!lv) return "";
+    const label = lv.label || "휴가";
+    if (lv.until && lv.until !== "24:00") return `오늘 ${label}라 ${lv.until}까지 열려 있어요`;
+    return `오늘 ${label}라 ${lv.kind === "VACATION" || lv.kind === "SPECIAL" ? "하루 종일" : "오늘은 계속"} 열려 있어요`;
   }
 
   // 업무 시간 안내
@@ -1179,5 +1197,5 @@ window.HKPlay = (function () {
     });
   }
 
-  return { closedHtml, mountGame, roomFor, tintStyle, formatScore, seededRng, smoothPixels, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
+  return { closedHtml, leaveNote, mountGame, roomFor, tintStyle, formatScore, seededRng, smoothPixels, todayKst, TINTS, sfx: (name, arg) => HKSound.play(name, arg) };
 })();

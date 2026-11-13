@@ -72,6 +72,16 @@
     .ar-g__n { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .ar-g__d { font-size: 11.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .ar-g.is-practice .ar-g__n { font-weight: 600; color: var(--text-muted); }
+    /* 오늘 휴가로 열린 사람 — 위쪽 작은 칸, 누르면 목록 */
+    .ar-leave { margin: -4px 0 16px; }
+    .ar-leave__btn { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border: 1px solid var(--border-default); border-radius: 999px; background: var(--surface-card, #fff); color: var(--color-midnight-navy); font: inherit; font-size: 13.5px; cursor: pointer; }
+    .ar-leave__btn:hover { border-color: var(--color-signal-blue); }
+    .ar-leave__btn b { font-weight: 700; }
+    .ar-leave__btn small { color: var(--text-muted); font-size: 12.5px; }
+    .ar-leave__btn .ar-caret { margin: 0; }
+    .ar-leave.is-open .ar-leave__btn .ar-caret { transform: rotate(90deg); }
+    .ar-leave__panel { margin-top: 10px; }
+    .ar-leave__panel p { font-size: 12.5px; color: var(--text-muted); margin: 0 0 8px; }
     @media (max-width: 1100px) { .ar-kpis { grid-template-columns: 1fr 1fr; } .ar-grid2 { grid-template-columns: minmax(0, 1fr); } }
     @media (max-width: 560px) {
       .ar-kpis { grid-template-columns: 1fr; }
@@ -310,14 +320,39 @@
       body.style.opacity = "";
     }
 
+    // ── 오늘 휴가로 열린 사람 (그룹웨어 휴가 · 반차 · 반반차 · 특별휴가 — 사내망 프로그램이 보내 준다)
+    let leave = null, leaveOpen = false;
+    const hm = (isoText) => (isoText ? isoText.slice(11, 16) : "");
+    function paintLeave() {
+      const box = document.getElementById("ar-leave");
+      if (!box) return;
+      if (!leave) { box.innerHTML = ""; return; }
+      const last = leave.lastSync && leave.lastSync.at;
+      const lastText = last ? `마지막 갱신 ${last.slice(0, 10) === leave.date ? hm(last) : `${md(last.slice(0, 10))} ${hm(last)}`}` : "아직 받은 적 없어요";
+      const rows = leave.people.map((p) => `<tr class="${p.opensWork ? "" : "is-dim"}"><td><b style="font-weight:600">${esc(p.name)}</b></td><td>${esc(p.department || "-")}</td><td><span class="ar-tag">${esc(p.label)}</span></td><td class="num">${p.windows.map((w) => `${esc(w.start)}~${esc(w.end)}`).join(", ")}</td></tr>`).join("");
+      box.className = `ar-leave${leaveOpen ? " is-open" : ""}`;
+      box.innerHTML = `<button type="button" class="ar-leave__btn" id="ar-leave-btn" aria-expanded="${leaveOpen}"><span class="ar-caret">›</span>${HKUI.icon("tent-tree", 15, "var(--color-signal-blue)")}<span>오늘 휴가로 열린 사람 <b>${num(leave.count)}명</b></span><small>· ${esc(lastText)}</small></button>
+        ${leaveOpen ? `<div class="hk-card hk-card--pad ar-leave__panel">
+            <p>${leave.workday ? "업무 시간에 쉬는 시간대가 겹치는 사람만 셌어요 · 옅은 줄은 업무 시간과 안 겹쳐요" : "오늘은 주말 · 공휴일이라 모두에게 열려 있어요"} · 그룹웨어 결재 진행중 · 완료 기준</p>
+            <div class="ar-scroll"><table class="ar-table"><thead><tr><th>이름</th><th>부서</th><th>종류</th><th class="num">쉬는 시간대</th></tr></thead><tbody>${rows || `<tr><td colspan="4" style="color:var(--text-muted)">오늘 휴가인 사람이 없어요</td></tr>`}</tbody></table></div>
+          </div>` : ""}`;
+      HKUI.refreshIcons(box);
+      document.getElementById("ar-leave-btn").onclick = () => { leaveOpen = !leaveOpen; paintLeave(); };
+    }
+    async function loadLeave() {
+      try { leave = await HKApi.adminArcadeLeave(iso(new Date())); } catch (_) { leave = null; }
+      paintLeave();
+    }
+
     HKAdmin.mountPage({
       active: "arcade",
       render() {
         return `${HKAdmin.pageHead("아케이드 이용현황", "누가 · 언제 · 어떤 게임을 얼마나 하는지 — 끝까지 한 판 기준이에요. 참여 인원은 도장을 받은 날도 함께 세요.")}
+          <div class="ar-leave" id="ar-leave"></div>
           <div class="ar-period" id="ar-period"></div>
           <div id="ar-body"></div>`;
       },
-      afterMount: load,
+      afterMount() { loadLeave(); load(); },
     });
   </script>
 </body>

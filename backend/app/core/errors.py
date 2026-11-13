@@ -103,6 +103,8 @@ ERROR_MESSAGES = {
     "MAZE_STUNNED": "미끄러져서 잠깐 못 움직여요.",
     "COOP_NO_OPTIONS": "이 게임은 고를 설정이 없어요.",
     "GAME_CLOSED": "지금은 업무 시간이라 게임을 할 수 없어요. (점심 11:30~13:00 · 18:00 이후 · 9:00 이전)",
+    "LEAVE_SYNC_OFF": "휴가 받기 입구가 꺼져 있어요.",
+    "LEAVE_SYNC_TOO_BIG": "보낸 내용이 너무 커요.",
     "GAME_REQUEST_EMPTY": "내용을 적어 주세요.",
     "GAME_REQUEST_LIMIT": "오늘은 의견을 충분히 보내 주셨어요. 내일 또 보내 주세요.",
     "TOO_MANY_REQUESTS": "잠시 후 다시 시도해 주세요.",

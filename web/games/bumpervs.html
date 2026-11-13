@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>선다운 범퍼스 대전 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <style>
+    /* 선다운 범퍼스 대전 — 3D 경주 본체(창) 위에 덮는 카드 */
+    .bv-main { align-items: stretch !important; padding: 10px !important; }
+    .hk-pf.is-playing .hk-pf__pause:not([hidden]) { display: inline-flex; }
+    .hk-pf__tools > [hidden] { display: none !important; }
+    .bv { position: relative; flex: 1; min-width: 0; min-height: 320px; border-radius: 16px; overflow: hidden; background: #1a0a2b; box-shadow: 0 10px 30px rgba(15, 23, 42, .16); }
+    .bv iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+    .bv-load { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: #fde8cf; font-size: 14px; }
+    .bv-load[hidden] { display: none; }
+    .bv-over { position: absolute; inset: 0; z-index: 5; display: flex; padding: 14px; overflow-y: auto; background: rgba(26, 10, 43, .46); box-sizing: border-box; }
+    .bv-over[hidden] { display: none; }
+    .bv-card { margin: auto; width: 100%; max-width: 560px; box-sizing: border-box; padding: 20px; border-radius: 18px; background: #fff; box-shadow: 0 18px 44px rgba(15, 23, 42, .32); color: var(--color-midnight-navy, #0b3558); }
+    .bv-card h2 { margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; word-break: keep-all; }
+    .bv-card p { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: var(--text-secondary); word-break: keep-all; }
+    .bv-card.is-small { max-width: 420px; text-align: center; }
+    .bv-card.is-wide { max-width: 760px; padding: 0; overflow: hidden; }
+    .bv-card.is-wide .gk { padding: 18px 18px 24px; }
+    .bv-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; text-align: left; }
+    .bv-logo { flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #7c2d12, #fb923c); }
+    .bv-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .bv-mode { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px; border-radius: 14px; border: 2px solid #e2e8f0; background: #fff; text-align: left; font: inherit; color: #0f172a; cursor: pointer; }
+    .bv-mode:hover { border-color: #fdba74; }
+    .bv-mode.is-on { border-color: #ea580c; background: #fff7ed; box-shadow: 0 0 0 3px rgba(234, 88, 12, .14); }
+    .bv-mode__ic { display: inline-flex; width: 30px; height: 30px; border-radius: 9px; align-items: center; justify-content: center; margin-bottom: 4px; background: #ffedd5; color: #ea580c; }
+    .bv-mode[data-mode="online"] .bv-mode__ic { background: #dcfce7; color: #16a34a; }
+    .bv-mode b { font-size: 15px; font-weight: 800; }
+    .bv-mode small { font-size: 12px; line-height: 1.35; color: var(--text-muted); word-break: keep-all; }
+    .bv-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; text-align: left; }
+    .bv-row[hidden] { display: none; }
+    .bv-row__k { flex-shrink: 0; width: 46px; font-size: 13px; font-weight: 800; color: #475569; }
+    .bv-seg { flex: 1; min-width: 0; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #f1f5f9; }
+    .bv-seg button { flex: 1; min-width: 0; height: 36px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; font-weight: 700; color: #475569; cursor: pointer; }
+    .bv-seg button.is-on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
+    .bv-seg button:disabled { cursor: not-allowed; opacity: .45; }
+    /* 트랙 · 레이서 고르기 — 칸 여러 개 */
+    .bv-grid { flex: 1; min-width: 0; display: grid; gap: 4px; padding: 4px; border-radius: 12px; background: #f1f5f9; }
+    .bv-grid.is-tracks { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+    .bv-grid.is-racers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .bv-grid button { min-width: 0; min-height: 40px; padding: 5px 3px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 12.5px; font-weight: 700; line-height: 1.2; color: #475569; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; word-break: keep-all; }
+    .bv-grid.is-racers button { flex-direction: row; gap: 6px; }
+    .bv-grid button b { font-size: 14px; color: #0f172a; }
+    .bv-grid button small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+    .bv-grid button.is-on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
+    .bv-grid button:disabled { cursor: not-allowed; opacity: .42; }
+    .bv-dot { flex-shrink: 0; width: 16px; height: 16px; border-radius: 50%; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .9), 0 0 0 1px rgba(15, 23, 42, .18); }
+    .bv-go { width: 100%; height: 50px; margin-top: 14px; font-size: 16px !important; }
+    .bv-help { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #f8fafc; font-size: 12.5px; line-height: 1.7; color: #475569; word-break: keep-all; text-align: left; }
+    .bv-help kbd, .bv-rules kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; border: 1px solid #cbd5e1; border-bottom-width: 2px; background: #fff; font: 700 11px/1 inherit; color: #0f172a; box-sizing: border-box; }
+    .bv-badge { display: inline-flex; width: 56px; height: 56px; border-radius: 16px; align-items: center; justify-content: center; margin-bottom: 8px; background: #e2e8f0; color: #475569; }
+    .bv-badge.is-win { background: linear-gradient(135deg, #ffd23f, #ff9f1c); color: #fff; }
+    .bv-badge.is-lose { background: #ede9fe; color: #6d28d9; }
+    .bv-who { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+    .bv-who div { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; padding: 10px 6px; border-radius: 12px; background: #f1f5f9; font-size: 13px; font-weight: 700; color: #475569; }
+    .bv-who div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .bv-who div.is-on { background: #dcfce7; color: #15803d; }
+    .bv-btnrow { display: flex; gap: 8px; margin-top: 16px; }
+    .bv-btnrow .hk-btn { flex: 1; height: 46px; }
+    .bv-mini { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--text-muted); word-break: keep-all; }
+    .bv-mini.is-ok { color: #15803d; font-weight: 700; }
+    .bv-mini.is-bad { color: #b45309; font-weight: 700; }
+    .bv-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
+    .bv-stats div { padding: 10px 4px; border-radius: 12px; background: #f8fafc; }
+    .bv-stats b { display: block; font-size: 17px; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; }
+    .bv-stats small { font-size: 11.5px; color: var(--text-muted); }
+    .bv-again { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #fff7ed; font-size: 13px; font-weight: 700; color: #c2410c; word-break: keep-all; }
+    .bv-again[hidden] { display: none; }
+    .bv-rules { max-width: 600px; text-align: left; }
+    .bv-rules h3 { margin: 14px 0 4px; font-size: 15px; font-weight: 800; color: #0f172a; }
+    .bv-rules ul { margin: 4px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); word-break: keep-all; }
+    .bv-rules li + li { margin-top: 3px; }
+    .bv-over--set { z-index: 6; }
+    @media (max-width: 640px) {
+      .hk-pf__bar .hk-pf__icon { display: none; }
+      .hk-pf__tools { gap: 5px; }
+      .hk-pf__tools .hk-play-sound { padding: 7px 8px; }
+      .bv-main { padding: 6px !important; }
+      .bv { border-radius: 12px; }
+      .bv-over { padding: 8px; }
+      .bv-card { padding: 16px 14px; border-radius: 16px; }
+      .bv-card h2 { font-size: 19px; }
+      .bv-mode { padding: 10px 8px; }
+      .bv-mode b { font-size: 14px; }
+      .bv-logo { width: 42px; height: 42px; }
+      .bv-row { align-items: flex-start; }
+      .bv-row__k { padding-top: 12px; width: 40px; }
+      .bv-grid button { font-size: 11.5px; padding: 4px 2px; }
+      .bv-grid.is-tracks button small { display: none; }
+      .bv-grid.is-racers button { flex-direction: column; gap: 2px; }
+    }
+    @media (max-height: 560px) {
+      .bv-head, .bv-help, .bv-badge { display: none; }
+      .bv-row { margin-top: 8px; }
+      .bv-go { height: 44px; margin-top: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  (async function () {
+    // 선다운 범퍼스 대전 — 컴퓨터와 연습(기록 안 함) · 동료와(실시간 1:1). 3D 경주는 혼자 하기 본체(/games/embed/sundown.html?vs=1)를 창으로 띄워 쓴다
+    const esc = HKUI.escapeHtml;
+    const KEY = "bumpervs";
+    const TINT = "linear-gradient(135deg, #7c2d12, #fb923c)";
+    // 시험용 — 한 브라우저 두 탭으로 온라인을 흉내 낸다(#rt-host · #rt-guest). 사용자에게는 보이지 않는다
+    const DEV = HKLunch.isLocal() || /\.test$/.test(location.hostname) || (() => { try { return localStorage.getItem("hk-dev") === "1"; } catch (_) { return false; } })();
+    const AUTO = DEV && (() => { try { return localStorage.getItem("hk-bumpervs-auto") === "1"; } catch (_) { return false; } })(); // 시험 — 차가 저절로 달린다
+    const IS_TOUCH = matchMedia("(pointer: coarse)").matches;
+    // 혼자 하기와 같은 레이서 · 트랙 (모양 · 이름만 — 대전에서는 성능이 모두 같다)
+    const RACERS = [["bunny", "모찌", "토끼", "#ff5fa8"], ["fox", "불꽃", "여우", "#ff7a1f"], ["panda", "만두", "판다", "#2fd6a0"], ["frog", "폴짝이", "개구리", "#a5e02b"], ["penguin", "뒤뚱이", "펭귄", "#3f8cff"], ["pig", "트러플", "돼지", "#a765ff"]];
+    const RID = RACERS.map((r) => r[0]);
+    const okRid = (r) => RID.includes(r);
+    const racerName = (r) => { const x = RACERS.find((y) => y[0] === r); return x ? `${x[2]} ${x[1]}` : ""; };
+    const TRACKS = ["팝콘 퍼레이드", "찻잔 회오리", "등불 루프", "망치 언덕", "그랜드 축제길"];
+    const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    const LEVEL_NAME = Object.fromEntries(LEVELS);
+    const LIMIT = 180; // 경주 시간 상한(초) — 엔진 versus_bumpervs.LIMIT_SEC 과 같다
+    const PREF_KEY = "hk-bumpervs-pref";
+    const pref = { mode: "cpu", level: "normal", track: 0, rid: "bunny" };
+    try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY) || "{}")); } catch (_) { /* 처음 */ }
+    if (!["cpu", "online"].includes(pref.mode)) pref.mode = "cpu";
+    if (!LEVEL_NAME[pref.level]) pref.level = "normal";
+    if (!okRid(pref.rid)) pref.rid = "bunny";
+    const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (_) { /* 저장 못 해도 이번엔 그대로 */ } };
+    // 혼자 하기에서 연 트랙 수(1~5) — 같은 주소라 혼자 하기 저장을 읽는다. 연습 · 대전 모두 연 트랙까지만 고른다
+    const unlocked = () => { try { const v = JSON.parse(localStorage.getItem("sundown-bumpers-v1") || "{}"); const n = Math.floor(Number(v && v.unlocked)); return n >= 1 && n <= 5 ? n : 1; } catch (_) { return 1; } };
+    if (!(Number.isInteger(pref.track) && pref.track >= 0 && pref.track < unlocked())) pref.track = 0;
+
+    await HKUI.loadLucide();
+    const profile = await HKMember.requireAuth(location.pathname + location.hash);
+    if (!profile) return;
+    const icon = (n, s = 18, c = "currentColor") => HKUI.icon(n, s, c);
+    document.body.classList.add("hk-pf-body");
+
+    document.getElementById("app").innerHTML = `<div class="hk-pf" id="bv-pf">
+        <header class="hk-pf__bar">
+          <a class="hk-pf__back" href="${HKRoutes.lounge}" id="bv-back">${icon("chevron-left", 20)}<span>아케이드</span></a>
+          <a class="hk-pf__back hk-pf__vs" href="/together#tg-versus" id="bv-vs">${icon("swords", 18)}<span>대전 보기</span></a>
+          <span class="hk-pf__icon" style="background:${TINT}">${icon("car-front", 18, "#fff")}</span>
+          <div class="hk-pf__title"><b>선다운 범퍼스 대전</b><small>노을 카니발 트랙에서 동료와 1:1 범퍼카 경주</small></div>
+          <div class="hk-pf__tools">
+            <button type="button" class="hk-play-sound hk-pf__pause" id="bv-pause" aria-label="일시정지" hidden>${icon("pause")}<span>일시정지</span></button>
+            <button type="button" class="hk-play-sound" id="bv-rules" aria-label="게임 방법">${icon("book-open")}<span>게임 방법</span></button>
+            <button type="button" class="hk-play-sound" id="bv-sound"></button>
+          </div>
+        </header>
+        <div class="hk-pf__body">
+          <main class="hk-pf__main bv-main" id="bv-main">
+            <div class="bv" id="bv">
+              <iframe id="bv-frame" title="선다운 범퍼스 대전 경주 화면" src="/games/embed/sundown.html?vs=1" allow="autoplay; fullscreen; gamepad"
+                sandbox="allow-scripts allow-same-origin allow-pointer-lock" referrerpolicy="no-referrer"></iframe>
+              <div class="bv-load" id="bv-load"><span class="hk-spin"></span> 경주장을 불러오는 중이에요</div>
+              <div class="bv-over" id="bv-over" hidden></div>
+              <div class="bv-over bv-over--set" id="bv-setover" hidden></div>
+            </div>
+          </main>
+        </div>
+      </div>`;
+    HKUI.refreshIcons();
+    const $ = (s) => document.querySelector(s);
+    const over = $("#bv-over"), setOver = $("#bv-setover"), frame = $("#bv-frame"), pauseBtn = $("#bv-pause");
+    const me = { name: profile.name || "나", avatarUrl: profile.avatarUrl || "" };
+
+    // ───── 본체 창과 주고받기 (같은 주소 — 우리가 띄운 창이 보낸 vs: 신호만 받는다)
+    let frameReady = false;
+    const frameQ = [];
+    const toFrame = (m) => { if (!frameReady) { frameQ.push(m); return; } try { frame.contentWindow.postMessage(m, location.origin); } catch (_) { /* 창이 아직 없음 */ } };
+    const frameHandlers = new Set();
+    addEventListener("message", (e) => {
+      if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
+      const m = e.data && typeof e.data === "object" ? e.data : null;
+      if (!m || typeof m.type !== "string" || !m.type.startsWith("vs:")) return;
+      if (m.type === "vs:ready") {
+        frameReady = true; $("#bv-load").hidden = true;
+        toFrame({ type: "vs:sound", mute: HKSound.isMuted() });
+        while (frameQ.length) toFrame(frameQ.shift());
+        return;
+      }
+      if (m.type === "vs:esc") return onEsc();
+      if (m.type === "vs:vis") return onVis(!!m.hidden);
+      frameHandlers.forEach((fn) => fn(m));
+    });
+    // 키보드 — 초점이 바깥 화면에 있을 때도 경주 키가 먹게 본체로 넘긴다 (본체에 초점이 있으면 본체가 직접 받는다)
+    const RACE_KEYS = { ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright", KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", Space: " " };
+    const racing = () => screen === "play";
+    function keyFwd(e, down) {
+      const k = RACE_KEYS[e.code];
+      if (!k || !racing() || setOpen() || document.querySelector(".hk-dialog__overlay")) return false;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return false;
+      e.preventDefault();
+      if (!e.repeat) toFrame({ type: "vs:key", k, down });
+      return true;
+    }
+    addEventListener("keyup", (e) => keyFwd(e, false));
+    function focusFrame() { try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); frame.focus(); frame.contentWindow.focus(); } catch (_) { /* 초점을 못 옮겨도 키는 넘긴다 */ } }
+
+    // ───── 소리 (모든 게임 공통 설정)
+    const soundBtn = $("#bv-sound");
+    const paintSound = () => {
+      const m = HKSound.isMuted();
+      soundBtn.innerHTML = `${icon(m ? "volume-x" : "volume-2")}<span>${m ? "소리 꺼짐" : "소리 켜짐"}</span>`;
+      soundBtn.setAttribute("aria-pressed", m ? "false" : "true");
+      soundBtn.classList.toggle("is-off", m);
+      HKUI.refreshIcons(soundBtn);
+      toFrame({ type: "vs:sound", mute: m });
+    };
+    paintSound();
+    HKSound.onChange(paintSound);
+    soundBtn.onclick = () => { HKSound.toggle(); HKSound.play("select"); soundBtn.blur(); };
+
+    // ───── 화면 상태
+    let screen = "menu", playing = null; // playing: { mode: "cpu"|"host"|"guest", online, role, rival, report, resign, matchId, track }
+    function setPlaying(on) { $("#bv-pf").classList.toggle("is-playing", on); }
+    function showOver(html) { over.innerHTML = html; over.hidden = false; HKUI.refreshIcons(over); }
+    function hideOver() { over.hidden = true; over.innerHTML = ""; }
+    const setOpen = () => !setOver.hidden;
+    function closeLayer() { setOver.hidden = true; setOver.innerHTML = ""; }
+    const fmtSec = (v) => { if (typeof v !== "number") return "—"; const m = Math.floor(v / 60), s = v - m * 60; return `${m}:${s < 10 ? "0" : ""}${s.toFixed(2)}`; };
+    const timeText = (sec) => { const t = Math.round(sec), m = Math.floor(t / 60), s = t % 60; return m ? (s ? `${m}분 ${s}초` : `${m}분`) : `${s}초`; };
+    const pct = (d) => `${Math.round((Number(d) || 0) * 100).toLocaleString("ko-KR")}%`;
+    function cardHtml(iconName, title, sub, buttons) {
+      return `<div class="bv-card is-small" role="alert"><span class="bv-badge">${icon(iconName, 26)}</span><h2>${esc(title)}</h2>${sub ? `<p>${esc(sub)}</p>` : ""}
+        ${buttons ? `<div class="bv-btnrow">${buttons}</div>` : ""}</div>`;
+    }
+    const trackGrid = (attr, cur, max, disabled) => `<div class="bv-grid is-tracks">${TRACKS.map((n, i) => `<button type="button" ${attr}="${i}" class="${i === cur ? "is-on" : ""}" ${disabled || i >= max ? "disabled" : ""} title="${i >= max ? "아직 안 연 트랙이에요" : esc(n)}"><b>${i + 1}</b><small>${i >= max ? "잠김" : esc(n)}</small></button>`).join("")}</div>`;
+    const racerGrid = (attr, cur) => `<div class="bv-grid is-racers">${RACERS.map(([id, nm, kind, col]) => `<button type="button" ${attr}="${id}" class="${id === cur ? "is-on" : ""}" aria-label="${kind} ${nm}"><span class="bv-dot" style="background:${col}"></span><span>${nm}</span></button>`).join("")}</div>`;
+
+    // ───── 첫 화면 — 모드 고르기
+    function showMenu() {
+      closeConn();
+      screen = "menu"; playing = null; setPlaying(false); pauseBtn.hidden = true;
+      toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"] });
+      showOver(`<div class="bv-card" role="dialog" aria-label="선다운 범퍼스 대전 시작">
+          <div class="bv-head">
+            <span class="bv-logo">${icon("car-front", 26, "#fff")}</span>
+            <div><h2>선다운 범퍼스 대전</h2><p>같은 트랙을 나란히 달려 먼저 결승선을 지나면 이겨요</p></div>
+          </div>
+          <div class="bv-modes" role="radiogroup" aria-label="모드">
+            <button type="button" class="bv-mode" data-mode="cpu" role="radio"><span class="bv-mode__ic">${icon("bot", 18)}</span><b>컴퓨터와 연습</b><small>컴퓨터 레이서 한 대와 겨뤄요 · 기록 안 함</small></button>
+            <button type="button" class="bv-mode" data-mode="online" role="radio"><span class="bv-mode__ic">${icon("wifi", 18)}</span><b>동료와</b><small>실시간 1:1 경주</small></button>
+          </div>
+          <div class="bv-row" data-row="level"><span class="bv-row__k">상대</span><div class="bv-seg">${LEVELS.map(([k, t]) => `<button type="button" data-level="${k}">${t}</button>`).join("")}</div></div>
+          <div class="bv-row" data-row="track"><span class="bv-row__k">트랙</span>${trackGrid("data-track", pref.track, unlocked(), false)}</div>
+          <div class="bv-row"><span class="bv-row__k">레이서</span>${racerGrid("data-rid", pref.rid)}</div>
+          <button type="button" class="hk-btn hk-btn--primary bv-go" id="bv-go">출발하기</button>
+          <div class="bv-help" id="bv-help"></div>
+        </div>`);
+      paintMenu();
+    }
+    function helpHtml() {
+      const k = (t) => `<kbd>${t}</kbd>`;
+      const keys = IS_TOUCH ? "화면을 누르고 있으면 달리고, 떼면 느려져요 · 누른 채 좌우로 끌어 방향을 바꿔요"
+        : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · 마우스로 눌러 끌어도 돼요`;
+      return `<div>${keys}</div><div>레이서는 모양만 달라요(성능은 모두 같아요) · 트랙은 혼자 하기에서 연 곳까지 골라요 · 3분 안에 둘 다 못 들어오면 더 멀리 간 쪽이 이겨요</div>`;
+    }
+    function paintMenu() {
+      over.querySelectorAll("[data-mode]").forEach((b) => { const on = b.dataset.mode === pref.mode; b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
+      over.querySelectorAll("[data-level]").forEach((b) => b.classList.toggle("is-on", b.dataset.level === pref.level));
+      over.querySelectorAll("[data-track]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.track) === pref.track));
+      over.querySelectorAll("[data-rid]").forEach((b) => b.classList.toggle("is-on", b.dataset.rid === pref.rid));
+      // 동료와 — 트랙은 들어간 뒤 준비 화면에서 도전한 사람이 고른다
+      over.querySelector('[data-row="level"]').hidden = pref.mode !== "cpu";
+      over.querySelector('[data-row="track"]').hidden = pref.mode !== "cpu";
+      $("#bv-go").textContent = pref.mode === "cpu" ? "출발하기" : "동료 대전 목록";
+      $("#bv-help").innerHTML = helpHtml();
+    }
+
+    // ───── 컴퓨터와 연습 — 본체가 혼자 계산한다(기록 안 함)
+    function startPractice() {
+      closeLayer();
+      const botRid = RID.filter((r) => r !== pref.rid)[Math.floor(Math.random() * 5)];
+      playing = { mode: "cpu", online: false, track: pref.track, level: pref.level, rival: { name: `컴퓨터(${LEVEL_NAME[pref.level]})` } };
+      toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, botRid], names: [me.name, playing.rival.name], level: pref.level, auto: AUTO, mute: HKSound.isMuted() });
+      toFrame({ type: "vs:go" });
+      hideOver();
+      screen = "play"; setPlaying(true); pauseBtn.hidden = false; pauseBtn.disabled = false;
+      focusFrame();
+    }
+    function pausePractice(why) {
+      if (screen !== "play" || !playing || playing.online) return;
+      screen = "pause";
+      toFrame({ type: "vs:freeze", on: true, why: "pause" });
+      showOver(`<div class="bv-card is-small" role="dialog" aria-label="일시정지">
+          <span class="bv-badge">${icon("pause", 26)}</span>
+          <h2>잠깐 멈췄어요</h2>
+          <p>${why ? `${esc(why)} · ` : ""}「계속하기」를 누르면 이어서 달려요</p>
+          <div class="bv-btnrow">
+            <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만하기</button>
+            <button type="button" class="hk-btn hk-btn--primary" data-act="resume">계속하기</button>
+          </div>
+        </div>`);
+    }
+    function resumePractice() {
+      if (screen !== "pause") return;
+      hideOver(); screen = "play";
+      toFrame({ type: "vs:freeze", on: false, why: "pause", hold: 0 });
+      focusFrame();
+    }
+
+    // ───── 게임 방법
+    function openRules() {
+      const k = (t) => `<kbd>${t}</kbd>`;
+      setOver.innerHTML = `<div class="bv-card bv-rules" role="dialog" aria-label="게임 방법">
+          <h2>선다운 범퍼스 대전 게임 방법</h2>
+          <h3>먼저 결승선을 지나면 이겨요</h3>
+          <ul>
+            <li>두 사람이 같은 트랙을 나란히 출발해요. 먼저 결승선을 지난 사람이 이겨요.</li>
+            <li>한 사람이 들어온 뒤 12초 안에 상대가 못 들어오면 경주가 끝나요. 3분 안에 둘 다 못 들어오면 더 멀리 간 사람이 이겨요.</li>
+            <li>서로 부딪히면 튕겨 나가요. 아이템(로켓 · 방패 · 범퍼 폭발), 드리프트 부스트, 바이킹 · 망치 · 찻잔 장애물은 혼자 하기와 같아요.</li>
+            <li>레이서는 모양만 달라요. 대전에서는 해금 · 업그레이드 효과 없이 모두 같은 기본 성능으로 달려요. 티켓은 모이지 않아요.</li>
+          </ul>
+          <h3>조작</h3>
+          <ul>
+            <li>${IS_TOUCH ? "화면을 누르고 있으면 달리고, 떼면 느려져요. 누른 채 좌우로 끌면 방향을 바꿔요." : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · 마우스로 눌러 끌어도 돼요.`}</li>
+            <li>굽은 길에서 안쪽으로 꺾고 버티면 드리프트 부스트가 모여요. 점프해서 공중에 떴을 때 좌우로 세게 꺾으면 빙글 돌고 착지 부스트를 받아요.</li>
+          </ul>
+          <h3>동료와</h3>
+          <ul>
+            <li>트랙은 도전한 사람이, 레이서는 각자 골라요. 둘 다 혼자 하기에서 연 트랙까지만 고를 수 있어요(처음엔 트랙 1). 바꾸면 두 사람 준비가 풀려요.</li>
+            <li>두 사람 모두 준비하면 3 · 2 · 1 뒤 출발해요. 경주 중에는 멈출 수 없어요. 다른 탭 · 앱으로 가거나 연결이 끊기면 잠깐 멈췄다가, 돌아오면 3초 세고 이어 가요.</li>
+            <li>두 사람이 보낸 결과가 맞으면 대전 기록에 남아요. 경주 중에 나가면 기권으로 져요.</li>
+          </ul>
+          <h3>연습</h3>
+          <ul><li>컴퓨터 레이서 한 대와 겨뤄요. 기록은 남지 않고 아케이드 순위에도 들어가지 않아요.</li></ul>
+          <div class="bv-btnrow"><button type="button" class="hk-btn hk-btn--primary" data-act="setclose">닫기</button></div>
+        </div>`;
+      setOver.hidden = false; setOver.scrollTop = 0;
+      if (screen === "play" && playing && !playing.online) pausePractice();
+    }
+
+    // ───── 결과
+    function showResult(r) {
+      if (!playing) return;
+      const P = playing;
+      screen = "result"; setPlaying(false); pauseBtn.hidden = true;
+      const mi = P.role === "guest" ? 1 : 0, ri = 1 - mi;
+      const won = r.winner === mi, draw = r.winner == null;
+      const title = draw ? "비겼어요" : won ? "이겼어요!" : "아쉽게 졌어요";
+      const tName = `트랙 ${r.track} · ${TRACKS[r.track - 1] || ""}`;
+      const lead = P.online ? `${esc(P.rival.name)}님과의 경주 · ${esc(tName)}` : `${esc(P.rival.name)}와 연습 · ${esc(tName)}`;
+      const anyFin = r.order[0] != null || r.order[1] != null;
+      const how = anyFin ? (won ? "먼저 결승선을 지났어요" : draw ? "" : `${esc(P.rival.name)}${P.online ? "님" : ""}이 먼저 들어왔어요`) : `3분 안에 둘 다 못 들어와 ${draw ? "간 거리가 같았어요" : "더 멀리 간 쪽이 이겼어요"}`;
+      const mine = r.order[mi], theirs = r.order[ri];
+      showOver(`<div class="bv-card is-small bv-result" role="dialog" aria-label="경주 결과">
+          <span class="bv-badge ${won ? "is-win" : draw ? "" : "is-lose"}">${icon(won ? "trophy" : draw ? "handshake" : "flag", 28)}</span>
+          <h2>${esc(title)}</h2>
+          <p>${lead}${how ? `<br><small>${how}</small>` : ""}</p>
+          <div class="bv-stats">
+            <div><b>${mine != null ? fmtSec(mine) : pct(r.dist && r.dist[mi])}</b><small>${mine != null ? "내 기록" : "내가 간 거리"}</small></div>
+            <div><b>${theirs != null ? fmtSec(theirs) : pct(r.dist && r.dist[ri])}</b><small>${theirs != null ? "상대 기록" : "상대가 간 거리"}</small></div>
+            <div><b>${timeText(r.sec)}</b><small>경주 시간</small></div>
+          </div>
+          <div class="bv-again" id="bv-again" hidden></div>
+          <div class="bv-btnrow" id="bv-endbtns">
+            <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">처음으로</button>
+            ${P.online ? (P.rival && P.rival.id ? `<button type="button" class="hk-btn hk-btn--primary" data-act="rematch">다시 도전</button>` : `<button type="button" class="hk-btn hk-btn--primary" data-act="lobby">대전 목록</button>`) : `<button type="button" class="hk-btn hk-btn--primary" data-act="again">다시 하기</button>`}
+          </div>
+          <div class="bv-mini" id="bv-mini">${P.online && P.report ? "결과를 대전 기록에 남기는 중…" : "연습이라 기록에 남지 않아요 · 아케이드 순위에도 들어가지 않아요"}</div>
+        </div>`);
+      if (P.online && P.againId) showAgain(P.againId);
+      // 동료와 — 두 사람 모두 결과를 서버에 알린다(서버가 두 결과를 맞춰 보고 승패를 적는다)
+      if (P.online && typeof P.report === "function" && !P.reported) {
+        P.reported = true;
+        Promise.resolve(P.report(r)).catch(() => null).then((ok) => {
+          const el = $("#bv-mini");
+          if (!el || screen !== "result" || playing !== P) return;
+          el.textContent = ok ? "대전 기록에 남겼어요" : "결과를 아직 저장하지 못했어요 · 대전 목록에서 이 경주에 다시 들어오면 다시 보내요";
+          el.classList.add(ok ? "is-ok" : "is-bad");
+        });
+      }
+    }
+    function showAgain(id) {
+      if (!playing || !playing.online || screen !== "result") return;
+      const box = $("#bv-again"), row = $("#bv-endbtns");
+      if (!box || !row) return;
+      box.hidden = false;
+      box.textContent = `${playing.rival.name}님이 다시 도전했어요`;
+      const mine = row.querySelector('[data-act="rematch"]');
+      if (mine) mine.remove();
+      const acc = row.querySelector('[data-act="accept"]');
+      if (acc) acc.dataset.id = String(id);
+      else row.insertAdjacentHTML("beforeend", `<button type="button" class="hk-btn hk-btn--primary" data-act="accept" data-id="${id}">다시 경주 수락</button>`);
+    }
+    // 연습 결과 · 대전 결과 모두 본체가 vs:end 로 알려 준다
+    frameHandlers.add((m) => {
+      if (m.type !== "vs:end" || !playing) return;
+      if (!playing.online) { if (screen === "play" || screen === "pause") showResult(m.r); return; }
+      if (playing.onEnd) playing.onEnd(m.r);
+    });
+
+    // ───── 동료와 — 실시간 1:1 (host 의 본체가 경주를 계산하고, guest 의 본체는 받아 그린다)
+    // connect(matchId, h) 는 HKRt.connect(/_shared/rt.js) 와 같은 약속이다 — 시험용 devConnect 도 똑같이 군다
+    //   h.onHello({ role, peerHere }) · h.onPeer(here) · h.onMessage(msg) · h.onClose({ final, text }) → { send(obj) → bool, close() }
+    // 주고받는 말(바깥 화면끼리)
+    //   guest → host: hi {rid, un, rd} · rd {on, rid} · in {a, s} · vis {h} · ping {c}
+    //   host → guest: lb {ph, track, max, rids, rd} · go {e, track, rids} · s {d} · end {e, r} · vis {h} · pong {c}
+    const PEER_GRACE = 20000; // 상대가 이만큼 안 돌아오면 「상대가 나갔어요」 (그동안 경주는 멈춰 있다)
+    const AWAY_MAX = 20000; // 상대가 다른 탭에 가 있어도 이만큼 지나면 경주를 이어 간다
+    let conn = null, sess = null;
+    function closeConn() {
+      if (sess) { sess.closed = true; clearTimeout(sess.graceT); clearTimeout(sess.awayT); clearInterval(sess.tick); sess = null; }
+      if (conn) { try { conn.close(); } catch (_) { /* 이미 닫힘 */ } conn = null; }
+    }
+    function playOnline({ matchId, rival, track, connect, report, resign, check, fallbackRole }) {
+      closeConn(); closeLayer();
+      screen = "connect"; setPlaying(false); pauseBtn.hidden = true;
+      showOver(cardHtml("wifi", "연결하는 중…", `${rival.name}님과 연결하고 있어요`, `<button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>`));
+      const S = { closed: false, graceT: 0, awayT: 0, tick: 0, role: null, peerHere: false, gotLb: false, lastHi: 0, lastPing: 0, phase: "wait",
+        track: Number.isInteger(track) ? track : 0, max: 1, rids: ["bunny", "fox"], rd: [0, 0], e: 0, result: null, guestUn: 1, endSent: 0 };
+      sess = S;
+      const send = (o) => !S.closed && !!conn && conn.send(o);
+      const names = () => (S.role === "host" ? [me.name, rival.name] : [rival.name, me.name]);
+      const mi = () => (S.role === "guest" ? 1 : 0);
+      const lost = async (title, sub) => {
+        if (S.closed || S.phase === "end") return;
+        closeConn();
+        screen = "lost"; setPlaying(false);
+        toFrame({ type: "vs:freeze", on: true, why: "lost" });
+        showOver(cardHtml("wifi-off", title, sub || "경주를 이어 갈 수 없어요", `<button type="button" class="hk-btn hk-btn--primary" data-act="menu">처음으로</button>`));
+        const d = check ? await check().catch(() => null) : null;
+        if (d && d.status === "DONE" && screen === "lost") {
+          const t = d.result === "win" ? "이 경주는 이겼어요" : d.result === "lose" ? "이 경주는 졌어요" : "이 경주는 비겼어요";
+          showOver(cardHtml(d.result === "win" ? "trophy" : "flag", title, `${t}${d.reasonLabel ? ` · ${d.reasonLabel}` : ""}`, `<button type="button" class="hk-btn hk-btn--primary" data-act="menu">처음으로</button>`));
+        }
+      };
+      // 경주 결과 — host 의 본체가 정한 것을 두 사람이 같이 쓴다
+      const finish = (r) => {
+        if (S.phase === "end" && S.result) return;
+        S.phase = "end"; S.result = r;
+        if (S.role === "host") { send({ t: "end", e: S.e, r }); S.endSent = Date.now(); }
+        else toFrame({ type: "vs:end", r });
+        playing.result = r;
+        showResult(r);
+      };
+      playing = { mode: "online", online: true, role: null, rival, report, resign, matchId: typeof matchId === "number" ? matchId : null, onEnd: (r) => { if (S.role === "host") finish(r); } };
+      // ── 준비 화면
+      const myRid = () => (okRid(pref.rid) ? pref.rid : S.role === "guest" ? "fox" : "bunny");
+      function paintLobby() {
+        if (S.closed || S.phase !== "wait" || !S.role || !["connect", "ready"].includes(screen)) return;
+        screen = "ready";
+        const host = S.role === "host", i = mi();
+        const who = (on, name, here, rid) => `<div class="${on ? "is-on" : ""}">${icon(on ? "check-circle-2" : here ? "circle" : "loader", 15)}${here && okRid(rid) ? `<span class="bv-dot" style="background:${RACERS.find((x) => x[0] === rid)[3]}"></span>` : ""}<span>${esc(name)} · ${on ? "준비 완료" : here ? "준비 전" : "들어오는 중…"}</span></div>`;
+        const ready = !!S.rd[i];
+        showOver(`<div class="bv-card" role="dialog" aria-label="경주 준비">
+            <h2>경주를 준비해 주세요</h2>
+            <p>${esc(rival.name)}님과 실시간 경주 · 트랙 ${S.track + 1} ${esc(TRACKS[S.track])}</p>
+            <div class="bv-row"><span class="bv-row__k">트랙</span>${trackGrid("data-otrack", S.track, S.max, !host)}</div>
+            <div class="bv-row"><span class="bv-row__k">레이서</span>${racerGrid("data-orid", S.rids[i])}</div>
+            <div class="bv-who">${who(S.rd[i], "나", true, S.rids[i])}${who(S.rd[1 - i], rival.name, S.peerHere && (host ? S.gotHi : S.gotLb), S.rids[1 - i])}</div>
+            <div class="bv-btnrow">
+              <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>
+              <button type="button" class="hk-btn hk-btn--primary" data-act="ready" data-on="${ready ? 0 : 1}">${ready ? "준비 취소" : "준비"}</button>
+            </div>
+            <div class="bv-mini">${host ? "트랙은 도전한 내가" : "트랙은 도전한 사람이"}, 레이서는 각자 골라요 · 둘 다 혼자 하기에서 연 트랙까지만 고를 수 있어요 · 바꾸면 두 사람 준비가 풀려요 · 레이서는 모양만 달라요 · 두 사람 모두 준비하면 바로 출발 세기를 해요</div>
+          </div>`);
+      }
+      // 본체를 준비 화면(출발선)으로 — 트랙 · 레이서가 바뀔 때마다
+      let shownSetup = "";
+      function frameWait() {
+        if (S.phase !== "wait") return; // 경주 중 · 끝난 뒤에는 출발선으로 되돌리지 않는다
+        const sig = `${S.track}.${S.rids}`;
+        if (sig === shownSetup) return;
+        shownSetup = sig;
+        toFrame({ type: "vs:setup", role: S.role, track: S.track, rids: S.rids.slice(), names: names(), e: 0, mute: HKSound.isMuted() });
+      }
+      // host — 준비 상태 알리기
+      const lbMsg = () => ({ t: "lb", ph: S.phase, track: S.track, max: S.max, rids: S.rids.slice(), rd: S.rd.slice() });
+      function hostChanged() {
+        if (S.role !== "host") return;
+        if (S.phase === "wait") { S.max = Math.min(unlocked(), S.guestUn); if (S.track >= S.max) S.track = 0; } // 경주 중에는 트랙을 바꾸지 않는다
+        send(lbMsg()); frameWait(); paintLobby(); maybeGo();
+      }
+      function maybeGo() {
+        if (S.role !== "host" || S.phase !== "wait" || !S.rd[0] || !S.rd[1] || !S.peerHere) return;
+        S.phase = "race"; S.e = 1 + Math.floor(Math.random() * 1e9); S.result = null;
+        const go = { t: "go", e: S.e, track: S.track, rids: S.rids.slice() };
+        toFrame({ type: "vs:setup", role: "host", track: S.track, rids: S.rids.slice(), names: names(), e: S.e, auto: AUTO, mute: HKSound.isMuted() });
+        toFrame({ type: "vs:go" });
+        shownSetup = "";
+        send(go);
+        startRace();
+      }
+      function startRace() {
+        hideOver(); closeLayer();
+        screen = "play"; setPlaying(true);
+        playing.track = S.track;
+        focusFrame();
+      }
+      // guest — 경주 시작(처음이든, 다시 들어와 중간에 붙든)
+      function guestGo(m) {
+        if (!Number.isInteger(m.e) || m.e === S.e) return;
+        S.e = m.e; S.phase = "race"; S.result = null;
+        S.track = clamp(m.track | 0, 0, 4);
+        if (Array.isArray(m.rids)) S.rids = m.rids.map((r, i) => (okRid(r) ? r : i ? "fox" : "bunny"));
+        toFrame({ type: "vs:setup", role: "guest", track: S.track, rids: S.rids.slice(), names: names(), e: S.e, auto: AUTO, mute: HKSound.isMuted() });
+        toFrame({ type: "vs:go" });
+        shownSetup = "";
+        startRace();
+      }
+      // 경주 중 멈춤(host 본체) — 상대 연결이 끊기거나 다른 탭에 갔을 때 · 내가 다른 탭에 갔을 때
+      const freeze = (on, why) => toFrame({ type: "vs:freeze", on, why, hold: 3 });
+      const note = (text) => toFrame({ type: "vs:note", text: text || null });
+      function peerAway() {
+        clearTimeout(S.graceT);
+        if (S.phase === "race") { if (S.role === "host") { freeze(true, "link"); toFrame({ type: "vs:in", a: 0, s: 0 }); } note("상대 연결이 끊겨 기다리는 중이에요"); }
+        S.graceT = setTimeout(() => { if (!S.closed && !S.peerHere && S.phase === "race") lost("상대가 나갔어요"); }, PEER_GRACE);
+        if (check) check().then((d) => { if (d && d.status === "DONE" && !S.closed && !S.peerHere) lost("상대가 나갔어요"); }).catch(() => null);
+        if (S.phase === "wait") { if (S.role === "host") S.rd[1] = 0; paintLobby(); }
+      }
+      function peerBack() {
+        clearTimeout(S.graceT);
+        if (S.phase === "race") { if (S.role === "host") freeze(false, "link"); note(null); }
+        if (S.role === "host") send(lbMsg());
+        paintLobby();
+      }
+      // 본체가 보낸 것 — host: 스냅숏을 guest 로 · guest: 입력을 host 로
+      const onFrame = (m) => {
+        if (S.closed) return;
+        if (m.type === "vs:snap" && S.role === "host" && S.phase !== "wait" && m.d) send({ t: "s", d: m.d });
+        else if (m.type === "vs:in" && S.role === "guest" && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0 });
+      };
+      frameHandlers.add(onFrame);
+      S.offFrame = () => frameHandlers.delete(onFrame);
+      S.onVis = (hidden) => {
+        if (S.role === "host") { if (S.phase === "race") freeze(hidden, "self"); send({ t: "vis", h: hidden ? 1 : 0 }); }
+        else send({ t: "vis", h: hidden ? 1 : 0 });
+      };
+      function onMsg(m) {
+        if (!m || typeof m.t !== "string") return;
+        if (m.t === "again" && Number.isInteger(m.id) && m.id > 0) { playing.againId = m.id; showAgain(m.id); return; }
+        if (m.t === "ping") { send({ t: "pong", c: m.c }); return; }
+        if (m.t === "pong") { const ms = performance.now() - Number(m.c); if (ms >= 0 && ms < 5000) toFrame({ type: "vs:rtt", ms }); return; }
+        if (S.role === "host") {
+          if (m.t === "hi") {
+            S.gotHi = true;
+            if (okRid(m.rid) && S.phase === "wait") S.rids[1] = m.rid;
+            S.guestUn = Number.isInteger(m.un) && m.un >= 1 && m.un <= 5 ? m.un : 1;
+            if (S.phase === "wait") S.rd[1] = m.rd ? 1 : 0;
+            if (S.phase === "race") send({ t: "go", e: S.e, track: S.track, rids: S.rids.slice() }); // 손님이 새로 들어와 중간에 붙는다
+            else if (S.phase === "end" && S.result) send({ t: "end", e: S.e, r: S.result });
+            hostChanged();
+          } else if (m.t === "rd" && S.phase === "wait") {
+            if (okRid(m.rid) && m.rid !== S.rids[1]) { S.rids[1] = m.rid; S.rd = [0, 0]; }
+            else S.rd[1] = m.on ? 1 : 0;
+            hostChanged();
+          } else if (m.t === "in" && S.phase === "race") toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0 });
+          else if (m.t === "vis" && S.phase === "race") {
+            clearTimeout(S.awayT);
+            if (m.h) toFrame({ type: "vs:in", a: 0, s: 0 }); // 손님 조작은 놓은 것으로 — 돌아오면 새 입력이 온다
+            freeze(!!m.h, "away");
+            note(m.h ? "상대가 다른 화면으로 가서 기다리는 중이에요" : null);
+            if (m.h) S.awayT = setTimeout(() => { if (!S.closed && S.phase === "race") { freeze(false, "away"); note(null); } }, AWAY_MAX);
+          }
+        } else {
+          if (m.t === "lb") {
+            S.gotLb = true;
+            if (m.ph === "wait" && S.phase !== "wait") {
+              // 주인이 다시 들어왔다 — 처음부터 다시
+              S.phase = "wait"; S.e = 0; S.result = null; S.rd = [0, 0];
+              if (screen === "play" || screen === "result") HKUI.toast("상대가 다시 들어와 처음부터 다시 달려요");
+              screen = "ready"; setPlaying(false);
+            }
+            if (S.phase !== "wait") return;
+            S.track = clamp(m.track | 0, 0, 4); S.max = clamp(m.max | 0, 1, 5);
+            if (Array.isArray(m.rids)) { S.rids = [okRid(m.rids[0]) ? m.rids[0] : "bunny", S.rids[1]]; if (okRid(m.rids[1])) S.rids[1] = m.rids[1]; }
+            if (Array.isArray(m.rd)) { S.rd = [m.rd[0] ? 1 : 0, m.rd[1] ? 1 : 0]; }
+            frameWait(); paintLobby();
+          } else if (m.t === "go") guestGo(m);
+          else if (m.t === "s" && m.d && S.phase === "race" && m.d.e === S.e) toFrame({ type: "vs:snap", d: m.d });
+          else if (m.t === "end" && m.r && (m.e === S.e || S.phase !== "end")) { if (m.e !== S.e && S.e) return; finish(m.r); }
+          else if (m.t === "vis") note(m.h && S.phase === "race" ? "상대 화면이 잠깐 멈췄어요 · 돌아오면 3초 뒤 이어 가요" : null);
+        }
+      }
+      function begin(role) {
+        S.role = role;
+        playing.role = role;
+        S.rids = role === "host" ? [myRid(), "fox"] : ["bunny", myRid()];
+        S.max = role === "host" ? 1 : 1;
+        frameWait();
+        // 1초마다 — host: 준비 상태 · 끝 소식 다시 보내기 · guest: 들어왔다고 알리기 · 둘 다: 지연 재기
+        S.tick = setInterval(() => {
+          if (S.closed) return;
+          const now = performance.now();
+          if (S.role === "host") {
+            if (S.phase === "wait" && S.peerHere) send(lbMsg());
+            if (S.phase === "end" && S.result && Date.now() - S.endSent < 6000) send({ t: "end", e: S.e, r: S.result });
+          } else if (!S.gotLb || S.phase === "wait") {
+            if (!S.gotLb || now - S.lastHi > 3000) { S.lastHi = now; send({ t: "hi", rid: S.rids[1], un: unlocked(), rd: S.rd[1] }); }
+          }
+          if (now - S.lastPing > 2000) { S.lastPing = now; send({ t: "ping", c: now }); }
+        }, 500);
+        paintLobby();
+      }
+      S.setReady = (on) => {
+        if (S.phase !== "wait") return;
+        const i = mi();
+        S.rd[i] = on ? 1 : 0;
+        if (S.role === "host") hostChanged();
+        else { send({ t: "rd", on: on ? 1 : 0, rid: S.rids[1] }); paintLobby(); }
+      };
+      S.setTrack = (t) => {
+        if (S.role !== "host" || S.phase !== "wait" || !(t >= 0 && t < S.max) || t === S.track) return;
+        S.track = t; S.rd = [0, 0]; hostChanged();
+      };
+      S.setRid = (r) => {
+        if (S.phase !== "wait" || !okRid(r)) return;
+        const i = mi();
+        if (S.rids[i] === r) return;
+        S.rids[i] = r; S.rd = [0, 0];
+        pref.rid = r; savePref();
+        if (S.role === "host") hostChanged();
+        else { send({ t: "rd", on: 0, rid: r }); frameWait(); paintLobby(); }
+      };
+      conn = connect(matchId, {
+        onHello: (h) => {
+          if (S.closed) return;
+          if (!S.role) {
+            const role = h && (h.role === "host" || h.role === "guest") ? h.role : fallbackRole;
+            if (!role) { lost("연결하지 못했어요", "잠시 뒤 다시 들어와 주세요"); return; }
+            begin(role);
+          }
+          S.peerHere = !!(h && h.peerHere);
+          if (S.peerHere) peerBack(); else peerAway();
+        },
+        onPeer: (here) => {
+          if (S.closed) return;
+          S.peerHere = here === true || !!(here && here.here);
+          if (!S.role) return;
+          if (S.peerHere) { if (S.role === "guest") { S.gotLb = false; } peerBack(); } else peerAway();
+        },
+        onMessage: (m) => { if (!S.closed) onMsg(m); },
+        onClose: (c) => {
+          if (S.closed) return;
+          if (c && c.final) lost(c.text || "연결이 끊겼어요");
+          else if (S.phase === "race") note("다시 연결하는 중이에요");
+        },
+      });
+    }
+    function onVis(hidden) {
+      if (sess && sess.onVis && playing && playing.online) sess.onVis(hidden);
+      else if (hidden && screen === "play" && playing && !playing.online) pausePractice("다른 화면으로 가서 멈췄어요");
+    }
+    // 화면 숨김은 본체 창이 vs:vis 로 알려 준다(같은 탭이라 한 번만 받는다)
+    async function giveUp() {
+      if (!playing || !playing.online) return;
+      const P = playing;
+      const ok = await HKUI.confirmDialog("기권할까요?", "상대의 승리로 경주를 마쳐요.", { confirmLabel: "기권하기", cancelLabel: "계속하기" });
+      if (!ok || playing !== P) return;
+      if (P.resign) await P.resign();
+      closeConn();
+      if (P.matchId) openMatch(P.matchId); else showMenu();
+    }
+    function onEsc() {
+      if (setOpen()) return closeLayer();
+      if (screen === "play" && playing && !playing.online) return pausePractice();
+      if (screen === "pause") return;
+      if (screen === "play" && playing && playing.online) giveUp();
+    }
+    // 시험용 연결 — 같은 브라우저의 두 탭이 BroadcastChannel 로 주고받는다. HKRt.connect 와 같은 순서 · 모양으로 알린다
+    function devConnect(matchId, h) {
+      const role = /^#rt-host/.test(location.hash) ? "host" : "guest";
+      const ch = new BroadcastChannel(`hk-bumpervs-dev-${matchId}`);
+      const id = Math.random().toString(36).slice(2);
+      let closed = false;
+      const post = (o) => { if (closed) return false; try { ch.postMessage({ from: id, ...o }); return true; } catch (_) { return false; } };
+      ch.onmessage = (e) => {
+        const d = e.data;
+        if (closed || !d || d.from === id) return;
+        if (d.hello) { if (h.onPeer) h.onPeer(true); if (d.hello === 1) post({ hello: 2 }); return; }
+        if (d.bye) { if (h.onPeer) h.onPeer(false); return; }
+        if (h.onMessage) h.onMessage(d.m);
+      };
+      setTimeout(() => { if (closed) return; if (h.onHello) h.onHello({ role, peerHere: false }); post({ hello: 1 }); }, 0);
+      const bye = () => post({ bye: 1 });
+      addEventListener("pagehide", bye);
+      return {
+        send: (m) => post({ m }),
+        close: () => { if (closed) return; bye(); closed = true; ch.close(); removeEventListener("pagehide", bye); if (h.onClose) h.onClose({ final: true }); },
+      };
+    }
+    function loadScript(src) {
+      return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+    }
+    const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    // 경주 결과 알리기 — 두 사람 모두 보낸다. 서버 엔진(versus_bumpervs.act)이 두 사람 것이 같으면 승패를 적는다
+    const toData = (r) => ({ winner: r.winner === 0 ? "host" : r.winner === 1 ? "guest" : null, order: r.order.slice(), track: r.track, sec: r.sec, dist: r.dist ? r.dist.slice() : null });
+    async function reportResult(id, r) {
+      const data = toData(r);
+      if (!data.dist) delete data.dist;
+      // 서버는 수락 뒤 30초가 지나야 결과를 받는다(BUMPERVS_TOO_EARLY) — 빨리 끝난 경주는 받아 줄 때까지 기다렸다 다시 보낸다
+      const earlyUntil = Date.now() + 60000;
+      let fails = 0;
+      while (fails < 3) {
+        try {
+          const d = await HKApi.matchDetail(id);
+          if (d.status !== "ACTIVE") return d.status === "DONE";
+          if (d.reported && d.reported.me) return true;
+          await HKApi.matchMove(id, { data }, d.seq);
+          return true;
+        } catch (e) {
+          if (e && e.code === "BUMPERVS_TOO_EARLY" && Date.now() < earlyUntil) { await sleep(3000); continue; }
+          if (++fails < 3) await sleep(800 * fails);
+        }
+      }
+      return false;
+    }
+    // 보낼 결과를 이 기기에 적어 둔다 — 보내다 실패하거나 창을 닫아도, 다시 들어오면 새 경주 대신 이것을 다시 보낸다
+    let saving = 0, leaving = false;
+    const repKey = (id) => `hk-bumpervs-rep-${id}`;
+    const loadRep = (id) => { try { const v = JSON.parse(localStorage.getItem(repKey(id)) || "null"); return v && v.r && Array.isArray(v.r.order) && Date.now() - v.at < 3 * 3600e3 ? v : null; } catch (_) { return null; } };
+    const putRep = (id, r, role) => { try { localStorage.setItem(repKey(id), JSON.stringify({ r, role, at: Date.now() })); } catch (_) { /* 저장 못 해도 보내기는 그대로 */ } };
+    const dropRep = (id) => { try { localStorage.removeItem(repKey(id)); } catch (_) { /* 없음 */ } };
+    async function sendResult(id, r, role) {
+      putRep(id, r, role);
+      saving++;
+      try { const ok = await reportResult(id, r); if (ok) dropRep(id); return ok; } finally { saving--; }
+    }
+    // 대전 목록 — 도전 · 수락은 공용 HKMatch. 수락하면 #m{id} 로 들어온다
+    let lobbyPoll = 0;
+    async function showOnlineLobby() {
+      closeConn(); clearInterval(lobbyPoll); closeLayer();
+      screen = "lobby"; playing = null; setPlaying(false); pauseBtn.hidden = true;
+      showOver(`<div class="bv-card is-wide"><div id="bv-lobby"></div></div>`);
+      const box = $("#bv-lobby");
+      const raceNote = (m) => { const r = m.race; if (!r) return ""; return [r.me != null ? `내 기록 ${fmtSec(r.me)}` : "", `트랙 ${m.track}`].filter(Boolean).join(" · "); };
+      await HKMatch.lobby(box, KEY, {
+        title: "선다운 범퍼스 대전 — 동료와", lead: "동료에게 도전장을 보내요. 상대가 수락하면 둘 다 들어와 실시간으로 경주해요.",
+        bot: false, rankNote: "같은 상대에게 하루에 거둔 승은 1승으로 쳐요", rankEmpty: "아직 끝난 경주가 없어요",
+        labels: { myTurn: "들어갈 경주", waiting: "들어갈 경주", turnTag: "들어가기", waitTag: "들어가기", recent: "최근 경주" },
+        rowNote: (m) => ["실시간 경주", HKMatch.due(m.deadlineAt)].filter(Boolean).join(" · "),
+        resultNote: (m) => [raceNote(m), HKMatch.reason(m)].filter(Boolean).join(" · ") || "경주 끝",
+      });
+      if (screen !== "lobby" || !box.isConnected) return;
+      const back = box.querySelector(".gk__back");
+      if (back) { back.textContent = "‹ 처음으로"; back.setAttribute("href", "#"); }
+      box.onclick = async (e) => {
+        const t = e.target.closest("button, a");
+        if (!t) return;
+        if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; showMenu(); return; }
+        await HKMatch.act(t, KEY, showOnlineLobby);
+      };
+      // 내가 보낸 도전을 상대가 받으면 바로 들어간다 (실시간이라 둘 다 들어와야 시작)
+      const sent = new Set([...box.querySelectorAll("[data-decline]")].filter((b) => !b.closest(".gk__row").querySelector("[data-accept]")).map((b) => Number(b.dataset.decline)));
+      if (!sent.size) return;
+      lobbyPoll = setInterval(async () => {
+        if (screen !== "lobby") { clearInterval(lobbyPoll); return; }
+        const d = await HKApi.matchOverview(KEY).catch(() => null);
+        if (!d || screen !== "lobby") return;
+        const m = [...(d.myTurn || []), ...(d.waiting || [])].find((x) => sent.has(x.id) && x.status === "ACTIVE");
+        if (!m) return;
+        clearInterval(lobbyPoll);
+        HKUI.toast(`${m.opponent ? m.opponent.name : "상대"}님이 도전을 받았어요`);
+        location.hash = `m${m.id}`;
+      }, 4000);
+    }
+    const endBtns = `<button type="button" class="hk-btn hk-btn--secondary" data-act="menu">처음으로</button><button type="button" class="hk-btn hk-btn--primary" data-act="lobby">대전 목록</button>`;
+    function showServerResult(m) {
+      screen = "lost"; setPlaying(false); pauseBtn.hidden = true;
+      const t = m.result === "win" ? "이긴 경주예요" : m.result === "lose" ? "진 경주예요" : "비긴 경주예요";
+      const r = m.race;
+      const sc = r ? [r.me != null ? `내 기록 ${fmtSec(r.me)}` : "", r.rival != null ? `상대 ${fmtSec(r.rival)}` : ""].filter(Boolean).join(" · ") : "";
+      showOver(cardHtml(m.result === "win" ? "trophy" : "flag", t, [`${m.opponent ? m.opponent.name : "상대"}님과의 경주`, sc, m.reasonLabel].filter(Boolean).join(" · "), endBtns));
+    }
+    let sentPoll = 0;
+    function showSent(id) {
+      clearInterval(sentPoll);
+      screen = "sent"; playing = null; setPlaying(false);
+      showOver(cardHtml("send", "결과를 보냈어요", "상대 결과가 오면 대전 기록에 남아요", endBtns));
+      const still = () => screen === "sent" && location.hash === `#m${id}`;
+      sentPoll = setInterval(async () => {
+        if (!still()) { clearInterval(sentPoll); return; }
+        const d = await HKApi.matchDetail(id).catch(() => null);
+        if (!d || !still() || d.status === "ACTIVE") return;
+        clearInterval(sentPoll);
+        if (d.status === "DONE") showServerResult(d);
+      }, 5000);
+    }
+    async function resendResult(id, saved, m) {
+      screen = "result"; playing = null; setPlaying(false);
+      showOver(cardHtml("send", "결과를 다시 보내는 중…", `${(m.opponent && m.opponent.name) || "상대"}님과의 경주`));
+      const ok = await sendResult(id, saved.r, saved.role);
+      if (screen !== "result" || location.hash !== `#m${id}`) return;
+      const d = ok ? await HKApi.matchDetail(id).catch(() => null) : null;
+      if (screen !== "result" || location.hash !== `#m${id}`) return;
+      if (d && d.status === "DONE") return showServerResult(d);
+      if (ok) return showSent(id);
+      screen = "lost";
+      showOver(cardHtml("wifi-off", "결과를 아직 보내지 못했어요", "대전 목록에서 이 경주에 다시 들어오면 다시 보내요", endBtns));
+    }
+    async function openMatch(id) {
+      closeConn(); clearInterval(lobbyPoll); clearInterval(sentPoll); closeLayer();
+      screen = "connect"; setPlaying(false); pauseBtn.hidden = true;
+      showOver(cardHtml("wifi", "경주를 불러오는 중…", ""));
+      let m;
+      try { m = await HKApi.matchDetail(id); } catch (e) { HKMatch.fail(e); history.replaceState(null, "", location.pathname); return showMenu(); }
+      if (m.game !== KEY) { location.href = `/games/${m.game}#m${id}`; return; }
+      if (m.status === "DONE") { dropRep(id); return showServerResult(m); }
+      if (m.status !== "ACTIVE") {
+        dropRep(id);
+        HKUI.toast(m.status === "PENDING" ? "상대가 아직 도전을 받지 않았어요" : "이미 끝난 도전이에요");
+        history.replaceState(null, "", location.pathname);
+        return showOnlineLobby();
+      }
+      if (m.reported && m.reported.me) { dropRep(id); return showSent(id); }
+      const saved = loadRep(id);
+      if (saved) return resendResult(id, saved, m);
+      if (!window.HKRt) { try { await loadScript("/_shared/rt.js"); } catch (_) { HKUI.toast("실시간 연결을 열지 못했어요", "error"); return showMenu(); } }
+      const rival = { id: (m.opponent && m.opponent.id) || null, name: (m.opponent && m.opponent.name) || "상대", avatarUrl: (m.opponent && m.opponent.avatarUrl) || "" };
+      const role0 = m.role === "host" || m.role === "guest" ? m.role : null;
+      playOnline({
+        matchId: id, rival, track: Number.isInteger(m.track) ? clamp(m.track - 1, 0, 4) : 0, fallbackRole: role0,
+        connect: (mid, h) => window.HKRt.connect(mid, h),
+        report: (r) => sendResult(id, r, playing && playing.role),
+        resign: () => HKApi.matchResign(id).catch(() => null),
+        check: () => HKApi.matchDetail(id),
+      });
+    }
+
+    // ───── 업무 시간이면 게임 대신 안내
+    const status = await HKApi.playStatus().catch(() => ({ open: true }));
+    function route() {
+      const dev = /^#rt-(host|guest)/.exec(location.hash);
+      const mm = /^#m(\d+)$/.exec(location.hash);
+      if (dev && DEV) {
+        const role = dev[1];
+        return playOnline({ matchId: "dev", fallbackRole: role, track: 0, rival: { name: role === "host" ? "손님(시험)" : "주인(시험)" }, connect: devConnect });
+      }
+      if (mm) return openMatch(Number(mm[1]));
+      showMenu();
+    }
+    if (!status.open) {
+      showOver(`<div class="bv-card is-small">${HKPlay.closedHtml(status.opensAt)}</div>`);
+      const cl = over.querySelector(".hk-play-closed");
+      if (cl) cl.style.cssText = "border:0;padding:8px 4px";
+      setInterval(async () => { const st = await HKApi.playStatus().catch(() => null); if (st && st.open) location.reload(); }, 60000);
+      return;
+    }
+    route();
+    addEventListener("hashchange", () => { closeConn(); route(); });
+    addEventListener("pagehide", closeConn);
+    addEventListener("beforeunload", (e) => { if (saving > 0 && !leaving) { e.preventDefault(); e.returnValue = ""; } });
+
+    // ───── 버튼
+    const overClick = (e) => {
+      const b = e.target.closest("button");
+      if (!b || b.disabled) return;
+      if (b.dataset.mode) { pref.mode = b.dataset.mode; savePref(); HKSound.play("select"); paintMenu(); b.blur(); return; }
+      if (b.dataset.level) { pref.level = b.dataset.level; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.dataset.track) { pref.track = Number(b.dataset.track); savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"] }); b.blur(); return; }
+      if (b.dataset.rid) { pref.rid = b.dataset.rid; savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"] }); b.blur(); return; }
+      if (b.dataset.otrack) { if (sess && sess.setTrack) sess.setTrack(Number(b.dataset.otrack)); HKSound.play("tap"); return; }
+      if (b.dataset.orid) { if (sess && sess.setRid) sess.setRid(b.dataset.orid); HKSound.play("tap"); return; }
+      if (b.id === "bv-go") { if (pref.mode === "online") showOnlineLobby(); else startPractice(); return; }
+      const act = b.dataset.act;
+      if (act === "setclose") { closeLayer(); return; }
+      if (act === "resume") return resumePractice();
+      if (act === "ready") { if (sess && sess.setReady) sess.setReady(b.dataset.on === "1"); HKSound.play("select"); return; }
+      if (act === "again" && playing && !playing.online) return startPractice();
+      if (act === "accept") {
+        const id = Number(b.dataset.id);
+        if (!(id > 0)) return;
+        b.disabled = true;
+        HKApi.matchAccept(id).then(() => { closeConn(); location.hash = `m${id}`; }).catch((err) => { b.disabled = false; HKMatch.fail(err); });
+        return;
+      }
+      if (act === "rematch" && playing && playing.rival && playing.rival.id) {
+        b.disabled = true;
+        HKApi.matchCreate(Number(playing.rival.id), KEY).then((m) => {
+          const id = m && Number(m.id);
+          if (id > 0 && conn) { try { conn.send({ t: "again", id }); } catch (_) { /* 목록으로만 */ } }
+          HKUI.toast("다시 도전장을 보냈어요 · 상대가 받으면 바로 들어가요");
+          setTimeout(() => { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); showOnlineLobby(); }, 300);
+        }).catch((err) => { b.disabled = false; HKMatch.fail(err); });
+        return;
+      }
+      if (act === "menu") { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); return showMenu(); }
+      if (act === "lobby") { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); return showOnlineLobby(); }
+    };
+    over.addEventListener("click", overClick);
+    setOver.addEventListener("click", overClick);
+    pauseBtn.onclick = (e) => { e.currentTarget.blur(); pausePractice(); };
+    $("#bv-rules").onclick = (e) => { e.currentTarget.blur(); if (setOpen()) closeLayer(); else openRules(); };
+    // 「‹ 아케이드」 · 「대전 보기」 — 경주 중 · 결과 저장 중이면 확인 창을 거친 뒤 간다
+    const guardLeave = async (e, go) => {
+      if (saving > 0 && screen !== "play") {
+        e.preventDefault();
+        const ok = await HKUI.confirmDialog("결과를 남기는 중이에요", "지금 나가면 무승부가 될 수 있어요.", { confirmLabel: "나가기", cancelLabel: "기다리기" });
+        if (ok) { leaving = true; closeConn(); go(); }
+        return;
+      }
+      if (!["play", "pause", "ready"].includes(screen)) return;
+      e.preventDefault();
+      if (playing && playing.online) {
+        const before = screen === "ready";
+        const ok = await HKUI.confirmDialog("경주를 그만할까요?", before ? "아직 출발 전이에요. 나중에 대전 목록에서 다시 들어올 수 있어요." : "그만하면 이 경주는 기권으로 져요.", { confirmLabel: "그만하기", cancelLabel: "계속하기" });
+        if (!ok) return;
+        if (!before && playing.resign) await playing.resign();
+        closeConn(); go();
+        return;
+      }
+      const was = screen === "play";
+      if (was) pausePractice();
+      if (await HKUI.confirmDialog("경주를 그만할까요?", "연습 경주는 저장되지 않아요.", { confirmLabel: "그만하기", cancelLabel: "계속하기" })) { closeConn(); go(); }
+      else if (was) resumePractice();
+    };
+    $("#bv-back").addEventListener("click", (e) => guardLeave(e, HKGoArcade));
+    $("#bv-vs").addEventListener("click", (e) => guardLeave(e, () => { location.href = "/together#tg-versus"; }));
+    addEventListener("keydown", (e) => {
+      if (document.querySelector(".hk-dialog__overlay")) return;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (e.code === "Escape" || e.code === "KeyP") {
+        if (e.code === "KeyP" && !(screen === "play" && playing && !playing.online)) return;
+        e.preventDefault();
+        if (!e.repeat) onEsc();
+        return;
+      }
+      if (keyFwd(e, true)) return;
+      if (e.repeat) return;
+      const onBtn = t && t.closest && t.closest("button, a");
+      if ((e.code === "Enter" || e.code === "Space") && !onBtn && !setOpen()) {
+        if (screen === "menu") { e.preventDefault(); $("#bv-go")?.click(); }
+        else if (screen === "ready") { e.preventDefault(); over.querySelector('[data-act="ready"]')?.click(); }
+      }
+    });
+    // 연습 — 다른 창으로 가면 멈춘다(돌아와도 저절로 이어 가지 않는다)
+    addEventListener("blur", () => { setTimeout(() => { if (document.activeElement === frame) return; if (screen === "play" && playing && !playing.online) pausePractice("다른 창으로 가서 멈췄어요"); }, 0); });
+  })();
+  </script>
+</body>
+</html>

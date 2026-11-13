@@ -75,6 +75,10 @@ class Settings(BaseSettings):
 
     public_data_portal_service_key: str = ""
 
+    # 그룹웨어 휴가 받는 입구(/api/internal/leave-sync) 비밀값 — 비어 있으면 입구가 꺼져 있다(503).
+    # 사내망 맥의 scripts/gw-leave-sync.py 가 X-Leave-Sync-Token 헤더로 같은 값을 보낸다
+    leave_sync_token: str = ""
+
     def allowed_email_domains(self) -> list[str]:
         """SSO_ALLOWED_DOMAIN — 쉼표 구분 (예: ibank.co.kr,digitalworks.co.kr)."""
         return [d.strip().lower() for d in self.sso_allowed_domain.split(",") if d.strip()]

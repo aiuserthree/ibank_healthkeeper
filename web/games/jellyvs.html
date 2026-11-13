@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>꿀꺽 젤리 숲 대전 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <style>@font-face{font-family:'Pretendard';src:url('/assets/fonts/PretendardVariable.woff2') format('woff2');font-weight:100 900;font-display:swap}</style>
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <script src="/_shared/jellyvs-three.js"></script>
+  <script src="/_shared/jellyvs-vs.js"></script>
+  <style>
+    /* 꿀꺽 젤리 숲 대전 — 숲 화면을 꽉 채우고, 위에 카드(모드 고르기 · 준비 · 멈춤 · 결과)를 덮는다 */
+    .jv-main { align-items: stretch !important; }
+    .hk-pf.is-playing .hk-pf__pause:not([hidden]) { display: inline-flex; }
+    .jvp { position: relative; flex: 1; min-width: 0; min-height: 320px; border-radius: 16px; overflow: hidden; background: #120d2b; box-shadow: 0 10px 30px rgba(15, 23, 42, .14); }
+    .jvp-game { position: absolute; inset: 0; border-radius: inherit; }
+    .jvp-over { position: absolute; inset: 0; z-index: 5; display: flex; padding: 14px; overflow-y: auto; background: rgba(13, 9, 36, .5); box-sizing: border-box; }
+    .jvp-over[hidden] { display: none; }
+    .jvp-over--set { z-index: 6; }
+    .jvp-card { margin: auto; width: 100%; max-width: 520px; box-sizing: border-box; padding: 20px; border-radius: 18px; background: #fff; box-shadow: 0 18px 44px rgba(8, 4, 26, .4); color: var(--color-midnight-navy, #0b3558); }
+    .jvp-card.is-small { max-width: 400px; text-align: center; }
+    .jvp-card.is-wide { max-width: 760px; padding: 0; overflow: hidden; }
+    .jvp-card.is-wide .gk { padding: 18px 18px 24px; }
+    .jvp-card h2 { margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; word-break: keep-all; }
+    .jvp-card p { margin: 4px 0 0; font-size: 14px; line-height: 1.5; color: var(--text-secondary); word-break: keep-all; }
+    .jvp-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; text-align: left; }
+    .jvp-logo { flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff7ac8, #5fd4ff); }
+    .jvp-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .jvp-mode { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px; border-radius: 14px; border: 2px solid #e2e8f0; background: #fff; text-align: left; font: inherit; color: #0f172a; cursor: pointer; }
+    .jvp-mode:hover { border-color: #f9a8d4; }
+    .jvp-mode.is-on { border-color: #ec4899; background: #fdf2f8; box-shadow: 0 0 0 3px rgba(236, 72, 153, .14); }
+    .jvp-mode__ic { display: inline-flex; width: 30px; height: 30px; border-radius: 9px; align-items: center; justify-content: center; margin-bottom: 4px; background: #fce7f3; color: #db2777; }
+    .jvp-mode[data-mode="online"] .jvp-mode__ic { background: #e0f2fe; color: #0284c7; }
+    .jvp-mode b { font-size: 15px; font-weight: 800; }
+    .jvp-mode small { font-size: 12px; line-height: 1.35; color: var(--text-muted); word-break: keep-all; }
+    .jvp-row { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+    .jvp-row[hidden] { display: none; }
+    .jvp-row__k { flex-shrink: 0; width: 46px; font-size: 13px; font-weight: 800; color: #475569; text-align: left; }
+    .jvp-seg { flex: 1; display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #f1f5f9; }
+    .jvp-seg button { flex: 1; height: 36px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 14px; font-weight: 700; color: #475569; cursor: pointer; }
+    .jvp-seg button.is-on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
+    .jvp-go { width: 100%; height: 50px; margin-top: 14px; font-size: 16px !important; }
+    .jvp-help { margin: 12px 0 0; padding: 10px 12px 10px 28px; border-radius: 12px; background: #f8fafc; font-size: 12.5px; line-height: 1.65; color: #475569; word-break: keep-all; text-align: left; }
+    .jvp-help b { color: #0f172a; }
+    .jvp-badge { display: inline-flex; width: 56px; height: 56px; border-radius: 16px; align-items: center; justify-content: center; margin-bottom: 8px; background: #e2e8f0; color: #475569; }
+    .jvp-badge.is-win { background: linear-gradient(135deg, #ffd23f, #ff9f1c); color: #fff; }
+    .jvp-badge.is-lose { background: #fce7f3; color: #db2777; }
+    .jvp-who { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+    .jvp-who div { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 10px 6px; border-radius: 12px; background: #f1f5f9; font-size: 13px; font-weight: 700; color: #475569; min-width: 0; }
+    .jvp-who div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .jvp-who div.is-on { background: #dcfce7; color: #15803d; }
+    .jvp-dot { flex-shrink: 0; width: 12px; height: 12px; border-radius: 50%; }
+    .jvp-btnrow { display: flex; gap: 8px; margin-top: 16px; }
+    .jvp-btnrow .hk-btn { flex: 1; height: 46px; }
+    .jvp-mini { margin-top: 10px; font-size: 12px; color: var(--text-muted); word-break: keep-all; }
+    .jvp-mini.is-ok { color: #15803d; font-weight: 700; }
+    .jvp-mini.is-bad { color: #b45309; font-weight: 700; }
+    .jvp-score { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 0 4px; }
+    .jvp-side { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; max-width: 40%; }
+    .jvp-side small { font-size: 12.5px; font-weight: 700; color: #475569; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .jvp-num { font-size: 32px; font-weight: 900; font-variant-numeric: tabular-nums; color: #0f172a; }
+    .jvp-vs { font-size: 15px; font-weight: 800; color: #94a3b8; }
+    .jvp-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 12px; }
+    .jvp-stats div { padding: 10px 4px; border-radius: 12px; background: #f8fafc; }
+    .jvp-stats b { display: block; font-size: 16px; font-weight: 800; color: #0f172a; }
+    .jvp-stats small { font-size: 11.5px; color: var(--text-muted); }
+    .jvp-again { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #eff5ff; font-size: 13px; font-weight: 700; color: #1d4ed8; word-break: keep-all; }
+    .jvp-again[hidden] { display: none; }
+    .jvp-resback { position: absolute; left: 50%; bottom: 14px; z-index: 4; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 16px; border: 0; border-radius: 999px; background: rgba(255, 255, 255, .94); box-shadow: 0 6px 18px rgba(8, 4, 26, .3); font: 800 14px/1 inherit; color: #0f172a; cursor: pointer; }
+    .jvp-resback[hidden] { display: none; }
+    .jvp-rules { max-width: 600px; text-align: left; }
+    .jvp-rules h3 { margin: 14px 0 4px; font-size: 15px; font-weight: 800; color: #0f172a; }
+    .jvp-rules ul { margin: 4px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); word-break: keep-all; }
+    .jvp-rules li + li { margin-top: 3px; }
+    .hk-pf__tools > [hidden] { display: none !important; }
+    @media (max-width: 640px) {
+      .hk-pf__bar .hk-pf__icon { display: none; }
+      .hk-pf__tools { gap: 5px; }
+      .hk-pf__tools .hk-play-sound { padding: 7px 8px; }
+      .hk-pf .jv-main { padding: 6px !important; }
+      .jvp { border-radius: 12px; }
+      .jvp-over { padding: 8px; }
+      .jvp-card { padding: 16px 14px; border-radius: 16px; }
+      .jvp-card h2 { font-size: 19px; }
+      .jvp-logo { width: 42px; height: 42px; }
+    }
+    @media (max-height: 520px) and (orientation: landscape) {
+      .jvp-head, .jvp-card .jvp-badge, .jvp-help { display: none; }
+      .jvp-card { padding: 12px 16px; }
+      .jvp-btnrow { margin-top: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  (async function () {
+    // 꿀꺽 젤리 숲 대전 — 컴퓨터와(연습 · 기록 안 함) · 동료와(실시간 1:1). 서버 대전 엔진은 app/services/versus_jellyvs.py
+    const esc = HKUI.escapeHtml;
+    const KEY = "jellyvs";
+    const TINT = "linear-gradient(135deg, #ff7ac8, #5fd4ff)";
+    // 시험용 — 한 브라우저 두 탭으로 온라인을 흉내 낸다(#rt-host · #rt-guest, 뒤에 :80 을 붙이면 0.08초 늦게). 사용자에게는 보이지 않는다
+    const DEV = HKLunch.isLocal() || /\.test$/.test(location.hostname) || (() => { try { return localStorage.getItem("hk-dev") === "1"; } catch (_) { return false; } })();
+    const IS_TOUCH = matchMedia("(pointer: coarse)").matches;
+    const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    const LEVEL_NAME = Object.fromEntries(LEVELS);
+    const PREF_KEY = "hk-jellyvs-pref";
+    const pref = { mode: "cpu", level: "normal" };
+    try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY) || "{}")); } catch (_) { /* 처음 */ }
+    if (!["cpu", "online"].includes(pref.mode)) pref.mode = "cpu";
+    if (!LEVEL_NAME[pref.level]) pref.level = "normal";
+    const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (_) { /* 저장 못 해도 이번엔 그대로 */ } };
+    const hex = (n) => `#${n.toString(16).padStart(6, "0")}`;
+
+    await HKUI.loadLucide();
+    const profile = await HKMember.requireAuth(location.pathname + location.hash);
+    if (!profile) return;
+    const icon = (n, s = 18, c = "currentColor") => HKUI.icon(n, s, c);
+    document.body.classList.add("hk-pf-body");
+    const editable = (t) => t && t.closest && t.closest("input, textarea, [contenteditable]");
+    document.addEventListener("selectstart", (e) => { if (!editable(e.target)) e.preventDefault(); });
+    document.addEventListener("contextmenu", (e) => { if (!editable(e.target)) e.preventDefault(); });
+    document.addEventListener("touchstart", (e) => { if (e.target.closest && e.target.closest(".jvp-game") && !e.target.closest(".jvp-over")) e.preventDefault(); }, { passive: false });
+    document.addEventListener("gesturestart", (e) => e.preventDefault());
+
+    document.getElementById("app").innerHTML = `<div class="hk-pf" id="jv-pf">
+        <header class="hk-pf__bar">
+          <a class="hk-pf__back" href="${HKRoutes.lounge}" id="jv-back">${icon("chevron-left", 20)}<span>아케이드</span></a>
+          <a class="hk-pf__back hk-pf__vs" href="/together#tg-versus" id="jv-vs">${icon("swords", 18)}<span>대전 보기</span></a>
+          <span class="hk-pf__icon" style="background:${TINT}">${icon("candy", 18, "#fff")}</span>
+          <div class="hk-pf__title"><b>꿀꺽 젤리 숲 대전</b><small>같은 숲에서 먹고 자라 상대를 꿀꺽</small></div>
+          <div class="hk-pf__tools">
+            <button type="button" class="hk-play-sound hk-pf__pause" id="jv-pause" aria-label="일시정지">${icon("pause")}<span>일시정지</span></button>
+            <button type="button" class="hk-play-sound" id="jv-rules" aria-label="게임 방법">${icon("book-open")}<span>게임 방법</span></button>
+            <button type="button" class="hk-play-sound" id="jv-full" aria-label="전체 화면으로 보기" hidden></button>
+            <button type="button" class="hk-play-sound" id="jv-sound"></button>
+          </div>
+        </header>
+        <div class="hk-pf__body">
+          <main class="hk-pf__main jv-main" id="jv-main">
+            <div class="jvp" id="jvp">
+              <div class="jvp-game" id="jv-game"></div>
+              <button type="button" class="jvp-resback" id="jv-resback" hidden>경기 결과 보기</button>
+              <div class="jvp-over" id="jv-over" hidden></div>
+              <div class="jvp-over jvp-over--set" id="jv-setover" hidden></div>
+            </div>
+          </main>
+        </div>
+      </div>`;
+    HKUI.refreshIcons();
+    const $ = (s) => document.querySelector(s);
+    const over = $("#jv-over"), gameBox = $("#jv-game"), setOver = $("#jv-setover"), resBack = $("#jv-resback");
+
+    // ───── 3D 화면을 열 수 없는 브라우저
+    if (!window.HKJellyVs || !HKJellyVs.available()) {
+      over.hidden = false;
+      over.innerHTML = `<div class="jvp-card is-small"><h2>3D 화면을 열 수 없어요</h2><p>크롬 · 엣지 최신 버전에서 다시 열어 주세요.</p></div>`;
+      return;
+    }
+
+    // ───── 소리 버튼 (모든 게임 공통 설정)
+    const soundBtn = $("#jv-sound");
+    const paintSound = () => {
+      const m = HKSound.isMuted();
+      soundBtn.innerHTML = `${icon(m ? "volume-x" : "volume-2")}<span>${m ? "소리 꺼짐" : "소리 켜짐"}</span>`;
+      soundBtn.setAttribute("aria-pressed", m ? "false" : "true");
+      soundBtn.classList.toggle("is-off", m);
+      HKUI.refreshIcons(soundBtn);
+    };
+    paintSound();
+    HKSound.onChange(paintSound);
+    soundBtn.onclick = () => { HKSound.toggle(); HKSound.play("select"); soundBtn.blur(); };
+
+    // ───── 엔진 · 화면 상태
+    let engine = null, screen = "menu", playing = null; // playing: { mode, level, rival, online, role, report, resign, matchId }
+    const pauseBtn = $("#jv-pause");
+    function stopEngine() { if (engine) { engine.destroy(); engine = null; } }
+    const makeEngine = (o) => {
+      try { return HKJellyVs.create(gameBox, { touch: IS_TOUCH, isMuted: () => HKSound.isMuted(), dev: DEV, ...o }); }
+      catch (_) { over.hidden = false; over.innerHTML = `<div class="jvp-card is-small"><h2>3D 화면을 열 수 없어요</h2><p>크롬 · 엣지 최신 버전에서 다시 열어 주세요.</p></div>`; return null; }
+    };
+    if (DEV) window.__jvEngine = () => engine; // 시험용
+    function setPlaying(on) { $("#jv-pf").classList.toggle("is-playing", on); }
+    function showOver(html) { over.innerHTML = html; over.hidden = false; resBack.hidden = true; HKUI.refreshIcons(over); }
+    function hideOver() { over.hidden = true; over.innerHTML = ""; resBack.hidden = true; }
+    function forestView() { if (screen !== "result") return; screen = "forest"; over.hidden = true; resBack.hidden = false; }
+    function resultBack() { if (screen !== "forest") return; screen = "result"; over.hidden = false; resBack.hidden = true; }
+    resBack.onclick = () => { resBack.blur(); resultBack(); };
+    const me = { name: profile.name || "나", avatarUrl: profile.avatarUrl || "" };
+    const cardHtml = (iconName, title, sub, buttons) => `<div class="jvp-card is-small" role="alert"><span class="jvp-badge">${icon(iconName, 26)}</span><h2>${esc(title)}</h2>${sub ? `<p>${esc(sub)}</p>` : ""}${buttons ? `<div class="jvp-btnrow">${buttons}</div>` : ""}</div>`;
+    const sizeText = (n) => (n / 100).toFixed(2);
+    const helpHtml = () => `<ul class="jvp-help">
+        <li>열매 · 버섯 · <b>초록 고리</b> 친구를 먹으면 자라요. <b>빨간 고리</b>는 나보다 커요 — 물리면 몸이 줄어요.</li>
+        <li>상대보다 <b>1.2배</b> 넘게 크면 부딪혀 꿀꺽 삼켜 바로 이겨요. 처음 15초는 서로 못 삼켜요.</li>
+        <li>2분이 끝나면 더 큰 쪽이 이겨요. 크기가 거의 같으면 비겨요. <b>별빛 구슬</b>은 대시 한 칸 — 대시 중에는 안 삼켜져요.</li>
+        <li>${IS_TOUCH ? "화면을 끌어 움직이고 오른쪽 아래 버튼으로 대시해요." : "WASD · 방향키로 움직이고 Space 로 대시해요. 화면을 끌어도 돼요."}</li>
+      </ul>`;
+
+    // ───── 첫 화면 — 뒤에서는 젤리 둘이 숲을 돌아다닌다
+    function showMenu() {
+      stopEngine(); closeConn();
+      screen = "menu"; playing = null; setPlaying(false);
+      engine = makeEngine({ mode: "demo" });
+      if (!engine) return;
+      engine.start();
+      showOver(`<div class="jvp-card jvp-menu" role="dialog" aria-label="꿀꺽 젤리 숲 대전 시작">
+          <div class="jvp-head"><span class="jvp-logo">${icon("candy", 26, "#fff")}</span><div><h2>꿀꺽 젤리 숲 대전</h2><p>같은 숲에서 2분 동안 먹고 자라 상대를 꿀꺽!</p></div></div>
+          <div class="jvp-modes" role="radiogroup" aria-label="모드">
+            <button type="button" class="jvp-mode" data-mode="cpu" role="radio"><span class="jvp-mode__ic">${icon("bot", 18)}</span><b>컴퓨터와 연습</b><small>컴퓨터 젤리와 겨뤄요 · 기록 안 함</small></button>
+            <button type="button" class="jvp-mode" data-mode="online" role="radio"><span class="jvp-mode__ic">${icon("wifi", 18)}</span><b>동료와</b><small>실시간 1:1 대전</small></button>
+          </div>
+          <div class="jvp-row" data-row="level"><span class="jvp-row__k">난이도</span><div class="jvp-seg">${LEVELS.map(([k, t]) => `<button type="button" data-level="${k}">${t}</button>`).join("")}</div></div>
+          <button type="button" class="hk-btn hk-btn--primary jvp-go" id="jv-go">시작</button>
+          ${helpHtml()}
+        </div>`);
+      paintMenu();
+    }
+    function paintMenu() {
+      over.querySelectorAll("[data-mode]").forEach((b) => { const on = b.dataset.mode === pref.mode; b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
+      over.querySelectorAll("[data-level]").forEach((b) => b.classList.toggle("is-on", b.dataset.level === pref.level));
+      const lv = over.querySelector('[data-row="level"]');
+      if (lv) lv.hidden = pref.mode !== "cpu";
+      const go = $("#jv-go");
+      if (go) go.textContent = pref.mode === "online" ? "대전 목록 열기" : "연습 시작";
+    }
+
+    // ───── 컴퓨터와 연습 (기록하지 않는다)
+    function startCpu() {
+      stopEngine(); closeConn(); hideOver();
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      playing = { mode: "cpu", level: pref.level, rival: { name: `컴퓨터(${LEVEL_NAME[pref.level]})` } };
+      engine = makeEngine({ mode: "cpu", level: pref.level, me, rival: playing.rival, onEnd: (r) => showResult(r) });
+      if (!engine) return;
+      screen = "play"; setPlaying(true);
+      pauseBtn.disabled = false;
+      engine.start();
+    }
+    function pauseGame(why) {
+      if (screen === "play" && playing && playing.online) { if (engine) engine.requestPause(); return; }
+      if (screen !== "play" || !engine || !engine.pause()) return;
+      screen = "pause";
+      showOver(`<div class="jvp-card is-small" role="dialog" aria-label="일시정지">
+          <span class="jvp-badge">${icon("pause", 26)}</span>
+          <h2>잠깐 멈췄어요</h2>
+          <p>${why ? esc(why) : "계속하기를 누르면 이어서 해요"}</p>
+          <div class="jvp-btnrow">
+            <button type="button" class="hk-btn hk-btn--secondary" data-act="quit">그만하기</button>
+            <button type="button" class="hk-btn hk-btn--primary" data-act="resume">계속하기</button>
+          </div>
+        </div>`);
+    }
+    function resumeGame() {
+      if (screen !== "pause" || !engine) return;
+      hideOver(); screen = "play"; engine.resume();
+    }
+
+    // ───── 결과
+    function timeText(sec) { const t = Math.round(sec), m = Math.floor(t / 60), s = t % 60; return m ? (s ? `${m}분 ${s}초` : `${m}분`) : `${s}초`; }
+    function showResult(r) {
+      if (!playing) return;
+      screen = "result"; setPlaying(false);
+      const P = playing;
+      const title = r.draw ? "비겼어요" : r.win ? "이겼어요!" : "아쉽게 졌어요";
+      const how = r.draw ? "2분 뒤 크기가 거의 같았어요" : r.eaten ? (r.win ? "상대를 꿀꺽 삼켰어요" : "상대에게 꿀꺽 삼켜졌어요") : r.win ? "2분 뒤 내가 더 컸어요" : "2분 뒤 상대가 더 컸어요";
+      const lead = P.online ? `${esc(P.rival.name)}님과의 경기 · ${how}` : `${esc(P.rival.name)}와 연습 · ${how}`;
+      const side = (name, n, col) => `<div class="jvp-side"><span class="jvp-num" style="color:${col}">${sizeText(n)}</span><small>${esc(name)}</small></div>`;
+      const myCol = hex(HKJellyVs.JCOL[r.me]), rvCol = hex(HKJellyVs.JCOL[1 - r.me]);
+      showOver(`<div class="jvp-card is-small jvp-result" role="dialog" aria-label="경기 결과">
+          <span class="jvp-badge ${r.win ? "is-win" : r.draw ? "" : "is-lose"}">${icon(r.win ? "trophy" : r.draw ? "handshake" : "heart-handshake", 28)}</span>
+          <h2>${esc(title)}</h2>
+          <p>${lead}</p>
+          <div class="jvp-score">${side(`${me.name} (나)`, r.mySize, myCol)}<span class="jvp-vs">크기</span>${side(P.rival.name, r.rivalSize, rvCol)}</div>
+          <div class="jvp-stats">
+            <div><b>${(r.friends[r.me] || 0).toLocaleString("ko-KR")}마리</b><small>내가 삼킨 친구</small></div>
+            <div><b>${(r.bites[r.me] || 0).toLocaleString("ko-KR")}번</b><small>물린 횟수</small></div>
+            <div><b>${timeText(r.sec)}</b><small>경기 시간</small></div>
+          </div>
+          <div class="jvp-again" id="jv-again" hidden></div>
+          <div class="jvp-btnrow" id="jv-endbtns">
+            <button type="button" class="hk-btn hk-btn--secondary" data-act="forest">숲 보기</button>
+            <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">처음으로</button>
+            ${P.online ? (P.rival && P.rival.id ? `<button type="button" class="hk-btn hk-btn--primary" data-act="rematch">다시 도전</button>` : "") : `<button type="button" class="hk-btn hk-btn--primary" data-act="again">다시 하기</button>`}
+          </div>
+          <div class="jvp-mini" id="jv-mini">${P.online && P.report ? "결과를 대전 기록에 남기는 중…" : "연습 경기라 기록에 남지 않아요"}</div>
+        </div>`);
+      if (P.online && P.againId) showAgain(P.againId);
+      if (P.online && typeof P.report === "function") {
+        Promise.resolve(P.report(r)).catch(() => null).then((ok) => {
+          const el = $("#jv-mini");
+          if (!el || (screen !== "result" && screen !== "forest")) return;
+          el.textContent = ok ? "대전 기록에 남겼어요" : "결과를 아직 저장하지 못했어요 · 대전 목록에서 이 경기에 다시 들어오면 다시 보내요";
+          el.classList.add(ok ? "is-ok" : "is-bad");
+        });
+      }
+    }
+
+    // ───── 동료와 — 실시간 1:1 (host 가 판을 계산, guest 는 받아 그림). connect 약속은 HKRt.connect(/_shared/rt.js)와 같다
+    const PEER_GRACE = 20000; // 상대가 이만큼 안 돌아오면 「상대가 나갔어요」 (그동안 판은 멈춰 있다)
+    let conn = null, sess = null;
+    function closeConn() {
+      if (sess) { sess.closed = true; clearTimeout(sess.graceT); sess = null; }
+      if (conn) { try { conn.close(); } catch (_) { /* 이미 닫힘 */ } conn = null; }
+    }
+    function playOnline({ matchId, rival, connect, report, resign, check, fallbackRole }) {
+      stopEngine(); closeConn();
+      screen = "connect"; setPlaying(false);
+      showOver(cardHtml("wifi", "연결하는 중…", `${rival.name}님과 연결하고 있어요`, `<button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>`));
+      const S2 = { closed: false, graceT: 0, role: null, peerHere: false };
+      sess = S2;
+      const handlers = [];
+      const link = (k) => { if (engine && !S2.closed) engine.setLink(k); };
+      const lost = async (title, sub) => {
+        if (S2.closed || (engine && engine.isOver())) return;
+        closeConn(); stopEngine();
+        screen = "lost"; setPlaying(false);
+        showOver(cardHtml("wifi-off", title, sub || "경기를 이어 갈 수 없어요", `<button type="button" class="hk-btn hk-btn--primary" data-act="menu">처음으로</button>`));
+        const d = check ? await check().catch(() => null) : null;
+        if (d && d.status === "DONE" && screen === "lost") {
+          const t = d.result === "win" ? "이 경기는 이겼어요" : d.result === "lose" ? "이 경기는 졌어요" : "이 경기는 비겼어요";
+          showOver(cardHtml(d.result === "win" ? "trophy" : "flag", title, `${t}${d.reasonLabel ? ` · ${d.reasonLabel}` : ""}`, `<button type="button" class="hk-btn hk-btn--primary" data-act="menu">처음으로</button>`));
+        }
+      };
+      const peerAway = () => {
+        link("away");
+        clearTimeout(S2.graceT);
+        S2.graceT = setTimeout(() => { if (S2.closed || S2.peerHere || !engine || engine.phase() === "wait") return; lost("상대가 나갔어요"); }, PEER_GRACE);
+        if (check) check().then((d) => { if (d && d.status === "DONE" && !S2.closed && !S2.peerHere) lost("상대가 나갔어요"); }).catch(() => null);
+      };
+      const peerBack = () => { clearTimeout(S2.graceT); link("ok"); };
+      function begin(role) {
+        S2.role = role;
+        playing = { mode: role, online: true, role, rival, report, resign, matchId: typeof matchId === "number" ? matchId : null };
+        engine = makeEngine({
+          mode: role, me, rival,
+          net: { send: (o) => !S2.closed && !!conn && conn.send(o), onMessage: (fn) => handlers.push(fn) },
+          onEvent: (e) => { if (e.type === "lobby") showLobby(e); },
+          onEnd: (r) => showResult(r),
+        });
+        if (!engine) return;
+        hideOver();
+        screen = "play"; setPlaying(true);
+        engine.start();
+      }
+      conn = connect(matchId, {
+        onHello: (h) => {
+          if (S2.closed) return;
+          if (!S2.role) {
+            const role = h && (h.role === "host" || h.role === "guest") ? h.role : fallbackRole;
+            if (!role) { lost("연결하지 못했어요", "잠시 뒤 다시 들어와 주세요"); return; }
+            begin(role);
+          }
+          S2.peerHere = !!(h && h.peerHere);
+          if (S2.peerHere) peerBack(); else if (engine && engine.phase() !== "wait") peerAway(); else link("away");
+        },
+        onPeer: (here) => {
+          if (S2.closed) return;
+          S2.peerHere = here === true || !!(here && here.here);
+          if (!engine) return;
+          if (S2.peerHere) peerBack(); else if (engine.phase() !== "wait") peerAway(); else link("away");
+        },
+        onMessage: (m) => {
+          if (S2.closed) return;
+          if (m && m.t === "again" && Number.isInteger(m.id) && m.id > 0) { if (playing && playing.online) { playing.againId = m.id; showAgain(m.id); } return; }
+          handlers.forEach((fn) => fn(m));
+        },
+        onClose: (c) => {
+          if (S2.closed) return;
+          if (c && c.final) lost(c.text || "연결이 끊겼어요");
+          else link("retry");
+        },
+      });
+    }
+    function showAgain(id) {
+      if (!playing || !playing.online || (screen !== "result" && screen !== "forest")) return;
+      const box = $("#jv-again"), row = $("#jv-endbtns");
+      if (!box || !row) return;
+      box.hidden = false;
+      box.textContent = `${playing.rival.name}님이 다시 도전했어요`;
+      const mine = row.querySelector('[data-act="rematch"]');
+      if (mine) mine.remove();
+      const acc = row.querySelector('[data-act="accept"]');
+      if (acc) acc.dataset.id = String(id);
+      else row.insertAdjacentHTML("beforeend", `<button type="button" class="hk-btn hk-btn--primary" data-act="accept" data-id="${id}">다시 경기 수락</button>`);
+      if (screen === "forest") resultBack();
+    }
+    async function giveUp() {
+      if (!playing || !playing.online) return;
+      const P = playing;
+      const ok = await HKUI.confirmDialog("기권할까요?", "상대의 승리로 경기를 마쳐요.", { confirmLabel: "기권하기", cancelLabel: "계속하기" });
+      if (!ok || playing !== P) return;
+      if (engine && !engine.isOver() && P.resign) await P.resign();
+      closeConn();
+      if (P.matchId) openMatch(P.matchId); else showMenu();
+    }
+    // 온라인 준비 화면 — 경기 전: 준비, 일시정지 중: 계속 준비. 엔진이 상태가 바뀔 때마다 알려 준다
+    function showLobby(L) {
+      if (!playing || !playing.online || !["play", "ready", "opause"].includes(screen)) return;
+      const rv = playing.rival.name;
+      const myCol = hex(HKJellyVs.JCOL[playing.role === "host" ? 0 : 1]), rvCol = hex(HKJellyVs.JCOL[playing.role === "host" ? 1 : 0]);
+      const who = (on, name, here, col) => `<div class="${on ? "is-on" : ""}"><i class="jvp-dot" style="background:${col}"></i><span>${esc(name)} · ${on ? "준비 완료" : here ? "준비 전" : "들어오는 중…"}</span></div>`;
+      if (L.phase === "wait" && !L.counting) {
+        screen = "ready";
+        showOver(`<div class="jvp-card is-small" role="dialog" aria-label="경기 준비">
+            <span class="jvp-badge">${icon("users", 26)}</span>
+            <h2>경기를 준비해 주세요</h2>
+            <p>${esc(rv)}님과 실시간 경기 · 2분 동안 먹고 자라기</p>
+            <div class="jvp-who">${who(L.ready[0], "나", true, myCol)}${who(L.ready[1], rv, L.peer, rvCol)}</div>
+            <div class="jvp-btnrow">
+              <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>
+              <button type="button" class="hk-btn hk-btn--primary" data-act="ready" data-on="${L.ready[0] ? 0 : 1}">${L.ready[0] ? "준비 취소" : "준비"}</button>
+            </div>
+            <div class="jvp-mini">내 젤리는 ${playing.role === "host" ? "분홍" : "하늘"}색이에요 · 두 사람 모두 준비하면 3초 뒤 시작해요 · 숲은 두 사람에게 똑같아요</div>
+          </div>`);
+      } else if (L.paused && !L.counting) {
+        screen = "opause";
+        const by = L.pausedBy === "me" ? "내가" : `${esc(rv)}님이`;
+        const why = { pause: `${by} 일시정지를 눌렀어요`, away: `${by} 다른 화면으로 가서 멈췄어요`, link: "연결이 끊겨 멈췄어요" }[L.pausedWhy] || `${by} 일시정지를 눌렀어요`;
+        showOver(`<div class="jvp-card is-small" role="dialog" aria-label="일시정지">
+            <span class="jvp-badge">${icon("pause", 26)}</span>
+            <h2>잠깐 멈췄어요</h2>
+            <p>${why} · 두 사람 모두 계속 준비를 누르면 3초 뒤 이어서 해요</p>
+            <div class="jvp-who">${who(L.ready[0], "나", true, myCol)}${who(L.ready[1], rv, L.peer, rvCol)}</div>
+            <div class="jvp-btnrow">
+              <button type="button" class="hk-btn hk-btn--secondary" data-act="giveup">기권하기</button>
+              <button type="button" class="hk-btn hk-btn--primary" data-act="ready" data-on="${L.ready[0] ? 0 : 1}">${L.ready[0] ? "준비 취소" : "계속 준비"}</button>
+            </div>
+          </div>`);
+      } else if (screen === "ready" || screen === "opause") {
+        hideOver();
+        screen = "play";
+      }
+    }
+    // 시험용 연결 — 같은 브라우저의 두 탭이 BroadcastChannel 로 주고받는다. HKRt.connect 와 같은 순서 · 모양으로 알린다
+    function devConnect(matchId, h) {
+      const role = /^#rt-host/.test(location.hash) ? "host" : "guest";
+      const ch = new BroadcastChannel(`hk-jellyvs-dev-${matchId}`);
+      const id = Math.random().toString(36).slice(2);
+      const lag = Number((location.hash.split(":")[1] || "0").replace(/\D/g, "")) || 0;
+      let closed = false;
+      const post = (o) => { if (closed) return false; try { ch.postMessage({ from: id, ...o }); return true; } catch (_) { return false; } };
+      ch.onmessage = (e) => {
+        const d = e.data;
+        if (closed || !d || d.from === id) return;
+        if (d.hello) { if (h.onPeer) h.onPeer(true); if (d.hello === 1) post({ hello: 2 }); return; }
+        if (d.bye) { if (h.onPeer) h.onPeer(false); return; }
+        const run = () => !closed && h.onMessage && h.onMessage(d.m);
+        if (lag) setTimeout(run, lag); else run();
+      };
+      setTimeout(() => { if (closed) return; if (h.onHello) h.onHello({ role, peerHere: false }); post({ hello: 1 }); }, 0);
+      const bye = () => post({ bye: 1 });
+      addEventListener("pagehide", bye);
+      return {
+        send: (m) => { if (DEV) { try { const n = new Blob([JSON.stringify(m)]).size; window.__jvMaxMsg = Math.max(window.__jvMaxMsg || 0, n); window.__jvSent = (window.__jvSent || 0) + 1; } catch (_) { /* 재기 */ } } return post({ m }); },
+        close: () => { if (closed) return; bye(); closed = true; ch.close(); removeEventListener("pagehide", bye); if (h.onClose) h.onClose({ final: true }); },
+      };
+    }
+    function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+    const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
+    // 경기 결과 알리기 — 두 사람 모두 보낸다. 서버 대전 엔진(versus_jellyvs.act)이 두 사람 것이 같으면 승패를 적는다
+    async function reportResult(id, r) {
+      const data = { winner: r.winner, size: r.size.slice(), eaten: !!r.eaten, sec: r.sec };
+      const earlyUntil = Date.now() + 60000; // 서버는 수락 뒤 30초가 지나야 받는다 — 빨리 끝난 판은 받아 줄 때까지 다시 보낸다
+      let fails = 0;
+      while (fails < 3) {
+        try {
+          const d = await HKApi.matchDetail(id);
+          if (d.status !== "ACTIVE") return d.status === "DONE";
+          if (d.reported && d.reported.me) return true;
+          await HKApi.matchMove(id, { data }, d.seq);
+          return true;
+        } catch (e) {
+          if (e && e.code === "JELLYVS_TOO_EARLY" && Date.now() < earlyUntil) { await sleep(3000); continue; }
+          if (++fails < 3) await sleep(800 * fails);
+        }
+      }
+      return false;
+    }
+    // 보낼 결과를 이 기기에 적어 둔다 — 보내다 실패하거나 창을 닫아도, 다시 들어오면 새 경기 대신 이것을 다시 보낸다
+    let saving = 0, leaving = false;
+    const repKey = (id) => `hk-jellyvs-rep-${id}`;
+    const loadRep = (id) => { try { const v = JSON.parse(localStorage.getItem(repKey(id)) || "null"); return v && Array.isArray(v.size) && v.size.length === 2 && Date.now() - v.at < 3 * 3600e3 ? v : null; } catch (_) { return null; } };
+    const putRep = (id, r) => { try { localStorage.setItem(repKey(id), JSON.stringify({ winner: r.winner, size: r.size, eaten: r.eaten, sec: r.sec, me: r.me, at: Date.now() })); } catch (_) { /* 저장 못 해도 보내기는 그대로 */ } };
+    const dropRep = (id) => { try { localStorage.removeItem(repKey(id)); } catch (_) { /* 없음 */ } };
+    async function sendResult(id, r) {
+      putRep(id, r);
+      saving++;
+      try { const ok = await reportResult(id, r); if (ok) dropRep(id); return ok; } finally { saving--; }
+    }
+    // 대전 목록 — 도전 · 수락은 공용 HKMatch. 수락하면 #m{id} 로 들어온다
+    let lobbyPoll = 0;
+    async function showOnlineLobby() {
+      stopEngine(); closeConn(); clearInterval(lobbyPoll);
+      screen = "lobby"; setPlaying(false);
+      engine = makeEngine({ mode: "demo" });
+      if (engine) engine.start();
+      showOver(`<div class="jvp-card is-wide"><div id="jv-lobby"></div></div>`);
+      const box = $("#jv-lobby");
+      const sz = (m) => (Array.isArray(m.size) && m.size.length === 2 ? `${sizeText(m.size[0])} : ${sizeText(m.size[1])}` : "");
+      await HKMatch.lobby(box, KEY, {
+        title: "꿀꺽 젤리 숲 대전 — 동료와", lead: "동료에게 도전장을 보내요. 상대가 수락하면 둘 다 들어와 실시간으로 겨뤄요.",
+        bot: false, rankNote: "같은 상대에게 하루에 거둔 승은 1승으로 쳐요", rankEmpty: "아직 끝난 경기가 없어요",
+        labels: { myTurn: "들어갈 경기", waiting: "들어갈 경기", turnTag: "들어가기", waitTag: "들어가기", recent: "최근 경기" },
+        rowNote: (m) => ["실시간 2분 경기", HKMatch.due(m.deadlineAt)].filter(Boolean).join(" · "),
+        resultNote: (m) => [sz(m) ? `크기 ${sz(m)}` : "", HKMatch.reason(m)].filter(Boolean).join(" · ") || "경기 끝",
+      });
+      if (screen !== "lobby" || !box.isConnected) return;
+      const back = box.querySelector(".gk__back");
+      if (back) { back.textContent = "‹ 처음으로"; back.setAttribute("href", "#"); }
+      box.onclick = async (e) => {
+        const t = e.target.closest("button, a");
+        if (!t) return;
+        if (t.getAttribute("href") === "#") { e.preventDefault(); location.hash = ""; showMenu(); return; }
+        await HKMatch.act(t, KEY, showOnlineLobby);
+      };
+      const sent = new Set([...box.querySelectorAll("[data-decline]")].filter((b) => !b.closest(".gk__row").querySelector("[data-accept]")).map((b) => Number(b.dataset.decline)));
+      if (!sent.size) return;
+      lobbyPoll = setInterval(async () => {
+        if (screen !== "lobby") { clearInterval(lobbyPoll); return; }
+        const d = await HKApi.matchOverview(KEY).catch(() => null);
+        if (!d || screen !== "lobby") return;
+        const m = [...(d.myTurn || []), ...(d.waiting || [])].find((x) => sent.has(x.id) && x.status === "ACTIVE");
+        if (!m) return;
+        clearInterval(lobbyPoll);
+        HKUI.toast(`${m.opponent ? m.opponent.name : "상대"}님이 도전을 받았어요`);
+        location.hash = `m${m.id}`;
+      }, 4000);
+    }
+    const endBtns = `<button type="button" class="hk-btn hk-btn--secondary" data-act="menu">처음으로</button><button type="button" class="hk-btn hk-btn--primary" data-act="lobby">대전 목록</button>`;
+    function showServerResult(m) {
+      screen = "lost"; setPlaying(false);
+      const t = m.result === "win" ? "이긴 경기예요" : m.result === "lose" ? "진 경기예요" : "비긴 경기예요";
+      const sc = Array.isArray(m.size) && m.size.length === 2 ? `크기 ${sizeText(m.size[0])} : ${sizeText(m.size[1])}` : "";
+      showOver(cardHtml(m.result === "win" ? "trophy" : "flag", t, [`${m.opponent ? m.opponent.name : "상대"}님과의 경기`, sc, m.reasonLabel].filter(Boolean).join(" · "), endBtns));
+    }
+    let sentPoll = 0;
+    function showSent(id) {
+      clearInterval(sentPoll);
+      screen = "sent"; playing = null; setPlaying(false);
+      showOver(cardHtml("send", "결과를 보냈어요", "상대 결과가 오면 대전 기록에 남아요", endBtns));
+      const still = () => screen === "sent" && location.hash === `#m${id}`;
+      sentPoll = setInterval(async () => {
+        if (!still()) { clearInterval(sentPoll); return; }
+        const d = await HKApi.matchDetail(id).catch(() => null);
+        if (!d || !still() || d.status === "ACTIVE") return;
+        clearInterval(sentPoll);
+        if (d.status === "DONE") showServerResult(d);
+      }, 5000);
+    }
+    async function resendResult(id, saved, m) {
+      screen = "result"; playing = null; setPlaying(false);
+      const rivalName = (m.opponent && m.opponent.name) || "상대";
+      showOver(cardHtml("send", "결과를 다시 보내는 중…", `${rivalName}님과의 경기`));
+      const ok = await sendResult(id, saved);
+      if (screen !== "result" || location.hash !== `#m${id}`) return;
+      const d = ok ? await HKApi.matchDetail(id).catch(() => null) : null;
+      if (screen !== "result" || location.hash !== `#m${id}`) return;
+      if (d && d.status === "DONE") return showServerResult(d);
+      if (ok) return showSent(id);
+      screen = "lost";
+      showOver(cardHtml("wifi-off", "결과를 아직 보내지 못했어요", "대전 목록에서 이 경기에 다시 들어오면 다시 보내요", endBtns));
+    }
+    async function openMatch(id) {
+      stopEngine(); closeConn(); clearInterval(lobbyPoll); clearInterval(sentPoll);
+      screen = "connect"; setPlaying(false);
+      showOver(cardHtml("wifi", "경기를 불러오는 중…", ""));
+      let m;
+      try { m = await HKApi.matchDetail(id); } catch (e) { HKMatch.fail(e); history.replaceState(null, "", location.pathname); return showMenu(); }
+      if (m.game !== KEY) { location.href = `/games/${m.game}#m${id}`; return; }
+      if (m.status === "DONE") { dropRep(id); return showServerResult(m); }
+      if (m.status !== "ACTIVE") {
+        dropRep(id);
+        HKUI.toast(m.status === "PENDING" ? "상대가 아직 도전을 받지 않았어요" : "이미 끝난 도전이에요");
+        history.replaceState(null, "", location.pathname);
+        return showOnlineLobby();
+      }
+      if (m.reported && m.reported.me) { dropRep(id); return showSent(id); }
+      const saved = loadRep(id);
+      if (saved) return resendResult(id, saved, m);
+      if (!window.HKRt) { try { await loadScript("/_shared/rt.js"); } catch (_) { HKUI.toast("실시간 연결을 열지 못했어요", "error"); return showMenu(); } }
+      const rival = { id: (m.opponent && m.opponent.id) || null, name: (m.opponent && m.opponent.name) || "상대", avatarUrl: (m.opponent && m.opponent.avatarUrl) || "" };
+      playOnline({
+        matchId: id, rival,
+        fallbackRole: m.role === "host" || m.role === "guest" ? m.role : null,
+        connect: (mid, h) => window.HKRt.connect(mid, h),
+        report: (r) => sendResult(id, r),
+        resign: () => HKApi.matchResign(id).catch(() => null),
+        check: () => HKApi.matchDetail(id),
+      });
+    }
+
+    // ───── 게임 방법
+    function openRules() {
+      setOver.innerHTML = `<div class="jvp-card jvp-rules" role="dialog" aria-label="게임 방법">
+          <h2>꿀꺽 젤리 숲 대전 게임 방법</h2>
+          <h3>먹고 자라요</h3>
+          <ul>
+            <li>열매 · 버섯을 먹으면 몸이 자라요. 버섯이 열매보다 세 배 더 자라게 해요.</li>
+            <li>숲 친구 발밑 <b>초록 고리</b>는 먹을 수 있다는 뜻, <b>빨간 고리</b>는 나보다 커서 위험하다는 뜻이에요. 물리면 몸이 줄고 잠깐 깜빡여요(그동안은 안 물려요).</li>
+            <li><b>별빛 구슬</b>을 먹으면 대시가 한 칸 차요(최대 3칸). 대시하는 동안에는 물리지도, 삼켜지지도 않아요.</li>
+            <li>가시대왕은 두 사람 모두에게 위험한 큰 녀석이에요. 더 커지면 대왕을 삼켜 몸을 크게 키울 수 있어요.</li>
+          </ul>
+          <h3>이기는 법</h3>
+          <ul>
+            <li>상대보다 <b>1.2배</b> 넘게 크면 부딪혀 상대를 꿀꺽 삼켜요 — 그 자리에서 이겨요. 상대 발밑 고리와 머리 위 이름표 색으로 알려 줘요.</li>
+            <li>처음 15초는 서로 삼킬 수 없어요. 2분이 끝나면 더 큰 쪽이 이기고, 크기 차이가 2% 안이면 비겨요.</li>
+            <li>상대가 화면 밖에 있으면 가장자리 화살표가 상대 쪽을 가리켜요.</li>
+          </ul>
+          <h3>조작 · 멈춤 · 기록</h3>
+          <ul>
+            <li>${IS_TOUCH ? "화면 아무 곳이나 눌러 끌면 그쪽으로 움직여요. 오른쪽 아래 버튼이 대시예요." : "WASD · 방향키로 움직이고 Space 로 대시해요. 화면을 마우스로 끌어도 움직여요. P · Esc 는 일시정지예요."}</li>
+            <li>동료와 경기는 일시정지하면 두 사람 모두 「계속 준비」를 눌러야 이어 가요. 다른 화면으로 가도 멈춰요.</li>
+            <li>동료와 끝까지 한 경기만 대전 기록 · 순위에 남아요. 컴퓨터와 연습은 남지 않아요.</li>
+          </ul>
+          <div class="jvp-btnrow"><button type="button" class="hk-btn hk-btn--primary" data-act="setclose">닫기</button></div>
+        </div>`;
+      setOver.hidden = false; setOver.scrollTop = 0;
+      if (screen === "play" && playing && !playing.online) pauseGame();
+    }
+    function closeRules() { setOver.hidden = true; setOver.innerHTML = ""; }
+
+    // ───── 업무 시간이면 게임 대신 안내
+    const status = await HKApi.playStatus().catch(() => ({ open: true }));
+    function route() {
+      const dev = /^#rt-(host|guest)/.exec(location.hash);
+      const mm = /^#m(\d+)$/.exec(location.hash);
+      if (dev && DEV) {
+        const role = dev[1];
+        return playOnline({ matchId: "dev", fallbackRole: role, rival: { name: role === "host" ? "손님(시험)" : "주인(시험)" }, connect: devConnect });
+      }
+      if (mm) return openMatch(Number(mm[1]));
+      showMenu();
+    }
+    if (!status.open) {
+      engine = makeEngine({ mode: "demo" });
+      if (engine) engine.start();
+      showOver(`<div class="jvp-card is-small">${HKPlay.closedHtml(status.opensAt)}</div>`);
+      const c = over.querySelector(".hk-play-closed"); if (c) c.style.cssText = "border:0;padding:8px 4px";
+      setInterval(async () => { const st = await HKApi.playStatus().catch(() => null); if (st && st.open) location.reload(); }, 60000);
+      return;
+    }
+    route();
+    addEventListener("hashchange", () => { closeConn(); route(); });
+    addEventListener("pagehide", closeConn);
+    addEventListener("beforeunload", (e) => { if (saving > 0 && !leaving) { e.preventDefault(); e.returnValue = ""; } });
+
+    // ───── 화면 버튼
+    const overClick = (e) => {
+      const b = e.target.closest("button");
+      if (!b || b.disabled) return;
+      if (b.dataset.mode) { pref.mode = b.dataset.mode; savePref(); HKSound.play("select"); paintMenu(); b.blur(); return; }
+      if (b.dataset.level) { pref.level = b.dataset.level; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.id === "jv-go") { if (pref.mode === "online") return showOnlineLobby(); return startCpu(); }
+      const act = b.dataset.act;
+      if (act === "setclose") return closeRules();
+      if (act === "resume") return resumeGame();
+      if (act === "forest") return forestView();
+      if (act === "accept") {
+        const id = Number(b.dataset.id);
+        if (!(id > 0)) return;
+        b.disabled = true;
+        HKApi.matchAccept(id).then(() => { closeConn(); location.hash = `m${id}`; }).catch((err) => { b.disabled = false; HKMatch.fail(err); });
+        return;
+      }
+      if (act === "ready") { if (engine) engine.setReady(b.dataset.on === "1"); HKSound.play("select"); return; }
+      if (act === "giveup") return giveUp();
+      if (act === "rematch" && playing && playing.rival && playing.rival.id) {
+        b.disabled = true;
+        HKApi.matchCreate(Number(playing.rival.id), KEY).then((m) => {
+          const id = m && Number(m.id);
+          if (id > 0 && conn) { try { conn.send({ t: "again", id }); } catch (_) { /* 연결이 끊겼으면 목록으로만 */ } }
+          HKUI.toast("다시 도전장을 보냈어요 · 상대가 받으면 바로 들어가요");
+          setTimeout(() => { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); showOnlineLobby(); }, 300);
+        }).catch((err) => { b.disabled = false; HKMatch.fail(err); });
+        return;
+      }
+      if (act === "quit" || act === "menu") { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); return showMenu(); }
+      if (act === "lobby") { closeConn(); if (location.hash) history.replaceState(null, "", location.pathname); return showOnlineLobby(); }
+      if (act === "again" && playing) return startCpu();
+    };
+    over.addEventListener("click", overClick);
+    setOver.addEventListener("click", overClick);
+    pauseBtn.onclick = (e) => { e.currentTarget.blur(); if (screen === "play") pauseGame(); };
+    $("#jv-rules").onclick = (e) => { e.currentTarget.blur(); if (!setOver.hidden) closeRules(); else openRules(); };
+    // 전체 화면 — 지원하는 곳만 버튼을 보인다
+    const fullBtn = $("#jv-full"), fsRoot = document.documentElement;
+    const canFull = !!(document.fullscreenEnabled && fsRoot.requestFullscreen && document.exitFullscreen);
+    function paintFull() {
+      const on = !!document.fullscreenElement;
+      fullBtn.innerHTML = `${icon(on ? "minimize" : "maximize")}<span>${on ? "화면 축소" : "전체 화면"}</span>`;
+      fullBtn.setAttribute("aria-label", on ? "전체 화면 닫기" : "전체 화면으로 보기");
+      HKUI.refreshIcons(fullBtn);
+    }
+    fullBtn.hidden = !canFull;
+    if (canFull) {
+      paintFull();
+      document.addEventListener("fullscreenchange", paintFull);
+      fullBtn.onclick = (e) => { e.currentTarget.blur(); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else fsRoot.requestFullscreen().catch(() => HKUI.toast("전체 화면을 열지 못했어요")); };
+    }
+    // 「‹ 아케이드」 · 「대전 보기」 — 경기 중 · 결과 저장 중이면 확인 창을 거친 뒤 간다
+    const guardLeave = async (e, go) => {
+      if (saving > 0 && screen !== "play" && screen !== "pause") {
+        e.preventDefault();
+        const ok = await HKUI.confirmDialog("결과를 남기는 중이에요", "지금 나가면 무승부가 될 수 있어요.", { confirmLabel: "나가기", cancelLabel: "기다리기" });
+        if (ok) { leaving = true; closeConn(); go(); }
+        return;
+      }
+      if (!["play", "pause", "ready", "opause"].includes(screen)) return;
+      e.preventDefault();
+      if (playing && playing.online) {
+        const before = !engine || engine.phase() === "wait";
+        const ok = await HKUI.confirmDialog("경기를 그만할까요?", before ? "아직 시작 전이에요. 나중에 대전 목록에서 다시 들어올 수 있어요." : "그만하면 이 경기는 기권으로 져요.", { confirmLabel: "그만하기", cancelLabel: "계속하기" });
+        if (!ok || !["play", "ready", "opause"].includes(screen)) return;
+        if (!before && engine && !engine.isOver() && playing.resign) await playing.resign();
+        closeConn(); go();
+        return;
+      }
+      const wasPlaying = screen === "play";
+      if (wasPlaying) pauseGame();
+      if (await HKUI.confirmDialog("연습을 그만할까요?", "연습 경기는 기록에 남지 않아요.", { confirmLabel: "그만하기", cancelLabel: "계속하기" })) { closeConn(); go(); }
+      else if (wasPlaying && screen === "pause") resumeGame();
+    };
+    $("#jv-back").addEventListener("click", (e) => guardLeave(e, HKGoArcade));
+    $("#jv-vs").addEventListener("click", (e) => guardLeave(e, () => { location.href = "/together#tg-versus"; }));
+    addEventListener("keydown", (e) => {
+      if (document.querySelector(".hk-dialog__overlay")) return;
+      const t = e.target;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+      if (!setOver.hidden) { if (e.code === "Escape") { e.preventDefault(); closeRules(); } return; }
+      if (e.code === "Escape" || e.code === "KeyP") {
+        if (screen === "play") { e.preventDefault(); if (!e.repeat) pauseGame(); }
+        else if (screen === "result" && e.code === "Escape") { e.preventDefault(); forestView(); }
+        return;
+      }
+      if (e.repeat) return;
+      const onBtn = t && t.closest && t.closest("button, a");
+      if (e.code === "Enter" || e.code === "NumpadEnter" || (e.code === "Space" && screen !== "play")) {
+        if (screen === "menu" && !onBtn) { e.preventDefault(); $("#jv-go")?.click(); }
+        else if ((screen === "ready" || screen === "opause") && !onBtn) { e.preventDefault(); over.querySelector('[data-act="ready"]')?.click(); }
+        else if (screen === "pause" && !onBtn) { e.preventDefault(); resumeGame(); }
+      }
+    });
+    // 컴퓨터와 — 다른 창으로 가면 멈춘다 (동료와는 엔진이 두 사람 모두 멈춘다)
+    addEventListener("blur", () => { if (screen === "play" && playing && !playing.online) pauseGame("다른 창으로 가서 멈췄어요"); });
+    document.addEventListener("visibilitychange", () => { if (document.hidden && screen === "play" && playing && !playing.online) pauseGame("다른 화면으로 가서 멈췄어요"); });
+  })();
+  </script>
+</body>
+</html>

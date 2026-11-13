@@ -88,7 +88,7 @@ from app.services.game import _give_stamp, ensure_open, game_visible
 GOMOKU = "gomoku"
 CHESS = "chess"
 CLASSIC_GAMES = (GOMOKU, CHESS)  # 이 파일이 직접 두는 게임
-ENGINE_GAMES = ("baseball", "boxes", "quizduel", "gostop", "memory", "soccer", "volley", "rummy", "alkkagi")  # 대전 엔진 — app/services/versus_<키>.py
+ENGINE_GAMES = ("baseball", "boxes", "quizduel", "gostop", "memory", "soccer", "volley", "rummy", "alkkagi", "bumpervs", "jellyvs")  # 대전 엔진 — app/services/versus_<키>.py
 MATCH_GAMES = (*CLASSIC_GAMES, *ENGINE_GAMES)
 BOARD = 15
 ACCEPT_HOURS = 24  # 받은 도전을 기다리는 시간
@@ -486,7 +486,7 @@ async def search_members(db: AsyncSession, member: Member, q: str) -> list:
 
 
 async def start_bot(db: AsyncSession, member: Member, level: str, game: str = GOMOKU) -> dict:
-    ensure_open()
+    ensure_open(member=member)
     _check_game(game)
     eng = _engine(game)
     if eng is not None and not getattr(eng, "SUPPORTS_BOT", False):
@@ -524,7 +524,7 @@ async def start_bot(db: AsyncSession, member: Member, level: str, game: str = GO
 
 
 async def create(db: AsyncSession, member: Member, opponent_id: int, game: str = GOMOKU) -> dict:
-    ensure_open()
+    ensure_open(member=member)
     _check_game(game)
     await _sweep(db, member.id)
     rival = await db.get(Member, opponent_id)
@@ -553,7 +553,7 @@ async def create(db: AsyncSession, member: Member, opponent_id: int, game: str =
 
 
 async def accept(db: AsyncSession, member: Member, match_id: int) -> dict:
-    ensure_open()
+    ensure_open(member=member)
     await _sweep(db, member.id)
     m = await _get(db, member, match_id, lock=True)
     if m.status != "PENDING" or m.opponent_id != member.id:
@@ -642,7 +642,7 @@ async def move(
     data: Optional[dict] = None,
 ) -> dict:
     """한 수 두기 — 오목은 x · y, 체스는 uci, 엔진 게임은 data(게임마다 모양이 다르다). seq 는 화면이 본 판의 번호."""
-    ensure_open()
+    ensure_open(member=member)
     await _sweep(db, member.id)
     m = await _get(db, member, match_id, lock=True)
     if m.status != "ACTIVE":
@@ -666,7 +666,7 @@ async def move(
 
 
 async def resign(db: AsyncSession, member: Member, match_id: int) -> dict:
-    ensure_open()
+    ensure_open(member=member)
     await _sweep(db, member.id)
     m = await _get(db, member, match_id, lock=True)
     if m.status != "ACTIVE":

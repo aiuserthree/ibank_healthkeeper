@@ -407,6 +407,20 @@ async def arcade_stats(
     return {"data": await admin_arcade_stats(db, start, end)}
 
 
+@router.get("/arcade/leave")
+async def arcade_leave(
+    date_: Optional[date] = Query(None, alias="date"),
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis_client),
+    _: AdminUser = Depends(get_current_admin),
+):
+    """그날(기본 오늘) 휴가로 아케이드가 열린 사람 — 이름 · 부서 · 종류 · 시간대 + 그룹웨어에서 마지막으로 받은 시각."""
+    from app.core.time import today_kst
+    from app.services.leave import admin_day
+
+    return {"data": await admin_day(db, redis, date_ or today_kst())}
+
+
 @router.get("/coupons/members/{member_id}")
 async def member_coupons(
     member_id: int,

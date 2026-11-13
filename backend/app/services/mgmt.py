@@ -105,13 +105,13 @@ async def list_games(db: AsyncSession, member: Member) -> list[dict]:
 
 async def load(db: AsyncSession, member: Member, key: str) -> dict:
     _game(key)
-    game_service.ensure_open()
+    game_service.ensure_open(member=member)
     return _out(await _row(db, member, key))
 
 
 async def save(db: AsyncSession, member: Member, key: str, state: dict, version: int) -> dict:
     _game(key)
-    game_service.ensure_open(grace=True)
+    game_service.ensure_open(grace=True, member=member)
     if len(json.dumps(state, ensure_ascii=False).encode("utf-8")) > MAX_STATE_BYTES:
         raise_app_error("MGMT_TOO_BIG", 413)
     now = now_kst()
@@ -141,7 +141,7 @@ async def save(db: AsyncSession, member: Member, key: str, state: dict, version:
 async def reset(db: AsyncSession, member: Member, key: str) -> dict:
     """처음부터 다시 — 상태를 비우고 횟수만 남긴다."""
     _game(key)
-    game_service.ensure_open(grace=True)
+    game_service.ensure_open(grace=True, member=member)
     row = await _row(db, member, key)
     if row is not None:
         row.state = {}

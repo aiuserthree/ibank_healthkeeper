@@ -58,8 +58,9 @@ class ScoreRequest(BaseModel):
 
 @router.get("/status")
 async def status(member: Member = Depends(get_current_active_member)):
-    """지금 게임을 할 수 있는 시간인지 — 닫혀 있으면 다시 열리는 시각(HH:MM)."""
-    return {"data": game_service.play_window()}
+    """지금 게임을 할 수 있는 시간인지 — 닫혀 있으면 다시 열리는 시각(HH:MM).
+    휴가 · 반차 · 반반차 · 특별휴가로 업무 시간에 열렸으면 reason "leave" 와 leave {kind, label, until}."""
+    return {"data": game_service.play_window(member=member)}
 
 
 @router.get("/games")

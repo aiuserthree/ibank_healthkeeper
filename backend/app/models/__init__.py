@@ -20,6 +20,7 @@ from app.models.enums import (
     TeamsMessageType,
     TransferRequestStatus,
 )
+from app.models.leave import MemberLeave
 from app.models.legacy_usage import LegacyUsage
 from app.models.mail import MailMessage, MailTemplate
 from app.models.member import Member
@@ -35,6 +36,7 @@ from app.models.vacation import Vacation
 
 __all__ = [
     "MgmtSave",
+    "MemberLeave",
     "Base",
     "AdminUser",
     "AdminRole",

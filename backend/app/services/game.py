@@ -15,6 +15,7 @@ from app.core.errors import raise_app_error
 from app.config import get_settings
 from app.core.time import KST, now_kst, today_kst
 from app.models import ArcadeStamp, Coupon, CouponSource, CouponStatus, GamePlay, GameRequest, Member, MemberStatus
+from app.services import leave as leave_service
 from app.services.avatar import member_avatar_url
 from app.services.fun_stats import DEPARTMENT_RANKING_EXCLUDED
 from app.services.korean_holidays import is_public_holiday
@@ -52,6 +53,8 @@ class Game:
 GAMES: dict[str, Game] = {
     g.key: g
     for g in (
+        Game("bumpervs", "선다운 범퍼스 대전", "MINI", "동료와 실시간 1:1 · 같은 트랙을 나란히 달리며 부딪히고 먼저 결승선 들어오기", "car-front", "승", 1_000_000, added="2026-11-13"),
+        Game("jellyvs", "꿀꺽 젤리 숲 대전", "MINI", "동료와 실시간 1:1 · 같은 숲에서 먹고 자라 상대를 삼키거나 더 커지기", "candy", "승", 1_000_000, added="2026-11-13"),
         Game("vinyl", "빙글빙글 레코드 파티 3D", "MINI", "돌아가는 레코드판 위에서 노란 바는 뛰고 하늘색 바는 숙이며 한 곡 버티기 · 봉제 인형 넷의 리듬 서바이벌", "disc-3", "점", 1_000_000, added="2026-11-13"),
         Game("nightsquad", "야간 분대 작전 3D", "MINI", "좌우로 조준해 폭주 로봇을 쏘고 숫자 게이트 · 바리케이드로 분대를 불려 검문소 돌파 · 3D 분대 슈팅", "crosshair", "점", 1_000_000, added="2026-11-13"),
         Game("frostcamp", "눈꽃 야영지 3D", "MINI", "소나무를 베어 통나무집 · 작업장 · 제재소 · 썰매를 짓고 눈보라를 버텨 얼음 문 열기 · 겨울 야영지 경영 · 한 판 8분", "tent-tree", "점", 1_000_000, added="2026-11-13"),
@@ -119,30 +122,80 @@ GAMES: dict[str, Game] = {
 
 # ── 이용 시간 — 업무 시간에는 게임을 할 수 없다 ──
 # 평일(공휴일 제외) 09:00~11:30, 13:00~18:00 은 닫힘. 점심시간·퇴근 후·출근 전·주말·공휴일은 열림.
+# 휴가 · 반차 · 반반차 · 특별휴가인 사람은 그 쉬는 시간대에 업무 시간이어도 열림(services/leave.py — 회원마다 다르다).
 # 개발(DEBUG) 환경은 테스트를 위해 늘 열림.
 CLOSED_WINDOWS = ((9 * 60, 11 * 60 + 30), (13 * 60, 18 * 60))
-SUBMIT_GRACE_MIN = 10  # 점심시간 끝(13:00) 직전에 시작한 판은 10분 안에 끝내면 기록 인정
+SUBMIT_GRACE_MIN = 10  # 점심시간 끝(13:00) 직전에 시작한 판은 10분 안에 끝내면 기록 인정 (휴가 시간대 끝도 같다)
 
 
-def play_window(now: datetime | None = None) -> dict:
+def workday(d: date) -> bool:
+    return d.weekday() < 5 and not is_public_holiday(d)
+
+
+def _closed_end(minute: int, is_workday: bool):
+    """업무 시간(닫힘) 안이면 그 닫힘이 끝나는 분, 아니면 None — 휴가는 보지 않는다."""
+    if is_workday:
+        for start, end in CLOSED_WINDOWS:
+            if start <= minute < end:
+                return end
+    return None
+
+
+def _open_minute(minute: int, is_workday: bool, leaves) -> bool:
+    return _closed_end(minute, is_workday) is None or leave_service.leave_at(minute, leaves) is not None
+
+
+def leave_opens_closed_hours(leaves) -> bool:
+    """이 쉬는 시간대가 평일 업무 시간(닫힘)과 겹치는지 — 겹쳐야 「휴가로 열린」 것."""
+    return any(s < end and start < e for s, e, _ in leaves for start, end in CLOSED_WINDOWS)
+
+
+def window_at(minute: int, is_workday: bool, leaves=()) -> dict:
+    """그 분에 열려 있는지 (순수 함수). leaves = 그 회원의 그날 쉬는 시간대 [(시작 분, 끝 분, 종류)].
+
+    휴가로 열렸으면 reason "leave" 와 leave {kind, label, until} — until 은 실제로 닫히는 시각(오늘 안 닫히면 "24:00").
+    닫혀 있으면 opensAt — 닫힘이 끝나는 시각, 그 전에 휴가 시간대가 시작하면 그 시각."""
+    end = _closed_end(minute, is_workday)
+    if end is None:
+        return {"open": True, "opensAt": None}
+    hit = leave_service.leave_at(minute, leaves)
+    if hit is not None:
+        until = next((m for m in range(minute + 1, leave_service.DAY_END) if not _open_minute(m, is_workday, leaves)), leave_service.DAY_END)
+        return {
+            "open": True,
+            "opensAt": None,
+            "reason": "leave",
+            "leave": {"kind": hit[2], "label": leave_service.leave_label(hit[2], hit[0], hit[1]), "until": leave_service.hhmm(until)},
+        }
+    opens = min([end] + [w[0] for w in leaves if minute < w[0] < end])
+    return {"open": False, "opensAt": leave_service.hhmm(opens)}
+
+
+def play_window(now: datetime | None = None, member=None) -> dict:
+    """지금(now) 게임을 할 수 있는지 — member(Member 또는 회원 번호)를 주면 그 사람의 휴가 시간대도 본다."""
     now = now or now_kst()
     if get_settings().debug:
         return {"open": True, "opensAt": None}
-    minute = now.hour * 60 + now.minute
-    workday = now.weekday() < 5 and not is_public_holiday(now.date())
-    if workday:
-        for start, end in CLOSED_WINDOWS:
-            if start <= minute < end:
-                return {"open": False, "opensAt": f"{end // 60:02d}:{end % 60:02d}"}
-    return {"open": True, "opensAt": None}
+    return window_at(now.hour * 60 + now.minute, workday(now.date()), leave_service.windows_for(member, now.date()))
 
 
-def ensure_open(grace: bool = False) -> None:
-    if play_window()["open"]:
+def ensure_open(grace: bool = False, member=None) -> None:
+    """닫혀 있으면 GAME_CLOSED(403). member 를 주면 그 사람 기준(휴가면 열림). grace — 닫힌 지 10분 안이면 통과(막 끝난 판 저장)."""
+    if play_window(member=member)["open"]:
         return
-    if grace and play_window(now_kst() - timedelta(minutes=SUBMIT_GRACE_MIN))["open"]:
+    if grace and play_window(now_kst() - timedelta(minutes=SUBMIT_GRACE_MIN), member=member)["open"]:
         return
     raise_app_error("GAME_CLOSED", 403)
+
+
+def minutes_to_close(now: datetime, member=None):
+    """오늘 이 사람에게 아케이드가 닫히기까지 남은 분 — 오늘 안 닫히면 None (지금 닫혀 있으면 0)."""
+    if get_settings().debug:
+        return None
+    is_workday = workday(now.date())
+    leaves = leave_service.windows_for(member, now.date())
+    minute = now.hour * 60 + now.minute
+    return next((m - minute for m in range(minute, leave_service.DAY_END) if not _open_minute(m, is_workday, leaves)), None)
 
 
 LEADERBOARD_SIZE = 30
@@ -277,7 +330,7 @@ async def list_games(db: AsyncSession, member: Member) -> list[dict]:
         played_variants.setdefault(g, []).append(v)
 
     # 업무 시간에는 오늘 1위·참가자 수도 숨긴다
-    show_ranks = play_window()["open"]
+    show_ranks = play_window(member=member)["open"]
     out = []
     for game in GAMES.values():
         if not game_visible(game.key):
@@ -327,7 +380,7 @@ async def _department_board(db: AsyncSession, game: Game, since: date | None, me
 
 async def leaderboard(db: AsyncSession, member: Member, key: str, period: str, variant: str | None = None) -> dict:
     # 업무 시간에는 순위도 닫는다 (막 끝난 판의 순위는 볼 수 있게 저장과 같은 여유를 둔다)
-    ensure_open(grace=True)
+    ensure_open(grace=True, member=member)
     game = get_game(key)
     variant = get_variant(game, variant)
     if period not in ("today", "week", "all"):
@@ -554,7 +607,7 @@ async def stage_stamp(db: AsyncSession, redis: Redis, member: Member, key: str) 
     game = get_game(key)
     if not game.stage_stamp:
         raise_app_error("NOT_FOUND", 404)
-    ensure_open(grace=True)
+    ensure_open(grace=True, member=member)
     rate_key = f"hk:game:rate:{member.id}"
     count = await redis.incr(rate_key)
     if count == 1:
@@ -580,7 +633,7 @@ async def start_daily(db: AsyncSession, redis: Redis, member: Member, key: str, 
     """
     game = get_game(key)
     variant = get_variant(game, variant)
-    ensure_open()
+    ensure_open(member=member)
     await start_run(redis, member, key)
     if not game.daily_once:
         return {"ranked": True, "token": None}
@@ -601,7 +654,7 @@ async def submit_score(
 ) -> dict:
     game = get_game(key)
     variant = get_variant(game, variant)
-    ensure_open(grace=True)
+    ensure_open(grace=True, member=member)
     if not isinstance(score, int) or score < game.min_score or score > game.max_score:
         raise_app_error("INVALID_SCORE", 400)
     rate_key = f"hk:game:rate:{member.id}"
