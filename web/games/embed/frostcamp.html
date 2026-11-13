@@ -5535,29 +5535,62 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+/* 화면 누르기 — 두 가지 조작
+   ① 누르자마자 끌면(0.15초 안에 12px 넘게) 지금처럼 가상 막대: 끈 방향으로 걷는다
+   ② 거의 안 움직이고 누르고 있으면(0.15초) 「꾹 누르기」: 누른 땅 지점으로 저절로 걸어가 멈춘다.
+      누른 채 손가락을 옮기면 목적지도 따라 바뀐다. 떼면 멈춘다. 나무를 누르면 나무 곁에서 멈춰 도끼질한다 */
+const HOLD_T = 150, DRAG_PX = 12;
+const hold = { st: '', id: -1, t0: 0, x: 0, y: 0, tx: 0, tz: 0, r: .4, mx: 0, my: 0, best: 0, bt: 0, stuck: false };
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _gnd = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _hit = new THREE.Vector3();
+const holdMark = new THREE.Mesh(flatGeo, new THREE.MeshBasicMaterial({ map: texPad, transparent: true, depthWrite: false, color: 0xffc23d }));
+holdMark.renderOrder = 3; holdMark.visible = false; scene.add(holdMark);
+function holdAim(cx, cy) { // 누른 화면 점 → 땅 위 점(광선과 바닥이 만나는 곳)
+  _ndc.set(cx / VW * 2 - 1, -(cy / VH) * 2 + 1); _ray.setFromCamera(_ndc, camera);
+  if (!_ray.ray.intersectPlane(_gnd, _hit)) return;
+  hold.tx = clamp(_hit.x, -BX, BX); hold.tz = clamp(_hit.z, BZ0, BZ1); hold.mx = cx; hold.my = cy;
+  const tr = nearestTree(hold.tx, hold.tz, 1.3); // 나무를 눌렀으면 줄기에 부딪히지 않게 곁에서 멈춘다(도끼질 거리 1.7 안)
+  hold.r = tr ? 1.25 : .35; if (tr) { hold.tx = tr.x; hold.tz = tr.z; }
+  hold.best = 1e9; hold.bt = performance.now(); hold.stuck = false;
+  holdMark.position.set(hold.tx, .06, hold.tz); holdMark.visible = true; G.markT = 0;
+}
+function holdGo() { hold.st = 'go'; joy.on = false; joy.dx = joy.dz = 0; stick.style.display = 'none'; holdAim(hold.x, hold.y); }
 cv.addEventListener('pointerdown', e => {
-  if (!canMove()) return;
+  if (!canMove() || hold.st) return;
+  hold.st = 'wait'; hold.id = e.pointerId; hold.t0 = performance.now(); hold.x = e.clientX; hold.y = e.clientY;
   joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dz = 0;
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
-  stick.style.display = 'block'; stick.style.left = e.clientX + 'px'; stick.style.top = e.clientY + 'px'; knob.style.transform = '';
 });
 cv.addEventListener('pointermove', e => {
-  if (!joy.on || e.pointerId !== joy.id) return;
+  if (!hold.st || e.pointerId !== hold.id) return;
+  hold.x = e.clientX; hold.y = e.clientY;
+  if (hold.st === 'go') { if (Math.hypot(e.clientX - hold.mx, e.clientY - hold.my) > 6) holdAim(e.clientX, e.clientY); return; }
   let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), m = 52;
+  if (hold.st === 'wait') { if (d <= DRAG_PX) return; hold.st = 'drag'; stick.style.display = 'block'; stick.style.left = joy.ox + 'px'; stick.style.top = joy.oy + 'px'; }
   if (d > m) { dx *= m / d; dy *= m / d; }
   joy.dx = dx / m; joy.dz = dy / m; knob.style.transform = `translate(${dx}px,${dy}px)`;
 });
-const joyEnd = e => { if (e.pointerId !== joy.id) return; joy.on = false; joy.dx = joy.dz = 0; stick.style.display = 'none'; };
+const holdStop = () => { hold.st = ''; hold.id = -1; joy.on = false; joy.dx = joy.dz = 0; stick.style.display = 'none'; knob.style.transform = ''; holdMark.visible = false; };
+const joyEnd = e => { if (e.pointerId === hold.id) holdStop(); };
 cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd);
 cv.addEventListener('contextmenu', e => e.preventDefault());
-function stopInput() { for (const k in keys) keys[k] = false; joy.on = false; joy.dx = joy.dz = 0; stick.style.display = 'none'; input.x = input.z = 0; }
+function stopInput() { for (const k in keys) keys[k] = false; holdStop(); input.x = input.z = 0; }
 function readInput() {
   let x = 0, z = 0;
   if (keys.KeyA || keys.ArrowLeft) x -= 1; if (keys.KeyD || keys.ArrowRight) x += 1; if (keys.KeyW || keys.ArrowUp) z -= 1; if (keys.KeyS || keys.ArrowDown) z += 1;
-  if (joy.on) { x += joy.dx; z += joy.dz; }
+  if (hold.st === 'wait' && performance.now() - hold.t0 >= HOLD_T) holdGo();
+  if (hold.st === 'drag') { x += joy.dx; z += joy.dz; }
+  else if (hold.st === 'go' && !hold.stuck) {
+    const dx = hold.tx - player.x, dz = hold.tz - player.z, d = Math.hypot(dx, dz);
+    if (d > hold.r) {
+      x += dx / d; z += dz / d;
+      // 바위 · 집터에 막혀 1초 넘게 다가가지 못하면 멈춘다(손가락을 옮기면 다시 간다) — 미끄러지는 건 부딪힘 처리가 해 준다
+      const now = performance.now(); if (d < hold.best - .25) { hold.best = d; hold.bt = now; } else if (now - hold.bt > 1000) hold.stuck = true;
+    }
+  }
   const l = Math.hypot(x, z); if (l > 1) { x /= l; z /= l; }
   input.x = x; input.z = z;
 }
+function updateHoldMark(dt) { if (!holdMark.visible) return; G.markT = (G.markT || 0) + dt; const k = 1.1 + Math.sin(G.markT * 7) * .12; holdMark.scale.set(k * hold.r * 2 + .8, 1, k * hold.r * 2 + .8); holdMark.rotation.y += dt * 1.5; holdMark.material.opacity = hold.stuck ? .45 : .95; }
 $('mute').innerHTML = ICON.soundOn;
 $('mute').addEventListener('click', () => { sfx.init(); sfx.setMuted(!sfx.muted()); $('mute').innerHTML = sfx.muted() ? ICON.soundOff : ICON.soundOn; $('mute').setAttribute('aria-label', sfx.muted() ? '소리 켜기' : '소리 끄기'); $('mute').blur(); });
 $('logIc').innerHTML = ICON.log; $('helpIc').innerHTML = ICON.helper; $('scoreIc').innerHTML = ICON.star; $('timeIc').innerHTML = ICON.clock; $('coldIc').innerHTML = ICON.snow; $('hotIc').innerHTML = ICON.flame;
@@ -5568,7 +5601,8 @@ function step(dt) {
   G.clock += dt;
   if (mode === 'play' && !cine.on) G.time += dt;
   if (live) { for (let i = G.timers.length - 1; i >= 0; i--) { const t = G.timers[i]; t.t -= dt; if (t.t <= 0) { G.timers.splice(i, 1); t.fn(); } } }
-  if (live && !cine.on) readInput(); else input.x = input.z = 0;
+  if (live && !cine.on) readInput(); else { input.x = input.z = 0; if (hold.st) holdStop(); }
+  updateHoldMark(dt);
   if (mode === 'story') updateStory(dt);
   G.fade = Math.max(0, G.fade - dt * .9);
   if (typeof devInput === 'function') devInput(live);
@@ -5609,7 +5643,7 @@ function menuCard() {
     <li><b>온기</b>가 떨어지면 모닥불 곁에서 녹여요. 눈보라 속에 모닥불이 꺼진 채 10초가 지나면 끝나요.</li>
     <li>장마다 건물 넷과 특별 목표를 마치면 얼음 문이 열려 다음 장으로 가요. 모두 <b>8장</b>이에요.</li></ol>
     ${ARC ? '<p class="note">장마다 시간을 새로 받아요(1장 7분 · 2~4장 5분 30초 · 5~6장 6분 · 7~8장 6분 30초). 빨리 깰수록 남은 시간이 점수가 돼요.</p>' : ''}
-    <p class="keys">움직이기: 화면을 끌거나 WASD · 방향키</p>
+    <p class="keys">${coarse ? '움직이기: 화면을 끌면 그 방향으로 · 가고 싶은 곳을 꾹 누르고 있으면 그곳까지 걸어가요' : '움직이기: WASD · 방향키 · 마우스로 끌기 · 가고 싶은 곳을 꾹 누르고 있기'}</p>
     <button id="play" data-act="start">시작</button>`);
 }
 function startRound() {
@@ -5622,6 +5656,7 @@ function startRound() {
 const chTitle = () => `<small>${ci + 1}장 / ${CHAPTERS.length}</small><b>${CH().title}</b><span>${CH().sub}</span>`;
 function beginChapter() { // 이야기가 끝나면 이 장을 시작한다
   mode = 'play'; last = performance.now(); G.time = 0; sites[0].activate(); updateQuest(0, true);
+  if (coarse && ci === 0) later(4.5, () => toast('가고 싶은 곳을 <b>꾹 누르고</b> 있으면 그곳까지 걸어가요'));
   const ch = CH(); toast(`${ICON.hammer} <b>${ci + 1}장</b> ${ch.sites.map(o => o.name).join(' · ')} 짓기${ARC ? ' · ' + mmss(ch.time) : ''}`, 'good');
 }
 // 얼음 문을 지나면: 이번 장 점수를 쌓고 → 다음 장 땅을 새로 깔고 → 이야기 → 시작 (마지막 장이면 엔딩)
