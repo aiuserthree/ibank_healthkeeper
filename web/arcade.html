@@ -124,6 +124,15 @@
         </div>`;
     }
 
+    // 이번 주(월요일부터, 한국 날짜)에 아케이드에 들어온 게임 — 서버 GAMES 의 added(들어온 날)
+    function weekStartKst() {
+      const t = HKPlay.todayKst(), d = new Date(t + "T00:00:00Z");
+      d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+      return d.toISOString().slice(0, 10);
+    }
+    const isNewThisWeek = (g) => !!(g.addedOn && g.addedOn >= weekStartKst());
+    const mdDot = (iso) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`;
+
     // 게임 타일 — 게임 찾기 결과에 쓴다. 바탕은 게임 색(그림이 늦거나 없을 때 보인다)
     function tileHtml(g) {
       // 꿀알바 시리즈 2~8화는 그림 밑에 게임 색 + 아이콘을 깔아 둔다(그림이 늦거나 못 불러오면 아이콘이 보인다)
@@ -133,7 +142,7 @@
         : img;
       return `<a class="hk-aa-tile" href="/games/${g.key}" style="${HKPlay.tintStyle(g.key)}">
           ${art}
-          ${SERIES_EPISODES.includes(g.key) ? `<span class="hk-aa-tile__tag">꿀알바 시리즈</span>` : ""}
+          ${SERIES_EPISODES.includes(g.key) ? `<span class="hk-aa-tile__tag">꿀알바 시리즈</span>` : isNewThisWeek(g) ? `<span class="hk-aa-tile__tag is-new">NEW · ${mdDot(g.addedOn)}</span>` : ""}
           <span class="hk-aa-tile__copy"><small>${GENRE[g.key] || "기타"}</small><b>${esc(g.title)}</b></span>
           <span class="hk-aa-pill is-sm is-white hk-aa-tile__go">시작하기</span>
         </a>`;
@@ -149,6 +158,26 @@
       const lead = pool[Math.floor(Math.random() * pool.length)];
       try { localStorage.setItem(LEAD_KEY, lead.key); } catch (_) { /* 위와 같음 */ }
       return lead;
+    }
+
+    // 이번 주 새 게임 — 월요일부터 들어온 게임을 최근 들어온 순으로. 없으면 영역을 숨긴다. 8개 넘으면 「더 보기」
+    const NEW_SHOW = 8;
+    function newHtml(games) {
+      const ws = weekStartKst();
+      const list = games.filter(isNewThisWeek).sort((a, b) => (b.addedOn > a.addedOn ? 1 : b.addedOn < a.addedOn ? -1 : 0));
+      if (!list.length) return "";
+      const we = new Date(ws + "T00:00:00Z"); we.setUTCDate(we.getUTCDate() + 6);
+      const tiles = list.map((g, i) => `<div class="hk-aa-new__item"${i >= NEW_SHOW ? " hidden" : ""}>${tileHtml(g)}</div>`).join("");
+      return `<div class="hk-aa-new hk-aa-wrap" id="aa-new">
+          <span class="hk-aa-offer__eyebrow">${HKUI.icon("sparkles", 16, "currentColor")} 이번 주 새 게임 · ${mdDot(ws)} ~ ${mdDot(we.toISOString().slice(0, 10))}</span>
+          <h2 class="hk-aa-h2">이번 주에 새로 나왔어요 <small>${list.length.toLocaleString("ko-KR")}개</small></h2>
+          <div class="hk-aa-find__grid hk-aa-new__grid">${tiles}</div>
+          ${list.length > NEW_SHOW ? `<button type="button" class="hk-aa-pill is-sm hk-aa-new__more" id="aa-new-more">${(list.length - NEW_SHOW).toLocaleString("ko-KR")}개 더 보기</button>` : ""}
+        </div>`;
+    }
+    function bindNew(root) {
+      const more = root.querySelector("#aa-new-more");
+      if (more) more.onclick = () => { root.querySelectorAll(".hk-aa-new__item[hidden]").forEach((x) => (x.hidden = false)); more.remove(); };
     }
 
     // 게임 모음 — 제목 · 대표 게임(무작위) · 게임 찾기(검색칸 + 분류 칩 + 결과)
@@ -829,9 +858,10 @@
           const [st, allGames, sp, wk] = await Promise.all([HKApi.playStatus().catch(() => ({ open: true })), HKApi.playGames(), HKApi.playStamps().catch(() => null), HKApi.playWeekly().catch(() => null)]);
           status = st;
           const games = allGames.filter((g) => !SERIES_ONLY.includes(g.key));
-          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + `<div class="hk-aa-wrap" id="aa-notices"></div>` + trioHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + collectionHtml(games, allGames) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
+          body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + `<div class="hk-aa-wrap" id="aa-notices"></div>` + trioHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + newHtml(games) + collectionHtml(games, allGames) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
           bindFind(body);
+          bindNew(body);
           bindHof(body);
           matchNotice(body);
           if (window.HKRaid) HKRaid.renderWidget(document.getElementById("aa-raid")).catch(() => null);
