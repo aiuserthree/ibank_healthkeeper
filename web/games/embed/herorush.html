@@ -74,7 +74,7 @@ p{margin:0;font-size:15px;line-height:1.5;font-weight:500;opacity:.8;word-break:
 #grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .lv{background:#eef3fb;border-radius:14px;padding:8px 2px 6px;display:flex;flex-direction:column;align-items:center;gap:1px;font-family:var(--font-display);box-shadow:0 3px 0 #cfd8e8}
 .lv b{font-size:22px;line-height:1}
-.lv small{font-size:10px;font-weight:600;opacity:.65;white-space:nowrap}
+.lv small{font-size:11.5px;font-weight:700;opacity:.72;white-space:nowrap}
 .lv i{font-style:normal;font-size:11px;color:var(--gold);letter-spacing:1px;height:13px}
 .lv.sel{background:var(--hero);color:#fff;box-shadow:0 3px 0 #1b62c4}
 .lv.sel small{opacity:.9}
@@ -90,6 +90,7 @@ p{margin:0;font-size:15px;line-height:1.5;font-weight:500;opacity:.8;word-break:
 .hint{font-size:13px;opacity:.6;word-break:keep-all;line-height:1.5}
 #drag{position:fixed;left:0;right:0;bottom:9%;text-align:center;font-family:var(--font-display);font-weight:600;font-size:18px;color:#fff;text-shadow:0 2px 0 rgba(0,0,0,.35);pointer-events:none;display:none}
 @media (max-width:560px){h1{font-size:30px}#count{top:70px;padding:6px 16px 6px 10px}#count .num{font-size:28px}#count .ico{width:28px;height:28px}#count .ico::before{top:4px;width:9px;height:9px;margin-left:-4.5px}#count .ico::after{width:14px;height:10px;margin-left:-7px;bottom:3px}}
+body.inmenu #lvl,body.inmenu #count{visibility:hidden} /* 단계 고르기 화면에선 게임 안 숫자를 숨겨 카드만 보이게 */
 @media (prefers-reduced-motion:reduce){#count.up,#count.down,#bub.up,#bub.down{animation:none}}
 </style>
 </head>
@@ -499,7 +500,7 @@ function resize(){
   const w = window.innerWidth, h = window.innerHeight, a = w / h;
   renderer.setSize(w, h, false);
   camera.aspect = a;
-  camera.fov = a < 1.25 ? clamp(2 * Math.atan(Math.tan(31 * Math.PI / 180) / a) * 180 / Math.PI, 55, 86) : 55;
+  camera.fov = a < 1.25 ? clamp(2 * Math.atan(Math.tan(31 * Math.PI / 180) / a) * 180 / Math.PI, 55, 72) : 55; // 세로 화면은 시야를 너무 넓히지 않아야 앞 관문 숫자 · 보스가 작아지지 않는다
   camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize); resize();
@@ -587,13 +588,13 @@ function gateTex(o){
     x.fillStyle = 'rgba(255,255,255,.1)'; x.beginPath(); x.moveTo(200, 0); x.lineTo(240, 0); x.lineTo(160, H); x.lineTo(120, H); x.fill(); x.restore();
     x.lineWidth = 12; x.strokeStyle = 'rgba(255,255,255,.95)'; x.beginPath(); x.roundRect(10, 10, W - 20, H - 20, 32); x.stroke();
     x.lineWidth = 4; x.strokeStyle = good ? 'rgba(200,235,255,.8)' : 'rgba(255,220,225,.8)'; x.beginPath(); x.roundRect(26, 26, W - 52, H - 52, 22); x.stroke();
-    const t = opLabel(o); let fs = 168; x.font = `900 ${fs}px "Arial Rounded MT Bold","Apple SD Gothic Neo","Trebuchet MS",Arial,sans-serif`;
+    const t = opLabel(o); let fs = 200; x.font = `900 ${fs}px "Arial Rounded MT Bold","Apple SD Gothic Neo","Trebuchet MS",Arial,sans-serif`;
     while (x.measureText(t).width > W - 90 && fs > 80) { fs -= 8; x.font = `900 ${fs}px "Arial Rounded MT Bold","Apple SD Gothic Neo","Trebuchet MS",Arial,sans-serif`; }
     x.textAlign = 'center'; x.textBaseline = 'middle';
     x.shadowColor = good ? 'rgba(160,220,255,1)' : 'rgba(255,170,180,1)'; x.shadowBlur = 26;
     x.lineJoin = 'round'; x.lineWidth = 16; x.strokeStyle = good ? '#0d3f9e' : '#8f1426'; x.strokeText(t, W / 2, H / 2 + 10);
     x.shadowBlur = 0; x.fillStyle = '#fff'; x.fillText(t, W / 2, H / 2 + 10);
-    x.fillStyle = 'rgba(255,255,255,.35)'; x.fillRect(W / 2 - 110, H / 2 - fs * .32, 220, 6);
+    x.fillStyle = 'rgba(255,255,255,.35)'; x.fillRect(W / 2 - 110, H / 2 - fs * .5 - 2, 220, 6);
   }));
 }
 function mkGate(it){
@@ -1075,11 +1076,12 @@ function render(dt){
   }
 
   // camera
-  const rad = .165 * Math.sqrt(Math.max(1, n)), zoom = 1 + Math.min(1, rad / 4.5) * .55, tall = camera.aspect < 1 ? 1.15 : 1;
+  const rad = .165 * Math.sqrt(Math.max(1, n)), zoom = 1 + Math.min(1, rad / 4.5) * .55, port = camera.aspect < 1, tall = port ? 1.15 : 1;
+  const near = port ? clamp(.45 + camera.aspect * .55, .6, 1) : 1; // 세로 화면 보스 장면은 카메라를 당겨 보스를 크게
   if (ph === 'menu') { wantPos.set(Math.sin(t * .3) * 4, 6, 12); wantLook.set(0, 1, -8); }
-  else if (ph === 'run' || (ph === 'fail' && S.why === 'trap')) { wantPos.set(S.px * .45, (6.5 * zoom + 1.5) * tall, S.pz + 9.5 * zoom * tall); wantLook.set(S.px * .45, .5, S.pz - 9); }
-  else if (ph === 'battle' || (ph === 'fail' && S.why === 'army')) { wantPos.set(0, 12 * tall, S.armyZ + 19 * tall); wantLook.set(0, 1, S.armyZ - 3); }
-  else { wantPos.set(5.5, 8.5 * tall, S.bossZ + 23 * tall); wantLook.set(0, 4.6, S.bossZ + 1); }
+  else if (ph === 'run' || (ph === 'fail' && S.why === 'trap')) { wantPos.set(S.px * .45, (6.5 * zoom + 1.5) * tall, S.pz + 9.5 * zoom * tall); wantLook.set(S.px * .45, .5, S.pz - (port ? 12 : 9)); }
+  else if (ph === 'battle' || (ph === 'fail' && S.why === 'army')) { wantPos.set(0, 12 * tall, S.armyZ + 19 * tall); wantLook.set(0, 1, S.armyZ - (port ? 3 : 5.5)); }
+  else { wantLook.set(0, port ? 4.2 : 4.6, S.bossZ + 1); wantPos.set(5.5 * near, wantLook.y + (8.5 * tall - 4.6) * near, S.bossZ + 1 + (23 * tall - 1) * near); }
   const ck = 1 - Math.exp(-dt * (ph === 'run' ? 8 : 3)); camPos.lerp(wantPos, ck); camLook.lerp(wantLook, ck);
   camera.position.copy(camPos); if (S.shake > 0) { camera.position.x += rand(-1, 1) * S.shake * .5; camera.position.y += rand(-1, 1) * S.shake * .5; }
   camera.lookAt(camLook);
@@ -1093,8 +1095,10 @@ function render(dt){
   if (n !== lastN) { const c = $('count'), b = $('bub'); if (lastN >= 0) { const cls = n > lastN ? 'up' : 'down'; [c, b].forEach(el => { el.classList.remove('up', 'down'); void el.offsetWidth; el.classList.add(cls); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('up', 'down'), 460); }); } lastN = n; $('num').textContent = n.toLocaleString('ko-KR'); b.textContent = n.toLocaleString('ko-KR'); }
   if (en !== lastEn) { lastEn = en; $('foeTag').textContent = en.toLocaleString('ko-KR'); }
   $('progFill').style.width = clamp(-S.pz / S.len, 0, 1) * 100 + '%';
-  place($('bub'), S.px, 1.6 + rad * .25, S.pz, (ph === 'run' || ph === 'battle') && n > 0);
-  place($('foeTag'), 0, 2.2, S.armyZ - 2, en > 0 && S.pz < S.armyZ + 90 && ph !== 'menu');
+  const fight = ph === 'battle'; // 맞붙으면 두 숫자가 겹치지 않게 좌우로 벌린다
+  const gateNear = ph === 'run' && gates.some(g => !g.used && S.pz - g.z < 9); // 관문 바로 앞에선 머리 위 숫자가 관문 숫자를 가리지 않게 숨김(위 영웅 수는 그대로)
+  place($('bub'), fight ? -2.3 : S.px, 1.6 + rad * .25, fight ? S.armyZ + 1 : S.pz, (ph === 'run' && !gateNear || fight) && n > 0);
+  place($('foeTag'), fight ? 2.3 : 0, 2.2, S.armyZ - 2, en > 0 && S.pz < S.armyZ + 90 && ph !== 'menu');
   place($('bossTag'), 0, 11.4, S.bossZ, ph === 'boss');
   $('bossFill').style.width = S.hp / S.hp0 * 100 + '%';
 }
@@ -1108,14 +1112,14 @@ function drawGrid(){
     b.setAttribute('aria-label', `${i + 1}단계, ${L.name}`); b.onclick = () => { sel = i; drawGrid(); buildLevel(i); S.phase = 'menu'; }; g.appendChild(b); });
   $('bPlay').textContent = (sel + 1) + '단계 시작';
 }
-function showMenu(){ setPause(false); roundOn = false; S.phase = 'menu'; $('end').classList.remove('on'); $('menu').classList.add('on'); $('drag').style.display = 'none'; drawGrid(); buildLevel(sel); S.phase = 'menu'; }
-function startLevel(i){ setPause(false); sel = i; buildLevel(i); S.phase = 'run'; roundOn = true; hk({type:'hk:start'}); $('menu').classList.remove('on'); $('end').classList.remove('on'); $('drag').style.display = 'block'; }
+function showMenu(){ setPause(false); roundOn = false; S.phase = 'menu'; document.body.classList.add('inmenu'); $('end').classList.remove('on'); $('menu').classList.add('on'); $('drag').style.display = 'none'; drawGrid(); buildLevel(sel); S.phase = 'menu'; }
+function startLevel(i){ setPause(false); document.body.classList.remove('inmenu'); sel = i; buildLevel(i); S.phase = 'run'; roundOn = true; hk({type:'hk:start'}); $('menu').classList.remove('on'); $('end').classList.remove('on'); $('drag').style.display = 'block'; }
 function showEnd(won){
   S.shown = true; const last = S.lvl === LEVELS.length - 1;
   const st0 = won ? (n / S.best >= .5 ? 3 : n / S.best >= .25 ? 2 : 1) : 0;
   const res = calcScore(won, S.lvl + 1, st0, n, clamp(-S.pz / S.len, 0, 1));
   $('endScore').textContent = '점수 ' + res.score.toLocaleString('ko-KR') + '점';
-  $('endCalc').innerHTML = res.lines.map(l => '<div>' + l + '</div>').join('') + (won ? '' : '<div>성공하면: 단계 × 500 + 별 × 300 + 살아남은 영웅 × 10</div>');
+  $('endCalc').innerHTML = res.lines.map(l => '<div>' + l + '</div>').join('') + (won ? `<div style="opacity:.75">별: 이 단계 최대 ${S.best.toLocaleString('ko-KR')}명 중 절반 이상 ★3 · 4분의 1 이상 ★2</div>` : '<div>성공하면: 단계 × 500 + 별 × 300 + 살아남은 영웅 × 10</div>');
   if (roundOn) { roundOn = false; hk({type:'hk:score', score:Math.max(0, Math.floor(res.score))}); }
   if (won) {
     const st = st0;
@@ -1180,7 +1184,19 @@ window.addEventListener('keyup', e => { keys[e.key] = false; setKeys(); });
 
 /* ---------------- loop ---------------- */
 let last = performance.now();
-function frame(now){ const dt = Math.min(.05, (now - last) / 1000); last = now; if (!paused) update(dt); render(paused ? 0 : dt); requestAnimationFrame(frame); }
+/* 느린 휴대폰: 플레이 중 2초 평균이 25ms(40fps)보다 느리면 화면 해상도를 한 칸씩 낮춘다(최저 1.25배) */
+let prNow = Math.min(window.devicePixelRatio || 1, 2), slowT = 0, slowF = 0;
+function adapt(raw){
+  if (prNow <= 1.25 || raw > .1 || !(S.phase === 'run' || S.phase === 'battle' || S.phase === 'boss')) return;
+  slowT += raw; slowF++;
+  if (slowT < 2) return;
+  if (slowT / slowF > .025) { prNow = Math.max(1.25, prNow - .25); renderer.setPixelRatio(prNow); resize(); }
+  slowT = 0; slowF = 0;
+}
+function frame(now){ const raw = (now - last) / 1000, dt = Math.min(.05, raw); last = now; if (!paused) adapt(raw);
+  // 느린 휴대폰(프레임이 듬성)에서도 함정 판정이 건너뛰지 않게 1/60초 이하로 나눠 움직인다
+  if (!paused) { const st = Math.ceil(dt * 60 - 1e-6) || 1; for (let i = 0; i < st; i++) update(dt / st); }
+  render(paused ? 0 : dt); requestAnimationFrame(frame); }
 showMenu();
 requestAnimationFrame(frame);
 if (!ARCADE) window.__hr = {S, LEVELS, update, render, startLevel, gates: () => gates, n: () => n, en: () => en, applyOp}; // 시험용 — 아케이드 모드에선 숨김

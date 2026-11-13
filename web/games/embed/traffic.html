@@ -59,7 +59,8 @@ button.primary{background:#3ecf6e;color:#fff;box-shadow:0 5px 0 #23a04c;font-siz
 #pauseOv.on{display:flex}
 #pauseOv b{font-size:28px;margin-bottom:8px}
 #pauseOv span{font-weight:700;opacity:.85}
-#help{position:fixed;bottom:84px;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100% - 32px);background:rgba(255,255,255,.88);border-radius:999px;padding:7px 14px;box-shadow:0 4px 12px rgba(43,51,80,.15);text-align:center;font-weight:800;color:#2b3350;opacity:.75;pointer-events:none;font-size:14px;transition:opacity .4s;padding:0 16px;word-break:keep-all}
+#help{position:fixed;bottom:84px;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100% - 32px);background:rgba(255,255,255,.88);border-radius:16px;padding:7px 14px;box-shadow:0 4px 12px rgba(43,51,80,.15);text-align:center;font-weight:800;color:#2b3350;opacity:.75;pointer-events:none;font-size:14px;transition:opacity .4s;padding:6px 16px;word-break:keep-all}
+.arc #help{bottom:100px}
 #note{display:none;position:fixed;bottom:70px;left:0;right:0;margin:0 auto;width:max-content;max-width:calc(100% - 32px);text-align:center;font-weight:700;color:#59617d;background:rgba(255,255,255,.8);border-radius:999px;pointer-events:none;font-size:11.5px;padding:3px 12px}
 .arc #note{display:block}
 @media (max-width:440px){
@@ -348,7 +349,11 @@ function burstSparks(x,y,z){
 
 /* ---------- 귀여운 도시 블록 ---------- */
 const ROAD_W=1.3,BLOCK=6.6;
-const camDir=new THREE.Vector3(0.42,1.25,0.8).normalize();
+// 카메라 방향: 가로 화면은 비스듬히(입체감), 세로(휴대폰)는 조금 더 위에서 · 덜 비스듬히 — 판이 화면 너비를 더 넓게 쓰게
+const camDir=new THREE.Vector3();
+function aimFor(aspect){const k=Math.max(0,Math.min(1,(1.05-aspect)/0.5));
+  return camDir.set(0.42-0.24*k,1.25+0.45*k,0.8+0.05*k).normalize();}
+aimFor(innerWidth/Math.max(1,innerHeight));
 const camH=new THREE.Vector2(camDir.x,camDir.z).normalize();
 function boardTexture(N){
   return canvasTex(N*96,N*96,(x,W)=>{
@@ -381,8 +386,14 @@ function disposeCity(n){
     if(o.material)(Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{if(!KEEP_MAT.has(m)){if(m.map)m.map.dispose();m.dispose();}});});
 }
 // 판 크기(N)가 바뀔 때만 새 도시. 다음 크기는 단계 깸 카드가 떠 있는 동안 미리 만들어 둔다
+// 다음 크기 도시는 지금 단계를 하는 동안 여러 프레임에 나눠 미리 만든다(단계 넘어갈 때 끊김 줄이기)
+const cityJobs={};
+function finishCity(N,ct){cities[N]=ct;try{renderer.initTexture(ct.groundTex);renderer.initTexture(ct.boardTex);}catch(e){}}
+function makeCity(N){const it=cityJobs[N]||makeCityGen(N);delete cityJobs[N];let r;while(!(r=it.next()).done);return r.value;}
+function warmCity(N){if(!cities[N]&&!cityJobs[N])cityJobs[N]=makeCityGen(N);}
+function stepCityJobs(){for(const k in cityJobs){const r=cityJobs[k].next();if(r.done){delete cityJobs[k];if(!cities[k])finishCity(+k,r.value);}return;}}
 function prepareCity(N){
-  if(!cities[N]){cities[N]=makeCity(N);try{renderer.initTexture(cities[N].groundTex);}catch(e){}}
+  if(!cities[N])finishCity(N,makeCity(N));
   return cities[N];
 }
 function buildCity(N){
@@ -392,7 +403,7 @@ function buildCity(N){
   else if(!ct.group.parent)scene.add(ct.group);
   for(const k in cities)if(+k!==N&&+k!==N+1&&+k!==Math.min(9,N+1))disposeCity(+k);
 }
-function makeCity(N){
+function* makeCityGen(N){
   const rnd=mulberry32(N*977+5),grp=new THREE.Group(),keep=new Set([trunkGeo,crownGeo,pineGeo]);
   const h=N/2,e0=h+0.15,c=e0+ROAD_W/2,E=h+22,PPU=MOBILE?22:28;
   const roads=[];for(let k=0;k<5;k++){const r=c+k*BLOCK;if(r+ROAD_W/2<E){roads.push(r,-r);}}roads.sort((a,b)=>a-b);
@@ -445,6 +456,7 @@ function makeCity(N){
       });
     });
   });
+  yield;
   const groundMat=new THREE.MeshLambertMaterial({map:groundTex});
   const gm=new THREE.Mesh(new THREE.PlaneGeometry(2*E,2*E),groundMat);gm.rotation.x=-Math.PI/2;gm.position.y=-0.03;gm.receiveShadow=true;grp.add(gm);
   // 주차판 (게임판)
@@ -453,6 +465,7 @@ function makeCity(N){
   const bg=new THREE.BoxGeometry(N+0.3,0.12,N+0.3);
   const b=new THREE.Mesh(bg,boardMat);b.position.y=-0.06;b.receiveShadow=true;grp.add(b);
   // 3D 소품 (연석 · 건물 지붕 장식 · 가로등 · 벤치) → 한 메시, 건물 벽 → 한 메시, 나무 → 인스턴스
+  yield;
   const deco=[],walls=[],trees=[],pines=[];
   const box=(w,hh,d,x,y,z,col,r)=>deco.push({g:roundBox(w,hh,d,r==null?Math.min(w,hh,d)*0.3:r,1),p:[x,y,z],c:col});
   const WALL=[0xfff1dc,0xffd9c7,0xd8e9ff,0xe7dcff,0xfdeaa8,0xd4f2e4,0xffe0ec];
@@ -515,7 +528,9 @@ function makeCity(N){
       }
     }
   }));
+  yield;
   const wm=new THREE.Mesh(merge(walls,{color:true,uv:true}),matWall);wm.castShadow=wm.receiveShadow=true;grp.add(wm);
+  yield;
   const dm=new THREE.Mesh(merge(deco,{color:true}),matDeco);dm.castShadow=true;dm.receiveShadow=true;grp.add(dm);
   const all=trees.concat(pines),GR=[0x4fbf5f,0x5cc96a,0x3fae5a,0x6fd37a,0x48b86c];
   if(all.length){
@@ -527,7 +542,7 @@ function makeCity(N){
     pines.forEach((t,i)=>{tmpM.compose(tmpV.set(t[0],0.3*t[2],t[1]),tmpQ.identity(),tmpS.set(t[2],t[2],t[2]));pn.setMatrixAt(i,tmpM);pn.setColorAt(i,tmpC.set(GR[Math.floor(t[3]*GR.length)]).multiplyScalar(0.85));});
     grp.add(tr,cr,pn);
   }
-  return {group:grp,keep,groundTex};
+  return {group:grp,keep,groundTex,boardTex};
 }
 
 /* ---------- game state ---------- */
@@ -557,6 +572,7 @@ function buildLevel(){
     return car;
   });
   remaining=cars.length;fitCamera();hud();setCombo();
+  {const nN=levelSpec(save.level+1).N;if(nN!==N)warmCity(nN);}
   $('help').style.opacity=save.level===1&&mode!=='menu'?0.75:0;
 }
 const fmtTime=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');};
@@ -720,12 +736,24 @@ function resumeGame(){
 }
 
 /* ---------- camera / input ---------- */
+const fitPts=[...Array(8)].map(()=>new THREE.Vector3()),fitV=new THREE.Vector3();
 function fitCamera(){
-  const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;
-  const R=N*0.72+1.4,hv=THREE.MathUtils.degToRad(camera.fov/2),hh=Math.atan(Math.tan(hv)*camera.aspect);
-  const dist=R/Math.sin(Math.min(hv,hh));
-  camera.position.copy(camDir).multiplyScalar(dist);camera.userData.base=camera.position.clone();
-  camera.lookAt(0,0,0.3);camera.updateProjectionMatrix();
+  const w=innerWidth,h=innerHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.clearViewOffset();
+  aimFor(camera.aspect);
+  // 판(+ 차 높이 · 약간의 여백)이 위 HUD 와 아래 버튼 사이 빈 곳에 꼭 맞게 거리를 정하고, 그 가운데로 옮긴다
+  const top=$('top').getBoundingClientRect().bottom+8,bot=$('bottom').getBoundingClientRect().top-(ARC?24:8);
+  const availH=Math.max(120,bot-top),port=camera.aspect<0.9,tight=port||availH<460,availW=w-(port?16:40);
+  const e=tight?Math.max(N,6)/2+0.3:Math.max(N,7)/2+1.2; // 좁은 화면은 판을 꽉 차게, 넓은 화면은 둘레 도시도 조금 보이게
+  [[-e,-e],[e,-e],[e,e],[-e,e]].forEach(([x,z],i)=>{fitPts[i].set(x,0,z);fitPts[i+4].set(x,0.95,z);});
+  const box=d=>{camera.position.copy(camDir).multiplyScalar(d);camera.lookAt(0,0,0);camera.updateMatrixWorld();camera.updateProjectionMatrix();
+    let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+    for(const p of fitPts){fitV.copy(p).project(camera);const px=(fitV.x+1)/2*w,py=(1-fitV.y)/2*h;x0=Math.min(x0,px);x1=Math.max(x1,px);y0=Math.min(y0,py);y1=Math.max(y1,py);}
+    return [x0,x1,y0,y1];};
+  let lo=2,hi=200;
+  for(let i=0;i<30;i++){const m=(lo+hi)/2,[x0,x1,y0,y1]=box(m);if(x1-x0>availW||y1-y0>availH)lo=m;else hi=m;}
+  const dist=hi,[x0,x1,y0,y1]=box(dist);
+  camera.userData.base=camera.position.clone();
+  camera.setViewOffset(w,h,Math.round((x0+x1)/2-w/2),Math.round((y0+y1)/2-(top+bot)/2),w,h);
   scene.fog.near=dist*1.0;scene.fog.far=dist*2.3;
 }
 addEventListener('resize',fitCamera);
@@ -734,8 +762,16 @@ canvas.addEventListener('pointerdown',e=>{
   if(paused||locked)return;
   ptr.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1);ray.setFromCamera(ptr,camera);
   const hits=ray.intersectObjects(cars.map(c=>c.hit),false);
-  for(const h of hits){const car=h.object.userData.car;if(car.state==='idle'){tapCar(car);break;}}
+  for(const h of hits){const car=h.object.userData.car;if(car.state==='idle'){tapCar(car);return;}}
+  // 살짝 빗나간 탭(차 사이 · 가장자리)은 가까운 차로 — 휴대폰에서 칸이 작을 때 손가락 오차를 받아 준다
+  if(!ray.ray.intersectPlane(tapPlane,tapV))return;
+  let best=null,bd=0.35;
+  for(const car of cars){if(car.state!=='idle')continue;const d=DIRS[car.dir],L=(car.len-1)/2;
+    const cx=wx(car.c0+d[0]*L),cz=wx(car.r0+d[1]*L),ax=Math.abs(tapV.x-cx)-(d[0]?car.len/2:0.5),az=Math.abs(tapV.z-cz)-(d[1]?car.len/2:0.5);
+    const dist=Math.hypot(Math.max(0,ax),Math.max(0,az));if(dist<bd){bd=dist;best=car;}}
+  if(best)tapCar(best);
 });
+const tapPlane=new THREE.Plane(new THREE.Vector3(0,1,0),-0.4),tapV=new THREE.Vector3();
 $('bRestart').onclick=()=>{
   if(paused)return;
   if(ARC){
@@ -783,6 +819,7 @@ function frame(now){
   if(!paused){
     update(dt,now/1000);
     stepPool(smoke,dt,'smoke');stepPool(sparks,dt,'spark');stepPool(confetti,dt,'conf');
+    if(!active.length&&clearIn<=0)stepCityJobs(); // 차가 움직이지 않을 때만 조금씩
     if(clearIn>0){clearIn-=dt;if(clearIn<=0){clearIn=0;levelClear();}}
     if(nextIn>0){nextIn-=dt;if(nextIn<=0){nextIn=0;if(mode==='play'){hideCard();buildLevel();}}}
     if(mode==='play'){
