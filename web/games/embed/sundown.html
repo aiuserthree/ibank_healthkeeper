@@ -114,6 +114,21 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 .h-chips{position:absolute;left:16px;bottom:18px;display:flex;gap:8px;flex-wrap:wrap}
 .chip{font-family:var(--font-display);font-size:12px;letter-spacing:.06em;line-height:1;padding:7px 10px;border-radius:999px;background:rgba(26,10,43,.75);border:2px solid currentColor}
 .chip.sh{color:var(--cyan)}.chip.bl{color:var(--pink)}.chip.bo{color:var(--marigold)}
+/* 아이템 칸 · 쓰기 버튼(휴대폰은 엄지로 누르기 좋게 오른쪽 아래, 달리기 · 방향 터치와 안 겹치게 버튼 자리만 따로) */
+.h-slots{position:absolute;left:16px;top:96px;display:flex;gap:8px}
+.slot{width:66px;height:66px;border-radius:14px;background:rgba(26,10,43,.78);border:2px solid rgba(255,242,216,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
+.slot.first{border-color:var(--marigold);box-shadow:0 0 14px rgba(255,197,51,.45)}
+.slot i{font-style:normal;font-size:28px;line-height:1;min-height:28px}
+.slot b{font-family:var(--font-display);font-size:10px;line-height:1.1;text-align:center;max-width:62px;word-break:keep-all;color:var(--cream)}
+.slot.roll i{animation:roll .12s linear infinite}
+@keyframes roll{0%{transform:translateY(-6px);opacity:.4}50%{transform:none;opacity:1}100%{transform:translateY(6px);opacity:.4}}
+.item-btn{position:absolute;right:16px;bottom:44px;width:96px;height:96px;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  background:radial-gradient(circle at 50% 35%,#ff6b9e,#c8246a 70%);border:4px solid var(--marigold);box-shadow:0 0 22px rgba(255,65,146,.6);font-family:var(--font-display);font-size:16px;font-weight:800;color:var(--cream);touch-action:none;-webkit-user-select:none;user-select:none}
+.item-btn small{font-size:11px;opacity:.85;padding:1px 6px;border-radius:5px;background:rgba(26,10,43,.5)}
+.item-btn.off{opacity:.45;box-shadow:none}
+.item-btn:active{transform:scale(.94)}
+@media (pointer:coarse){.item-btn small{display:none}.item-btn{width:104px;height:104px;font-size:17px}}
+@media (max-width:760px){.h-slots{top:96px}.slot{width:58px;height:58px}.slot i{font-size:24px;min-height:24px}}
 .drift{position:absolute;right:16px;bottom:18px;display:flex;gap:4px;align-items:center;font-family:var(--font-display);font-size:11px;letter-spacing:.12em;text-shadow:0 2px 0 var(--ink)}
 .drift span{margin-right:4px}
 .drift i{width:24px;height:10px;border-radius:3px;background:rgba(255,242,216,.22)}
@@ -193,7 +208,7 @@ html.vs #hTixW,html.vs #btnPause{display:none}
       <button class="btn go" id="btnRace" type="button">출발하기</button>
       <button class="btn" id="btnGarage" type="button">차고</button>
       <button class="btn quiet" id="btnSound" type="button">소리 켬</button>
-      <p class="how" id="howTxt">누르고 있으면 달리고, 떼면 느려져요. 좌우로 끌어 방향을 바꿔요.</p>
+      <p class="how" id="howTxt">누르고 있으면 달리고, 떼면 느려져요. 좌우로 끌어 방향을 바꿔요. 상자를 지나 얻은 아이템은 E 키나 「아이템」 버튼으로 써요.</p>
     </div>
   </section>
 
@@ -221,6 +236,8 @@ html.vs #hTixW,html.vs #btnPause{display:none}
       <button class="icon-btn" id="btnPause" type="button" aria-label="일시정지">II</button>
     </div>
     <div class="h-chips" id="hChips"></div>
+    <div class="h-slots" aria-label="아이템 칸"><div class="slot first" id="slot0"><i></i><b></b></div><div class="slot" id="slot1"><i></i><b></b></div></div>
+    <button class="item-btn off" id="btnItem" type="button" aria-label="아이템 쓰기"><span>아이템</span><small>E</small></button>
     <div class="drift" id="hDrift"><span>드리프트</span><i></i><i></i><i></i></div>
     <div class="toast" id="toast" role="status"></div>
     <div class="count" id="count" hidden></div>
@@ -245,7 +262,7 @@ html.vs #hTixW,html.vs #btnPause{display:none}
   <section id="pause" class="panel-wrap" hidden>
     <div class="panel">
       <h2>잠깐 멈춤</h2>
-      <p>누르고 있으면 달리고, 떼면 느려지고, 좌우로 끌면 방향을 바꿔요. 굽은 길에서 안쪽으로 꺾고 버티면 드리프트 부스트가 모여요. 점프해서 공중에 떴을 때 좌우로 세게 끌면 빙글 돌아 티켓을 받아요.</p>
+      <p>누르고 있으면 달리고, 떼면 느려지고, 좌우로 끌면 방향을 바꿔요. 굽은 길에서 안쪽으로 꺾고 버티면 드리프트 부스트가 모여요. 점프해서 공중에 떴을 때 좌우로 세게 끌면 빙글 돌아 티켓을 받아요. 길 위 선물 상자를 지나면 아이템이 칸(2칸)에 들어가요 — E 키(또는 Shift)나 오른쪽 아래 「아이템」 버튼으로 첫 칸부터 써요. 뒤처질수록 센 아이템이 잘 나와요.</p>
       <p class="arc-note" id="pauseArc" hidden>중간에 나가면 이번 판 점수는 없어요.</p>
       <div class="row">
         <button class="btn go" id="btnResume" type="button">이어 하기</button>
@@ -873,7 +890,7 @@ function populate(tr){
     let s=s0,ok=false;
     for(let k=0;k<30;k++,s+=5){if(tr.FL[s|0]===0&&tr.FL[(s|0)+4]===0&&!nearHz(s,16)){ok=true;break;}}
     if(!ok)continue;
-    for(const u of [-4,0,4]){const r=rnd();items.push({s:s,u:u,type:r<.4?'rocket':r<.7?'shield':'blast',on:true,cd:0,grp:null});}
+    for(const u of [-4,0,4]){rnd();items.push({s:s,u:u,type:'box',on:true,cd:0,grp:null});} // 상자 — 무엇이 나올지는 먹을 때 순위로 정한다
   }
   const nearIt=(s,d)=>{for(const it of items){if(Math.abs(it.s-s)<d)return true;}return false;};
   const tix=[];
@@ -1059,11 +1076,23 @@ function getItemGeos(){
     const q=new THREE.Quaternion().setFromUnitVectors(_Y,new V3(d[0],d[1],d[2]));
     b.add(G.cone,0xffc533,new THREE.Matrix4().compose(new V3(d[0]*.75,d[1]*.75,d[2]*.75),q,new V3(.2,.5,.2)));
   }
-  itemGeos={rocket:r.geo(),shield:s.geo(),blast:b.geo()};
+  // 아이템 상자(선물 상자) · 던진 팝콘 폭탄 · 바닥 솜사탕 함정 · 회오리 바람
+  const x=new Bake();
+  x.add(G.box,0xff4192,mat(0,0,0,1.3));x.add(G.box,0xffc533,mat(0,0,0,1.36,1.36,.32));x.add(G.box,0xffc533,mat(0,0,0,.32,1.36,1.36));
+  x.add(G.sphLo,0xfff27a,mat(-.3,.85,0,.32,.22,.22));x.add(G.sphLo,0xfff27a,mat(.3,.85,0,.32,.22,.22));
+  const pc=new Bake();
+  for(let k=0;k<9;k++){const a=k*2.4,r=.5;pc.add(G.sphLo,k%3?0xfff4c8:0xffd84a,mat(Math.cos(a)*r*(k%2?1:.5),(k%4)*.25-.3,Math.sin(a)*r,.45));}
+  pc.add(G.cylLo,0xe83a3a,mat(0,-.6,0,.6,.5,.6),[0xffffff,2]);
+  const cd=new Bake();
+  cd.add(G.cyl,0xff9fd8,mat(0,0,0,2.1,.18,2.1),[0xffffff,4]);for(let k=0;k<5;k++){const a=k*TAU/5;cd.add(G.sphLo,0xffd0ee,mat(Math.cos(a)*1.2,.25,Math.sin(a)*1.2,.55,.4,.55));}
+  cd.add(G.cylLo,0xfff8f0,mat(0,.6,0,.08,1.2,.08));cd.add(G.sphLo,0xff5fa8,mat(0,1.3,0,.5));
+  const wd=new Bake();
+  for(let k=0;k<4;k++)wd.add(G.torThin,k%2?0x9fe8ff:0xffffff,mat(0,-.9+k*.75,0,.6+k*.38,.6+k*.38,12,Math.PI/2,0,0));
+  wd.add(G.cylLo,0xcff4ff,mat(0,0,0,.25,3,.25));
+  itemGeos={rocket:r.geo(),shield:s.geo(),blast:b.geo(),box:x.geo(),popcorn:pc.geo(),candy:cd.geo(),wind:wd.geo()};
   for(const k in itemGeos)itemGeos[k].userData={keep:true};
   return itemGeos;
 }
-const ITEM_COL={rocket:0xff8a3c,shield:0x48e4ff,blast:0xff4192};
 
 function makeBoat(hz){
   const g=new THREE.Group(),B=new Bake(),PV=15;
@@ -1660,7 +1689,7 @@ function aiStats(v){return {vmax:v,acc:21,hand:13,driftRate:.85,boostMul:1.27,bo
 function baseStats(){return {vmax:45,acc:20,hand:15,driftRate:1,boostMul:1.3,boostDur:1,spinoutDur:1,ticketLoss:3,scrape:.8,magnet:1,spinTix:1,shieldT:8};}
 function resetCar(c){
   Object.assign(c,{h:0,vy:0,v:0,uVel:0,air:false,airT:0,spins:0,spinning:false,spinP:0,spinDir:1,spinYaw:0,boostT:0,shield:0,armed:0,invuln:0,
-    spinout:0,spinoutMax:1,squash:0,driftT:0,driftDir:1,driftGrace:0,driftVis:0,steerVis:0,lastSteer:0,scrape:false,padCd:0,bumpCd:0,finished:false,finishT:0,rb:1});
+    spinout:0,spinoutMax:1,squash:0,driftT:0,driftDir:1,driftGrace:0,driftVis:0,steerVis:0,lastSteer:0,scrape:false,padCd:0,bumpCd:0,finished:false,finishT:0,rb:1,slots:[],slowT:0,starT:0,magT:0,itemHeld:0,aiItemT:0});
   c.ai={home:0,wf:.4+Math.random()*.5,wp:Math.random()*TAU,t:Math.random()*.1,lane:0,dec:new Map(),brakeT:0,greed:Math.random(),trick:false,trickDir:1,tubeAmp:Math.random()<.5?0:6+Math.random()*10,out:{accel:true,steer:0}};
 }
 function gridCars(){
@@ -1717,6 +1746,7 @@ function nearPlayer(c,d){return Math.abs(c.s-player.s)<d;}
 function boost(c,d){c.boostT=Math.max(c.boostT,d*c.st.boostDur);}
 function addTix(n,trick){game.tix+=n;if(trick)game.tixTrick+=n;}
 
+const HIT_TXT={hammer:'납작해졌어요!',boat:'바이킹에 쿵!',cups:'찻잔에 걸렸어요!',blast:'펑! 맞았어요',pop:'팝콘 폭탄에 맞았어요!',trap:'솜사탕에 미끄러졌어요!',wind:'회오리에 휘말렸어요!',star:'무지개 별에 튕겼어요!'};
 function hit(c,kind){
   if(c.invuln>0||c.finished)return false;
   surf(track,c.s,c.u,1+c.h,S1);
@@ -1734,7 +1764,7 @@ function hit(c,kind){
     const lost=Math.min(game.tix,c.st.ticketLoss);
     if(lost>0){game.tix-=lost;game.tixLost+=lost;burst(S1.pos,lost*4,0xffc533,8,.8,20);}
     game.shake=1;Snd.hit();
-    toast(kind==='hammer'?'납작해졌어요!':kind==='boat'?'바이킹에 쿵!':kind==='cups'?'찻잔에 걸렸어요!':'펑! 맞았어요');
+    toast(HIT_TXT[kind]||HIT_TXT.blast);
   }
   return true;
 }
@@ -1749,12 +1779,150 @@ function blast(c){
   boost(c,.5);
   if(nearPlayer(c,60)){Snd.blast();if(c.isPlayer)toast('범퍼 폭발!');else game.shake=Math.max(game.shake,.5);}
 }
-function applyItem(c,type){
-  vsEv('item',c,type);
-  if(type==='rocket'){boost(c,2.2);if(c.isPlayer){toast('로켓 부스트!');Snd.boost();}}
-  else if(type==='shield'){c.shield=c.st.shieldT;if(c.isPlayer){toast('방패를 얻었어요');Snd.pickup();}}
-  else{c.armed=10;if(c.isPlayer){toast('범퍼 폭발 준비!');Snd.pickup();}}
-  surf(track,c.s,c.u,1.4,S1);burst(S1.pos,12,ITEM_COL[type],8,.45,4);
+/* ================= 아이템 — 상자를 지나면 무작위 아이템이 「아이템 칸」(2칸)에 들어가고, 원할 때 첫 칸부터 쓴다 =================
+   나오는 확률은 순위로 정한다 — 앞설수록 방패 · 함정, 뒤처질수록 센 아이템(회오리 · 무지개 별은 뒤처진 차만). 컴퓨터 차도 상황을 보고 쓴다 */
+const ITEM_KEYS=['rocket','shield','blast','popcorn','candy','wind','magnet','star','balloon'];
+const ITEM_CODE='rsbpcwmtl'; // 대전 스냅숏에서 칸을 짧게 적는 글자(ITEM_KEYS 순서)
+const ITEM={
+  rocket:{n:'로켓 부스트',ic:'🚀',col:0xff8a3c},
+  shield:{n:'방패',ic:'🛡️',col:0x48e4ff},
+  blast:{n:'범퍼 폭발',ic:'💥',col:0xff4192},
+  popcorn:{n:'팝콘 폭탄',ic:'🍿',col:0xffe14a},
+  candy:{n:'솜사탕 함정',ic:'🍭',col:0xff9fd8},
+  wind:{n:'회오리 바람',ic:'🌪️',col:0x9fe8ff},
+  magnet:{n:'자석',ic:'🧲',col:0xd8d8f0},
+  star:{n:'무지개 별',ic:'🌈',col:0xfff27a},
+  balloon:{n:'물풍선',ic:'💧',col:0x48a8ff}
+};
+const ITEM_COL={box:0xffc533};for(const k in ITEM)ITEM_COL[k]=ITEM[k].col;
+const slotsCode=c=>c.slots.map(k=>ITEM_CODE[ITEM_KEYS.indexOf(k)]).join('');
+const slotsFrom=s=>{const o=[];for(const ch of String(s||'')){const i=ITEM_CODE.indexOf(ch);if(i>=0)o.push(ITEM_KEYS[i]);}return o.slice(0,2);};
+function udiff(a,b){let d=a-b;const half=Math.PI*TUBE_R;if(d>half)d-=2*half;else if(d<-half)d+=2*half;return d;}
+function aheadOf(c,d){let best=null;for(const o of cars){if(o===c||o.finished)continue;const ds=o.s-c.s;if(ds>0&&ds<d&&(!best||ds<best.s-c.s))best=o;}return best;}
+function behindOf(c,d){for(const o of cars){if(o===c||o.finished)continue;const ds=c.s-o.s;if(ds>0&&ds<d)return o;}return null;}
+function leaderFor(c){let best=null;for(const o of cars){if(o===c||o.finished)continue;if(!best||o.s>best.s)best=o;}return best&&best.s>c.s?best:null;}
+/* 순위로 고르기 — f: 0(1등) ~ 1(꼴찌) */
+function rollItem(c){
+  const n=cars.length,f=n>1?clamp((c.place-1)/(n-1),0,1):0,first=c.place===1;
+  const w={rocket:10+20*f,shield:22-14*f,blast:10,popcorn:12,candy:22-16*f,wind:(!first&&f>=.5)?8*f:0,magnet:first?0:4+12*f,star:f>=.6?3*f:0,balloon:first?2:6+6*f};
+  let tot=0;for(const k in w)tot+=w[k];
+  let r=Math.random()*tot;for(const k in w){r-=w[k];if(r<=0)return k;}
+  return 'shield';
+}
+function gainItem(c){
+  const k=rollItem(c);c.slots.push(k);c.itemHeld=0;
+  vsEv('get',c,k);
+  surf(track,c.s,c.u,1.4,S1);burst(S1.pos,10,ITEM_COL.box,7,.4,4);
+  if(c.isPlayer){Snd.pickup();if(!save.seenHelp&&!game.hints.item){game.hints.item=1;hint(itemHelpHtml(),3.6);}}
+}
+function itemHelpHtml(){const kb=window.matchMedia&&window.matchMedia('(pointer:fine)').matches;return '아이템을 얻었어요! '+(kb?'<b>E</b> 키(또는 Shift)나 ':'')+'오른쪽 아래 「아이템」 버튼으로 써요.';}
+/* 던진 것 · 떨어뜨린 것 — host · 혼자 하기만 계산한다(guest 는 스냅숏으로 그린다) */
+let objs=[];
+function addObj(o){if(objs.length>=24)objs.shift();objs.push(o);}
+function wet(o){
+  if(o.invuln>0||o.finished)return;
+  surf(track,o.s,o.u,1+o.h,S1);
+  if(o.shield>0){o.shield=0;o.invuln=1.2;burst(S1.pos,18,0x48e4ff,9,.5,6);vsEv('shd',o);if(o.isPlayer){toast('방패가 막아 줬어요');Snd.pop();}return;}
+  o.slowT=2.5;o.boostT=0;vsEv('wet',o);burst(S1.pos,22,[0x48a8ff,0xcff4ff],9,.55,10);
+  if(o.isPlayer){toast('물풍선에 젖었어요!');Snd.pop();game.shake=Math.max(game.shake,.4);}
+}
+function useItem(c){
+  if(!c.slots.length||c.finished||c.spinout>0||game.state!=='race'||game.paused)return false;
+  const k=c.slots.shift();c.itemHeld=0;
+  vsEv('use',c,k);
+  surf(track,c.s,c.u,1.4,S1);burst(S1.pos,14,ITEM[k].col,8,.45,4);
+  const me=c.isPlayer;
+  if(k==='rocket'){boost(c,2.2);if(me)Snd.boost();}
+  else if(k==='shield'){c.shield=c.st.shieldT;if(me)Snd.pickup();}
+  else if(k==='blast'){blast(c);}
+  else if(k==='popcorn'){addObj({k:'popcorn',s:c.s+3,u:c.u,h:1.2,v:Math.max(c.v,30)+38,t:2.6,own:c});if(me)Snd.pop();}
+  else if(k==='candy'){addObj({k:'candy',s:Math.max(1,c.s-5),u:c.u,h:.15,v:0,t:25,own:c,grace:1});if(me)Snd.pop();}
+  else if(k==='wind'){const g=leaderFor(c);if(g)addObj({k:'wind',s:c.s+2,u:c.u,h:1.6,v:140,t:10,own:c,tgt:g});if(me)Snd.boost();}
+  else if(k==='magnet'){c.magT=3.2;if(me)Snd.pickup();}
+  else if(k==='star'){c.starT=5;c.invuln=Math.max(c.invuln,5);boost(c,4);if(me)Snd.boost();}
+  else if(k==='balloon'){const g=aheadOf(c,160);if(g)wet(g);}
+  if(me)toast(ITEM[k].n+'!');
+  return true;
+}
+/* 매 단계 — 던진 것 움직이기 · 맞히기, 자석 끌기 */
+function stepObjs(dt){
+  for(let i=objs.length-1;i>=0;i--){
+    const o=objs[i];o.t-=dt;
+    if(o.k==='wind'){
+      const g=o.tgt;
+      if(!g||g.finished)o.t=0;
+      else{o.s+=o.v*dt;o.u+=udiff(g.u,o.u)*Math.min(1,3*dt);if(o.s>=g.s-1.5){hit(g,'wind');o.t=0;}}
+    }else if(o.k==='popcorn'){
+      o.s+=o.v*dt;
+      for(const c of cars){if(c===o.own||c.finished)continue;if(Math.abs(c.s-o.s)<2.6&&Math.abs(udiff(c.u,o.u))<2.3&&c.h<3){hit(c,'pop');o.t=0;break;}}
+    }else if(o.k==='candy'){
+      if(o.grace>0)o.grace-=dt;
+      for(const c of cars){if(c.finished||(c===o.own&&o.grace>0))continue;if(Math.abs(c.s-o.s)<2.4&&Math.abs(udiff(c.u,o.u))<2.4&&c.h<1.2){hit(c,'trap');o.t=0;break;}}
+    }
+    if(o.s>track.n-6)o.t=0;
+    if(o.t<=0)objs.splice(i,1);
+  }
+}
+function magnetPull(c,dt){
+  if(c.magT<=0)return;
+  c.magT-=dt;
+  const g=aheadOf(c,90);
+  if(g&&!c.air&&c.spinout<=0){c.u+=udiff(g.u,c.u)*Math.min(1,1.6*dt);c.v=Math.min(c.v+30*dt,c.st.vmax*1.3);}
+  else if(c.spinout<=0)c.boostT=Math.max(c.boostT,.15);
+}
+/* 컴퓨터(그리고 시험용 자동 운전)의 아이템 쓰기 */
+function aiItems(c,dt){
+  if(!c.slots.length||c.finished||c.spinout>0||game.state!=='race')return;
+  c.itemHeld+=dt;c.aiItemT-=dt;if(c.aiItemT>0)return;c.aiItemT=.4+Math.random()*.4;
+  const k=c.slots[0],ahead=aheadOf(c,120);
+  let go=c.itemHeld>9;
+  if(k==='rocket')go=go||c.itemHeld>1.5;
+  else if(k==='shield')go=go||(c.shield<=0&&c.itemHeld>2);
+  else if(k==='blast'){for(const o of cars)if(o!==c&&!o.finished&&Math.abs(o.s-c.s)<10)go=true;}
+  else if(k==='popcorn')go=go||!!(ahead&&ahead.s-c.s<60&&Math.abs(udiff(ahead.u,c.u))<3);
+  else if(k==='candy')go=go||!!behindOf(c,30);
+  else if(k==='wind'||k==='star')go=true;
+  else if(k==='magnet')go=go||!!(ahead&&ahead.s-c.s<70);
+  else if(k==='balloon')go=go||!!ahead;
+  if(go)useItem(c);
+}
+/* 던진 것 그리기 — 모두 같은 도형 · 재질을 함께 쓰는 고정 묶음(트랙을 바꿔도 새로 만들지 않음) */
+const objPool=[];
+function renderObjs(list,tau){
+  const ig=getItemGeos();
+  for(let i=0;i<list.length;i++){
+    const o=list[i];let m=objPool[i];
+    if(!m){m=new THREE.Mesh(ig.popcorn,MAT.unlit);m.frustumCulled=false;scene.add(m);objPool.push(m);}
+    const geo=ig[o.k]||ig.popcorn;if(m.geometry!==geo)m.geometry=geo;
+    surf(track,o.s+(o.v||0)*(tau||0),o.u,o.h,S1);m.position.copy(S1.pos);basisQuat(S1,m.quaternion);
+    m.rotateY(game.time*(o.k==='wind'?9:o.k==='popcorn'?6:1.2));m.visible=true;
+  }
+  for(let i=list.length;i<objPool.length;i++)objPool[i].visible=false;
+}
+/* 누르기 — PC 는 E · Shift, 휴대폰은 오른쪽 아래 「아이템」 버튼. guest 는 누른 횟수를 host 로 보낸다 */
+function itemPress(){
+  if(game.state!=='race'||!player)return;
+  Snd.init();
+  if(VS.on&&VS.role==='guest'){if(!player.slots.length)return;VS.useN++;VS.lastInT=0;return;}
+  if(game.paused)return;
+  useItem(player);
+}
+/* HUD — 아이템 칸 2개(아이콘 + 이름), 새로 들어오면 짧게 돌아가는 연출 */
+const slotHud={key:null,roll:[0,0]};
+function tickSlots(dt){
+  const p=player,sl=p.slots||[],key=sl.join(',');
+  if(key!==slotHud.key){
+    const old=slotHud.key===null?[]:slotHud.key.split(',').filter(Boolean);
+    for(let i=0;i<2;i++){if(sl[i]&&sl[i]!==old[i]&&!(i===0&&old[1]===sl[0]))slotHud.roll[i]=.6;}
+    slotHud.key=key;
+    $('btnItem').classList.toggle('off',!sl.length);
+  }
+  for(let i=0;i<2;i++){
+    const el=$('slot'+i),k=sl[i];let ic='',nm='',cls='slot'+(i===0?' first':'');
+    if(slotHud.roll[i]>0){slotHud.roll[i]-=dt;const r=ITEM_KEYS[((game.time*14)|0)%ITEM_KEYS.length];ic=ITEM[r].ic;nm='…';cls+=' roll';}
+    else if(k){ic=ITEM[k].ic;nm=ITEM[k].n;}
+    if(el.dataset.v!==ic+nm+cls){el.dataset.v=ic+nm+cls;el.className=cls;el.firstChild.textContent=ic;el.lastChild.textContent=nm;}
+  }
 }
 function land(c){
   c.spinning=false;c.spinP=0;c.squash=Math.max(c.squash,.45);
@@ -1814,13 +1982,15 @@ function stepCar(c,dt,inp){
   if(c.invuln>0)c.invuln-=dt;
   if(c.shield>0)c.shield-=dt;
   if(c.boostT>0)c.boostT-=dt;
+  if(c.slowT>0)c.slowT-=dt;
+  if(c.starT>0)c.starT-=dt;
   if(c.padCd>0)c.padCd-=dt;
   if(c.bumpCd>0)c.bumpCd-=dt;
   if(c.squash>0)c.squash=Math.max(0,c.squash-dt*1.5);
   const boosting=c.boostT>0,belt=!c.air&&(S0.fl&F_BELT)!==0;
   if(c.spinout>0){c.spinout-=dt;steer=0;c.v+=(st.vmax*.28-c.v)*Math.min(1,3*dt);}
   else if(inp.accel){
-    const top=(boosting?st.vmax*st.boostMul:st.vmax)*c.rb*(belt?BELT_TOP:1);
+    const top=(boosting?st.vmax*st.boostMul:st.vmax)*c.rb*(belt?BELT_TOP:1)*(c.slowT>0?.62:1);
     if(c.v<top)c.v=Math.min(top,c.v+(boosting?st.acc*2.8:st.acc)*(belt?1.6:1)*dt);
     else c.v+=(top-c.v)*Math.min(1,1.4*dt);
   }else c.v+=((belt?st.vmax*.85:6)-c.v)*Math.min(1,1.25*dt);
@@ -1892,6 +2062,7 @@ function collideCars(){
     if(ds>3.3||ds<-3.3)continue;
     let du=a.u-b.u;if(du>half)du-=2*half;else if(du<-half)du+=2*half;
     if(du>2.2||du<-2.2||Math.abs(a.h-b.h)>1.6)continue;
+    if(a.starT>0&&b.starT<=0)hit(b,'star');else if(b.starT>0&&a.starT<=0)hit(a,'star'); // 무지개 별 — 부딪힌 차를 튕긴다
     const sg=du>=0?1:-1,push=(2.2-Math.abs(du))*.5;
     const kick=VS.on?8:5;a.u+=sg*push;b.u-=sg*push;a.uVel+=sg*kick;b.uVel-=sg*kick;
     if(Math.abs(ds)>1.2){const rear=ds<0?a:b,front=ds<0?b:a;if(rear.v>front.v){const dv=rear.v-front.v;rear.v-=dv*.6;front.v+=dv*.45;}}
@@ -1926,10 +2097,13 @@ function stepRace(dt){
     }
     c.lastSteer=inp.steer;c.lastAccel=!!inp.accel;
     stepCar(c,dt,inp);
+    magnetPull(c,dt);
+    if(racing&&!c.remote&&(!c.isPlayer||game.auto))aiItems(c,dt);
     if(c.padCd<=0&&!c.air){for(const ps of pads){if(c.s>ps&&c.s<ps+10){c.padCd=1.2;boost(c,.9);if(c.v<40)c.v=40;vsEv('pad',c);if(c.isPlayer)Snd.boost();break;}}}
     if(!c.finished&&c.s>=tr.finish){c.finished=true;c.finishT=game.raceTime;game.order.push(c);if(VS.on)vsFinish(c);else if(c.isPlayer)onPlayerFinish();}
   }
   collideCars();
+  stepObjs(dt);
   const t=game.time;
   for(const hz of hazards){
     for(const c of cars){const d=c.s-hz.s;if(d<-12||d>12)continue;if(hzHit(hz,t,c.s,c.u,c.h,0))hit(c,hz.type);}
@@ -1937,7 +2111,7 @@ function stepRace(dt){
   for(const it of items){
     if(!it.on){it.cd-=dt;if(it.cd<=0){it.on=true;it.grp.visible=true;}continue;}
     for(const c of cars){
-      if(Math.abs(c.s-it.s)<2.5&&Math.abs(c.u-it.u)<1.9&&c.h<2.6&&!c.finished){it.on=false;it.cd=5;it.grp.visible=false;applyItem(c,it.type);break;}
+      if(Math.abs(c.s-it.s)<2.5&&Math.abs(c.u-it.u)<1.9&&c.h<2.6&&!c.finished&&c.slots.length<2){it.on=false;it.cd=5;it.grp.visible=false;gainItem(c);break;} // 칸이 꽉 차면 안 먹힌다
     }
   }
   const p=player;
@@ -1986,8 +2160,8 @@ function placeCar(c,dt){
   const boosting=c.boostT>0;
   c.mFlame.visible=boosting;
   if(boosting)c.mFlame.scale.set(1,1,.8+Math.random()*.5);
-  c.mShield.visible=c.shield>0;
-  if(c.shield>0)c.mShield.material.opacity=.2+.1*Math.sin(game.time*8);
+  c.mShield.visible=c.shield>0||c.starT>0;
+  if(c.mShield.visible){c.mShield.material.opacity=.2+.1*Math.sin(game.time*8);c.mShield.material.color.setHex(c.starT>0?[0xff5a5a,0xffd84a,0x5ad86a,0x5ab0ff][((game.time*10)|0)&3]:0x58e8ff);}
   c.mRing.visible=c.armed>0;
   if(c.armed>0){const r=2.3+.3*Math.sin(game.time*10);c.mRing.scale.set(r,r,r);}
   c.mUnder.material.opacity=.7*clamp(1-c.h/9,.25,1);
@@ -2085,7 +2259,11 @@ function tickHud(dt){
   if(p.shield>0){const n=Math.ceil(p.shield);key+='s'+n;html+='<span class="chip sh">방패 '+n+'초</span>';}
   if(p.armed>0){key+='b';html+='<span class="chip bl">폭발 준비</span>';}
   if(p.boostT>0){key+='o';html+='<span class="chip bo">부스트</span>';}
+  if(p.slowT>0){key+='w';html+='<span class="chip sh">젖었어요</span>';}
+  if(p.magT>0){key+='m'+Math.ceil(p.magT);html+='<span class="chip bo">자석 '+Math.ceil(p.magT)+'초</span>';}
+  if(p.starT>0){key+='t'+Math.ceil(p.starT);html+='<span class="chip bl">무지개 별 '+Math.ceil(p.starT)+'초</span>';}
   if(key!==hud.chips){hud.chips=key;$('hChips').innerHTML=html;}
+  tickSlots(dt);
   const lv=p.driftT>2.1?3:p.driftT>1.25?2:p.driftT>.55?1:0;
   if(lv!==hud.drift){hud.drift=lv;$('hDrift').className='drift'+(lv?' l'+lv:'');}
   game.rush+=((game.state==='race'&&p.boostT>0?1:0)-game.rush)*Math.min(1,6*dt);
@@ -2120,6 +2298,7 @@ function resetRace(){
   for(const hz of hazards)hz.prev=1;
   for(const f of fx){scene.remove(f.m);f.m.material.dispose();}
   fx=[];
+  objs=[];VS.gobjs=[];for(const m of objPool)m.visible=false;slotHud.key=null;slotHud.roll=[0,0];
   Object.assign(game,{raceTime:0,order:[],tix:0,tixTrick:0,tixLost:0,combo:0,comboT:0,shake:0,hints:{},hintT:0,result:null});
   hud.place=0;hud.tix=-1;hud.chips='x';hud.drift=-1;hud.time=-1;
   camInit=false;camU=player.u;
@@ -2137,7 +2316,7 @@ function startRace(){
   hk({type:'hk:start'});
   if(!save.seenHelp){
     const kb=window.matchMedia&&window.matchMedia('(pointer:fine)').matches;
-    hint('<ul><li><b>누르기</b>달려요</li><li><b>떼기</b>느려져요</li><li><b>좌우로 끌기</b>방향</li></ul>'+(kb?'<p>방향키나 W · A · D 키도 돼요</p>':''),5.4);
+    hint('<ul><li><b>누르기</b>달려요</li><li><b>떼기</b>느려져요</li><li><b>좌우로 끌기</b>방향</li><li><b>아이템</b>'+(kb?'E 키 · ':'')+'오른쪽 아래 버튼</li></ul>'+(kb?'<p>방향키나 W · A · D 키도 돼요</p>':''),5.4);
   }
 }
 function goHome(){
@@ -2306,11 +2485,13 @@ function pointerEnd(e){if(e.pointerId!==input.pid)return;input.pid=null;input.pA
 canvas.addEventListener('pointerup',pointerEnd);
 canvas.addEventListener('pointercancel',pointerEnd);
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
+$('btnItem').addEventListener('pointerdown',e=>{e.preventDefault();e.stopPropagation();itemPress();});
 window.addEventListener('keydown',e=>{
   const k=e.key.toLowerCase(),racing=game.state==='race'||game.state==='countdown';
   if(racing&&(k==='arrowup'||k==='arrowdown'||k==='arrowleft'||k==='arrowright'||k===' '))e.preventDefault();
   input.keys[k]=true;
   if(e.repeat)return;
+  if((k==='e'||k==='shift')&&racing){e.preventDefault();itemPress();return;} // 아이템 쓰기 — 달리기(↑ · W · 스페이스) · 방향(← → · A · D)과 안 겹치는 키
   if(k==='escape'&&ARC&&inFrame){e.preventDefault();if(racing)hk({type:'hk:esc'});return;} // 창 안 Esc 는 헬스키퍼가 멈춤/이어 하기를 정한다
   if(VS.on){if(k==='escape'||k==='p'){e.preventDefault();vsPost({type:'vs:esc'});}return;} // 대전 — 멈춤 · 그만하기는 바깥 화면이 정한다
   if(k==='p'||k==='escape')togglePause();
@@ -2374,6 +2555,7 @@ function update(dt){
     if(game.finishT<=0&&!VS.on)showResults();
   }
   for(const c of cars)placeCar(c,dt);
+  if(VS.on&&VS.role==='guest')renderObjs(VS.gobjs||[],VS.gtau||0);else renderObjs(objs,0);
   for(let i=0;i<tix.length;i++){
     const k=tix[i];if(k.got)continue;
     _q2.setFromAxisAngle(_Y,t*3+i*.7);_q1.copy(k.q).multiply(_q2);_m4.compose(k.pos,_q1,_one);tixMesh.setMatrixAt(i,_m4);
@@ -2446,33 +2628,58 @@ const VS_LIMIT=180,VS_SNAP_MS=66,VS_START=31,VS_MAX=6;
 const vsGrace=()=>cars.length>=3?20:12; // 누구든 처음 들어온 뒤 기다리는 시간
 const VS_LEVEL={easy:39,normal:42.5,hard:45.5};
 VS.on=VSM;Object.assign(VS,{role:'solo',me:0,track:0,rids:['bunny','fox'],names:['나','상대'],bots:[1],humans:1,level:'normal',e:0,remote:{},evq:[],snaps:[],seq:0,
-  lastSnap:0,ended:false,endT:0,firstT:0,freeze:{},hold:0,rtt:120,autoIn:{accel:false,steer:0},lastIn:null,lastInT:0,err:[],shown:-1,stale:false,auto:false,keys:{}});
+  lastSnap:0,ended:false,endT:0,firstT:0,freeze:{},hold:0,rtt:120,useN:0,useU:{},gobjs:[],gtau:0,avatars:[],autoIn:{accel:false,steer:0},lastIn:null,lastInT:0,err:[],shown:-1,stale:false,auto:false,keys:{}});
 const DEVHOST=/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)||/\.(test|localhost)$/.test(location.hostname);
 function vsEv(k,c,a){if(VS.on&&VS.role==='host'&&VS.evq.length<48)VS.evq.push(a===undefined?[k,c.id]:[k,c.id,a]);}
-function vsLabel(c,name){
-  const cv=document.createElement('canvas');cv.width=256;cv.height=72;
-  const g=cv.getContext('2d'),col=css(RACERS[c.rid].car);
-  g.font='800 34px Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
-  let t=String(name||'상대');if(t.length>8)t=t.slice(0,8)+'…';
-  const w=Math.min(244,g.measureText(t).width+40);
-  g.fillStyle='rgba(26,10,43,.82)';g.beginPath();
-  const x=(256-w)/2,y=6,h=50,r=24;g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();g.fill();
-  g.lineWidth=4;g.strokeStyle=col;g.stroke();
-  g.fillStyle='#fff2d8';g.textAlign='center';g.textBaseline='middle';g.fillText(t,128,y+h/2+2);
-  g.fillStyle=col;g.beginPath();g.moveTo(116,y+h);g.lineTo(140,y+h);g.lineTo(128,70);g.closePath();g.fill();
+/* 이름표 — 동그란 프로필 사진 + 이름. 사진이 없거나 못 불러오면 이름 첫 글자(레이서 색 동그라미), 컴퓨터는 로봇 표시 + 「컴퓨터 ○○」.
+   사진 주소는 같은 사이트의 /api/ · /assets/ 로 시작할 때만 쓴다(다른 사이트 주소는 무시). 불러오면 캔버스에 다시 그려 텍스처를 갱신한다 */
+function vsAvatarOk(u){
+  if(typeof u!=='string'||!u||u.length>500)return null;
+  try{const x=new URL(u,location.href);if(x.origin!==location.origin||!/^\/(api|assets)\//.test(x.pathname))return null;return x.pathname+x.search;}catch(e){return null;}
+}
+function vsLabel(c,name,avatar,me){
+  const W=512,H=128,cv=document.createElement('canvas');cv.width=W;cv.height=H;
+  const g=cv.getContext('2d'),col=css(RACERS[c.rid].car),FONT='800 54px Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+  const bot=!me&&(c.bot||/^컴퓨터/.test(String(name||'')));
+  let t=me?'나':String(name||'상대');
+  if(bot&&t==='컴퓨터')t='컴퓨터 '+RACERS[c.rid].name;
+  if(t.length>9)t=t.slice(0,9)+'…';
+  let img=null;
+  const draw=()=>{
+    g.clearRect(0,0,W,H);g.font=FONT;
+    const R=50,tw=Math.min(W-2*R-44,g.measureText(t).width),w=me?tw+64:2*R+tw+40,x=(W-w)/2,y=8,h=2*R+4;
+    // 바탕 알약
+    g.fillStyle='rgba(26,10,43,.86)';g.beginPath();g.moveTo(x+h/2,y);g.arcTo(x+w,y,x+w,y+h,h/2);g.arcTo(x+w,y+h,x,y+h,h/2);g.arcTo(x,y+h,x,y,h/2);g.arcTo(x,y,x+w,y,h/2);g.closePath();g.fill();
+    g.lineWidth=6;g.strokeStyle=me?'#ffc533':col;g.stroke();
+    g.fillStyle='#fff2d8';g.textBaseline='middle';
+    if(me){g.textAlign='center';g.fillText(t,W/2,y+h/2+3);return;}
+    // 동그라미 — 사진 · 첫 글자 · 로봇
+    const cx=x+R+4,cy=y+h/2;
+    g.save();g.beginPath();g.arc(cx,cy,R-4,0,TAU);g.closePath();g.clip();
+    if(img){const s=Math.min(img.naturalWidth,img.naturalHeight)||1;g.drawImage(img,(img.naturalWidth-s)/2,(img.naturalHeight-s)/2,s,s,cx-R+4,cy-R+4,2*R-8,2*R-8);}
+    else{g.fillStyle=bot?'#3a3a5a':col;g.fillRect(cx-R,cy-R,2*R,2*R);
+      if(bot){g.fillStyle='#d8e4ff';g.fillRect(cx-26,cy-18,52,40);g.fillStyle='#1a1030';g.fillRect(cx-16,cy-8,10,10);g.fillRect(cx+6,cy-8,10,10);g.fillRect(cx-12,cy+10,24,4);g.fillStyle='#d8e4ff';g.fillRect(cx-2,cy-32,4,14);g.fillStyle='#ff5a3a';g.beginPath();g.arc(cx,cy-34,5,0,TAU);g.fill();}
+      else{g.fillStyle='#fff';g.textAlign='center';g.font='900 56px Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';g.fillText(String(name||'?').trim().slice(0,1)||'?',cx,cy+3);g.font=FONT;}}
+    g.restore();
+    g.lineWidth=5;g.strokeStyle=col;g.beginPath();g.arc(cx,cy,R-4,0,TAU);g.stroke();
+    g.fillStyle='#fff2d8';g.textAlign='left';g.fillText(t,cx+R+12,cy+3,W-(cx+R+24));
+  };
+  draw();
   const tex=new THREE.CanvasTexture(cv);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,fog:false}));
-  sp.scale.set(6.4,1.8,1);sp.position.set(0,5.4,0);sp.renderOrder=5;
+  sp.userData={w:me?3.2:8.8,h:me?.8:2.2};sp.scale.set(sp.userData.w,sp.userData.h,1);sp.position.set(0,me?4.6:5.6,0);sp.renderOrder=5;
   c.root.add(sp);c.label=sp;
+  const url=me?null:vsAvatarOk(avatar);
+  if(url){const im=new Image();im.decoding='async';im.onload=()=>{if(c.label!==sp)return;img=im;draw();tex.needsUpdate=true;};im.onerror=()=>{};im.src=url;}
 }
 function vsCars(){
-  for(const c of cars){if(c.label&&c.label.material.map)c.label.material.map.dispose();scene.remove(c.root);disposeCar(c);}
+  for(const c of cars){if(c.label){if(c.label.material.map)c.label.material.map.dispose();c.label.material.dispose();c.label=null;}scene.remove(c.root);disposeCar(c);}
   cars=[];
   VS.rids.forEach((rid,i)=>{
     const bot=VS.bots.indexOf(i)>=0;
     const c=Object.assign({id:i,rid:rid,isPlayer:i===VS.me,bot:bot,remote:VS.role==='host'&&i!==VS.me&&!bot},buildCarModel(rid));
     scene.add(c.root);cars.push(c);
-    if(i!==VS.me)vsLabel(c,VS.names[i]);
+    if(i!==VS.me)vsLabel(c,VS.names[i],VS.avatars[i]); // 내 차가 아닌 차마다 프로필 사진 + 이름
   });
   player=cars[VS.me];
   buildDots();gridCars();
@@ -2493,10 +2700,11 @@ function vsSetup(o){
   if(VS.role==='solo')VS.bots=VS.rids.map((r,i)=>i).filter(i=>i!==VS.me);
   else VS.bots=Array.isArray(o.bots)?o.bots.filter((x,k,a)=>okI(x)&&x!==VS.me&&a.indexOf(x)===k):[];
   VS.humans=n-VS.bots.length;
+  VS.avatars=[];for(let i=0;i<n;i++)VS.avatars.push(Array.isArray(o.avatars)?vsAvatarOk(o.avatars[i]):null); // 프로필 사진(같은 사이트 /api/ · /assets/ 만)
   VS.level=VS_LEVEL[o.level]?o.level:'normal';
   VS.e=Number(o.e)||0;VS.auto=!!o.auto&&DEVHOST;game.auto=VS.auto;
   if(typeof o.mute==='boolean'){save.mute=o.mute;Snd.setMute(save.mute);}
-  Object.assign(VS,{snaps:[],seq:0,evq:[],ended:false,endT:0,firstT:0,freeze:{},hold:0,err:[],shown:-1,stale:false,remote:{},lastIn:null,result:null});
+  Object.assign(VS,{snaps:[],seq:0,evq:[],ended:false,endT:0,firstT:0,freeze:{},hold:0,err:[],shown:-1,stale:false,remote:{},lastIn:null,result:null,useN:0,useU:{},gobjs:[],gtau:0});
   game.paused=false;show('pause',false);$('hint').hidden=true;game.hintT=0;
   loadTrack(VS.track);vsCars();resetRace();
   setState('vswait');
@@ -2509,7 +2717,7 @@ function vsGo(){
   setState('countdown');game.countdown=3.2;game.lastCount=4;
   if(!save.seenHelp&&VS.role!=='guest'){
     const kb=window.matchMedia&&window.matchMedia('(pointer:fine)').matches;
-    hint('<ul><li><b>누르기</b>달려요</li><li><b>떼기</b>느려져요</li><li><b>좌우로 끌기</b>방향</li></ul>'+(kb?'<p>방향키나 W · A · D 키도 돼요</p>':''),4.4);
+    hint('<ul><li><b>누르기</b>달려요</li><li><b>떼기</b>느려져요</li><li><b>좌우로 끌기</b>방향</li><li><b>아이템</b>'+(kb?'E 키 · ':'')+'오른쪽 아래 버튼</li></ul>'+(kb?'<p>방향키나 W · A · D 키도 돼요</p>':''),4.4);
   }
 }
 function vsDist(c){return c.finished?1:r3(clamp((c.s-VS_START)/(track.finish-VS_START),0,1));}
@@ -2551,10 +2759,11 @@ function vsSnap(force){
   if(!force&&now-VS.lastSnap<VS_SNAP_MS)return;
   VS.lastSnap=now;
   const cs=cars.map(c=>[r1(c.s),r2(c.u),r2(c.h),r1(c.v),r1(c.uVel),c.air?1:0,r1(c.vy),r2(Math.max(0,c.spinout)),r2(c.spinoutMax),r2(Math.max(0,c.boostT)),r1(Math.max(0,c.shield)),r1(Math.max(0,c.armed)),
-    r2(c.driftT),c.driftDir,c.spinning?r2(c.spinP):-1,c.spinDir,r2(c.squash),r2(Math.max(0,c.invuln)),c.finished?r2(c.finishT):-1,r2(c.lastSteer||0),c.lastAccel?1:0,c.spins|0]);
+    r2(c.driftT),c.driftDir,c.spinning?r2(c.spinP):-1,c.spinDir,r2(c.squash),r2(Math.max(0,c.invuln)),c.finished?r2(c.finishT):-1,r2(c.lastSteer||0),c.lastAccel?1:0,c.spins|0,r2(Math.max(0,c.slowT)),r2(Math.max(0,c.starT)),slotsCode(c),r1(Math.max(0,c.magT))]);
   let it='';for(const x of items)it+=x.on?'1':'0';
   const ph=PH[game.state];if(ph===undefined)return;
-  const d={e:VS.e,ph:ph,cd:r2(game.countdown),t:r2(game.time),rt:r2(game.raceTime),c:cs,it:it,fz:game.paused?1:0,ho:r2(VS.hold),ev:VS.evq};
+  const ob=objs.map(o=>[o.k==='popcorn'?'p':o.k==='candy'?'c':'w',r1(o.s),r2(o.u),r1(o.k==='candy'?0:o.v)]);
+  const d={e:VS.e,ph:ph,cd:r2(game.countdown),t:r2(game.time),rt:r2(game.raceTime),c:cs,it:it,ob:ob,fz:game.paused?1:0,ho:r2(VS.hold),ev:VS.evq};
   VS.evq=[];
   vsPost({type:'vs:snap',d:d});
 }
@@ -2570,7 +2779,7 @@ function vsPredict(b,tau,acc,steer,cst){
     const k=_PS.k,inTube=(_PS.fl&F_TUBE)!==0;
     let stv=steer;const belt=!air&&(_PS.fl&F_BELT)!==0;
     if(sp>0){sp-=dt;stv=0;v+=(st.vmax*.28-v)*Math.min(1,3*dt);}
-    else if(acc){const top=(bo>0?st.vmax*st.boostMul:st.vmax)*(belt?BELT_TOP:1);if(v<top)v=Math.min(top,v+(bo>0?st.acc*2.8:st.acc)*(belt?1.6:1)*dt);else v+=(top-v)*Math.min(1,1.4*dt);}
+    else if(acc){const top=(bo>0?st.vmax*st.boostMul:st.vmax)*(belt?BELT_TOP:1)*(b[22]>0?.62:1);if(v<top)v=Math.min(top,v+(bo>0?st.acc*2.8:st.acc)*(belt?1.6:1)*dt);else v+=(top-v)*Math.min(1,1.4*dt);}
     else v+=((belt?st.vmax*.85:6)-v)*Math.min(1,1.25*dt);
     if(bo>0)bo-=dt;
     let tgt=stv*st.hand;
@@ -2630,16 +2839,19 @@ function vsGuestStep(dt){
     c.driftT=b[12];c.driftDir=b[13]||1;c.spinning=b[14]>=0;c.spinP=c.spinning?Math.min(.99,b[14]+tau/.44):0;c.spinDir=b[15]||1;
     c.squash=Math.max(0,b[16]-tau*1.5);c.invuln=Math.max(0,b[17]-tau);
     c.finished=fin;c.finishT=fin?b[18]:0;c.lastSteer=mine&&!fin?steer:b[19];c.spins=b[21];
+    c.slowT=Math.max(0,(b[22]||0)-tau);c.starT=Math.max(0,(b[23]||0)-tau);c.slots=slotsFrom(b[24]);c.magT=Math.max(0,(b[25]||0)-tau);
   }
   // 순위 — 들어온 차는 들어온 순서, 아니면 앞선 차
   const arr=cars.slice().sort((a,b)=>(a.finished&&b.finished)?a.finishT-b.finishT:a.finished?-1:b.finished?1:b.s-a.s);
   for(let i=0;i<arr.length;i++)arr[i].place=i+1;
+  // 던진 것 · 함정 — host 가 알려 준 자리(움직이는 것은 지난 시간만큼 앞으로)
+  const KO={p:'popcorn',c:'candy',w:'wind'};VS.gtau=frozen?0:Math.min(.4,age);
+  VS.gobjs=Array.isArray(L.ob)?L.ob.filter(o=>Array.isArray(o)&&KO[o[0]]).slice(0,24).map(o=>({k:KO[o[0]],s:+o[1]||0,u:+o[2]||0,v:+o[3]||0,h:o[0]==='c'?.15:o[0]==='p'?1.2:1.6})):[];
   if(L.it&&L.it.length===items.length){
     for(let i=0;i<items.length;i++){const on=L.it.charCodeAt(i)===49;if(items[i].on!==on){items[i].on=on;items[i].grp.visible=on;}}
   }
 }
 /* guest — host 가 알려 준 일(부딪힘 · 아이템 · 결승 …)을 소리 · 불꽃 · 알림으로 */
-const HIT_TXT={hammer:'납작해졌어요!',boat:'바이킹에 쿵!',cups:'찻잔에 걸렸어요!',blast:'펑! 맞았어요'};
 function vsPlayEv(ev){
   if(!Array.isArray(ev))return;
   const k=ev[0],c=cars[ev[1]],a=ev[2];
@@ -2648,7 +2860,9 @@ function vsPlayEv(ev){
   surf(track,c.s,c.u,1+c.h,S1);
   if(k==='hit'){burst(S1.pos,16,[0xffc533,0xff4192,0xfff2d8],11,.55,14);if(mine){game.shake=1;Snd.hit();toast(HIT_TXT[a]||HIT_TXT.blast);}}
   else if(k==='shd'){burst(S1.pos,18,0x48e4ff,9,.5,6);if(mine){toast('방패가 막아 줬어요');Snd.pop();}}
-  else if(k==='item'){if(ITEM_COL[a])burst(S1.pos,12,ITEM_COL[a],8,.45,4);if(mine){if(a==='rocket'){toast('로켓 부스트!');Snd.boost();}else{toast(a==='shield'?'방패를 얻었어요':'범퍼 폭발 준비!');Snd.pickup();}}}
+  else if(k==='get'){burst(S1.pos,10,ITEM_COL.box,7,.4,4);if(mine){Snd.pickup();if(!save.seenHelp&&!game.hints.item){game.hints.item=1;hint(itemHelpHtml(),3.6);}}}
+  else if(k==='use'){if(ITEM[a]){burst(S1.pos,14,ITEM[a].col,8,.45,4);if(mine){toast(ITEM[a].n+'!');if(a==='rocket'||a==='star'||a==='wind')Snd.boost();else Snd.pickup();}}}
+  else if(k==='wet'){burst(S1.pos,22,[0x48a8ff,0xcff4ff],9,.55,10);if(mine){toast('물풍선에 젖었어요!');Snd.pop();game.shake=Math.max(game.shake,.4);}}
   else if(k==='blast'){ringFx(c.root.position,c.root.quaternion,0xff4192);Snd.blast();if(mine)toast('범퍼 폭발!');else game.shake=Math.max(game.shake,.5);}
   else if(k==='trick'){if(mine){const tk=2*(a|0);toast((a|0)>1?'회전 ×'+a:'회전!');void tk;Snd.trick();}burst(S1.pos,8,0xfff2d8,6,.35,8);}
   else if(k==='drift'){if(mine&&a>=1&&a<=3){toast(['','드리프트 부스트','슈퍼 드리프트','메가 드리프트'][a]);Snd.drift(a);Snd.boost();}}
@@ -2684,11 +2898,12 @@ function vsHoldTick(dt){
 /* 매 화면마다 — host: 스냅숏 · solo/host: 끝 보기 · guest: 입력 보내기, 소식이 끊기면 안내 */
 function vsTick(dt){
   if(!VS.on)return;
-  // 이름표 — 카메라 바로 옆 차의 이름표가 화면을 크게 가리지 않게: 카메라 앞쪽 깊이 16 안쪽이면 그만큼 작게(화면 크기 그대로), 2~5 사이에서 흐려져 숨김
+  // 이름표 크기 · 흐림
   for(const c of cars){
     const L=c.label;if(!L)continue;
-    L.getWorldPosition(_v1).applyMatrix4(camera.matrixWorldInverse);const d=Math.max(.01,-_v1.z),k=Math.min(1,d/16),o=clamp((d-2)/3,0,1); // d = 카메라 앞쪽 깊이
-    L.scale.set(6.4*k,1.8*k,1);L.material.opacity=o;L.visible=o>.02;
+    // 화면에서 늘 비슷한 크기(사진 지름 약 30px) — 깊이에 비례해 키우고 줄인다. 아주 가까우면(깊이 2~5) 흐려져 숨김
+    L.getWorldPosition(_v1).applyMatrix4(camera.matrixWorldInverse);const d=Math.max(.01,-_v1.z),k=clamp(d/34,.25,4),o=clamp((d-2)/3,0,1); // d = 카메라 앞쪽 깊이
+    L.scale.set(L.userData.w*k,L.userData.h*k,1);L.material.opacity=o;L.visible=o>.02;
   }
   const live=game.state==='countdown'||game.state==='race'||game.state==='finish';
   if(VS.role==='host'&&live){if(game.state!=='finish'||VS.endT<6){vsSnap(false);}if(game.state==='finish')VS.endT+=dt;}
@@ -2697,7 +2912,8 @@ function vsTick(dt){
     if(game.auto&&player&&track){const o=aiInput(player,dt);a=o.accel;s=o.steer;VS.autoIn={accel:a,steer:s};}
     // 입력은 바뀔 때만 — 달리기 누름/뗌은 바로, 방향은 0.1초에 한 번까지(초당 10번 이하), 아무 변화 없어도 0.3초마다 한 번
     const now=performance.now(),ac=a?1:0,sv=r2(clamp(s,-1,1)),P=VS.lastIn||{a:-1,s:9};
-    if(ac!==P.a||(Math.abs(sv-P.s)>.04&&now-VS.lastInT>=100)||now-VS.lastInT>300){VS.lastIn={a:ac,s:sv};VS.lastInT=now;vsPost({type:'vs:in',a:ac,s:sv});}
+    // u = 아이템 쓰기를 누른 누적 횟수 — 모든 vs:in 에 함께 실어 한 번 잃어버려도 다음 소식에서 맞춰진다(host 는 늘어난 만큼만 쓴다)
+    if(ac!==P.a||(Math.abs(sv-P.s)>.04&&now-VS.lastInT>=100)||now-VS.lastInT>300||VS.useN!==P.u){VS.lastIn={a:ac,s:sv,u:VS.useN};VS.lastInT=now;vsPost({type:'vs:in',a:ac,s:sv,u:VS.useN});}
     const L=VS.snaps[VS.snaps.length-1],stale=!L||now-L.recv>1200;
     if(stale!==VS.stale){VS.stale=stale;if(stale)hint('상대 연결을 기다리는 중이에요',60);else{$('hint').hidden=true;game.hintT=0;}}
   }
@@ -2717,6 +2933,9 @@ if(VS.on){
       const i=d.i===undefined||d.i===null?1:Number(d.i),c=Number.isInteger(i)?cars[i]:null;
       if(!c||!c.remote)return;
       VS.remote[i]={accel:!!d.a,steer:clamp(Number(d.s)||0,-1,1)};
+      // 아이템 쓰기 — u(누른 누적 횟수)가 늘어난 만큼(한 번에 최대 2번) 쓴다
+      const un=Number(d.u);
+      if(Number.isInteger(un)&&un>=0){const last=VS.useU[i]||0;if(un>last){for(let n=Math.min(2,un-last);n>0;n--)useItem(c);}VS.useU[i]=Math.max(last,un);}
     }
     else if(t==='vs:snap'){
       const s=d.d;
@@ -2731,7 +2950,8 @@ if(VS.on){
     else if(t==='vs:rtt'){const ms=Number(d.ms);if(ms>=0&&ms<2000)VS.rtt=VS.rtt*.7+ms*.3;}
     else if(t==='vs:note'){if(d.text){hint(String(d.text).replace(/[<>&]/g,''),600);}else{$('hint').hidden=true;game.hintT=0;}}
     else if(t==='vs:sound'){save.mute=!!d.mute;Snd.init();Snd.setMute(save.mute);}
-    else if(t==='vs:key'){const k=String(d.k||'').toLowerCase();if(/^(arrow(up|down|left|right)|[wasd ])$/.test(k)){if(d.down&&(game.state==='race'||game.state==='countdown'))Snd.init();input.keys[k]=!!d.down;}}
+    else if(t==='vs:key'){const k=String(d.k||'').toLowerCase();if(/^(arrow(up|down|left|right)|[wasd ])$/.test(k)){if(d.down&&(game.state==='race'||game.state==='countdown'))Snd.init();input.keys[k]=!!d.down;}
+      else if((k==='e'||k==='shift')&&d.down)itemPress();} // 아이템 쓰기 키(바깥이 넘겨 준 키 — 누를 때 한 번)
   });
 }
 

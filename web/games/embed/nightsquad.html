@@ -37,7 +37,8 @@ button:focus-visible{outline:3px solid var(--hazard);outline-offset:3px}
 .plate.pulse{animation:pulse .36s ease-out}
 @keyframes pulse{0%{transform:scale(1)}35%{transform:scale(1.14)}100%{transform:scale(1)}}
 #pSquad svg{width:20px;height:20px;color:var(--good);align-self:center;flex:none}
-#pSquad b{font-size:30px;line-height:1;font-variant-numeric:tabular-nums;min-width:1.15em;text-align:right}
+#pSquad b{font-size:30px;line-height:1;font-variant-numeric:tabular-nums;min-width:1.15em;text-align:right;white-space:nowrap}
+#pSquad.xl b{font-size:24px} /* 1만 명 넘으면 글자를 줄인다 */
 #prog{display:flex;flex-direction:column;gap:5px;align-items:center;padding-top:7px;min-width:0}
 #progBar{position:relative;width:min(100%,460px);height:12px;background:rgba(13,19,36,.88);border:1px solid var(--line);border-radius:3px}
 #progFill{position:absolute;left:0;top:0;bottom:0;width:0;background:repeating-linear-gradient(-45deg,var(--sodium) 0 8px,#e0962e 8px 16px);border-radius:2px}
@@ -135,6 +136,8 @@ h2{font-size:clamp(30px,6vw,42px);line-height:1.05}
   #prog{grid-column:1/-1;grid-row:2;padding-top:0}
   #right{justify-self:end}
   #pSquad b{font-size:26px}
+  #pSquad.long b{font-size:21px}
+  #pSquad.xl b{font-size:18px}
   #bossBar{top:104px}
   #menu{background:linear-gradient(0deg,rgba(7,10,20,.92) 0,rgba(7,10,20,.6) 55%,rgba(7,10,20,0) 82%)}
   .sign{padding:26px 18px 16px}
@@ -233,7 +236,7 @@ const CFG = {
   HALF: 5,        // 도로 반폭
   SPEED: 7.5,     // 분대 전진 속도 (m/s)
   START: 4,       // 처음 분대원 수
-  MAX: 200,       // 분대원 상한
+  MAX: 200,       // 길에 서는 병사 수 상한 — 넘는 인원은 「예비 병력」 숫자로 들고 있다가 앞줄이 쓰러지면 채운다(전체 인원은 제한 없음)
   RANGE: 30,      // 사거리 (m)
   BV: 46,         // 총알 속도 (m/s)
   LEN: 506,       // 결승선
@@ -291,12 +294,12 @@ const STAGE = [
 /* 연속 작전 — 검문소를 깨면 다음 작전으로 이어진다. 작전 1 은 위 코스 그대로,
  * 작전 2 부터는 위 코스를 바탕으로 작전 번호를 씨앗(시드)으로 삼아 바꾼다(같은 작전 번호는 늘 같은 배치).
  * 어려움(작전 n ≥ 2)
- *   적 · 바리케이드 · 보스 체력 × hpMul = 4 × 1.4^(n−2)   (2: ×4, 3: ×5.6, 4: ×7.8, 5: ×11 …)
+ *   적 · 바리케이드 · 보스 체력 × hpMul = 4 × 1.7^(n−2)   (2: ×4, 3: ×6.8, 4: ×11.6, 5: ×19.7 …)
  *   적 수 × cntMul = 1 + 0.2 × (n−1)  (최대 ×2.2)
  *   빨강 게이트 감소 × (1 + 0.35 × (n−1)), 게이트를 쏴서 올리는 데 드는 명중 수 × (1 + 0.3 × (n−1))
  *   작전 3 부터 일부 졸개 무리가 장갑 로봇으로, 작전 4 부터 큰 로봇이 더 자주 섞인다
- * 분대 인원 · 무기는 다음 작전으로 이어진다(대신 위처럼 적이 세진다). */
-const opHp = op => op <= 1 ? 1 : 4 * Math.pow(1.4, op - 2);
+ * 분대 인원(예비 병력 포함, 상한 없음) · 무기는 다음 작전으로 이어진다(대신 위처럼 적이 세진다). */
+const opHp = op => op <= 1 ? 1 : 4 * Math.pow(1.7, op - 2);
 const opCnt = op => op <= 1 ? 1 : Math.min(2.2, 1 + 0.2 * (op - 1));
 function makeCourse(op) {
   if (op <= 1) return STAGE;
@@ -371,12 +374,13 @@ function createSim(seed, op, carry) {
   const HALF = CFG.HALF;
   op = op || 1;
   const COURSE = makeCourse(op);
-  const n0 = carry ? clamp(carry.n, 1, CFG.MAX) : CFG.START;
+  const all0 = carry ? Math.max(1, Math.floor(carry.n)) : CFG.START; // 전체 인원(서 있는 병사 + 예비)
+  const n0 = Math.min(all0, CFG.MAX);
   const S = {
     phase: 'ready', t: 0, d: 0, x: 0, tx: 0, v: 0, weapon: carry ? carry.weapon : 0, op,
     soldiers: [], bullets: [], enemies: [], gates: [], barrs: [], picks: [],
     si: 0, F: formation(n0), events: [],
-    kills: carry ? carry.kills : 0, freed: carry ? carry.freed : 0, lost: carry ? carry.lost : 0, maxN: Math.max(n0, carry ? carry.maxN : 0), shots: 0,
+    kills: carry ? carry.kills : 0, freed: carry ? carry.freed : 0, lost: carry ? carry.lost : 0, maxN: Math.max(all0, carry ? carry.maxN : 0), shots: 0, reserve: all0 - n0,
     boss: null, bossDead: false, hold: false, why: '', lastHit: '', lostBy: { enemy: 0, barr: 0, gate: 0, boss: 0 },
   };
   const ev = e => { if (S.events.length < 400) S.events.push(e); };
@@ -404,17 +408,26 @@ function createSim(seed, op, carry) {
     }
   }
 
-  function reform() { S.F = formation(Math.max(1, S.soldiers.length)); if (S.soldiers.length > S.maxN) S.maxN = S.soldiers.length; }
+  const total = () => S.soldiers.length + S.reserve;
+  function reform() { S.F = formation(Math.max(1, S.soldiers.length)); if (total() > S.maxN) S.maxN = total(); }
+  // 병사 한 명 추가 — 길이 꽉 찼으면 예비 병력으로. 길에 섰으면 1, 예비로 가면 2
   function addSoldier(x, d) {
-    if (S.soldiers.length >= CFG.MAX) return false;
+    if (S.soldiers.length >= CFG.MAX) { S.reserve++; return 2; }
     S.soldiers.push({ x, d, cd: rnd() * 0.4, ph: rnd() * 6.28, born: S.t });
-    return true;
+    return 1;
   }
+  // 병사 한 명이 쓰러짐 — 예비가 있으면 그 자리를 대열 뒤에서 새 병사가 달려와 채운다
   function killSoldier(i, why) {
-    const s = S.soldiers[i], last = S.soldiers.pop();
-    if (i < S.soldiers.length) S.soldiers[i] = last;
+    const s = S.soldiers[i];
     S.lost++; S.lastHit = why; S.lostBy[why]++;
     ev({ t: 'sdie', x: s.x, d: s.d, why });
+    if (S.reserve > 0) {
+      S.reserve--;
+      s.x = clamp(S.x + (rnd() - 0.5) * 2, -HALF + 0.3, HALF - 0.3); s.d = S.d - S.F.rd - 1.5; s.born = S.t;
+      return;
+    }
+    const last = S.soldiers.pop();
+    if (i < S.soldiers.length) S.soldiers[i] = last;
   }
   for (let i = 0; i < n0; i++) addSoldier(S.F.ox[i], S.F.od[i]);
   for (const s of S.soldiers) s.born = -1;
@@ -452,21 +465,24 @@ function createSim(seed, op, carry) {
   function breakBarr(b, rammed) {
     b.on = false; b.hp = 0;
     let n = 0;
-    for (const c of b.caps) if (addSoldier(c.x, c.d)) { S.soldiers[S.soldiers.length - 1].born = -1; n++; } // 갇혀 있던 모습 그대로 합류
+    for (const c of b.caps) { if (addSoldier(c.x, c.d) === 1) S.soldiers[S.soldiers.length - 1].born = -1; n++; } // 갇혀 있던 모습 그대로 합류
     S.freed += n; reform();
     ev({ t: 'bbreak', x: (b.x0 + b.x1) / 2, d: b.d, w: b.x1 - b.x0, n, rammed: !!rammed });
   }
   function applyGate(g) {
     g.taken = true;
-    const n0 = S.soldiers.length;
+    const n0 = total();
     if (g.v > 0) {
-      for (let i = 0; i < g.v; i++) if (!addSoldier(clamp(S.x + (rnd() - 0.5) * 3, g.x0 + 0.4, g.x1 - 0.4), g.d - 0.5 - rnd() * 2)) break;
+      const room = Math.max(0, Math.min(g.v, CFG.MAX - S.soldiers.length)); // 길에 설 자리만큼만 병사로, 나머지는 바로 예비로
+      for (let i = 0; i < room; i++) addSoldier(clamp(S.x + (rnd() - 0.5) * 3, g.x0 + 0.4, g.x1 - 0.4), g.d - 0.5 - rnd() * 2);
+      S.reserve += g.v - room;
     } else if (g.v < 0) {
-      const k = Math.min(-g.v, n0);
+      let k = Math.min(-g.v, n0);
+      const r = Math.min(k, S.reserve); S.reserve -= r; k -= r; S.lost += r; if (r) { S.lastHit = 'gate'; S.lostBy.gate += r; } // 예비부터 줄인다
       for (let i = 0; i < k; i++) killSoldier(S.soldiers.length - 1, 'gate');
     }
     reform();
-    ev({ t: 'gate', v: g.v, x: clamp(S.x, g.x0 + 1, g.x1 - 1), d: g.d, n: S.soldiers.length - n0 });
+    ev({ t: 'gate', v: g.v, x: clamp(S.x, g.x0 + 1, g.x1 - 1), d: g.d, n: total() - n0 });
   }
 
   function step(dt) {
@@ -492,6 +508,8 @@ function createSim(seed, op, carry) {
     // 분대원 — 대형 자리로 모이며 쏜다
     const W = WEAPONS[S.weapon];
     const scale = Math.max(1, sol.length * W.rate / CFG.BUDGET);
+    // 예비 병력 화력 — 서 있는 병사 대비 전체 인원 비율의 0.4제곱만큼 한 발이 세진다(2배 인원 → ×1.32, 10배 → ×2.5, 50배 → ×4.8)
+    const pw = S.reserve > 0 ? Math.pow(total() / Math.max(1, sol.length), 0.4) : 1;
     const k = Math.min(1, 9 * dt), life = CFG.RANGE / CFG.BV;
     for (let i = 0; i < sol.length; i++) {
       const s = sol[i];
@@ -502,7 +520,7 @@ function createSim(seed, op, carry) {
       s.cd -= dt;
       if (s.cd <= 0) {
         s.cd += (1 / W.rate) * scale * (0.85 + rnd() * 0.3);
-        S.bullets.push({ x: s.x, d: s.d + 0.7, vx: (rnd() - 0.5) * 2 * W.spread, life, dmg: W.dmg * scale, wt: scale });
+        S.bullets.push({ x: s.x, d: s.d + 0.7, vx: (rnd() - 0.5) * 2 * W.spread, life, dmg: W.dmg * scale * pw, wt: scale * pw });
         S.shots++;
       }
     }
@@ -638,12 +656,12 @@ function createSim(seed, op, carry) {
     }
 
     if (sol.length === 0) { S.phase = 'lose'; S.why = S.lastHit || 'enemy'; ev({ t: 'lose', why: S.why }); return; }
-    if (sol.length > S.maxN) S.maxN = sol.length;
+    if (total() > S.maxN) S.maxN = total();
     if (S.d >= CFG.LEN) { S.phase = 'win'; ev({ t: 'win' }); }
   }
 
   return {
-    S, step,
+    S, step, total,
     start() { if (S.phase === 'ready') S.phase = 'run'; },
     steer(x) { S.tx = x; },
     nudge(dx) { S.tx += dx; },
@@ -1319,7 +1337,7 @@ function onEvent(e) {
     case 'summon': burst(e.x, 0.5, -e.d + 2, 16, 0xff5a4a, 6, 0.16, 0.5, 2); break;
     case 'bossdie': boss.dying = 1.4; sfx.boom(1.4); addShake(0.9); $('bossBar').classList.remove('on'); banner('검문소 돌파!', 1600); break;
     case 'win': { // 검문소 돌파 — 점수를 쌓고 잠깐 뒤 다음 작전으로
-      const c = clearScore(S.op, S.soldiers.length);
+      const c = clearScore(S.op, sim.total());
       RUN.cleared.push(c); RUN.banked = Math.min(SCORE_CAP, RUN.banked + c.pts);
       if (roundOn) hk({ type: 'hk:live', score: RUN.banked });
       floatText(`+${fmt(c.pts)}점`, 'plus', S.x, 3.2, -S.d - 3);
@@ -1336,8 +1354,8 @@ function onEvent(e) {
 const hudC = { n: -1, d: -1, w: -1, boss: -1 };
 function pulse(el) { el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse'); }
 function hud() {
-  const S = sim.S, n = S.soldiers.length, d = Math.min(LEN, Math.max(0, Math.floor(S.d)));
-  if (n !== hudC.n) { hudC.n = n; $('nSquad').textContent = n; }
+  const S = sim.S, n = sim.total(), d = Math.min(LEN, Math.max(0, Math.floor(S.d)));
+  if (n !== hudC.n) { hudC.n = n; $('nSquad').textContent = fmt(n); $('pSquad').classList.toggle('long', n >= 1000); $('pSquad').classList.toggle('xl', n >= 10000); }
   if (d !== hudC.d) { hudC.d = d; $('progFill').style.width = (d / LEN * 100).toFixed(1) + '%'; $('progTxt').textContent = `작전 ${S.op} · ${d}m / ${LEN}m`; }
   if (S.weapon !== hudC.w) {
     hudC.w = S.weapon; $('wName').textContent = WEAPONS[S.weapon].name;
@@ -1367,7 +1385,7 @@ function newSim() { // 판 처음(작전 1)
 function nextOp() { // 다음 작전 — 분대 인원 · 무기 · 기록을 이어 간다. hk:start 는 다시 보내지 않는다
   const S = sim.S;
   RUN.op = S.op + 1;
-  sim = createSim(seed++, RUN.op, { n: S.soldiers.length, weapon: S.weapon, kills: S.kills, freed: S.freed, lost: S.lost, maxN: S.maxN });
+  sim = createSim(seed++, RUN.op, { n: sim.total(), weapon: S.weapon, kills: S.kills, freed: S.freed, lost: S.lost, maxN: S.maxN });
   showCourse();
   sim.start(); acc = 0; liveAt = tsec + 2;
   banner(`작전 ${RUN.op} · 로봇 강화!`, 1700);

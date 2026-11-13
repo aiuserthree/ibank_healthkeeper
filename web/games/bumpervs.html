@@ -236,7 +236,7 @@
       frameHandlers.forEach((fn) => fn(m));
     });
     // 키보드 — 초점이 바깥 화면에 있을 때도 경주 키가 먹게 본체로 넘긴다 (본체에 초점이 있으면 본체가 직접 받는다)
-    const RACE_KEYS = { ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright", KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", Space: " " };
+    const RACE_KEYS = { ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright", KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", Space: " ", KeyE: "e", ShiftLeft: "shift", ShiftRight: "shift" }; // E · Shift 는 아이템 쓰기
     const racing = () => screen === "play";
     function keyFwd(e, down) {
       const k = RACE_KEYS[e.code];
@@ -316,7 +316,7 @@
     function helpHtml() {
       const k = (t) => `<kbd>${t}</kbd>`;
       const keys = IS_TOUCH ? "화면을 누르고 있으면 달리고, 떼면 느려져요 · 누른 채 좌우로 끌어 방향을 바꿔요"
-        : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · 마우스로 눌러 끌어도 돼요`;
+        : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · ${k("E")}${k("Shift")} 아이템 · 마우스로 눌러 끌어도 돼요`;
       return `<div>${keys}</div><div>레이서는 모양만 달라요(성능은 모두 같아요) · 트랙은 모두 골라 달릴 수 있어요 · 3분 안에 아무도 못 들어오면 더 멀리 간 쪽이 이겨요</div>`;
     }
     function paintMenu() {
@@ -372,7 +372,8 @@
           <ul>
             <li>두 사람이 같은 트랙을 나란히 출발해요. 먼저 결승선을 지난 사람이 이겨요.</li>
             <li>한 사람이 들어온 뒤 12초 안에 상대가 못 들어오면 경주가 끝나요. 3분 안에 둘 다 못 들어오면 더 멀리 간 사람이 이겨요.</li>
-            <li>서로 부딪히면 튕겨 나가요. 아이템(로켓 · 방패 · 범퍼 폭발), 드리프트 부스트, 바이킹 · 망치 · 찻잔 장애물은 혼자 하기와 같아요.</li>
+            <li>서로 부딪히면 튕겨 나가요. 드리프트 부스트, 바이킹 · 망치 · 찻잔 장애물은 혼자 하기와 같아요.</li>
+            <li>아이템 상자를 지나면 아이템이 칸(2칸)에 담겨요. ${IS_TOUCH ? "화면 오른쪽 아래 「아이템」 버튼" : `${k("E")} 또는 ${k("Shift")}`}으로 원할 때 써요 — 로켓 부스트 · 방패 · 범퍼 폭발 · 팝콘 폭탄 · 솜사탕 함정 · 회오리 바람 · 자석 · 무지개 별 · 물풍선. 뒤처질수록 센 아이템이 잘 나와요.</li>
             <li>레이서는 모양만 달라요. 대전에서는 해금 · 업그레이드 효과 없이 모두 같은 기본 성능으로 달려요. 티켓은 모이지 않아요.</li>
           </ul>
           <h3>조작</h3>
@@ -590,7 +591,7 @@
       const onFrame = (m) => {
         if (S.closed) return;
         if (m.type === "vs:snap" && S.role === "host" && S.phase !== "wait" && m.d) send({ t: "s", d: m.d });
-        else if (m.type === "vs:in" && S.role === "guest" && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0 });
+        else if (m.type === "vs:in" && S.role === "guest" && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0, u: Number.isInteger(m.u) ? m.u : 0 });
       };
       frameHandlers.add(onFrame);
       S.offFrame = () => frameHandlers.delete(onFrame);
@@ -616,7 +617,7 @@
             if (okRid(m.rid) && m.rid !== S.rids[1]) { S.rids[1] = m.rid; S.rd = [0, 0]; }
             else S.rd[1] = m.on ? 1 : 0;
             hostChanged();
-          } else if (m.t === "in" && S.phase === "race") toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0 });
+          } else if (m.t === "in" && S.phase === "race") toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0, ...(Number.isInteger(m.u) ? { u: m.u } : {}) });
           else if (m.t === "vis" && S.phase === "race") {
             clearTimeout(S.awayT);
             if (m.h) toFrame({ type: "vs:in", a: 0, s: 0 }); // 손님 조작은 놓은 것으로 — 돌아오면 새 입력이 온다
@@ -1111,7 +1112,7 @@
       const onFrame = (m) => {
         if (S.closed) return;
         if (m.type === "vs:snap" && isHost() && S.phase !== "wait" && m.d) send({ t: "s", d: m.d });
-        else if (m.type === "vs:in" && !isHost() && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0 });
+        else if (m.type === "vs:in" && !isHost() && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0, u: Number.isInteger(m.u) ? m.u : 0 });
       };
       frameHandlers.add(onFrame);
       S.offFrame = () => frameHandlers.delete(onFrame);
@@ -1138,7 +1139,7 @@
             hostChanged();
           } else if (m.t === "in" && S.phase === "race" && S.go) {
             const i = S.go.players.indexOf(from);
-            if (i > 0) toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0, i });
+            if (i > 0) toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0, i, ...(Number.isInteger(m.u) ? { u: m.u } : {}) });
           } else if (m.t === "vis" && S.phase === "race" && S.go) {
             const i = S.go.players.indexOf(from);
             if (i > 0 && m.h) toFrame({ type: "vs:in", a: 0, s: 0, i }); // 다른 화면에 간 사람 차는 손을 놓은 것으로 — 다른 사람들은 계속 달린다
