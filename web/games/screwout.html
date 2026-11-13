@@ -479,7 +479,7 @@
         // ── 퍼즐 엔진 끝 ── SO-CORE-END
 
         // ── 상수 ───────────────────────────────────────────────
-        const TIME_LIMIT = 180;          // 3분
+        const TIME_LIMIT = 120;          // 단계마다 2분(새 단계에 들어가면 다시 2분)
         const UNDO_PER_STAGE = 3;
         const MAX_SCORE = 1_000_000;
         const CLEAR_MS = 1100;           // 단계를 푼 뒤 다음 단계까지
@@ -523,7 +523,7 @@
             <span class="gm-so__chip">${HKUI.icon("star", 15, "currentColor")}<b data-score>0</b></span>
             <span class="gm-so__chip">${HKUI.icon("drill", 15, "currentColor")}<span data-level>1단계</span></span>
             <span class="gm-so__gap"></span>
-            <span class="gm-so__chip gm-so__chip--time" data-timechip>${HKUI.icon("timer", 15, "currentColor")}<b data-time>3:00</b></span>
+            <span class="gm-so__chip gm-so__chip--time" data-timechip>${HKUI.icon("timer", 15, "currentColor")}<b data-time>2:00</b></span>
           </div>
           <div class="gm-so__time" data-timebar><i></i></div>
           <div class="gm-so__meta"><span>이번 단계 <b data-moves>0</b>수 · 목표 <b data-par>0</b>수</span><span>남은 판 <b data-left>0</b>장 · 빈 구멍 <b data-empty>0</b>개</span></div>
@@ -1501,6 +1501,8 @@
               if (state !== "play" && state !== "pause") return;
               level++;
               clearing = false;
+              timeLeftMs = TIME_LIMIT * 1000; // 새 단계는 다시 2분
+              lastSec = TIME_LIMIT;
               loadLevel();
               sfx("whoosh");
             }, CLEAR_MS);
@@ -1670,8 +1672,9 @@
           lastFrame = now;
           // 시간 — 2D 판과 같은 셈
           if (state === "play") {
-            timeLeftMs -= clamp(now - lastTick, 0, 250);
+            const step = clamp(now - lastTick, 0, 250);
             lastTick = now;
+            if (!clearing) timeLeftMs -= step; // 단계를 깨고 넘어가는 동안은 시간이 멈춘다
             const sec = Math.ceil(timeLeftMs / 1000);
             if (sec !== lastSec) {
               lastSec = sec;
@@ -1847,9 +1850,10 @@
                 <li>나사를 눌러 들고, 옮길 빈 구멍(어느 면이든)을 눌러요.</li>
                 <li>위에 다른 판이 덮은 나사는 못 뽑고, 판이 덮은 구멍에도 못 넣어요. 판에 구멍이 뚫린 자리는 돼요.</li>
                 <li>나사가 하나도 안 남은 판은 떨어져요. 다 떨어뜨리면 다음 단계!</li>
-                <li>3분 동안 판 하나에 +단계×10, 단계를 깨면 +단계×100, 적은 수로 깨면 보너스.</li>
+                <li>단계마다 2분 — 깨면 다음 단계에서 다시 2분, 2분 안에 못 깨면 끝나요.</li>
+                <li>판 하나에 +단계×10, 단계를 깨면 +단계×100, 적은 수로 깨면 보너스.</li>
               </ol></div>
-              <p class="gm-so__keys">되돌리기는 단계마다 ${UNDO_PER_STAGE}번 · 이 단계 다시는 언제든(시간은 흘러요) · Z 되돌리기 · Esc 쉬기</p>
+              <p class="gm-so__keys">되돌리기는 단계마다 ${UNDO_PER_STAGE}번 · 이 단계 다시는 언제든(이 단계 시간은 계속 흘러요) · Z 되돌리기 · Esc 쉬기</p>
               <button type="button" class="gm-so__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
             const c = demoCanvas();
             if (c) { cover.querySelector(".gm-so__demo").appendChild(c); demo.on = true; demo.w = 0; }
@@ -1861,7 +1865,7 @@
             const parts = [];
             if (solvedCount) parts.push(`${fmt(solvedCount)}단계를 깼어요`);
             if (info.dropped) parts.push(`마지막 단계에서 판 ${fmt(info.dropped)}장을 떨어뜨렸어요`);
-            cover.innerHTML = `<h2>시간 끝!</h2><div class="gm-so__big">${fmt(info.final != null ? info.final : liveScore())}점</div>
+            cover.innerHTML = `<h2>시간 끝!</h2><p class="gm-so__keys">${fmt(level)}단계를 2분 안에 못 깼어요</p><div class="gm-so__big">${fmt(info.final != null ? info.final : liveScore())}점</div>
               <p>${parts.length ? parts.join("<br>") : "다음엔 판 하나라도 떨어뜨려 봐요"}</p>
               <button type="button" class="gm-so__go" data-go>${HKUI.icon("rotate-ccw", 18, "currentColor")} 다시 하기</button>`;
           }
