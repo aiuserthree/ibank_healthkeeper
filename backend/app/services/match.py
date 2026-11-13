@@ -482,7 +482,57 @@ async def search_members(db: AsyncSession, member: Member, q: str) -> list:
     if q:
         like = f"%{q.replace('%', '').replace('_', '')}%"
         stmt = stmt.where(or_(Member.name.ilike(like), Member.department.ilike(like)))
-    return [_person(p) for p in (await db.execute(stmt)).scalars().all()]
+        return [_person(p) for p in (await db.execute(stmt)).scalars().all()]
+    # 검색어가 없으면 — 최근에 같이 한 동료(1:1 대전 · 여러 명 경주)를 맨 위에, 나머지는 이름순으로 채운다
+    recent = await _recent_partners(db, member.id)
+    picked = []
+    if recent:
+        rows = {
+            p.id: p
+            for p in (await db.execute(stmt.where(Member.id.in_(recent)).limit(len(recent)))).scalars().all()
+        }
+        picked = [rows[i] for i in recent if i in rows][:RECENT_PARTNERS]
+    rest = (await db.execute(stmt.where(Member.id.not_in([p.id for p in picked] or [0])))).scalars().all()
+    return [{**_person(p), "recent": True} for p in picked] + [_person(p) for p in rest][: max(0, 20 - len(picked))]
+
+
+RECENT_PARTNERS = 10  # 목록 맨 위에 둘 최근 상대 수
+RECENT_DAYS = 30
+
+
+async def _recent_partners(db: AsyncSession, member_id: int) -> list:
+    """최근 30일 안에 같이 한 동료 id — 가장 최근 순. 1:1 대전(컴퓨터 제외)과 여러 명 경주(같이 들어온 사람)."""
+    from sqlalchemy import func
+
+    from app.models import GameParty, GamePartySeat
+
+    since = now_kst() - timedelta(days=RECENT_DAYS)
+    seen: dict = {}
+    for m in (
+        await db.execute(
+            select(GameMatch.challenger_id, GameMatch.opponent_id, func.coalesce(GameMatch.finished_at, GameMatch.created_at))
+            .where(_mine(member_id), GameMatch.bot.is_(None), GameMatch.opponent_id.is_not(None), GameMatch.created_at >= since)
+            .order_by(GameMatch.created_at.desc())
+            .limit(80)
+        )
+    ).all():
+        other = m[1] if m[0] == member_id else m[0]
+        if other and (other not in seen or seen[other] < m[2]):
+            seen[other] = m[2]
+    mine = select(GamePartySeat.party_id).where(GamePartySeat.member_id == member_id, GamePartySeat.status.in_(("HOST", "JOINED")))
+    for pid_member, at in (
+        await db.execute(
+            select(GamePartySeat.member_id, func.coalesce(GameParty.finished_at, GameParty.created_at))
+            .join(GameParty, GameParty.id == GamePartySeat.party_id)
+            .where(GamePartySeat.party_id.in_(mine), GamePartySeat.member_id != member_id,
+                   GamePartySeat.status.in_(("HOST", "JOINED")), GameParty.created_at >= since)
+            .order_by(GameParty.created_at.desc())
+            .limit(80)
+        )
+    ).all():
+        if pid_member not in seen or seen[pid_member] < at:
+            seen[pid_member] = at
+    return [i for i, _ in sorted(seen.items(), key=lambda kv: kv[1], reverse=True)]
 
 
 async def start_bot(db: AsyncSession, member: Member, level: str, game: str = GOMOKU) -> dict:

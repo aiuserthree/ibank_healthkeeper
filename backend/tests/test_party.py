@@ -16,7 +16,7 @@ from unittest import mock
 
 os.environ.setdefault("DEBUG", "false")
 
-from sqlalchemy import BigInteger  # noqa: E402
+from sqlalchemy import BigInteger, event  # noqa: E402
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine  # noqa: E402
 from sqlalchemy.ext.compiler import compiles  # noqa: E402
 
@@ -40,6 +40,10 @@ class PartyFlow(unittest.TestCase):
         self.loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self.loop)
         self.engine = create_async_engine("sqlite+aiosqlite://")
+
+        @event.listens_for(self.engine.sync_engine, "connect")
+        def _fns(conn, _):  # Postgres 의 split_part 를 SQLite 에도
+            conn.create_function("split_part", 3, lambda v, sep, n: ((v or "").split(sep) + [""] * n)[n - 1])
         run(self._schema())
         self.Session = async_sessionmaker(self.engine, expire_on_commit=False)
         self.stamps = []
@@ -221,6 +225,20 @@ class PartyFlow(unittest.TestCase):
             self.call(party.invite, 2, pid, [7])  # 주인만
         d = self.call(party.decline, 1, pid)
         self.assertEqual(d["status"], "CANCELLED")
+
+    def test_recent_partners_first(self):
+        from app.services import match as match_service
+        pid, d = self.open_race(guests=(5, 6), joins=(6,))
+        async def go():
+            async with self.Session() as db:
+                m = await db.get(Member, 1)
+                with mock.patch.object(match_service, "_real_person", lambda p: True):
+                    return await match_service.search_members(db, m, "")
+        out = run(go())
+        self.assertEqual([x["id"] for x in out[:1]], [6])  # 같이 들어와 달린 사람이 맨 위(초대만 받고 안 들어온 5 는 아님)
+        self.assertTrue(out[0].get("recent"))
+        self.assertEqual(sorted(x["id"] for x in out), [2, 3, 4, 5, 6, 7])
+        self.assertFalse(any(x.get("recent") for x in out[1:]))
 
     def test_rt_seat(self):
         data, _ = self.call(party.create, 1, "bumpervs", [2, 3])
