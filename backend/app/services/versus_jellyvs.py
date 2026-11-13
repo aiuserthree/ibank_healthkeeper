@@ -7,6 +7,8 @@
 
 규칙(한 판 2분)
   · 두 젤리가 같은 숲(host 가 정한 시드 — 열매 · 버섯 · 별빛 구슬 · 숲 친구 배치가 같다)에서 먹고 자란다.
+  · 숲(맵)은 MAP_COUNT 가지 — 준비 화면에서 host 가 고르고, 상태 소식(mp)으로 guest 화면도 같은 맵이 된다.
+    맵마다 장애물 · 먹이 퍼짐은 좌우 대칭이라 어느 맵이든 두 사람에게 같은 조건이다(서버는 맵 번호만 적어 둔다).
   · 상대보다 1.2배 넘게 크면 부딪혀 상대를 삼킨다 → 바로 승("EATEN"). 처음 15초(SAFE_SEC)는 서로 삼킬 수 없다.
     대시하는 동안 · 물린 직후 잠깐은 삼켜지지 않는다(화면이 판단 — 서버는 결과만 본다).
   · 2분이 끝나면 더 큰 쪽 승("SIZE"). 큰 쪽이 작은 쪽의 1.02배보다 작으면(크기 차이가 아주 작으면) 무승부("EVEN").
@@ -15,7 +17,7 @@
 흐름
   · 수락하면 판이 열린다. 두 사람이 화면에 들어와 둘 다 「준비」를 누르면 3초 뒤 host 가 시작한다.
   · 경기가 끝나면 두 사람이 각자 결과를 보낸다 —
-      {"winner": "host" | "guest" | "draw", "size": [주인 크기, 손님 크기], "eaten": true | false, "sec": 경기 초}
+      {"winner": "host" | "guest" | "draw", "size": [주인 크기, 손님 크기], "eaten": true | false, "sec": 경기 초, "map": 맵 번호(선택 · 없으면 1)}
     크기는 100배한 정수(3.42 → 342). 결과는 host 계산이 기준 — guest 는 host 가 보낸 끝 소식을 그대로 보낸다.
   · 둘 다 보냈고 winner · size · eaten 이 같으면 끝. 다르면 다시 묻지 않고 무승부("MISMATCH", 도장 · 순위에 세지 않는다).
   · 결과는 수락 뒤 MIN_PLAY_SEC 이 지나야 받는다 — 경기를 하지 않고 결과만 주고받아 승수를 쌓지 못하게.
@@ -24,7 +26,8 @@
   · 경기 중 기권(공통 RESIGN)은 상대 승이지만 도장 · 순위에는 세지 않는다. 도장 · 순위는 서로 맞은 결과(EATEN · SIZE · EVEN)만 센다.
 
 결과 검증(act)
-  · size 는 두 칸 정수 MIN_SIZE~MAX_SIZE, eaten 은 참/거짓, sec 는 0~MAX_SEC 숫자.
+  · size 는 두 칸 정수 MIN_SIZE~MAX_SIZE, eaten 은 참/거짓, sec 는 0~MAX_SEC 숫자, map 은 1~MAP_COUNT 정수(없으면 1).
+  · 맵 번호는 승패 비교에 넣지 않는다 — 두 사람 것이 달라도 host 것을 적는다(승패는 winner · size · eaten 으로만).
   · eaten 이면: winner 는 host · guest 중 하나, 이긴 쪽이 진 쪽의 1.2배 이상(반올림 여유 1.18배), SAFE_SEC 이후.
   · eaten 이 아니면: 2분을 다 채운 경기(sec ≥ ROUND_SEC - 5)이고, winner 는 크기 규칙(1.02배 미만이면 draw, 아니면 큰 쪽)과 같아야 한다.
 
@@ -34,7 +37,7 @@
 판(m.state)
   p: [주인 id, 손님 id] · at: 수락 시각(epoch ms) · until: 판 전체 기한(epoch ms)
   rep: {str(id): {"winner", "size", "eaten", "sec", "at": 보낸 시각}} — 결과를 보낸 사람만
-  final: {"winner", "size": [주인, 손님], "eaten", "sec"} — 서로 맞은 결과로 끝난 판만
+  final: {"winner", "size": [주인, 손님], "eaten", "sec", "map"} — 서로 맞은 결과로 끝난 판만
 """
 
 from __future__ import annotations
@@ -71,6 +74,7 @@ AFTER_REPORT_MIN = 30  # 한 사람이 결과를 보낸 뒤 상대를 기다리�
 MIN_PLAY_SEC = 30  # 수락 뒤 이만큼 지나야 결과를 받는다(준비 · 3초 세기 · 서로 삼킬 수 없는 15초 — 가장 빨리 끝나는 판도 이보다 길다)
 MAX_SEC = 7200
 WINNERS = ("host", "guest", "draw")
+MAP_COUNT = 6  # 숲(맵) 가짓수 — 화면 jellyvs-vs.js JELLY_MAPS 와 같은 수
 
 register_messages(
     {
@@ -134,6 +138,11 @@ def _check(data: dict) -> dict:
     sec = data.get("sec")
     if not isinstance(sec, (int, float)) or isinstance(sec, bool) or not 0 <= sec <= MAX_SEC:
         raise_app_error("JELLYVS_BAD")
+    mp = data.get("map", 1)  # 숲(맵) 번호 — 선택 키, 옛 화면은 보내지 않는다
+    if mp is None:
+        mp = 1
+    if not _is_int(mp) or not 1 <= mp <= MAP_COUNT:
+        raise_app_error("JELLYVS_BAD")
     if eaten:
         # 삼킨 판 — 이긴 쪽이 1.2배 이상 컸다(크기를 100배해 반올림했으니 1.18배까지 봐준다), 처음 15초 뒤
         if winner == "draw":
@@ -145,7 +154,7 @@ def _check(data: dict) -> dict:
         # 2분을 다 채운 판 — 크기 규칙과 같은 승자
         if sec < ROUND_SEC - 5 or winner != size_winner(h, g):
             raise_app_error("JELLYVS_BAD")
-    return {"winner": winner, "size": [h, g], "eaten": eaten, "sec": round(float(sec), 1)}
+    return {"winner": winner, "size": [h, g], "eaten": eaten, "sec": round(float(sec), 1), "map": mp}
 
 
 def _judge(m) -> tuple:
@@ -155,7 +164,7 @@ def _judge(m) -> tuple:
     keys = ("winner", "size", "eaten")
     if any(ra.get(k) != rb.get(k) for k in keys):
         return (None, "MISMATCH")
-    st["final"] = {"winner": ra["winner"], "size": list(ra["size"]), "eaten": ra["eaten"], "sec": ra.get("sec", 0)}
+    st["final"] = {"winner": ra["winner"], "size": list(ra["size"]), "eaten": ra["eaten"], "sec": ra.get("sec", 0), "map": ra.get("map", 1)}
     if ra["winner"] == "draw":
         return (None, "EVEN")
     return (host if ra["winner"] == "host" else guest, "EATEN" if ra["eaten"] else "SIZE")
@@ -232,4 +241,5 @@ def view(m, member_id: int, board: bool) -> dict:
         h, g = final["size"]
         out["size"] = [h, g] if me_host else [g, h]  # [내 크기, 상대 크기] × 100
         out["eaten"] = bool(final.get("eaten"))
+        out["map"] = final.get("map", 1)
     return out

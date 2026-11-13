@@ -31,7 +31,8 @@ window.HKJellyVs = (function () {
 
   // ───────── 규칙 값 (서버 versus_jellyvs.py 와 같은 값: ROUND_SEC · SAFE_SEC · EAT_RATIO · EVEN_RATIO)
   const ROUND = 120, SAFE = 15, PVP = 1.2, EVEN = 1.02;
-  const WORLD = 56, EAT = 1.12, BOSS_S = 4.6, RIVAL_CAP = BOSS_S * 0.84, MAXDASH = 3, COUNT = 3, END_T = 1.8;
+  let WORLD = 56; // 숲 반지름 — 맵마다 다르다(맵을 고르면 바뀐다)
+  const EAT = 1.12, BOSS_S = 4.6, RIVAL_CAP = BOSS_S * 0.84, MAXDASH = 3, COUNT = 3, END_T = 1.8;
   const N_BERRY = 96, N_SHROOM = 28, N_ORB = 8, N_FOOD = N_BERRY + N_SHROOM + N_ORB, N_FRIEND = 12;
   const START = [[-14, 10], [14, 10]]; // 주인 · 손님 시작 자리 (좌우 대칭)
   const JCOL = [0xff7ac8, 0x5fd4ff]; // 주인 분홍 · 손님 하늘
@@ -49,10 +50,286 @@ window.HKJellyVs = (function () {
   function foodPos(seed, i, gen) {
     const [s0, n, pad] = FOOD_GROUPS[foodType(i)], k = i - s0, half = n >> 1;
     if (gen === 0 && k >= half) { const p = foodPos(seed, s0 + k - half, 0); return { x: -p.x, z: p.z }; }
-    const r = seeded(seed, i, gen), a = r() * TAU, rr = Math.sqrt(r()) * (WORLD - pad);
-    return { x: Math.cos(a) * rr, z: Math.sin(a) * rr };
+    return MK.foodPos(seeded(seed, i, gen), pad); // 맵마다 퍼짐이 다르다 · 장애물은 피한다
   }
   const ALPH = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  let MK = null; // 맵 도구 (buildWorld 에서 만든다)
+
+  // ───────── 숲 고르기(맵) — 대전 web/_shared/jellyvs-vs.js 와 혼자 하기 web/games/embed/jelly.html 에 같은 글이 들어 있다(한쪽을 고치면 다른 쪽도 같이)
+  //   맵마다 하늘 · 안개 · 빛 · 땅 색 · 둘레 장식 · 나무 · 날리는 것(반딧불 · 낙엽 · 눈 · 꽃잎 · 포자) · 장애물(바위 · 물 · 돌기둥) · 미끄러운 얼음 · 먹이 퍼짐이 다르다.
+  //   장애물 · 먹이 무리는 모두 좌우 대칭 — 대전에서 좌우에서 출발하는 두 젤리에게 같은 숲이 되게. 출발 자리(±14, 10) · (0, 18) · 가시대왕 자리(0, -34)는 비워 둔다.
+  //   obs: [x, z, 반지름, 종류] — rock(바위) · pillar(돌기둥) · water(물) 는 못 지나가고, ice(얼음)는 지나가지만 미끄럽다.
+  const JELLY_MAPS = [
+    { id: 1, name: "달빛 마법 숲", tip: "지금 숲 · 먹이가 고르게", world: 56,
+      sky: ["#0a0722", "#241a60", "#1e5068"], fog: [0x1c1650, 0.0098], hemi: [0xc3b4ff, 0x1f6a52, 1.0], moon: [0xd6e6ff, 0.8], rim: [0xff9ad8, 0.3], exp: 1.15,
+      ground: [0x18473f, 0x2c8658, 0x6ad07e, 0x40318f, 0x0b1a2a], edge: "caps", edgeCol: [0x7dffd0, 0xff9ad8, 0xffe27a, 0x9ad0ff],
+      tree: "pine", trunk: 0x4a3558, leaves: [0x1f7a6b, 0x186a78, 0x2a8a62, 0x23806e, 0x4a3fa0, 0x7a3fa6], bush: [0x1f7a6b, 0x2a8a62, 0x4a3fa0, 0x186a78], big: 1 / 3,
+      grass: [0x3fa46a, 0x56c27c, 0x2f8f72, 0x7ad88a, 0x5d6fd0], grassN: 1500, flowers: [0xffffff, 0xff9ad8, 0x8fe9ff, 0xffe27a], flowerN: 280, flowerSize: 0.55, pebble: 0x6f6a96,
+      air: "fly", airCol: [0xffe27a, 0xffe27a, 0x7dffd0], airN: 130, airSize: 0.7,
+      food: "even", berry: [0xff4d6d, 0x6b8cff, 0xc77dff, 0xffb347], shroom: [0xff5a6e, 0xffa34d, 0xb07bff], foodScale: 1, obs: [],
+      chip: ["#241a60", "#2c8658", "#ff7ac8"] },
+    { id: 2, name: "단풍 언덕", tip: "노을빛 바위 언덕 · 먹이는 가장자리에", world: 58,
+      sky: ["#2a1640", "#a8436a", "#f2a65a"], fog: [0x7a3d55, 0.0082], hemi: [0xffd8b8, 0x5a3a1a, 1.05], moon: [0xffc58a, 0.95], rim: [0xff7a5a, 0.45], exp: 1.08,
+      ground: [0x5a3a1c, 0x8a5a24, 0xc98a3a, 0x8a3a2a, 0x1e120c], edge: "stones", edgeCol: [0xa08a74, 0x8a7460, 0xb89a7a, 0x7a6450],
+      tree: "round", trunk: 0x4a2e1e, leaves: [0xd9482b, 0xe8792b, 0xf0b030, 0xb8322a, 0xc95a1a], bush: [0xa8501e, 0xc07a2a, 0x8a3a1e, 0xd0902a], big: 0,
+      grass: [0xb08a3a, 0xc9a04a, 0x8a6a2a, 0xd8b060], grassN: 1100, flowers: [0xffd27a, 0xff8a5a, 0xffffff], flowerN: 120, flowerSize: 0.5, pebble: 0x8a7a6a,
+      air: "leaf", airCol: [0xe8692b, 0xf0a830, 0xc8402a], airN: 110, airSize: 0.75,
+      food: "ring", berry: [0xc0302a, 0x7a3fa6, 0xff8a3d, 0xffd23a], shroom: [0xd9482b, 0xf0b030, 0xa0703a], foodScale: 1,
+      obs: [[-20, -8, 3.2, "rock"], [20, -8, 3.2, "rock"], [-9, -20, 2.4, "rock"], [9, -20, 2.4, "rock"], [-31, 16, 2.8, "rock"], [31, 16, 2.8, "rock"], [0, 30, 2.6, "rock"]],
+      rock: 0x8a7462, chip: ["#a8436a", "#c98a3a", "#e8792b"] },
+    { id: 3, name: "눈 덮인 숲", tip: "하얀 눈밭 · 얼음 위는 미끄러워요", world: 56,
+      sky: ["#0b1838", "#33508a", "#9fc0e0"], fog: [0x8aa0c8, 0.0102], hemi: [0xdbe8ff, 0x6a7aa0, 1.0], moon: [0xeaf2ff, 0.85], rim: [0x9ad0ff, 0.35], exp: 0.98,
+      ground: [0xb8c8e0, 0xd8e4f4, 0xf4f8ff, 0x9ab0d8, 0x2a3450], edge: "crystals", edgeCol: [0x9ad0ff, 0xcfe8ff, 0x7dffd0, 0xffffff],
+      tree: "snowpine", trunk: 0x3e3048, leaves: [0x1f5a5a, 0x245a6a, 0x2a6a5a, 0x1e4a5a], bush: [0xdfe8f5, 0xc8d8ee, 0xeef4ff, 0xb8cce4], big: 0,
+      grass: [0xeef4ff, 0xc8d8ee, 0x9ab0c8], grassN: 450, flowers: [0xffffff, 0xbfe0ff], flowerN: 200, flowerSize: 0.45, pebble: 0x8a96b0,
+      air: "snow", airCol: [0xffffff, 0xdfeaff], airN: 230, airSize: 0.5,
+      food: "even", berry: [0xff2a50, 0x3d6cff, 0xb05aff, 0xff8a1d], shroom: [0xff2a50, 0xff7a1a, 0x7a4aff], foodScale: 1.08,
+      obs: [[0, -6, 9, "ice"], [-27, 22, 6, "ice"], [27, 22, 6, "ice"], [-25, -22, 2.4, "rock"], [25, -22, 2.4, "rock"], [-38, -2, 2.2, "rock"], [38, -2, 2.2, "rock"]],
+      rock: 0x8a96b0, chip: ["#33508a", "#e6eef8", "#9ad0ff"] },
+    { id: 4, name: "꽃밭 호숫가", tip: "호수를 돌아가요 · 꽃밭에 먹이가 모여요", world: 60,
+      sky: ["#1a1a4a", "#6a4a9a", "#f0a0b8"], fog: [0x5a4a80, 0.0078], hemi: [0xffe0f0, 0x2a6a4a, 1.05], moon: [0xfff0e0, 0.85], rim: [0xff9ad8, 0.45], exp: 1.1,
+      ground: [0x2a6a3a, 0x4a9a4a, 0x8ad06a, 0x8a5aa0, 0x0e2418], edge: "caps", edgeCol: [0xff9ad8, 0xffffff, 0xffe27a, 0xc79aff],
+      tree: "round", trunk: 0x5a3a4a, leaves: [0x3a8a4a, 0x4aa05a, 0xe890c0, 0xf0b0d0, 0x2a7a5a], bush: [0xe87ab0, 0x4aa05a, 0xc79aff, 0xf4f0ff], big: 0,
+      grass: [0x4aa05a, 0x5ab868, 0x3a8a4a, 0x7ad070], grassN: 1300, flowers: [0xff7ac8, 0xffffff, 0xffe27a, 0xc79aff, 0x8fe9ff], flowerN: 700, flowerSize: 0.8, pebble: 0x8a8aa0,
+      air: "petal", airCol: [0xffb0d8, 0xffffff, 0xffd0e8], airN: 120, airSize: 0.55,
+      food: "patches", patches: [[-30, -16], [30, -16], [-26, 28], [26, 28], [0, 24]], berry: [0xff4d6d, 0x6b8cff, 0xc77dff, 0xffb347], shroom: [0xff5a6e, 0xffa34d, 0xb07bff], foodScale: 1,
+      obs: [[0, -11, 8.5, "water"], [-34, 2, 5, "water"], [34, 2, 5, "water"]],
+      water: 0x2f7fb8, shore: 0xc8d8a8, lily: true, chip: ["#6a4a9a", "#4a9a4a", "#ff7ac8"] },
+    { id: 5, name: "버섯 동굴", tip: "어둡고 좁은 굴 · 빛나는 버섯 기둥", world: 48,
+      sky: ["#03020a", "#0c0a24", "#141a3a"], fog: [0x0a0a22, 0.0155], hemi: [0x6a7aff, 0x101830, 0.75], moon: [0x9ab0ff, 0.45], rim: [0x7dffd0, 0.55], exp: 1.25,
+      ground: [0x14142a, 0x1e2040, 0x2a3a5a, 0x1a4a5a, 0x05050c], edge: "crystals", edgeCol: [0x7dffd0, 0x9ad0ff, 0xc79aff, 0x5fd4ff],
+      tree: "cave", trunk: 0x2a2840, leaves: [0x2a2840], bush: [0x23264a, 0x2a2a5a, 0x1e2a4a], big: 1 / 2,
+      grass: [0x3a4a8a, 0x2a6a8a, 0x5a3a9a], grassN: 600, flowers: [0x7dffd0, 0x9ad0ff, 0xc79aff], flowerN: 420, flowerSize: 0.6, pebble: 0x3a3a5a,
+      air: "spore", airCol: [0x7dffd0, 0x9ad0ff, 0xc79aff], airN: 160, airSize: 0.55,
+      food: "center", berry: [0x5fd4ff, 0x7dffd0, 0xc77dff, 0xffe27a], shroom: [0x7dffd0, 0x5fd4ff, 0xc79aff], foodScale: 1.15,
+      obs: [[-16, -14, 2.6, "pillar"], [16, -14, 2.6, "pillar"], [-30, -2, 2.4, "pillar"], [30, -2, 2.4, "pillar"], [-8, 28, 2.2, "pillar"], [8, 28, 2.2, "pillar"], [0, -16, 2.2, "pillar"]],
+      rock: 0x2e2c4a, chip: ["#0c0a24", "#2a3a5a", "#7dffd0"] },
+    { id: 6, name: "반딧불 늪", tip: "반딧불이 가득 · 늪 웅덩이를 피해요", world: 56,
+      sky: ["#020806", "#0a2a22", "#1a3a2a"], fog: [0x061410, 0.0135], hemi: [0x8ad8b8, 0x061a10, 0.62], moon: [0xb0e8d0, 0.45], rim: [0xffe27a, 0.35], exp: 1.05,
+      ground: [0x07160f, 0x0d2818, 0x1c3e1e, 0x0e2426, 0x010503], edge: "stones", edgeCol: [0x4a5a4a, 0x3a4a3a, 0x5a6a52, 0x44503c],
+      tree: "willow", trunk: 0x2e2a1e, leaves: [0x2a5a2a, 0x3a6a2a, 0x1e4a32, 0x35602c], bush: [0x1e4a2a, 0x2a5a2a, 0x24502e, 0x30602a], big: 0,
+      grass: [0x1e4a22, 0x2a5a2a, 0x355a26, 0x16402a], grassN: 1600, flowers: [0xffe27a, 0xc8ff7a], flowerN: 150, flowerSize: 0.5, pebble: 0x3a4a3a,
+      air: "fly", airCol: [0xffe27a, 0xd8ff7a, 0x7dffd0], airN: 320, airSize: 0.8,
+      food: "patches", patches: [[-22, -2], [22, -2], [-12, -30], [12, -30], [0, 32]], berry: [0xff4d6d, 0xffe27a, 0xc77dff, 0xffb347], shroom: [0xd8ff7a, 0xffa34d, 0xb07bff], foodScale: 1,
+      obs: [[-22, -18, 4.5, "water"], [22, -18, 4.5, "water"], [-34, 12, 4, "water"], [34, 12, 4, "water"], [0, -1, 3.8, "water"]],
+      water: 0x1e4a3a, shore: 0x3a4a2a, lily: true, chip: ["#0a2a22", "#1a4a2a", "#ffe27a"] },
+  ];
+  function JellyMapKit(T, env) {
+    const scene = env.scene, renderer = env.renderer, C = env.C, canvasTex = env.canvasTex, glowTex = env.glowTex, G = env.G;
+    const TAU = Math.PI * 2;
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+    const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+    function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+    function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf); return lerp(lerp(hash(xi, yi), hash(xi + 1, yi), u), lerp(hash(xi, yi + 1), hash(xi + 1, yi + 1), u), v); }
+    function fbm(x, y) { return vnoise(x, y) * 0.6 + vnoise(x * 2.1, y * 2.1) * 0.28 + vnoise(x * 4.3, y * 4.3) * 0.12; }
+    function mulb(a) { return function () { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    // 빛은 한 번만 만들고 맵마다 색만 바꾼다
+    const hemi = new T.HemisphereLight(0xffffff, 0xffffff, 1); scene.add(hemi);
+    const moon = new T.DirectionalLight(0xffffff, 0.8); moon.position.set(-30, 60, 24); scene.add(moon);
+    const rim = new T.DirectionalLight(0xffffff, 0.3); rim.position.set(40, 22, -40); scene.add(rim);
+    scene.fog = new T.FogExp2(0x000000, 0.01);
+    // 맵과 상관없는 질감 · 모양은 한 번만 (맵을 바꿔도 버리지 않는다)
+    const grTex = canvasTex(256, 256, (g, w, h) => {
+      g.fillStyle = "#fff"; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 70; i++) { const x = hash(i, 1) * w, y = hash(i, 2) * h, r = 8 + hash(i, 3) * 26; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "rgba(40,40,90,.09)"); gr.addColorStop(1, "rgba(40,40,90,0)"); g.fillStyle = gr; for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) { g.beginPath(); g.arc(x + ox, y + oy, r, 0, TAU); g.fill(); } }
+      g.lineCap = "round";
+      for (let i = 0; i < 520; i++) { const x = hash(i, 5) * w, y = hash(i, 6) * h, l = 3 + hash(i, 7) * 6, an = -1.2 + hash(i, 8) * 0.7, lt = hash(i, 9) < 0.35; g.strokeStyle = lt ? "rgba(255,255,230,.28)" : "rgba(10,30,30," + (0.06 + hash(i, 10) * 0.08) + ")"; g.lineWidth = lt ? 1 : 1.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(an) * l, y + Math.sin(an) * l); g.stroke(); }
+    });
+    grTex.wrapS = grTex.wrapT = T.RepeatWrapping; grTex.repeat.set(30, 30); grTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const capTex = canvasTex(128, 32, (g, w, h) => { const v = g.createLinearGradient(0, 0, 0, h); v.addColorStop(0, "#fff"); v.addColorStop(1, "#bdb6d6"); g.fillStyle = v; g.fillRect(0, 0, w, h); g.fillStyle = "rgba(255,255,255,.95)"; for (let i = 0; i < 10; i++) { g.beginPath(); g.arc((i * 29 + 7) % w, 5 + ((i * 11) % (h - 14)), 2 + (i % 3), 0, TAU); g.fill(); } });
+    const spotTex = canvasTex(256, 64, (g, w, h) => { g.fillStyle = "#000"; g.fillRect(0, 0, w, h); for (let i = 0; i < 22; i++) { const x = (i * 53 + 17) % w, y = 8 + ((i * 29) % (h - 26)), r = 4 + (i % 4) * 2.2; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "#fff"); gr.addColorStop(0.75, "#e8e0ff"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); } const v = g.createLinearGradient(0, 0, 0, h); v.addColorStop(0, "rgba(255,255,255,.22)"); v.addColorStop(0.5, "rgba(255,255,255,0)"); g.fillStyle = v; g.fillRect(0, 0, w, h); });
+    const K = { grass: new T.ConeGeometry(0.1, 0.55, 3).translate(0, 0.27, 0), dodeca: new T.DodecahedronGeometry(1, 0), disc: new T.CircleGeometry(1, 40).rotateX(-Math.PI / 2), shore: new T.RingGeometry(0.96, 1.16, 40).rotateX(-Math.PI / 2) };
+    const keep = new Set([grTex, capTex, spotTex, glowTex, ...Object.values(K), ...Object.values(G)]);
+    let cur = null, group = null, bg = null, air = null, solid = [], ice = [];
+    const dummy = new T.Object3D();
+    function own(o) { group.add(o); return o; }
+    function inst(geo, mat, n) { const m = new T.InstancedMesh(geo, mat, Math.max(1, n)); m.count = n; m.frustumCulled = false; return own(m); }
+    function put(m, i, x, y, z, sx, sy, sz, ry) { dummy.position.set(x, y, z); dummy.rotation.set(0, ry || 0, 0); dummy.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); }
+    function points(n, size, fill) { const p = new Float32Array(n * 3), c = new Float32Array(n * 3); fill(p, c); const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(p, 3)); g.setAttribute("color", new T.BufferAttribute(c, 3)); const pts = new T.Points(g, new T.PointsMaterial({ size, map: glowTex, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); pts.frustumCulled = false; return own(pts); }
+    // 앞 맵의 모양 · 재질 · 질감을 버린다 (같이 쓰는 것은 남긴다)
+    function dispose() {
+      if (!group) return;
+      const geos = new Set(), mats = new Set(), texs = new Set();
+      group.traverse((o) => {
+        if (o.geometry && !keep.has(o.geometry)) geos.add(o.geometry);
+        const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+        ms.forEach((m) => { mats.add(m); ["map", "emissiveMap"].forEach((k) => { if (m[k] && !keep.has(m[k])) texs.add(m[k]); }); });
+        if (o.isInstancedMesh && o.dispose) o.dispose();
+      });
+      geos.forEach((g) => g.dispose()); mats.forEach((m) => m.dispose()); texs.forEach((t) => t.dispose());
+      scene.remove(group); group = null; air = null;
+      if (bg) { bg.dispose(); bg = null; }
+    }
+    function build(def) {
+      const R = mulb(20261113 + def.id * 7919), rand = (a, b) => (b === undefined ? R() * a : a + R() * (b - a)), pick = (arr) => arr[(R() * arr.length) | 0];
+      const WORLD = def.world, tmp = new T.Color();
+      group = new T.Group(); scene.add(group);
+      scene.background = bg = canvasTex(4, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, def.sky[0]); gr.addColorStop(0.5, def.sky[1]); gr.addColorStop(1, def.sky[2]); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+      scene.fog.color.copy(C(def.fog[0])); scene.fog.density = def.fog[1];
+      hemi.color.copy(C(def.hemi[0])); hemi.groundColor.copy(C(def.hemi[1])); hemi.intensity = def.hemi[2];
+      moon.color.copy(C(def.moon[0])); moon.intensity = def.moon[1]; rim.color.copy(C(def.rim[0])); rim.intensity = def.rim[1];
+      renderer.toneMappingExposure = def.exp;
+      // 땅 — 맵 색으로 얼룩 · 둘레 밖은 어둡게
+      {
+        const geo = new T.PlaneGeometry(320, 320, 150, 150); geo.rotateX(-Math.PI / 2);
+        const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+        const [a, b, c, v, e] = def.ground.map(C);
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i), z = pos.getZ(i), r = Math.hypot(x, z);
+          const n = fbm(x * 0.06 + 7, z * 0.06 + 3), n2 = fbm(x * 0.025 + 40, z * 0.025 - 11);
+          tmp.copy(a).lerp(b, sstep(0.3, 0.7, n)); tmp.lerp(c, sstep(0.62, 0.9, n) * 0.55); tmp.lerp(v, sstep(0.5, 0.82, n2) * 0.36);
+          tmp.lerp(e, sstep(WORLD - 1, WORLD + 18, r) * 0.88);
+          col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+        }
+        geo.setAttribute("color", new T.BufferAttribute(col, 3));
+        own(new T.Mesh(geo, new T.MeshLambertMaterial({ vertexColors: true, map: grTex })));
+      }
+      const glow = def.edgeCol.map(C);
+      // 둘레 — 여기까지가 놀이터 (빛나는 버섯 고리 · 돌 · 얼음 결정)
+      {
+        const NR = Math.round(84 * WORLD / 56);
+        if (def.edge === "caps") {
+          const capM = inst(G.cap, new T.MeshBasicMaterial({ map: capTex }), NR), stemM = inst(G.stem, new T.MeshLambertMaterial({ color: C(0xe9e2ff) }), NR);
+          for (let i = 0; i < NR; i++) { const an = (i / NR) * TAU, r = WORLD + 1 + rand(-0.3, 0.5), s = rand(0.9, 1.5); put(stemM, i, Math.cos(an) * r, 0, Math.sin(an) * r, s); put(capM, i, Math.cos(an) * r, 0.5 * s, Math.sin(an) * r, s * 1.25); capM.setColorAt(i, glow[i % glow.length]); }
+        } else if (def.edge === "stones") {
+          const m = inst(K.dodeca, new T.MeshLambertMaterial(), NR);
+          for (let i = 0; i < NR; i++) { const an = (i / NR) * TAU, r = WORLD + 1.2 + rand(-0.3, 0.6), s = rand(0.55, 1.05); put(m, i, Math.cos(an) * r, s * 0.3, Math.sin(an) * r, s, s * 0.7, s, rand(TAU)); m.setColorAt(i, tmp.copy(glow[i % glow.length]).multiplyScalar(rand(0.85, 1.15))); }
+        } else {
+          const m = inst(G.spike, new T.MeshBasicMaterial({ transparent: true, opacity: 0.85 }), NR);
+          for (let i = 0; i < NR; i++) { const an = (i / NR) * TAU, r = WORLD + 1 + rand(-0.3, 0.5), s = rand(0.35, 0.6); put(m, i, Math.cos(an) * r, 0, Math.sin(an) * r, s, s * rand(2.2, 3.6), s, rand(TAU)); m.setColorAt(i, tmp.copy(glow[i % glow.length]).multiplyScalar(0.75)); }
+        }
+      }
+      // 나무 · 덤불 — 카메라 반대편(북쪽 · 양옆)에만 키 크게, 카메라 쪽은 낮게
+      const spots = [];
+      [[WORLD + 7, 40], [WORLD + 14, 36], [WORLD + 23, 32], [WORLD + 33, 28]].forEach(([Rr, n], ri) => { for (let k = 0; k < n; k++) { const an = ((k + rand(0.7)) / n) * TAU, r = Rr + rand(-2, 2.5); spots.push({ x: Math.cos(an) * r, z: Math.sin(an) * r, front: Math.sin(an), ri }); } });
+      const trees = spots.filter((s) => s.front < 0.3), bushes = spots.filter((s) => s.front >= 0.3);
+      const pal = def.leaves.map(C), trunkMat = new T.MeshLambertMaterial({ color: C(def.trunk) });
+      if (def.tree === "pine" || def.tree === "snowpine") {
+        const trunkM = inst(G.trunk, trunkMat, trees.length), leafM = inst(G.tier, new T.MeshLambertMaterial(), trees.length * 3), white = C(0xf4f8ff);
+        trees.forEach((t, i) => { const sc = rand(1, 1.9) * (1 + t.ri * 0.12), h = rand(4.5, 7.5) * sc * 0.8, ry = rand(TAU); put(trunkM, i, t.x, 0, t.z, sc, h, sc, ry); const base = pick(pal); for (let k = 0; k < 3; k++) { put(leafM, i * 3 + k, t.x, h * (0.45 + k * 0.3), t.z, sc * (2.9 - k * 0.62), sc * (3.6 - k * 0.4), sc * (2.9 - k * 0.62), ry + k); tmp.copy(base).multiplyScalar(0.8 + k * 0.22 + rand(-0.06, 0.06)); if (def.tree === "snowpine") tmp.lerp(white, 0.3 + k * 0.24); leafM.setColorAt(i * 3 + k, tmp); } });
+      } else if (def.tree === "round" || def.tree === "willow") {
+        const wil = def.tree === "willow";
+        const trunkM = inst(G.trunk, trunkMat, trees.length), crownM = inst(G.sphLo, new T.MeshLambertMaterial(), trees.length * 2);
+        trees.forEach((t, i) => { const sc = rand(1, 1.8) * (1 + t.ri * 0.12), h = rand(3.6, 5.6) * sc * (wil ? 1.05 : 0.8), ry = rand(TAU); put(trunkM, i, t.x, 0, t.z, sc * 0.9, h, sc * 0.9, ry); const base = pick(pal);
+          if (wil) { put(crownM, i * 2, t.x, h * 0.95, t.z, sc * 3.2, sc * 2.2, sc * 3.2, ry); put(crownM, i * 2 + 1, t.x, h * 0.55, t.z, sc * 2.9, sc * 3.4, sc * 2.9, ry); }
+          else { put(crownM, i * 2, t.x, h * 1.05, t.z, sc * 3, sc * 2.6, sc * 3, ry); put(crownM, i * 2 + 1, t.x + rand(-1.2, 1.2), h * 1.45, t.z + rand(-1, 1), sc * 2.1, sc * 1.9, sc * 2.1, ry); }
+          crownM.setColorAt(i * 2, tmp.copy(base).multiplyScalar(rand(0.82, 1.02))); crownM.setColorAt(i * 2 + 1, tmp.copy(base).multiplyScalar(rand(0.95, 1.18))); });
+      } else {
+        // 동굴 — 나무 대신 종유석 기둥
+        const stM = inst(G.spike, new T.MeshLambertMaterial(), trees.length);
+        trees.forEach((t, i) => { const sc = rand(1.4, 2.6) * (1 + t.ri * 0.15); put(stM, i, t.x, 0, t.z, sc, sc * rand(3.5, 7), sc, rand(TAU)); stM.setColorAt(i, tmp.copy(C(def.trunk)).multiplyScalar(rand(0.8, 1.4))); });
+      }
+      {
+        const bpal = def.bush.map(C), bushM = inst(G.sphLo, new T.MeshLambertMaterial(), bushes.length * 2);
+        bushes.forEach((t, i) => { const s = rand(1.5, 2.6); put(bushM, i * 2, t.x, s * 0.35, t.z, s, s * 0.62, s); put(bushM, i * 2 + 1, t.x + rand(-1.6, 1.6), s * 0.25, t.z + rand(-1, 1), s * 0.7, s * 0.45, s * 0.7); const c = bpal[i % bpal.length]; bushM.setColorAt(i * 2, tmp.copy(c).multiplyScalar(rand(0.85, 1.1))); bushM.setColorAt(i * 2 + 1, tmp.copy(c).multiplyScalar(rand(0.95, 1.25))); });
+      }
+      // 빛나는 큰 버섯
+      if (def.big > 0) {
+        const every = Math.max(1, Math.round(1 / def.big)), big = trees.filter((t) => t.ri < (def.tree === "cave" ? 3 : 2)).filter((_, i) => i % every === 0);
+        const bCap = inst(G.capHi, new T.MeshLambertMaterial({ emissive: C(0xffffff), emissiveMap: spotTex, emissiveIntensity: 0.7 }), big.length), bStem = inst(G.stemHi, new T.MeshLambertMaterial({ color: C(0xe4dcfa), emissive: C(0x2a2050) }), big.length);
+        const bGill = inst(G.gill, new T.MeshLambertMaterial({ color: C(0x6b5a9a), emissive: C(0x2a1f55), side: T.DoubleSide }), big.length);
+        const hp = [], hc = [];
+        big.forEach((t, i) => { const s = rand(3.2, 5.6), x = t.x * 0.93 + rand(-2, 2), z = t.z * 0.93 + rand(-2, 2), col = glow[i % glow.length], ry = rand(TAU); put(bStem, i, x, 0, z, s, s, s, ry); put(bCap, i, x, 0.53 * s, z, s * 1.5, s * 1.2, s * 1.5, ry); put(bGill, i, x, 0.53 * s, z, s * 1.5, s, s * 1.5); bCap.setColorAt(i, tmp.copy(col).multiplyScalar(0.8)); hp.push(x, s * 0.8, z); hc.push(col.r * 0.55, col.g * 0.55, col.b * 0.55); });
+        points(big.length, 11, (p, c) => { p.set(hp); c.set(hc); });
+      }
+      // 풀 · 조약돌 · 반짝이는 꽃
+      {
+        const gp = def.grass.map(C), grassM = inst(K.grass, new T.MeshLambertMaterial(), def.grassN);
+        for (let i = 0; i < def.grassN; i++) { const an = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 8); put(grassM, i, Math.cos(an) * r, 0, Math.sin(an) * r, rand(0.7, 1.5), rand(0.6, 1.9), rand(0.7, 1.5), rand(TAU)); grassM.setColorAt(i, pick(gp)); }
+        const NP = 70, peb = inst(K.dodeca, new T.MeshLambertMaterial({ color: C(def.pebble) }), NP);
+        for (let i = 0; i < NP; i++) { const an = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 6), s = rand(0.18, 0.5); put(peb, i, Math.cos(an) * r, s * 0.2, Math.sin(an) * r, s, s * 0.55, s, rand(TAU)); }
+        const fpal = def.flowers.map(C);
+        points(def.flowerN, def.flowerSize, (p, c) => { for (let i = 0; i < def.flowerN; i++) { const an = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 4), q = fpal[i % fpal.length], k = rand(0.35, 0.8); p[i * 3] = Math.cos(an) * r; p[i * 3 + 1] = 0.2; p[i * 3 + 2] = Math.sin(an) * r; c[i * 3] = q.r * k; c[i * 3 + 1] = q.g * k; c[i * 3 + 2] = q.b * k; } });
+      }
+      // 장애물
+      solid = []; ice = [];
+      const rocks = def.obs.filter((o) => o[3] === "rock");
+      if (rocks.length) {
+        const rm = inst(K.dodeca, new T.MeshLambertMaterial(), rocks.length * 3);
+        rocks.forEach((o, i) => { const [x, z, r] = o; put(rm, i * 3, x, r * 0.3, z, r * 1.08, r * 0.8, r * 1.08, rand(TAU)); for (let k = 1; k < 3; k++) { const an = rand(TAU), s = r * rand(0.28, 0.42); put(rm, i * 3 + k, x + Math.cos(an) * r * 0.95, s * 0.25, z + Math.sin(an) * r * 0.95, s, s * 0.7, s, rand(TAU)); } for (let k = 0; k < 3; k++) rm.setColorAt(i * 3 + k, tmp.copy(C(def.rock || def.pebble)).multiplyScalar(rand(0.85, 1.15))); });
+      }
+      const pills = def.obs.filter((o) => o[3] === "pillar");
+      if (pills.length) {
+        const pm = inst(G.spike, new T.MeshLambertMaterial({ color: C(def.rock || def.trunk) }), pills.length), gm = inst(G.sphLo, new T.MeshBasicMaterial(), pills.length);
+        pills.forEach((o, i) => { const [x, z, r] = o; put(pm, i, x, 0, z, r * 1.05, r * 4.2, r * 1.05, rand(TAU)); put(gm, i, x, r * 1.6, z, r * 0.45, r * 0.7, r * 0.45); gm.setColorAt(i, glow[i % glow.length]); });
+        points(pills.length, 9, (p, c) => { pills.forEach((o, i) => { const q = glow[i % glow.length]; p[i * 3] = o[0]; p[i * 3 + 1] = o[2] * 1.6; p[i * 3 + 2] = o[1]; c[i * 3] = q.r * 0.6; c[i * 3 + 1] = q.g * 0.6; c[i * 3 + 2] = q.b * 0.6; }); });
+      }
+      def.obs.filter((o) => o[3] === "water" || o[3] === "ice").forEach((o) => {
+        const [x, z, r, kind] = o, isIce = kind === "ice";
+        const w = own(new T.Mesh(K.disc, new T.MeshStandardMaterial({ color: C(isIce ? 0xcfe6ff : def.water), roughness: isIce ? 0.08 : 0.18, metalness: isIce ? 0.05 : 0.2, emissive: C(isIce ? 0x6a8ab8 : def.water), emissiveIntensity: isIce ? 0.25 : 0.18, transparent: true, opacity: isIce ? 0.82 : 0.92, depthWrite: false })));
+        w.position.set(x, 0.035, z); w.scale.setScalar(r);
+        const s = own(new T.Mesh(K.shore, new T.MeshLambertMaterial({ color: C(isIce ? 0xffffff : def.shore) }))); s.position.set(x, 0.04, z); s.scale.setScalar(r);
+        if (!isIce && def.lily) { const n = Math.round(r * 1.2), lm = inst(K.disc, new T.MeshLambertMaterial({ color: C(0x3a9a4a) }), n); for (let k = 0; k < n; k++) { const an = rand(TAU), rr = Math.sqrt(rand(1)) * r * 0.75; put(lm, k, x + Math.cos(an) * rr, 0.06, z + Math.sin(an) * rr, rand(0.35, 0.65)); } }
+      });
+      def.obs.forEach((o) => { const q = { x: o[0], z: o[1], r: o[2] }; if (o[3] === "ice") ice.push(q); else solid.push(q); });
+      // 날리는 것 — 반딧불 · 낙엽 · 눈 · 꽃잎 · 포자
+      {
+        const N = def.airN, base = [], acol = def.airCol.map(C);
+        for (let i = 0; i < N; i++) { const an = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 12); base.push({ x: Math.cos(an) * r, y: rand(def.air === "fly" ? 1 : 0, def.air === "fly" ? 7 : 14), z: Math.sin(an) * r, p: rand(TAU), s: rand(0.3, 0.9), c: acol[i % acol.length] }); }
+        const pts = points(N, def.airSize, () => {});
+        air = { pts, base, mode: def.air, pos: pts.geometry.attributes.position, col: pts.geometry.attributes.color };
+      }
+    }
+    function update(t) {
+      if (!air) return;
+      const { base, mode, pos, col } = air, P = pos.array, Cc = col.array;
+      for (let i = 0; i < base.length; i++) {
+        const f = base[i]; let x = f.x, y = f.y, z = f.z, k = 1;
+        if (mode === "fly") { k = 0.45 + 0.55 * Math.sin(t * 1.7 * f.s + f.p * 3); x += Math.sin(t * f.s + f.p) * 2.2; y += Math.sin(t * f.s * 1.3 + f.p * 2) * 0.9; z += Math.cos(t * f.s * 0.8 + f.p) * 2.2; }
+        else if (mode === "spore") { k = 0.4 + 0.6 * Math.sin(t * 1.3 * f.s + f.p * 3) ** 2; y = (f.y + t * f.s * 0.9) % 12; x += Math.sin(t * 0.5 * f.s + f.p) * 1.4; z += Math.cos(t * 0.4 * f.s + f.p) * 1.4; }
+        else { const sp = mode === "snow" ? 1.5 : mode === "leaf" ? 1.0 : 0.7, sw = mode === "snow" ? 0.8 : 2.2; y = 14 - ((14 - f.y + t * f.s * sp) % 14); x += Math.sin(t * f.s * 1.1 + f.p) * sw; z += Math.cos(t * f.s * 0.9 + f.p) * sw * 0.6; k = mode === "snow" ? 0.75 : 0.6 + 0.4 * Math.sin(t * 3 * f.s + f.p) ** 2; }
+        P[i * 3] = x; P[i * 3 + 1] = y; P[i * 3 + 2] = z; Cc[i * 3] = f.c.r * k; Cc[i * 3 + 1] = f.c.g * k; Cc[i * 3 + 2] = f.c.b * k;
+      }
+      pos.needsUpdate = true; col.needsUpdate = true;
+    }
+    const byId = (id) => JELLY_MAPS.find((m) => m.id === id) || JELLY_MAPS[0];
+    return {
+      maps: JELLY_MAPS,
+      apply(id) { const def = byId(Number(id) || 1); if (cur === def && group) return false; dispose(); cur = def; build(def); return true; },
+      get cur() { return cur; },
+      world: () => cur.world,
+      update,
+      // 그 자리가 막혔는지 (물 · 바위 · 기둥 — 얼음은 지나갈 수 있다)
+      blocked(x, z, pad) { for (const o of solid) if (Math.hypot(x - o.x, z - o.z) < o.r + pad) return true; return false; },
+      onIce(x, z) { for (const o of ice) if (Math.hypot(x - o.x, z - o.z) < o.r) return true; return false; },
+      // 장애물 안으로 들어갔으면 가장자리로 밀어내고 그쪽 속도를 없앤다
+      push(c, rad) {
+        for (const o of solid) {
+          let dx = c.x - o.x, dz = c.z - o.z; const d = Math.hypot(dx, dz) || 1e-4, lim = o.r + rad;
+          if (d >= lim) continue;
+          dx /= d; dz /= d; c.x = o.x + dx * lim; c.z = o.z + dz * lim;
+          const vn = c.vx * dx + c.vz * dz; if (vn < 0) { c.vx -= vn * dx; c.vz -= vn * dz; }
+        }
+      },
+      // 가는 방향 앞에 장애물이 있으면 옆으로 돌아가게 (숲 친구 · 컴퓨터 젤리)
+      steer(x, z, rad, dx, dz) {
+        let sx = dx, sz = dz;
+        for (const o of solid) {
+          const ox = o.x - x, oz = o.z - z, d = Math.hypot(ox, oz) || 1e-4, gap = d - o.r - rad;
+          if (gap > 4) continue;
+          const ux = ox / d, uz = oz / d, fw = ux * dx + uz * dz;
+          if (fw <= 0.15) continue;
+          const side = ux * dz - uz * dx >= 0 ? 1 : -1, w = clamp(1 - gap / 4, 0, 1) * fw;
+          sx += -uz * side * w * 1.6 - ux * w * 0.5; sz += ux * side * w * 1.6 - uz * w * 0.5;
+        }
+        const l = Math.hypot(sx, sz) || 1; return [sx / l, sz / l];
+      },
+      // 먹이 자리 — 맵마다 퍼짐이 다르다(고르게 · 가운데 · 가장자리 · 무리). rng 는 0~1 수를 내는 함수
+      foodPos(rng, pad) {
+        const W = cur.world - pad;
+        let x = 0, z = 0;
+        for (let k = 0; k < 12; k++) {
+          const u = rng(), an = rng() * TAU;
+          if (cur.food === "patches" && u < 0.7) { const pt = cur.patches[(rng() * cur.patches.length) | 0], rr = Math.sqrt(rng()) * 10; x = pt[0] + Math.cos(an) * rr; z = pt[1] + Math.sin(an) * rr; const l = Math.hypot(x, z); if (l > W) { x *= W / l; z *= W / l; } }
+          else { const v = cur.food === "patches" ? (u - 0.7) / 0.3 : u, rr = cur.food === "center" ? Math.pow(v, 0.8) * W : cur.food === "ring" ? Math.sqrt(0.3 + 0.7 * v) * W : Math.sqrt(v) * W; x = Math.cos(an) * rr; z = Math.sin(an) * rr; }
+          if (!this.blocked(x, z, 0.8)) break;
+        }
+        return { x, z };
+      },
+    };
+  }
+
 
   // ───────── 화면 글 · 꾸밈 (한 번만 넣는다)
   const CSS = `
@@ -128,18 +405,9 @@ window.HKJellyVs = (function () {
     renderer.outputEncoding = T.sRGBEncoding;
     renderer.toneMapping = T.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
     const scene = new T.Scene();
-    scene.fog = new T.FogExp2(C(0x1c1650), 0.0098);
     const camera = new T.PerspectiveCamera(52, 1, 0.5, 460);
     const canvasTex = (w, h, draw) => { const cv = document.createElement("canvas"); cv.width = w; cv.height = h; draw(cv.getContext("2d"), w, h); const t = new T.CanvasTexture(cv); t.encoding = T.sRGBEncoding; return t; };
     const glowTex = canvasTex(64, 64, (g) => { const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, "rgba(255,255,255,1)"); gr.addColorStop(0.22, "rgba(255,255,255,.6)"); gr.addColorStop(1, "rgba(255,255,255,0)"); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); });
-    scene.background = canvasTex(4, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, "#0a0722"); gr.addColorStop(0.5, "#241a60"); gr.addColorStop(1, "#1e5068"); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
-    scene.add(new T.HemisphereLight(C(0xc3b4ff), C(0x1f6a52), 1.0));
-    const moon = new T.DirectionalLight(C(0xd6e6ff), 0.8); moon.position.set(-30, 60, 24); scene.add(moon);
-    const rim = new T.DirectionalLight(C(0xff9ad8), 0.3); rim.position.set(40, 22, -40); scene.add(rim);
-
-    function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
-    function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf); return lerp(lerp(hash(xi, yi), hash(xi + 1, yi), u), lerp(hash(xi, yi + 1), hash(xi + 1, yi + 1), u), v); }
-    function fbm(x, y) { return vnoise(x, y) * 0.6 + vnoise(x * 2.1, y * 2.1) * 0.28 + vnoise(x * 4.3, y * 4.3) * 0.12; }
     const G = {
       sph: new T.SphereGeometry(1, 30, 22), sphLo: new T.SphereGeometry(1, 14, 10), berry: new T.SphereGeometry(1, 10, 7),
       cyl: new T.CylinderGeometry(1, 1, 1, 7), spike: new T.ConeGeometry(1, 1, 6).translate(0, 0.5, 0), box: new T.BoxGeometry(1, 1, 1),
@@ -154,69 +422,10 @@ window.HKJellyVs = (function () {
     const inst = (geo, mat, n) => { const m = new T.InstancedMesh(geo, mat, n); m.frustumCulled = false; scene.add(m); return m; };
     const put = (m, i, x, y, z, sx, sy, sz, ry) => { dummy.position.set(x, y, z); dummy.rotation.set(0, ry || 0, 0); dummy.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); };
 
-    RNG = mulberry(20261113); // 숲 꾸밈은 늘 같은 모습 — 두 사람 화면이 같게
-    (function buildGround() {
-      const geo = new T.PlaneGeometry(320, 320, 160, 160); geo.rotateX(-Math.PI / 2);
-      const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
-      const a = C(0x18473f), b = C(0x2c8658), c = C(0x6ad07e), v = C(0x40318f), e = C(0x0b1a2a), tmp = new T.Color();
-      for (let i = 0; i < pos.count; i++) {
-        const x = pos.getX(i), z = pos.getZ(i), r = Math.hypot(x, z);
-        const n = fbm(x * 0.06 + 7, z * 0.06 + 3), n2 = fbm(x * 0.025 + 40, z * 0.025 - 11);
-        tmp.copy(a).lerp(b, sstep(0.3, 0.7, n)); tmp.lerp(c, sstep(0.62, 0.9, n) * 0.55); tmp.lerp(v, sstep(0.5, 0.82, n2) * 0.36);
-        tmp.lerp(e, sstep(WORLD - 1, WORLD + 18, r) * 0.88);
-        col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
-      }
-      geo.setAttribute("color", new T.BufferAttribute(col, 3));
-      const grTex = canvasTex(256, 256, (g, w, h) => {
-        g.fillStyle = "#fff"; g.fillRect(0, 0, w, h);
-        for (let i = 0; i < 70; i++) { const x = hash(i, 1) * w, y = hash(i, 2) * h, r = 8 + hash(i, 3) * 26; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "rgba(40,40,90,.09)"); gr.addColorStop(1, "rgba(40,40,90,0)"); g.fillStyle = gr; for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) { g.beginPath(); g.arc(x + ox, y + oy, r, 0, TAU); g.fill(); } }
-        g.lineCap = "round";
-        for (let i = 0; i < 520; i++) { const x = hash(i, 5) * w, y = hash(i, 6) * h, l = 3 + hash(i, 7) * 6, an = -1.2 + hash(i, 8) * 0.7, lt = hash(i, 9) < 0.35; g.strokeStyle = lt ? "rgba(255,255,230,.28)" : "rgba(10,30,30," + (0.06 + hash(i, 10) * 0.08) + ")"; g.lineWidth = lt ? 1 : 1.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(an) * l, y + Math.sin(an) * l); g.stroke(); }
-      });
-      grTex.wrapS = grTex.wrapT = T.RepeatWrapping; grTex.repeat.set(30, 30); grTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-      scene.add(new T.Mesh(geo, new T.MeshLambertMaterial({ vertexColors: true, map: grTex })));
-    })();
-    const glow = [C(0x7dffd0), C(0xff9ad8), C(0xffe27a), C(0x9ad0ff)];
-    (function buildScenery() {
-      const tmp = new T.Color();
-      const capTex = canvasTex(128, 32, (g, w, h) => { const v = g.createLinearGradient(0, 0, 0, h); v.addColorStop(0, "#fff"); v.addColorStop(1, "#bdb6d6"); g.fillStyle = v; g.fillRect(0, 0, w, h); g.fillStyle = "rgba(255,255,255,.95)"; for (let i = 0; i < 10; i++) { g.beginPath(); g.arc((i * 29 + 7) % w, 5 + ((i * 11) % (h - 14)), 2 + (i % 3), 0, TAU); g.fill(); } });
-      const NR = 84, capM = inst(G.cap, new T.MeshBasicMaterial({ map: capTex }), NR), stemM = inst(G.stem, new T.MeshLambertMaterial({ color: C(0xe9e2ff) }), NR);
-      for (let i = 0; i < NR; i++) { const a = (i / NR) * TAU, r = WORLD + 1 + rand(-0.3, 0.5), s = rand(0.9, 1.5); put(stemM, i, Math.cos(a) * r, 0, Math.sin(a) * r, s); put(capM, i, Math.cos(a) * r, 0.5 * s, Math.sin(a) * r, s * 1.25); capM.setColorAt(i, glow[i % 4]); }
-      const spots = [];
-      [[WORLD + 7, 40], [WORLD + 14, 36], [WORLD + 23, 32], [WORLD + 33, 28]].forEach(([R, n], ri) => { for (let k = 0; k < n; k++) { const a = ((k + rand(0.7)) / n) * TAU, r = R + rand(-2, 2.5); spots.push({ x: Math.cos(a) * r, z: Math.sin(a) * r, front: Math.sin(a), ri }); } });
-      const trees = spots.filter((s) => s.front < 0.3), bushes = spots.filter((s) => s.front >= 0.3);
-      const trunkM = inst(G.trunk, new T.MeshLambertMaterial({ color: C(0x4a3558) }), trees.length);
-      const leafM = inst(G.tier, new T.MeshLambertMaterial(), trees.length * 3);
-      const pal = [0x1f7a6b, 0x186a78, 0x2a8a62, 0x23806e, 0x4a3fa0, 0x7a3fa6];
-      trees.forEach((t, i) => { const sc = rand(1, 1.9) * (1 + t.ri * 0.12), h = rand(4.5, 7.5) * sc * 0.8, ry = rand(TAU); put(trunkM, i, t.x, 0, t.z, sc, h, sc, ry); const base = C(pal[(RNG() * pal.length) | 0]); for (let k = 0; k < 3; k++) { put(leafM, i * 3 + k, t.x, h * (0.45 + k * 0.3), t.z, sc * (2.9 - k * 0.62), sc * (3.6 - k * 0.4), sc * (2.9 - k * 0.62), ry + k); leafM.setColorAt(i * 3 + k, tmp.copy(base).multiplyScalar(0.8 + k * 0.22 + rand(-0.06, 0.06))); } });
-      const bushM = inst(G.sphLo, new T.MeshLambertMaterial(), bushes.length * 2);
-      const bpal = [0x1f7a6b, 0x2a8a62, 0x4a3fa0, 0x186a78];
-      bushes.forEach((t, i) => { const s = rand(1.5, 2.6); put(bushM, i * 2, t.x, s * 0.35, t.z, s, s * 0.62, s); put(bushM, i * 2 + 1, t.x + rand(-1.6, 1.6), s * 0.25, t.z + rand(-1, 1), s * 0.7, s * 0.45, s * 0.7); const c = C(bpal[i % 4]); bushM.setColorAt(i * 2, tmp.copy(c).multiplyScalar(rand(0.85, 1.1))); bushM.setColorAt(i * 2 + 1, tmp.copy(c).multiplyScalar(rand(0.95, 1.25))); });
-      const big = trees.filter((t) => t.ri < 2).filter((_, i) => i % 3 === 0);
-      const spotTex = canvasTex(256, 64, (g, w, h) => { g.fillStyle = "#000"; g.fillRect(0, 0, w, h); for (let i = 0; i < 22; i++) { const x = (i * 53 + 17) % w, y = 8 + ((i * 29) % (h - 26)), r = 4 + (i % 4) * 2.2; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "#fff"); gr.addColorStop(0.75, "#e8e0ff"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); } const v = g.createLinearGradient(0, 0, 0, h); v.addColorStop(0, "rgba(255,255,255,.22)"); v.addColorStop(0.5, "rgba(255,255,255,0)"); g.fillStyle = v; g.fillRect(0, 0, w, h); });
-      const bCap = inst(G.capHi, new T.MeshLambertMaterial({ emissive: C(0xffffff), emissiveMap: spotTex, emissiveIntensity: 0.7 }), big.length), bStem = inst(G.stemHi, new T.MeshLambertMaterial({ color: C(0xe4dcfa), emissive: C(0x2a2050) }), big.length);
-      const bGill = inst(G.gill, new T.MeshLambertMaterial({ color: C(0x6b5a9a), emissive: C(0x2a1f55), side: T.DoubleSide }), big.length);
-      const hp = new Float32Array(big.length * 3), hc = new Float32Array(big.length * 3);
-      big.forEach((t, i) => { const s = rand(3.2, 5.6), x = t.x * 0.93 + rand(-2, 2), z = t.z * 0.93 + rand(-2, 2), col = glow[i % 4]; const ry = rand(TAU); put(bStem, i, x, 0, z, s, s, s, ry); put(bCap, i, x, 0.53 * s, z, s * 1.5, s * 1.2, s * 1.5, ry); put(bGill, i, x, 0.53 * s, z, s * 1.5, s, s * 1.5); bCap.setColorAt(i, tmp.copy(col).multiplyScalar(0.8)); hp[i * 3] = x; hp[i * 3 + 1] = s * 0.8; hp[i * 3 + 2] = z; hc[i * 3] = col.r * 0.55; hc[i * 3 + 1] = col.g * 0.55; hc[i * 3 + 2] = col.b * 0.55; });
-      const hg = new T.BufferGeometry(); hg.setAttribute("position", new T.BufferAttribute(hp, 3)); hg.setAttribute("color", new T.BufferAttribute(hc, 3));
-      const halo = new T.Points(hg, new T.PointsMaterial({ size: 11, map: glowTex, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); halo.frustumCulled = false; scene.add(halo);
-      const NG = 1500, grassM = inst(new T.ConeGeometry(0.1, 0.55, 3).translate(0, 0.27, 0), new T.MeshLambertMaterial(), NG);
-      const gp = [C(0x3fa46a), C(0x56c27c), C(0x2f8f72), C(0x7ad88a), C(0x5d6fd0)];
-      for (let i = 0; i < NG; i++) { const a = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 8); put(grassM, i, Math.cos(a) * r, 0, Math.sin(a) * r, rand(0.7, 1.5), rand(0.6, 1.9), rand(0.7, 1.5), rand(TAU)); grassM.setColorAt(i, gp[(RNG() * gp.length) | 0]); }
-      const NP = 70, peb = inst(new T.DodecahedronGeometry(1, 0), new T.MeshLambertMaterial({ color: C(0x6f6a96) }), NP);
-      for (let i = 0; i < NP; i++) { const a = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 6), s = rand(0.18, 0.5); put(peb, i, Math.cos(a) * r, s * 0.2, Math.sin(a) * r, s, s * 0.55, s, rand(TAU)); }
-      const NF = 280, fp = new Float32Array(NF * 3), fc = new Float32Array(NF * 3), fpal = [C(0xffffff), C(0xff9ad8), C(0x8fe9ff), C(0xffe27a)];
-      for (let i = 0; i < NF; i++) { const a = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 4), c = fpal[i % 4], k = rand(0.35, 0.8); fp[i * 3] = Math.cos(a) * r; fp[i * 3 + 1] = 0.2; fp[i * 3 + 2] = Math.sin(a) * r; fc[i * 3] = c.r * k; fc[i * 3 + 1] = c.g * k; fc[i * 3 + 2] = c.b * k; }
-      const fg = new T.BufferGeometry(); fg.setAttribute("position", new T.BufferAttribute(fp, 3)); fg.setAttribute("color", new T.BufferAttribute(fc, 3));
-      const fl = new T.Points(fg, new T.PointsMaterial({ size: 0.55, map: glowTex, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); fl.frustumCulled = false; scene.add(fl);
-    })();
-    // 반딧불이
-    const FLY = 130, flyBase = [], flyPos = new Float32Array(FLY * 3), flyCol = new Float32Array(FLY * 3);
-    for (let i = 0; i < FLY; i++) { const a = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 12); flyBase.push({ x: Math.cos(a) * r, y: rand(1, 7), z: Math.sin(a) * r, p: rand(TAU), s: rand(0.3, 0.9), g: i % 3 === 0 }); }
-    const flyGeo = new T.BufferGeometry(); flyGeo.setAttribute("position", new T.BufferAttribute(flyPos, 3)); flyGeo.setAttribute("color", new T.BufferAttribute(flyCol, 3));
-    const flies = new T.Points(flyGeo, new T.PointsMaterial({ size: 0.7, map: glowTex, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); flies.frustumCulled = false; scene.add(flies);
-    const FLY_A = C(0xffe27a), FLY_B = C(0x7dffd0);
-    function updateFlies(t) { for (let i = 0; i < FLY; i++) { const f = flyBase[i], k = 0.45 + 0.55 * Math.sin(t * 1.7 * f.s + f.p * 3), c = f.g ? FLY_B : FLY_A; flyPos[i * 3] = f.x + Math.sin(t * f.s + f.p) * 2.2; flyPos[i * 3 + 1] = f.y + Math.sin(t * f.s * 1.3 + f.p * 2) * 0.9; flyPos[i * 3 + 2] = f.z + Math.cos(t * f.s * 0.8 + f.p) * 2.2; flyCol[i * 3] = c.r * k; flyCol[i * 3 + 1] = c.g * k; flyCol[i * 3 + 2] = c.b * k; } flyGeo.attributes.position.needsUpdate = true; flyGeo.attributes.color.needsUpdate = true; }
+    // 하늘 · 빛 · 땅 · 나무 · 날리는 것 · 장애물은 맵 도구가 맵마다 새로 만든다 (앞 맵 것은 버린다)
+    MK = JellyMapKit(T, { scene, renderer, C, canvasTex, glowTex, G });
+    MK.apply(1); WORLD = MK.world();
+    RNG = mulberry(20261113); // 먹을 것 · 젤리 꾸밈은 늘 같은 모습 — 두 사람 화면이 같게
     // 터지는 가루
     const PN = 320, P = [], pPos = new Float32Array(PN * 3), pCol = new Float32Array(PN * 3);
     for (let i = 0; i < PN; i++) { P.push({ life: 0, max: 1, x: 0, y: -99, z: 0, vx: 0, vy: 0, vz: 0, r: 1, g: 1, b: 1 }); pPos[i * 3 + 1] = -99; }
@@ -247,9 +456,10 @@ window.HKJellyVs = (function () {
       food.push(f);
     }
     function updateFoodVisuals(t, dt) {
-      for (let i = 0; i < N_BERRY; i++) { const b = food[i]; b.pop = b.alive ? damp(b.pop, 1, 9, dt) : 0; const s = b.pop * 0.27 * (1 + 0.07 * Math.sin(t * 3 + b.ph)); for (let k = 0; k < 4; k++) { const o = B_OFF[k]; put(berryM, i * 4 + k, b.x + o[0] * b.pop, o[1] * b.pop, b.z + o[2] * b.pop, s); } }
+      const fsc = MK.cur.foodScale || 1;
+      for (let i = 0; i < N_BERRY; i++) { const b = food[i]; b.pop = b.alive ? damp(b.pop, 1, 9, dt) : 0; const s = fsc * b.pop * 0.27 * (1 + 0.07 * Math.sin(t * 3 + b.ph)); for (let k = 0; k < 4; k++) { const o = B_OFF[k]; put(berryM, i * 4 + k, b.x + o[0] * b.pop, o[1] * b.pop, b.z + o[2] * b.pop, s); } }
       berryM.instanceMatrix.needsUpdate = true;
-      for (let j = 0; j < N_SHROOM; j++) { const b = food[N_BERRY + j]; b.pop = b.alive ? damp(b.pop, 1, 9, dt) : 0; const s = b.pop * b.sz, w = 1 + 0.04 * Math.sin(t * 2.4 + b.ph); put(shStemM, j, b.x, 0, b.z, s, s * w, s); put(shCapM, j, b.x, 0.5 * s * w, b.z, s * 1.25, s * 1.25 * (2 - w), s * 1.25, b.ph); }
+      for (let j = 0; j < N_SHROOM; j++) { const b = food[N_BERRY + j]; b.pop = b.alive ? damp(b.pop, 1, 9, dt) : 0; const s = fsc * b.pop * b.sz, w = 1 + 0.04 * Math.sin(t * 2.4 + b.ph); put(shStemM, j, b.x, 0, b.z, s, s * w, s); put(shCapM, j, b.x, 0.5 * s * w, b.z, s * 1.25, s * 1.25 * (2 - w), s * 1.25, b.ph); }
       shStemM.instanceMatrix.needsUpdate = true; shCapM.instanceMatrix.needsUpdate = true;
       for (let i = N_BERRY + N_SHROOM; i < N_FOOD; i++) { const o = food[i]; o.pop = o.alive ? damp(o.pop, 1, 8, dt) : 0; o.g.visible = o.pop > 0.02; o.g.position.set(o.x, 1.05 + 0.28 * Math.sin(t * 2.2 + o.ph), o.z); o.g.scale.setScalar(o.pop); o.core.rotation.y = t * 2 + o.ph; }
     }
@@ -322,7 +532,17 @@ window.HKJellyVs = (function () {
     for (let i = 0; i < N_FRIEND; i++) all.push(makeEnt(RKINDS[(i >> 1) % 4], 3 + i));
     RNG = Math.random;
 
-    W0 = { canvas, renderer, scene, camera, all, food, M, KIND_COL, BERRY_COL, SHROOM_COL, C, burst, updateParticles, clearParticles, updateFlies, updateFoodVisuals, session: null, last: 0, raf: 0, tG: 0 };
+    // 맵 바꾸기 — 숲을 다시 만들고 먹을 것 색을 맵에 맞춘다. 바뀌었으면 true
+    function setMap(id) {
+      const changed = MK.apply(id); WORLD = MK.world(); W0.mapId = MK.cur.id;
+      if (changed) {
+        MK.cur.berry.forEach((h, k) => BERRY_COL[k].copy(C(h))); MK.cur.shroom.forEach((h, k) => SHROOM_COL[k].copy(C(h)));
+        for (const f of food) { if (f.type === 0) for (let k = 0; k < 4; k++) berryM.setColorAt(f.i * 4 + k, BERRY_COL[f.col]); else if (f.type === 1) shCapM.setColorAt(f.i - N_BERRY, SHROOM_COL[(f.i - N_BERRY) % 3]); }
+        berryM.instanceColor.needsUpdate = true; shCapM.instanceColor.needsUpdate = true;
+      }
+      return changed;
+    }
+    W0 = { canvas, renderer, scene, camera, all, food, M, KIND_COL, BERRY_COL, SHROOM_COL, C, burst, updateParticles, clearParticles, updateFlies: (t) => MK.update(t), updateFoodVisuals, setMap, mapId: 1, session: null, last: 0, raf: 0, tG: 0 };
     return W0;
   }
 
@@ -350,6 +570,7 @@ window.HKJellyVs = (function () {
     const w = buildWorld();
     if (w.session) w.session.destroy();
     const mode = opts.mode || "cpu";
+    if (mode !== "guest") w.setMap(opts.map || 1); // guest 는 주인이 보낸 맵을 쓴다
     const online = mode === "host" || mode === "guest";
     const sim = mode !== "guest"; // 판을 직접 계산하는 쪽
     const me = mode === "guest" ? 1 : 0, rv = 1 - me;
@@ -402,7 +623,7 @@ window.HKJellyVs = (function () {
 
     // ───── 판 상태
     const S = {
-      seed: (Math.random() * 2147483647) | 0, epoch: Math.random().toString(36).slice(2, 8),
+      map: w.mapId, seed: (Math.random() * 2147483647) | 0, epoch: Math.random().toString(36).slice(2, 8),
       phase: mode === "demo" ? "play" : "wait", timeLeft: ROUND, playT: 0, countT: 0, endT: 0, result: null, ended: false,
       pz: 0, pzBy: 0, pzWhy: "", ready: [0, 0], resumeT: 0, evId: 0, ev: [], spawnRef: 0, warn30: false, safeSaid: false, lastTick: 99, rel: 0,
     };
@@ -421,7 +642,7 @@ window.HKJellyVs = (function () {
     function spotFriend(c, s, minD) {
       for (let k = 0; k < 30; k++) {
         const a = srand(TAU), r = Math.sqrt(srand(1)) * (WORLD - s - 2); c.x = Math.cos(a) * r; c.z = Math.sin(a) * r;
-        if (J.every((j) => Math.hypot(c.x - j.x, c.z - j.z) > minD) && Math.hypot(c.x - boss.x, c.z - boss.z) > boss.s + s + 3) break;
+        if (J.every((j) => Math.hypot(c.x - j.x, c.z - j.z) > minD) && Math.hypot(c.x - boss.x, c.z - boss.z) > boss.s + s + 3 && !MK.blocked(c.x, c.z, s + 1)) break;
         minD *= 0.94;
       }
     }
@@ -484,7 +705,7 @@ window.HKJellyVs = (function () {
     function endBy(winner, eaten, by) {
       if (S.phase !== "play") return;
       const size = [Math.round(J[0].s * 100), Math.round(J[1].s * 100)];
-      S.result = { winner, size, eaten, sec: eaten ? Math.round(S.playT * 10) / 10 : ROUND, by, friends: [J[0].eat, J[1].eat], bites: [J[0].bites, J[1].bites] };
+      S.result = { winner, size, eaten, sec: eaten ? Math.round(S.playT * 10) / 10 : ROUND, map: S.map, by, friends: [J[0].eat, J[1].eat], bites: [J[0].bites, J[1].bites] };
       S.phase = "end"; S.endT = 0;
       if (eaten) { const big = J[by], sm = J[1 - by]; sm.state = "dying"; sm.t = 0; sm.eater = big; grow(big, sm.m * 0.5); }
       handleEnd();
@@ -551,10 +772,12 @@ window.HKJellyVs = (function () {
         const nx = c.x / r, nz = c.z / r, out = dx * nx + dz * nz;
         if (out > 0) { if (c.mode === "wander") c.wang = Math.atan2(-c.x, -c.z) + rand(-0.9, 0.9); dx -= nx * out; dz -= nz * out; const inw = clamp((r - (lim - 3.5)) / 3.5, 0, 1) * 0.5; dx -= nx * inw; dz -= nz * inw; if (Math.hypot(dx, dz) < 0.3) { dx += -nz * c.side; dz += nx * c.side; } l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l; }
       }
+      [dx, dz] = MK.steer(c.x, c.z, c.s * 0.7, dx, dz); // 물 · 바위는 돌아간다
       const sp = rspd(c.s) * f * (c.state === "spawn" ? 0.25 : 1);
       c.vx = damp(c.vx, dx * sp, 6, dt); c.vz = damp(c.vz, dz * sp, 6, dt);
       c.x += c.vx * dt; c.z += c.vz * dt;
       const r2 = Math.hypot(c.x, c.z); if (r2 > lim) { c.x *= lim / r2; c.z *= lim / r2; }
+      MK.push(c, c.s * 0.7);
     }
     // 젤리 움직이기 — 입력(inx · inz)으로. guest 화면은 내 젤리를 같은 셈으로 먼저 움직인다
     function tryDash(j) {
@@ -573,9 +796,10 @@ window.HKJellyVs = (function () {
         if (l > 0.3) { j.dashDx = damp(j.dashDx, ix / l, 5, dt); j.dashDz = damp(j.dashDz, iz / l, 5, dt); const n = Math.hypot(j.dashDx, j.dashDz) || 1; j.dashDx /= n; j.dashDz /= n; }
         j.vx = j.dashDx * sp * 2.7; j.vz = j.dashDz * sp * 2.7;
         j.trail = (j.trail || 0) - dt; if (j.trail <= 0) { j.trail = 0.03; burst(j.x, j.s * 0.7, j.z, 2, Cc(JCOL[j.idx]), 1.5, 2); }
-      } else { j.vx = damp(j.vx, ix * sp, 9, dt); j.vz = damp(j.vz, iz * sp, 9, dt); }
+      } else { const k = MK.onIce(j.x, j.z) ? 1.6 : 9; j.vx = damp(j.vx, ix * sp, k, dt); j.vz = damp(j.vz, iz * sp, k, dt); } // 얼음 위는 미끄럽다
       j.x += j.vx * dt; j.z += j.vz * dt;
       const lim = WORLD - j.s * 0.6, r = Math.hypot(j.x, j.z); if (r > lim) { j.x *= lim / r; j.z *= lim / r; }
+      MK.push(j, j.s * 0.6);
     }
 
     // ───── 컴퓨터 젤리 (연습 · 구경 · 시험 자동 조작)
@@ -610,7 +834,7 @@ window.HKJellyVs = (function () {
           }
         }
       }
-      const l = Math.hypot(gx, gz) || 1; B.x = (gx / l) * lv.mag; B.z = (gz / l) * lv.mag;
+      const [sx, sz] = MK.steer(j.x, j.z, j.s * 0.6, gx / (Math.hypot(gx, gz) || 1), gz / (Math.hypot(gx, gz) || 1)); B.x = sx * lv.mag; B.z = sz * lv.mag;
       const r = Math.hypot(j.x, j.z); if (r > WORLD - 6) { B.x -= (j.x / r) * 0.6; B.z -= (j.z / r) * 0.6; }
     }
     function botDrive(j, lv, dt) {
@@ -724,7 +948,7 @@ window.HKJellyVs = (function () {
       let f = ""; for (const q of food) f += ALPH[(q.gen % 31) * 2 + (q.alive ? 1 : 0)];
       const now = performance.now();
       const ev = S.ev.filter((e) => now - e[4] < 900).map((e) => e.slice(0, 4));
-      return { t: "s", e: S.epoch, sd: S.seed, ph: ["wait", "count", "play", "end"].indexOf(S.phase), tl: r1(S.timeLeft), pt: r1(S.playT), cn: r1(Math.max(S.countT, S.resumeT)), rd: S.ready.slice(), pz: S.pz, pb: S.pzBy, pw: S.pzWhy, j, c, f, ev, en: S.result || 0 };
+      return { t: "s", e: S.epoch, sd: S.seed, mp: S.map, ph: ["wait", "count", "play", "end"].indexOf(S.phase), tl: r1(S.timeLeft), pt: r1(S.playT), cn: r1(Math.max(S.countT, S.resumeT)), rd: S.ready.slice(), pz: S.pz, pb: S.pzBy, pw: S.pzWhy, j, c, f, ev, en: S.result || 0 };
     }
     function sendSnap() { lastSnap = performance.now(); send(snapshot()); }
     function sendInput(force) {
@@ -756,6 +980,7 @@ window.HKJellyVs = (function () {
       if (m.e !== gEpoch) guestReset(m.e);
       lastSnapAt = performance.now();
       if (m.sd !== gSeed) { gSeed = m.sd; S.seed = m.sd; for (const f of food) { f.gen = -1; } }
+      if (Number.isInteger(m.mp) && m.mp !== S.map) { w.setMap(m.mp); S.map = w.mapId; for (const f of food) { f.gen = -1; } if (S.phase === "wait") resetJellies(); } // 주인이 고른 맵
       const prevPhase = S.phase;
       S.phase = ["wait", "count", "play", "end"][m.ph] || "wait";
       if (prevPhase === "wait" && S.phase === "count") { resetWorld(); }
@@ -834,12 +1059,12 @@ window.HKJellyVs = (function () {
     function lobbyInfo() {
       const rd = S.ready;
       return { phase: S.phase === "count" ? "wait" : S.phase, counting: S.phase === "count" || S.resumeT > 0, paused: !!S.pz, pausedBy: S.pz ? (S.pzBy === me ? "me" : "rival") : null, pausedWhy: S.pz ? S.pzWhy || "pause" : null,
-        ready: [mode === "guest" ? (myReady ? 1 : 0) : rd[me], rd[rv]], peer: link === "ok", host: mode === "host" };
+        ready: [mode === "guest" ? (myReady ? 1 : 0) : rd[me], rd[rv]], peer: link === "ok", host: mode === "host", map: S.map };
     }
     function lobbyTick() {
       if (!online) return;
       const L = lobbyInfo();
-      const sig = `${L.phase}.${L.counting}.${L.paused}.${L.pausedBy}.${L.pausedWhy}.${L.ready}.${L.peer}`;
+      const sig = `${L.phase}.${L.counting}.${L.paused}.${L.pausedBy}.${L.pausedWhy}.${L.ready}.${L.peer}.${L.map}`;
       if (sig !== lobbySig) { lobbySig = sig; try { if (opts.onEvent) opts.onEvent({ type: "lobby", ...L }); } catch (_) { /* 페이지 오류 무시 */ } }
     }
 
@@ -1080,6 +1305,18 @@ window.HKJellyVs = (function () {
         lobbyTick();
       },
       lobby: () => lobbyInfo(),
+      map: () => S.map,
+      // 맵 고르기 — 컴퓨터와 · 구경은 언제든(경기 전), 대전은 주인만 경기 전에. 바꾸면 두 사람 준비가 풀린다
+      setMap(id) {
+        if (mode === "guest" || ((mode === "host" || mode === "cpu") && S.phase !== "wait")) return false;
+        if (!w.setMap(id) && S.map === w.mapId) return false;
+        S.map = w.mapId;
+        if (mode === "host") { S.ready = [0, 0]; S.countT = 0; }
+        resetWorld(); if (mode === "demo") S.phase = "play";
+        if (mode === "host") sendSnap();
+        lobbyTick();
+        return true;
+      },
       debug: () => ({ mode, phase: S.phase, timeLeft: Math.round(S.timeLeft * 10) / 10, playT: Math.round(S.playT * 10) / 10, pz: S.pz, ready: S.ready.slice(), size: J.map((j) => Math.round(j.s * 100)), pos: J.map((j) => [Math.round(j.x * 10) / 10, Math.round(j.z * 10) / 10]), dash: J.map((j) => j.dash), result: S.result, seed: S.seed, alive: food.filter((f) => f.alive).length, food0: [Math.round(food[0].x * 100) / 100, Math.round(food[0].z * 100) / 100], snapAge: lastSnapAt ? Math.round(performance.now() - lastSnapAt) : null, rtt }),
       devSet(o) { if (!opts.dev || !sim) return; if (o.time !== undefined) S.timeLeft = o.time; if (o.playT !== undefined) S.playT = o.playT; if (o.m) o.m.forEach((v, i) => { if (v) { J[i].m = v; setSize(J[i]); } }); if (o.pos) o.pos.forEach((p, i) => { if (p) { J[i].x = p[0]; J[i].z = p[1]; } }); if (o.inv !== undefined) J.forEach((j) => { j.inv = o.inv; }); },
       devAuto(on) { if (opts.dev) devAuto = !!on; },
@@ -1088,5 +1325,7 @@ window.HKJellyVs = (function () {
     return api;
   }
 
-  return { create, sizeWinner, ROUND, SAFE, PVP, EVEN, JCOL, available: () => !!window.THREE };
+  // 맵 목록(화면 카드용) — { id, name, tip, chip: [색 셋] }
+  const MAPS = JELLY_MAPS.map((m) => ({ id: m.id, name: m.name, tip: m.tip, chip: m.chip.slice() }));
+  return { create, sizeWinner, ROUND, SAFE, PVP, EVEN, JCOL, MAPS, available: () => !!window.THREE };
 })();

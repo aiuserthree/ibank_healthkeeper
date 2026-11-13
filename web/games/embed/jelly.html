@@ -173,6 +173,7 @@ h2{margin:0;font-family:var(--font-display);font-weight:800;font-size:clamp(36px
       <div class="stat"><b id="sizeV">1.0</b><span>크기</span></div>
       <div class="stat"><b id="rankV">–</b><span>순위</span></div>
       <div class="stat"><b id="scoreV">0</b><span>점수</span></div>
+      <div class="stat"><b id="stageV">1</b><span>판</span></div>
     </div>
   </div>
   <div class="tc" id="tc">
@@ -200,11 +201,12 @@ h2{margin:0;font-family:var(--font-display);font-weight:800;font-size:clamp(36px
 <section id="start" class="ov">
   <div class="panel">
     <h1><span class="gulp"><i>꿀</i><i>꺽</i></span><span class="grove">젤리 숲</span></h1>
-    <p class="lede">2분 30초 안에 숲에서 가장 큰 젤리가 되어 가시대왕을 삼키세요.</p>
+    <p class="lede">2분 30초 안에 숲에서 가장 큰 젤리가 되어 가시대왕을 삼키세요. 삼키면 다음 숲으로 이어지고, 판마다 가시대왕이 더 커져요.</p>
     <ul class="rules">
       <li><span class="mk ok"></span><span><b>초록 고리</b>는 먹을 수 있어요. 열매 · 버섯 · 나보다 작은 친구를 먹으면 몸이 자라요.</span></li>
       <li><span class="mk bad"></span><span><b>빨간 고리</b>는 나보다 커요. 닿으면 하트를 하나 잃고 몸이 줄어요.</span></li>
       <li><span class="mk orb"></span><span><b>별빛 구슬</b>을 먹으면 대시가 한 칸 차요. 대시하는 동안에는 물리지 않아요.</span></li>
+      <li><span class="mk ok" style="box-shadow:inset 0 0 0 4px var(--gold),0 0 10px rgba(255,226,122,.5)"></span><span>판을 깨면 <b>보너스 점수</b>와 하트 하나를 받고 다음 숲으로 가요. 물 · 바위는 돌아가고, 얼음 위는 미끄러워요.</span></li>
     </ul>
     <div class="cta">
       <button class="go" id="play" type="button">시작</button>
@@ -258,15 +260,19 @@ const C=h=>new T.Color(h).convertSRGBToLinear();
 const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 // ───────── 놀이 규칙 값
-const WORLD=56;          // 숲 빈터 반지름
-const ROUND=150;         // 한 판 2분 30초
-const BOSS_S=5.5;        // 가시대왕 크기
+let WORLD=56;            // 숲 빈터 반지름 — 숲(맵)마다 다르다
+const ROUND=150;         // 한 판 2분 30초 — 판마다 새로 준다
+let BOSS_S=5.5;          // 가시대왕 크기 — 판마다 커진다(stageParams)
 const EAT=1.12;          // 이만큼 더 커야 삼킬 수 있다
-const NEED=BOSS_S*EAT;   // 대왕을 삼키는 데 필요한 내 크기
+let NEED=BOSS_S*EAT;     // 대왕을 삼키는 데 필요한 내 크기
 const MAXH=3, MAXDASH=3;
-const N_BERRY=96, N_SHROOM=28, N_ORB=7, N_RIVAL=11;
-const RIVAL_CAP=BOSS_S*0.84;
-const PTS={berry:10,shroom:30,orb:50,boss:5000,sec:50,heart:500};
+const N_BERRY=96, N_SHROOM=28, N_ORB=7, N_RIVAL=11, MAX_RIVAL=17;
+let RIVAL_CAP=BOSS_S*0.84;
+let SPD=1;               // 숲 친구 · 대왕 빠르기 배율 — 판마다 조금씩 (늘 나보다는 느리다)
+const PTS={berry:10,shroom:30,orb:50,boss:5000,sec:50,heart:500,stage:1000};
+const MAXSCORE=1000000;  // 헬스키퍼 점수 상한 (game.py jelly 최대값)
+// 판 — 가시대왕을 삼키면 다음 판(다음 숲)으로 이어진다. 판마다 숲이 바뀌고 대왕 · 친구 크기 · 수 · 빠르기가 올라간다
+function stageParams(n){const k=n-1;return{map:(k%6)+1,boss:Math.min(5.5+.6*k,9.5),rivals:Math.min(N_RIVAL+k,MAX_RIVAL),spd:Math.min(1+.04*k,1.2),tier:Math.min(1+.06*k,1.4)};}
 
 // ───────── 헬스키퍼 아케이드 연결 — 아케이드 창 안(?hk=1)에서 열렸을 때만 판 시작 · 점수를 넘긴다
 const inFrame=window.parent!==window;
@@ -284,7 +290,6 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
 renderer.outputEncoding=T.sRGBEncoding;
 renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;
 const scene=new T.Scene();
-scene.fog=new T.FogExp2(C(0x1c1650),0.0098);
 const camera=new T.PerspectiveCamera(52,1,0.5,460);
 let W=1,H=1;
 function resize(){W=window.innerWidth||1;H=window.innerHeight||1;renderer.setSize(W,H,false);camera.aspect=W/H;camera.updateProjectionMatrix();}
@@ -292,18 +297,6 @@ window.addEventListener('resize',resize);
 
 function canvasTex(w,h,draw){const cv=document.createElement('canvas');cv.width=w;cv.height=h;draw(cv.getContext('2d'),w,h);const t=new T.CanvasTexture(cv);t.encoding=T.sRGBEncoding;return t;}
 const glowTex=canvasTex(64,64,g=>{const gr=g.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(.22,'rgba(255,255,255,.6)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,64,64);});
-scene.background=canvasTex(4,256,(g,w,h)=>{const gr=g.createLinearGradient(0,0,0,h);gr.addColorStop(0,'#0a0722');gr.addColorStop(.5,'#241a60');gr.addColorStop(1,'#1e5068');g.fillStyle=gr;g.fillRect(0,0,w,h);});
-
-scene.add(new T.HemisphereLight(C(0xc3b4ff),C(0x1f6a52),1.0));
-const moon=new T.DirectionalLight(C(0xd6e6ff),0.8);moon.position.set(-30,60,24);scene.add(moon);
-const rim=new T.DirectionalLight(C(0xff9ad8),0.3);rim.position.set(40,22,-40);scene.add(rim);
-
-// ───────── 숲 만들기
-function hash(x,y){const s=Math.sin(x*127.1+y*311.7)*43758.5453;return s-Math.floor(s);}
-function vnoise(x,y){const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi,u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
-  return lerp(lerp(hash(xi,yi),hash(xi+1,yi),u),lerp(hash(xi,yi+1),hash(xi+1,yi+1),u),v);}
-function fbm(x,y){return vnoise(x,y)*.6+vnoise(x*2.1,y*2.1)*.28+vnoise(x*4.3,y*4.3)*.12;}
-
 const G={
   sph:new T.SphereGeometry(1,30,22),
   sphLo:new T.SphereGeometry(1,14,10),
@@ -329,92 +322,284 @@ const dummy=new T.Object3D();
 function inst(geo,mat,n){const m=new T.InstancedMesh(geo,mat,n);m.frustumCulled=false;scene.add(m);return m;}
 function put(m,i,x,y,z,sx,sy,sz,ry){dummy.position.set(x,y,z);dummy.rotation.set(0,ry||0,0);dummy.scale.set(sx,sy===undefined?sx:sy,sz===undefined?sx:sz);dummy.updateMatrix();m.setMatrixAt(i,dummy.matrix);}
 
-(function buildGround(){
-  const geo=new T.PlaneGeometry(320,320,160,160);geo.rotateX(-Math.PI/2);
-  const pos=geo.attributes.position,col=new Float32Array(pos.count*3);
-  const a=C(0x18473f),b=C(0x2c8658),c=C(0x6ad07e),v=C(0x40318f),e=C(0x0b1a2a),tmp=new T.Color();
-  for(let i=0;i<pos.count;i++){
-    const x=pos.getX(i),z=pos.getZ(i),r=Math.hypot(x,z);
-    const n=fbm(x*.06+7,z*.06+3),n2=fbm(x*.025+40,z*.025-11);
-    tmp.copy(a).lerp(b,sstep(.3,.7,n));tmp.lerp(c,sstep(.62,.9,n)*.55);tmp.lerp(v,sstep(.5,.82,n2)*.36);
-    tmp.lerp(e,sstep(WORLD-1,WORLD+18,r)*.88);
-    col[i*3]=tmp.r;col[i*3+1]=tmp.g;col[i*3+2]=tmp.b;
+// 하늘 · 빛 · 땅 · 나무 · 날리는 것 · 장애물 — 맵 도구가 판(숲)마다 새로 만든다(앞 숲 것은 버린다)
+  // ───────── 숲 고르기(맵) — 대전 web/_shared/jellyvs-vs.js 와 혼자 하기 web/games/embed/jelly.html 에 같은 글이 들어 있다(한쪽을 고치면 다른 쪽도 같이)
+  //   맵마다 하늘 · 안개 · 빛 · 땅 색 · 둘레 장식 · 나무 · 날리는 것(반딧불 · 낙엽 · 눈 · 꽃잎 · 포자) · 장애물(바위 · 물 · 돌기둥) · 미끄러운 얼음 · 먹이 퍼짐이 다르다.
+  //   장애물 · 먹이 무리는 모두 좌우 대칭 — 대전에서 좌우에서 출발하는 두 젤리에게 같은 숲이 되게. 출발 자리(±14, 10) · (0, 18) · 가시대왕 자리(0, -34)는 비워 둔다.
+  //   obs: [x, z, 반지름, 종류] — rock(바위) · pillar(돌기둥) · water(물) 는 못 지나가고, ice(얼음)는 지나가지만 미끄럽다.
+  const JELLY_MAPS = [
+    { id: 1, name: "달빛 마법 숲", tip: "지금 숲 · 먹이가 고르게", world: 56,
+      sky: ["#0a0722", "#241a60", "#1e5068"], fog: [0x1c1650, 0.0098], hemi: [0xc3b4ff, 0x1f6a52, 1.0], moon: [0xd6e6ff, 0.8], rim: [0xff9ad8, 0.3], exp: 1.15,
+      ground: [0x18473f, 0x2c8658, 0x6ad07e, 0x40318f, 0x0b1a2a], edge: "caps", edgeCol: [0x7dffd0, 0xff9ad8, 0xffe27a, 0x9ad0ff],
+      tree: "pine", trunk: 0x4a3558, leaves: [0x1f7a6b, 0x186a78, 0x2a8a62, 0x23806e, 0x4a3fa0, 0x7a3fa6], bush: [0x1f7a6b, 0x2a8a62, 0x4a3fa0, 0x186a78], big: 1 / 3,
+      grass: [0x3fa46a, 0x56c27c, 0x2f8f72, 0x7ad88a, 0x5d6fd0], grassN: 1500, flowers: [0xffffff, 0xff9ad8, 0x8fe9ff, 0xffe27a], flowerN: 280, flowerSize: 0.55, pebble: 0x6f6a96,
+      air: "fly", airCol: [0xffe27a, 0xffe27a, 0x7dffd0], airN: 130, airSize: 0.7,
+      food: "even", berry: [0xff4d6d, 0x6b8cff, 0xc77dff, 0xffb347], shroom: [0xff5a6e, 0xffa34d, 0xb07bff], foodScale: 1, obs: [],
+      chip: ["#241a60", "#2c8658", "#ff7ac8"] },
+    { id: 2, name: "단풍 언덕", tip: "노을빛 바위 언덕 · 먹이는 가장자리에", world: 58,
+      sky: ["#2a1640", "#a8436a", "#f2a65a"], fog: [0x7a3d55, 0.0082], hemi: [0xffd8b8, 0x5a3a1a, 1.05], moon: [0xffc58a, 0.95], rim: [0xff7a5a, 0.45], exp: 1.08,
+      ground: [0x5a3a1c, 0x8a5a24, 0xc98a3a, 0x8a3a2a, 0x1e120c], edge: "stones", edgeCol: [0xa08a74, 0x8a7460, 0xb89a7a, 0x7a6450],
+      tree: "round", trunk: 0x4a2e1e, leaves: [0xd9482b, 0xe8792b, 0xf0b030, 0xb8322a, 0xc95a1a], bush: [0xa8501e, 0xc07a2a, 0x8a3a1e, 0xd0902a], big: 0,
+      grass: [0xb08a3a, 0xc9a04a, 0x8a6a2a, 0xd8b060], grassN: 1100, flowers: [0xffd27a, 0xff8a5a, 0xffffff], flowerN: 120, flowerSize: 0.5, pebble: 0x8a7a6a,
+      air: "leaf", airCol: [0xe8692b, 0xf0a830, 0xc8402a], airN: 110, airSize: 0.75,
+      food: "ring", berry: [0xc0302a, 0x7a3fa6, 0xff8a3d, 0xffd23a], shroom: [0xd9482b, 0xf0b030, 0xa0703a], foodScale: 1,
+      obs: [[-20, -8, 3.2, "rock"], [20, -8, 3.2, "rock"], [-9, -20, 2.4, "rock"], [9, -20, 2.4, "rock"], [-31, 16, 2.8, "rock"], [31, 16, 2.8, "rock"], [0, 30, 2.6, "rock"]],
+      rock: 0x8a7462, chip: ["#a8436a", "#c98a3a", "#e8792b"] },
+    { id: 3, name: "눈 덮인 숲", tip: "하얀 눈밭 · 얼음 위는 미끄러워요", world: 56,
+      sky: ["#0b1838", "#33508a", "#9fc0e0"], fog: [0x8aa0c8, 0.0102], hemi: [0xdbe8ff, 0x6a7aa0, 1.0], moon: [0xeaf2ff, 0.85], rim: [0x9ad0ff, 0.35], exp: 0.98,
+      ground: [0xb8c8e0, 0xd8e4f4, 0xf4f8ff, 0x9ab0d8, 0x2a3450], edge: "crystals", edgeCol: [0x9ad0ff, 0xcfe8ff, 0x7dffd0, 0xffffff],
+      tree: "snowpine", trunk: 0x3e3048, leaves: [0x1f5a5a, 0x245a6a, 0x2a6a5a, 0x1e4a5a], bush: [0xdfe8f5, 0xc8d8ee, 0xeef4ff, 0xb8cce4], big: 0,
+      grass: [0xeef4ff, 0xc8d8ee, 0x9ab0c8], grassN: 450, flowers: [0xffffff, 0xbfe0ff], flowerN: 200, flowerSize: 0.45, pebble: 0x8a96b0,
+      air: "snow", airCol: [0xffffff, 0xdfeaff], airN: 230, airSize: 0.5,
+      food: "even", berry: [0xff2a50, 0x3d6cff, 0xb05aff, 0xff8a1d], shroom: [0xff2a50, 0xff7a1a, 0x7a4aff], foodScale: 1.08,
+      obs: [[0, -6, 9, "ice"], [-27, 22, 6, "ice"], [27, 22, 6, "ice"], [-25, -22, 2.4, "rock"], [25, -22, 2.4, "rock"], [-38, -2, 2.2, "rock"], [38, -2, 2.2, "rock"]],
+      rock: 0x8a96b0, chip: ["#33508a", "#e6eef8", "#9ad0ff"] },
+    { id: 4, name: "꽃밭 호숫가", tip: "호수를 돌아가요 · 꽃밭에 먹이가 모여요", world: 60,
+      sky: ["#1a1a4a", "#6a4a9a", "#f0a0b8"], fog: [0x5a4a80, 0.0078], hemi: [0xffe0f0, 0x2a6a4a, 1.05], moon: [0xfff0e0, 0.85], rim: [0xff9ad8, 0.45], exp: 1.1,
+      ground: [0x2a6a3a, 0x4a9a4a, 0x8ad06a, 0x8a5aa0, 0x0e2418], edge: "caps", edgeCol: [0xff9ad8, 0xffffff, 0xffe27a, 0xc79aff],
+      tree: "round", trunk: 0x5a3a4a, leaves: [0x3a8a4a, 0x4aa05a, 0xe890c0, 0xf0b0d0, 0x2a7a5a], bush: [0xe87ab0, 0x4aa05a, 0xc79aff, 0xf4f0ff], big: 0,
+      grass: [0x4aa05a, 0x5ab868, 0x3a8a4a, 0x7ad070], grassN: 1300, flowers: [0xff7ac8, 0xffffff, 0xffe27a, 0xc79aff, 0x8fe9ff], flowerN: 700, flowerSize: 0.8, pebble: 0x8a8aa0,
+      air: "petal", airCol: [0xffb0d8, 0xffffff, 0xffd0e8], airN: 120, airSize: 0.55,
+      food: "patches", patches: [[-30, -16], [30, -16], [-26, 28], [26, 28], [0, 24]], berry: [0xff4d6d, 0x6b8cff, 0xc77dff, 0xffb347], shroom: [0xff5a6e, 0xffa34d, 0xb07bff], foodScale: 1,
+      obs: [[0, -11, 8.5, "water"], [-34, 2, 5, "water"], [34, 2, 5, "water"]],
+      water: 0x2f7fb8, shore: 0xc8d8a8, lily: true, chip: ["#6a4a9a", "#4a9a4a", "#ff7ac8"] },
+    { id: 5, name: "버섯 동굴", tip: "어둡고 좁은 굴 · 빛나는 버섯 기둥", world: 48,
+      sky: ["#03020a", "#0c0a24", "#141a3a"], fog: [0x0a0a22, 0.0155], hemi: [0x6a7aff, 0x101830, 0.75], moon: [0x9ab0ff, 0.45], rim: [0x7dffd0, 0.55], exp: 1.25,
+      ground: [0x14142a, 0x1e2040, 0x2a3a5a, 0x1a4a5a, 0x05050c], edge: "crystals", edgeCol: [0x7dffd0, 0x9ad0ff, 0xc79aff, 0x5fd4ff],
+      tree: "cave", trunk: 0x2a2840, leaves: [0x2a2840], bush: [0x23264a, 0x2a2a5a, 0x1e2a4a], big: 1 / 2,
+      grass: [0x3a4a8a, 0x2a6a8a, 0x5a3a9a], grassN: 600, flowers: [0x7dffd0, 0x9ad0ff, 0xc79aff], flowerN: 420, flowerSize: 0.6, pebble: 0x3a3a5a,
+      air: "spore", airCol: [0x7dffd0, 0x9ad0ff, 0xc79aff], airN: 160, airSize: 0.55,
+      food: "center", berry: [0x5fd4ff, 0x7dffd0, 0xc77dff, 0xffe27a], shroom: [0x7dffd0, 0x5fd4ff, 0xc79aff], foodScale: 1.15,
+      obs: [[-16, -14, 2.6, "pillar"], [16, -14, 2.6, "pillar"], [-30, -2, 2.4, "pillar"], [30, -2, 2.4, "pillar"], [-8, 28, 2.2, "pillar"], [8, 28, 2.2, "pillar"], [0, -16, 2.2, "pillar"]],
+      rock: 0x2e2c4a, chip: ["#0c0a24", "#2a3a5a", "#7dffd0"] },
+    { id: 6, name: "반딧불 늪", tip: "반딧불이 가득 · 늪 웅덩이를 피해요", world: 56,
+      sky: ["#020806", "#0a2a22", "#1a3a2a"], fog: [0x061410, 0.0135], hemi: [0x8ad8b8, 0x061a10, 0.62], moon: [0xb0e8d0, 0.45], rim: [0xffe27a, 0.35], exp: 1.05,
+      ground: [0x07160f, 0x0d2818, 0x1c3e1e, 0x0e2426, 0x010503], edge: "stones", edgeCol: [0x4a5a4a, 0x3a4a3a, 0x5a6a52, 0x44503c],
+      tree: "willow", trunk: 0x2e2a1e, leaves: [0x2a5a2a, 0x3a6a2a, 0x1e4a32, 0x35602c], bush: [0x1e4a2a, 0x2a5a2a, 0x24502e, 0x30602a], big: 0,
+      grass: [0x1e4a22, 0x2a5a2a, 0x355a26, 0x16402a], grassN: 1600, flowers: [0xffe27a, 0xc8ff7a], flowerN: 150, flowerSize: 0.5, pebble: 0x3a4a3a,
+      air: "fly", airCol: [0xffe27a, 0xd8ff7a, 0x7dffd0], airN: 320, airSize: 0.8,
+      food: "patches", patches: [[-22, -2], [22, -2], [-12, -30], [12, -30], [0, 32]], berry: [0xff4d6d, 0xffe27a, 0xc77dff, 0xffb347], shroom: [0xd8ff7a, 0xffa34d, 0xb07bff], foodScale: 1,
+      obs: [[-22, -18, 4.5, "water"], [22, -18, 4.5, "water"], [-34, 12, 4, "water"], [34, 12, 4, "water"], [0, -1, 3.8, "water"]],
+      water: 0x1e4a3a, shore: 0x3a4a2a, lily: true, chip: ["#0a2a22", "#1a4a2a", "#ffe27a"] },
+  ];
+  function JellyMapKit(T, env) {
+    const scene = env.scene, renderer = env.renderer, C = env.C, canvasTex = env.canvasTex, glowTex = env.glowTex, G = env.G;
+    const TAU = Math.PI * 2;
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+    const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+    function hash(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+    function vnoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi, u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf); return lerp(lerp(hash(xi, yi), hash(xi + 1, yi), u), lerp(hash(xi, yi + 1), hash(xi + 1, yi + 1), u), v); }
+    function fbm(x, y) { return vnoise(x, y) * 0.6 + vnoise(x * 2.1, y * 2.1) * 0.28 + vnoise(x * 4.3, y * 4.3) * 0.12; }
+    function mulb(a) { return function () { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    // 빛은 한 번만 만들고 맵마다 색만 바꾼다
+    const hemi = new T.HemisphereLight(0xffffff, 0xffffff, 1); scene.add(hemi);
+    const moon = new T.DirectionalLight(0xffffff, 0.8); moon.position.set(-30, 60, 24); scene.add(moon);
+    const rim = new T.DirectionalLight(0xffffff, 0.3); rim.position.set(40, 22, -40); scene.add(rim);
+    scene.fog = new T.FogExp2(0x000000, 0.01);
+    // 맵과 상관없는 질감 · 모양은 한 번만 (맵을 바꿔도 버리지 않는다)
+    const grTex = canvasTex(256, 256, (g, w, h) => {
+      g.fillStyle = "#fff"; g.fillRect(0, 0, w, h);
+      for (let i = 0; i < 70; i++) { const x = hash(i, 1) * w, y = hash(i, 2) * h, r = 8 + hash(i, 3) * 26; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "rgba(40,40,90,.09)"); gr.addColorStop(1, "rgba(40,40,90,0)"); g.fillStyle = gr; for (const ox of [-w, 0, w]) for (const oy of [-h, 0, h]) { g.beginPath(); g.arc(x + ox, y + oy, r, 0, TAU); g.fill(); } }
+      g.lineCap = "round";
+      for (let i = 0; i < 520; i++) { const x = hash(i, 5) * w, y = hash(i, 6) * h, l = 3 + hash(i, 7) * 6, an = -1.2 + hash(i, 8) * 0.7, lt = hash(i, 9) < 0.35; g.strokeStyle = lt ? "rgba(255,255,230,.28)" : "rgba(10,30,30," + (0.06 + hash(i, 10) * 0.08) + ")"; g.lineWidth = lt ? 1 : 1.4; g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(an) * l, y + Math.sin(an) * l); g.stroke(); }
+    });
+    grTex.wrapS = grTex.wrapT = T.RepeatWrapping; grTex.repeat.set(30, 30); grTex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    const capTex = canvasTex(128, 32, (g, w, h) => { const v = g.createLinearGradient(0, 0, 0, h); v.addColorStop(0, "#fff"); v.addColorStop(1, "#bdb6d6"); g.fillStyle = v; g.fillRect(0, 0, w, h); g.fillStyle = "rgba(255,255,255,.95)"; for (let i = 0; i < 10; i++) { g.beginPath(); g.arc((i * 29 + 7) % w, 5 + ((i * 11) % (h - 14)), 2 + (i % 3), 0, TAU); g.fill(); } });
+    const spotTex = canvasTex(256, 64, (g, w, h) => { g.fillStyle = "#000"; g.fillRect(0, 0, w, h); for (let i = 0; i < 22; i++) { const x = (i * 53 + 17) % w, y = 8 + ((i * 29) % (h - 26)), r = 4 + (i % 4) * 2.2; const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, "#fff"); gr.addColorStop(0.75, "#e8e0ff"); gr.addColorStop(1, "rgba(0,0,0,0)"); g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); } const v = g.createLinearGradient(0, 0, 0, h); v.addColorStop(0, "rgba(255,255,255,.22)"); v.addColorStop(0.5, "rgba(255,255,255,0)"); g.fillStyle = v; g.fillRect(0, 0, w, h); });
+    const K = { grass: new T.ConeGeometry(0.1, 0.55, 3).translate(0, 0.27, 0), dodeca: new T.DodecahedronGeometry(1, 0), disc: new T.CircleGeometry(1, 40).rotateX(-Math.PI / 2), shore: new T.RingGeometry(0.96, 1.16, 40).rotateX(-Math.PI / 2) };
+    const keep = new Set([grTex, capTex, spotTex, glowTex, ...Object.values(K), ...Object.values(G)]);
+    let cur = null, group = null, bg = null, air = null, solid = [], ice = [];
+    const dummy = new T.Object3D();
+    function own(o) { group.add(o); return o; }
+    function inst(geo, mat, n) { const m = new T.InstancedMesh(geo, mat, Math.max(1, n)); m.count = n; m.frustumCulled = false; return own(m); }
+    function put(m, i, x, y, z, sx, sy, sz, ry) { dummy.position.set(x, y, z); dummy.rotation.set(0, ry || 0, 0); dummy.scale.set(sx, sy === undefined ? sx : sy, sz === undefined ? sx : sz); dummy.updateMatrix(); m.setMatrixAt(i, dummy.matrix); }
+    function points(n, size, fill) { const p = new Float32Array(n * 3), c = new Float32Array(n * 3); fill(p, c); const g = new T.BufferGeometry(); g.setAttribute("position", new T.BufferAttribute(p, 3)); g.setAttribute("color", new T.BufferAttribute(c, 3)); const pts = new T.Points(g, new T.PointsMaterial({ size, map: glowTex, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); pts.frustumCulled = false; return own(pts); }
+    // 앞 맵의 모양 · 재질 · 질감을 버린다 (같이 쓰는 것은 남긴다)
+    function dispose() {
+      if (!group) return;
+      const geos = new Set(), mats = new Set(), texs = new Set();
+      group.traverse((o) => {
+        if (o.geometry && !keep.has(o.geometry)) geos.add(o.geometry);
+        const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+        ms.forEach((m) => { mats.add(m); ["map", "emissiveMap"].forEach((k) => { if (m[k] && !keep.has(m[k])) texs.add(m[k]); }); });
+        if (o.isInstancedMesh && o.dispose) o.dispose();
+      });
+      geos.forEach((g) => g.dispose()); mats.forEach((m) => m.dispose()); texs.forEach((t) => t.dispose());
+      scene.remove(group); group = null; air = null;
+      if (bg) { bg.dispose(); bg = null; }
+    }
+    function build(def) {
+      const R = mulb(20261113 + def.id * 7919), rand = (a, b) => (b === undefined ? R() * a : a + R() * (b - a)), pick = (arr) => arr[(R() * arr.length) | 0];
+      const WORLD = def.world, tmp = new T.Color();
+      group = new T.Group(); scene.add(group);
+      scene.background = bg = canvasTex(4, 256, (g, w, h) => { const gr = g.createLinearGradient(0, 0, 0, h); gr.addColorStop(0, def.sky[0]); gr.addColorStop(0.5, def.sky[1]); gr.addColorStop(1, def.sky[2]); g.fillStyle = gr; g.fillRect(0, 0, w, h); });
+      scene.fog.color.copy(C(def.fog[0])); scene.fog.density = def.fog[1];
+      hemi.color.copy(C(def.hemi[0])); hemi.groundColor.copy(C(def.hemi[1])); hemi.intensity = def.hemi[2];
+      moon.color.copy(C(def.moon[0])); moon.intensity = def.moon[1]; rim.color.copy(C(def.rim[0])); rim.intensity = def.rim[1];
+      renderer.toneMappingExposure = def.exp;
+      // 땅 — 맵 색으로 얼룩 · 둘레 밖은 어둡게
+      {
+        const geo = new T.PlaneGeometry(320, 320, 150, 150); geo.rotateX(-Math.PI / 2);
+        const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+        const [a, b, c, v, e] = def.ground.map(C);
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i), z = pos.getZ(i), r = Math.hypot(x, z);
+          const n = fbm(x * 0.06 + 7, z * 0.06 + 3), n2 = fbm(x * 0.025 + 40, z * 0.025 - 11);
+          tmp.copy(a).lerp(b, sstep(0.3, 0.7, n)); tmp.lerp(c, sstep(0.62, 0.9, n) * 0.55); tmp.lerp(v, sstep(0.5, 0.82, n2) * 0.36);
+          tmp.lerp(e, sstep(WORLD - 1, WORLD + 18, r) * 0.88);
+          col[i * 3] = tmp.r; col[i * 3 + 1] = tmp.g; col[i * 3 + 2] = tmp.b;
+        }
+        geo.setAttribute("color", new T.BufferAttribute(col, 3));
+        own(new T.Mesh(geo, new T.MeshLambertMaterial({ vertexColors: true, map: grTex })));
+      }
+      const glow = def.edgeCol.map(C);
+      // 둘레 — 여기까지가 놀이터 (빛나는 버섯 고리 · 돌 · 얼음 결정)
+      {
+        const NR = Math.round(84 * WORLD / 56);
+        if (def.edge === "caps") {
+          const capM = inst(G.cap, new T.MeshBasicMaterial({ map: capTex }), NR), stemM = inst(G.stem, new T.MeshLambertMaterial({ color: C(0xe9e2ff) }), NR);
+          for (let i = 0; i < NR; i++) { const an = (i / NR) * TAU, r = WORLD + 1 + rand(-0.3, 0.5), s = rand(0.9, 1.5); put(stemM, i, Math.cos(an) * r, 0, Math.sin(an) * r, s); put(capM, i, Math.cos(an) * r, 0.5 * s, Math.sin(an) * r, s * 1.25); capM.setColorAt(i, glow[i % glow.length]); }
+        } else if (def.edge === "stones") {
+          const m = inst(K.dodeca, new T.MeshLambertMaterial(), NR);
+          for (let i = 0; i < NR; i++) { const an = (i / NR) * TAU, r = WORLD + 1.2 + rand(-0.3, 0.6), s = rand(0.55, 1.05); put(m, i, Math.cos(an) * r, s * 0.3, Math.sin(an) * r, s, s * 0.7, s, rand(TAU)); m.setColorAt(i, tmp.copy(glow[i % glow.length]).multiplyScalar(rand(0.85, 1.15))); }
+        } else {
+          const m = inst(G.spike, new T.MeshBasicMaterial({ transparent: true, opacity: 0.85 }), NR);
+          for (let i = 0; i < NR; i++) { const an = (i / NR) * TAU, r = WORLD + 1 + rand(-0.3, 0.5), s = rand(0.35, 0.6); put(m, i, Math.cos(an) * r, 0, Math.sin(an) * r, s, s * rand(2.2, 3.6), s, rand(TAU)); m.setColorAt(i, tmp.copy(glow[i % glow.length]).multiplyScalar(0.75)); }
+        }
+      }
+      // 나무 · 덤불 — 카메라 반대편(북쪽 · 양옆)에만 키 크게, 카메라 쪽은 낮게
+      const spots = [];
+      [[WORLD + 7, 40], [WORLD + 14, 36], [WORLD + 23, 32], [WORLD + 33, 28]].forEach(([Rr, n], ri) => { for (let k = 0; k < n; k++) { const an = ((k + rand(0.7)) / n) * TAU, r = Rr + rand(-2, 2.5); spots.push({ x: Math.cos(an) * r, z: Math.sin(an) * r, front: Math.sin(an), ri }); } });
+      const trees = spots.filter((s) => s.front < 0.3), bushes = spots.filter((s) => s.front >= 0.3);
+      const pal = def.leaves.map(C), trunkMat = new T.MeshLambertMaterial({ color: C(def.trunk) });
+      if (def.tree === "pine" || def.tree === "snowpine") {
+        const trunkM = inst(G.trunk, trunkMat, trees.length), leafM = inst(G.tier, new T.MeshLambertMaterial(), trees.length * 3), white = C(0xf4f8ff);
+        trees.forEach((t, i) => { const sc = rand(1, 1.9) * (1 + t.ri * 0.12), h = rand(4.5, 7.5) * sc * 0.8, ry = rand(TAU); put(trunkM, i, t.x, 0, t.z, sc, h, sc, ry); const base = pick(pal); for (let k = 0; k < 3; k++) { put(leafM, i * 3 + k, t.x, h * (0.45 + k * 0.3), t.z, sc * (2.9 - k * 0.62), sc * (3.6 - k * 0.4), sc * (2.9 - k * 0.62), ry + k); tmp.copy(base).multiplyScalar(0.8 + k * 0.22 + rand(-0.06, 0.06)); if (def.tree === "snowpine") tmp.lerp(white, 0.3 + k * 0.24); leafM.setColorAt(i * 3 + k, tmp); } });
+      } else if (def.tree === "round" || def.tree === "willow") {
+        const wil = def.tree === "willow";
+        const trunkM = inst(G.trunk, trunkMat, trees.length), crownM = inst(G.sphLo, new T.MeshLambertMaterial(), trees.length * 2);
+        trees.forEach((t, i) => { const sc = rand(1, 1.8) * (1 + t.ri * 0.12), h = rand(3.6, 5.6) * sc * (wil ? 1.05 : 0.8), ry = rand(TAU); put(trunkM, i, t.x, 0, t.z, sc * 0.9, h, sc * 0.9, ry); const base = pick(pal);
+          if (wil) { put(crownM, i * 2, t.x, h * 0.95, t.z, sc * 3.2, sc * 2.2, sc * 3.2, ry); put(crownM, i * 2 + 1, t.x, h * 0.55, t.z, sc * 2.9, sc * 3.4, sc * 2.9, ry); }
+          else { put(crownM, i * 2, t.x, h * 1.05, t.z, sc * 3, sc * 2.6, sc * 3, ry); put(crownM, i * 2 + 1, t.x + rand(-1.2, 1.2), h * 1.45, t.z + rand(-1, 1), sc * 2.1, sc * 1.9, sc * 2.1, ry); }
+          crownM.setColorAt(i * 2, tmp.copy(base).multiplyScalar(rand(0.82, 1.02))); crownM.setColorAt(i * 2 + 1, tmp.copy(base).multiplyScalar(rand(0.95, 1.18))); });
+      } else {
+        // 동굴 — 나무 대신 종유석 기둥
+        const stM = inst(G.spike, new T.MeshLambertMaterial(), trees.length);
+        trees.forEach((t, i) => { const sc = rand(1.4, 2.6) * (1 + t.ri * 0.15); put(stM, i, t.x, 0, t.z, sc, sc * rand(3.5, 7), sc, rand(TAU)); stM.setColorAt(i, tmp.copy(C(def.trunk)).multiplyScalar(rand(0.8, 1.4))); });
+      }
+      {
+        const bpal = def.bush.map(C), bushM = inst(G.sphLo, new T.MeshLambertMaterial(), bushes.length * 2);
+        bushes.forEach((t, i) => { const s = rand(1.5, 2.6); put(bushM, i * 2, t.x, s * 0.35, t.z, s, s * 0.62, s); put(bushM, i * 2 + 1, t.x + rand(-1.6, 1.6), s * 0.25, t.z + rand(-1, 1), s * 0.7, s * 0.45, s * 0.7); const c = bpal[i % bpal.length]; bushM.setColorAt(i * 2, tmp.copy(c).multiplyScalar(rand(0.85, 1.1))); bushM.setColorAt(i * 2 + 1, tmp.copy(c).multiplyScalar(rand(0.95, 1.25))); });
+      }
+      // 빛나는 큰 버섯
+      if (def.big > 0) {
+        const every = Math.max(1, Math.round(1 / def.big)), big = trees.filter((t) => t.ri < (def.tree === "cave" ? 3 : 2)).filter((_, i) => i % every === 0);
+        const bCap = inst(G.capHi, new T.MeshLambertMaterial({ emissive: C(0xffffff), emissiveMap: spotTex, emissiveIntensity: 0.7 }), big.length), bStem = inst(G.stemHi, new T.MeshLambertMaterial({ color: C(0xe4dcfa), emissive: C(0x2a2050) }), big.length);
+        const bGill = inst(G.gill, new T.MeshLambertMaterial({ color: C(0x6b5a9a), emissive: C(0x2a1f55), side: T.DoubleSide }), big.length);
+        const hp = [], hc = [];
+        big.forEach((t, i) => { const s = rand(3.2, 5.6), x = t.x * 0.93 + rand(-2, 2), z = t.z * 0.93 + rand(-2, 2), col = glow[i % glow.length], ry = rand(TAU); put(bStem, i, x, 0, z, s, s, s, ry); put(bCap, i, x, 0.53 * s, z, s * 1.5, s * 1.2, s * 1.5, ry); put(bGill, i, x, 0.53 * s, z, s * 1.5, s, s * 1.5); bCap.setColorAt(i, tmp.copy(col).multiplyScalar(0.8)); hp.push(x, s * 0.8, z); hc.push(col.r * 0.55, col.g * 0.55, col.b * 0.55); });
+        points(big.length, 11, (p, c) => { p.set(hp); c.set(hc); });
+      }
+      // 풀 · 조약돌 · 반짝이는 꽃
+      {
+        const gp = def.grass.map(C), grassM = inst(K.grass, new T.MeshLambertMaterial(), def.grassN);
+        for (let i = 0; i < def.grassN; i++) { const an = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 8); put(grassM, i, Math.cos(an) * r, 0, Math.sin(an) * r, rand(0.7, 1.5), rand(0.6, 1.9), rand(0.7, 1.5), rand(TAU)); grassM.setColorAt(i, pick(gp)); }
+        const NP = 70, peb = inst(K.dodeca, new T.MeshLambertMaterial({ color: C(def.pebble) }), NP);
+        for (let i = 0; i < NP; i++) { const an = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 6), s = rand(0.18, 0.5); put(peb, i, Math.cos(an) * r, s * 0.2, Math.sin(an) * r, s, s * 0.55, s, rand(TAU)); }
+        const fpal = def.flowers.map(C);
+        points(def.flowerN, def.flowerSize, (p, c) => { for (let i = 0; i < def.flowerN; i++) { const an = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 4), q = fpal[i % fpal.length], k = rand(0.35, 0.8); p[i * 3] = Math.cos(an) * r; p[i * 3 + 1] = 0.2; p[i * 3 + 2] = Math.sin(an) * r; c[i * 3] = q.r * k; c[i * 3 + 1] = q.g * k; c[i * 3 + 2] = q.b * k; } });
+      }
+      // 장애물
+      solid = []; ice = [];
+      const rocks = def.obs.filter((o) => o[3] === "rock");
+      if (rocks.length) {
+        const rm = inst(K.dodeca, new T.MeshLambertMaterial(), rocks.length * 3);
+        rocks.forEach((o, i) => { const [x, z, r] = o; put(rm, i * 3, x, r * 0.3, z, r * 1.08, r * 0.8, r * 1.08, rand(TAU)); for (let k = 1; k < 3; k++) { const an = rand(TAU), s = r * rand(0.28, 0.42); put(rm, i * 3 + k, x + Math.cos(an) * r * 0.95, s * 0.25, z + Math.sin(an) * r * 0.95, s, s * 0.7, s, rand(TAU)); } for (let k = 0; k < 3; k++) rm.setColorAt(i * 3 + k, tmp.copy(C(def.rock || def.pebble)).multiplyScalar(rand(0.85, 1.15))); });
+      }
+      const pills = def.obs.filter((o) => o[3] === "pillar");
+      if (pills.length) {
+        const pm = inst(G.spike, new T.MeshLambertMaterial({ color: C(def.rock || def.trunk) }), pills.length), gm = inst(G.sphLo, new T.MeshBasicMaterial(), pills.length);
+        pills.forEach((o, i) => { const [x, z, r] = o; put(pm, i, x, 0, z, r * 1.05, r * 4.2, r * 1.05, rand(TAU)); put(gm, i, x, r * 1.6, z, r * 0.45, r * 0.7, r * 0.45); gm.setColorAt(i, glow[i % glow.length]); });
+        points(pills.length, 9, (p, c) => { pills.forEach((o, i) => { const q = glow[i % glow.length]; p[i * 3] = o[0]; p[i * 3 + 1] = o[2] * 1.6; p[i * 3 + 2] = o[1]; c[i * 3] = q.r * 0.6; c[i * 3 + 1] = q.g * 0.6; c[i * 3 + 2] = q.b * 0.6; }); });
+      }
+      def.obs.filter((o) => o[3] === "water" || o[3] === "ice").forEach((o) => {
+        const [x, z, r, kind] = o, isIce = kind === "ice";
+        const w = own(new T.Mesh(K.disc, new T.MeshStandardMaterial({ color: C(isIce ? 0xcfe6ff : def.water), roughness: isIce ? 0.08 : 0.18, metalness: isIce ? 0.05 : 0.2, emissive: C(isIce ? 0x6a8ab8 : def.water), emissiveIntensity: isIce ? 0.25 : 0.18, transparent: true, opacity: isIce ? 0.82 : 0.92, depthWrite: false })));
+        w.position.set(x, 0.035, z); w.scale.setScalar(r);
+        const s = own(new T.Mesh(K.shore, new T.MeshLambertMaterial({ color: C(isIce ? 0xffffff : def.shore) }))); s.position.set(x, 0.04, z); s.scale.setScalar(r);
+        if (!isIce && def.lily) { const n = Math.round(r * 1.2), lm = inst(K.disc, new T.MeshLambertMaterial({ color: C(0x3a9a4a) }), n); for (let k = 0; k < n; k++) { const an = rand(TAU), rr = Math.sqrt(rand(1)) * r * 0.75; put(lm, k, x + Math.cos(an) * rr, 0.06, z + Math.sin(an) * rr, rand(0.35, 0.65)); } }
+      });
+      def.obs.forEach((o) => { const q = { x: o[0], z: o[1], r: o[2] }; if (o[3] === "ice") ice.push(q); else solid.push(q); });
+      // 날리는 것 — 반딧불 · 낙엽 · 눈 · 꽃잎 · 포자
+      {
+        const N = def.airN, base = [], acol = def.airCol.map(C);
+        for (let i = 0; i < N; i++) { const an = rand(TAU), r = Math.sqrt(rand(1)) * (WORLD + 12); base.push({ x: Math.cos(an) * r, y: rand(def.air === "fly" ? 1 : 0, def.air === "fly" ? 7 : 14), z: Math.sin(an) * r, p: rand(TAU), s: rand(0.3, 0.9), c: acol[i % acol.length] }); }
+        const pts = points(N, def.airSize, () => {});
+        air = { pts, base, mode: def.air, pos: pts.geometry.attributes.position, col: pts.geometry.attributes.color };
+      }
+    }
+    function update(t) {
+      if (!air) return;
+      const { base, mode, pos, col } = air, P = pos.array, Cc = col.array;
+      for (let i = 0; i < base.length; i++) {
+        const f = base[i]; let x = f.x, y = f.y, z = f.z, k = 1;
+        if (mode === "fly") { k = 0.45 + 0.55 * Math.sin(t * 1.7 * f.s + f.p * 3); x += Math.sin(t * f.s + f.p) * 2.2; y += Math.sin(t * f.s * 1.3 + f.p * 2) * 0.9; z += Math.cos(t * f.s * 0.8 + f.p) * 2.2; }
+        else if (mode === "spore") { k = 0.4 + 0.6 * Math.sin(t * 1.3 * f.s + f.p * 3) ** 2; y = (f.y + t * f.s * 0.9) % 12; x += Math.sin(t * 0.5 * f.s + f.p) * 1.4; z += Math.cos(t * 0.4 * f.s + f.p) * 1.4; }
+        else { const sp = mode === "snow" ? 1.5 : mode === "leaf" ? 1.0 : 0.7, sw = mode === "snow" ? 0.8 : 2.2; y = 14 - ((14 - f.y + t * f.s * sp) % 14); x += Math.sin(t * f.s * 1.1 + f.p) * sw; z += Math.cos(t * f.s * 0.9 + f.p) * sw * 0.6; k = mode === "snow" ? 0.75 : 0.6 + 0.4 * Math.sin(t * 3 * f.s + f.p) ** 2; }
+        P[i * 3] = x; P[i * 3 + 1] = y; P[i * 3 + 2] = z; Cc[i * 3] = f.c.r * k; Cc[i * 3 + 1] = f.c.g * k; Cc[i * 3 + 2] = f.c.b * k;
+      }
+      pos.needsUpdate = true; col.needsUpdate = true;
+    }
+    const byId = (id) => JELLY_MAPS.find((m) => m.id === id) || JELLY_MAPS[0];
+    return {
+      maps: JELLY_MAPS,
+      apply(id) { const def = byId(Number(id) || 1); if (cur === def && group) return false; dispose(); cur = def; build(def); return true; },
+      get cur() { return cur; },
+      world: () => cur.world,
+      update,
+      // 그 자리가 막혔는지 (물 · 바위 · 기둥 — 얼음은 지나갈 수 있다)
+      blocked(x, z, pad) { for (const o of solid) if (Math.hypot(x - o.x, z - o.z) < o.r + pad) return true; return false; },
+      onIce(x, z) { for (const o of ice) if (Math.hypot(x - o.x, z - o.z) < o.r) return true; return false; },
+      // 장애물 안으로 들어갔으면 가장자리로 밀어내고 그쪽 속도를 없앤다
+      push(c, rad) {
+        for (const o of solid) {
+          let dx = c.x - o.x, dz = c.z - o.z; const d = Math.hypot(dx, dz) || 1e-4, lim = o.r + rad;
+          if (d >= lim) continue;
+          dx /= d; dz /= d; c.x = o.x + dx * lim; c.z = o.z + dz * lim;
+          const vn = c.vx * dx + c.vz * dz; if (vn < 0) { c.vx -= vn * dx; c.vz -= vn * dz; }
+        }
+      },
+      // 가는 방향 앞에 장애물이 있으면 옆으로 돌아가게 (숲 친구 · 컴퓨터 젤리)
+      steer(x, z, rad, dx, dz) {
+        let sx = dx, sz = dz;
+        for (const o of solid) {
+          const ox = o.x - x, oz = o.z - z, d = Math.hypot(ox, oz) || 1e-4, gap = d - o.r - rad;
+          if (gap > 4) continue;
+          const ux = ox / d, uz = oz / d, fw = ux * dx + uz * dz;
+          if (fw <= 0.15) continue;
+          const side = ux * dz - uz * dx >= 0 ? 1 : -1, w = clamp(1 - gap / 4, 0, 1) * fw;
+          sx += -uz * side * w * 1.6 - ux * w * 0.5; sz += ux * side * w * 1.6 - uz * w * 0.5;
+        }
+        const l = Math.hypot(sx, sz) || 1; return [sx / l, sz / l];
+      },
+      // 먹이 자리 — 맵마다 퍼짐이 다르다(고르게 · 가운데 · 가장자리 · 무리). rng 는 0~1 수를 내는 함수
+      foodPos(rng, pad) {
+        const W = cur.world - pad;
+        let x = 0, z = 0;
+        for (let k = 0; k < 12; k++) {
+          const u = rng(), an = rng() * TAU;
+          if (cur.food === "patches" && u < 0.7) { const pt = cur.patches[(rng() * cur.patches.length) | 0], rr = Math.sqrt(rng()) * 10; x = pt[0] + Math.cos(an) * rr; z = pt[1] + Math.sin(an) * rr; const l = Math.hypot(x, z); if (l > W) { x *= W / l; z *= W / l; } }
+          else { const v = cur.food === "patches" ? (u - 0.7) / 0.3 : u, rr = cur.food === "center" ? Math.pow(v, 0.8) * W : cur.food === "ring" ? Math.sqrt(0.3 + 0.7 * v) * W : Math.sqrt(v) * W; x = Math.cos(an) * rr; z = Math.sin(an) * rr; }
+          if (!this.blocked(x, z, 0.8)) break;
+        }
+        return { x, z };
+      },
+    };
   }
-  geo.setAttribute('color',new T.BufferAttribute(col,3));
-  // 땅결: 이끼 얼룩 · 짧은 풀잎 자국을 그린 질감을 곱해 밋밋한 색면을 없앤다
-  const grTex=canvasTex(256,256,(g,w,h)=>{g.fillStyle='#fff';g.fillRect(0,0,w,h);
-    for(let i=0;i<70;i++){const x=hash(i,1)*w,y=hash(i,2)*h,r=8+hash(i,3)*26;const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,'rgba(40,40,90,.09)');gr.addColorStop(1,'rgba(40,40,90,0)');g.fillStyle=gr;
-      for(const ox of[-w,0,w])for(const oy of[-h,0,h]){g.beginPath();g.arc(x+ox,y+oy,r,0,TAU);g.fill();}}
-    g.lineCap='round';
-    for(let i=0;i<520;i++){const x=hash(i,5)*w,y=hash(i,6)*h,l=3+hash(i,7)*6,a=-1.2+hash(i,8)*.7,lt=hash(i,9)<.35;
-      g.strokeStyle=lt?'rgba(255,255,230,.28)':'rgba(10,30,30,'+(.06+hash(i,10)*.08)+')';g.lineWidth=lt?1:1.4;
-      g.beginPath();g.moveTo(x,y);g.lineTo(x+Math.cos(a)*l,y+Math.sin(a)*l);g.stroke();}});
-  grTex.wrapS=grTex.wrapT=T.RepeatWrapping;grTex.repeat.set(30,30);grTex.anisotropy=Math.min(8,renderer.capabilities.getMaxAnisotropy());
-  scene.add(new T.Mesh(geo,new T.MeshLambertMaterial({vertexColors:true,map:grTex})));
-})();
 
-(function buildScenery(){
-  const tmp=new T.Color();
-  // 빈터 둘레의 요정 고리 — 여기까지가 놀이터
-  const capTex=canvasTex(128,32,(g,w,h)=>{const v=g.createLinearGradient(0,0,0,h);v.addColorStop(0,'#fff');v.addColorStop(1,'#bdb6d6');g.fillStyle=v;g.fillRect(0,0,w,h);
-    g.fillStyle='rgba(255,255,255,.95)';for(let i=0;i<10;i++){g.beginPath();g.arc((i*29+7)%w,5+(i*11)%(h-14),2+(i%3),0,TAU);g.fill();}});
-  const NR=84,capM=inst(G.cap,new T.MeshBasicMaterial({map:capTex}),NR),stemM=inst(G.stem,new T.MeshLambertMaterial({color:C(0xe9e2ff)}),NR);
-  const glow=[C(0x7dffd0),C(0xff9ad8),C(0xffe27a),C(0x9ad0ff)];
-  for(let i=0;i<NR;i++){const a=i/NR*TAU,r=WORLD+1+rand(-.3,.5),s=rand(.9,1.5);
-    put(stemM,i,Math.cos(a)*r,0,Math.sin(a)*r,s);put(capM,i,Math.cos(a)*r,.5*s,Math.sin(a)*r,s*1.25);capM.setColorAt(i,glow[i%4]);}
-  // 나무는 카메라 반대편(북쪽 · 양옆)에만 키 크게, 카메라 쪽(남쪽)은 낮은 덤불만 — 시야를 가리지 않게
-  const spots=[];
-  [[WORLD+7,40],[WORLD+14,36],[WORLD+23,32],[WORLD+33,28]].forEach(([R,n],ri)=>{
-    for(let k=0;k<n;k++){const a=(k+rand(.7))/n*TAU,r=R+rand(-2,2.5);spots.push({x:Math.cos(a)*r,z:Math.sin(a)*r,front:Math.sin(a),ri});}});
-  const trees=spots.filter(s=>s.front<.3),bushes=spots.filter(s=>s.front>=.3);
-  const trunkM=inst(G.trunk,new T.MeshLambertMaterial({color:C(0x4a3558)}),trees.length);
-  const leafM=inst(G.tier,new T.MeshLambertMaterial(),trees.length*3);
-  const pal=[0x1f7a6b,0x186a78,0x2a8a62,0x23806e,0x4a3fa0,0x7a3fa6];
-  trees.forEach((t,i)=>{const sc=rand(1,1.9)*(1+t.ri*.12),h=rand(4.5,7.5)*sc*.8,ry=rand(TAU);
-    put(trunkM,i,t.x,0,t.z,sc,h,sc,ry);
-    const base=C(pal[(Math.random()*pal.length)|0]);
-    for(let k=0;k<3;k++){put(leafM,i*3+k,t.x,h*(.45+k*.3),t.z,sc*(2.9-k*.62),sc*(3.6-k*.4),sc*(2.9-k*.62),ry+k);
-      leafM.setColorAt(i*3+k,tmp.copy(base).multiplyScalar(.8+k*.22+rand(-.06,.06)));}});
-  const bushM=inst(G.sphLo,new T.MeshLambertMaterial(),bushes.length*2);
-  const bpal=[0x1f7a6b,0x2a8a62,0x4a3fa0,0x186a78];
-  bushes.forEach((t,i)=>{const s=rand(1.5,2.6);
-    put(bushM,i*2,t.x,s*.35,t.z,s,s*.62,s);put(bushM,i*2+1,t.x+rand(-1.6,1.6),s*.25,t.z+rand(-1,1),s*.7,s*.45,s*.7);
-    const c=C(bpal[i%4]);bushM.setColorAt(i*2,tmp.copy(c).multiplyScalar(rand(.85,1.1)));bushM.setColorAt(i*2+1,tmp.copy(c).multiplyScalar(rand(.95,1.25)));});
-  // 빛나는 큰 버섯
-  const big=trees.filter(t=>t.ri<2).filter((_,i)=>i%3===0);
-  const spotTex=canvasTex(256,64,(g,w,h)=>{g.fillStyle='#000';g.fillRect(0,0,w,h);
-    for(let i=0;i<22;i++){const x=(i*53+17)%w,y=8+(i*29)%(h-26),r=4+(i%4)*2.2;const gr=g.createRadialGradient(x,y,0,x,y,r);gr.addColorStop(0,'#fff');gr.addColorStop(.75,'#e8e0ff');gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.beginPath();g.arc(x,y,r,0,TAU);g.fill();}
-    const v=g.createLinearGradient(0,0,0,h);v.addColorStop(0,'rgba(255,255,255,.22)');v.addColorStop(.5,'rgba(255,255,255,0)');g.fillStyle=v;g.fillRect(0,0,w,h);});
-  const bCap=inst(G.capHi,new T.MeshLambertMaterial({emissive:C(0xffffff),emissiveMap:spotTex,emissiveIntensity:.7}),big.length),bStem=inst(G.stemHi,new T.MeshLambertMaterial({color:C(0xe4dcfa),emissive:C(0x2a2050)}),big.length);
-  const bGill=inst(G.gill,new T.MeshLambertMaterial({color:C(0x6b5a9a),emissive:C(0x2a1f55),side:T.DoubleSide}),big.length);
-  const hp=new Float32Array(big.length*3),hc=new Float32Array(big.length*3);
-  big.forEach((t,i)=>{const s=rand(3.2,5.6),x=t.x*.93+rand(-2,2),z=t.z*.93+rand(-2,2),col=glow[i%4];
-    const ry=rand(TAU);put(bStem,i,x,0,z,s,s,s,ry);put(bCap,i,x,.53*s,z,s*1.5,s*1.2,s*1.5,ry);put(bGill,i,x,.53*s,z,s*1.5,s,s*1.5);bCap.setColorAt(i,tmp.copy(col).multiplyScalar(.8));
-    hp[i*3]=x;hp[i*3+1]=s*.8;hp[i*3+2]=z;hc[i*3]=col.r*.55;hc[i*3+1]=col.g*.55;hc[i*3+2]=col.b*.55;});
-  const hg=new T.BufferGeometry();hg.setAttribute('position',new T.BufferAttribute(hp,3));hg.setAttribute('color',new T.BufferAttribute(hc,3));
-  const halo=new T.Points(hg,new T.PointsMaterial({size:11,map:glowTex,vertexColors:true,transparent:true,blending:T.AdditiveBlending,depthWrite:false}));halo.frustumCulled=false;scene.add(halo);
-  // 풀 · 조약돌 · 반짝이는 꽃
-  const NG=1500,grassM=inst(new T.ConeGeometry(.1,.55,3).translate(0,.27,0),new T.MeshLambertMaterial(),NG);
-  const gp=[C(0x3fa46a),C(0x56c27c),C(0x2f8f72),C(0x7ad88a),C(0x5d6fd0)];
-  for(let i=0;i<NG;i++){const a=rand(TAU),r=Math.sqrt(rand(1))*(WORLD+8);put(grassM,i,Math.cos(a)*r,0,Math.sin(a)*r,rand(.7,1.5),rand(.6,1.9),rand(.7,1.5),rand(TAU));grassM.setColorAt(i,gp[(Math.random()*gp.length)|0]);}
-  const NP=70,peb=inst(new T.DodecahedronGeometry(1,0),new T.MeshLambertMaterial({color:C(0x6f6a96)}),NP);
-  for(let i=0;i<NP;i++){const a=rand(TAU),r=Math.sqrt(rand(1))*(WORLD+6),s=rand(.18,.5);put(peb,i,Math.cos(a)*r,s*.2,Math.sin(a)*r,s,s*.55,s,rand(TAU));}
-  const NF=280,fp=new Float32Array(NF*3),fc=new Float32Array(NF*3),fpal=[C(0xffffff),C(0xff9ad8),C(0x8fe9ff),C(0xffe27a)];
-  for(let i=0;i<NF;i++){const a=rand(TAU),r=Math.sqrt(rand(1))*(WORLD+4),c=fpal[i%4],k=rand(.35,.8);fp[i*3]=Math.cos(a)*r;fp[i*3+1]=.2;fp[i*3+2]=Math.sin(a)*r;fc[i*3]=c.r*k;fc[i*3+1]=c.g*k;fc[i*3+2]=c.b*k;}
-  const fg=new T.BufferGeometry();fg.setAttribute('position',new T.BufferAttribute(fp,3));fg.setAttribute('color',new T.BufferAttribute(fc,3));
-  const fl=new T.Points(fg,new T.PointsMaterial({size:.55,map:glowTex,vertexColors:true,transparent:true,blending:T.AdditiveBlending,depthWrite:false}));fl.frustumCulled=false;scene.add(fl);
-})();
-
-// 반딧불이
-const FLY=130,flyBase=[],flyPos=new Float32Array(FLY*3),flyCol=new Float32Array(FLY*3);
-for(let i=0;i<FLY;i++){const a=rand(TAU),r=Math.sqrt(rand(1))*(WORLD+12);flyBase.push({x:Math.cos(a)*r,y:rand(1,7),z:Math.sin(a)*r,p:rand(TAU),s:rand(.3,.9),g:i%3===0});}
-const flyGeo=new T.BufferGeometry();flyGeo.setAttribute('position',new T.BufferAttribute(flyPos,3));flyGeo.setAttribute('color',new T.BufferAttribute(flyCol,3));
-const flies=new T.Points(flyGeo,new T.PointsMaterial({size:.7,map:glowTex,vertexColors:true,transparent:true,blending:T.AdditiveBlending,depthWrite:false}));flies.frustumCulled=false;scene.add(flies);
-const FLY_A=C(0xffe27a),FLY_B=C(0x7dffd0);
-function updateFlies(t){for(let i=0;i<FLY;i++){const f=flyBase[i],k=.45+.55*Math.sin(t*1.7*f.s+f.p*3),c=f.g?FLY_B:FLY_A;
-  flyPos[i*3]=f.x+Math.sin(t*f.s+f.p)*2.2;flyPos[i*3+1]=f.y+Math.sin(t*f.s*1.3+f.p*2)*.9;flyPos[i*3+2]=f.z+Math.cos(t*f.s*.8+f.p)*2.2;
-  flyCol[i*3]=c.r*k;flyCol[i*3+1]=c.g*k;flyCol[i*3+2]=c.b*k;}
-  flyGeo.attributes.position.needsUpdate=true;flyGeo.attributes.color.needsUpdate=true;}
+const MK=JellyMapKit(T,{scene,renderer,C,canvasTex,glowTex,G});
+MK.apply(1);
 
 // 터지는 가루
 const PN=320,P=[],pPos=new Float32Array(PN*3),pCol=new Float32Array(PN*3);
@@ -450,12 +635,16 @@ const orbGeo=(()=>{const sh=new T.Shape();for(let i=0;i<10;i++){const a=i/10*TAU
   const g=new T.ExtrudeGeometry(sh,{depth:.1,bevelEnabled:true,bevelThickness:.1,bevelSize:.07,bevelSegments:3,curveSegments:1});g.center();return g;})();
 for(let i=0;i<N_ORB;i++){const g=new T.Group(),core=new T.Mesh(orbGeo,M_orb),halo=new T.Sprite(M_orbHalo);halo.scale.setScalar(3.2);g.add(core);g.add(halo);scene.add(g);
   orbs.push({x:0,z:0,alive:true,t:0,pop:1,ph:rand(TAU),g,core});}
-function spot(o,pad){const a=rand(TAU),r=Math.sqrt(rand(1))*(WORLD-(pad||2.5));o.x=Math.cos(a)*r;o.z=Math.sin(a)*r;}
+function spot(o,pad){const p=MK.foodPos(Math.random,pad||2.5);o.x=p.x;o.z=p.z;}   // 숲마다 먹이 퍼짐이 다르다 · 물 · 바위는 피한다
+function paintFood(){MK.cur.berry.forEach((h,k)=>BERRY_COL[k].copy(C(h)));MK.cur.shroom.forEach((h,k)=>SHROOM_COL[k].copy(C(h)));
+  berries.forEach((b,i)=>{for(let k=0;k<4;k++)berryM.setColorAt(i*4+k,BERRY_COL[b.col]);});for(let i=0;i<N_SHROOM;i++)shCapM.setColorAt(i,SHROOM_COL[i%3]);
+  berryM.instanceColor.needsUpdate=true;shCapM.instanceColor.needsUpdate=true;}
 function updateFoodVisuals(t,dt){
-  for(let i=0;i<N_BERRY;i++){const b=berries[i];b.pop=b.alive?damp(b.pop,1,9,dt):0;const s=b.pop*.27*(1+.07*Math.sin(t*3+b.ph));
+  const fsc=MK.cur.foodScale||1;
+  for(let i=0;i<N_BERRY;i++){const b=berries[i];b.pop=b.alive?damp(b.pop,1,9,dt):0;const s=fsc*b.pop*.27*(1+.07*Math.sin(t*3+b.ph));
     for(let k=0;k<4;k++){const o=B_OFF[k];put(berryM,i*4+k,b.x+o[0]*b.pop,o[1]*b.pop,b.z+o[2]*b.pop,s);}}
   berryM.instanceMatrix.needsUpdate=true;
-  for(let i=0;i<N_SHROOM;i++){const b=shrooms[i];b.pop=b.alive?damp(b.pop,1,9,dt):0;const s=b.pop*b.sz,w=1+.04*Math.sin(t*2.4+b.ph);
+  for(let i=0;i<N_SHROOM;i++){const b=shrooms[i];b.pop=b.alive?damp(b.pop,1,9,dt):0;const s=fsc*b.pop*b.sz,w=1+.04*Math.sin(t*2.4+b.ph);
     put(shStemM,i,b.x,0,b.z,s,s*w,s);put(shCapM,i,b.x,.5*s*w,b.z,s*1.25,s*1.25*(2-w),s*1.25,b.ph);}
   shStemM.instanceMatrix.needsUpdate=true;shCapM.instanceMatrix.needsUpdate=true;
   for(const o of orbs){o.pop=o.alive?damp(o.pop,1,8,dt):0;o.g.visible=o.pop>.02;o.g.position.set(o.x,1.05+.28*Math.sin(t*2.2+o.ph),o.z);o.g.scale.setScalar(o.pop);o.core.rotation.y=t*2+o.ph;o.core.rotation.x=0;}
@@ -531,15 +720,15 @@ function makeEnt(kind){const g=buildCreature(kind);scene.add(g.root);
   return{kind,isPlayer:kind==='jelly',isBoss:kind==='boss',g,x:0,z:0,vx:0,vz:0,m:1,s:1,ds:1,yaw:0,hop:rand(TAU),gulp:0,state:'ok',t:0,think:rand(.3),mode:'wander',tgt:null,wang:rand(TAU),calm:0,full:0,chaseT:0,side:Math.random()<.5?-1:1,eater:null,ph:rand(TAU)};}
 const RKINDS=['lime','puff','ember','shade'];
 const player=makeEnt('jelly'),boss=makeEnt('boss'),rivals=[];
-for(let i=0;i<N_RIVAL;i++)rivals.push(makeEnt(RKINDS[i%4]));
+for(let i=0;i<MAX_RIVAL;i++)rivals.push(makeEnt(RKINDS[i%4]));   // 판이 올라가면 더 꺼내 쓴다(c.off 는 이번 판에 안 나옴)
 const all=[player,boss].concat(rivals);
 const setSize=c=>{c.s=Math.sqrt(c.m);};
 const pspd=s=>9+1.4*(s-1);       // 내 빠르기
-const rspd=s=>8.6+.55*(s-1);     // 숲 친구 빠르기 (늘 나보다 조금 느리다)
+const rspd=s=>(8.6+.55*(s-1))*SPD;     // 숲 친구 빠르기 (늘 나보다 조금 느리다)
 
 // ───────── 판 상태
 let mode='menu',paused=false,timeLeft=ROUND,score=0,hearts=MAXH,dash=1,dashT=0,dashDx=0,dashDz=1,eaten=0,invuln=0,shake=0,tG=0,endT=0,endKind='',endShown=false;
-let reported=false,liveT=0,lastLive=-1,rankT=0,rank=1,rankOf=1,bossOk=false,slow=1,warn30=false,lastTick=99,trailT=0,fireT=0,best=0,muted=false;
+let stage=1,cleared=0,lastBonus=0,reported=false,liveT=0,lastLive=-1,rankT=0,rank=1,rankOf=1,bossOk=false,slow=1,warn30=false,lastTick=99,trailT=0,fireT=0,best=0,muted=false;
 let camX=0,camZ=18,camZoom=1.1;
 const keys={},joy={on:false,id:null,ox:0,oy:0,x:0,y:0},bot={x:0,z:0};
 try{best=+(localStorage.getItem('hk-jelly-best')||0)||0;}catch(e){}
@@ -550,22 +739,31 @@ function spawnRival(c,fixed){
   else{const ps=player.s,danger=ps*1.25<RIVAL_CAP&&Math.random()<.3;s=danger?ps*rand(1.25,1.7):ps*rand(.42,.8);}
   s=clamp(s,.5,RIVAL_CAP);c.m=s*s;setSize(c);c.ds=.01;
   let minD=(fixed?(s>player.s?22:11):16+camZoom*9)+s;
-  for(let k=0;k<30;k++){spot(c,s+2);if(Math.hypot(c.x-player.x,c.z-player.z)>minD&&Math.hypot(c.x-boss.x,c.z-boss.z)>boss.s+s+3)break;minD*=.94;}
+  for(let k=0;k<30;k++){spot(c,s+2);if(Math.hypot(c.x-player.x,c.z-player.z)>minD&&Math.hypot(c.x-boss.x,c.z-boss.z)>boss.s+s+3&&!MK.blocked(c.x,c.z,s+1))break;minD*=.94;}
   c.vx=c.vz=0;c.state='spawn';c.t=0;c.mode='wander';c.tgt=null;c.calm=fixed?6:0;c.full=rand(3);c.chaseT=0;c.eater=null;c.g.root.visible=true;
   if(mode==='play'&&!fixed)burst(c.x,.4,c.z,8,C(KIND_COL[c.kind]),4,5);
 }
-function resetWorld(){
+// 판 준비 — 숲(맵) · 대왕 · 친구 · 먹을 것을 그 판에 맞춰 새로 놓는다. 점수 · 하트 · 대시는 그대로 둔다
+function setupStage(n){
+  stage=n;const sp=stageParams(n);
+  if(MK.apply(sp.map))paintFood();
+  WORLD=MK.world();BOSS_S=sp.boss;NEED=BOSS_S*EAT;RIVAL_CAP=BOSS_S*.84;SPD=sp.spd;
   player.x=0;player.z=18;player.vx=player.vz=0;player.m=1;setSize(player);player.ds=1;player.state='ok';player.yaw=0;player.g.root.visible=true;player.gulp=0;player.eater=null;
   boss.x=0;boss.z=-34;boss.vx=boss.vz=0;boss.m=BOSS_S*BOSS_S;setSize(boss);boss.ds=BOSS_S;boss.state='ok';boss.mode='wander';boss.tgt=null;boss.calm=6;boss.g.root.visible=true;boss.yaw=0;boss.eater=null;
   const tiers=[.55,.6,.68,.74,.8,.62,.7,.76,1.45,2.2,3];
-  rivals.forEach((c,i)=>spawnRival(c,tiers[i%tiers.length]));
+  rivals.forEach((c,i)=>{if(i<sp.rivals){c.off=false;spawnRival(c,Math.min(tiers[i%tiers.length]*sp.tier,RIVAL_CAP));}else{c.off=true;c.state='dead';c.eater=null;c.g.root.visible=false;}});
   for(const b of berries){spot(b);b.alive=true;b.pop=1;}
   for(const b of shrooms){spot(b);b.alive=true;b.pop=1;}
   for(const o of orbs){spot(o,4);o.alive=true;o.pop=1;}
-  timeLeft=ROUND;score=0;hearts=MAXH;dash=1;dashT=0;eaten=0;invuln=0;shake=0;endT=0;endKind='';endShown=false;reported=false;liveT=1;lastLive=-1;bossOk=false;slow=1;warn30=false;lastTick=99;
+  timeLeft=ROUND;dashT=0;invuln=0;endT=0;bossOk=false;warn30=false;lastTick=99;slow=1;shake=0;
   camX=player.x;camZ=player.z;camZoom=1.32;
   for(const p of P)p.life=0;
   for(const el of popEls){el.t=0;el.style.opacity=0;}
+}
+// 처음부터 — 1판(지금 숲)으로
+function resetWorld(){
+  score=0;hearts=MAXH;dash=1;eaten=0;cleared=0;lastBonus=0;endKind='';endShown=false;reported=false;liveT=1;lastLive=-1;
+  setupStage(1);
 }
 
 // ───────── 소리 (누른 뒤에만 켠다)
@@ -618,7 +816,7 @@ function updateHud(){
   const sec=Math.max(0,Math.ceil(timeLeft));setText('timer',Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0'));
   const low=sec<=10&&mode==='play';if(hudLast.low!==low){hudLast.low=low;$('timer').classList.toggle('low',low);}
   const sc_=Math.round(score);if(hudLast.sc!==undefined&&sc_>hudLast.sc+20)bump($('scoreV'));if(hudLast.sc===undefined||sc_>hudLast.sc+20||sc_<hudLast.sc)hudLast.sc=sc_;
-  setText('sizeV',player.s.toFixed(1));setText('rankV',rank+'위');setText('scoreV',fmt(score));
+  setText('sizeV',player.s.toFixed(1));setText('rankV',rank+'위');setText('scoreV',fmt(score));setText('stageV',String(stage));
   const hk_=hearts+':'+dash;if(hudLast.hd!==hk_){if(hudLast.dash!==undefined&&dash>hudLast.dash)bump($('dashBtn'));hudLast.dash=dash;hudLast.hd=hk_;heartEls.forEach((e,i)=>e.classList.toggle('off',i>=hearts));pipEls.forEach((e,i)=>e.classList.toggle('on',i<dash));$('dashBtn').classList.toggle('ready',dash>0);}
   const p=clamp((player.s-1)/(NEED-1),0,1),pk=Math.round(p*200);
   if(hudLast.p!==pk){hudLast.p=pk;$('bbFill').style.width=(p*100)+'%';$('bbMe').style.left=(p*100)+'%';}
@@ -723,10 +921,12 @@ function moveAI(c,dt){
       dx-=nx*out;dz-=nz*out;const inw=clamp((r-(lim-3.5))/3.5,0,1)*.5;dx-=nx*inw;dz-=nz*inw;
       if(Math.hypot(dx,dz)<.3){dx+=-nz*c.side;dz+=nx*c.side;}
       l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;}}
+  [dx,dz]=MK.steer(c.x,c.z,c.s*.7,dx,dz);   // 물 · 바위 · 돌기둥은 돌아간다
   const sp=rspd(c.s)*f*(c.state==='spawn'?.25:1);
   c.vx=damp(c.vx,dx*sp,6,dt);c.vz=damp(c.vz,dz*sp,6,dt);
   c.x+=c.vx*dt;c.z+=c.vz*dt;
   const r2=Math.hypot(c.x,c.z);if(r2>lim){c.x*=lim/r2;c.z*=lim/r2;}
+  MK.push(c,c.s*.7);
 }
 
 // ───────── 내 젤리 움직이기
@@ -745,9 +945,10 @@ function movePlayer(dt){
   if(dashT>0){dashT-=dt;if(l>.3){dashDx=damp(dashDx,ix/l,5,dt);dashDz=damp(dashDz,iz/l,5,dt);const n=Math.hypot(dashDx,dashDz)||1;dashDx/=n;dashDz/=n;}
     player.vx=dashDx*sp*2.7;player.vz=dashDz*sp*2.7;
     trailT-=dt;if(trailT<=0){trailT=.03;burst(player.x,player.s*.7,player.z,2,C(0xff9ad8),1.5,2);}}
-  else{player.vx=damp(player.vx,ix*sp,9,dt);player.vz=damp(player.vz,iz*sp,9,dt);}
+  else{const k=MK.onIce(player.x,player.z)?1.6:9;player.vx=damp(player.vx,ix*sp,k,dt);player.vz=damp(player.vz,iz*sp,k,dt);}   // 얼음 위는 미끄럽다
   player.x+=player.vx*dt;player.z+=player.vz*dt;
   const lim=WORLD-player.s*.6,r=Math.hypot(player.x,player.z);if(r>lim){player.x*=lim/r;player.z*=lim/r;}
+  MK.push(player,player.s*.6);
 }
 
 // ───────── 몸짓
@@ -791,41 +992,51 @@ function newGame(){
   resetWorld();mode='play';paused=false;
   $('start').hidden=true;$('end').hidden=true;$('pauseOv').hidden=true;$('hud').hidden=false;$('hud').classList.remove('done');
   for(const k in hudLast)delete hudLast[k];
-  updateRank();updateHud();SFX.go();banner('가시대왕보다 커져서 꿀꺽!','',2.2);
+  updateRank();updateHud();SFX.go();banner('1판 · '+MK.cur.name+' — 가시대왕보다 커져서 꿀꺽!','',2.4);
   hk({type:'hk:start'});hk({type:'hk:live',score:0});lastLive=0;
 }
 function toMenu(){resetWorld();mode='menu';paused=false;$('start').hidden=false;$('end').hidden=true;$('pauseOv').hidden=true;$('hud').hidden=true;$('banner').className='';showBest();}
+// 가시대왕을 삼켰다 — 판 보너스를 받고 잠깐 축하한 뒤 다음 판(다음 숲)으로
 function win(){
-  score+=PTS.boss+Math.ceil(timeLeft)*PTS.sec+hearts*PTS.heart;eaten++;
+  cleared++;eaten++;
+  lastBonus=PTS.boss+Math.ceil(timeLeft)*PTS.sec+hearts*PTS.heart+stage*PTS.stage;
+  score=Math.min(MAXSCORE,score+lastBonus);
   grow(player,boss.m*.3);SFX.gulp();SFX.win();if(!reduceMotion){shake=.7;slow=.35;}
   burst(boss.x,boss.s,boss.z,70,C(0xffe27a),12,13);burst(boss.x,boss.s,boss.z,40,C(KIND_COL.boss),9,10);
-  pop('꿀꺽!!',boss.x,boss.s*2+2,boss.z,'mint');
-  finish('win');
+  pop('꿀꺽!! +'+fmt(lastBonus),boss.x,boss.s*2+2,boss.z,'mint');
+  mode='clear';endT=0;fireT=0;stopInput();
+  const nx=MK.maps[(stageParams(stage+1).map-1)%MK.maps.length];
+  banner(stage+'판 완료! 다음 숲 → '+nx.name,'mint',3);
+}
+function nextStage(){
+  hearts=Math.min(MAXH,hearts+1);   // 판을 깨면 하트 하나를 돌려받는다
+  setupStage(stage+1);dash=Math.max(dash,1);
+  mode='play';for(const k in hudLast)delete hudLast[k];
+  updateRank();updateHud();SFX.go();
+  banner(stage+'판 · '+MK.cur.name+' — 가시대왕이 더 커졌어요','',2.6);
 }
 function finish(kind){
   if(mode!=='play')return;
-  mode=kind==='win'?'win':'over';endKind=kind;endT=0;endShown=false;stopInput();$('hud').classList.add('done');
-  if(kind!=='win')SFX.lose();
+  mode='over';endKind=kind;endT=0;endShown=false;stopInput();$('hud').classList.add('done');
+  SFX.lose();
   if(kind==='time')banner('시간 끝!','bad',1.6);
 }
 function showEnd(){
   endShown=true;
-  const winF=endKind==='win',sc=Math.round(score);
+  const sc=Math.min(MAXSCORE,Math.round(score));
   if(sc>best){best=sc;try{localStorage.setItem('hk-jelly-best',String(best));}catch(e){}}
-  $('end').className='ov '+(winF?'win':'lose');
-  $('endTitle').textContent=winF?'가시대왕을 꿀꺽!':endKind==='eaten'?'잡아먹혔어요':'시간 끝!';
-  $('endSub').textContent=winF?'숲에서 가장 큰 젤리가 됐어요.':endKind==='eaten'?'빨간 고리가 다가오면 대시로 빠져나가 보세요.'
-    :bossOk?'삼킬 만큼 커졌는데 한 발 늦었어요. 커지면 바로 가시대왕에게 달려가세요.':'가시대왕을 삼키려면 크기 '+NEED.toFixed(1)+' 이상이 되어야 해요. 작은 친구를 더 많이 삼켜 보세요.';
+  $('end').className='ov '+(cleared>0?'win':'lose');
+  $('endTitle').textContent=endKind==='eaten'?'잡아먹혔어요':'시간 끝!';
+  $('endSub').textContent=stage+'판에서 멈췄어요 · 깬 판 '+cleared+'개. '+(endKind==='eaten'?'빨간 고리가 다가오면 대시로 빠져나가 보세요.'
+    :bossOk?'삼킬 만큼 커졌는데 한 발 늦었어요. 커지면 바로 가시대왕에게 달려가세요.':'이 판 가시대왕을 삼키려면 크기 '+NEED.toFixed(1)+' 이상이 되어야 해요.');
   $('endScore').textContent=fmt(sc);
-  const rows=[['마지막 크기',player.s.toFixed(1)],['삼킨 친구',fmt(eaten)+'마리']];
-  if(winF){rows.push(['가시대왕',fmt(PTS.boss)+'점']);rows.push(['남은 시간',Math.ceil(timeLeft)+'초 × '+PTS.sec+'점']);rows.push(['남은 하트',hearts+'개 × '+fmt(PTS.heart)+'점']);}
-  else rows.push(['숲 순위',rank+'위 / '+rankOf]);
+  const rows=[['멈춘 판',stage+'판 · '+MK.cur.name],['깬 판',cleared+'개'],['마지막 크기',player.s.toFixed(1)],['삼킨 친구',fmt(eaten)+'마리'],['숲 순위',rank+'위 / '+rankOf]];
   $('endRows').innerHTML=rows.map(r=>'<dt>'+r[0]+'</dt><dd>'+r[1]+'</dd>').join('');
   showBest();$('end').hidden=false;
   if(!reported){reported=true;hk({type:'hk:score',score:sc});}
 }
 function updateRank(){let n=1,tot=1;for(const c of all){if(c.isPlayer||c.state==='dead'||c.state==='dying')continue;tot++;if(c.s>player.s)n++;}rank=n;rankOf=tot;}
-function pause(){if(mode!=='play'||paused)return;paused=true;stopInput();$('pauseOv').hidden=false;hk({type:'hk:paused'});}
+function pause(){if((mode!=='play'&&mode!=='clear')||paused)return;paused=true;stopInput();$('pauseOv').hidden=false;hk({type:'hk:paused'});}
 function resume(){if(!paused)return;paused=false;last=performance.now();$('pauseOv').hidden=true;hk({type:'hk:resumed'});}
 function stopInput(){for(const k in keys)keys[k]=false;joy.on=false;joy.id=null;joy.x=joy.y=0;$('stick').style.display='none';}
 
@@ -845,6 +1056,12 @@ function step(rdt){
     if(ok!==bossOk){bossOk=ok;if(ok){banner('가시대왕보다 커졌어요! 지금 삼키세요','mint',2.8);SFX.ready();}}
     liveT-=rdt;if(liveT<=0){liveT=1;const s=Math.round(score);if(s!==lastLive){lastLive=s;hk({type:'hk:live',score:s});}}
     if(timeLeft<=0){timeLeft=0;finish('time');}
+  }else if(mode==='clear'){
+    // 판 완료 — 잠깐 축하한 뒤 다음 숲으로
+    endT+=rdt;player.vx=damp(player.vx,0,5,dt);player.vz=damp(player.vz,0,5,dt);
+    fireT-=rdt;if(fireT<=0&&endT<2.4){fireT=.22;const a=rand(TAU),r=rand(2,7)*player.s*.5;
+      burst(player.x+Math.cos(a)*r,player.s+rand(1,4),player.z+Math.sin(a)*r,16,[C(0xffe27a),C(0x7dffd0),C(0xff9ad8)][(Math.random()*3)|0],6,7);}
+    if(endT>3){nextStage();return;}
   }else if(mode==='win'||mode==='over'){
     endT+=rdt;player.vx=damp(player.vx,0,5,dt);player.vz=damp(player.vz,0,5,dt);
     if(mode==='win'){fireT-=rdt;if(fireT<=0&&endT<3.5){fireT=.22;const a=rand(TAU),r=rand(2,7)*player.s*.5;
@@ -856,7 +1073,7 @@ function step(rdt){
     if(c.isPlayer){if(c.state==='dying'){c.t+=dt;if(c.t>=.24)c.state='dead';}continue;}
     if(c.state==='ok'||c.state==='spawn'){moveAI(c,dt);if(c.state==='spawn'){c.t+=dt;if(c.t>.75)c.state='ok';}else if(!c.isBoss)eatFood(c);}
     else if(c.state==='dying'){c.t+=dt;if(c.t>=.24){c.state='dead';c.t=rand(2.5,5);c.g.root.visible=false;}}
-    else if(c.state==='dead'&&!c.isBoss){c.t-=dt;if(c.t<=0&&(mode==='play'||mode==='menu'))spawnRival(c);}
+    else if(c.state==='dead'&&!c.isBoss&&!c.off){c.t-=dt;if(c.t<=0&&(mode==='play'||mode==='menu'))spawnRival(c);}
   }
   interact();
   // 먹을 것 다시 돋아나기
@@ -864,7 +1081,8 @@ function step(rdt){
   for(const b of shrooms)if(!b.alive){b.t-=dt;if(b.t<=0){spot(b);b.alive=true;b.pop=0;}}
   for(const o of orbs)if(!o.alive){o.t-=dt;if(o.t<=0){spot(o,4);o.alive=true;o.pop=0;}}
   for(const c of all)animate(c,dt);
-  updateFoodVisuals(tG,rdt);updateFlies(tG);updateParticles(dt);
+  if(score>MAXSCORE)score=MAXSCORE;
+  updateFoodVisuals(tG,rdt);MK.update(tG);updateParticles(dt);
   rankT-=rdt;if(rankT<=0){rankT=.25;updateRank();}
   // 카메라
   const pm=H>W?lerp(1,1.28,clamp((H/W-1)/.9,0,1)):1;
@@ -883,7 +1101,8 @@ function step(rdt){
 
 // ───────── 조작
 window.addEventListener('keydown',e=>{
-  if(e.code==='Escape'&&!e.repeat){e.preventDefault();if(ARC){if(mode==='play')hk({type:'hk:esc'});}else if(paused)resume();else pause();return;}
+  if(e.code==='Escape'&&!e.repeat){e.preventDefault();if(ARC){if(mode==='play'||mode==='clear')hk({type:'hk:esc'});}else if(paused)resume();else pause();return;}
+  if(mode==='clear'){if(e.code==='KeyP'&&!e.repeat){if(paused)resume();else pause();}return;}
   if(mode!=='play'){if(e.code==='Enter'&&!e.repeat&&!(document.activeElement&&document.activeElement.tagName==='BUTTON')){e.preventDefault();if(mode==='menu'||endShown)startClick();}return;}
   if(e.code==='KeyP'&&!e.repeat){if(paused)resume();else pause();return;}
   if(paused)return;
@@ -938,7 +1157,8 @@ function boot(saved){
   hk({type:'hk:ready'});
 }
 if(DBG&&!ARC)window.__jelly={step,newGame,tryDash,bot,all,player,boss,rivals,berries,shrooms,orbs,EAT,NEED,WORLD,
-  get:()=>({mode,timeLeft,score,hearts,dash,eaten,size:player.s,rank,bossOk,endKind,endShown}),
+  get:()=>({mode,timeLeft,score,hearts,dash,eaten,size:player.s,rank,bossOk,endKind,endShown,stage,cleared,map:MK.cur.id,mapName:MK.cur.name,boss:BOSS_S,rivalsOn:rivals.filter(c=>!c.off).length,paused}),
+  win,MK,pause,resume,
   set:o=>{if(o.m){player.m=o.m;setSize(player);}if(o.time!==undefined)timeLeft=o.time;if(o.hearts!==undefined)hearts=o.hearts;},
   render:()=>renderer.render(scene,camera)};
 // claude.ai 에서 새 판으로 바뀔 때 소리 설정만 이어 준다 (그 밖에서는 window.claude 가 없다)

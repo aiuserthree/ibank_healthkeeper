@@ -80,6 +80,19 @@
     .jvp-rules h3 { margin: 14px 0 4px; font-size: 15px; font-weight: 800; color: #0f172a; }
     .jvp-rules ul { margin: 4px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); word-break: keep-all; }
     .jvp-rules li + li { margin-top: 3px; }
+    /* 숲 고르기 — 맵 카드(색 칩 = 하늘 · 땅 · 대표 색) */
+    .jvp-sub { margin: 14px 0 6px; font-size: 13px; font-weight: 800; color: #475569; text-align: left; }
+    .jvp-maps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    .jvp-map { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 8px; border-radius: 12px; border: 2px solid #e2e8f0; background: #fff; font: inherit; text-align: left; color: #0f172a; cursor: pointer; }
+    .jvp-map:hover:not(:disabled) { border-color: #f9a8d4; }
+    .jvp-map.is-on { border-color: #ec4899; background: #fdf2f8; box-shadow: 0 0 0 3px rgba(236, 72, 153, .14); }
+    .jvp-map:disabled { cursor: default; }
+    .jvp-map:disabled:not(.is-on) { opacity: .5; }
+    .jvp-map__chip { flex-shrink: 0; width: 28px; height: 28px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(15, 23, 42, .12); }
+    .jvp-map b { min-width: 0; font-size: 13px; font-weight: 800; line-height: 1.25; word-break: keep-all; overflow: hidden; text-overflow: ellipsis; }
+    .jvp-maptip { margin-top: 6px; font-size: 12.5px; line-height: 1.45; color: #475569; text-align: left; word-break: keep-all; }
+    .jvp-maptip b { color: #0f172a; }
+    .jvp-card.is-mid { max-width: 470px; }
     .hk-pf__tools > [hidden] { display: none !important; }
     @media (max-width: 640px) {
       .hk-pf__bar .hk-pf__icon { display: none; }
@@ -91,6 +104,8 @@
       .jvp-card { padding: 16px 14px; border-radius: 16px; }
       .jvp-card h2 { font-size: 19px; }
       .jvp-logo { width: 42px; height: 42px; }
+      .jvp-maps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .jvp-map { padding: 6px 7px; }
     }
     @media (max-height: 520px) and (orientation: landscape) {
       .jvp-head, .jvp-card .jvp-badge, .jvp-help { display: none; }
@@ -113,10 +128,11 @@
     const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
     const LEVEL_NAME = Object.fromEntries(LEVELS);
     const PREF_KEY = "hk-jellyvs-pref";
-    const pref = { mode: "cpu", level: "normal" };
+    const pref = { mode: "cpu", level: "normal", map: 1 };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY) || "{}")); } catch (_) { /* 처음 */ }
     if (!["cpu", "online"].includes(pref.mode)) pref.mode = "cpu";
     if (!LEVEL_NAME[pref.level]) pref.level = "normal";
+    if (!Number.isInteger(pref.map) || pref.map < 1) pref.map = 1;
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (_) { /* 저장 못 해도 이번엔 그대로 */ } };
     const hex = (n) => `#${n.toString(16).padStart(6, "0")}`;
 
@@ -166,6 +182,15 @@
       return;
     }
 
+    // ───── 숲(맵) — 목록은 3D 엔진(HKJellyVs.MAPS)이 갖고 있다
+    const MAPS = HKJellyVs.MAPS && HKJellyVs.MAPS.length ? HKJellyVs.MAPS : [{ id: 1, name: "달빛 마법 숲", tip: "", chip: ["#241a60", "#2c8658", "#ff7ac8"] }];
+    const mapOf = (id) => MAPS.find((m) => m.id === id) || MAPS[0];
+    if (!MAPS.some((m) => m.id === pref.map)) pref.map = 1;
+    const chipBg = (c) => `radial-gradient(circle at 70% 72%, ${c[2]} 0 20%, transparent 22%), linear-gradient(180deg, ${c[0]} 0 52%, ${c[1]} 52%)`;
+    // 맵 카드 — can: 누를 수 있는지(대전 손님은 보기만)
+    const mapCards = (sel, can) => `<div class="jvp-maps" role="radiogroup" aria-label="숲 고르기">${MAPS.map((m) => `<button type="button" class="jvp-map${m.id === sel ? " is-on" : ""}" data-map="${m.id}" role="radio" aria-checked="${m.id === sel ? "true" : "false"}"${can ? "" : " disabled"}><span class="jvp-map__chip" style="background:${chipBg(m.chip)}"></span><b>${esc(m.name)}</b></button>`).join("")}</div>`;
+    const mapTip = (id) => { const m = mapOf(id); return `<b>${esc(m.name)}</b>${m.tip ? ` — ${esc(m.tip)}` : ""}`; };
+
     // ───── 소리 버튼 (모든 게임 공통 설정)
     const soundBtn = $("#jv-sound");
     const paintSound = () => {
@@ -208,7 +233,7 @@
     function showMenu() {
       stopEngine(); closeConn();
       screen = "menu"; playing = null; setPlaying(false);
-      engine = makeEngine({ mode: "demo" });
+      engine = makeEngine({ mode: "demo", map: pref.map });
       if (!engine) return;
       engine.start();
       showOver(`<div class="jvp-card jvp-menu" role="dialog" aria-label="꿀꺽 젤리 숲 대전 시작">
@@ -218,6 +243,7 @@
             <button type="button" class="jvp-mode" data-mode="online" role="radio"><span class="jvp-mode__ic">${icon("wifi", 18)}</span><b>동료와</b><small>실시간 1:1 대전</small></button>
           </div>
           <div class="jvp-row" data-row="level"><span class="jvp-row__k">난이도</span><div class="jvp-seg">${LEVELS.map(([k, t]) => `<button type="button" data-level="${k}">${t}</button>`).join("")}</div></div>
+          <div data-row="map"><div class="jvp-sub" id="jv-mapk">숲 고르기</div>${mapCards(pref.map, true)}<div class="jvp-maptip" id="jv-maptip"></div></div>
           <button type="button" class="hk-btn hk-btn--primary jvp-go" id="jv-go">시작</button>
           ${helpHtml()}
         </div>`);
@@ -230,6 +256,10 @@
       if (lv) lv.hidden = pref.mode !== "cpu";
       const go = $("#jv-go");
       if (go) go.textContent = pref.mode === "online" ? "대전 목록 열기" : "연습 시작";
+      over.querySelectorAll("[data-map]").forEach((b) => { const on = Number(b.dataset.map) === pref.map; b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
+      const mk = $("#jv-mapk"), tip = $("#jv-maptip");
+      if (mk) mk.textContent = pref.mode === "online" ? "숲 고르기 · 내가 도전하면 이 숲으로 시작해요" : "숲 고르기";
+      if (tip) tip.innerHTML = mapTip(pref.map);
     }
 
     // ───── 컴퓨터와 연습 (기록하지 않는다)
@@ -237,7 +267,7 @@
       stopEngine(); closeConn(); hideOver();
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       playing = { mode: "cpu", level: pref.level, rival: { name: `컴퓨터(${LEVEL_NAME[pref.level]})` } };
-      engine = makeEngine({ mode: "cpu", level: pref.level, me, rival: playing.rival, onEnd: (r) => showResult(r) });
+      engine = makeEngine({ mode: "cpu", level: pref.level, map: pref.map, me, rival: playing.rival, onEnd: (r) => showResult(r) });
       if (!engine) return;
       screen = "play"; setPlaying(true);
       pauseBtn.disabled = false;
@@ -270,7 +300,7 @@
       const P = playing;
       const title = r.draw ? "비겼어요" : r.win ? "이겼어요!" : "아쉽게 졌어요";
       const how = r.draw ? "2분 뒤 크기가 거의 같았어요" : r.eaten ? (r.win ? "상대를 꿀꺽 삼켰어요" : "상대에게 꿀꺽 삼켜졌어요") : r.win ? "2분 뒤 내가 더 컸어요" : "2분 뒤 상대가 더 컸어요";
-      const lead = P.online ? `${esc(P.rival.name)}님과의 경기 · ${how}` : `${esc(P.rival.name)}와 연습 · ${how}`;
+      const lead = `${P.online ? `${esc(P.rival.name)}님과의 경기` : `${esc(P.rival.name)}와 연습`} · ${esc(mapOf(r.map || 1).name)} · ${how}`;
       const side = (name, n, col) => `<div class="jvp-side"><span class="jvp-num" style="color:${col}">${sizeText(n)}</span><small>${esc(name)}</small></div>`;
       const myCol = hex(HKJellyVs.JCOL[r.me]), rvCol = hex(HKJellyVs.JCOL[1 - r.me]);
       showOver(`<div class="jvp-card is-small jvp-result" role="dialog" aria-label="경기 결과">
@@ -339,7 +369,7 @@
         S2.role = role;
         playing = { mode: role, online: true, role, rival, report, resign, matchId: typeof matchId === "number" ? matchId : null };
         engine = makeEngine({
-          mode: role, me, rival,
+          mode: role, me, rival, map: role === "host" ? pref.map : undefined, // 맵은 주인이 고른다 — 손님은 주인이 보낸 맵으로 그린다
           net: { send: (o) => !S2.closed && !!conn && conn.send(o), onMessage: (fn) => handlers.push(fn) },
           onEvent: (e) => { if (e.type === "lobby") showLobby(e); },
           onEnd: (r) => showResult(r),
@@ -408,10 +438,14 @@
       const who = (on, name, here, col) => `<div class="${on ? "is-on" : ""}"><i class="jvp-dot" style="background:${col}"></i><span>${esc(name)} · ${on ? "준비 완료" : here ? "준비 전" : "들어오는 중…"}</span></div>`;
       if (L.phase === "wait" && !L.counting) {
         screen = "ready";
-        showOver(`<div class="jvp-card is-small" role="dialog" aria-label="경기 준비">
+        const host = playing.role === "host", mp = L.map || 1;
+        showOver(`<div class="jvp-card is-small is-mid" role="dialog" aria-label="경기 준비">
             <span class="jvp-badge">${icon("users", 26)}</span>
             <h2>경기를 준비해 주세요</h2>
             <p>${esc(rv)}님과 실시간 경기 · 2분 동안 먹고 자라기</p>
+            <div class="jvp-sub">${host ? "숲 고르기 · 바꾸면 두 사람 준비가 풀려요" : `숲 · ${esc(rv)}님(도전한 사람)이 골라요`}</div>
+            ${mapCards(mp, host)}
+            <div class="jvp-maptip">${mapTip(mp)}</div>
             <div class="jvp-who">${who(L.ready[0], "나", true, myCol)}${who(L.ready[1], rv, L.peer, rvCol)}</div>
             <div class="jvp-btnrow">
               <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>
@@ -466,7 +500,7 @@
     const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
     // 경기 결과 알리기 — 두 사람 모두 보낸다. 서버 대전 엔진(versus_jellyvs.act)이 두 사람 것이 같으면 승패를 적는다
     async function reportResult(id, r) {
-      const data = { winner: r.winner, size: r.size.slice(), eaten: !!r.eaten, sec: r.sec };
+      const data = { winner: r.winner, size: r.size.slice(), eaten: !!r.eaten, sec: r.sec, map: Number.isInteger(r.map) ? r.map : 1 };
       const earlyUntil = Date.now() + 60000; // 서버는 수락 뒤 30초가 지나야 받는다 — 빨리 끝난 판은 받아 줄 때까지 다시 보낸다
       let fails = 0;
       while (fails < 3) {
@@ -487,7 +521,7 @@
     let saving = 0, leaving = false;
     const repKey = (id) => `hk-jellyvs-rep-${id}`;
     const loadRep = (id) => { try { const v = JSON.parse(localStorage.getItem(repKey(id)) || "null"); return v && Array.isArray(v.size) && v.size.length === 2 && Date.now() - v.at < 3 * 3600e3 ? v : null; } catch (_) { return null; } };
-    const putRep = (id, r) => { try { localStorage.setItem(repKey(id), JSON.stringify({ winner: r.winner, size: r.size, eaten: r.eaten, sec: r.sec, me: r.me, at: Date.now() })); } catch (_) { /* 저장 못 해도 보내기는 그대로 */ } };
+    const putRep = (id, r) => { try { localStorage.setItem(repKey(id), JSON.stringify({ winner: r.winner, size: r.size, eaten: r.eaten, sec: r.sec, map: r.map, me: r.me, at: Date.now() })); } catch (_) { /* 저장 못 해도 보내기는 그대로 */ } };
     const dropRep = (id) => { try { localStorage.removeItem(repKey(id)); } catch (_) { /* 없음 */ } };
     async function sendResult(id, r) {
       putRep(id, r);
@@ -499,7 +533,7 @@
     async function showOnlineLobby() {
       stopEngine(); closeConn(); clearInterval(lobbyPoll);
       screen = "lobby"; setPlaying(false);
-      engine = makeEngine({ mode: "demo" });
+      engine = makeEngine({ mode: "demo", map: pref.map });
       if (engine) engine.start();
       showOver(`<div class="jvp-card is-wide"><div id="jv-lobby"></div></div>`);
       const box = $("#jv-lobby");
@@ -613,6 +647,12 @@
             <li>처음 15초는 서로 삼킬 수 없어요. 2분이 끝나면 더 큰 쪽이 이기고, 크기 차이가 2% 안이면 비겨요.</li>
             <li>상대가 화면 밖에 있으면 가장자리 화살표가 상대 쪽을 가리켜요.</li>
           </ul>
+          <h3>숲 고르기</h3>
+          <ul>
+            <li>숲은 ${MAPS.length}가지예요 — ${MAPS.map((m) => esc(m.name)).join(" · ")}. 숲마다 하늘 · 나무 · 장애물 · 먹이가 퍼진 모양이 달라요.</li>
+            <li>물 · 바위 · 돌기둥은 지나갈 수 없어요. 눈 덮인 숲의 얼음 위에서는 미끄러져요.</li>
+            <li>컴퓨터와 연습은 첫 화면에서 골라요. 동료와는 도전한 사람이 준비 화면에서 고르고, 받은 사람 화면에도 같은 숲이 보여요.</li>
+          </ul>
           <h3>조작 · 멈춤 · 기록</h3>
           <ul>
             <li>${IS_TOUCH ? "화면 아무 곳이나 눌러 끌면 그쪽으로 움직여요. 오른쪽 아래 버튼이 대시예요." : "WASD · 방향키로 움직이고 Space 로 대시해요. 화면을 마우스로 끌어도 움직여요. P · Esc 는 일시정지예요."}</li>
@@ -657,6 +697,13 @@
       if (!b || b.disabled) return;
       if (b.dataset.mode) { pref.mode = b.dataset.mode; savePref(); HKSound.play("select"); paintMenu(); b.blur(); return; }
       if (b.dataset.level) { pref.level = b.dataset.level; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.dataset.map) {
+        const id = Number(b.dataset.map);
+        if (screen === "menu") { pref.map = id; savePref(); if (engine) engine.setMap(id); paintMenu(); }
+        else if (screen === "ready" && playing && playing.role === "host" && engine) { pref.map = id; savePref(); engine.setMap(id); } // 준비 화면은 엔진 알림으로 다시 그린다
+        HKSound.play("tap");
+        return;
+      }
       if (b.id === "jv-go") { if (pref.mode === "online") return showOnlineLobby(); return startCpu(); }
       const act = b.dataset.act;
       if (act === "setclose") return closeRules();
