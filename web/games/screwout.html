@@ -998,18 +998,11 @@
           V.scene.attach(pl.holder);
           pl.holder.visible = true; // 판 상태를 맞추는 쪽이 「없어진 판」이라 먼저 숨겼다 — 떨어지는 동안은 보이게
           const r = () => Math.random() - 0.5;
-          // 보는 사람 쪽(카메라 방향, 바닥 평면) — 판이 면에서 살짝 떨어져 아래로 미끄러지며 앞으로 굴러 나오게(화면 밖으로 바로 날아가지 않게)
-          const cam = three && V === three.V ? three.camera.position : new T3.Vector3(0, 0, 1);
-          const toCam = new T3.Vector3(cam.x, 0, cam.z);
-          if (toCam.lengthSq() < 1e-6) toCam.set(0, 0, 1);
-          toCam.normalize();
+          // 스르륵 — 면에서 살짝 떨어지며 아래로 미끄러져 내려가 화면 밖으로(튀거나 구르지 않는다)
           pl.fall = {
-            t: 0, bounced: 0,
-            v: new T3.Vector3(nW.x * 0.7 + toCam.x * 0.15 + r() * 0.3, 1.5 + Math.max(0, nW.y) * 1.2, nW.z * 0.7 + toCam.z * 0.15 + r() * 0.3),
-            w: new T3.Vector3(r(), r(), r()).normalize(), ws: 3 + Math.random() * 3,
-            toCam,
-            // 구를 방향 — 화면에서 옆으로(판이 있던 쪽, 가운데면 무작위) 조금 앞으로. 화면 안 바닥을 가로질러 구르다 가장자리로 떨어진다
-            side: (() => { const sx = new T3.Vector3(toCam.z, 0, -toCam.x); const wp = pl.holder.getWorldPosition(new T3.Vector3()); let sg = Math.sign(wp.dot(sx)); if (!sg) sg = Math.random() < 0.5 ? -1 : 1; return sx.multiplyScalar(sg).addScaledVector(toCam, -0.15).normalize(); })(),
+            t: 0,
+            v: new T3.Vector3(nW.x * 0.6, Math.min(0, nW.y) * 0.6 - 0.2, nW.z * 0.6),
+            w: new T3.Vector3(r(), 0, r()).normalize(), ws: 0.5 + Math.random() * 0.4,
           };
         }
 
@@ -1145,37 +1138,11 @@
             if (pl.fall) {
               const f = pl.fall;
               f.t += dt;
-              if (!(f.rolling && f.v.y === 0)) f.v.y -= 17 * dt;
+              f.v.y -= 9 * dt;
+              f.v.x *= 1 - 1.5 * dt; f.v.z *= 1 - 1.5 * dt; // 옆으로는 금방 멈추고 아래로만
               pl.holder.position.addScaledVector(f.v, dt);
               pl.holder.rotateOnWorldAxis(f.w, f.ws * dt);
-              // 바닥(물건 아래 둥근 받침, 반지름 R×1.35) 위에서는 튕기고 구르다가, 가장자리를 넘으면 그대로 아래로 굴러 떨어져 화면 밖으로
-              const px = pl.holder.position.x, pz = pl.holder.position.z, rr = Math.hypot(px, pz);
-              // 바닥 — 옆으로는 넓게(화면 안에서 구르는 게 보이게), 앞으로는 조금만
-              const fx = f.side ? Math.abs(px * f.side.x + pz * f.side.z) : rr, fz = f.toCam ? px * f.toCam.x + pz * f.toCam.z : 0;
-              const onFloor = f.side ? fx < V.R * 2.4 && fz < V.R * 1.2 : rr < V.R * 1.35;
-              if (onFloor && pl.holder.position.y < floorY + 0.25 && f.v.y < 0 && pl.holder.position.y > floorY - 0.4) {
-                pl.holder.position.y = floorY + 0.25;
-                f.v.y = Math.abs(f.v.y) > 1.2 ? -f.v.y * 0.38 : 0; // 작게 튀면 그대로 바닥에 붙어 구른다
-                f.v.x *= 0.88; f.v.z *= 0.88;
-                // 정해 둔 옆쪽으로 구르게 — 가운데로 되돌아오지 않는다(바닥에 닿을 때마다 그쪽 속도를 채운다)
-                const ox = f.side ? f.side.x : (rr > 1e-3 ? px / rr : 1), oz = f.side ? f.side.z : (rr > 1e-3 ? pz / rr : 0);
-                const out = f.v.x * ox + f.v.z * oz;
-                if (out < 2.4) { f.v.x += ox * (2.4 - out); f.v.z += oz * (2.4 - out); }
-                if (!f.bounced++) { sfx("land"); opt.onBounce && opt.onBounce(pl.holder.position); }
-                f.rolling = true;
-              }
-              if (f.rolling && onFloor && f.v.y === 0) {
-                pl.holder.position.y = floorY + 0.25;
-                // 구르기 — 움직이는 방향에 맞춰 옆으로 데굴데굴(축 = 위 × 속도)
-                const sp = Math.hypot(f.v.x, f.v.z);
-                if (sp > 1e-3) { f.w.set(f.v.z, 0, -f.v.x).normalize(); f.ws = sp / 0.35; }
-                const sp2 = Math.hypot(f.v.x, f.v.z);
-                if (sp2 > 1.7) { f.v.x *= 1 - 0.35 * dt; f.v.z *= 1 - 0.35 * dt; } // 조금씩 느려지지만 가장자리까지는 간다
-              } else if (f.rolling && !onFloor) {
-                f.rolling = false; // 가장자리를 넘었다 — 다시 떨어진다(중력은 위에서)
-                if (f.v.y === 0) f.v.y = -0.5;
-              }
-              if (pl.holder.position.y < floorY - V.R * 4 || f.t > 6) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
+              if (pl.holder.position.y < floorY - V.R * 2.5 || f.t > 3) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
               busy = true;
               continue;
             }
@@ -1487,10 +1454,6 @@
               if (!((fallen >> k) & 1)) continue;
               dropPlate3(V, k);
               n++;
-            }
-            if (n) {
-              view.shake = Math.max(view.shake, 0.05 + n * 0.03);
-              burst(toWorld(holePos(V, a, 0.3)), 14 + n * 6);
             }
           }
           draw();
