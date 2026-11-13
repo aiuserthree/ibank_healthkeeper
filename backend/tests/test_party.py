@@ -205,7 +205,7 @@ class PartyFlow(unittest.TestCase):
             self.result({0: 10.0}, winner=0),  # 너무 빠른 기록
             self.result({0: 40.0}, winner=1),  # 못 들어온 차가 1등
             {**self.result({0: 40.0}, winner=0), "order": [40.0]},  # 차 수가 다름
-            {**self.result({0: 40.0}, winner=0), "track": 9},
+            {**self.result({0: 40.0}, winner=0), "track": 99},
             {**self.result({0: 40.0}, winner=0), "winner": True},
         ]
         for b in bad:
