@@ -298,7 +298,6 @@ window.HKPlay = (function () {
     eggfarm: ["#a16207", "#facc15"],
     herorush: ["#1d4ed8", "#ef4444"],
     traffic: ["#2b3350", "#3ecf6e"],
-    suncrown: ["#1a1c2c", "#f2c230"],
     screwout: ["#92400e", "#f59e0b"],
     boltup: ["#475569", "#22c55e"],
     soccer: ["#166534", "#84cc16"],
