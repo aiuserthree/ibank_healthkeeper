@@ -251,7 +251,8 @@ class FakeSession:
             for v in stmt.compile().params.values():
                 if isinstance(v, (list, tuple)):
                     wanted |= set(v)
-            return FakeResult([(e, i) for e, i in self.members.items() if e in wanted])
+            # 메일 목록(IN)으로 찾으면 그 메일만, 목록 없이 찾으면(아이디로 맞추기) 모든 회원
+            return FakeResult([(e, i) for e, i in self.members.items() if not wanted or e in wanted])
         if sql.startswith("INSERT INTO member_leave"):
             self.inserted.extend(params or [])
             return FakeResult([])
@@ -356,6 +357,14 @@ class LeaveSyncApiTest(unittest.TestCase):
         self.assertEqual(r.status_code, 413)
         many = self.body([{"email": "kim@ibank.co.kr", "day": date.today().isoformat(), "start": "00:00", "end": "24:00", "kind": "VACATION"}] * 2001)
         self.assertEqual(self.post(many).status_code, 422)
+
+    def test_matches_by_company_id(self):
+        """그룹웨어 메일(ibank.co.kr · digitalworks.co.kr)과 회원 메일(3ibank.com)은 아이디(메일 앞부분)로 맞춘다 — 같은 아이디가 둘이면 안 맞춤."""
+        import asyncio
+        from app.services import leave
+        db = FakeSession({"kim@3ibank.com": 7, "lee@3ibank.com": 8, "dup@3ibank.com": 9, "dup@ibank.co.kr": 10, "park@gmail.com": 11})
+        got = asyncio.run(leave.member_ids_by_email(db, {"kim@ibank.co.kr", "lee@digitalworks.co.kr", "dup@digitalworks.co.kr", "park@ibank.co.kr", "kim@3ibank.com", "x@other.com"}))
+        self.assertEqual(got, {"kim@ibank.co.kr": 7, "lee@digitalworks.co.kr": 8, "kim@3ibank.com": 7})
 
     def test_saves_and_replaces(self):
         with self.assertLogs("app.services.leave", level="INFO") as logs:

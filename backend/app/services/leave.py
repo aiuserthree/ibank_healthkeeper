@@ -145,18 +145,41 @@ async def job_refresh_cache(db: AsyncSession) -> None:
 
 # ── 받기 ──────────────────────────────────────────────────────
 
+# 같은 사람의 회사 메일 도메인들 — 그룹웨어는 ibank.co.kr · digitalworks.co.kr 메일을, 헬스키퍼 회원은 회사 로그인 계정(3ibank.com)을 쓴다.
+# 아이디(메일 앞부분)는 셋이 같다(그룹웨어 usr_id = 메일 앞부분 확인함)
+COMPANY_DOMAINS = ("3ibank.com", "ibank.co.kr", "digitalworks.co.kr")
+
+
+def _local(email: str) -> tuple:
+    e = (email or "").strip().lower()
+    local, _, dom = e.partition("@")
+    return local, dom
+
+
 async def member_ids_by_email(db: AsyncSession, emails: set) -> dict:
-    """회사 메일(소문자) → 회원 번호. 지금 쓰는 회원(ACTIVE)만."""
+    """회사 메일(소문자) → 회원 번호. 지금 쓰는 회원(ACTIVE)만.
+    메일이 그대로 같은 회원을 먼저 찾고, 없으면 회사 도메인끼리 아이디(메일 앞부분)가 같은 회원 — 그 아이디의 회원이 한 명일 때만."""
     if not emails:
         return {}
-    rows = (
-        await db.execute(
-            select(func.lower(Member.email), Member.id).where(
-                func.lower(Member.email).in_(sorted(emails)), Member.status == MemberStatus.ACTIVE
-            )
-        )
+    members = (
+        await db.execute(select(func.lower(Member.email), Member.id).where(Member.status == MemberStatus.ACTIVE))
     ).all()
-    return {email: member_id for email, member_id in rows}
+    exact = {email: member_id for email, member_id in members}
+    by_local: dict = {}
+    for email, member_id in members:
+        local, dom = _local(email)
+        if local and dom in COMPANY_DOMAINS:
+            by_local.setdefault(local, set()).add(member_id)
+    out = {}
+    for email in emails:
+        if email in exact:
+            out[email] = exact[email]
+            continue
+        local, dom = _local(email)
+        ids = by_local.get(local) if dom in COMPANY_DOMAINS else None
+        if ids and len(ids) == 1:
+            out[email] = next(iter(ids))
+    return out
 
 
 async def replace_rows(db: AsyncSession, frm: date, to: date, rows: list, now: datetime) -> None:
