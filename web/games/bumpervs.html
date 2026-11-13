@@ -482,6 +482,7 @@
       sess = S;
       const send = (o) => !S.closed && !!conn && conn.send(o);
       const names = () => (S.role === "host" ? [me.name, rival.name] : [rival.name, me.name]);
+      const faces = () => (S.role === "host" ? [me.avatarUrl || null, rival.avatarUrl || null] : [rival.avatarUrl || null, me.avatarUrl || null]);
       const mi = () => (S.role === "guest" ? 1 : 0);
       const lost = async (title, sub) => {
         if (S.closed || S.phase === "end") return;
@@ -533,7 +534,7 @@
         const sig = `${S.track}.${S.rids}`;
         if (sig === shownSetup) return;
         shownSetup = sig;
-        toFrame({ type: "vs:setup", role: S.role, track: S.track, rids: S.rids.slice(), names: names(), e: 0, mute: HKSound.isMuted() });
+        toFrame({ type: "vs:setup", role: S.role, track: S.track, rids: S.rids.slice(), names: names(), avatars: faces(), e: 0, mute: HKSound.isMuted() });
       }
       // host — 준비 상태 알리기
       const lbMsg = () => ({ t: "lb", ph: S.phase, track: S.track, max: S.max, rids: S.rids.slice(), rd: S.rd.slice() });
@@ -546,7 +547,7 @@
         if (S.role !== "host" || S.phase !== "wait" || !S.rd[0] || !S.rd[1] || !S.peerHere) return;
         S.phase = "race"; S.e = 1 + Math.floor(Math.random() * 1e9); S.result = null;
         const go = { t: "go", e: S.e, track: S.track, rids: S.rids.slice() };
-        toFrame({ type: "vs:setup", role: "host", track: S.track, rids: S.rids.slice(), names: names(), e: S.e, auto: AUTO, mute: HKSound.isMuted() });
+        toFrame({ type: "vs:setup", role: "host", track: S.track, rids: S.rids.slice(), names: names(), avatars: faces(), e: S.e, auto: AUTO, mute: HKSound.isMuted() });
         toFrame({ type: "vs:go" });
         shownSetup = "";
         send(go);
@@ -564,7 +565,7 @@
         S.e = m.e; S.phase = "race"; S.result = null;
         S.track = clamp(m.track | 0, 0, TRACKS.length - 1);
         if (Array.isArray(m.rids)) S.rids = m.rids.map((r, i) => (okRid(r) ? r : i ? "fox" : "bunny"));
-        toFrame({ type: "vs:setup", role: "guest", track: S.track, rids: S.rids.slice(), names: names(), e: S.e, auto: AUTO, mute: HKSound.isMuted() });
+        toFrame({ type: "vs:setup", role: "guest", track: S.track, rids: S.rids.slice(), names: names(), avatars: faces(), e: S.e, auto: AUTO, mute: HKSound.isMuted() });
         toFrame({ type: "vs:go" });
         shownSetup = "";
         startRace();
@@ -1073,7 +1074,8 @@
         const rids = [...used, ...bots].slice(0, PMAX);
         const botName = (rid) => { const x = RACERS.find((y) => y[0] === rid); return x ? `컴퓨터 ${x[1]}` : "컴퓨터"; };
         const nm = [...players.map((id) => names[id] || "동료"), ...rids.slice(players.length).map(botName)];
-        S.go = { t: "go", e: 1 + Math.floor(Math.random() * 1e9), track: S.track, players, rids, names: nm, bots: n.bots };
+        const pic = (id) => { const x = n.seats.find((y) => y.id === id); return (x && x.avatarUrl) || null; };
+        S.go = { t: "go", e: 1 + Math.floor(Math.random() * 1e9), track: S.track, players, rids, names: nm, bots: n.bots, avatars: [...players.map(pic), ...Array(PMAX - players.length).fill(null)] };
         startGo(S.go);
         send(S.go);
       }
@@ -1082,7 +1084,8 @@
         const i = g.players.indexOf(S.me);
         if (i < 0) { S.phase = "out"; screen = "lost"; showOver(cardHtml("flag", "이번 경주에는 빠졌어요", "준비하기 전에 출발했어요", `<button type="button" class="hk-btn hk-btn--primary" data-act="plobby">여러 명 경주 목록</button>`)); return; }
         const nm = g.names.map((x, k) => (k === i ? me.name : x));
-        toFrame({ type: "vs:setup", role: isHost() ? "host" : "guest", track: S.track, rids: g.rids.slice(), names: nm, me: i, bots: g.bots.slice(), level: "normal", e: S.e, auto: AUTO, mute: HKSound.isMuted() });
+        const av = Array.isArray(g.avatars) ? g.avatars.map((u) => (typeof u === "string" && /^\/(api|assets)\//.test(u) ? u : null)) : [];
+        toFrame({ type: "vs:setup", role: isHost() ? "host" : "guest", track: S.track, rids: g.rids.slice(), names: nm, avatars: av, me: i, bots: g.bots.slice(), level: "normal", e: S.e, auto: AUTO, mute: HKSound.isMuted() });
         toFrame({ type: "vs:go" });
         shownSetup = "";
         hideOver(); closeLayer();

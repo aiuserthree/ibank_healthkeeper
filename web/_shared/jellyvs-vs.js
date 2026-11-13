@@ -377,6 +377,9 @@ window.HKJellyVs = (function () {
 .jv-tag{position:absolute;left:0;top:0;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:800;white-space:nowrap;background:rgba(18,13,43,.8);box-shadow:inset 0 0 0 2px rgba(255,255,255,.25);transform:translate(-50%,-100%);display:none;max-width:140px;overflow:hidden;text-overflow:ellipsis}
 .jv-tag.ok{box-shadow:inset 0 0 0 2px #4dffa0;color:#b8ffd9}
 .jv-tag.bad{box-shadow:inset 0 0 0 2px #ff3b4f;color:#ffc2c8}
+.jv-tag{display:inline-flex;align-items:center;gap:5px}
+.jv-face{position:relative;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;overflow:hidden;background:#7c3aed;color:#fff;font-size:11px;font-weight:800;box-shadow:0 0 0 2px rgba(255,255,255,.85)}
+.jv-face img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
 .jv-tag.me{background:rgba(255,255,255,.9);color:#2a1650;box-shadow:none;font-size:11px;padding:2px 7px}
 .jv-arrow{position:absolute;left:0;top:0;width:46px;height:46px;margin:-23px 0 0 -23px;pointer-events:none;display:none;border-radius:50%;background:rgba(18,13,43,.82);box-shadow:inset 0 0 0 2.5px #cfd3ff;place-items:center}
 .jv-arrow em{position:absolute;inset:-11px;display:block}
@@ -578,6 +581,12 @@ window.HKJellyVs = (function () {
     mutedFn = typeof opts.isMuted === "function" ? opts.isMuted : () => false;
     const { all, food, M, C: Cc, burst, renderer, camera, scene } = w;
     const J = [all[0], all[1]], boss = all[2], friends = all.slice(3);
+    // 머리 위 이름표의 프로필 사진 — 사진이 없으면 이름 첫 글자 동그라미
+    const face = (p, name) => {
+      const url = p && typeof p.avatarUrl === "string" && /^\/(api|assets)\//.test(p.avatarUrl) ? p.avatarUrl : "";
+      const ch = esc(String(name || "?").trim().charAt(0) || "?");
+      return `<span class="jv-face">${ch}${url ? `<img src="${esc(url)}" alt="" onerror="this.style.display='none'">` : ""}</span>`;
+    };
     const names = [mode === "guest" ? (opts.rival && opts.rival.name) || "상대" : (opts.me && opts.me.name) || "나", mode === "guest" ? (opts.me && opts.me.name) || "나" : (opts.rival && opts.rival.name) || (mode === "cpu" ? "컴퓨터" : "상대")];
     const hex = (n) => `#${n.toString(16).padStart(6, "0")}`;
 
@@ -596,7 +605,7 @@ window.HKJellyVs = (function () {
         <button type="button" class="jv-dash" data-v="dash" aria-label="대시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg><span class="jv-pips" data-v="pips"><i></i><i></i><i></i></span>대시</button>
         <div class="jv-keys">움직이기 <kbd>WASD</kbd> <kbd>방향키</kbd> · 대시 <kbd>Space</kbd> · 멈춤 <kbd>P</kbd></div>
         <div class="jv-pops" data-v="pops"></div>
-        <div class="jv-tag me" data-v="tagme">나</div><div class="jv-tag" data-v="tagrv">${esc(names[rv])}</div>
+        <div class="jv-tag me" data-v="tagme">${face(opts.me, (opts.me && opts.me.name) || "나")}나</div><div class="jv-tag" data-v="tagrv">${face(opts.rival, names[rv])}${esc(names[rv])}</div>
         <div class="jv-arrow" data-v="arrow"><em></em><span></span></div>
         <div class="jv-banner" data-v="banner"></div><div class="jv-big" data-v="big"></div><div class="jv-hold" data-v="hold"></div>
       </div><div class="jv-stick" data-v="stick"><i></i></div>`;
