@@ -1005,6 +1005,7 @@
           pl.fall = {
             t: 0,
             nL, out: 1.4, // 몸통 기준 면 바깥쪽 · 그쪽 속도(점점 줄어듦)
+            sp: 2.6, coast: 0, coastDir: null, world: false, rad: (pl.mesh.geometry.computeBoundingSphere(), pl.mesh.geometry.boundingSphere.radius), // 몸통을 벗어날 때까지의 속도 · 벗어난 뒤 이어서 서서히 줄어드는 속도
             gy: 0, // 세상 기준 아래로 떨어지는 속도
             // 회전은 판 면 안에서만(면 바깥 방향 축으로) — 아무 축으로 기울면 판 끝이 몸통으로 파고든다
             w: nL.clone().applyQuaternion(pl.holder.quaternion.clone().invert()).normalize(), ws: (Math.random() < 0.5 ? -1 : 1) * (0.5 + Math.random() * 0.4),
@@ -1167,26 +1168,49 @@
           // 판 — 매달린 판 흔들림(용수철) · 덮인 나사를 누르면 떨림 · 떨어지는 판
           const floorY = three && V === three.V ? three.floor.position.y : -V.R;
           for (const pl of V.plates) {
+            if (pl.fall && pl.fall.world) {
+              // 몸통에서 충분히 멀어진 판 — 세상 기준으로 그냥 아래로(몸통이 돌아도 따라 돌지 않고 제자리에서 자연스럽게 떨어진다)
+              const f = pl.fall;
+              f.t += dt;
+              f.out *= 1 - 2.5 * dt;
+              f.gy += 9 * dt;
+              pl.holder.position.y -= f.gy * dt;
+              pl.holder.position.addScaledVector(f.outW, Math.max(f.out, 0.25) * dt);
+              if (f.coast > 0 && f.coastW) { pl.holder.position.addScaledVector(f.coastW, f.coast * dt); f.coast *= 1 - 2.6 * dt; if (f.coast < 0.04) f.coast = 0; }
+              pl.holder.rotateOnAxis(f.w, f.ws * dt);
+              const wp = pl.holder.getWorldPosition(new T3.Vector3());
+              const off = three && V === three.V ? wp.clone().project(three.camera).y < -1.35 : wp.y < floorY - V.R * 2.5;
+              if (off || f.t > 4) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
+              busy = true;
+              continue;
+            }
             if (pl.fall) {
               const f = pl.fall;
               f.t += dt;
               // 면 바깥쪽으로 빠지는 힘은 금방 줄고(몸통 기준), 아래로는 점점 빨라진다(세상 기준 → 몸통 기준으로 바꿔 더함)
               f.out *= 1 - 2.5 * dt;
+              // 끊김 없이 — 처음엔 살며시 움직이기 시작하고, 몸통을 벗어난 뒤에도 뚝 멈추지 않고 그 방향으로 서서히 느려지며 떨어진다
+              const e = Math.min(1, f.t / 0.16), ease = e * e * (3 - 2 * e);
               let gravity = true;
               if (f.clear > 0) {
                 // 옆면 판 — 몸통에서 가장 튀어나온 곳보다 바깥으로 빠질 때까지는 떨어지지 않는다
-                const step = Math.min(f.clear, 3.4 * dt);
+                const step = Math.min(f.clear, f.sp * ease * dt);
                 pl.holder.position.addScaledVector(f.nL, step);
                 f.clear -= step;
                 gravity = false;
+                if (f.clear <= 1e-4) { f.clear = 0; f.coast = f.sp; f.coastDir = f.nL; }
               }
               if (f.slide) {
                 // 윗면 판 — 몸통 가장자리를 다 넘을 때까지 면을 따라 미끄러진다(몸통 기준 거리, 넘으면 그때부터 떨어짐)
-                const step = Math.min(f.left, 3.2 * dt);
+                const step = Math.min(f.left, f.sp * ease * dt);
                 pl.holder.position.addScaledVector(f.slide, step);
                 f.left -= step;
                 gravity = false;
-                if (f.left <= 1e-4) { f.away = f.slide; f.slide = null; } // 다 넘은 뒤에는 이 방향으로만 멀어진다
+                if (f.left <= 1e-4) { f.away = f.slide; f.coast = f.sp; f.coastDir = f.slide; f.slide = null; } // 다 넘은 뒤에는 이 방향으로만 멀어진다
+              } else if (f.coast > 0) {
+                pl.holder.position.addScaledVector(f.coastDir, f.coast * dt);
+                f.coast *= 1 - 2.6 * dt;
+                if (f.coast < 0.04) f.coast = 0;
               }
               if (gravity) f.gy += 9 * dt;
               const qInv = V.content.getWorldQuaternion(new T3.Quaternion()).invert();
@@ -1195,9 +1219,21 @@
               const awayDir = f.top ? f.away : f.nL;
               if (awayDir) { const dn = down.dot(awayDir); if (dn < 0) down.addScaledVector(awayDir, -dn); }
               pl.holder.position.addScaledVector(f.nL, Math.max(f.out, 0.25) * dt).addScaledVector(down, dt);
-              pl.holder.rotateOnAxis(f.w, f.ws * dt);
+              pl.holder.rotateOnAxis(f.w, f.ws * ease * dt);
+              // 몸통을 둘러싼 공 밖으로 다 나가면 세상 기준으로 넘긴다 — 그 뒤로는 몸통이 어떻게 돌아도 닿지 않는다
+              if (gravity && V.pivot.parent) {
+                const cW = V.content.getWorldPosition(new T3.Vector3()), pW = pl.mesh.localToWorld(pl.mesh.geometry.boundingSphere.center.clone());
+                const sc = V.content.getWorldScale(new T3.Vector3()).x;
+                if (pW.distanceTo(cW) > (V.R + f.rad) * sc) {
+                  const qW = V.content.getWorldQuaternion(new T3.Quaternion());
+                  f.outW = f.nL.clone().applyQuaternion(qW);
+                  f.coastW = f.coastDir ? f.coastDir.clone().applyQuaternion(qW) : null;
+                  V.pivot.parent.attach(pl.holder);
+                  f.world = true;
+                }
+              }
               const wy = pl.holder.getWorldPosition(new T3.Vector3()).y;
-              if (wy < floorY - V.R * 2.5 || f.t > 3) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
+              if (wy < floorY - V.R * 2.5 || f.t > 4) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
               busy = true;
               continue;
             }
@@ -1451,20 +1487,26 @@
           drawHud();
           draw();
           sfx("powerup");
-          setTimeout(() => {
+          // 마지막 판이 다 떨어져 나간 뒤에 몸통이 돌고(축하) 다음 단계로 — 떨어지던 판이 도는 몸통에 휘둘리거나 새 물건이 나오며 사라지지 않게
+          const falling = () => three && three.V.plates.some((q) => q.fall && !q.fall.world);
+          const t0 = performance.now();
+          const celebrate = () => {
+            if (state !== "play" && state !== "pause") return;
+            if (falling() && performance.now() - t0 < 2200) { clearTimer = setTimeout(celebrate, 60); return; }
             if (three) { view.pulse = 1; view.shake = Math.max(view.shake, 0.12); burst(new T3.Vector3(0, 0, 0), 46, false); }
             floatText(`${fmt(level)}단계 완료! +${fmt(base + bonus)}`);
             sparks(boardEl.clientWidth / 2, boardEl.clientHeight * 0.42, 10);
-          }, 380);
-          if (bonus) setTimeout(() => floatText(`${fmt(history.length)}수 · 절약 보너스 +${fmt(bonus)}`, true, 0.58), 580);
+            if (bonus) setTimeout(() => floatText(`${fmt(history.length)}수 · 절약 보너스 +${fmt(bonus)}`, true, 0.58), 200);
+            clearTimer = setTimeout(() => {
+              if (state !== "play" && state !== "pause") return;
+              level++;
+              clearing = false;
+              loadLevel();
+              sfx("whoosh");
+            }, CLEAR_MS);
+          };
           clearTimeout(clearTimer);
-          clearTimer = setTimeout(() => {
-            if (state !== "play" && state !== "pause") return;
-            level++;
-            clearing = false;
-            loadLevel();
-            sfx("whoosh");
-          }, CLEAR_MS + 380);
+          clearTimer = setTimeout(celebrate, 120);
         }
 
         // ── 조작 ───────────────────────────────────────────────
