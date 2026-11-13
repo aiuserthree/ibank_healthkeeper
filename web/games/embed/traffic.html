@@ -105,7 +105,7 @@ function(t,e){"object"==typeof exports&&"undefined"!=typeof module?e(exports):"f
 (()=>{
 'use strict';
 const $=id=>document.getElementById(id);
-// 헬스키퍼 아케이드 창 안(?hk=1 · 부모 창 안)이면 「3분 동안 몇 단계나」 모드
+// 헬스키퍼 아케이드 창 안(?hk=1 · 부모 창 안)이면 「단계마다 늘어나는 시간 안에 몇 단계나」 모드
 const inFrame=window.parent!==window;
 const ARC=/[?&]hk=1(&|$)/.test(location.search)||inFrame;
 const HK=location.origin;
@@ -547,8 +547,9 @@ function* makeCityGen(N){
 
 /* ---------- game state ---------- */
 let N=5,cars=[],home=[],active=[],remaining=0,bumps=0,combo=0,bestCombo=0,earned=0,seq=0,locked=false,shake=0,hintCar=null,hintT=0;
-/* ---------- 아케이드 모드: 3분 동안 몇 단계나 ---------- */
-const ROUND=180;
+/* ---------- 아케이드 모드: 단계마다 시간(1단계 1분, 한 단계마다 +5초, 최대 2분) · 몇 단계나 ---------- */
+const stageTime=L=>Math.min(120,60+(L-1)*5);
+const ROUND=stageTime(1);
 let mode=ARC?'menu':'free'; // menu · play · over (아케이드) / free (본체 주소를 직접 열 때)
 let paused=false,timeLeft=ROUND,cleared=0,lvlGain=0,hintUsed=false,clearIn=0,nextIn=0,reported=false;
 const wx=c=>c-(N-1)/2;
@@ -579,10 +580,16 @@ const fmtTime=s=>{s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(
 function setVal(id,v){const el=$(id);v=String(v);if(el.textContent===v)return;el.textContent=v;el.classList.remove('bump');void el.offsetWidth;el.classList.add('bump');}
 function hud(){
   setVal('lvl',save.level);setVal('left',remaining);setVal('coins',fmt(save.coins));
-  if(ARC){$('time').textContent=fmtTime(timeLeft);$('timePill').classList.toggle('warn',mode==='play'&&timeLeft<=30);}
+  if(ARC){$('time').textContent=fmtTime(timeLeft);$('timePill').classList.toggle('warn',mode==='play'&&timeLeft<=15);}
 }
 function live(){if(ARC&&mode==='play')hk({type:'hk:live',score:Math.max(0,Math.round(save.coins))});}
 function setCombo(){const el=$('combo');if(combo>=2){el.textContent='콤보 ×'+combo;el.classList.add('on');}else el.classList.remove('on');}
+function stageNote(){ // 새 단계 시작 때 그 단계 시간을 잠깐 알려 준다
+  const t=stageTime(save.level),m=Math.floor(t/60),sc=t%60;
+  const el=document.createElement('div');el.className='pop';el.style.fontSize='18px';
+  el.textContent=save.level+'단계 · '+[m?m+'분':'',sc?sc+'초':''].filter(Boolean).join(' ');
+  el.style.left='50%';el.style.top='24%';document.body.appendChild(el);setTimeout(()=>el.remove(),900);
+}
 function popup(car,text,bad){
   const v=car.g.position.clone();v.y=1;v.project(camera);
   const el=document.createElement('div');el.className='pop'+(bad?' bad':'');el.textContent=text;
@@ -702,7 +709,8 @@ function levelClear(){
 function showMenu(){
   showCard('<h1>차 빼기 대작전 3D</h1><ol>'+
     '<li>차를 누르면 화살표 쪽으로 달려 나가요. 앞이 막힌 차는 부딪히고 돌아와요.</li>'+
-    '<li>3분 동안 단계를 몇 개나 깨는지 겨뤄요. 매 판 1단계부터 시작해요.</li>'+
+    '<li>단계마다 시간이 새로 주어져요 — 1단계 1분, 한 단계 오를 때마다 5초씩 늘어 최대 2분. 시간 안에 못 깨면 끝나요.</li>'+
+    '<li>단계를 몇 개나 깨는지 겨뤄요. 매 판 1단계부터 시작해요.</li>'+
     '<li>차를 뺄 때 · 단계를 깰 때 점수를 받고, 한 번도 안 부딪히면 퍼펙트 보너스가 있어요.</li>'+
     '</ol><button class="primary" data-act="start">시작</button>');
 }
@@ -722,7 +730,7 @@ function endRun(){
   mode='over';locked=true;clearIn=0;nextIn=0;hintCar=null;paused=false;$('pauseOv').classList.remove('on');
   $('combo').classList.remove('on');hud();
   const score=Math.max(0,Math.round(save.coins));
-  showCard('<h1>시간 끝!</h1><div class="big">'+fmt(score)+'점</div><p class="sub">깬 단계 '+fmt(cleared)+'개</p><button class="primary" data-act="again">다시 하기</button>');
+  showCard('<h1>시간 끝!</h1><div class="big">'+fmt(score)+'점</div><p class="sub">깬 단계 '+fmt(cleared)+'개 · '+fmt(save.level)+'단계를 시간 안에 못 깼어요</p><button class="primary" data-act="again">다시 하기</button>');
   if(!reported){reported=true;hk({type:'hk:score',score});}
   [784,659,523,392].forEach((f,i)=>setTimeout(()=>tone(f,0.22,'triangle',0.1),i*120));
 }
@@ -821,11 +829,11 @@ function frame(now){
     stepPool(smoke,dt,'smoke');stepPool(sparks,dt,'spark');stepPool(confetti,dt,'conf');
     if(!active.length&&clearIn<=0)stepCityJobs(); // 차가 움직이지 않을 때만 조금씩
     if(clearIn>0){clearIn-=dt;if(clearIn<=0){clearIn=0;levelClear();}}
-    if(nextIn>0){nextIn-=dt;if(nextIn<=0){nextIn=0;if(mode==='play'){hideCard();buildLevel();}}}
-    if(mode==='play'){
+    if(nextIn>0){nextIn-=dt;if(nextIn<=0){nextIn=0;if(mode==='play'){timeLeft=stageTime(save.level);hideCard();buildLevel();hud();stageNote();}}}
+    if(mode==='play'&&remaining>0&&nextIn<=0){ // 단계를 깨고 넘어가는 동안은 시간이 멈춘다
       timeLeft-=Math.min(0.25,raw);
       if(timeLeft<=0){timeLeft=0;endRun();}
-      else{const s=fmtTime(timeLeft);if($('time').textContent!==s){$('time').textContent=s;$('timePill').classList.toggle('warn',timeLeft<=30);}}
+      else{const s=fmtTime(timeLeft);if($('time').textContent!==s){$('time').textContent=s;$('timePill').classList.toggle('warn',timeLeft<=15);}}
     }
   }
   const b=camera.userData.base;

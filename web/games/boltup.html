@@ -314,7 +314,8 @@
         // ── 퍼즐 엔진 끝 ── BU-CORE-END
 
         // ── 상수 ───────────────────────────────────────────────
-        const TIME_LIMIT = 180;          // 3분
+        // 단계마다 시간 — 1단계 1분, 한 단계 오를 때마다 5초씩 늘어 13단계부터 2분(뒤 단계는 색 · 너트가 많다)
+        const stageTime = (lv) => Math.min(120, 60 + (lv - 1) * 5);
         const UNDO_PER_STAGE = 3;
         const MAX_SCORE = 1_000_000;
         const T_LIFT = 180, T_FLY = 200, T_DOWN = 220; // 너트 애니메이션 — 돌려 빼기 · 옮기기 · 돌려 끼우기
@@ -403,7 +404,7 @@
         let clearing = false;
         let hidTipShown = false;
         let nextPuzzle = null, nextTimer = 0, clearTimer = 0;
-        let timeLeftMs = TIME_LIMIT * 1000, lastTick = 0, rafId = 0, lastSec = 0;
+        let timeLeftMs = stageTime(1) * 1000, lastTick = 0, rafId = 0, lastSec = 0;
         let els = [];          // 볼트 단추
         let caps = [];         // 볼트마다 캡
         let geo = [];          // 볼트 자리 { x(가운데), plate(받침 위 끝 = 맨 아래 너트 바닥), tip(기둥 끝) } — 판 기준 px
@@ -646,9 +647,9 @@
         function drawTime() {
           const sec = Math.ceil(timeLeftMs / 1000);
           timeEl.textContent = `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-          timeBar.firstElementChild.style.width = `${clamp((timeLeftMs / (TIME_LIMIT * 1000)) * 100, 0, 100)}%`;
-          timeBar.classList.toggle("is-low", sec <= 20);
-          timeChip.classList.toggle("is-low", sec <= 20);
+          timeBar.firstElementChild.style.width = `${clamp((timeLeftMs / (stageTime(level) * 1000)) * 100, 0, 100)}%`;
+          timeBar.classList.toggle("is-low", sec <= 15);
+          timeChip.classList.toggle("is-low", sec <= 15);
         }
 
         // ── 단계 ───────────────────────────────────────────────
@@ -703,8 +704,11 @@
             if (state !== "play" && state !== "pause") return;
             level++;
             clearing = false;
+            timeLeftMs = stageTime(level) * 1000; // 새 단계는 시간을 새로(조금 더 길게)
+            lastSec = stageTime(level);
             loadLevel();
             sfx("whoosh");
+            { const t = stageTime(level), m = Math.floor(t / 60), sc = t % 60; floatText(`${fmt(level)}단계 · ${[m ? `${m}분` : "", sc ? `${sc}초` : ""].filter(Boolean).join(" ")}`, true, 0.2); }
           }, CLEAR_MS + delay);
         }
 
@@ -852,8 +856,9 @@
         function loop() {
           if (state !== "play") return;
           const t = performance.now();
-          timeLeftMs -= clamp(t - lastTick, 0, 250);
+          const step = clamp(t - lastTick, 0, 250);
           lastTick = t;
+          if (!clearing) timeLeftMs -= step; // 단계를 깨고 넘어가는 동안은 시간이 멈춘다
           const sec = Math.ceil(timeLeftMs / 1000);
           if (sec !== lastSec) {
             lastSec = sec;
@@ -927,7 +932,7 @@
           solvedCount = 0;
           clearing = false;
           hidTipShown = false;
-          timeLeftMs = TIME_LIMIT * 1000;
+          timeLeftMs = stageTime(1) * 1000;
           nextPuzzle = null;
           loadLevel();
           showCover("ready");
@@ -967,7 +972,8 @@
                 <li>볼트를 누르면 맨 위 너트(같은 색은 묶음째)가 빠져요. 끼울 볼트를 눌러요.</li>
                 <li>빈 볼트나 맨 위가 같은 색인 볼트에만, 자리가 남은 만큼 끼워져요.</li>
                 <li>물음표 너트는 위를 치우면 색이 보여요.</li>
-                <li>3분 동안 단계를 깰수록 점수가 쌓여요. 적은 수로 깨면 보너스!</li>
+                <li>단계마다 시간이 새로 주어져요 — 1단계 1분, 한 단계 오를 때마다 5초씩 늘어 최대 2분. 시간 안에 못 깨면 끝나요.</li>
+                <li>단계를 깰수록 점수가 쌓여요. 적은 수로 깨면 보너스!</li>
               </ol></div>
               <p class="gm-bu__keys">되돌리기는 단계마다 ${UNDO_PER_STAGE}번 · 빈 볼트 +1은 단계마다 한 번(그 단계 점수 절반)</p>
               <button type="button" class="gm-bu__go" data-go>${HKUI.icon("play", 18, "currentColor")} 시작</button>`;
