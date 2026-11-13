@@ -887,6 +887,7 @@
           for (const [x, y, z, sx, sy, sz] of obj.boxes) bb.union(new T3.Box3(new T3.Vector3(x - sx / 2, y - sy / 2, z - sz / 2), new T3.Vector3(x + sx / 2, y + sy / 2, z + sz / 2)));
           const center = bb.getCenter(new T3.Vector3());
           V.R = bb.getSize(new T3.Vector3()).length() / 2 + 0.6;
+          { const sz = bb.getSize(new T3.Vector3()); V.Rh = Math.hypot(sz.x, sz.z) / 2 + 0.45; } // 옆으로 돌려도(좌우 회전) 가로로 차지하는 반지름
           const lvGroup = new T3.Group();
           V.level = lvGroup;
           V.content.add(lvGroup);
@@ -1109,7 +1110,9 @@
           const cam = three.camera, R = three.V.R;
           const vf = (cam.fov * Math.PI) / 180;
           const hf = 2 * Math.atan(Math.tan(vf / 2) * cam.aspect);
-          const D = (R / Math.sin(Math.min(vf, hf) / 2)) * 0.95;
+          // 가로는 좌우로 돌려도 넘지 않는 반지름(Rh), 세로는 전체 반지름(R)으로 따로 맞춘다 — 휴대폰처럼 좁은 화면에서 물건이 더 크게
+          const Rh = Math.min(R, three.V.Rh || R);
+          const D = Math.max(Rh / Math.sin(hf / 2), R / Math.sin(vf / 2) * 0.95);
           three.camDist = D;
           cam.near = Math.max(0.1, D - R * 3);
           cam.far = D + R * 4;
