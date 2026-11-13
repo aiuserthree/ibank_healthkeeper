@@ -13,6 +13,7 @@ from app.models import Member
 from app.services import game as game_service
 from app.services import escape as escape_service
 from app.services import match as match_service
+from app.services import party as party_service
 
 router = APIRouter(prefix="/play", tags=["play"])
 
@@ -119,6 +120,86 @@ async def match_inbox(
 ):
     """게임별 내 차례인 판과 받은 도전 수 — 아케이드 알림."""
     return {"data": await match_service.inbox(db, member)}
+
+
+class PartyCreate(BaseModel):
+    game: str = "bumpervs"
+    memberIds: list[int]
+    track: int = 1
+
+
+class PartyInvite(BaseModel):
+    memberIds: list[int]
+
+
+class PartyStart(BaseModel):
+    playerIds: list[int]
+    track: int = 1
+
+
+class PartyReport(BaseModel):
+    data: dict
+
+
+@router.get("/party")
+async def party_overview(
+    game: str = Query("bumpervs", max_length=30),
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    """여러 명 대전 — 받은 초대 · 내 대기실 · 최근 끝난 판."""
+    return {"data": await party_service.overview(db, member, game)}
+
+
+@router.post("/party")
+async def party_create(
+    body: PartyCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    data, notify = await party_service.create(db, member, body.game, body.memberIds, body.track)
+    _deliver(background_tasks, notify)
+    return {"data": data}
+
+
+@router.get("/party/{party_id}")
+async def party_detail(party_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    return {"data": await party_service.detail(db, member, party_id)}
+
+
+@router.post("/party/{party_id}/invite")
+async def party_invite(
+    party_id: int,
+    body: PartyInvite,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+    member: Member = Depends(get_current_active_member),
+):
+    data, notify = await party_service.invite(db, member, party_id, body.memberIds)
+    _deliver(background_tasks, notify)
+    return {"data": data}
+
+
+@router.post("/party/{party_id}/accept")
+async def party_accept(party_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    return {"data": await party_service.accept(db, member, party_id)}
+
+
+@router.post("/party/{party_id}/decline")
+async def party_decline(party_id: int, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    """초대 거절 · 대기실 나가기 · (연 사람이면) 대기실 닫기 — 업무 시간에도 할 수 있다."""
+    return {"data": await party_service.decline(db, member, party_id)}
+
+
+@router.post("/party/{party_id}/start")
+async def party_start(party_id: int, body: PartyStart, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    return {"data": await party_service.start(db, member, party_id, body.playerIds, body.track)}
+
+
+@router.post("/party/{party_id}/report")
+async def party_report(party_id: int, body: PartyReport, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
+    return {"data": await party_service.report(db, member, party_id, body.data)}
 
 
 @router.get("/match/members")

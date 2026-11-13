@@ -11,7 +11,7 @@
 //                                    text: 화면에 띄울 말 · reason: 서버가 알린 이유("REPLACED" 등)
 //     onStatus(state),               "connecting" · "open" · "retry" · "closed"
 //     onError(code),                 서버가 내 메시지를 버렸을 때 — "TOO_BIG" · "BAD_MESSAGE" · "RATE_LIMIT"
-//     url,                           (개발용) 주소를 직접 줄 때. 예: "ws://localhost:8100/api/play/rt/12"
+//     url,                           주소를 직접 줄 때. 여러 명 대전은 "/api/play/rt/party/{id}" (wss://주소 포함). 예: "ws://localhost:8100/api/play/rt/12"
 //     checkUrl,                      (개발용) 거절 이유를 물을 주소. 안 주면 url 에서 만든다(/api/play/rt-check/{id}), null 이면 묻지 않음
 //   });
 //   rt.send(obj) → true/false        보냈으면 true. false 면 안 보낸 것이다 — 한 번뿐인 일(득점 등)은 다음 상태에도 넣어 다시 맞추기.
@@ -75,9 +75,9 @@ window.HKRt = (function () {
     }
   }
 
-  // ws(s)://주소/api/play/rt/{id} → http(s)://주소/api/play/rt-check/{id}
+  // ws(s)://주소/api/play/rt/{id} → http(s)://주소/api/play/rt-check/{id} (여러 명 통로 rt/party/{id} → rt-check/party/{id})
   function checkUrlFor(url) {
-    const m = /^ws(s?):\/\/([^/?#]+)\/api\/play\/rt\/([^/?#]+)$/.exec(String(url));
+    const m = /^ws(s?):\/\/([^/?#]+)\/api\/play\/rt\/((?:party\/)?[^/?#]+)$/.exec(String(url));
     return m ? "http" + m[1] + "://" + m[2] + "/api/play/rt-check/" + m[3] : null;
   }
 
@@ -268,9 +268,12 @@ window.HKRt = (function () {
             info.role = msg.role === "guest" ? "guest" : "host";
             info.peerHere = !!msg.peerHere;
             setState("open");
-            call(opts.onHello, { role: info.role, peerHere: info.peerHere });
+            // 여러 명 통로는 me(내 회원 id) · here(주인: 와 있는 손님 id 들)도 준다
+            call(opts.onHello, { role: info.role, peerHere: info.peerHere, me: msg.me, here: Array.isArray(msg.here) ? msg.here : undefined });
             break;
           case "peer":
+            // 여러 명 통로에서 주인이 받는 소식은 id(그 손님)가 있다 — 두 번째 인자로 넘긴다(1:1 은 그대로 here 하나)
+            if (typeof msg.id === "number") { call(opts.onPeer, !!msg.here, msg.id); break; }
             info.peerHere = !!msg.here;
             call(opts.onPeer, info.peerHere);
             break;

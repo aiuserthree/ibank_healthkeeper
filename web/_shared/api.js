@@ -78,6 +78,15 @@ window.HKApi = (function () {
     matchCreate: (opponentId, game) => request("/play/match", { method: "POST", body: JSON.stringify({ opponentId, game }) }),
     matchBot: (level, game) => request("/play/match/bot", { method: "POST", body: JSON.stringify({ level, game }) }),
     matchDetail: (id) => request(`/play/match/${id}`),
+    // 여러 명 대전(선다운 범퍼스 최대 6명) — 초대 · 대기실 · 출발 · 결과
+    partyOverview: (game) => request(`/play/party?game=${encodeURIComponent(game)}`),
+    partyCreate: (game, memberIds, track) => request("/play/party", { method: "POST", body: JSON.stringify({ game, memberIds, track }) }),
+    partyDetail: (id) => request(`/play/party/${id}`),
+    partyInvite: (id, memberIds) => request(`/play/party/${id}/invite`, { method: "POST", body: JSON.stringify({ memberIds }) }),
+    partyAccept: (id) => request(`/play/party/${id}/accept`, { method: "POST" }),
+    partyDecline: (id) => request(`/play/party/${id}/decline`, { method: "POST" }),
+    partyStart: (id, playerIds, track) => request(`/play/party/${id}/start`, { method: "POST", body: JSON.stringify({ playerIds, track }) }),
+    partyReport: (id, data) => request(`/play/party/${id}/report`, { method: "POST", body: JSON.stringify({ data }) }),
     // 상대 수를 기다린다 — 판이 바뀌면 바로, 아니면 20초 뒤 돌아온다
     matchWait: (id, seq, status, signal) =>
       request(`/play/match/${id}/wait?seq=${seq}&status=${encodeURIComponent(status)}`, { signal }),

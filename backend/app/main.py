@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.database import AsyncSessionLocal, close_neo4j, close_redis
-from app.routers import admin, auth, health, play, realtime_ws, reservation
+from app.routers import admin, auth, health, play, realtime_party, realtime_ws, reservation
 from app.routers import raid
 from app.routers import mgmt
 from app.routers import internal
@@ -173,6 +173,7 @@ def create_app() -> FastAPI:
     app.include_router(reservation.router, prefix="/api")
     app.include_router(admin.router, prefix="/api")
     app.include_router(play.router, prefix="/api")
+    app.include_router(realtime_party.router, prefix="/api")  # 여러 명 실시간 연결 /api/play/rt/party/{party_id}
     app.include_router(realtime_ws.router, prefix="/api")  # 1:1 실시간 연결(웹소켓) /api/play/rt/{match_id}
     app.include_router(raid.router, prefix="/api")  # 부서 대항 레이드 /api/play/raid
     app.include_router(mgmt.router, prefix="/api")  # 매니지먼트 게임 저장 /api/play/mgmt

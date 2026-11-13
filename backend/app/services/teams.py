@@ -1363,6 +1363,27 @@ async def enqueue_match_cancelled_notice(db: AsyncSession, *, game: str, match_i
 
 
 
+def party_page_url(game: str, party_id: int) -> str:
+    return f"{get_settings().app_base_url.rstrip('/')}/games/{game}#p{party_id}"
+
+
+def render_party_invited_body(*, game: str, party_id: int, target: Member, host: Member, deadline_at: Optional[datetime]) -> str:
+    name = MATCH_GAME_NAME.get(game, "대전")
+    url = party_page_url(game, party_id)
+    due = f"{_datetime_label(deadline_at)}까지 출발하지 않으면 대기실이 닫혀요. " if deadline_at else ""
+    return (
+        f"<p><strong>[헬스키퍼]</strong> {name} 여러 명 경주 초대</p>"
+        f"<p>{html.escape(target.name)}님, {_who(host)}이 여러 명이 함께 달리는 {name}에 초대했어요.</p>"
+        f"<p>{due}들어가기는 아케이드가 열린 시간에만 할 수 있어요.</p>"
+        f'<p><a href="{url}">대기실 열기</a>에서 들어가거나 거절해 주세요.</p>'
+    )
+
+
+async def enqueue_party_invited_notice(db: AsyncSession, *, game: str, party_id: int, host: Member, target: Member, deadline_at: Optional[datetime]) -> list[int]:
+    body = render_party_invited_body(game=game, party_id=party_id, target=target, host=host, deadline_at=deadline_at)
+    return await _enqueue_match_notice(db, kind=TeamsMessageType.MATCH_CHALLENGED, to=target, body=body, key=f"party-invited:{party_id}:{target.id}")
+
+
 # ── 2인 협동 게임(방탈출 · 분식집) ───────────────────────────────
 # room 은 협동 방 정보 — title · label(방탈출/협동 게임) · page(화면 주소) · blurb(한 줄 소개) · limit_sec
 

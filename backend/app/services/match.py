@@ -748,6 +748,15 @@ async def inbox(db: AsyncSession, member: Member) -> dict:
             "myTurn": sum(1 for m in mine if _my_turn_safe(m, member.id)),
             "incoming": sum(1 for m in mine if m.status == "PENDING" and m.opponent_id == member.id),
         }
+    # 여러 명 대전 초대(선다운 범퍼스 대전) — 받은 도전 수에 더한다
+    from app.services import party as party_service
+
+    for game in party_service.PARTY_GAMES:
+        if game in out:
+            try:
+                out[game]["incoming"] += await party_service.incoming_count(db, member, game)
+            except Exception:  # noqa: BLE001 — 여러 명 대전에 문제가 있어도 다른 알림은 그대로
+                logger.exception("party inbox failed")
     return out
 
 
@@ -765,6 +774,11 @@ async def _ranking(db: AsyncSession, member: Member, game: str) -> dict:
         day = m.finished_at.astimezone(KST).date()
         wins.setdefault(m.winner_id, set()).add((loser, day))
         losses.setdefault(loser, set()).add((m.winner_id, day))
+    from app.services import party as party_service
+
+    if game in party_service.PARTY_GAMES:  # 여러 명 대전 — 1등만 1승(같은 사람들과 하루에 여러 번 이겨도 1승), 패는 세지 않는다
+        for winner_id, keys in (await party_service.ranking_wins(db, game)).items():
+            wins.setdefault(winner_id, set()).update(keys)
     people = {i: p for i, p in (await _people(db, set(wins) | set(losses))).items() if p.status == MemberStatus.ACTIVE}
     table = [{**_person(p), "wins": len(wins.get(i, ())), "losses": len(losses.get(i, ()))} for i, p in people.items()]
     table.sort(key=lambda r: (-r["wins"], r["losses"], r["name"]))

@@ -5,7 +5,7 @@ from app.models.base import Base
 from app.models.cycle import ReservationCycle
 from app.models.coupon import Coupon, CouponSource, CouponStatus
 from app.models.email_token import EmailVerificationToken
-from app.models.game import ArcadeStamp, EscapeRoom, GameMatch, GamePlay, GameRequest, MgmtSave
+from app.models.game import ArcadeStamp, EscapeRoom, GameMatch, GameParty, GamePartySeat, GamePlay, GameRequest, MgmtSave
 from app.models.enums import (
     AdminRole,
     ConfirmedBy,
@@ -69,6 +69,8 @@ __all__ = [
     "ArcadeStamp",
     "EscapeRoom",
     "GameMatch",
+    "GameParty",
+    "GamePartySeat",
     "GamePlay",
     "GameRequest",
     "Coupon",

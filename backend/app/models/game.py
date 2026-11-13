@@ -42,6 +42,46 @@ class GameMatch(Base):
     )
 
 
+class GameParty(Base):
+    """여러 명 대전 한 판(지금은 선다운 범퍼스 대전만) — 주인이 동료 여러 명(최대 5명)을 초대해 함께 실시간 경주.
+    OPEN(대기실 · 초대 받는 중) → RACING(출발 — 달리는 사람이 정해짐) → DONE, 또는 CANCELLED · EXPIRED.
+    자리(누가 초대 받았고 들어왔는지)는 game_party_seat, 경주 결과 보고 · 최종 결과는 state(JSON)."""
+
+    __tablename__ = "game_party"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    game: Mapped[str] = mapped_column(String(30), nullable=False)
+    host_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)  # OPEN · RACING · DONE · CANCELLED · EXPIRED
+    state: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    winner_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    end_reason: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    deadline_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("ix_game_party_game_status", "game", "status"),)
+
+
+class GamePartySeat(Base):
+    """여러 명 대전의 자리 — 주인(HOST) · 초대 받음(INVITED) · 들어옴(JOINED) · 거절(DECLINED) · 나감(LEFT)."""
+
+    __tablename__ = "game_party_seat"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    party_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("game_party.id", ondelete="CASCADE"), nullable=False)
+    member_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[str] = mapped_column(String(10), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("party_id", "member_id", name="uq_game_party_seat"),
+        Index("ix_game_party_seat_member", "member_id", "status"),
+    )
+
+
 class GamePlay(Base):
     """점심 라운지 게임 한 판 기록 — 순위는 기간(오늘·이번 주·전체)별 회원 최고 기록으로 계산."""
 
