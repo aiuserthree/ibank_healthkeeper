@@ -127,13 +127,14 @@
         </div>`;
     }
 
-    // 이번 주(월요일부터, 한국 날짜)에 아케이드에 들어온 게임 — 서버 GAMES 의 added(들어온 날)
-    function weekStartKst() {
+    // 새 게임 — 아케이드에 들어온 지 2주(오늘 포함 14일) 안의 게임. 서버 GAMES 의 added(들어온 날, 한국 날짜)
+    const NEW_DAYS = 14;
+    function newSinceKst() {
       const t = HKPlay.todayKst(), d = new Date(t + "T00:00:00Z");
-      d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+      d.setUTCDate(d.getUTCDate() - (NEW_DAYS - 1));
       return d.toISOString().slice(0, 10);
     }
-    const isNewThisWeek = (g) => !!(g.addedOn && g.addedOn >= weekStartKst());
+    const isNewThisWeek = (g) => !!(g.addedOn && g.addedOn >= newSinceKst());
     const mdDot = (iso) => `${Number(iso.slice(5, 7))}.${Number(iso.slice(8, 10))}`;
 
     // 게임 타일 — 게임 찾기 결과에 쓴다. 바탕은 게임 색(그림이 늦거나 없을 때 보인다)
@@ -163,7 +164,7 @@
       return lead;
     }
 
-    // 새 게임(화면 문구는 「새로 나왔어요」 — 「이번 주」라고 쓰지 않는다) — 이번 주 월요일부터 들어온 게임을 최근 들어온 순으로. 없으면 영역을 숨긴다. 8개 넘으면 「더 보기」
+    // 새 게임(화면 문구는 「새로 나왔어요」 — 「이번 주」라고 쓰지 않는다) — 들어온 지 2주 안의 게임을 최근 들어온 순으로. 없으면 영역을 숨긴다. 8개 넘으면 「더 보기」
     const NEW_SHOW = 8;
     function newHtml(games) {
       const list = games.filter(isNewThisWeek).sort((a, b) => (b.addedOn > a.addedOn ? 1 : b.addedOn < a.addedOn ? -1 : 0));
