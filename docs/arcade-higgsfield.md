@@ -47,3 +47,20 @@ window.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.repeat)
 - 창은 sandbox — 게임이 헬스키퍼 화면을 다른 곳으로 옮기거나 새 창을 띄우지 못한다.
 - 회원 이름 · 메일 같은 개인 정보는 게임 쪽으로 보내지 않는다.
 - 다른 아케이드 게임처럼 점수는 화면(게임)이 보내는 값이라, 마음먹고 조작하면 막을 수 없다(지금 게임들과 같은 수준).
+
+## 힉스필드 프롬프트로 만든 게임 (2026-11-13 운영 반영)
+다른 채팅(Claude)에서 힉스필드 Playable 예시 게임의 프롬프트를 보고 **코드로만 다시 만든** 게임들이다. 힉스필드 MCP · 생성 크레딧은 쓰지 않았다
+(그래서 힉스필드 원본처럼 AI 생성 3D 모델 · 그림은 없고, 코드로 그림을 다듬었다). 모두 `HKEmbed` 로 아케이드 창 안에 끼워 넣었다.
+
+| 아케이드 이름 | 키 | 바탕이 된 힉스필드 예시 | 장르 | 아케이드 점수 |
+|---|---|---|---|---|
+| 차 빼기 대작전 3D | `traffic` | Gridlock Out — https://higgsfield.ai/ko/playable?preset=446f4a39-15b7-4798-acb6-97e5bd47823f | 퍼즐 | 3분 동안 번 코인(매 판 1단계부터) |
+| 태양 왕관 군단 | `suncrown` | Pixel Legion — https://higgsfield.ai/ko/playable?preset=0a0d32af-8464-4b33-a8d3-93881eb8feae | 액션 | 단계 하나: 이기면 단계 기본(1,000·2,000·3,000) + 별×500 + 남은 병력×10(목표의 2배까지), 지면 진행률×기본×0.5 |
+| 영웅 돌격 다리 3D | `herorush` | Crowd Surge — https://higgsfield.ai/ko/playable?preset=2b20c165-397b-4663-aeef-14afaa2db089 | 액션 | 단계 하나: 이기면 단계×500 + 별×300 + 영웅×10, 지면 진행%×단계×250÷100 |
+| 햇살 농장 3D | `eggfarm` | Egg Valley — https://higgsfield.ai/ko/playable?preset=528833a2-3978-4ce9-b3f5-9254acefddb8 | 캐주얼 | 3분 동안 판매로 번 코인(매 판 새 농장) |
+| 여우 신사 정원 | `kitsune` | 확인 안 됨(사용자가 준 예시 4개에 없음) | 액션 | 처치×10 + 레벨×200 + 버틴 초×2, 성공하면 +5,000 |
+
+- 파일: 바깥(아케이드 틀) `web/games/<키>.html`, 게임 본체 `web/games/embed/<키>.html`, 대표 그림 `web/assets/lounge/<키>.jpg`.
+- 원래 커밋: 태양 왕관 군단 01e069a · 여우 신사 정원 8a1b9bf(브랜치 `claude/kitsune-garden-3d`) · 차 빼기 fdf1697(`claude/traffic-jam-escape-3d`) · 햇살 농장 7b2135e(`claude/sunny-side-farm-3d`) · 영웅 돌격 다리 c30dc32(`claude/hero-rush-bridge-game`). 아케이드 연결 · 그림 다듬기는 df0ea72.
+- `herorush` · `eggfarm` 은 three.js 를 cdnjs 에서 불러온다(회사망에서 막히면 안 뜸). 나머지는 파일 안에 들어 있다.
+- 나중에 힉스필드 크레딧이 생기면: 힉스필드 MCP(`https://mcp.higgsfield.ai/mcp`, claude.ai 커넥터 「힉스필드」)로 같은 게임을 다시 생성해 본체만 바꿔 끼우면 된다. 점수 · 순위 키는 그대로 둔다(기록이 이어지게).
