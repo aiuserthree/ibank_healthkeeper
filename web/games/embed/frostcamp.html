@@ -103,7 +103,8 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 #card .big{font-size:44px;font-weight:900;display:flex;align-items:center;gap:8px;margin:4px 0 10px;font-variant-numeric:tabular-nums}
 #card table{width:100%;border-collapse:collapse;font-size:15px;font-weight:700;margin-bottom:14px}
 #card td{padding:6px 2px;border-top:1.5px solid rgba(14,49,82,.12)}
-#card td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+#card td:last-child{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:900}
+#card td.d{text-align:right;color:var(--ink-soft);font-size:13px;font-weight:700;padding-right:10px;word-break:keep-all}
 #card .btns{display:flex;gap:10px;flex-wrap:wrap}
 #card button{flex:1;min-width:140px;width:100%;margin-top:8px;font:inherit;font-weight:900;font-size:19px;padding:13px 18px;border-radius:18px;border:0;cursor:pointer;color:#5a2a00;
   background:linear-gradient(var(--ember-hot),#ff9d3b);box-shadow:0 5px 0 #d9741a,0 10px 20px rgba(200,100,20,.28)}
@@ -4766,7 +4767,7 @@ function updatePads(dt, live) {
     const busy = inside && p.dwell > p.need;
     p.mesh.rotation.y += dt * (busy ? 1.6 : .35);
     const s = p.r * 2.35 * (1 + Math.sin(G.clock * 3.2 + p.x) * .035 + (busy ? .06 : 0)); p.mesh.scale.set(s, 1, s);
-    setLabel(p.label, p.html()); placeLabel(p.label, p.x, .1, p.z + p.r + .35);
+    setLabel(p.label, p.html()); if (p.above) placeLabel(p.label, p.x, .1, p.z - p.r - .1, '-100%'); else placeLabel(p.label, p.x, .1, p.z + p.r + .35);
   }
 }
 
@@ -4883,7 +4884,7 @@ const upgrades = [
 for (const u of upgrades) {
   u.paid = 0;
   u.pad = makePad({
-    x: u.x, z: 1.0, r: .95, color: 0x8d6fd1,
+    x: u.x, z: 1.0, r: .95, color: 0x8d6fd1, above: u.key === 'pack', // 가운데 이름표는 위로 — 좁은 화면에서 셋이 겹치지 않게
     accepts: () => G.up[u.key] < 2 && u.paid + u.pad.pending < UP_COST[G.up[u.key]],
     onLog: () => {
       u.paid++; if (u.paid < UP_COST[G.up[u.key]]) return;
@@ -5360,9 +5361,12 @@ function endRound(win) {
   if (mode !== 'play') return; mode = 'over'; stopInput(); arrow.visible = false; ptr.style.display = 'none';
   const sc = score(), done = sites.filter(s => s.state === 'done').length, built = sites.reduce((a, s) => a + s.progress, 0);
   if (!win) sfx.timeup();
-  const rows = `<table><tr><td>지은 건물</td><td>${done} / ${sites.length}</td></tr><tr><td>건물에 쓴 통나무</td><td>${fmt(built)}개</td></tr>
-    <tr><td>나무꾼 · 장비</td><td>${jacks.length}명 · ${G.up.axe + G.up.pack + G.up.coat}단계</td></tr><tr><td>버틴 눈보라</td><td>${G.stats.storms}번</td></tr>
-    ${win ? `<tr><td>걸린 시간</td><td>${mmss(G.time)} (시간 점수 +${fmt(G.timeBonus)})</td></tr>` : ''}</table>`;
+  // 점수가 어디서 왔는지 — score() 와 같은 계산을 줄마다 보여 준다
+  const bPts = sites.reduce((a, s) => a + s.progress * 20 + (s.state === 'done' ? s.def.bonus : 0), 0), lv = G.up.axe + G.up.pack + G.up.coat;
+  const row = (k, d, v) => `<tr><td>${k}</td><td class="d">${d}</td><td>${v < 0 ? '−' + fmt(-v) : '+' + fmt(v)}</td></tr>`;
+  const rows = `<table>${row('지은 건물', `${done} / ${sites.length} · 통나무 ${fmt(built)}개`, bPts)}${row('나무꾼 · 장비', `${jacks.length}명 · ${lv}단계`, jacks.length * 300 + lv * 200)}
+    ${row('버틴 눈보라', `${G.stats.storms}번`, Math.min(G.stats.storms, 2) * 800)}${G.stats.frozen ? row('꽁꽁 얼어붙음', `${G.stats.frozen}번`, -G.stats.frozen * 200) : ''}
+    ${win ? row('얼음 문 열기', '', 3000) + row('남은 시간', `${mmss(ROUND - G.time)} × 10점/초`, G.timeBonus) : ''}</table>`;
   showCard(`<h1>${win ? ICON.gate + ' 얼음 문이 열렸어요!' : ICON.clock + ' 해가 저물었어요'}</h1>
     <p class="sub">${win ? '썰매가 새 땅으로 떠났어요' : '8분이 지났어요 · 여기까지의 점수'}</p><div class="big">${ICON.star} ${fmt(sc)}</div>${rows}
     <div class="btns">${win && !ARC ? '<button class="ghost" data-act="roam">계속 둘러보기</button>' : ''}<button id="play" data-act="again">다시 하기</button></div>`);
