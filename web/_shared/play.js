@@ -296,6 +296,7 @@ window.HKPlay = (function () {
     watersort: ["#0e7490", "#a855f7"],
     bumpervs: ["#7c2d12", "#fb923c"],
     jellyvs: ["#3b1d6e", "#ff7ac8"],
+    holecity: ["#2b2f3a", "#ff6b1a"],
     vinyl: ["#1a1026", "#ff5e4d"],
     nightsquad: ["#141d42", "#ff9a3c"],
     frostcamp: ["#1e6fb8", "#8fd8ff"],
