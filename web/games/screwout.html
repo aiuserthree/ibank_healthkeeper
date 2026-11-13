@@ -483,7 +483,7 @@
         const stageTime = (lv) => Math.min(120, 60 + (lv - 1) * 5);
         const UNDO_PER_STAGE = 3;
         const MAX_SCORE = 1_000_000;
-        const CLEAR_MS = 1100;           // 단계를 푼 뒤 다음 단계까지
+        const CLEAR_MS = 600;            // 단계를 푼 뒤(축하 회전 시작부터) 다음 단계까지
         const GEN_SLICE = 18;            // 다음 단계를 미리 만들 때 한 번에 쓰는 시간(ms) — 화면이 멈칫하지 않게 나눠서
         // 판 12가지 — 색만으로 가리지 않게 결 무늬를 하나씩. [이름, 판 색, 테두리, 무늬 색, 무늬, 재질(0 나무 · 1 아크릴 · 2 금속)]
         const LOOKS = [
@@ -870,12 +870,41 @@
           content.add(V.selRing, V.badRing);
           return V;
         }
+        // 몸통에서 충분히 멀어진 판 — 세상 기준으로 그냥 아래로(몸통이 돌아도 따라 돌지 않고 제자리에서 자연스럽게 떨어진다). 화면 밖으로 나가면 true
+        function plateToWorld(pl, V) {
+          const f = pl.fall;
+          if (!f || f.world || !V.pivot.parent) return;
+          const qW = V.content.getWorldQuaternion(new T3.Quaternion());
+          f.outW = f.nL.clone().applyQuaternion(qW);
+          f.coastW = f.coastDir ? f.coastDir.clone().applyQuaternion(qW) : f.slide ? f.slide.clone().applyQuaternion(qW) : null;
+          if (f.slide && !f.coast) f.coast = f.sp;
+          f.slide = null; f.clear = 0;
+          V.pivot.parent.attach(pl.holder);
+          f.world = true;
+        }
+        function worldFall(pl, dt, V, floorY) {
+          const f = pl.fall;
+          f.t += dt;
+          f.out *= 1 - 2.5 * dt;
+          f.gy += 9 * dt;
+          pl.holder.position.y -= f.gy * dt;
+          pl.holder.position.addScaledVector(f.outW, Math.max(f.out, 0.25) * dt);
+          if (f.coast > 0 && f.coastW) { pl.holder.position.addScaledVector(f.coastW, f.coast * dt); f.coast *= 1 - 2.6 * dt; if (f.coast < 0.04) f.coast = 0; }
+          pl.holder.rotateOnAxis(f.w, f.ws * dt);
+          const wp = pl.holder.getWorldPosition(new T3.Vector3());
+          const off = three && V === three.V ? wp.clone().project(three.camera).y < -1.35 : wp.y < floorY - V.R * 2.5;
+          return off || f.t > 4;
+        }
         function disposeLevel(V) {
           if (!V.level) return;
           V.level.traverse((o) => { if (o.geometry && !o.isInstancedMesh && o.geometry !== GEO.ring) o.geometry.dispose(); });
           V.content.remove(V.level);
           // 떨어지는 중인 판은 물건 밖(세상)에 있으니 따로
-          for (const pl of V.plates) { if (pl.fall) pl.mesh.geometry.dispose(); if (pl.holder.parent) pl.holder.parent.remove(pl.holder); }
+          for (const pl of V.plates) {
+            if (pl.fall && pl.fall.world) { (V.orphans || (V.orphans = [])).push(pl); continue; } // 세상 기준으로 떨어지는 중 — 끝까지 떨어진 뒤 정리
+            if (pl.fall) pl.mesh.geometry.dispose();
+            if (pl.holder.parent) pl.holder.parent.remove(pl.holder);
+          }
           V.level = null;
           V.plates = [];
         }
@@ -1171,20 +1200,19 @@
           if (hs.instanceColor) hs.instanceColor.needsUpdate = true;
           // 판 — 매달린 판 흔들림(용수철) · 덮인 나사를 누르면 떨림 · 떨어지는 판
           const floorY = three && V === three.V ? three.floor.position.y : -V.R;
+          // 앞 단계에서 떨어지던 판 — 다음 단계가 와도 화면 밖으로 다 떨어질 때까지 그대로(뚝 사라지지 않게)
+          if (V.orphans && V.orphans.length) {
+            V.orphans = V.orphans.filter((pl) => {
+              if (!worldFall(pl, dt, V, floorY)) return true;
+              if (pl.holder.parent) pl.holder.parent.remove(pl.holder);
+              pl.mesh.geometry.dispose();
+              return false;
+            });
+            busy = true;
+          }
           for (const pl of V.plates) {
             if (pl.fall && pl.fall.world) {
-              // 몸통에서 충분히 멀어진 판 — 세상 기준으로 그냥 아래로(몸통이 돌아도 따라 돌지 않고 제자리에서 자연스럽게 떨어진다)
-              const f = pl.fall;
-              f.t += dt;
-              f.out *= 1 - 2.5 * dt;
-              f.gy += 9 * dt;
-              pl.holder.position.y -= f.gy * dt;
-              pl.holder.position.addScaledVector(f.outW, Math.max(f.out, 0.25) * dt);
-              if (f.coast > 0 && f.coastW) { pl.holder.position.addScaledVector(f.coastW, f.coast * dt); f.coast *= 1 - 2.6 * dt; if (f.coast < 0.04) f.coast = 0; }
-              pl.holder.rotateOnAxis(f.w, f.ws * dt);
-              const wp = pl.holder.getWorldPosition(new T3.Vector3());
-              const off = three && V === three.V ? wp.clone().project(three.camera).y < -1.35 : wp.y < floorY - V.R * 2.5;
-              if (off || f.t > 4) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
+              if (worldFall(pl, dt, V, floorY)) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
               busy = true;
               continue;
             }
@@ -1228,13 +1256,7 @@
               if (gravity && V.pivot.parent) {
                 const cW = V.content.getWorldPosition(new T3.Vector3()), pW = pl.mesh.localToWorld(pl.mesh.geometry.boundingSphere.center.clone());
                 const sc = V.content.getWorldScale(new T3.Vector3()).x;
-                if (pW.distanceTo(cW) > (V.R + f.rad) * sc) {
-                  const qW = V.content.getWorldQuaternion(new T3.Quaternion());
-                  f.outW = f.nL.clone().applyQuaternion(qW);
-                  f.coastW = f.coastDir ? f.coastDir.clone().applyQuaternion(qW) : null;
-                  V.pivot.parent.attach(pl.holder);
-                  f.world = true;
-                }
+                if (pW.distanceTo(cW) > (V.R + f.rad) * sc) plateToWorld(pl, V);
               }
               const wy = pl.holder.getWorldPosition(new T3.Vector3()).y;
               if (wy < floorY - V.R * 2.5 || f.t > 4) { pl.fall = null; pl.holder.visible = false; V.faceObjs[P.plates[pl.k].f].add(pl.holder); pl.holder.position.set(0, 0, 0); pl.holder.quaternion.identity(); pl.holder.scale.setScalar(1); }
@@ -1484,6 +1506,7 @@
         }
         function stageClear() {
           clearing = true;
+          if (three) for (const q of three.V.plates) if (q.fall && !q.fall.world) { q.fall.sp = Math.max(q.fall.sp, 6.5); }
           sel = -1;
           const { base, bonus } = stagePoints(level, history.length, puzzle.par);
           banked = Math.min(MAX_SCORE, banked + puzzle.plates.length * platePts() + base + bonus);
@@ -1496,8 +1519,11 @@
           const t0 = performance.now();
           const celebrate = () => {
             if (state !== "play" && state !== "pause") return;
-            if (falling() && performance.now() - t0 < 2200) { clearTimer = setTimeout(celebrate, 60); return; }
-            if (three) { view.pulse = 1; view.shake = Math.max(view.shake, 0.12); burst(new T3.Vector3(0, 0, 0), 46, false); }
+            if (falling() && performance.now() - t0 < 700) { clearTimer = setTimeout(celebrate, 40); return; }
+            if (three) {
+              for (const q of three.V.plates) if (q.fall && !q.fall.world) plateToWorld(q, three.V); // 아직 떨어지는 판은 여기서 몸통과 떼어 제자리에서 계속 떨어지게
+              view.pulse = 1; view.shake = Math.max(view.shake, 0.12); burst(new T3.Vector3(0, 0, 0), 46, false);
+            }
             floatText(`${fmt(level)}단계 완료! +${fmt(base + bonus)}`);
             sparks(boardEl.clientWidth / 2, boardEl.clientHeight * 0.42, 10);
             if (bonus) setTimeout(() => floatText(`${fmt(history.length)}수 · 절약 보너스 +${fmt(bonus)}`, true, 0.58), 200);
@@ -1513,7 +1539,7 @@
             }, CLEAR_MS);
           };
           clearTimeout(clearTimer);
-          clearTimer = setTimeout(celebrate, 120);
+          clearTimer = setTimeout(celebrate, 40);
         }
 
         // ── 조작 ───────────────────────────────────────────────
@@ -1701,8 +1727,8 @@
             view.vy *= damp; view.vp *= damp;
             busy = true;
           }
-          if (view.intro > 0) { view.intro = Math.max(0, view.intro - dt * 1.8); busy = true; }
-          if (view.pulse > 0) { view.pulse = Math.max(0, view.pulse - dt * 1.6); busy = true; }
+          if (view.intro > 0) { view.intro = Math.max(0, view.intro - dt * 2.6); busy = true; }
+          if (view.pulse > 0) { view.pulse = Math.max(0, view.pulse - dt * 2.4); busy = true; }
           if (view.shake > 0) { view.shake = Math.max(0, view.shake - dt * 0.5); busy = true; }
           const V = three.V;
           // 새 물건은 작게 돌며 나타나고, 단계를 깨면 한 번 통 튄다
