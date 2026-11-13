@@ -163,17 +163,15 @@
       return lead;
     }
 
-    // 이번 주 새 게임 — 월요일부터 들어온 게임을 최근 들어온 순으로. 없으면 영역을 숨긴다. 8개 넘으면 「더 보기」
+    // 새 게임(화면 문구는 「새로 나왔어요」 — 「이번 주」라고 쓰지 않는다) — 이번 주 월요일부터 들어온 게임을 최근 들어온 순으로. 없으면 영역을 숨긴다. 8개 넘으면 「더 보기」
     const NEW_SHOW = 8;
     function newHtml(games) {
-      const ws = weekStartKst();
       const list = games.filter(isNewThisWeek).sort((a, b) => (b.addedOn > a.addedOn ? 1 : b.addedOn < a.addedOn ? -1 : 0));
       if (!list.length) return "";
-      const we = new Date(ws + "T00:00:00Z"); we.setUTCDate(we.getUTCDate() + 6);
       const tiles = list.map((g, i) => `<div class="hk-aa-new__item"${i >= NEW_SHOW ? " hidden" : ""}>${tileHtml(g)}</div>`).join("");
       return `<div class="hk-aa-new hk-aa-wrap" id="aa-new">
-          <span class="hk-aa-offer__eyebrow">${HKUI.icon("sparkles", 16, "currentColor")} 이번 주 새 게임 · ${mdDot(ws)} ~ ${mdDot(we.toISOString().slice(0, 10))}</span>
-          <h2 class="hk-aa-h2">이번 주에 새로 나왔어요 <small>${list.length.toLocaleString("ko-KR")}개</small></h2>
+          <span class="hk-aa-offer__eyebrow">${HKUI.icon("sparkles", 16, "currentColor")} 새 게임</span>
+          <h2 class="hk-aa-h2">새로 나왔어요 <small>${list.length.toLocaleString("ko-KR")}개</small></h2>
           <div class="hk-aa-find__grid hk-aa-new__grid">${tiles}</div>
           ${list.length > NEW_SHOW ? `<button type="button" class="hk-aa-pill is-sm hk-aa-new__more" id="aa-new-more">${(list.length - NEW_SHOW).toLocaleString("ko-KR")}개 더 보기</button>` : ""}
         </div>`;
