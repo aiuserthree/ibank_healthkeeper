@@ -60,6 +60,8 @@ button:focus-visible{outline:3px solid var(--hazard);outline-offset:3px}
 #bossFill{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--foe),#ff8a5c)}
 #banner{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%) scale(.9);padding:9px 26px;font-size:clamp(22px,5vw,42px);color:#14161c;background:var(--hazard);border-top:6px solid #14161c;border-bottom:6px solid #14161c;outline:4px solid var(--hazard);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;white-space:nowrap}
 #banner.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#fade{position:fixed;inset:0;background:#05070f;opacity:0;pointer-events:none;transition:opacity .3s}
+#fade.on{opacity:1}
 #floats{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 .float{position:absolute;left:-99px;top:-99px;font-family:var(--font-display);font-weight:900;font-synthesis:none;font-style:normal;font-size:clamp(26px,5vw,46px);white-space:nowrap;opacity:0;transform:translate(-50%,-50%);animation:rise .95s cubic-bezier(.2,.7,.3,1) forwards;text-shadow:0 2px 0 rgba(0,0,0,.6),0 0 18px rgba(0,0,0,.55)}
 .float.plus{color:#84c8ff}.float.minus{color:#ff6b78}.float.zero{color:#c3cbe0}
@@ -172,15 +174,16 @@ h2{font-size:clamp(30px,6vw,42px);line-height:1.05}
   </div>
 </div>
 <div id="bossBar"><span class="disp">거대 경비 로봇</span><div><i id="bossFill"></i></div></div>
+<div id="fade" aria-hidden="true"></div>
 <div class="disp" id="banner" role="status"></div>
 <div id="floats" aria-hidden="true"><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i></div>
 <div id="hint"><span class="mouse">마우스를 좌우로 움직여 조준 · ← → 키도 돼요</span><span class="touch">화면을 좌우로 끌어 조준</span></div>
 
 <div class="overlay on" id="menu">
   <div class="sign">
-    <p class="eyebrow">공단 7번 도로 · 야간 · 506m</p>
+    <p class="eyebrow">공단 7번 도로 · 야간 · 연속 작전</p>
     <h1 class="disp">야간 분대 작전 <em>3D</em></h1>
-    <p class="lead">병사 4명으로 출발합니다. 좌우로 움직여 폭주 로봇을 쏘고, 분대를 최대한 불려서 끝 검문소의 거대 경비 로봇까지 돌파하세요.</p>
+    <p class="lead">병사 4명으로 출발합니다. 좌우로 움직여 폭주 로봇을 쏘고 분대를 불려, 끝 검문소의 거대 경비 로봇을 깨면 다음 작전으로 이어져요. 분대와 무기는 그대로 데려가지만 작전마다 로봇이 세지고, 분대가 전멸하면 끝나요.</p>
     <ul class="rules">
       <li><span class="tile t-gate disp"><span>+5</span><span>&minus;3</span></span><span><b>숫자 게이트</b> — 파랑은 병력 추가, 빨강은 감소. 쏘면 숫자가 올라가고, 양쪽에 걸쳐 지나가면 둘 다 적용돼요.</span></li>
       <li><span class="tile t-barr disp"><span>40</span></span><span><b>숫자 바리케이드</b> — 쏴서 0으로 만들면 갇힌 병사가 합류해요. 부딪히면 병력을 잃어요.</span></li>
@@ -285,6 +288,58 @@ const STAGE = [
   { d: 500, t: 'boss', hp: 20000, minHp: 50 },
 ];
 
+/* 연속 작전 — 검문소를 깨면 다음 작전으로 이어진다. 작전 1 은 위 코스 그대로,
+ * 작전 2 부터는 위 코스를 바탕으로 작전 번호를 씨앗(시드)으로 삼아 바꾼다(같은 작전 번호는 늘 같은 배치).
+ * 어려움(작전 n ≥ 2)
+ *   적 · 바리케이드 · 보스 체력 × hpMul = 4 × 1.4^(n−2)   (2: ×4, 3: ×5.6, 4: ×7.8, 5: ×11 …)
+ *   적 수 × cntMul = 1 + 0.2 × (n−1)  (최대 ×2.2)
+ *   빨강 게이트 감소 × (1 + 0.35 × (n−1)), 게이트를 쏴서 올리는 데 드는 명중 수 × (1 + 0.3 × (n−1))
+ *   작전 3 부터 일부 졸개 무리가 장갑 로봇으로, 작전 4 부터 큰 로봇이 더 자주 섞인다
+ * 분대 인원 · 무기는 다음 작전으로 이어진다(대신 위처럼 적이 세진다). */
+const opHp = op => op <= 1 ? 1 : 4 * Math.pow(1.4, op - 2);
+const opCnt = op => op <= 1 ? 1 : Math.min(2.2, 1 + 0.2 * (op - 1));
+function makeCourse(op) {
+  if (op <= 1) return STAGE;
+  const r = mulberry32((op * 2654435761) ^ 0x5eed1234);
+  const hm = opHp(op), cm = opCnt(op), neg = 1 + 0.35 * (op - 1), cost = 1 + 0.3 * (op - 1);
+  const flip = r() < 0.5 ? -1 : 1; // 코스 전체 좌우 뒤집기
+  const out = STAGE.map(it => {
+    const o = { ...it };
+    if (it.t === 'gate') {
+      let L = it.L, R = it.R;
+      if (flip < 0) [L, R] = [R, L];
+      if (r() < 0.4) [L, R] = [R, L];
+      const g = s => {
+        let v = s.v + Math.round((r() - 0.5) * 3);
+        if (s.v > 0) v = Math.max(1, v); else v = Math.min(-1, Math.round(v * neg));
+        return { v, c: +(s.c * cost).toFixed(2) };
+      };
+      o.L = g(L); o.R = g(R);
+    } else if (it.t === 'barr') {
+      o.x = (r() < 0.5 ? -1 : 1) * Math.abs(it.x);
+      o.hp = Math.round(it.hp * hm);
+    } else if (it.t === 'pick') {
+      o.x = (r() < 0.5 ? -1 : 1) * Math.abs(it.x);
+    } else if (it.t === 'wave') {
+      o.d = it.d + Math.round((r() - 0.5) * 8);
+      let type = it.type, hp = it.hp;
+      if (type === 'grunt' && op >= 3 && r() < 0.3) { type = 'armor'; hp *= 1.6; }
+      o.type = type;
+      o.n = Math.min(45, Math.round(it.n * cm));
+      o.hp = Math.round(hp * hm);
+      o.side = it.side ? (r() < 0.5 ? -1 : 1) : 0;
+      if (it.extra) o.extra = { type: it.extra.type, n: Math.min(30, Math.round(it.extra.n * cm)), hp: Math.round(it.extra.hp * hm) };
+      if (it.brute) o.brute = { n: it.brute.n + (op >= 5 ? 1 : 0), hp: Math.round(it.brute.hp * hm) };
+      else if (op >= 4 && r() < 0.25 + 0.05 * op) o.brute = { n: 1, hp: Math.round(it.hp * 25 * hm) };
+    } else if (it.t === 'boss') {
+      o.hp = Math.round(it.hp * hm);
+      o.minHp = Math.round(it.minHp * hm);
+    }
+    return o;
+  });
+  return out.sort((a, b) => a.d - b.d);
+}
+
 function mulberry32(a) {
   return function () {
     a |= 0; a = a + 0x6D2B79F5 | 0;
@@ -310,21 +365,25 @@ function formation(n) {
 
 const gateCost = g => g.c * Math.pow(CFG.GATE_G, g.k);
 
-function createSim(seed) {
+// carry: 앞 작전에서 이어받는 것(분대 인원 · 무기 · 누적 기록). 없으면 처음 출발
+function createSim(seed, op, carry) {
   const rnd = mulberry32(seed || 1);
   const HALF = CFG.HALF;
+  op = op || 1;
+  const COURSE = makeCourse(op);
+  const n0 = carry ? clamp(carry.n, 1, CFG.MAX) : CFG.START;
   const S = {
-    phase: 'ready', t: 0, d: 0, x: 0, tx: 0, v: 0, weapon: 0,
+    phase: 'ready', t: 0, d: 0, x: 0, tx: 0, v: 0, weapon: carry ? carry.weapon : 0, op,
     soldiers: [], bullets: [], enemies: [], gates: [], barrs: [], picks: [],
-    si: 0, F: formation(CFG.START), events: [],
-    kills: 0, freed: 0, lost: 0, maxN: CFG.START, shots: 0,
+    si: 0, F: formation(n0), events: [],
+    kills: carry ? carry.kills : 0, freed: carry ? carry.freed : 0, lost: carry ? carry.lost : 0, maxN: Math.max(n0, carry ? carry.maxN : 0), shots: 0,
     boss: null, bossDead: false, hold: false, why: '', lastHit: '', lostBy: { enemy: 0, barr: 0, gate: 0, boss: 0 },
   };
   const ev = e => { if (S.events.length < 400) S.events.push(e); };
 
   // 처음부터 놓여 있는 것들(게이트 · 바리케이드 · 무기 상자)
   let pid = 0, uid = 0;
-  for (const it of STAGE) {
+  for (const it of COURSE) {
     if (it.t === 'gate') {
       pid++;
       const mk = (o, side) => o && S.gates.push({
@@ -357,7 +416,7 @@ function createSim(seed) {
     S.lost++; S.lastHit = why; S.lostBy[why]++;
     ev({ t: 'sdie', x: s.x, d: s.d, why });
   }
-  for (let i = 0; i < CFG.START; i++) addSoldier(S.F.ox[i], S.F.od[i]);
+  for (let i = 0; i < n0; i++) addSoldier(S.F.ox[i], S.F.od[i]);
   for (const s of S.soldiers) s.born = -1;
 
   function spawnEnemy(type, x, d, hp) {
@@ -425,8 +484,8 @@ function createSim(seed) {
     S.v += ((S.hold ? 0 : CFG.SPEED) - S.v) * Math.min(1, 5 * dt);
     S.d += S.v * dt;
 
-    while (S.si < STAGE.length && STAGE[S.si].d <= S.d + 62) {
-      const it = STAGE[S.si++];
+    while (S.si < COURSE.length && COURSE[S.si].d <= S.d + 62) {
+      const it = COURSE[S.si++];
       if (it.t === 'wave' || it.t === 'boss') activate(it);
     }
 
@@ -786,12 +845,21 @@ const smokes = [];
 }
 // 표지판 달린 구조물 · 결승 검문소
 const signs = [];
+// 표지판 글 — 첫 표지판과 검문소 표지판에 작전 번호를 적는다
+function signText(s, op) {
+  if (s.warn) { s.a = op > 1 ? `작전 ${op} 검문소` : '최종 검문소'; s.b = '거대 경비 로봇 주의'; }
+  else if (s.d === SIGNS[0].d) { s.a = `작전 ${op} · ${s.name}`; s.b = `검문소까지 ${LEN - s.d}m`; }
+  else { s.a = s.name; s.b = `검문소까지 ${LEN - s.d}m`; }
+}
+function setSignsOp(op) { for (const s of signs) { signText(s, op); drawSign(s); } }
 function drawSign(s) {
   const g = s.g, w = 512, h = 144;
   g.fillStyle = s.warn ? '#8f1d24' : '#0e5a3c'; g.fillRect(0, 0, w, h);
   g.strokeStyle = '#eef2ff'; g.lineWidth = 6; g.strokeRect(8, 8, w - 16, h - 16);
   g.fillStyle = '#eef2ff'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = `${FONTW} 46px ${FONT}`; g.fillText(s.a, w / 2, 52);
+  g.font = `${FONTW} 46px ${FONT}`;
+  const fw = g.measureText(s.a).width; if (fw > w - 44) g.font = `${FONTW} ${Math.floor(46 * (w - 44) / fw)}px ${FONT}`; // 길면 글자를 줄인다
+  g.fillText(s.a, w / 2, 52);
   g.font = `${FONTW} 34px ${FONT}`; g.fillStyle = s.warn ? '#ffd21f' : '#c8f5dd'; g.fillText(s.b, w / 2, 104);
   s.tx.needsUpdate = true;
 }
@@ -803,7 +871,8 @@ function drawSign(s) {
     for (const o of [-2.5, 2.5]) { const leg = new T.Mesh(new T.BoxGeometry(0.22, 6.4, 0.22), steel); leg.position.set(cx + o, 3.2, z - 0.15); env.add(leg); }
     const c = document.createElement('canvas'); c.width = 512; c.height = 144;
     const tx = new T.CanvasTexture(c); tx.anisotropy = MAXANI;
-    const s = { g: c.getContext('2d'), tx, a: last ? '최종 검문소' : names[i], b: last ? '거대 경비 로봇 주의' : `검문소까지 ${LEN - sg.d}m`, warn: last };
+    const s = { g: c.getContext('2d'), tx, name: names[i], d: sg.d, a: '', b: '', warn: last };
+    signText(s, 1);
     const m = new T.Mesh(new T.PlaneGeometry(5.6, 1.58), new T.MeshBasicMaterial({ map: tx, color: 0xd8dcea }));
     m.position.set(cx, 5.55, z); m.rotation.y = -sg.s * 0.22; env.add(m); signs.push(s); drawSign(s);
   });
@@ -1091,31 +1160,50 @@ function drawHp(h, hp) {
 
 /* ================= 화면: 진행 · 효과 · 계기판 · 소리 · 조작 ================= */
 /* ---------- 헬스키퍼 아케이드 연결 ----------
- * ?hk=1 로 열리면 「아케이드 모드」. 한 판 = 스테이지 하나(성공 또는 전멸).
- * 시작할 때 hk:start, 결과 화면에서 hk:score 한 번, 진행 중에는 2초마다 hk:live(지금 그만두면 받을 점수).
+ * ?hk=1 로 열리면 「아케이드 모드」. 한 판 = 분대가 전멸할 때까지 이어지는 연속 작전(작전 1 → 2 → 3 …).
+ * hk:start 는 판 처음 한 번만, hk:score 는 전멸해서 결과 화면이 뜰 때 한 번, 진행 중에는 2초마다 hk:live(지금 그만두면 받을 점수).
  * 점수
- *   성공: 3,000 + 별 하나에 500 + 살아남은 분대원 × 20
- *   실패: 진행률(1% 단위 내림) × 15
+ *   작전을 깰 때마다: 3,000 + 별 하나에 500 + 살아남은 분대원 × 20 + 작전 번호 × 1,000(보너스)
+ *   지금 작전: 진행률(1% 단위 내림) × 15
+ *   합계는 1,000,000 점을 넘지 않는다(아케이드 최고 점수 상한)
  */
 const HK = location.origin;
 const ARCADE = /[?&]hk=1(&|$)/.test(location.search);
 const hk = msg => { if (ARCADE && window.parent !== window) { try { window.parent.postMessage(msg, HK); } catch (e) { /* 부모 창이 없으면 넘어간다 */ } } };
 const fmt = n => Math.round(n).toLocaleString('ko-KR');
+const SCORE_CAP = 1000000;
 const starsFor = n => n >= 130 ? 3 : n >= 80 ? 2 : 1;
-function calcScore(won, n, prog) {
-  if (won) {
-    const st = starsFor(n), b = st * 500, c = n * 20;
-    return { score: 3000 + b + c, stars: st, lines: ['작전 성공 3,000', `별 ${st}개 × 500 = ${fmt(b)}`, `생존 ${fmt(n)}명 × 20 = ${fmt(c)}`] };
+// 작전 하나를 깼을 때 점수
+function clearScore(op, n) {
+  const st = starsFor(n);
+  return { op, n, stars: st, pts: 3000 + st * 500 + n * 20 + op * 1000 };
+}
+// 한 판 기록 — 지금 작전 번호 · 깬 작전들 · 쌓인 점수
+const RUN = { op: 1, cleared: [], banked: 0 };
+function resetRun() { RUN.op = 1; RUN.cleared = []; RUN.banked = 0; }
+const progPct = prog => Math.floor(clamp(prog, 0, 1) * 100);
+const liveScore = prog => Math.min(SCORE_CAP, RUN.banked + progPct(prog) * 15); // 지금 그만두면 받을 점수
+function calcScore(prog) {
+  const p = progPct(prog), k = RUN.cleared.length, lines = [];
+  if (k) {
+    const st = RUN.cleared.reduce((a, c) => a + c.stars, 0), n = RUN.cleared.reduce((a, c) => a + c.n, 0), ob = RUN.cleared.reduce((a, c) => a + c.op, 0);
+    lines.push(`깬 작전 ${k}개 × 3,000 = ${fmt(k * 3000)}`, `별 합계 ${st}개 × 500 = ${fmt(st * 500)}`, `작전마다 살아남은 분대원 합계 ${fmt(n)}명 × 20 = ${fmt(n * 20)}`,
+      `작전 보너스 (${k > 4 ? `1+2+…+${k}` : RUN.cleared.map(c => c.op).join('+')}) × 1,000 = ${fmt(ob * 1000)}`);
   }
-  const p = Math.floor(clamp(prog, 0, 1) * 100);
-  return { score: p * 15, stars: 0, lines: [`진행률 ${p}% × 15 = ${fmt(p * 15)}`, '성공하면 3,000 + 별 × 500 + 생존 분대원 × 20'] };
+  lines.push(`작전 ${RUN.op} 진행률 ${p}% × 15 = ${fmt(p * 15)}`);
+  if (!k) lines.push('검문소를 깨면 3,000 + 별 × 500 + 생존 분대원 × 20 + 작전 번호 × 1,000 을 받고 다음 작전으로');
+  const score = liveScore(prog);
+  if (score >= SCORE_CAP) lines.push(`최고 점수 상한 ${fmt(SCORE_CAP)}점`);
+  return { score, lines };
 }
 
 let sim = null, paused = false, roundOn = false, muted = false, seed = (Date.now() % 1e9) | 0;
 let endAt = -1, liveAt = 0, tsec = 0, shake = 0, lastWeapon = -1, inputSeen = false;
-let save = { best: 0 };
-try { const s = JSON.parse(localStorage.getItem('nightSquad3d') || 'null'); if (s && typeof s.best === 'number') save = s; } catch (e) { /* 저장소를 못 쓰면 기록 없이 */ }
-const store = () => { try { localStorage.setItem('nightSquad3d', JSON.stringify(save)); } catch (e) { /* 무시 */ } };
+let fadeAt = -1, nextAt = -1; // 작전 사이 전환 — 화면을 어둡게 할 때 · 다음 작전을 시작할 때
+let save = { best: 0, op: 0 }; // 최고 점수 · 그때 도달한 작전
+try { const s = JSON.parse(localStorage.getItem('nightSquad3dOps') || 'null'); if (s && typeof s.best === 'number') save = { best: s.best, op: s.op | 0 }; } catch (e) { /* 저장소를 못 쓰면 기록 없이 */ }
+const store = () => { try { localStorage.setItem('nightSquad3dOps', JSON.stringify(save)); } catch (e) { /* 무시 */ } };
+const bestText = () => save.best ? `내 최고 기록 ${fmt(save.best)}점 · 작전 ${save.op}까지` : '';
 
 /* ---------- 소리 (Web Audio 합성음) ---------- */
 let AC = null, master = null, noiseBuf = null;
@@ -1230,7 +1318,15 @@ function onEvent(e) {
     case 'boss': banner('거대 경비 로봇 접근!', 2200); sfx.siren(); $('bossBar').classList.add('on'); break;
     case 'summon': burst(e.x, 0.5, -e.d + 2, 16, 0xff5a4a, 6, 0.16, 0.5, 2); break;
     case 'bossdie': boss.dying = 1.4; sfx.boom(1.4); addShake(0.9); $('bossBar').classList.remove('on'); banner('검문소 돌파!', 1600); break;
-    case 'win': endAt = tsec + 1.5; sfx.win(); break;
+    case 'win': { // 검문소 돌파 — 점수를 쌓고 잠깐 뒤 다음 작전으로
+      const c = clearScore(S.op, S.soldiers.length);
+      RUN.cleared.push(c); RUN.banked = Math.min(SCORE_CAP, RUN.banked + c.pts);
+      if (roundOn) hk({ type: 'hk:live', score: RUN.banked });
+      floatText(`+${fmt(c.pts)}점`, 'plus', S.x, 3.2, -S.d - 3);
+      banner(`작전 ${S.op} 완료! 다음 작전 →`, 1900);
+      fadeAt = tsec + 1.45; nextAt = tsec + 1.8; sfx.win();
+      break;
+    }
     case 'lose': endAt = tsec + 0.9; sfx.fail(); break;
   }
   void S;
@@ -1242,7 +1338,7 @@ function pulse(el) { el.classList.remove('pulse'); void el.offsetWidth; el.class
 function hud() {
   const S = sim.S, n = S.soldiers.length, d = Math.min(LEN, Math.max(0, Math.floor(S.d)));
   if (n !== hudC.n) { hudC.n = n; $('nSquad').textContent = n; }
-  if (d !== hudC.d) { hudC.d = d; $('progFill').style.width = (d / LEN * 100).toFixed(1) + '%'; $('progTxt').textContent = `${d}m / ${LEN}m`; }
+  if (d !== hudC.d) { hudC.d = d; $('progFill').style.width = (d / LEN * 100).toFixed(1) + '%'; $('progTxt').textContent = `작전 ${S.op} · ${d}m / ${LEN}m`; }
   if (S.weapon !== hudC.w) {
     hudC.w = S.weapon; $('wName').textContent = WEAPONS[S.weapon].name;
     Array.from($('wPips').children).forEach((p, i) => p.classList.toggle('on', i <= S.weapon));
@@ -1251,19 +1347,35 @@ function hud() {
 }
 
 /* ---------- 판 흐름 ---------- */
-function newSim() {
-  sim = createSim(seed++);
-  buildStage(sim.S);
+// 새 작전의 코스를 화면에 올린다 — 앞 작전 물체 · 텍스처는 buildStage 가 먼저 정리(dispose)한다
+function showCourse() {
+  const S = sim.S;
+  buildStage(S);
   parts.length = 0; boss.g.visible = false; boss.dying = 0; endAt = -1; shake = 0; lastWeapon = -1;
   hudC.n = hudC.d = hudC.w = hudC.boss = -1;
-  $('bossBar').classList.remove('on'); $('banner').classList.remove('on');
+  $('bossBar').classList.remove('on');
+  $('bossBar').querySelector('span').textContent = S.op > 1 ? `거대 경비 로봇 · 작전 ${S.op}` : '거대 경비 로봇';
   for (const gv of gateViews) drawGate(gv);
   for (const bv of barrViews) drawBarr(bv);
+  setSignsOp(S.op);
+}
+function newSim() { // 판 처음(작전 1)
+  resetRun(); fadeAt = nextAt = -1; $('fade').classList.remove('on'); $('banner').classList.remove('on');
+  sim = createSim(seed++, 1, null);
+  showCourse();
+}
+function nextOp() { // 다음 작전 — 분대 인원 · 무기 · 기록을 이어 간다. hk:start 는 다시 보내지 않는다
+  const S = sim.S;
+  RUN.op = S.op + 1;
+  sim = createSim(seed++, RUN.op, { n: S.soldiers.length, weapon: S.weapon, kills: S.kills, freed: S.freed, lost: S.lost, maxN: S.maxN });
+  showCourse();
+  sim.start(); acc = 0; liveAt = tsec + 2;
+  banner(`작전 ${RUN.op} · 로봇 강화!`, 1700);
 }
 function showMenu() {
   setPause(false); roundOn = false; newSim();
   $('end').classList.remove('on'); $('menu').classList.add('on'); $('hint').classList.remove('on');
-  $('best').textContent = save.best ? `내 최고 기록 ${fmt(save.best)}명` : '';
+  $('best').textContent = bestText();
 }
 function startRun() {
   audioOn(); setPause(false);
@@ -1278,30 +1390,29 @@ const WHY = {
   barr: '바리케이드에 부딪혔어요. 숫자가 0이 될 때까지 쏘거나 옆으로 피해 가세요.',
   boss: '거대 경비 로봇의 체력을 다 깎지 못했어요. 더 큰 분대와 강한 무기를 데려가 보세요.',
 };
-function showEnd() {
-  const S = sim.S, won = S.phase === 'win', n = S.soldiers.length;
-  const res = calcScore(won, n, S.d / LEN);
+function showEnd() { // 분대 전멸 — 판의 끝
+  const S = sim.S, res = calcScore(S.d / LEN), cleared = RUN.cleared.length;
   if (roundOn) { roundOn = false; hk({ type: 'hk:score', score: Math.max(0, Math.floor(res.score)) }); }
-  $('end').classList.toggle('lost', !won);
-  $('endEyebrow').textContent = won ? '검문소 돌파' : '작전 실패';
-  $('endTitle').textContent = won ? '작전 성공' : '분대 전멸';
-  $('endNum').textContent = won ? fmt(n) : fmt(Math.floor(S.d));
-  $('endUnit').textContent = won ? '명 생존' : `m 지점 \u00b7 전체 ${LEN}m`;
-  $('stars').innerHTML = won ? [1, 2, 3].map(i => `<i class="${i <= res.stars ? 'on' : ''}">★</i>`).join('') : '';
-  $('stars').setAttribute('aria-label', won ? `별 ${res.stars}개` : '');
-  $('endSub').textContent = won ? (res.stars === 3 ? '대규모 분대로 완벽하게 돌파했어요.' : `별 3개는 130명, 2개는 80명부터예요.`) : WHY[S.why] || WHY.enemy;
+  $('end').classList.toggle('lost', cleared === 0);
+  $('endEyebrow').textContent = `작전 ${S.op}에서 멈췄어요 · 깬 작전 ${cleared}개`;
+  $('endTitle').textContent = '분대 전멸';
+  $('endNum').textContent = fmt(cleared);
+  $('endUnit').textContent = `개 작전 돌파 \u00b7 작전 ${S.op} ${fmt(Math.floor(S.d))}m 지점`;
+  $('stars').innerHTML = ''; $('stars').setAttribute('aria-label', '');
+  $('endSub').textContent = WHY[S.why] || WHY.enemy;
   $('endScore').textContent = fmt(res.score) + '점';
   $('endCalc').innerHTML = res.lines.map(l => `<li>${l}</li>`).join('');
   $('endStats').innerHTML = [['처치', fmt(S.kills)], ['구출', fmt(S.freed)], ['최대 분대', fmt(S.maxN) + '명'], ['무기', WEAPONS[S.weapon].name]].map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
-  if (won && n > save.best) { save.best = n; store(); }
-  $('endBest').textContent = save.best ? `내 최고 기록 ${fmt(save.best)}명` : '';
-  $('bAgain').textContent = won ? '다시 하기' : '다시 도전';
+  if (res.score > save.best) { save.best = res.score; save.op = S.op; store(); }
+  $('endBest').textContent = bestText();
+  $('bAgain').textContent = '다시 도전';
   $('hint').classList.remove('on'); $('end').classList.add('on');
   try { $('bAgain').focus({ preventScroll: true }); } catch (e) { /* 초점을 못 줘도 진행 */ }
 }
+const active = () => sim.S.phase === 'run' || nextAt > 0; // 작전 중이거나 다음 작전으로 넘어가는 중
 function setPause(on) {
   const was = paused;
-  paused = !!on && !!sim && sim.S.phase === 'run';
+  paused = !!on && !!sim && active();
   if (paused !== was) hk({ type: paused ? 'hk:paused' : 'hk:resumed' });
   $('pause').classList.toggle('on', paused);
   if (paused) { for (const k in keys) keys[k] = false; keyDir = 0; drag = null; }
@@ -1335,7 +1446,7 @@ const setKeys = () => { keyDir = (keys.ArrowRight || keys.d || keys.D ? 1 : 0) -
 window.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (e.repeat) return; e.preventDefault();
-    if (ARCADE && window.parent !== window) { if (paused || sim.S.phase === 'run') hk({ type: 'hk:esc' }); } else setPause(!paused);
+    if (ARCADE && window.parent !== window) { if (paused || active()) hk({ type: 'hk:esc' }); } else setPause(!paused);
     return;
   }
   if (paused) return;
@@ -1531,13 +1642,15 @@ function frame(now) {
       if (acc > CFG.STEP * 4) acc = 0;
       if (S.shots !== shotsSeen) { shotsSeen = S.shots; sfx.shot(S.weapon); }
       if (!inputSeen && S.t > 5) seen();
-      if (roundOn && tsec >= liveAt) { liveAt = tsec + 2; hk({ type: 'hk:live', score: calcScore(false, 0, S.d / LEN).score }); }
+      if (roundOn && tsec >= liveAt) { liveAt = tsec + 2; hk({ type: 'hk:live', score: liveScore(S.d / LEN) }); }
     }
     for (let i = 0; i < S.events.length; i++) onEvent(S.events[i]);
     S.events.length = 0;
     if (S.phase === 'win' && Math.random() < 0.5) burst((Math.random() - 0.5) * 9, 5 + Math.random() * 3, -S.d - Math.random() * 8, 4, [0xffd21f, 0x3aa0ff, 0xff4757, 0x3ddc97][Math.random() * 4 | 0], 5, 0.16, 1.3, 1);
     updateParts(dt);
     if (endAt > 0 && tsec >= endAt) { endAt = -1; showEnd(); }
+    if (fadeAt > 0 && tsec >= fadeAt) { fadeAt = -1; $('fade').classList.add('on'); }
+    if (nextAt > 0 && tsec >= nextAt) { nextAt = -1; nextOp(); $('fade').classList.remove('on'); }
   }
   sync(paused ? 0 : dt);
   hud();
