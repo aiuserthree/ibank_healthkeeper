@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>먹보 구멍 3D</title>
-<style>@font-face{font-family:'Pretendard';src:url('/assets/fonts/PretendardVariable.woff2') format('woff2');font-weight:100 900;font-display:swap}</style>
+<style>@font-face{font-family:'Pretendard';src:url('/assets/fonts/PretendardVariable.woff2') format('woff2');font-weight:100 900;font-display:swap}.hint-touch{display:none!important}@media (pointer:coarse){.hint-pc{display:none!important}.hint-touch{display:inline-block!important}}
+</style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" rel="stylesheet">
@@ -175,6 +176,9 @@ b{font-weight:inherit}
   .hud-area b{font-size:22px}
   .limit{width:60px;height:60px;border-width:6px;padding-top:12px}
   .limit b{font-size:25px}
+  .limit.wide{padding-top:15px}
+  .limit.wide b{font-size:20px}
+  .limit.wide span{font-size:10px}
   .hud-mid{width:min(40vw,200px)}
   .clear-txt{font-size:11px}
   .clear-txt span{padding:2px 7px 3px}
@@ -246,7 +250,7 @@ b{font-weight:inherit}
     </ul>
     <div class="title-row">
       <button class="btn" id="btnStart" type="button">시작하기</button>
-      <span class="hint">화면을 끌거나 방향키 · WASD 로 움직여요</span>
+      <span class="hint hint-pc">화면을 끌거나 방향키 · WASD 로 움직여요</span><span class="hint hint-touch">화면을 끌어 움직여요</span>
     </div>
     <span class="best" id="best" hidden>내 최고 점수 <b id="bestNum">0</b></span>
   </div>
@@ -1389,7 +1393,7 @@ SC.Renderer = function (canvas) {
     for (k in holeVis) if (!seen[k]) { scene.remove(holeVis[k].grp); holeVis[k].rim.material.dispose(); holeVis[k].pulse.material.dispose(); delete holeVis[k]; }
     for (i = 0; i < clouds.length; i++) { o = clouds[i]; o.position.x += o.userData.sp * dt; if (o.position.x > g.H * 1.25 + 80) o.position.x = -(g.H * 1.25 + 80); }
     // 카메라 — 놀 때는 내 구멍 뒤 위에서 고정된 방향으로, 구멍이 클수록 멀리서
-    var p = g.player, zoom = Math.min(2.3, Math.max(1, 1.2 / aspect));
+    var p = g.player, zoom = Math.min(1.85, Math.max(1, 1.2 / aspect));
     if (camMode === 'orbit' || !p.alive) {
       if (!reduceMotion) orbitA += dt * 0.06;
       var od = g.H * (1.55 + (zoom - 1) * 1.1);
@@ -1430,6 +1434,10 @@ var FAST = DBG ? Math.max(1, +((location.search.match(/[?&]fast=(\d+)/) || [])[1
 var DBG_AREA = DBG ? Math.min(2, +((location.search.match(/[?&]area=(\d)/) || [])[1] || 0)) : 0;
 var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 function fmt(n) { return Math.round(n).toLocaleString('ko-KR'); }
+// 받침에 맞춘 조사 — 공원을 · 주택가를, 주택가로 · 도심으로(ㄹ 받침은 「로」)
+function jong(w) { var c = w.charCodeAt(w.length - 1) - 0xAC00; return c >= 0 && c <= 11171 ? c % 28 : 0; }
+function eul(w) { return w + (jong(w) ? '을' : '를'); }
+function ro(w) { var j = jong(w); return w + (j && j !== 8 ? '으로' : '로'); }
 function fail(msg) { var f = $('fail'); f.textContent = msg; f.hidden = false; $('title').hidden = true; }
 
 if (!window.THREE) { fail('3D 엔진(three.js)을 불러오지 못했어요. 인터넷 연결을 확인하고 새로 고침해 주세요.'); return; }
@@ -1497,7 +1505,7 @@ function pumpToast(dt) {
 
 // ── 판 진행: 첫 화면 → (구역 안내 → 놀이 → 결과 → 상점) × 3 → 끝
 function toTitle() {
-  mode = 'title'; paused = false; run = null;
+  mode = 'title'; paused = false; run = null; audioHold(false);
   game = SC.createGame(0, null, { demo: true }); R.load(game); R.setCam('orbit');
   show('hud', false); show('intro', false); show('warn', false); show('joy', false); $('vig').classList.remove('danger'); clearLabels(); only('title');
   if (best > 0) { $('bestNum').textContent = fmt(best); show('best', true); }
@@ -1547,13 +1555,13 @@ function showResult() {
   $('resKicker').textContent = (a + 1) + '구역 ' + A.name;
   if (e.won && !e.last) {
     $('resTitle').textContent = A.name + ' 정복';
-    $('resMsg').textContent = '목표 ' + goal + '%를 채웠어요. 번 코인으로 구멍을 키우고 ' + AREAS[a + 1].name + '로 가요.';
+    $('resMsg').textContent = '목표 ' + goal + '%를 채웠어요. 번 코인으로 구멍을 키우고 ' + ro(AREAS[a + 1].name) + ' 가요.';
     rows = row('삼킨 물건', fmt(e.eaten) + '개') + row('삼킨 구멍', e.rivals + '개') + row('남은 시간', e.left + '초') + row('이번 구역 점수', '+' + fmt(e.objScore + e.clearScore + e.timeScore));
     $('resTotalLabel').textContent = '번 코인'; $('resTotal').innerHTML = '<i class="coin"></i>' + fmt(e.earn);
     $('btnNext').textContent = '강화 상점 열기';
   } else {
     if (e.won) { $('resTitle').textContent = '도시 정복'; $('resMsg').textContent = '공원부터 도심까지 통째로 삼켰어요.'; }
-    else { $('resTitle').textContent = '시간 끝'; $('resMsg').textContent = A.name + '를 ' + pct + '% 삼켰어요. 목표 ' + goal + '%까지 ' + Math.max(1, goal - pct) + '% 모자랐어요.'; }
+    else { $('resTitle').textContent = '시간 끝'; $('resMsg').textContent = eul(A.name) + ' ' + pct + '% 삼켰어요. 목표 ' + goal + '%까지 ' + Math.max(1, goal - pct) + '% 모자랐어요.'; }
     rows = row('정복한 구역', run.cleared + ' / ' + AREAS.length) + row('삼킨 물건', fmt(run.eaten) + '개') + row('삼킨 구멍', run.rivals + '개');
     if (e.won) rows += row('남은 시간 보너스', '+' + fmt(e.timeScore)) + row('도시 정복 보너스', '+' + fmt(e.cityScore));
     $('resTotalLabel').textContent = '최종 점수'; $('resTotal').textContent = fmt(run.score);
@@ -1580,7 +1588,7 @@ function renderShop() {
   $('shopGrid').innerHTML = html; $('wallet').textContent = fmt(run.coins);
 }
 function showShop() {
-  mode = 'shop'; renderShop(); $('btnGo').textContent = AREAS[run.area + 1].name + '로 출발'; only('shop');
+  mode = 'shop'; renderShop(); $('btnGo').textContent = ro(AREAS[run.area + 1].name) + ' 출발'; only('shop');
   if (AUTO) autoT = 0.8;
 }
 function buy(k) {
@@ -1589,8 +1597,9 @@ function buy(k) {
   run.coins -= cost; run.up[k]++; sfx.buy(); renderShop();
   var b = $('shopGrid').querySelector('[data-k="' + k + '"]'); if (b && !b.disabled) b.focus(); else $('btnGo').focus();
 }
-function pause() { if (mode !== 'play' || paused) return; paused = true; stopJoy(); show('pause', true); hk({ type: 'hk:paused' }); }
-function resume() { if (!paused) return; paused = false; last = performance.now(); show('pause', false); hk({ type: 'hk:resumed' }); }
+function audioHold(on) { try { if (!AC) return; if (on) { if (AC.state === 'running') AC.suspend(); } else if (AC.state === 'suspended') { var pr = AC.resume(); if (pr && pr.catch) pr.catch(function () {}); } } catch (e) {} }
+function pause() { if ((mode !== 'play' && mode !== 'intro') || paused) return; paused = true; keys = {}; stopJoy(); show('pause', true); audioHold(true); hk({ type: 'hk:paused' }); }
+function resume() { if (!paused) return; paused = false; last = performance.now(); show('pause', false); if (!document.hidden) audioHold(false); hk({ type: 'hk:resumed' }); }
 
 // ── 놀이 중 표시
 var hudCache = {};
@@ -1685,7 +1694,7 @@ canvas.addEventListener('pointerup', joyUp); canvas.addEventListener('pointercan
 canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 var KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd' };
 window.addEventListener('keydown', function (e) {
-  if (e.code === 'Escape' && !e.repeat) { e.preventDefault(); if (ARC) { if (mode === 'play') hk({ type: 'hk:esc' }); } else if (paused) resume(); else pause(); return; }
+  if (e.code === 'Escape' && !e.repeat) { e.preventDefault(); if (ARC) { if (mode === 'play' || mode === 'intro') hk({ type: 'hk:esc' }); } else if (paused) resume(); else pause(); return; }
   if (e.code === 'KeyM' && !e.repeat) { setMuted(!muted); return; }
   var k = KEYMAP[e.code]; if (k) { keys[k] = true; if (mode === 'play') e.preventDefault(); }
 });
@@ -1706,7 +1715,8 @@ $('shopGrid').addEventListener('click', function (e) { var b = e.target.closest 
 $('btnPause').addEventListener('click', function (e) { e.currentTarget.blur(); if (ARC) hk({ type: 'hk:esc' }); else pause(); });
 $('btnSound').addEventListener('click', function (e) { e.currentTarget.blur(); audioOn(); setMuted(!muted); });
 $('pause').addEventListener('click', resume);
-document.addEventListener('visibilitychange', function () { if (document.hidden) pause(); });
+// 화면이 숨으면 판을 멈추고, 놀이 중이 아닐 때(첫 화면 · 결과 · 상점)도 소리는 멈춘다
+document.addEventListener('visibilitychange', function () { if (document.hidden) { pause(); audioHold(true); } else if (!paused) audioHold(false); });
 window.addEventListener('message', function (e) {
   if (!ARC || e.origin !== HK || e.source !== window.parent) return;
   var t = e.data && e.data.type;
