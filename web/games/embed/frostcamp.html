@@ -119,7 +119,36 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 #pauseOv small{display:block;font-size:14px;font-weight:700;color:var(--ink-soft);margin-top:4px}
 #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:24px;background:#cfe6fb;font-weight:800;font-size:17px;text-align:center;z-index:30}
 
+/* 이야기 장면 · 장 제목 */
+#story{position:fixed;inset:0;display:none;z-index:18;cursor:pointer;background:linear-gradient(180deg,rgba(14,49,82,.06) 0,rgba(14,49,82,0) 40%,rgba(14,49,82,.3))}
+#story.on{display:block}
+#chT{position:absolute;left:50%;top:15%;transform:translateX(-50%);text-align:center;padding:14px 28px 16px;border-radius:24px;width:max-content;max-width:calc(100% - 32px);animation:chIn .7s cubic-bezier(.2,1.3,.4,1)}
+#chT small{display:block;font-size:14px;font-weight:900;color:var(--ink-soft);letter-spacing:.12em}
+#chT b{display:block;font-size:31px;font-weight:900;letter-spacing:-.02em;word-break:keep-all;margin-top:2px}
+#chT span{display:block;font-size:14px;font-weight:700;color:var(--ink-soft);margin-top:3px;word-break:keep-all}
+@keyframes chIn{from{opacity:0;transform:translate(-50%,-16px) scale(.94)}}
+#talk{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:min(590px,calc(100% - 24px));display:flex;gap:14px;align-items:flex-start;padding:14px 16px 12px;border-radius:22px}
+#talk .face{flex:none;width:72px;height:72px}
+#talk .face svg{width:100%;height:100%;display:block}
+#talk .tx{flex:1;min-width:0}
+#talk .who{font-weight:900;font-size:15px;color:#b4431b}
+#talk p{margin:3px 0 0;font-size:16.5px;line-height:1.5;font-weight:700;word-break:keep-all;min-height:3em}
+#talk .tbar{height:3px;border-radius:2px;background:rgba(14,49,82,.12);margin-top:6px;overflow:hidden}
+#talk .tbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffd66b,#ff9d3b)}
+#talk .sbar{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
+#talk .dots{font-size:12.5px;font-weight:800;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+#talk .bs{display:flex;gap:8px}
+#talk button{font:inherit;font-weight:900;font-size:15px;border:0;border-radius:14px;padding:7px 16px;cursor:pointer}
+#talk .nx{color:#5a2a00;background:linear-gradient(var(--ember-hot),#ff9d3b);box-shadow:0 3px 0 #d9741a}
+#talk .sk{color:var(--ink-soft);background:rgba(255,255,255,.75)}
+#talk button:focus-visible{outline:3px solid #0b62b5;outline-offset:2px}
+
 @media (max-width:760px){
+  #talk{padding:11px 12px 10px;gap:10px;bottom:10px}
+  #talk .face{width:54px;height:54px}
+  #talk p{font-size:15px}
+  #chT b{font-size:24px}
+  #chT{top:20%}
   #hud{grid-template-columns:1fr auto;grid-template-areas:"quest stats" "warm warm" "banner banner";gap:8px;padding:8px}
   #qTitle{font-size:15px}
   .chip{font-size:14px;padding:5px 9px 5px 7px}
@@ -128,7 +157,7 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
   #banner{font-size:14px}
   #card h1{font-size:25px}
 }
-@media (prefers-reduced-motion:reduce){#gust,.wl.full,#warm.cold,.toast,#quest.bump,.chip.bump{animation:none}}
+@media (prefers-reduced-motion:reduce){#gust,.wl.full,#warm.cold,.toast,#quest.bump,.chip.bump,#chT{animation:none}}
 </style>
 </head>
 <body>
@@ -150,6 +179,9 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 <div id="ptr" class="glass"><svg viewBox="0 0 24 24" fill="none" stroke="#5a2a00" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12.5 5.5 19 12l-6.5 6.5"/></svg></div>
 <div id="toasts"></div>
 <div id="stick"><i></i></div>
+<div id="story"><div id="chT" class="glass"></div>
+  <div id="talk" class="glass"><div class="face"></div><div class="tx"><div class="who"></div><p></p><div class="tbar"><i></i></div>
+    <div class="sbar"><span class="dots"></span><span class="bs"><button class="sk" type="button" data-st="skip">건너뛰기</button><button class="nx" type="button" data-st="next">다음</button></span></div></div></div></div>
 <div id="pauseOv"><div class="glass">잠깐 멈춤<small>눌러서 이어 하기</small></div></div>
 <div id="start"><div id="card" class="glass"></div></div>
 <div id="err">이 기기에서는 3D 화면(WebGL)을 열 수 없어요. 다른 브라우저로 열어 주세요.</div>
@@ -4054,6 +4086,7 @@ const logZ = (len, r, color, x, y, z, seg = 6) => P(cyl(r, r, len, seg), color, 
 
 const matV = new THREE.MeshLambertMaterial({ vertexColors: true });
 const matGlow = new THREE.MeshBasicMaterial({ color: 0xffd98a }); // 창문 · 등불
+const matTree = new THREE.MeshLambertMaterial({ vertexColors: true }), matGround = new THREE.MeshLambertMaterial({ vertexColors: true }); // 장마다 빛깔(color)을 곱해 땅 · 숲 느낌을 바꾼다
 const matIce = new THREE.MeshPhongMaterial({ color: 0xa9dcff, transparent: true, opacity: .74, shininess: 90, specular: 0xffffff, flatShading: true });
 
 function mesh(parts, o = {}) {
@@ -4310,7 +4343,7 @@ function buildSawmill() {
   return { parts, blade, sawLog, smoke: new THREE.Vector3(-2.4, 4.5, -1.3) };
 }
 
-function buildSled() { // 앞머리가 북쪽(-z, 얼음 문 쪽)
+function buildSled(sail) { // 앞머리가 북쪽(-z, 얼음 문 쪽) · sail 이면 돛을 단다
   const parts = [];
   const run = [];
   for (const x of [-.95, .95]) run.push(P(box(.16, .14, 4.6), C.woodDark, x, .12, .1), P(box(.18, .05, 4.6), C.steelDark, x, .03, .1), P(box(.16, .14, 1.0), C.woodDark, x, .4, -2.55, .65, 0, 0), P(box(.16, .14, .55), C.woodDark, x, .84, -2.98, 1.25, 0, 0));
@@ -4330,8 +4363,52 @@ function buildSled() { // 앞머리가 북쪽(-z, 얼음 문 쪽)
   parts.push(partMesh([P(cyl(.05, .05, 2.2, 5), C.woodDark, .95, 1.95, 2.2), P(box(.4, .06, .06), C.woodDark, .78, 2.98, 2.2), P(box(.24, .06, .24), C.steelDark, .62, 2.9, 2.2), P(box(.24, .06, .24), C.steelDark, .62, 2.6, 2.2),
     P(cyl(.05, .05, 2.0, 5), C.woodDark, -.95, 1.85, 2.2), P(cone(.28, .7, 3), C.red, -.6, 2.6, 2.2, 0, 0, -PI / 2, 1, 1, .2)],
     [P(box(.18, .24, .18), 0, .62, 2.75, 2.2)]));
+  if (sail) parts.push(partMesh([P(cyl(.07, .08, 3.4, 5), C.woodDark, 0, 2.5, -.2), P(box(.08, .08, 1.9), C.woodDark, 0, 1.6, .55),
+    P(cyl(1.35, 1.35, .05, 3), C.cream, .06, 2.65, .35, 0, 0, PI / 2, 1, 1, 1.2), P(box(.06, .5, .9), C.teal, .1, 3.9, -.25), P(cone(.16, .3, 4), C.mustard, 0, 4.35, -.2)]));
   return { parts };
 }
+// 새 건물 — 얼음집 · 망루 · 축제 무대 (집터 크기 안에 들어가게)
+function buildIgloo() {
+  const parts = [], ice = 0xdcefff, iceD = 0xbcdcf6;
+  parts.push(partMesh([P(cyl(2.45, 2.55, .24, 12), C.snowBlue, 0, .12, 0)]));
+  const R0 = [2.05, 1.85, 1.5, .98];
+  for (let L = 0; L < 4; L++) { // 얼음 벽돌을 둥글게 한 줄씩 쌓아 올린다
+    const r = R0[L], y = .5 + L * .48, n = Math.max(6, Math.round(r * 6.2)), bl = [];
+    for (let i = 0; i < n; i++) { const a = (i + (L % 2) * .5) / n * TAU; bl.push(P(box(TAU * r / n * .93, .46, .46), i % 2 ? ice : iceD, Math.cos(a) * r, y, Math.sin(a) * r, 0, -a - PI / 2, 0)); }
+    parts.push(partMesh(bl));
+  }
+  parts.push(partMesh([P(ico(.75, 1), C.snow, 0, 2.38, 0, 0, 0, 0, 1, .55, 1), P(ico(.5, 1), ice, -.9, 2.0, .6, 0, 0, 0, 1, .4, 1)]));
+  parts.push(partMesh([P(cyl(.78, .78, 1.3, 8, 1), ice, 0, .62, 2.05, PI / 2, 0, 0), P(cyl(.8, .8, 1.32, 8), C.snow, 0, .9, 2.05, PI / 2, 0, 0, 1, 1, .45),
+    P(cyl(.05, .05, 2.4, 5), C.woodDark, 1.9, 1.2, 1.3), P(cone(.3, .8, 3), C.red, 2.2, 2.15, 1.3, 0, 0, -PI / 2, 1, 1, .2)],
+    [P(cyl(.5, .5, .06, 8), 0, 0, .6, 2.72, PI / 2, 0, 0)]));
+  return { parts, smoke: new THREE.Vector3(0, 2.7, 0) };
+}
+function buildTower() {
+  const parts = [];
+  parts.push(partMesh([P(box(3.4, .45, 3.4), C.stone, 0, .22, 0), P(box(1.2, .3, .7), C.stoneDark, 0, .15, 1.9)]));
+  for (let i = 0; i < 3; i++) parts.push(partMesh([P(cyl(1.25 - i * .12, 1.32 - i * .12, 1.25, 10), i % 2 ? C.red : C.cream, 0, 1.08 + i * 1.25, 0)]));
+  parts.push(partMesh([P(cyl(1.55, 1.55, .16, 10), C.steelDark, 0, 4.15, 0), P(cyl(.95, .95, .95, 8), C.woodLight, 0, 4.7, 0), P(cyl(1.0, 1.0, .1, 8), C.woodDark, 0, 5.2, 0)],
+    [P(box(.5, .5, .1), 0, 0, 4.72, .93), P(box(.1, .5, .5), 0, .93, 4.72, 0), P(box(.1, .5, .5), 0, -.93, 4.72, 0)]));
+  parts.push(partMesh([P(cone(1.3, 1.4, 8), C.red, 0, 5.95, 0), P(cone(.9, .6, 8), C.snow, 0, 6.5, 0), P(cyl(.04, .04, .8, 4), C.woodDark, 0, 7.1, 0), P(box(.4, .26, .03), C.mustard, .2, 7.35, 0)]));
+  parts.push(partMesh([P(box(.75, 1.25, .12), C.woodDark, 0, 1.05, 1.31), P(ico(.06, 0), C.mustard, .24, 1.05, 1.4), P(box(1.1, .5, .8), C.wood, -1.7, .55, 1.0), P(box(1.15, .1, .85), C.snow, -1.7, .82, 1.0)]));
+  return { parts };
+}
+function buildStage() {
+  const parts = [];
+  parts.push(partMesh([P(box(7.0, .5, 4.6), C.woodDark, 0, .25, 0), P(box(6.8, .1, 4.4), C.woodLight, 0, .55, 0), P(box(2.0, .25, .6), C.wood, 0, .12, 2.55)]));
+  const po = []; for (const x of [-3.2, 3.2]) for (const z of [-2.0, 1.9]) po.push(P(cyl(.16, .18, 3.4, 6), C.woodDark, x, 2.1, z));
+  parts.push(partMesh(po));
+  parts.push(partMesh([P(box(7.0, .22, .22), C.woodDark, 0, 3.8, 1.9), P(box(7.0, .22, .22), C.woodDark, 0, 3.8, -2.0), P(box(6.8, 2.4, .14), C.purple, 0, 1.9, -2.05)]));
+  const fl = []; [C.red, C.mustard, C.teal, C.pink, C.sky].forEach((c, k) => { for (let i = k; i < 13; i += 5) fl.push(P(cone(.17, .38, 3), c, -3.0 + i * .5, 3.55, 1.95, PI, 0, 0)); });
+  parts.push(partMesh(fl));
+  parts.push(partMesh([P(box(7.4, .2, 4.4), C.red, 0, 4.15, -.05, .12, 0, 0), P(box(7.2, .26, 4.2), C.snow, 0, 4.36, -.1, .12, 0, 0)]));
+  parts.push(partMesh([P(cyl(.45, .45, .7, 10), C.red, -2.2, .95, -1.0), P(cyl(.47, .47, .08, 10), C.cream, -2.2, 1.32, -1.0), P(cyl(.35, .35, .55, 10), C.teal, -1.4, .88, -1.3), P(cyl(.37, .37, .07, 10), C.cream, -1.4, 1.17, -1.3),
+    P(box(.26, .06, .26), C.steelDark, 2.9, 3.4, 1.9), P(box(.26, .06, .26), C.steelDark, -2.9, 3.4, 1.9)],
+    [P(box(.22, .26, .22), 0, 2.9, 3.25, 1.9), P(box(.22, .26, .22), 0, -2.9, 3.25, 1.9)]));
+  return { parts };
+}
+// 색을 잠깐 바꿔 끼우고 지어서 같은 모양도 장마다 새 빛깔로
+function withC(over, fn) { const old = {}; for (const k in over) { old[k] = C[k]; C[k] = over[k]; } try { return fn(); } finally { Object.assign(C, old); } }
 
 /* ---------- 얼음 문 ---------- */
 function gateLightTex() { // 문 너머 빛 — 가운데가 밝고 위아래로 번진다
@@ -4430,11 +4507,12 @@ const hk = msg => { if (ARC && inFrame) { try { window.parent.postMessage(msg, H
 const fmt = n => Math.max(0, Math.round(n)).toLocaleString('ko-KR');
 const mmss = s => { s = Math.max(0, Math.ceil(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
 if (ARC) document.documentElement.classList.add('arc');
-const ROUND = 480;      // 아케이드 한 판 8분 (시간 점수의 기준이기도 하다)
-const STORM_LEN = 22;   // 눈보라 길이(초)
+const SCORE_MAX = 999999; // 아케이드 점수 상한(게임 목록 최대값 1,000,000 아래)
 let mode = 'menu', paused = false, reported = false; // menu · play · over · free(문을 연 뒤 둘러보기)
 
-const G = { time: 0, clock: 0, up: { axe: 0, pack: 0, coat: 0 }, stats: { chopped: 0, trees: 0, delivered: 0, frozen: 0, storms: 0 }, timeBonus: 0, dusk: 0, shake: 0, timers: [] };
+const G = { time: 0, clock: 0, up: { axe: 0, pack: 0, coat: 0 }, stats: { chopped: 0, trees: 0, delivered: 0, frozen: 0, storms: 0 }, dusk: 0, shake: 0, timers: [],
+  // 장 이야기: 지난 장에서 번 점수(pts) · 깬 장 수 · 이번 장 눈보라 · 특별 목표 · 남은 시간 보너스
+  pts: { build: 0, clear: 0, time: 0, special: 0, ending: 0 }, clears: 0, sitesDone: 0, logsBuilt: 0, specials: 0, chStorms: 0, chSpecial: false, chBonus: 0, fade: 0, duskBias: 0, snowSize: .3 };
 const later = (sec, fn) => G.timers.push({ t: sec, fn });
 const storm = { state: 'calm', t: 0, next: Infinity, k: 0 };
 const cine = { on: false, t: 0, fx: 0, fz: 0, shattered: false, cracks: 0 };
@@ -4454,6 +4532,99 @@ const ICON = {
   soundOn: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#0e3152" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="#0e3152"/><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18 6.5a7.8 7.8 0 0 1 0 11"/></svg>',
   soundOff: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="#0e3152" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" fill="#0e3152"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></svg>',
 };
+
+/* ---------- 이야기: 사람들 · 여덟 장 ----------
+   눈보라에 길을 잃은 야영대가 얼음 문을 여덟 번 지나 잠든 봄을 깨우러 가는 이야기(오리지널).
+   장마다 같은 빈터에 새 건물 넷(쉼터 · 공방 · 일터 · 탈것)을 짓고, 특별 목표 하나를 마치면 얼음 문이 열린다. */
+const PEOPLE = {
+  gomsol: { name: '곰솔 대장', bg: '#ffe1c2', hat: '#33466e', beard: '#8a5a3b' },
+  mulgyeol: { name: '물결 할머니', bg: '#d8f0ff', hat: '#5aa9e6', hair: '#eceff6' },
+  bandi: { name: '등대지기 반디', bg: '#fff1c8', hat: '#e9ad3c', gnome: true },
+  haesol: { name: '별지기 해솔', bg: '#e4dcff', hat: '#8d6fd1', gnome: true, star: true },
+  neoul: { name: '협곡지기 너울', bg: '#d6f5ee', hat: '#2fa7a0', hair: '#3b2a20' },
+  dodam: { name: '얼음 장인 도담', bg: '#e2f6ff', hat: '#74cdb6', beard: '#e8e8f0' },
+  seori: { name: '얼음 거인 서리뫼', giant: true },
+  saessak: { name: '봄 아이 새싹', bg: '#e6f8dc', hat: '#74cdb6', gnome: true, flower: true },
+  town: { name: '마을 사람들', bg: '#ffe4ee', hat: '#ec8fb0', gnome: true },
+};
+function faceSvg(p) {
+  if (p.giant) return '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="31" fill="#dfe9f5"/><path d="M8 42c2-17 12-28 24-28s22 11 24 28c-6 9-14 14-24 14S14 51 8 42z" fill="#8fa0b6"/>'
+    + '<path d="M12 24c6-7 13-10 20-10s14 3 20 10c-6-2-13-3-20-3s-14 1-20 3z" fill="#fff"/><path d="M19 35h9M36 35h9" stroke="#33466e" stroke-width="3" stroke-linecap="round"/>'
+    + '<path d="M15 45l5 11 5-8 7 10 7-10 5 8 5-11z" fill="#d6f0ff"/><circle cx="32" cy="41" r="2.6" fill="#6f8098"/></svg>';
+  const hat = p.gnome ? `<path d="M14 27 33 3l17 24z" fill="${p.hat}"/><rect x="12" y="24" width="40" height="7" rx="3.5" fill="#fbf4e8"/><circle cx="33" cy="4" r="3.5" fill="#fbf4e8"/>`
+    : `<path d="M13 29c0-12 8-19 19-19s19 7 19 19z" fill="${p.hat}"/><rect x="11" y="26" width="42" height="7" rx="3.5" fill="#fbf4e8"/><circle cx="32" cy="9" r="5" fill="#fbf4e8"/>`;
+  return `<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="31" fill="${p.bg}"/>`
+    + (p.hair ? `<path d="M13 36c0-6 3-10 7-11v18zM51 36c0-6-3-10-7-11v18z" fill="${p.hair}"/>` : '')
+    + '<circle cx="32" cy="39" r="17" fill="#ffcfa3"/><circle cx="22" cy="45" r="3.2" fill="#ff9f8f" opacity=".55"/><circle cx="42" cy="45" r="3.2" fill="#ff9f8f" opacity=".55"/>'
+    + '<path d="M28 47q4 3 8 0" stroke="#26303f" stroke-width="2" fill="none" stroke-linecap="round"/>'
+    + (p.beard ? `<path d="M17 43c2 10 8 16 15 16s13-6 15-16c-4 3-9 4-15 4s-11-1-15-4z" fill="${p.beard}"/>` : '')
+    + hat + '<circle cx="26" cy="39" r="2.4" fill="#26303f"/><circle cx="38" cy="39" r="2.4" fill="#26303f"/>'
+    + (p.flower ? '<circle cx="49" cy="14" r="5.5" fill="#ec8fb0"/><circle cx="49" cy="14" r="2.2" fill="#ffd66b"/>' : '')
+    + (p.star ? '<path d="m49 8 1.6 3.4 3.7.4-2.8 2.5.8 3.7-3.3-1.9-3.3 1.9.8-3.7-2.8-2.5 3.7-.4z" fill="#ffd66b"/>' : '') + '</svg>';
+}
+// 장마다: 시간(초) · 하늘(낮 · 어스름 · 눈보라 [배경, 하늘빛]) · 나무 · 땅 빛 · 눈(색 · 크기) · 눈보라 세기 · 건물 넷 · 특별 목표 · 이야기
+const CHAPTERS = [
+  { title: '눈보라 야영지', sub: '길 잃은 야영대의 첫날 밤', time: 420, land: 'pond', gate: '얼음 문 열기',
+    theme: { day: [0xcfe6fb, 0xcfe0ff], dusk: [0x98a6dc, 0xa6b4ee], storm: [0xc3d0e0, 0xc9d6ea], tree: 0xffffff, ground: 0xffffff, pond: 0xa8dcf7 },
+    storm: { first: Infinity, gap: [110, 150], len: 22, drain: 1, cold: 1 },
+    sites: [{ name: '통나무집', cost: 12, bonus: 500, b: 'cabin' }, { name: '작업장', cost: 28, bonus: 1000, b: 'workshop' }, { name: '제재소', cost: 45, bonus: 1500, b: 'sawmill' }, { name: '보급 썰매', cost: 70, bonus: 2000, b: 'sled' }],
+    special: { kind: 'storm', title: '눈보라 버티기 · 모닥불 곁에 머물기' },
+    intro: [['gomsol', '눈보라에 길을 잃었구나. 오늘 밤은 이 빈터에서 버텨야겠어.'], ['gomsol', '옛이야기에 따르면 얼음 문을 여덟 번 지나면 잠든 봄을 깨울 수 있대.'], ['gomsol', '소나무를 베어 통나무집부터 짓자. 모닥불은 절대 꺼뜨리지 말고!']] },
+  { title: '윤슬 호수 마을', sub: '꽁꽁 언 호숫가의 작은 마을', time: 330, land: 'lake', gate: '얼음 문 열기',
+    theme: { day: [0xd3eff9, 0xd2efff], dusk: [0x8fb3d8, 0x9fc4ee], storm: [0xc6dae6, 0xcde3f0], tree: 0xe2f4ff, ground: 0xf0faff, pond: 0x9fd8f5 },
+    storm: { first: 85, gap: [100, 130], len: 22, drain: 1.1, cold: 1.1 },
+    sites: [{ name: '호숫가 오두막', cost: 18, b: 'cabin', c: { red: 0x5aa9e6, redDark: 0x3f8cc9 } }, { name: '그물 공방', cost: 26, b: 'workshop', c: { teal: 0x33466e, tealDark: 0x26365a } },
+      { name: '얼음 톱질터', cost: 36, b: 'sawmill', c: { mustard: 0x74cdb6, mustardDark: 0x4fae98 } }, { name: '얼음 돛썰매', cost: 48, b: 'sail', c: { teal: 0x5aa9e6 } }],
+    special: { kind: 'offer', title: '물결 할머니 화덕에 불 지피기', short: '할머니 화덕', cost: 12, done: '할머니 화덕에 불이 붙었어요' },
+    intro: [['mulgyeol', '어머나, 얼음 문을 넘어온 손님들이네! 여긴 윤슬 호수 마을이에요.'], ['mulgyeol', '겨울이 너무 길어 이웃들이 다 떠났어요. 내 화덕도 식어 가고요.'], ['gomsol', '저희가 도울게요. 마을을 다시 세우고 화덕에 불도 지펴 드릴게요!']] },
+  { title: '바늘숲 등대', sub: '안개 낀 숲 한가운데 선 등대', time: 330, land: 'lighthouse', gate: '얼음 문 열기',
+    theme: { day: [0xc2d5e6, 0xc9e0e8], dusk: [0x7f8fc6, 0x95a6d6], storm: [0xb6c4d2, 0xc0cedc], tree: 0xcfe6dc, ground: 0xe6eef6, dusk2: .35 },
+    storm: { first: 75, gap: [95, 125], len: 24, drain: 1.2, cold: 1.15 },
+    sites: [{ name: '숲속 오두막', cost: 22, b: 'cabin', c: { red: 0x2f8060, redDark: 0x256b52 } }, { name: '도르래 공방', cost: 30, b: 'workshop', c: { teal: 0xe9ad3c, tealDark: 0xc98c22 } },
+      { name: '바늘숲 제재소', cost: 40, b: 'sawmill', c: { mustard: 0xd9534f, mustardDark: 0xb23f3c } }, { name: '등불 썰매', cost: 54, b: 'sled', c: { teal: 0xe9ad3c, red: 0x2fa7a0 } }],
+    special: { kind: 'offer', title: '등대에 불 밝히기', short: '등대 불', cost: 16, done: '등대에 불이 들어왔어요' },
+    intro: [['bandi', '쉿, 안개가 짙어요. 이 등대가 꺼진 뒤로 다들 숲에서 길을 잃었죠.'], ['bandi', '난 등대지기 반디예요. 등대에 장작을 넣어 불을 밝혀 줄래요?'], ['gomsol', '불빛이 돌아오면 다음 문도 보일 거야. 서두르자!']] },
+  { title: '별가루 고개', sub: '별가루가 흩날리는 밤의 고개', time: 330, land: 'observatory', gate: '얼음 문 열기',
+    theme: { day: [0x9fb0e0, 0xaab8ff], dusk: [0x6d77b8, 0x8a90d0], storm: [0x9aa6c8, 0xa8b2d8], tree: 0xc6cff0, ground: 0xdfe4ff, dusk2: .6, snow: 0xfff1b0, snowSize: .34, sun: 0xd8dcff },
+    storm: { first: 95, gap: [90, 120], len: 26, drain: 1.3, cold: 1.25 },
+    sites: [{ name: '별빛 얼음집', cost: 24, b: 'igloo' }, { name: '별지기 망루', cost: 32, b: 'tower', c: { red: 0x8d6fd1 } },
+      { name: '별가루 창고', cost: 44, b: 'sawmill', c: { mustard: 0x8d6fd1, mustardDark: 0x6f52b5 } }, { name: '별빛 썰매', cost: 58, b: 'sled', c: { teal: 0x8d6fd1 } }],
+    special: { kind: 'storm', title: '별가루 눈보라 버티기' },
+    intro: [['haesol', '별가루가 내리는 밤에는 눈보라가 유난히 매서워요.'], ['haesol', '난 별지기 해솔. 별자리를 보면 눈보라가 언제 오는지 알 수 있죠.'], ['gomsol', '이번 고개는 눈보라를 버텨야 넘을 수 있어. 모닥불을 든든히!']] },
+  { title: '오로라 협곡', sub: '하늘빛이 땅으로 흘러내리는 곳', time: 360, land: 'stones', gate: '얼음 문 열기',
+    theme: { day: [0xb3c4ea, 0xc6b8ff], dusk: [0x7d86c9, 0x9a8ee0], storm: [0xa9b4d4, 0xb8c0e0], tree: 0xc4e6dc, ground: 0xe4ebff, dusk2: .45, snow: 0xe8fff6 },
+    storm: { first: 80, gap: [90, 115], len: 26, drain: 1.35, cold: 1.3 },
+    sites: [{ name: '협곡 얼음집', cost: 26, b: 'igloo', c: { red: 0x2fa7a0 } }, { name: '바람 공방', cost: 36, b: 'workshop', c: { teal: 0x8d6fd1, tealDark: 0x6f52b5 } },
+      { name: '협곡 장작터', cost: 48, b: 'sawmill', c: { mustard: 0x2fa7a0, mustardDark: 0x23867f } }, { name: '오로라 돛썰매', cost: 62, b: 'sail', c: { teal: 0x74cdb6, cream: 0xe4dcff } }],
+    special: { kind: 'offer', title: '오로라 돌등 밝히기', short: '오로라 돌등', cost: 18, done: '돌등이 오로라를 불러왔어요' },
+    intro: [['neoul', '바람의 노래가 들리나요? 오로라가 협곡을 따라 흐르고 있어요.'], ['neoul', '난 협곡지기 너울. 돌등에 불을 붙이면 오로라가 다음 길을 비춰 줘요.'], ['gomsol', '봄이 조금씩 가까워지고 있어. 모두 힘내자!']] },
+  { title: '얼음 동굴 장터', sub: '반짝이는 얼음 수정 사이의 장터', time: 360, land: 'crystals', gate: '얼음 문 열기',
+    theme: { day: [0xd6ecff, 0xd8f2ff], dusk: [0x92a8d8, 0xa6bce8], storm: [0xc0d2e4, 0xcadcee], tree: 0xd6eeff, ground: 0xedf6ff },
+    storm: { first: 70, gap: [85, 110], len: 28, drain: 1.4, cold: 1.35 },
+    sites: [{ name: '수정 얼음집', cost: 28, b: 'igloo', c: { red: 0x5aa9e6 } }, { name: '장인 공방', cost: 40, b: 'workshop', c: { teal: 0x5aa9e6, tealDark: 0x3f8cc9 } },
+      { name: '장터 무대', cost: 52, b: 'stage' }, { name: '수정 썰매', cost: 66, b: 'sled', c: { teal: 0x5aa9e6 } }],
+    special: { kind: 'fire', title: '모닥불 활활 피우기 · 90%까지' },
+    intro: [['dodam', '어서 와요, 얼음 동굴 장터예요! 수정은 많은데 땔감이 귀하죠.'], ['dodam', '난 얼음 장인 도담. 모닥불이 활활 타오르면 장터가 다시 열려요.'], ['gomsol', '불을 가득 채우고 장터를 다시 세우자!']] },
+  { title: '잠든 얼음 거인의 산', sub: '거인의 숨결이 눈보라가 되는 산', time: 390, land: 'giant', gate: '얼음 문 열기',
+    theme: { day: [0xbcc6d4, 0xc6d0dc], dusk: [0x8790b4, 0x98a2c4], storm: [0xa8b4c4, 0xb4c0ce], tree: 0xc2ccd6, ground: 0xe4e8ee, dusk2: .2 },
+    storm: { first: 60, gap: [80, 100], len: 30, drain: 1.55, cold: 1.45 },
+    sites: [{ name: '산장', cost: 30, b: 'cabin', c: { red: 0x33466e, redDark: 0x26365a } }, { name: '바위 망루', cost: 42, b: 'tower', c: { red: 0x74808f } },
+      { name: '산 제재소', cost: 56, b: 'sawmill', c: { mustard: 0x74808f, mustardDark: 0x586271 } }, { name: '산길 썰매', cost: 72, b: 'sled', c: { teal: 0xd9534f } }],
+    special: { kind: 'storm', title: '거인의 숨결(큰 눈보라) 버티기' },
+    intro: [['gomsol', '저 산처럼 큰 게… 잠든 얼음 거인이야. 숨을 쉴 때마다 눈보라가 쳐.'], ['seori', '(쿠우우… 쿠우우…)'], ['gomsol', '거인의 숨결을 버티고 불씨를 지키면 마지막 문이 보일 거야.']] },
+  { title: '봄맞이 들판', sub: '마지막 문 너머에 잠든 봄', time: 390, land: 'spring', gate: '봄의 문 열기',
+    theme: { day: [0xd8f2dc, 0xfff6dc], dusk: [0xd6bccd, 0xf2d6cc], storm: [0xcfe0d4, 0xdcebdc], tree: 0xd2ffc6, ground: 0xd2efc2, snow: 0xffbfd8, snowSize: .38, sun: 0xfff2d0 },
+    storm: { first: 95, gap: [100, 130], len: 24, drain: 1.25, cold: 1.1 },
+    sites: [{ name: '꽃 오두막', cost: 32, b: 'cabin', c: { red: 0xec8fb0, redDark: 0xd06f94 } }, { name: '꽃 공방', cost: 46, b: 'workshop', c: { teal: 0x74cdb6, tealDark: 0x4fae98 } },
+      { name: '축제 무대', cost: 60, b: 'stage', c: { purple: 0xec8fb0, red: 0xe9ad3c } }, { name: '봄 마차', cost: 78, b: 'sail', c: { teal: 0xec8fb0, cream: 0xfff6d8 } }],
+    special: { kind: 'offer', title: '축제 봉화 올리기', short: '축제 봉화', cost: 24, done: '축제 봉화가 타올랐어요' },
+    intro: [['seori', '…따뜻하구나. 너희 불씨 덕에 긴 잠에서 깨었다.'], ['seori', '봄은 이 들판 아래 잠들어 있다. 축제의 봉화를 올려 깨워라.'], ['saessak', '안녕! 난 새싹이야. 봉화가 오르고 봄의 문이 열리면 꽃이 필 거야!']] },
+];
+const ENDING = [['saessak', '봄이 깨어났어! 눈이 녹고 들판 가득 꽃이 피어나!'], ['town', '고마워요! 호수 마을에도, 등대에도, 장터에도 불빛이 돌아왔대요.'], ['gomsol', '긴 겨울 여행이 끝났구나. 다음 겨울엔 우리가 길잡이가 되어 주자.']];
+let ci = 0; // 지금 장(0부터)
+const CH = () => CHAPTERS[ci];
+const chTime = () => CH().time;
+const stormLen = () => CH().storm.len;
 
 /* ---------- 렌더러 · 빛 ---------- */
 let renderer;
@@ -4503,7 +4674,7 @@ function groundH(x, z) {
   const n = g.attributes.position.count, col = new Float32Array(n * 3), a = new THREE.Color(C.snow), b = new THREE.Color(C.snowShade), c = new THREE.Color();
   for (let i = 0; i < n; i += 3) { c.copy(a).lerp(b, srand() * .7); for (let j = 0; j < 3; j++) { col[(i + j) * 3] = c.r; col[(i + j) * 3 + 1] = c.g; col[(i + j) * 3 + 2] = c.b; } }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
-  const m = new THREE.Mesh(g, matV); m.receiveShadow = true; scene.add(m);
+  const m = new THREE.Mesh(g, matGround); m.receiveShadow = true; scene.add(m);
 })();
 
 /* ---------- 부딪힘: 동그라미 · 네모 ---------- */
@@ -4609,7 +4780,7 @@ const _ax = new THREE.Vector3(), _q1 = new THREE.Quaternion();
 class Tree {
   constructor(x, z, v, s) {
     this.x = x; this.z = z; this.s = s; this.state = 'grown'; this.hp = 3; this.shake = 0; this.timer = 0; this.res = null; this.fx = 1; this.fz = 0;
-    this.mesh = new THREE.Mesh(pineGeos[v], matV); this.mesh.castShadow = this.mesh.receiveShadow = true;
+    this.mesh = new THREE.Mesh(pineGeos[v], matTree); this.mesh.castShadow = this.mesh.receiveShadow = true;
     this.mesh.position.set(x, 0, z); this.mesh.scale.setScalar(s);
     this.qYaw = new THREE.Quaternion().setFromAxisAngle(_ax.set(0, 1, 0), R(0, TAU)); this.mesh.quaternion.copy(this.qYaw);
     this.col = { x, z, r: .44, on: true }; circles.push(this.col); scene.add(this.mesh);
@@ -4674,7 +4845,7 @@ function treeFree(x, z) {
   }
   for (let i = 0; i < 26; i++) { const x = R(-13, 13), z = R(-54, -31); if (Math.abs(x) > 3.6) frost.push([x, z, R(1.0, 1.6)]); }
   const inst = (geo, list, cast) => {
-    const im = new THREE.InstancedMesh(geo, matV, list.length); im.castShadow = cast;
+    const im = new THREE.InstancedMesh(geo, matTree, list.length); im.castShadow = cast;
     list.forEach(([x, z, s], i) => { d.position.set(x, groundH(x, z) - .1, z); d.rotation.y = R(0, TAU); d.scale.setScalar(s); d.updateMatrix(); im.setMatrixAt(i, d.matrix); });
     scene.add(im);
   };
@@ -4688,6 +4859,7 @@ function nearestTree(x, z, range, free) {
 
 /* ---------- 바위 · 눈더미 · 연못 · 등불 · 눈사람 ---------- */
 const glows = []; // 어스름에 더 밝아지는 바닥 불빛
+let pondMesh = null, pondRim = null; // 장마다 보이거나 숨긴다
 function addGlow(g, o) { g.userData.o = o; glows.push(g); }
 (function decor() {
   const wall = [];
@@ -4701,10 +4873,10 @@ function addGlow(g, o) { g.userData.o = o; glows.push(g); }
   scene.add(mesh(drifts, { cast: false }));
   // 얼어붙은 연못
   const pond = new THREE.Mesh(new THREE.CircleGeometry(POND.r, 9).rotateX(-PI / 2), new THREE.MeshPhongMaterial({ color: 0xa8dcf7, shininess: 100, specular: 0xffffff, flatShading: true }));
-  pond.position.set(POND.x, .03, POND.z); pond.rotation.y = .3; pond.receiveShadow = true; scene.add(pond);
+  pond.position.set(POND.x, .03, POND.z); pond.rotation.y = .3; pond.receiveShadow = true; scene.add(pond); pondMesh = pond;
   const rim = []; for (let i = 0; i < 11; i++) { const a = i / 11 * TAU + .2; rim.push(P(ico(R(.5, .8), 1), C.snow, POND.x + Math.cos(a) * (POND.r + .2), 0, POND.z + Math.sin(a) * (POND.r + .2), 0, a, 0, 1.5, .4, 1)); }
   rim.push(P(box(2.4, .01, .05), 0xe9f6ff, POND.x - .6, .045, POND.z + .4, 0, .5, 0), P(box(1.6, .01, .05), 0xe9f6ff, POND.x + 1, .045, POND.z - 1.2, 0, -.7, 0));
-  scene.add(mesh(rim, { cast: false }));
+  pondRim = mesh(rim, { cast: false }); scene.add(pondRim);
   for (const [x, z, ry] of [[-3.4, -9.6, 0], [3.4, -9.6, PI], [-3.4, -21.6, 0], [3.4, -21.6, PI], [3.9, 6.6, PI * .8]]) {
     const l = buildLamp(); l.g.position.set(x, 0, z); l.g.rotation.y = ry; scene.add(l.g); addGlow(l.glow, .32); circles.push({ x, z, r: .22, on: true });
   }
@@ -4716,10 +4888,16 @@ function addGlow(g, o) { g.userData.o = o; glows.push(g); }
 
 /* ---------- 모닥불 ---------- */
 const fire = buildFire(); scene.add(fire.g);
-Object.assign(fire, { fuel: .62, t: 0, low: false, radius: () => 3.3 + 3.9 * fire.fuel });
+Object.assign(fire, { fuel: .62, t: 0, low: false, outT: 0, radius: () => 3.3 + 3.9 * fire.fuel });
+const FIRE_OUT = 10; // 눈보라 속 불씨가 꺼진 채 버틸 수 있는 시간(초)
 circles.push({ x: 0, z: 0, r: 1.05, on: true });
 function updateFire(dt, live) {
-  if (live && !cine.on) fire.fuel = Math.max(0, fire.fuel - dt * (storm.state === 'storm' ? .021 : .0062));
+  if (live && !cine.on) fire.fuel = Math.max(0, fire.fuel - dt * (storm.state === 'storm' ? .021 * CH().storm.drain : .0062));
+  // 눈보라 속에 불씨가 다 꺼진 채 10초가 지나면 판이 끝난다(장작을 넣으면 다시 살아난다)
+  if (live && !cine.on && storm.state === 'storm' && fire.fuel <= 0) {
+    if (!fire.outT) toast(ICON.flame + ' 불씨가 꺼지려 해요! 얼른 장작을 넣어요', 'cold');
+    fire.outT += dt; if (fire.outT >= FIRE_OUT && mode === 'play') endRound(false, 'fire');
+  } else fire.outT = 0;
   fire.t += dt;
   const f = fire.fuel, fl = .82 + Math.sin(fire.t * 13) * .08 + Math.sin(fire.t * 31) * .05 + Math.random() * .06;
   fire.flames.forEach((m, i) => { const s = (.5 + f * .85) * (1 + Math.sin(fire.t * (9 + i * 4) + i) * .1); m.scale.set(s, s * (1 + Math.sin(fire.t * (14 + i * 5)) * .16), s); m.rotation.y += dt * (2 + i); });
@@ -4747,6 +4925,13 @@ function makePad(o) {
   p.mesh = new THREE.Mesh(flatGeo, new THREE.MeshBasicMaterial({ map: texPad, transparent: true, depthWrite: false, color: p.color }));
   p.mesh.position.set(p.x, .04, p.z); p.mesh.scale.set(p.r * 2.35, 1, p.r * 2.35); p.mesh.renderOrder = 2; p.mesh.visible = false; scene.add(p.mesh);
   p.label = makeLabel(o.cls); pads.push(p); return p;
+}
+function removePad(p) { const k = pads.indexOf(p); if (k >= 0) pads.splice(k, 1); p.label.el.remove(); disposeObj(p.mesh); }
+// 장이 바뀔 때 지난 장 물체를 GPU 에서도 치운다(같이 쓰는 재질 · 모양은 남긴다)
+function disposeObj(o) {
+  const keep = [matV, matGlow, matIce, matTree, matGround, logGeo, flatGeo];
+  o.traverse(n => { if (n.geometry && !keep.includes(n.geometry)) n.geometry.dispose(); const ms = n.material ? [].concat(n.material) : []; for (const m of ms) if (!keep.includes(m)) m.dispose(); });
+  if (o.parent) o.parent.remove(o);
 }
 function updatePads(dt, live) {
   player.refuse = null;
@@ -4803,6 +4988,7 @@ class Site {
   accepts() { return this.state === 'active' && this.total() + this.pad.pending < this.def.cost; }
   pileTop(o) { return o.set(this.def.pile.x, .3 + Math.floor(Math.min(this.pile, PILE_MAX) / 4) * .26, this.def.pile.z); }
   refresh() { for (let i = 0; i < PILE_MAX; i++) this.pileM[i].visible = i < this.pile; }
+  destroy() { disposeObj(this.group); disposeObj(this.pileG); removePad(this.pad); const k = boxes.indexOf(this.col); if (k >= 0) boxes.splice(k, 1); }
   activate() {
     this.state = 'active'; this.marker.visible = true; this.col.on = true; this.pad.on = true;
     puff(this.def.x, .4, this.def.z, 14, 0xffffff, { speed: 3.5, up: 2.5, size: .3 });
@@ -4830,23 +5016,37 @@ class Site {
   }
 }
 const cabinDoor = { x: -9.5, z: -.9 };
-const SITE_DEFS = [
-  { id: 'cabin', name: '통나무집', cost: 12, bonus: 500, x: -9.5, z: -3.6, w: 5.4, d: 4.4, pad: { x: -9.5, z: .7 }, pile: { x: -7.2, z: .1 }, wait: { x: -9.5, z: 1.8 },
-    spots: [[-11.4, -.9], [-9.5, -.75], [-7.6, -.9], [-6.25, -3], [-12.75, -3]], build: buildCabin,
-    onDone() { hirePad.on = true; addWindowGlow(-9.5, -.2, .4); toast(ICON.helper + ' 통나무집 앞에서 <b>나무꾼</b>을 부를 수 있어요'); } },
-  { id: 'workshop', name: '작업장', cost: 28, bonus: 1000, x: 9.5, z: -3.6, w: 5.6, d: 4.2, pad: { x: 9.5, z: .7 }, pile: { x: 11.9, z: .1 }, wait: { x: 9.5, z: 1.8 },
-    spots: [[7.6, -1], [9.5, -1], [11.4, -1], [12.85, -3.2], [6.15, -3.2]], build: buildWorkshop,
-    onDone() { for (const u of upgrades) u.pad.on = true; spawnBuilder(); storm.next = Math.min(storm.next, G.time + 130); toast(ICON.axe + ' 작업장에서 <b>도끼 · 지게 · 털옷</b>을 손볼 수 있어요'); } },
-  { id: 'sawmill', name: '제재소', cost: 45, bonus: 1500, x: -11.5, z: 11, w: 7, d: 4.6, pad: { x: -11.5, z: 15.5 }, pile: { x: -9.1, z: 15.1 }, wait: { x: -11.5, z: 16.7 },
-    spots: [[-13.6, 13.85], [-11.5, 13.85], [-9.4, 13.85], [-7.45, 11.3], [-15.55, 11.3]], build: buildSawmill,
-    onDone() { millOut.grp.visible = true; millOut.col.on = true; if (!G.stats.storms && storm.state === 'calm') storm.next = Math.min(storm.next, G.time + 7); toast(ICON.log + ' 제재소가 통나무를 저절로 만들어요'); } },
-  { id: 'sled', name: '보급 썰매', cost: 70, bonus: 2000, x: 0, z: -16.5, w: 2.8, d: 5.6, pad: { x: 0, z: -11.4 }, pile: { x: 2.5, z: -11.8 }, wait: { x: -2.3, z: -11.6 },
-    spots: [[-1.95, -15], [1.95, -15], [-1.95, -17.6], [1.95, -17.6], [0, -13.1]], build: buildSled,
-    onDone() { gatePad.on = true; toast(ICON.gate + ' 썰매 준비 끝! <b>얼음 문</b> 앞으로 가요'); } },
+// 집터 자리 넷 — 장마다 그 자리에 새 건물을 짓는다(0 쉼터 · 1 공방 · 2 일터 · 3 탈것)
+const SLOTS = [
+  { x: -9.5, z: -3.6, w: 5.4, d: 4.4, pad: { x: -9.5, z: .7 }, pile: { x: -7.2, z: .1 }, wait: { x: -9.5, z: 1.8 }, spots: [[-11.4, -.9], [-9.5, -.75], [-7.6, -.9], [-6.25, -3], [-12.75, -3]] },
+  { x: 9.5, z: -3.6, w: 5.6, d: 4.2, pad: { x: 9.5, z: .7 }, pile: { x: 11.9, z: .1 }, wait: { x: 9.5, z: 1.8 }, spots: [[7.6, -1], [9.5, -1], [11.4, -1], [12.85, -3.2], [6.15, -3.2]] },
+  { x: -11.5, z: 11, w: 7, d: 4.6, pad: { x: -11.5, z: 15.5 }, pile: { x: -9.1, z: 15.1 }, wait: { x: -11.5, z: 16.7 }, spots: [[-13.6, 13.85], [-11.5, 13.85], [-9.4, 13.85], [-7.45, 11.3], [-15.55, 11.3]] },
+  { x: 0, z: -16.5, w: 2.8, d: 5.6, pad: { x: 0, z: -11.4 }, pile: { x: 2.5, z: -11.8 }, wait: { x: -2.3, z: -11.6 }, spots: [[-1.95, -15], [1.95, -15], [-1.95, -17.6], [1.95, -17.6], [0, -13.1]] },
 ];
-for (const d of SITE_DEFS) sites.push(new Site(d));
+const BUILD = { cabin: buildCabin, workshop: buildWorkshop, sawmill: buildSawmill, sled: () => buildSled(false), sail: () => buildSled(true), igloo: buildIgloo, tower: buildTower, stage: buildStage };
+function makeSites() {
+  CH().sites.forEach((o, i) => sites.push(new Site(Object.assign({}, SLOTS[i], { id: 's' + i, name: o.name, cost: o.cost, bonus: o.bonus || o.cost * 25,
+    build: () => withC(o.c || {}, BUILD[o.b]), onDone: site => slotDone(i, site) }))));
+}
+// 다 지으면 자리마다 하는 일 — 쉼터: 나무꾼 부르기 · 공방: 장비 손보기 · 일터: 통나무가 저절로 · 탈것: 얼음 문
+function slotDone(i, site) {
+  const nm = site.def.name;
+  if (i === 0) { addWindowGlow(-9.5, -.2, .4); if (jacks.length < HIRE_COST.length) { hirePad.on = true; toast(ICON.helper + ` ${nm} 앞에서 <b>나무꾼</b>을 부를 수 있어요`); } }
+  else if (i === 1) {
+    let up = false; for (const u of upgrades) if (G.up[u.key] < 2) { u.pad.on = true; up = true; }
+    if (builders.length < 3) spawnBuilder();
+    if (ci === 0) storm.next = Math.min(storm.next, G.time + 130);
+    if (up) toast(ICON.axe + ` ${nm}에서 <b>도끼 · 지게 · 털옷</b>을 손볼 수 있어요`);
+  } else if (i === 2) {
+    millOut.grp.visible = true; millOut.col.on = true;
+    if (ci === 0 && !G.stats.storms && storm.state === 'calm') storm.next = Math.min(storm.next, G.time + 7);
+    toast(ICON.log + ` ${nm} 곁에 통나무가 저절로 쌓여요`);
+  } else toast(G.chSpecial ? `${ICON.gate} ${nm} 준비 끝! <b>${CH().gate.replace(' 열기', '')}</b> 앞으로 가요` : `${ICON.gate} ${nm} 준비 끝! 먼저 「${CH().special.title}」`);
+}
+
 const activeSite = () => sites.find(s => s.state === 'active');
-function addWindowGlow(x, z, o) { const g = decal(0xffc46b, o, 5.5); g.position.set(x, .03, z); scene.add(g); addGlow(g, o); }
+function addWindowGlow(x, z, o) { const g = decal(0xffc46b, o, 5.5); g.position.set(x, .03, z); scene.add(g); addGlow(g, o); chObjs.push(g); }
+const chObjs = []; // 이번 장에만 있는 것(장이 바뀌면 치운다)
 
 /* ---------- 장작더미 · 제재소 통나무(가져가는 곳) ---------- */
 function makeStore(o) {
@@ -4924,7 +5124,7 @@ for (const u of upgrades) {
 const gate = buildGate(); gate.g.position.set(0, 0, -27.3); scene.add(gate.g); gate.opened = false;
 gate.col = { x0: -4.6, x1: 4.6, z0: -28, z1: -26.6, on: true }; boxes.push(gate.col);
 const gateGlow = decal(0xfff1c4, 0, 12); gateGlow.position.set(0, .03, -25); scene.add(gateGlow);
-const gatePad = makePad({ x: 0, z: -23, r: 1.5, color: 0x4fc3ff, mode: 'step', need: .5, onStep: () => startCine(), html: () => `${ICON.gate}<b>얼음 문 열기</b>` });
+const gatePad = makePad({ x: 0, z: -23, r: 1.5, color: 0x4fc3ff, mode: 'step', need: .5, onStep: () => startCine(), html: () => `${ICON.gate}<b>${CH().gate}</b>` });
 
 /* ---------- 사람 움직임 ---------- */
 function animChar(c, dt, o) {
@@ -5018,7 +5218,7 @@ function updateWarmth(dt) {
   const byCabin = sites[0].state === 'done' && Math.hypot(player.x - cabinDoor.x, player.z - cabinDoor.z) < 3.4;
   player.inWarm = byFire || byCabin;
   if (player.inWarm) player.warmth = Math.min(100, player.warmth + (byFire ? 18 : 10) * dt);
-  else player.warmth -= 1.55 * [1, .68, .45][G.up.coat] * (1 + 3.2 * storm.k) * dt;
+  else player.warmth -= 1.55 * [1, .68, .45][G.up.coat] * (1 + 3.2 * storm.k * CH().storm.cold) * dt;
   if (player.warmth < 28 && !player.coldWarned) { player.coldWarned = true; toast(ICON.snow + ' 몸이 얼고 있어요. 모닥불 곁으로 가요!', 'cold'); }
   if (player.warmth > 50) player.coldWarned = false;
   if (player.warmth <= 0) { // 꽁꽁 — 일꾼들이 불가로 데려다준다(통나무 절반은 그 자리에 떨어뜨린다)
@@ -5139,12 +5339,12 @@ spawnBuilder(); spawnBuilder();
 function updateStorm(dt) {
   if (cine.on) return;
   if (storm.state === 'calm') { if (G.time >= storm.next) { storm.state = 'warn'; storm.t = 9; sfx.warn(); toast(ICON.snow + ' <b>눈보라</b>가 몰려와요! 장작을 넣고 모닥불 곁으로', 'cold'); } }
-  else if (storm.state === 'warn') { storm.t -= dt; if (storm.t <= 0) { storm.state = 'storm'; storm.t = STORM_LEN; sfx.warn(); } }
+  else if (storm.state === 'warn') { storm.t -= dt; if (storm.t <= 0) { storm.state = 'storm'; storm.t = stormLen(); sfx.warn(); } }
   else {
     storm.t -= dt;
     if (storm.t <= 0) {
-      storm.state = 'calm'; storm.next = G.time + rnd(110, 150); G.stats.storms++; sfx.quest();
-      toast(`${ICON.star} 눈보라를 버텼어요!${G.stats.storms <= 2 ? ' +800점' : ''} 바람에 쓰러진 통나무를 주워요`, 'good');
+      const gp = CH().storm.gap; storm.state = 'calm'; storm.next = G.time + rnd(gp[0], gp[1]); G.stats.storms++; G.chStorms++; sfx.quest();
+      toast(`${ICON.star} 눈보라를 버텼어요!${G.stats.storms <= 16 ? ' +600점' : ''} 바람에 쓰러진 통나무를 주워요`, 'good');
       for (let i = 0; i < 9; i++) { const a = rnd(0, TAU), r = rnd(5.5, 9.5); spawnLoose(clamp(Math.cos(a) * r, -BX, BX), Math.sin(a) * r, 1, .5); }
     }
   }
@@ -5154,7 +5354,7 @@ function updateStorm(dt) {
 function startCine() {
   if (cine.on || gate.opened) return;
   cine.on = true; cine.t = 0; cine.fx = 0; cine.fz = -22.5; gatePad.on = false; gate.opened = true;
-  G.timeBonus = Math.ceil(Math.max(0, ROUND - G.time)) * 10; stopInput(); storm.state = 'calm'; sfx.crack();
+  G.chBonus = ARC ? Math.ceil(Math.max(0, chTime() - G.time)) * 10 : 0; stopInput(); storm.state = 'calm'; sfx.crack();
 }
 function updateCine(dt) {
   cine.t += dt; const t = cine.t, sled = sites[3];
@@ -5169,16 +5369,17 @@ function updateCine(dt) {
   if (t > 1.5) { const k = easeInOut(clamp((t - 1.5) / 1.7, 0, 1)); gate.dl.rotation.y = k * 1.85; gate.dr.rotation.y = -k * 1.85; gate.light.material.opacity = k * .92; gateGlow.material.opacity = k * .55; }
   if (t > 2.5) { const k = easeInOut(clamp((t - 2.5) / 3.4, 0, 1)); sled.group.position.z = sled.def.z - k * 21; sled.group.position.y = Math.abs(Math.sin(t * 9)) * .05; sled.col.on = false; if (Math.random() < dt * 30 && k < .95) puff(rnd(-1, 1), .15, sled.group.position.z + 2.6, 1, 0xffffff, { speed: 1.5, up: 1.5, size: .3 }); }
   if (t > 3 && t < 5.4 && Math.random() < dt * 9) confetti(rnd(-6, 6), rnd(4, 7), rnd(-25, -20), 5);
-  if (t > 6 && mode === 'play') endRound(true);
+  if (t > 6 && mode === 'play') chapterClear();
 }
 
 /* ---------- 점수 ---------- */
+// 지은 통나무 하나 20점 + 건물 완성 보너스 · 장 깨기 2,000 + 1,000×장 · 남은 시간 1초 10점 · 특별 목표 1,000 · 나무꾼 300 · 장비 200 · 눈보라 600(16번까지) · 얼음 −200 · 엔딩 10,000
+function chapterPts() { if (G.banked) return 0; let s = 0; for (const st of sites) { s += st.progress * 20; if (st.state === 'done') s += st.def.bonus; } return s; }
+const clearPts = n => 2000 + 1000 * (n + 1);
 function score() {
-  let s = 0;
-  for (const st of sites) { s += st.progress * 20; if (st.state === 'done') s += st.def.bonus; }
-  s += jacks.length * 300 + (G.up.axe + G.up.pack + G.up.coat) * 200 + Math.min(G.stats.storms, 2) * 800 - G.stats.frozen * 200;
-  if (gate.opened) s += 3000 + G.timeBonus;
-  return Math.max(0, Math.round(s));
+  const P0 = G.pts, s = P0.build + P0.clear + P0.time + P0.special + P0.ending + chapterPts()
+    + jacks.length * 300 + (G.up.axe + G.up.pack + G.up.coat) * 200 + Math.min(G.stats.storms, 16) * 600 - G.stats.frozen * 200;
+  return clamp(Math.round(s), 0, SCORE_MAX);
 }
 
 /* ---------- 목표(순서대로) ---------- */
@@ -5191,21 +5392,32 @@ function fetchOrDrop(pad, need) { // 통나무가 모자라면 가까운 나무�
   if (stock.count >= 4 && player.carried < player.cap) return { x: stock.pad.x, z: stock.pad.z, h: 2.6 };
   const t = nearestTree(player.x, player.z, 99); return t ? { x: t.x, z: t.z, h: 4 * t.s } : { x: pad.x, z: pad.z, h: 2.6 };
 }
-const siteQuest = (i, title) => ({ title, goal: SITE_DEFS[i].cost, val: () => sites[i].progress, count: () => `통나무 ${sites[i].progress} / ${SITE_DEFS[i].cost}`,
-  target: () => sites[i].state === 'active' ? fetchOrDrop(sites[i].pad, padNeed(SITE_DEFS[i].cost, sites[i].total() + sites[i].pad.pending)) : null });
-const quests = [
-  { title: '소나무를 베어 통나무 모으기', goal: 6, skip: () => sites[0].progress > 0, val: () => G.stats.chopped, count: () => `통나무 ${Math.min(6, G.stats.chopped)} / 6`, target: () => { const t = nearestTree(player.x, player.z, 99); return t && { x: t.x, z: t.z, h: 4 * t.s }; } },
-  siteQuest(0, '통나무집 짓기 · 집터에 통나무 내려놓기'),
-  { title: '통나무집 앞에서 나무꾼 부르기', goal: 1, skip: () => sites[1].progress >= 12, val: () => jacks.length, count: () => `통나무 ${hire.paid} / ${HIRE_COST[0]}`, target: () => fetchOrDrop(hirePad, padNeed(HIRE_COST[0], hire.paid + hirePad.pending)) },
-  siteQuest(1, '작업장 짓기'),
-  { title: '작업장에서 장비 하나 손보기', goal: 1, skip: () => sites[2].progress >= 18, val: () => G.up.axe + G.up.pack + G.up.coat, count: () => `통나무 ${Math.max(...upgrades.map(u => u.paid))} / ${UP_COST[0]}`,
-    target: () => { const u = upgrades.reduce((a, b) => (b.paid > a.paid ? b : a)); return fetchOrDrop(u.pad, padNeed(UP_COST[0], u.paid + u.pad.pending)); } },
-  siteQuest(2, '제재소 짓기'),
-  { title: '눈보라 버티기 · 모닥불 곁에 머물기', goal: 1, val: () => G.stats.storms, count: () => storm.state === 'storm' ? `남은 눈보라 ${mmss(storm.t)}` : storm.state === 'warn' ? `눈보라까지 ${mmss(storm.t)}` : '곧 눈보라가 와요',
-    frac: () => storm.state === 'storm' ? 1 - storm.t / STORM_LEN : 0, target: () => (fire.fuel < .7 && player.carried > 0 ? { x: firePad.x, z: firePad.z, h: 2.6 } : { x: 0, z: 0, h: 3.4 }) },
-  siteQuest(3, '보급 썰매 만들기'),
-  { title: '얼음 문 열기', goal: 1, val: () => (gate.opened ? 1 : 0), count: () => '문 앞 동그라미에 서요', target: () => ({ x: gatePad.x, z: gatePad.z, h: 2.8 }) },
-];
+const siteQuest = (i, title) => ({ title, goal: sites[i].def.cost, val: () => sites[i].progress, count: () => `통나무 ${sites[i].progress} / ${sites[i].def.cost}`,
+  target: () => sites[i].state === 'active' ? fetchOrDrop(sites[i].pad, padNeed(sites[i].def.cost, sites[i].total() + sites[i].pad.pending)) : null });
+const toFire = () => (fire.fuel < .7 && player.carried > 0 ? { x: firePad.x, z: firePad.z, h: 2.6 } : { x: 0, z: 0, h: 3.4 });
+function specialQuest(sp) { // 장마다 하나 — 눈보라 버티기 · 모닥불 채우기 · 특별한 곳에 장작 넣기
+  if (sp.kind === 'storm') return { special: true, title: sp.title, goal: 1, val: () => G.chStorms, enter: () => { if (storm.state === 'calm') storm.next = Math.min(storm.next, G.time + 6); },
+    count: () => storm.state === 'storm' ? `남은 눈보라 ${mmss(storm.t)}` : storm.state === 'warn' ? `눈보라까지 ${mmss(storm.t)}` : '곧 눈보라가 와요',
+    frac: () => storm.state === 'storm' ? 1 - storm.t / stormLen() : 0, target: toFire };
+  if (sp.kind === 'fire') return { special: true, title: sp.title, goal: 1, val: () => (fire.fuel >= .895 ? 1 : 0), count: () => `모닥불 ${Math.round(fire.fuel * 100)}% / 90%`, frac: () => fire.fuel / .9,
+    target: () => (player.carried > 0 ? { x: firePad.x, z: firePad.z, h: 2.6 } : fetchOrDrop(firePad, 9)) };
+  return { special: true, title: sp.title, goal: sp.cost, val: () => (offer ? offer.paid : 0), enter: () => { if (offer && offer.paid < sp.cost) offer.pad.on = true; },
+    count: () => `통나무 ${offer ? offer.paid : 0} / ${sp.cost}`, target: () => (offer && offer.pad.on ? fetchOrDrop(offer.pad, padNeed(sp.cost, offer.paid + offer.pad.pending)) : null) };
+}
+let quests = [];
+function makeQuests() {
+  const ch = CH(), sq = specialQuest(ch.special), gq = { title: ch.gate, goal: 1, val: () => (gate.opened ? 1 : 0), count: () => '문 앞 동그라미에 서요', target: () => (gatePad.on ? { x: gatePad.x, z: gatePad.z, h: 2.8 } : null) };
+  if (ci === 0) quests = [
+    { title: '소나무를 베어 통나무 모으기', goal: 6, skip: () => sites[0].progress > 0, val: () => G.stats.chopped, count: () => `통나무 ${Math.min(6, G.stats.chopped)} / 6`, target: () => { const t = nearestTree(player.x, player.z, 99); return t && { x: t.x, z: t.z, h: 4 * t.s }; } },
+    siteQuest(0, '통나무집 짓기 · 집터에 통나무 내려놓기'),
+    { title: '통나무집 앞에서 나무꾼 부르기', goal: 1, skip: () => sites[1].progress >= 12, val: () => jacks.length, count: () => `통나무 ${hire.paid} / ${HIRE_COST[0]}`, target: () => fetchOrDrop(hirePad, padNeed(HIRE_COST[0], hire.paid + hirePad.pending)) },
+    siteQuest(1, '작업장 짓기'),
+    { title: '작업장에서 장비 하나 손보기', goal: 1, skip: () => sites[2].progress >= 18, val: () => G.up.axe + G.up.pack + G.up.coat, count: () => `통나무 ${Math.max(...upgrades.map(u => u.paid))} / ${UP_COST[0]}`,
+      target: () => { const u = upgrades.reduce((a, b) => (b.paid > a.paid ? b : a)); return fetchOrDrop(u.pad, padNeed(UP_COST[0], u.paid + u.pad.pending)); } },
+    siteQuest(2, '제재소 짓기'), sq, siteQuest(3, '보급 썰매 만들기'), gq];
+  else quests = [siteQuest(0, `${ch.sites[0].name} 짓기`), siteQuest(1, `${ch.sites[1].name} 짓기`), siteQuest(2, `${ch.sites[2].name} 짓기`), sq, siteQuest(3, `${ch.sites[3].name} 만들기`), gq];
+  qi = 0;
+}
 let qi = 0;
 function arrowTex() {
   const s = 128, c = document.createElement('canvas'); c.width = c.height = s; const g = c.getContext('2d');
@@ -5219,10 +5431,17 @@ const arrow = new THREE.Sprite(new THREE.SpriteMaterial({ map: arrowTex(), depth
 arrow.center.set(.5, .08); arrow.scale.set(1.9, 1.9, 1); arrow.renderOrder = 10; arrow.visible = false; scene.add(arrow);
 const ptr = $('ptr');
 function updateQuest(dt, live) {
-  while (qi < quests.length && (quests[qi].val() >= quests[qi].goal || (quests[qi].skip && quests[qi].skip()))) { qi++; if (live) sfx.quest(); const q = $('quest'); q.classList.remove('bump'); void q.offsetWidth; q.classList.add('bump'); }
+  while (live && qi < quests.length && (quests[qi].val() >= quests[qi].goal || (quests[qi].skip && quests[qi].skip()))) {
+    if (quests[qi].special && !G.chSpecial) { // 특별 목표를 마치면 +1,000점 · 썰매가 다 됐으면 문이 열린다
+      G.chSpecial = true; G.specials++; G.pts.special += 1000; toast(`${ICON.star} <b>${quests[qi].title.split(' · ')[0]}</b> 완료! +1,000점`, 'good');
+      if (sites[3].state === 'done') toast(`${ICON.gate} <b>${CH().gate.replace(' 열기', '')}</b> 앞으로 가요`);
+    }
+    qi++; if (quests[qi] && quests[qi].enter) quests[qi].enter();
+    sfx.quest(); const q = $('quest'); q.classList.remove('bump'); void q.offsetWidth; q.classList.add('bump');
+  }
   const q = quests[qi];
-  if (!q) { setText($('qStep'), '모든 목표 달성'); setText($('qTitle'), gate.opened ? '새 땅으로 가는 길이 열렸어요' : ''); $('qBar').style.width = '100%'; setText($('qCount'), ''); arrow.visible = false; ptr.style.display = 'none'; return; }
-  setText($('qStep'), `목표 ${qi + 1} / ${quests.length}`); setText($('qTitle'), q.title); setText($('qCount'), q.count());
+  if (!q) { setText($('qStep'), `${ci + 1}장 · 모든 목표 달성`); setText($('qTitle'), gate.opened ? '새 땅으로 가는 길이 열렸어요' : ''); $('qBar').style.width = '100%'; setText($('qCount'), ''); arrow.visible = false; ptr.style.display = 'none'; return; }
+  setText($('qStep'), `${ci + 1}장 ${CH().title} · 목표 ${qi + 1} / ${quests.length}`); setText($('qTitle'), q.title); setText($('qCount'), q.count());
   $('qBar').style.width = Math.round(clamp(q.frac ? q.frac() : q.val() / q.goal, 0, 1) * 100) + '%';
   const tg = live && !cine.on ? q.target() : null;
   if (!tg) { arrow.visible = false; ptr.style.display = 'none'; return; }
@@ -5249,14 +5468,15 @@ function updateHud() {
   $('warmCover').style.width = (100 - w).toFixed(1) + '%'; setText($('warmTxt'), Math.round(w) + '°');
   $('warm').classList.toggle('cold', w < 28); $('warm').classList.toggle('cozy', player.inWarm && w < 99.5);
   $('frost').style.opacity = clamp((42 - w) / 42, 0, 1).toFixed(2);
-  if (player.frozenT <= 0) $('white').style.opacity = (storm.k * .2).toFixed(2);
+  if (player.frozenT <= 0) $('white').style.opacity = Math.max(storm.k * .2, G.fade).toFixed(2);
   $('gust').style.opacity = (storm.k * .75).toFixed(2);
   setText($('logTxt'), `${player.carried}/${player.cap}`); setText($('helpTxt'), String(helpers.length));
   const sc = score();
   if (sc !== shownScore) { if (shownScore >= 0 && sc > shownScore) { const ch = $('scoreChip'); ch.classList.remove('bump'); void ch.offsetWidth; ch.classList.add('bump'); } shownScore = sc; setText($('scoreTxt'), fmt(sc)); }
-  if (ARC) { const left = ROUND - G.time; setText($('timeTxt'), mmss(left)); $('timeChip').classList.toggle('warn', left <= 60); }
+  if (ARC) { const left = chTime() - G.time; setText($('timeTxt'), mmss(left)); $('timeChip').classList.toggle('warn', left <= 60); }
   const b = $('banner');
-  if (storm.state === 'warn') { b.className = 'glass on warn'; setLabelHtml(b, `${ICON.snow} 눈보라가 몰려와요 · ${mmss(storm.t)}`); }
+  if (fire.outT > 0) { b.className = 'glass on warn'; setLabelHtml(b, `${ICON.flame} 불씨가 꺼졌어요! ${Math.ceil(FIRE_OUT - fire.outT)}초 안에 장작을 넣어요`); }
+  else if (storm.state === 'warn') { b.className = 'glass on warn'; setLabelHtml(b, `${ICON.snow} 눈보라가 몰려와요 · ${mmss(storm.t)}`); }
   else if (storm.state === 'storm') { b.className = 'glass on storm'; setLabelHtml(b, `${ICON.snow} 눈보라! 모닥불 곁에 머물러요 · ${mmss(storm.t)}`); }
   else if (b.className !== '') b.className = '';
 }
@@ -5272,7 +5492,7 @@ const snow = new THREE.Points(snowGeo, snowMat); snow.frustumCulled = false; sce
 const focus = new THREE.Vector3(player.x, 0, player.z - 1.2);
 function updateSnow(dt) {
   const s = storm.k, fall = 2.3 + s * 5, wind = .8 + s * 15, n = Math.round(lerp(520, SNOW_N, s));
-  snowGeo.setDrawRange(0, n); snowMat.size = .3 + s * .12;
+  snowGeo.setDrawRange(0, n); snowMat.size = G.snowSize + s * .12;
   const dx = focus.x - snow.position.x, dz = focus.z - snow.position.z; snow.position.set(focus.x, 0, focus.z);
   for (let i = 0; i < n; i++) {
     const k = i * 3, sd = snowSeed[i];
@@ -5287,7 +5507,7 @@ function updateSnow(dt) {
 const _c1 = new THREE.Color();
 function updateSky(dt) {
   storm.k = damp(storm.k, storm.state === 'storm' ? 1 : storm.state === 'warn' ? .25 : 0, 1.3, dt);
-  const cyc = (G.clock % 230) / 230; let k = cyc < .46 ? 0 : cyc < .58 ? (cyc - .46) / .12 : cyc < .88 ? 1 : 1 - (cyc - .88) / .12; k = smooth(clamp(k, 0, 1)); G.dusk = k;
+  const cyc = (G.clock % 230) / 230; let k = cyc < .46 ? 0 : cyc < .58 ? (cyc - .46) / .12 : cyc < .88 ? 1 : 1 - (cyc - .88) / .12; k = lerp(G.duskBias, 1, smooth(clamp(k, 0, 1))); G.dusk = k; // 밤 장은 늘 조금 어둑하게
   const s = storm.k, D = PAL.day, U = PAL.dusk, S = PAL.storm;
   _c1.copy(D.bg).lerp(U.bg, k).lerp(S.bg, s); scene.background.copy(_c1); scene.fog.color.copy(_c1);
   scene.fog.near = lerp(lerp(D.fogN, U.fogN, k), S.fogN, s); scene.fog.far = lerp(lerp(D.fogF, U.fogF, k), S.fogF, s);
@@ -5310,7 +5530,8 @@ const canMove = () => (mode === 'play' || mode === 'free') && !paused;
 addEventListener('keydown', e => {
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
   keys[e.code] = true;
-  if (e.key === 'Escape' && !e.repeat) { e.preventDefault(); if (ARC) { if (mode === 'play') hk({ type: 'hk:esc' }); if (!inFrame) (paused ? resume : pause)(); } else (paused ? resume : pause)(); }
+  if (mode === 'story' && !paused && !e.repeat && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); nextLine(); return; }
+  if (e.key === 'Escape' && !e.repeat) { e.preventDefault(); if (ARC) { if (mode === 'play' || mode === 'story') hk({ type: 'hk:esc' }); if (!inFrame) (paused ? resume : pause)(); } else (paused ? resume : pause)(); }
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
@@ -5348,25 +5569,29 @@ function step(dt) {
   if (mode === 'play' && !cine.on) G.time += dt;
   if (live) { for (let i = G.timers.length - 1; i >= 0; i--) { const t = G.timers[i]; t.t -= dt; if (t.t <= 0) { G.timers.splice(i, 1); t.fn(); } } }
   if (live && !cine.on) readInput(); else input.x = input.z = 0;
+  if (mode === 'story') updateStory(dt);
+  G.fade = Math.max(0, G.fade - dt * .9);
   if (typeof devInput === 'function') devInput(live);
   if (live) updateStorm(dt);
   updatePlayer(dt, live);
   if (live) {
     updateWarmth(dt);
     for (const h of helpers) h.update(dt);
+    gatePad.on = !gate.opened && !cine.on && sites[3].state === 'done' && G.chSpecial; // 탈것을 다 짓고 특별 목표까지 마치면 문 앞 동그라미
     if (sites[2].state === 'done' && !cine.on) { // 제재소 — 통나무가 저절로 쌓인다
       millOut.t += dt; if (millOut.t >= 2.4) { millOut.t = 0; if (millOut.count < millOut.cap) { millOut.add(1); puff(millOut.x, 1.2, millOut.z, 2, C.logEnd, { speed: 1.4, size: .1 }); } }
-      const b = sites[2].built; b.blade.rotation.z -= dt * 14; b.sawLog.position.x = -1.7 + ((G.clock * .35) % 1) * 1.5;
-      if (Math.random() < dt * 5) puff(sites[2].def.x + .9, 1.3, sites[2].def.z + 1.6, 1, C.logEnd, { speed: 1.5, up: 2, size: .08 });
+      const b = sites[2].built;
+      if (b.blade) { b.blade.rotation.z -= dt * 14; b.sawLog.position.x = -1.7 + ((G.clock * .35) % 1) * 1.5; if (Math.random() < dt * 5) puff(sites[2].def.x + .9, 1.3, sites[2].def.z + 1.6, 1, C.logEnd, { speed: 1.5, up: 2, size: .08 }); }
     }
     if (cine.on) updateCine(dt);
-    if (ARC && mode === 'play' && !cine.on && G.time >= ROUND) endRound(false);
+    if (ARC && mode === 'play' && !cine.on && G.time >= chTime()) endRound(false, 'time');
   } else for (const h of helpers) { h.char.g.position.set(h.x, 0, h.z); h.char.g.rotation.y = h.face; h.pop = Math.min(1, h.pop + dt * 2.2); h.char.g.scale.setScalar(h.char.scale * Math.max(.01, easeOutBack(h.pop))); animChar(h.char, dt, { moving: false, swing: -1, carry: h.carried }); }
   updateLoose(dt, live);
   for (const s of sites) s.update(dt);
   for (const t of trees) t.update(dt);
   // 굴뚝 연기
-  if (sites[0].state === 'done' && Math.random() < dt * 2.4) { const v = sites[0].built.smoke; dust.emit(sites[0].def.x + v.x, v.y, sites[0].def.z + v.z, { vx: rnd(.2, .6), vz: rnd(-.2, .2), vy: rnd(.9, 1.4), g: -.3, life: rnd(1.8, 2.8), size: .28, grow: .55, color: 0xeef3f8 }); }
+  if (land && land.update) land.update(dt, G.clock);
+  if (sites[0].state === 'done' && sites[0].built.smoke && Math.random() < dt * 2.4) { const v = sites[0].built.smoke; dust.emit(sites[0].def.x + v.x, v.y, sites[0].def.z + v.z, { vx: rnd(.2, .6), vz: rnd(-.2, .2), vy: rnd(.9, 1.4), g: -.3, life: rnd(1.8, 2.8), size: .28, grow: .55, color: 0xeef3f8 }); }
   updateFire(dt, live); updateFlyers(dt); dust.update(dt); spark.update(dt); updateFoots(dt);
   updateSky(dt); updateCamera(dt); updateSnow(dt);
   camera.updateMatrixWorld(); updatePads(dt, live); updateQuest(dt, live); updateHud();
@@ -5378,42 +5603,220 @@ const card = $('card'), startOv = $('start');
 function showCard(html) { card.innerHTML = html; startOv.style.display = 'flex'; }
 function menuCard() {
   showCard(`<h1>${ICON.snow} 눈꽃 야영지 3D</h1>
-    <p>눈 덮인 숲에서 홀로 겨울을 나요. 나무를 베어 야영지를 짓고, <b>얼음 문</b> 너머 새 땅으로!</p>
+    <p>눈보라에 길을 잃은 야영대. <b>얼음 문</b>을 여덟 번 지나 잠든 <b>봄</b>을 깨우러 떠나요!</p>
     <ol><li><b>소나무</b> 곁에 서면 저절로 도끼질해요. 통나무는 지게에 실려요.</li>
     <li>반짝이는 <b>동그라미</b>에 서면 통나무를 내려놓아요. 꼬마 일꾼들이 차근차근 지어요.</li>
-    <li><b>온기</b>가 떨어지면 모닥불 곁에서 녹여요. 눈보라가 오면 장작을 넣고 불 곁에 머물러요.</li>
-    <li>통나무집 → 작업장 → 제재소 → 보급 썰매를 지으면 얼음 문이 열려요.</li></ol>
-    ${ARC ? '<p class="note">한 판 8분 · 문을 빨리 열수록 남은 시간이 점수가 돼요.</p>' : ''}
+    <li><b>온기</b>가 떨어지면 모닥불 곁에서 녹여요. 눈보라 속에 모닥불이 꺼진 채 10초가 지나면 끝나요.</li>
+    <li>장마다 건물 넷과 특별 목표를 마치면 얼음 문이 열려 다음 장으로 가요. 모두 <b>8장</b>이에요.</li></ol>
+    ${ARC ? '<p class="note">장마다 시간을 새로 받아요(1장 7분 · 2~4장 5분 30초 · 5~6장 6분 · 7~8장 6분 30초). 빨리 깰수록 남은 시간이 점수가 돼요.</p>' : ''}
     <p class="keys">움직이기: 화면을 끌거나 WASD · 방향키</p>
     <button id="play" data-act="start">시작</button>`);
 }
 function startRound() {
   if (mode !== 'menu') return;
-  mode = 'play'; startOv.style.display = 'none'; sfx.init(); last = performance.now(); reported = false; liveT = 1; lastLive = -1;
-  sites[0].activate(); document.documentElement.classList.add('playing');
+  startOv.style.display = 'none'; sfx.init(); last = performance.now(); reported = false; liveT = 1; lastLive = -1;
+  document.documentElement.classList.add('playing');
   hk({ type: 'hk:start' }); hk({ type: 'hk:live', score: 0 });
+  playStory(CH().intro, chTitle(), beginChapter);
 }
-function endRound(win) {
-  if (mode !== 'play') return; mode = 'over'; stopInput(); arrow.visible = false; ptr.style.display = 'none';
-  const sc = score(), done = sites.filter(s => s.state === 'done').length, built = sites.reduce((a, s) => a + s.progress, 0);
+const chTitle = () => `<small>${ci + 1}장 / ${CHAPTERS.length}</small><b>${CH().title}</b><span>${CH().sub}</span>`;
+function beginChapter() { // 이야기가 끝나면 이 장을 시작한다
+  mode = 'play'; last = performance.now(); G.time = 0; sites[0].activate(); updateQuest(0, true);
+  const ch = CH(); toast(`${ICON.hammer} <b>${ci + 1}장</b> ${ch.sites.map(o => o.name).join(' · ')} 짓기${ARC ? ' · ' + mmss(ch.time) : ''}`, 'good');
+}
+// 얼음 문을 지나면: 이번 장 점수를 쌓고 → 다음 장 땅을 새로 깔고 → 이야기 → 시작 (마지막 장이면 엔딩)
+function chapterClear() {
+  if (mode !== 'play') return;
+  const cp = chapterPts(), bonus = clearPts(ci);
+  G.pts.build += cp; G.pts.clear += bonus; G.pts.time += G.chBonus; G.clears++;
+  G.sitesDone += sites.filter(x => x.state === 'done').length; G.logsBuilt += sites.reduce((a, x) => a + x.progress, 0);
+  G.banked = true; // 이번 장 건물 점수는 쌓아 두었다(겹쳐 세지 않게)
+  if (ci >= CHAPTERS.length - 1) {
+    G.pts.ending += 10000; sfx.fanfare(); for (let i = 0; i < 6; i++) later(i * .25, () => confetti(player.x + rnd(-5, 5), 5, player.z + rnd(-4, 2), 30));
+    playStory(ENDING, `<small>마지막 이야기</small><b>봄이 돌아왔어요</b><span>여덟 장의 겨울 여행 끝 · 엔딩 보너스 +10,000점</span>`, () => endRound(true));
+    return;
+  }
+  G.fade = 1; loadChapter(ci + 1);
+  toast(`${ICON.star} <b>${ci}장 완료!</b> +${fmt(bonus + G.chBonus)}점`, 'good');
+  playStory(CH().intro, chTitle(), beginChapter);
+}
+function endRound(win, why) {
+  if (mode !== 'play' && mode !== 'story') return; mode = 'over'; stopInput(); arrow.visible = false; ptr.style.display = 'none'; closeStory();
+  const sc = score(), lv = G.up.axe + G.up.pack + G.up.coat;
   if (!win) sfx.timeup();
+  const doneN = G.sitesDone + (G.banked ? 0 : sites.filter(x => x.state === 'done').length), logsN = G.logsBuilt + (G.banked ? 0 : sites.reduce((a, x) => a + x.progress, 0));
   // 점수가 어디서 왔는지 — score() 와 같은 계산을 줄마다 보여 준다
-  const bPts = sites.reduce((a, s) => a + s.progress * 20 + (s.state === 'done' ? s.def.bonus : 0), 0), lv = G.up.axe + G.up.pack + G.up.coat;
   const row = (k, d, v) => `<tr><td>${k}</td><td class="d">${d}</td><td>${v < 0 ? '−' + fmt(-v) : '+' + fmt(v)}</td></tr>`;
-  const rows = `<table>${row('지은 건물', `${done} / ${sites.length} · 통나무 ${fmt(built)}개`, bPts)}${row('나무꾼 · 장비', `${jacks.length}명 · ${lv}단계`, jacks.length * 300 + lv * 200)}
-    ${row('버틴 눈보라', `${G.stats.storms}번`, Math.min(G.stats.storms, 2) * 800)}${G.stats.frozen ? row('꽁꽁 얼어붙음', `${G.stats.frozen}번`, -G.stats.frozen * 200) : ''}
-    ${win ? row('얼음 문 열기', '', 3000) + row('남은 시간', `${mmss(ROUND - G.time)} × 10점/초`, G.timeBonus) : ''}</table>`;
-  showCard(`<h1>${win ? ICON.gate + ' 얼음 문이 열렸어요!' : ICON.clock + ' 해가 저물었어요'}</h1>
-    <p class="sub">${win ? '썰매가 새 땅으로 떠났어요' : '8분이 지났어요 · 여기까지의 점수'}</p><div class="big">${ICON.star} ${fmt(sc)}</div>${rows}
+  const rows = `<table>${row('깬 장', `${G.clears} / ${CHAPTERS.length}장`, G.pts.clear)}${row('지은 건물', `${doneN}채 · 통나무 ${fmt(logsN)}개`, G.pts.build + chapterPts())}
+    ${row('특별 목표', `${G.specials}개`, G.pts.special)}${row('나무꾼 · 장비', `${jacks.length}명 · ${lv}단계`, jacks.length * 300 + lv * 200)}
+    ${row('버틴 눈보라', `${G.stats.storms}번`, Math.min(G.stats.storms, 16) * 600)}${G.stats.frozen ? row('꽁꽁 얼어붙음', `${G.stats.frozen}번`, -G.stats.frozen * 200) : ''}
+    ${G.pts.time ? row('남은 시간', '1초 × 10점', G.pts.time) : ''}${win ? row('엔딩', '봄을 되찾음', G.pts.ending) : ''}</table>`;
+  const head = win ? `${ICON.star} 봄을 되찾았어요!` : why === 'fire' ? `${ICON.flame} 불씨가 꺼졌어요` : `${ICON.clock} 해가 저물었어요`;
+  const sub = win ? '여덟 장의 겨울 여행을 모두 마쳤어요 · 축하해요!' : `${ci + 1}장 「${CH().title}」에서 멈췄어요 · 깬 장 ${G.clears}개`;
+  showCard(`<h1>${head}</h1><p class="sub">${sub}</p><div class="big">${ICON.star} ${fmt(sc)}</div>${rows}
     <div class="btns">${win && !ARC ? '<button class="ghost" data-act="roam">계속 둘러보기</button>' : ''}<button id="play" data-act="again">다시 하기</button></div>`);
   if (!reported) { reported = true; hk({ type: 'hk:score', score: sc }); }
 }
+/* ---------- 이야기 장면: 얼굴 · 이름 · 대사 한 줄씩(누르거나 몇 초 지나면 넘어감) ---------- */
+const story = { lines: [], i: 0, t: 0, dur: 4, done: null }, storyEl = $('story'), talkEl = $('talk'), chTEl = $('chT');
+function playStory(lines, title, done) {
+  mode = 'story'; stopInput(); arrow.visible = false; ptr.style.display = 'none';
+  Object.assign(story, { lines, i: 0, t: 0, done });
+  if (title) { chTEl.innerHTML = title; chTEl.style.display = ''; chTEl.style.animation = 'none'; void chTEl.offsetWidth; chTEl.style.animation = ''; } else chTEl.style.display = 'none';
+  storyEl.classList.add('on'); showLine();
+}
+function showLine() {
+  const [who, text] = story.lines[story.i], p = PEOPLE[who], last = story.i >= story.lines.length - 1;
+  talkEl.querySelector('.face').innerHTML = faceSvg(p); talkEl.querySelector('.who').textContent = p.name; talkEl.querySelector('p').textContent = text;
+  talkEl.querySelector('.dots').textContent = `${story.i + 1} / ${story.lines.length}`; talkEl.querySelector('.nx').textContent = last ? '시작' : '다음';
+  story.t = 0; story.dur = clamp(1.6 + text.length * .085, 3.2, 6.5);
+}
+function closeStory() { storyEl.classList.remove('on'); story.done = null; }
+function nextLine(skip) {
+  if (mode !== 'story' || paused) return;
+  if (skip || story.i >= story.lines.length - 1) { const d = story.done; closeStory(); if (d) d(); }
+  else { story.i++; showLine(); }
+}
+function updateStory(dt) { story.t += dt; talkEl.querySelector('.tbar i').style.width = Math.min(100, story.t / story.dur * 100).toFixed(1) + '%'; if (story.t >= story.dur) nextLine(); }
+storyEl.addEventListener('click', e => { const b = e.target.closest('[data-st]'); sfx.init(); sfx.click(); nextLine(!!b && b.dataset.st === 'skip'); });
+
+/* ---------- 장 바꾸기: 지난 장 치우기 → 새 땅 · 건물 · 볼거리 ---------- */
+let land = null, offer = null;
+const LM = { x: 14.5, z: 13.5 }, OFFER = { x: 10.4, z: 10.2 }; // 볼거리(연못 자리) · 특별 장작 넣는 곳
+function clearChapter() {
+  for (const x of sites) x.destroy(); sites.length = 0;
+  if (land) { disposeObj(land.g); for (const c of land.cols) { const k = circles.indexOf(c); if (k >= 0) circles.splice(k, 1); } land = null; }
+  if (offer) { removePad(offer.pad); offer = null; }
+  for (const o of chObjs) { const k = glows.indexOf(o); if (k >= 0) glows.splice(k, 1); disposeObj(o); } chObjs.length = 0;
+  for (const f of flyers) { f.m.visible = false; flyPool.push(f.m); } flyers.length = 0;
+  for (const l of loose) { l.m.visible = false; flyPool.push(l.m); } loose.length = 0;
+  G.timers.length = 0; toastsEl.textContent = ''; // 지난 장 알림도 치운다
+}
+function applyTheme(t) {
+  PAL.day.bg.setHex(t.day[0]); PAL.day.sky.setHex(t.day[1]); PAL.dusk.bg.setHex(t.dusk[0]); PAL.dusk.sky.setHex(t.dusk[1]); PAL.storm.bg.setHex(t.storm[0]); PAL.storm.sky.setHex(t.storm[1]);
+  PAL.day.sun.setHex(t.sun || 0xfff0d6); matTree.color.setHex(t.tree); matGround.color.setHex(t.ground);
+  snowMat.color.setHex(t.snow || 0xffffff); G.snowSize = t.snowSize || .3; G.duskBias = t.dusk2 || 0;
+  pondMesh.visible = pondRim.visible = !!t.pond; if (t.pond) pondMesh.material.color.setHex(t.pond);
+}
+function makeOffer(sp) {
+  offer = { paid: 0, sp };
+  offer.pad = makePad({ x: OFFER.x, z: OFFER.z, r: 1.15, color: 0xff6fae,
+    accepts: () => offer.paid + offer.pad.pending < sp.cost,
+    onLog: () => { offer.paid++; if (offer.paid >= sp.cost) { offer.pad.on = false; if (land.light) land.light(); sfx.complete(); confetti(LM.x, 3, LM.z, 40); toast(`${ICON.flame} ${sp.done}`, 'good'); } },
+    dropPos: o => o.set(LM.x + land.drop[0], land.drop[1], LM.z + land.drop[2]),
+    html: () => `${ICON.flame}<b>${sp.short}</b><span>${offer.paid + offer.pad.pending}/${sp.cost}</span>`,
+  });
+}
+function loadChapter(n) {
+  clearChapter(); ci = n; const ch = CH();
+  Object.assign(G, { time: 0, chStorms: 0, chSpecial: false, chBonus: 0, banked: false });
+  applyTheme(ch.theme); makeSites();
+  land = LAND[ch.land](); land.g.position.set(LM.x, 0, LM.z); scene.add(land.g); for (const c of land.cols) circles.push(c);
+  if (ch.special.kind === 'offer') makeOffer(ch.special);
+  for (const t of trees) { t.state = 'grown'; t.hp = 3; t.res = null; t.col.on = true; t.shake = 0; t.mesh.visible = true; t.mesh.quaternion.copy(t.qYaw); t.mesh.scale.setScalar(t.s); } // 숲이 다시 자라 있다
+  gate.opened = false; gate.col.on = true; gate.dl.rotation.y = gate.dr.rotation.y = 0; gate.light.material.opacity = 0; gateGlow.material.opacity = 0; // 새 얼음 문
+  for (const m of gate.ice) { m.visible = true; m.position.x = m.userData.x; }
+  Object.assign(cine, { on: false, t: 0, shattered: false, cracks: 0 }); gatePad.on = false;
+  fire.fuel = .62; fire.low = false; fire.outT = 0;
+  Object.assign(storm, { state: 'calm', t: 0, k: 0, next: ch.storm.first });
+  Object.assign(player, { x: -2.6, z: 2.2, face: 2.4, incoming: 0, warmth: 100, frozenT: 0, coldWarned: false }); player.swing.on = false; player.carried = Math.min(player.carried, player.cap);
+  for (const h of helpers) { Object.assign(h, { x: Math.cos(h.ha) * 3.4, z: Math.sin(h.ha) * 3.4 + 1, state: 'idle', timer: rnd(.5, 2), carried: 0, incoming: 0, tree: null, site: null, spot: null, dest: null }); }
+  focus.set(player.x, 0, player.z - 1.2);
+  hirePad.on = false; for (const u of upgrades) { u.pad.on = false; u.pad.pending = 0; } firePad.pending = hirePad.pending = stock.pad.pending = millOut.pad.pending = 0;
+  millOut.count = 0; millOut.refresh(); millOut.grp.visible = false; millOut.col.on = false; millOut.pad.on = false; millOut.t = 0;
+  if (stock.grp.visible) stock.pad.on = true; // 장작더미는 썰매에 싣고 함께 왔다
+  makeQuests();
+}
+
+/* ---------- 장마다 볼거리(연못 자리) — 호수 오두막 · 등대 · 별 관측대 · 돌등과 오로라 · 얼음 수정 · 잠든 거인 · 봄 들판 ---------- */
+function fireBowl(sc, y = 0) { // 돌을 둘러 놓은 화덕 — 장작을 다 넣으면 불이 붙는다
+  const g = new THREE.Group(), st = [];
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; st.push(P(ico(.26 * sc, 0), i % 2 ? C.stone : C.stoneDark, Math.cos(a) * .8 * sc, y + .13 * sc, Math.sin(a) * .8 * sc, a, a * 2, 0, 1, .75, 1)); }
+  st.push(logX(1.1 * sc, .12 * sc, 0x4a3524, 0, y + .2 * sc, 0), P(cyl(.12 * sc, .12 * sc, 1.1 * sc, 6), 0x3d2b1d, 0, y + .26 * sc, 0, PI / 2, 0, PI / 3));
+  g.add(mesh(st));
+  const flames = [[.45, 1.2, 0xff7a1a], [.3, .85, 0xffb52e], [.17, .55, 0xffec8a]].map(([r, h, c]) => { const m = new THREE.Mesh(new THREE.ConeGeometry(r * sc, h * sc, 6).translate(0, h * sc / 2, 0), new THREE.MeshBasicMaterial({ color: c })); m.position.y = y + .2 * sc; m.visible = false; g.add(m); return m; });
+  const glow = decal(0xff9d45, 0, 6 * sc); g.add(glow);
+  return { g, on: false, light() { this.on = true; for (const f of flames) f.visible = true; glow.material.opacity = .45; },
+    update(t) { if (!this.on) return; flames.forEach((m, i) => { const k = 1 + Math.sin(t * (9 + i * 4) + i) * .12; m.scale.set(k, k * (1 + Math.sin(t * (13 + i * 3)) * .15), k); }); if (Math.random() < .25) spark.emit(rnd(-.2, .2) * sc + this.g.parent.position.x + this.g.position.x, y + .9 * sc, this.g.parent.position.z + this.g.position.z, { vy: rnd(1.4, 2.6), g: -1, life: rnd(.5, 1), size: .08 * sc, color: pick([0xffb52e, 0xff7a1a, 0xffec8a]) }); } };
+}
+const at = (dx, dz, r) => ({ x: LM.x + dx, z: LM.z + dz, r, on: true });
+const LAND = {
+  pond() { return { g: new THREE.Group(), cols: [], drop: [0, 1, 0] }; },
+  lake() { // 언 호수 위 얼음낚시 오두막 둘 · 가운데 할머니 화덕
+    const g = new THREE.Group(), p = [];
+    for (const [x, z, ry, c] of [[-2.7, -1.6, .4, C.red], [2.6, 1.5, -.5, C.teal]]) {
+      const cs = Math.cos(ry), sn = Math.sin(ry), L = (lx, lz) => [x + lx * cs + lz * sn, z - lx * sn + lz * cs];
+      const [ax, az] = L(0, 0), [dx2, dz2] = L(0, .66), [hx, hz] = L(.9, 1.2);
+      p.push(P(box(1.5, 1.1, 1.3), C.wood, ax, .55, az, 0, ry, 0), P(box(1.75, .14, 1.55), c, ax, 1.2, az, 0, ry, 0), P(box(1.6, .16, 1.4), C.snow, ax, 1.33, az, 0, ry, 0),
+        P(box(.5, .75, .06), C.woodDark, dx2, .4, dz2, 0, ry, 0), P(cyl(.32, .32, .03, 8), 0x2a6390, hx, .05, hz), P(cyl(.03, .03, .9, 4), C.woodDark, hx + .2, .4, hz, .5, 0, 0));
+    }
+    g.add(mesh(p)); const fb = fireBowl(1.15); g.add(fb.g);
+    return { g, cols: [at(-2.7, -1.6, 1.0), at(2.6, 1.5, 1.0), at(0, 0, .95)], drop: [0, .8, 0], light: () => fb.light(), update: (dt, t) => fb.update(t) };
+  },
+  lighthouse() { // 숲 등대 — 불을 밝히면 빛줄기가 돈다
+    const g = new THREE.Group(), p = [P(cyl(2.0, 2.3, .6, 9), C.stone, 0, .3, 0), P(cyl(2.05, 2.05, .12, 9), C.snow, 0, .64, 0)];
+    for (let i = 0; i < 5; i++) p.push(P(cyl(1.22 - i * .1, 1.3 - i * .1, 1.2, 10), i % 2 ? C.cream : C.red, 0, 1.2 + i * 1.2, 0));
+    p.push(P(cyl(1.45, 1.45, .16, 10), C.steelDark, 0, 6.65, 0), P(cyl(1.0, 1.0, .1, 10), C.steelDark, 0, 7.75, 0), P(cone(1.1, 1.2, 10), C.red, 0, 8.4, 0), P(cone(.6, .45, 10), C.snow, 0, 8.85, 0),
+      P(box(.7, 1.15, .1), C.woodDark, 0, 1.25, 1.27), P(box(.5, .5, .08), C.woodLight, 0, 3.6, 1.06));
+    g.add(mesh(p));
+    const lampMat = new THREE.MeshLambertMaterial({ color: 0x5b6878 }), lamp = new THREE.Mesh(new THREE.CylinderGeometry(.75, .75, 1.0, 8), lampMat); lamp.position.y = 7.2; g.add(lamp);
+    const beam = new THREE.Mesh(new THREE.ConeGeometry(1.1, 9, 12, 1, true).translate(0, -4.5, 0).rotateZ(PI / 2), new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: .09, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false }));
+    const piv = new THREE.Group(); piv.position.y = 7.2; piv.add(beam); piv.visible = false; g.add(piv);
+    const glow = decal(0xfff0b0, 0, 9); g.add(glow);
+    return { g, cols: [at(0, 0, 2.1)], drop: [0, 7.2, 0], light() { lamp.material = matGlow; lampMat.dispose(); piv.visible = true; glow.material.opacity = .4; addGlow(glow, .4); chObjs.push(glow); }, update(dt) { piv.rotation.y += dt * .9; } };
+  },
+  observatory() { // 별 관측대 — 둥근 지붕 · 망원경 · 반짝이는 별가루
+    const g = new THREE.Group(), p = [P(cyl(2.2, 2.4, 1.6, 10), C.stone, 0, .8, 0), P(new THREE.SphereGeometry(2.05, 10, 5, 0, TAU, 0, PI / 2), 0x8d6fd1, 0, 1.6, 0), P(box(.6, 1.6, 4.2), 0x6f52b5, 0, 2.3, 0, 0, 0, 0, 1, 1, .9),
+      P(cyl(.32, .4, 2.8, 8), C.steel, 0, 3.4, .9, -.7, 0, 0), P(cyl(.42, .42, .3, 8), C.steelDark, 0, 4.4, 1.85, -.7, 0, 0), P(box(.8, 1.2, .1), C.woodDark, 0, .6, 2.3), P(cone(.5, .25, 10), C.snow, 0, 3.75, 0)];
+    g.add(mesh(p));
+    return { g, cols: [at(0, 0, 2.3)], drop: [0, 2, 0], update(dt) { if (Math.random() < dt * 6) spark.emit(LM.x + rnd(-4, 4), rnd(2, 6), LM.z + rnd(-4, 4), { vy: rnd(-.4, .2), g: 0, life: rnd(.8, 1.6), size: .1, color: pick([0xfff1b0, 0xffffff, 0xd6c8ff]) }); } };
+  },
+  stones() { // 둥글게 선 돌 · 가운데 돌등 · 눈밭에 일렁이는 오로라 빛
+    const g = new THREE.Group(), p = [], cols = [];
+    for (let i = 0; i < 7; i++) { const a = i / 7 * TAU + .3, x = Math.cos(a) * 3.4, z = Math.sin(a) * 3.4, h = 1.6 + (i % 3) * .5; p.push(P(box(.8, h, .55), i % 2 ? C.stone : C.stoneDark, x, h / 2, z, 0, -a, (i % 2 - .5) * .1), P(box(.84, .14, .6), C.snow, x, h + .05, z, 0, -a, 0)); cols.push(at(x, z, .5)); }
+    p.push(P(cyl(.5, .6, 1.1, 6), C.stone, 0, .55, 0)); g.add(mesh(p));
+    const fb = fireBowl(.7, 1.0); g.add(fb.g); cols.push(at(0, 0, .75));
+    const aur = [0x6dffc0, 0xb28cff, 0x7fd8ff].map((c, i) => { const d = decal(c, .14, 22, .06); d.material.blending = THREE.AdditiveBlending; d.userData.i = i; g.add(d); return d; });
+    let lit = 0;
+    return { g, cols, drop: [0, 1.6, 0], light() { fb.light(); lit = 1; },
+      update(dt, t) { fb.update(t); aur.forEach((d, i) => { d.position.set(focus.x - LM.x + Math.cos(t * .13 + i * 2.1) * 9, .06 + i * .01, focus.z - LM.z + Math.sin(t * .17 + i * 2.1) * 6); d.material.opacity = (.12 + lit * .1) * (.7 + .3 * Math.sin(t * .8 + i)); d.scale.setScalar(20 + Math.sin(t * .3 + i) * 4); }); } };
+  },
+  crystals() { // 얼음 수정 덩이 · 장터 가판 둘
+    const g = new THREE.Group(), ic = [];
+    for (let i = 0; i < 9; i++) { const a = i / 9 * TAU, r = i ? 1.0 + (i % 3) * .35 : 0, h = i ? 1.6 + (i % 4) * .6 : 3.6; ic.push(P(cone(.45 + (i ? 0 : .3), h, 5), 0xffffff, Math.cos(a) * r, h / 2, Math.sin(a) * r, Math.sin(a) * .25, a, -Math.cos(a) * .25)); }
+    g.add(new THREE.Mesh(M(ic), matIce));
+    const p = [];
+    for (const [x, z, c] of [[-3.0, 1.6, C.red], [2.9, -1.8, C.teal]]) { p.push(P(box(1.6, .8, .9), C.wood, x, .4, z), P(box(1.8, .12, 1.1), c, x, 1.75, z, .25, 0, 0), P(cyl(.05, .05, 1.0, 4), C.woodDark, x - .8, 1.2, z + .4), P(cyl(.05, .05, 1.0, 4), C.woodDark, x + .8, 1.2, z + .4), P(ico(.22, 0), 0xbfe6ff, x - .3, .95, z), P(ico(.18, 0), 0xd6c8ff, x + .3, .92, z)); }
+    g.add(mesh(p));
+    return { g, cols: [at(0, 0, 1.7), at(-3.0, 1.6, .9), at(2.9, -1.8, .9)], drop: [0, 2, 0], update(dt) { if (Math.random() < dt * 3) spark.emit(LM.x + rnd(-1.5, 1.5), rnd(1, 3.5), LM.z + rnd(-1.5, 1.5), { vy: .3, g: 0, life: 1, size: .09, color: 0xe8f7ff }); } };
+  },
+  giant() { // 잠든 얼음 거인 — 숨 쉴 때마다 몸이 오르내리고 콧김이 눈보라처럼
+    const g = new THREE.Group(), rock = 0x8fa0b6, rockD = 0x6f8098;
+    const body = mesh([P(ico(2.4, 1), rock, -.6, 1.1, 0, 0, 0, 0, 1.6, .75, 1.1), P(ico(2.0, 1), C.snow, -.6, 1.9, -.1, 0, 0, 0, 1.45, .35, 1), P(ico(.9, 1), rockD, -2.4, .7, 1.7, 0, 0, 0, 1.3, .7, .8), P(ico(.9, 1), rockD, 1.0, .7, 1.8, 0, 0, 0, 1.2, .7, .8)]);
+    g.add(body);
+    const head = mesh([P(ico(1.25, 1), rock, 0, 0, 0), P(ico(.8, 1), C.snow, 0, .95, -.45, 0, 0, 0, 1.1, .3, .8), P(box(.5, .08, .06), C.ink, -.42, .1, 1.18, 0, 0, .1), P(box(.5, .08, .06), C.ink, .42, .1, 1.18, 0, 0, -.1), P(ico(.28, 0), rockD, 0, -.15, 1.25),
+      P(cone(.2, .8, 4), 0xd6f0ff, -.45, -.85, .95, PI, 0, 0), P(cone(.22, 1.0, 4), 0xd6f0ff, 0, -.95, 1.05, PI, 0, 0), P(cone(.2, .8, 4), 0xd6f0ff, .45, -.85, .95, PI, 0, 0)]);
+    head.position.set(3.3, 1.25, .3); head.rotation.y = .5; g.add(head);
+    let br = 0;
+    return { g, cols: [at(-.6, 0, 2.9), at(3.3, .3, 1.3)], drop: [0, 2, 0], update(dt, t) {
+      const k = Math.sin(t * 1.1); body.scale.set(1, 1 + k * .035, 1); head.position.y = 1.25 + k * .06;
+      br -= dt; if (br <= 0) { br = 3.4; for (let i = 0; i < 6; i++) dust.emit(LM.x + 3.9, 1.2, LM.z + 1.4, { vx: rnd(.8, 2.2), vz: rnd(.8, 2.0), vy: rnd(.2, .8), g: -.2, life: rnd(1.2, 2), size: .35, grow: .6, color: 0xeef6ff }); } } };
+  },
+  spring() { // 봄 들판 — 꽃나무 · 꽃밭 · 가운데 축제 봉화
+    const g = new THREE.Group(), p = [P(cyl(.3, .45, 2.6, 7), C.trunk, 2.9, 1.3, -1.8)];
+    [[0, 3.4, 0, 1.4, 0xf7a8c8], [-.9, 3.0, .4, 1.0, 0xffc9de], [.9, 3.1, -.3, 1.05, 0xf39bbf], [.1, 4.2, -.2, .9, 0xffd6e6]].forEach(([x, y, z, r, c]) => p.push(P(ico(r, 1), c, 2.9 + x, y, -1.8 + z)));
+    for (let i = 0; i < 26; i++) { const a = i * 2.4, r = 1.8 + (i % 5) * .7; p.push(P(ico(.16, 0), [0xec8fb0, 0xffd66b, 0xffffff, 0xb28cff][i % 4], Math.cos(a) * r, .12, Math.sin(a) * r), P(cyl(.03, .03, .2, 3), 0x5aa860, Math.cos(a) * r, .05, Math.sin(a) * r)); }
+    for (let i = 0; i < 5; i++) { const a = i / 5 * TAU; p.push(P(cyl(.1, .1, 2.4, 5), C.wood, Math.cos(a) * .5, 1.0, Math.sin(a) * .5, Math.sin(a) * .35, 0, -Math.cos(a) * .35)); }
+    g.add(mesh(p)); const fb = fireBowl(1.6); g.add(fb.g);
+    return { g, cols: [at(2.9, -1.8, .6), at(0, 0, 1.4)], drop: [0, 1.6, 0], light() { fb.light(); for (let i = 0; i < 4; i++) later(i * .3, () => confetti(LM.x, 4, LM.z, 30)); }, update: (dt, t) => fb.update(t) };
+  },
+};
 // 새 판 = 새 야영지 — 창을 새로 열어 처음 상태로 (auto 면 시작 화면 없이 바로 시작)
 function fresh(auto) {
   if (!ARC) { location.reload(); return; }
   const u = new URL(location.href); if (auto) u.searchParams.set('go', '1'); else u.searchParams.delete('go'); location.replace(u.toString());
 }
-function pause() { if (mode !== 'play' && mode !== 'free' || paused) return; paused = true; stopInput(); $('pauseOv').classList.add('on'); sfx.suspend(); hk({ type: 'hk:paused' }); }
+function pause() { if (mode !== 'play' && mode !== 'free' && mode !== 'story' || paused) return; paused = true; stopInput(); $('pauseOv').classList.add('on'); sfx.suspend(); hk({ type: 'hk:paused' }); }
 function resume() { if (!paused) return; paused = false; last = performance.now(); $('pauseOv').classList.remove('on'); sfx.resume(); hk({ type: 'hk:resumed' }); }
 $('pauseOv').addEventListener('click', resume);
 card.addEventListener('click', e => {
@@ -5441,7 +5844,7 @@ function frame(now) {
   if (mode === 'play') { liveT -= real; if (liveT <= 0) { liveT = 1; const sc = score(); if (sc !== lastLive) { lastLive = sc; hk({ type: 'hk:live', score: sc }); } } }
   renderer.render(scene, camera);
 }
-resize(); menuCard(); step(1 / 60); renderer.render(scene, camera);
+loadChapter(0); resize(); menuCard(); step(1 / 60); renderer.render(scene, camera);
 requestAnimationFrame(frame);
 if (AUTO) { try { const u = new URL(location.href); u.searchParams.delete('go'); history.replaceState(null, '', u.toString()); } catch (e) {} startRound(); }
 hk({ type: 'hk:ready' });
