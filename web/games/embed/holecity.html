@@ -306,8 +306,9 @@ var TUNE = SC.TUNE = {
   edge: 0.6,          // 물건 중심이 (구멍 반지름 − 물건 반지름 × edge) 안으로 들어오면 빠진다
   eatRatio: 1.1,      // 이만큼 더 커야 다른 구멍을 삼킨다
   r0: 0.6,            // 내 구멍 시작 반지름(강화 전)
-  speed: 8,           // 내 구멍 기본 빠르기 — 커질수록 speedGrow 만큼씩 빨라진다(최대 speedMax)
-  speedGrow: 1.0, speedMax: 15,
+  speed: 8.8,         // 내 구멍 기본 빠르기 — 커질수록 speedGrow 만큼씩 빨라진다(최대 speedMax)
+  speedGrow: 1.0, speedMax: 16.5,
+  touchBoost: 1.8,    // 휴대폰 손가락 따라가기는 손 가는 대로 빠르게 — 최고 빠르기 × 이 배수(PC 키보드 · 마우스는 1)
   growK: 1.2,         // 크기 = 시작 크기 × (1 + 삼킨 양 ÷ growK) ^ growP
   growP: 0.42,
   rivalEff: 0.5,      // 라이벌은 같은 걸 먹어도 이만큼만 자란다
@@ -854,11 +855,11 @@ function genDowntown(G) {
 // ───────── 구역
 var AREAS = SC.AREAS = [
   { key: 'park', name: '공원', H: 50, time: 90, goal: 0.45, gen: genPark, ground: C.grass, sky: 0xbfe8f7, sun: 0xfff3d9, hemi: 0x8aa67c, sunI: 0.67,
-    rivals: [0.5, 0.72, 1.05], rivalSpeed: 4.3, aggro: 0.8 },
+    rivals: [0.5, 0.72, 1.05], rivalSpeed: 4.7, aggro: 0.8 },
   { key: 'suburbs', name: '주택가', H: 57, time: 85, goal: 0.6, gen: genSuburb, ground: C.walk, sky: 0xffe3bd, sun: 0xffe2b0, hemi: 0x9a8f86, sunI: 0.69,
-    rivals: [0.5, 0.75, 1.1, 1.5], rivalSpeed: 4.7, aggro: 1.0 },
+    rivals: [0.5, 0.75, 1.1, 1.5], rivalSpeed: 5.2, aggro: 1.0 },
   { key: 'downtown', name: '도심', H: 60, time: 95, goal: 0.7, gen: genDowntown, ground: C.walk, sky: 0xd9c9f6, sun: 0xffd9c2, hemi: 0x8a86a6, sunI: 0.67,
-    rivals: [0.55, 0.8, 1.15, 1.6, 2.1], rivalSpeed: 5.1, aggro: 1.2 }
+    rivals: [0.55, 0.8, 1.15, 1.6, 2.1], rivalSpeed: 5.6, aggro: 1.2 }
 ];
 
 function newHole(g, isPlayer, r0, x, z, name) {
@@ -1058,7 +1059,7 @@ SC.step = function (g, dt, inp) {
       h = g.holes[i]; if (!h.alive || h.dying > 0) continue;
       if (h.isPlayer) {
         var ix = inp ? inp.x : 0, iz = inp ? inp.z : 0, m = Math.hypot(ix, iz); if (m > 1) { ix /= m; iz /= m; }
-        var sp = SC.playerSpeed(g, h), kk = 1 - Math.exp(-((inp && inp.k) || 14) * dt);
+        var sp = SC.playerSpeed(g, h) * Math.min(3, (inp && inp.boost) || 1), kk = 1 - Math.exp(-((inp && inp.k) || 14) * dt);
         h.vx += (ix * sp - h.vx) * kk; h.vz += (iz * sp - h.vz) * kk; h.x += h.vx * dt; h.z += h.vz * dt;
       } else aiStep(g, h, dt);
       h.r += (h.tr - h.r) * (1 - Math.exp(-6 * dt));
@@ -1684,16 +1685,16 @@ function handleEvents() {
 // 구멍은 그 자리로 빠르게 미끄러져 간다. 손가락이 멈추면 구멍도 곧 멈추고, 떼면 남은 거리를 짧게 줄여 자연스럽게 선다.
 // (카메라가 구멍을 따라가므로 「손가락 바로 아래로」 가게 하면 끝없이 달아난다 — 그래서 끈 만큼 옮기는 방식)
 var canvas = $('c'), joyEl = $('joy'), knob = joyEl.firstElementChild, joy = { on: false, id: null, ox: 0, oy: 0, x: 0, y: 0 }, keys = {}, JOY_R = 50;
-var touch = { on: false, id: null, sx: 0, sy: 0, px: 0, py: 0, tx: 0, tz: 0, seen: false }, TOUCH_GAIN = 1.3, _ga = { x: 0, z: 0 }, _gb = { x: 0, z: 0 };
+var touch = { on: false, id: null, sx: 0, sy: 0, px: 0, py: 0, tx: 0, tz: 0, seen: false }, TOUCH_GAIN = 1.5, _ga = { x: 0, z: 0 }, _gb = { x: 0, z: 0 };
 function stopJoy() {
   joy.on = false; joy.x = joy.y = 0; joyEl.hidden = true;
-  if (touch.on) touchLeash(0.35);
+  if (touch.on) touchLeash(0.5);
   touch.on = false; touch.id = null;
 }
 // 목표 자리가 구멍에서 너무 멀어지지 않게(빠르게 크게 휘저어도 튀지 않게) — 구멍 크기에 맞춘 줄 길이
 function touchLeash(k) {
   var p = game && game.player; if (!p) return;
-  var dx = touch.tx - p.x, dz = touch.tz - p.z, d = Math.hypot(dx, dz), L = (2.2 + p.r * 1.4) * k;
+  var dx = touch.tx - p.x, dz = touch.tz - p.z, d = Math.hypot(dx, dz), L = (1.4 + p.r * 1.0) * k;
   if (d > L) { touch.tx = p.x + dx / d * L; touch.tz = p.z + dz / d * L; }
 }
 function touchMove() {
@@ -1749,12 +1750,13 @@ window.addEventListener('blur', function () { keys = {}; stopJoy(); });
 var inp = { x: 0, z: 0 };
 function input(dt) {
   if (AUTO) return SC.bot(game, botSt, dt);
-  inp.x = (keys.r ? 1 : 0) - (keys.l ? 1 : 0) + joy.x; inp.z = (keys.d ? 1 : 0) - (keys.u ? 1 : 0) + joy.y; inp.k = 0;
+  inp.x = (keys.r ? 1 : 0) - (keys.l ? 1 : 0) + joy.x; inp.z = (keys.d ? 1 : 0) - (keys.u ? 1 : 0) + joy.y; inp.k = 0; inp.boost = 1;
   if (touch.seen && !inp.x && !inp.z) {
     if (touch.on) touchMove();
-    var p = game.player, dx = touch.tx - p.x, dz = touch.tz - p.z, d = Math.hypot(dx, dz), sp = SC.playerSpeed(game, p);
-    if (d > 0.02) { var m = Math.min(1, d * 9 / sp); inp.x = dx / d * m; inp.z = dz / d * m; } else if (!touch.on) touch.seen = false;
-    inp.k = 24;
+    // 목표까지 남은 거리에 비례한 빠르기(0.05초 만에 따라붙는 꼴, 넘치지 않게 출렁임은 줄였다) — 최고 빠르기는 PC 의 touchBoost 배
+    var p = game.player, dx = touch.tx - p.x, dz = touch.tz - p.z, d = Math.hypot(dx, dz), sp = SC.playerSpeed(game, p) * SC.TUNE.touchBoost;
+    if (d > 0.02) { var m = Math.min(1, d * 20 / sp); inp.x = dx / d * m; inp.z = dz / d * m; } else if (!touch.on) touch.seen = false;
+    inp.k = 50; inp.boost = SC.TUNE.touchBoost;
   }
   return inp;
 }
