@@ -888,12 +888,14 @@ window.HKJellyVs = (function () {
       initAudio();
       const rc = root.getBoundingClientRect();
       joy.id = e.pointerId; joy.on = true; joy.ox = e.clientX; joy.oy = e.clientY; joy.x = joy.y = 0; joy.rx = rc.left; joy.ry = rc.top;
-      el.stick.style.display = "block"; el.stick.style.transform = `translate(${e.clientX - rc.left}px,${e.clientY - rc.top}px)`; el.stick.firstElementChild.style.transform = "";
+      joy.touch = e.pointerType !== "mouse"; // 손가락 · 펜은 이동 표시(원) 없이 — 끄는 방향으로 바로
+      if (!joy.touch) { el.stick.style.display = "block"; el.stick.style.transform = `translate(${e.clientX - rc.left}px,${e.clientY - rc.top}px)`; el.stick.firstElementChild.style.transform = ""; }
       try { cv.setPointerCapture(e.pointerId); } catch (_) { /* 잡지 못해도 움직임은 받는다 */ }
     };
     const onPMove = (e) => {
       if (e.pointerId !== joy.id) return;
       let dx = (e.clientX - joy.ox) / 50, dy = (e.clientY - joy.oy) / 50; const l = Math.hypot(dx, dy); if (l > 1) { dx /= l; dy /= l; }
+      if (joy.touch && l > 1) { joy.ox = e.clientX - dx * 50; joy.oy = e.clientY - dy * 50; } // 원 밖으로 끌면 기준점이 따라와 반대로 끌면 바로 돌아선다
       if (l < 0.14) { joy.x = joy.y = 0; } else { joy.x = dx; joy.y = dy; }
       el.stick.firstElementChild.style.transform = `translate(${(dx * 36).toFixed(1)}px,${(dy * 36).toFixed(1)}px)`;
     };

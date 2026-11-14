@@ -1116,12 +1116,15 @@ const stick=$('stick'),knob=stick.firstElementChild;
 canvas.addEventListener('pointerdown',e=>{
   if(mode!=='play'||paused||joy.id!==null)return;
   joy.id=e.pointerId;joy.on=true;joy.ox=e.clientX;joy.oy=e.clientY;joy.x=joy.y=0;
-  stick.style.display='block';stick.style.transform='translate('+joy.ox+'px,'+joy.oy+'px)';knob.style.transform='';
+  joy.touch=e.pointerType!=='mouse'; // 손가락 · 펜은 이동 표시(원) 없이 — 끄는 방향으로 바로
+  if(!joy.touch){stick.style.display='block';stick.style.transform='translate('+joy.ox+'px,'+joy.oy+'px)';knob.style.transform='';}
   try{canvas.setPointerCapture(e.pointerId);}catch(_){}
 });
 canvas.addEventListener('pointermove',e=>{
   if(e.pointerId!==joy.id)return;
   let dx=(e.clientX-joy.ox)/52,dy=(e.clientY-joy.oy)/52;const l=Math.hypot(dx,dy);if(l>1){dx/=l;dy/=l;}
+  // 손가락이 원 밖으로 나가면 기준점이 따라온다 — 반대로 끌면 바로 돌아선다
+  if(joy.touch&&l>1){joy.ox=e.clientX-dx*52;joy.oy=e.clientY-dy*52;}
   if(l<.14){joy.x=joy.y=0;}else{joy.x=dx;joy.y=dy;}
   knob.style.transform='translate('+(dx*38).toFixed(1)+'px,'+(dy*38).toFixed(1)+'px)';
 });
