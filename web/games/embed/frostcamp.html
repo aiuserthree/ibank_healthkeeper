@@ -89,8 +89,8 @@ canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
 .toast.cold{background:linear-gradient(155deg,rgba(255,255,255,.95),rgba(176,218,255,.82))}
 .toast.out{opacity:0;transform:translateY(8px)}
 @keyframes toastIn{from{opacity:0;transform:translateY(14px) scale(.92)}}
-#stick{position:fixed;width:112px;height:112px;margin:-56px 0 0 -56px;border-radius:50%;display:none;pointer-events:none;border:2px solid rgba(255,255,255,.9);background:rgba(190,225,255,.3)}
-#stick i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(255,255,255,.9);box-shadow:0 4px 10px rgba(24,70,124,.3)}
+#stick{position:fixed;width:84px;height:84px;margin:-42px 0 0 -42px;border-radius:50%;display:none;pointer-events:none;border:1.5px solid rgba(255,255,255,.6);background:rgba(190,225,255,.16)}
+#stick i{position:absolute;left:50%;top:50%;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;background:rgba(255,255,255,.72);box-shadow:0 3px 8px rgba(24,70,124,.22)}
 
 /* 시작 · 끝 · 멈춤 */
 #start{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:14px;background:rgba(196,224,250,.4);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);z-index:20}
@@ -5169,10 +5169,10 @@ function updatePlayer(dt, live) {
   } else if (!live || player.frozenT > 0) { player.frozenT -= dt; player.moving = false; sw.on = false; }
   else {
     const il = Math.hypot(input.x, input.z);
-    const sp = 6.1 * (1 + .1 * G.up.coat) * (storm.state === 'storm' && !player.inWarm ? .84 : 1) * (player.warmth < 15 ? .82 : 1);
+    const sp = 6.1 * (input.touch ? 1.1 : 1) * (1 + .1 * G.up.coat) * (storm.state === 'storm' && !player.inWarm ? .84 : 1) * (player.warmth < 15 ? .82 : 1);
     if (il > .12) {
       player.x += input.x * sp * dt; player.z += input.z * sp * dt; player.moving = true;
-      player.face += angDiff(player.face, Math.atan2(input.x, input.z)) * Math.min(1, dt * 14);
+      player.face += angDiff(player.face, Math.atan2(input.x, input.z)) * Math.min(1, dt * (input.touch ? 26 : 14)); // 화면 조작은 더 빨리 돌아선다
       player.foot += sp * il * dt;
       if (player.foot > .62) { player.foot = 0; player.footSide *= -1; const f = foots[footCur]; footCur = (footCur + 1) % FOOT_N; f.age = 0; f.a = player.face; f.x = player.x + Math.cos(player.face) * .17 * player.footSide; f.z = player.z - Math.sin(player.face) * .17 * player.footSide; }
     } else player.moving = false;
@@ -5535,62 +5535,65 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
-/* 화면 누르기 — 두 가지 조작
-   ① 누르자마자 끌면(0.15초 안에 12px 넘게) 지금처럼 가상 막대: 끈 방향으로 걷는다
-   ② 거의 안 움직이고 누르고 있으면(0.15초) 「꾹 누르기」: 누른 땅 지점으로 저절로 걸어가 멈춘다.
-      누른 채 손가락을 옮기면 목적지도 따라 바뀐다. 떼면 멈춘다. 나무를 누르면 나무 곁에서 멈춰 도끼질한다 */
-const HOLD_T = 150, DRAG_PX = 12;
-const hold = { st: '', id: -1, t0: 0, x: 0, y: 0, tx: 0, tz: 0, r: .4, mx: 0, my: 0, best: 0, bt: 0, stuck: false };
+/* 화면 누르기 — 기다림 없이 바로 반응
+   · 누르는 순간 그 땅 지점으로 바로 걸어가기 시작한다(꾹 누르고 있으면 그곳까지 가서 부드럽게 멈춤, 손가락을 옮기면 목적지도 따라감)
+   · 누르고 0.28초 안에 14px 넘게 끌면 가상 막대로 바뀐다: 끈 방향으로 걷고, 막대 끝을 넘으면 막대가 손가락을 따라와 반대로 끌면 바로 돌아선다
+   · 나무를 누르면 나무 곁에서 멈춰 도끼질, 동그라미를 누르면 그 안에서 멈춰 내려놓기 · 가져가기 */
+const DRAG_T = 280, DRAG_PX = 14, STICK_R = 40;
+const hold = { st: '', id: -1, t0: 0, x0: 0, y0: 0, tx: 0, tz: 0, r: .4, mx: 0, my: 0, best: 0, bt: 0, stuck: false };
 const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _gnd = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), _hit = new THREE.Vector3();
-const holdMark = new THREE.Mesh(flatGeo, new THREE.MeshBasicMaterial({ map: texPad, transparent: true, depthWrite: false, color: 0xffc23d }));
+const holdMark = new THREE.Mesh(flatGeo, new THREE.MeshBasicMaterial({ map: texPad, transparent: true, depthWrite: false, color: 0xffd27a, opacity: .5 }));
 holdMark.renderOrder = 3; holdMark.visible = false; scene.add(holdMark);
 function holdAim(cx, cy) { // 누른 화면 점 → 땅 위 점(광선과 바닥이 만나는 곳)
   _ndc.set(cx / VW * 2 - 1, -(cy / VH) * 2 + 1); _ray.setFromCamera(_ndc, camera);
   if (!_ray.ray.intersectPlane(_gnd, _hit)) return;
   hold.tx = clamp(_hit.x, -BX, BX); hold.tz = clamp(_hit.z, BZ0, BZ1); hold.mx = cx; hold.my = cy;
   const tr = nearestTree(hold.tx, hold.tz, 1.3); // 나무를 눌렀으면 줄기에 부딪히지 않게 곁에서 멈춘다(도끼질 거리 1.7 안)
-  hold.r = tr ? 1.25 : .35; if (tr) { hold.tx = tr.x; hold.tz = tr.z; }
+  hold.r = tr ? 1.25 : .3; if (tr) { hold.tx = tr.x; hold.tz = tr.z; }
   hold.best = 1e9; hold.bt = performance.now(); hold.stuck = false;
-  holdMark.position.set(hold.tx, .06, hold.tz); holdMark.visible = true; G.markT = 0;
+  holdMark.position.set(hold.tx, .06, hold.tz); holdMark.visible = true;
 }
-function holdGo() { hold.st = 'go'; joy.on = false; joy.dx = joy.dz = 0; stick.style.display = 'none'; holdAim(hold.x, hold.y); }
 cv.addEventListener('pointerdown', e => {
   if (!canMove() || hold.st) return;
-  hold.st = 'wait'; hold.id = e.pointerId; hold.t0 = performance.now(); hold.x = e.clientX; hold.y = e.clientY;
-  joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dz = 0;
+  hold.st = 'go'; hold.id = e.pointerId; hold.t0 = performance.now(); hold.x0 = e.clientX; hold.y0 = e.clientY;
+  joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dz = 0; G.markT = 0;
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  holdAim(e.clientX, e.clientY);
 });
 cv.addEventListener('pointermove', e => {
   if (!hold.st || e.pointerId !== hold.id) return;
-  hold.x = e.clientX; hold.y = e.clientY;
-  if (hold.st === 'go') { if (Math.hypot(e.clientX - hold.mx, e.clientY - hold.my) > 6) holdAim(e.clientX, e.clientY); return; }
-  let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), m = 52;
-  if (hold.st === 'wait') { if (d <= DRAG_PX) return; hold.st = 'drag'; stick.style.display = 'block'; stick.style.left = joy.ox + 'px'; stick.style.top = joy.oy + 'px'; }
-  if (d > m) { dx *= m / d; dy *= m / d; }
+  if (hold.st === 'go') {
+    if (performance.now() - hold.t0 < DRAG_T && Math.hypot(e.clientX - hold.x0, e.clientY - hold.y0) > DRAG_PX) { // 빠르게 끌었다 → 가상 막대
+      hold.st = 'drag'; joy.on = true; joy.id = e.pointerId; holdMark.visible = false; stick.style.display = 'block';
+    } else { if (Math.hypot(e.clientX - hold.mx, e.clientY - hold.my) > 3) holdAim(e.clientX, e.clientY); return; }
+  }
+  let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), m = STICK_R;
+  if (d > m) { joy.ox = e.clientX - dx / d * m; joy.oy = e.clientY - dy / d * m; dx = dx / d * m; dy = dy / d * m; } // 막대가 손가락을 따라온다
+  stick.style.left = joy.ox + 'px'; stick.style.top = joy.oy + 'px';
   joy.dx = dx / m; joy.dz = dy / m; knob.style.transform = `translate(${dx}px,${dy}px)`;
 });
 const holdStop = () => { hold.st = ''; hold.id = -1; joy.on = false; joy.dx = joy.dz = 0; stick.style.display = 'none'; knob.style.transform = ''; holdMark.visible = false; };
 const joyEnd = e => { if (e.pointerId === hold.id) holdStop(); };
 cv.addEventListener('pointerup', joyEnd); cv.addEventListener('pointercancel', joyEnd);
 cv.addEventListener('contextmenu', e => e.preventDefault());
-function stopInput() { for (const k in keys) keys[k] = false; holdStop(); input.x = input.z = 0; }
+function stopInput() { for (const k in keys) keys[k] = false; holdStop(); input.x = input.z = 0; input.touch = false; }
 function readInput() {
   let x = 0, z = 0;
   if (keys.KeyA || keys.ArrowLeft) x -= 1; if (keys.KeyD || keys.ArrowRight) x += 1; if (keys.KeyW || keys.ArrowUp) z -= 1; if (keys.KeyS || keys.ArrowDown) z += 1;
-  if (hold.st === 'wait' && performance.now() - hold.t0 >= HOLD_T) holdGo();
-  if (hold.st === 'drag') { x += joy.dx; z += joy.dz; }
+  if (hold.st === 'drag') { const l = Math.hypot(joy.dx, joy.dz); if (l > .2) { const k = Math.min(1, .45 + l * .7) / l; x += joy.dx * k; z += joy.dz * k; } } // 조금만 끌어도 거의 제 속도
   else if (hold.st === 'go' && !hold.stuck) {
     const dx = hold.tx - player.x, dz = hold.tz - player.z, d = Math.hypot(dx, dz);
     if (d > hold.r) {
-      x += dx / d; z += dz / d;
+      const k = clamp((d - hold.r) / .9 + .3, .3, 1); // 목적지 앞 0.9 칸에서 부드럽게 줄여 멈춘다(멈칫거림 없이)
+      x += dx / d * k; z += dz / d * k;
       // 바위 · 집터에 막혀 1초 넘게 다가가지 못하면 멈춘다(손가락을 옮기면 다시 간다) — 미끄러지는 건 부딪힘 처리가 해 준다
       const now = performance.now(); if (d < hold.best - .25) { hold.best = d; hold.bt = now; } else if (now - hold.bt > 1000) hold.stuck = true;
     }
   }
   const l = Math.hypot(x, z); if (l > 1) { x /= l; z /= l; }
-  input.x = x; input.z = z;
+  input.x = x; input.z = z; input.touch = !!hold.st;
 }
-function updateHoldMark(dt) { if (!holdMark.visible) return; G.markT = (G.markT || 0) + dt; const k = 1.1 + Math.sin(G.markT * 7) * .12; holdMark.scale.set(k * hold.r * 2 + .8, 1, k * hold.r * 2 + .8); holdMark.rotation.y += dt * 1.5; holdMark.material.opacity = hold.stuck ? .45 : .95; }
+function updateHoldMark(dt) { if (!holdMark.visible) return; G.markT = (G.markT || 0) + dt; const k = (.7 + hold.r * 1.6) * (1 + Math.sin(G.markT * 6) * .06) * Math.min(1, .5 + G.markT * 4); holdMark.scale.set(k, 1, k); holdMark.rotation.y += dt * 1.2; holdMark.material.opacity = hold.stuck ? .25 : .5; }
 $('mute').innerHTML = ICON.soundOn;
 $('mute').addEventListener('click', () => { sfx.init(); sfx.setMuted(!sfx.muted()); $('mute').innerHTML = sfx.muted() ? ICON.soundOff : ICON.soundOn; $('mute').setAttribute('aria-label', sfx.muted() ? '소리 켜기' : '소리 끄기'); $('mute').blur(); });
 $('logIc').innerHTML = ICON.log; $('helpIc').innerHTML = ICON.helper; $('scoreIc').innerHTML = ICON.star; $('timeIc').innerHTML = ICON.clock; $('coldIc').innerHTML = ICON.snow; $('hotIc').innerHTML = ICON.flame;
