@@ -56,10 +56,13 @@ button:focus-visible{outline:3px solid var(--hazard);outline-offset:3px}
 .ibtn.off{opacity:.45}
 #bossBar{position:fixed;left:50%;top:78px;transform:translateX(-50%);width:min(440px,calc(100% - 32px));display:none;flex-direction:column;gap:4px;align-items:center;pointer-events:none}
 #bossBar.on{display:flex}
-#bossBar span{font-size:15px;color:#ffd0d4;text-shadow:0 1px 3px #000}
-#bossBar div{width:100%;height:12px;background:rgba(13,19,36,.9);border:1px solid #6b2330;border-radius:3px;overflow:hidden}
+#bossBar span{display:flex;gap:10px;align-items:baseline;font-size:15px;color:#ffd0d4;text-shadow:0 1px 3px #000}
+#bossBar em{font-style:normal}
+#bossHp{font-size:16px;color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+#bossBar.shield #bossFill{background:linear-gradient(90deg,#3aa0ff,#8fd3ff)}
+#bossBar div{width:100%;height:14px;background:rgba(13,19,36,.9);border:1px solid #6b2330;border-radius:3px;overflow:hidden}
 #bossFill{display:block;height:100%;width:100%;background:linear-gradient(90deg,var(--foe),#ff8a5c)}
-#banner{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%) scale(.9);padding:9px 26px;font-size:clamp(22px,5vw,42px);color:#14161c;background:var(--hazard);border-top:6px solid #14161c;border-bottom:6px solid #14161c;outline:4px solid var(--hazard);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;white-space:nowrap}
+#banner{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%) scale(.9);padding:9px 26px;font-size:clamp(22px,5vw,42px);color:#14161c;background:var(--hazard);border-top:6px solid #14161c;border-bottom:6px solid #14161c;outline:4px solid var(--hazard);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;width:max-content;max-width:calc(100vw - 40px);text-align:center;line-height:1.2}
 #banner.on{opacity:1;transform:translate(-50%,-50%) scale(1)}
 #fade{position:fixed;inset:0;background:#05070f;opacity:0;pointer-events:none;transition:opacity .3s}
 #fade.on{opacity:1}
@@ -176,7 +179,7 @@ h2{font-size:clamp(30px,6vw,42px);line-height:1.05}
     <button class="ibtn" id="bMute" type="button" aria-label="소리 끄기" aria-pressed="false"><svg viewBox="0 0 18 18" aria-hidden="true"><path d="M2 6.5h3.2L9.5 3v12l-4.3-3.5H2z" fill="currentColor"/><path d="M12 6.2a4 4 0 0 1 0 5.6M14 4a7 7 0 0 1 0 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
   </div>
 </div>
-<div id="bossBar"><span class="disp">거대 경비 로봇</span><div><i id="bossFill"></i></div></div>
+<div id="bossBar"><span class="disp"><em id="bossName">거대 경비 로봇</em><b id="bossHp"></b></span><div><i id="bossFill"></i></div></div>
 <div id="fade" aria-hidden="true"></div>
 <div class="disp" id="banner" role="status"></div>
 <div id="floats" aria-hidden="true"><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i><i class="float"></i></div>
@@ -186,7 +189,7 @@ h2{font-size:clamp(30px,6vw,42px);line-height:1.05}
   <div class="sign">
     <p class="eyebrow">공단 7번 도로 · 야간 · 연속 작전</p>
     <h1 class="disp">야간 분대 작전 <em>3D</em></h1>
-    <p class="lead">병사 4명으로 출발합니다. 좌우로 움직여 폭주 로봇을 쏘고 분대를 불려, 끝 검문소의 거대 경비 로봇을 깨면 다음 작전으로 이어져요. 분대와 무기는 그대로 데려가지만 작전마다 로봇이 세지고, 분대가 전멸하면 끝나요.</p>
+    <p class="lead">병사 4명으로 출발합니다. 좌우로 움직여 폭주 로봇을 쏘고 분대를 불려, 끝 검문소의 거대 경비 로봇을 쓰러뜨려야 문이 열리고 다음 작전으로 이어져요. 분대와 무기는 그대로 데려가지만 작전마다 새 위협이 하나씩 늘고 로봇도 세지며, 분대가 전멸하면 끝나요.</p>
     <ul class="rules">
       <li><span class="tile t-gate disp"><span>+5</span><span>&minus;3</span></span><span><b>숫자 게이트</b> — 파랑은 병력 추가, 빨강은 감소. 쏘면 숫자가 올라가고, 양쪽에 걸쳐 지나가면 둘 다 적용돼요.</span></li>
       <li><span class="tile t-barr disp"><span>40</span></span><span><b>숫자 바리케이드</b> — 쏴서 0으로 만들면 갇힌 병사가 합류해요. 부딪히면 병력을 잃어요.</span></li>
@@ -258,6 +261,8 @@ const ETYPE = {
   grunt: { r: 0.5,  v: 3.8, steer: 1.8, scale: 1.15, ram: 1,   gap: 0,    tint: [1, 0.3, 0.28] },
   armor: { r: 0.6,  v: 3.2, steer: 1.5, scale: 1.45, ram: 0.5, gap: 0,    tint: [1, 0.62, 0.15] },
   brute: { r: 1.2,  v: 2.5, steer: 1.0, scale: 2.7,  ram: 0.2, gap: 0.12, tint: [0.72, 0.42, 1] },
+  sniper: { r: 0.7, v: 0,   steer: 0,   scale: 1.75, ram: 1,   gap: 0,    tint: [0.25, 0.95, 1] },  // 저격 로봇 — 길가에 서서 멀리서 쏜다
+  rusher: { r: 0.75, v: 8.5, steer: 0.6, scale: 1.75, ram: 0.34, gap: 0.05, tint: [1, 0.92, 0.2] }, // 돌진 로봇 — 아주 빠르게 달려든다
   boss:  { r: 2.4,  v: 1.0, steer: 0.7, scale: 1,    ram: 0,   gap: 0.08, tint: [1, 1, 1] },
 };
 
@@ -288,19 +293,23 @@ const STAGE = [
   { d: 434, t: 'barr', x: 2.9, w: 3.8, hp: 1400, free: 12 },
   { d: 446, t: 'pick', x: -3.7 },
   { d: 452, t: 'gate', L: { v: 8, c: 20 },   R: { v: -30, c: 4 } },
-  { d: 500, t: 'boss', hp: 20000, minHp: 50 },
+  { d: 500, t: 'boss', hp: 12000, minHp: 50 },
 ];
 
-/* 연속 작전 — 검문소를 깨면 다음 작전으로 이어진다. 작전 1 은 위 코스 그대로,
+/* 연속 작전 — 검문소의 거대 경비 로봇을 쓰러뜨려야 다음 작전으로 이어진다. 작전 1 은 위 코스 그대로,
  * 작전 2 부터는 위 코스를 바탕으로 작전 번호를 씨앗(시드)으로 삼아 바꾼다(같은 작전 번호는 늘 같은 배치).
- * 어려움(작전 n ≥ 2)
- *   적 · 바리케이드 · 보스 체력 × hpMul = 4 × 1.7^(n−2)   (2: ×4, 3: ×6.8, 4: ×11.6, 5: ×19.7 …)
- *   적 수 × cntMul = 1 + 0.2 × (n−1)  (최대 ×2.2)
- *   빨강 게이트 감소 × (1 + 0.35 × (n−1)), 게이트를 쏴서 올리는 데 드는 명중 수 × (1 + 0.3 × (n−1))
- *   작전 3 부터 일부 졸개 무리가 장갑 로봇으로, 작전 4 부터 큰 로봇이 더 자주 섞인다
- * 분대 인원(예비 병력 포함, 상한 없음) · 무기는 다음 작전으로 이어진다(대신 위처럼 적이 세진다). */
-const opHp = op => op <= 1 ? 1 : 4 * Math.pow(1.7, op - 2);
-const opCnt = op => op <= 1 ? 1 : Math.min(2.2, 1 + 0.2 * (op - 1));
+ * 어려움
+ *   작전 번호로 오르는 부분: 적 · 바리케이드 · 보스 체력 × opHp(작전 2: ×1.4, 3: ×1.8, 그 뒤 한 작전마다 ×1.3)
+ *                          적 수 × (1 + 0.15 × (n−1)), 최대 ×2.2 · 빨강 게이트 감소 × (1 + 0.35 × (n−1))
+ *   분대 크기로 오르는 부분(작전 2 부터): 인원이 120명을 넘으면 적 · 보스 체력 × (인원/120)^0.5, 적 수 × (인원/120)^0.15(최대 ×1.6),
+ *                          빨강 게이트 감소 × (출발 인원/100)^0.5, 바리케이드 체력 × (출발 인원/120)^0.4
+ *   새 위협(작전마다 하나씩): 3 ÷ 게이트 · 4 저격 로봇 · 5 돌진 로봇 · 6 함정 바리케이드, 7 부터는 수가 늘어난다
+ *   보스 새 공격(작전마다 하나씩): 2 미사일 · 3 방패 · 4 돌진 · 5 충격파 — 오래 끌수록 공격이 잦아지고 세진다
+ * 분대 인원(예비 병력 포함, 상한 없음) · 무기는 다음 작전으로 이어진다. */
+const THREATS = { 3: '÷ 게이트', 4: '저격 로봇', 5: '돌진 로봇', 6: '함정 바리케이드' };
+const BOSS_ATK = { 2: '미사일', 3: '방패', 4: '돌진', 5: '충격파' };
+const opHp = op => op <= 1 ? 1 : op === 2 ? 1.4 : 1.8 * Math.pow(1.3, op - 3);
+const opCnt = op => op <= 1 ? 1 : Math.min(2.2, 1 + 0.15 * (op - 1));
 function makeCourse(op) {
   if (op <= 1) return STAGE;
   const r = mulberry32((op * 2654435761) ^ 0x5eed1234);
@@ -334,12 +343,32 @@ function makeCourse(op) {
       if (it.extra) o.extra = { type: it.extra.type, n: Math.min(30, Math.round(it.extra.n * cm)), hp: Math.round(it.extra.hp * hm) };
       if (it.brute) o.brute = { n: it.brute.n + (op >= 5 ? 1 : 0), hp: Math.round(it.brute.hp * hm) };
       else if (op >= 4 && r() < 0.25 + 0.05 * op) o.brute = { n: 1, hp: Math.round(it.hp * 25 * hm) };
+      if (op >= 5 && it.d >= 230) o.rush = { n: op >= 7 ? 3 : 2, hp: Math.round(25 * hm) }; // 돌진 로봇
     } else if (it.t === 'boss') {
       o.hp = Math.round(it.hp * hm);
       o.minHp = Math.round(it.minHp * hm);
     }
     return o;
   });
+  // ÷ 게이트 — 빨강 쪽 하나를 「÷2」(작전 6 부터 ÷3)로 바꾼다. 쏴도 숫자가 바뀌지 않는다
+  if (op >= 3) {
+    const gs = out.filter(o => o.t === 'gate' && o.d > 100);
+    for (let k = 0, n = op >= 5 ? 2 : 1; k < n && gs.length; k++) {
+      const g = gs.splice(Math.floor(r() * gs.length), 1)[0];
+      const side = g.L.v < g.R.v ? 'L' : 'R';
+      g[side] = { v: 0, c: 1, div: op >= 6 ? 3 : 2 };
+    }
+  }
+  // 저격 로봇 — 길 가장자리에 서서 분대를 멀리서 쏜다. 그쪽으로 붙어서 쏴야 맞힌다
+  if (op >= 4) {
+    const n = op >= 7 ? 4 : op >= 5 ? 3 : 2;
+    [168, 296, 424, 470].slice(0, n).forEach(d => out.push({ d, t: 'snipe', x: (r() < 0.5 ? -1 : 1) * (CFG.HALF - 0.9), hp: Math.round(60 * hm) }));
+  }
+  // 함정 바리케이드 — 길 한가운데. 구출할 병사가 없고, 부딪히면 더 많이 잃는다
+  if (op >= 6) {
+    out.push({ d: 202, t: 'barr', x: 0, w: 3.2, hp: Math.round(300 * hm), free: 0, trap: true });
+    out.push({ d: 380, t: 'barr', x: 0, w: 3.2, hp: Math.round(800 * hm), free: 0, trap: true });
+  }
   return out.sort((a, b) => a.d - b.d);
 }
 
@@ -379,7 +408,7 @@ function createSim(seed, op, carry) {
   const S = {
     phase: 'ready', t: 0, d: 0, x: 0, tx: 0, v: 0, weapon: carry ? carry.weapon : 0, op,
     soldiers: [], bullets: [], enemies: [], gates: [], barrs: [], picks: [],
-    si: 0, F: formation(n0), events: [],
+    si: 0, F: formation(n0), events: [], missiles: [],
     kills: carry ? carry.kills : 0, freed: carry ? carry.freed : 0, lost: carry ? carry.lost : 0, maxN: Math.max(all0, carry ? carry.maxN : 0), shots: 0, reserve: all0 - n0,
     boss: null, bossDead: false, hold: false, why: '', lastHit: '', lostBy: { enemy: 0, barr: 0, gate: 0, boss: 0 },
   };
@@ -390,8 +419,9 @@ function createSim(seed, op, carry) {
   for (const it of COURSE) {
     if (it.t === 'gate') {
       pid++;
+      const big = op >= 2 ? Math.pow(Math.max(1, all0 / 100), 0.5) : 1; // 큰 분대일수록 빨강 게이트가 더 깎는다
       const mk = (o, side) => o && S.gates.push({
-        id: ++uid, pid, d: it.d, side, v: o.v, v0: o.v, c: o.c, k: 0, acc: 0, on: true, taken: false, pulse: 0,
+        id: ++uid, pid, d: it.d, side, v: o.v < 0 ? Math.round(o.v * big) : o.v, v0: o.v, c: o.c, k: 0, acc: 0, on: true, taken: false, pulse: 0, div: o.div || 0,
         x0: side < 0 ? -HALF : side > 0 ? 0.2 : -HALF, x1: side < 0 ? -0.2 : side > 0 ? HALF : HALF,
       });
       mk(it.L, -1); mk(it.R, 1); mk(it.M, 0);
@@ -402,7 +432,8 @@ function createSim(seed, op, carry) {
         const r = Math.floor(i / per), cnt = Math.min(per, it.free - r * per), j = i - r * per;
         caps.push({ x: x0 + 0.45 + (x1 - x0 - 0.9) * (cnt === 1 ? 0.5 : j / (cnt - 1)), d: it.d + 2.1 + r * 0.95, ph: rnd() * 6.28 });
       }
-      S.barrs.push({ id: ++uid, d: it.d, x0, x1, hp: it.hp, max: it.hp, free: it.free, caps, on: true, pulse: 0 });
+      const hp = Math.round(it.hp * (op >= 2 ? Math.pow(Math.max(1, all0 / 120), 0.4) : 1));
+      S.barrs.push({ id: ++uid, d: it.d, x0, x1, hp, max: hp, free: it.free, caps, on: true, pulse: 0, trap: !!it.trap });
     } else if (it.t === 'pick') {
       S.picks.push({ id: ++uid, d: it.d, x: it.x, on: true, lvl: Math.min(S.picks.length + 1, WEAPONS.length - 1) });
     }
@@ -429,18 +460,29 @@ function createSim(seed, op, carry) {
     const last = S.soldiers.pop();
     if (i < S.soldiers.length) S.soldiers[i] = last;
   }
+  // 한꺼번에 k 명을 잃는다(저격 · 미사일 · 보스 공격 · ÷ 게이트) — 예비부터 줄이고, 모자라면 길 위 병사가 쓰러진다
+  function killN(k, why) {
+    k = Math.min(Math.floor(k), total()); if (k <= 0) return 0;
+    const r = Math.min(k, S.reserve); S.reserve -= r; S.lost += r; S.lostBy[why] += r; S.lastHit = why;
+    for (let i = 0, m = k - r; i < m && S.soldiers.length; i++) killSoldier(S.soldiers.length - 1, why);
+    reform();
+    return k;
+  }
+  const sizeK = () => Math.max(1, total() / 120); // 분대 크기 배수 — 작전 2 부터 적이 분대 크기에 맞춰 세진다
   for (let i = 0; i < n0; i++) addSoldier(S.F.ox[i], S.F.od[i]);
   for (const s of S.soldiers) s.born = -1;
 
   function spawnEnemy(type, x, d, hp) {
     const T = ETYPE[type];
-    const e = { id: ++uid, type, x: clamp(x, -HALF + T.r, HALF - T.r), d, hp, max: hp, r: T.r, off: (rnd() - 0.5) * 4.4, vm: 0.85 + rnd() * 0.3, ph: rnd() * 6.28, flash: 0, cd: 0, born: S.t, sum: 2.5, minHp: 0 };
+    const e = { id: ++uid, type, x: clamp(x, -HALF + T.r, HALF - T.r), d, hp, max: hp, r: T.r, off: (rnd() - 0.5) * 4.4, vm: 0.85 + rnd() * 0.3, ph: rnd() * 6.28, flash: 0, cd: 0, born: S.t, sum: 2.5, minHp: 0, sh: 0 };
     S.enemies.push(e);
     return e;
   }
   function activate(it) {
+    const hs = op >= 2 ? Math.sqrt(sizeK()) : 1, ns = op >= 2 ? Math.min(1.6, Math.pow(sizeK(), 0.15)) : 1;
     if (it.t === 'wave') {
       const put = (type, n, hp, side) => {
+        n = Math.min(45, Math.round(n * ns)); hp = Math.round(hp * hs);
         for (let i = 0; i < n; i++) {
           const x = side ? side * (0.6 + rnd() * (HALF - 1.4)) : (rnd() * 2 - 1) * (HALF - 0.8);
           spawnEnemy(type, x, it.d + rnd() * (6 + n * 0.5), hp);
@@ -448,10 +490,14 @@ function createSim(seed, op, carry) {
       };
       put(it.type, it.n, it.hp, it.side || 0);
       if (it.extra) put(it.extra.type, it.extra.n, it.extra.hp, 0);
-      if (it.brute) for (let i = 0; i < it.brute.n; i++) spawnEnemy('brute', (rnd() * 2 - 1) * 3, it.d + 8 + i * 5, it.brute.hp);
+      if (it.brute) for (let i = 0; i < it.brute.n; i++) spawnEnemy('brute', (rnd() * 2 - 1) * 3, it.d + 8 + i * 5, Math.round(it.brute.hp * hs));
+      if (it.rush) for (let i = 0; i < it.rush.n; i++) { const e = spawnEnemy('rusher', (rnd() * 2 - 1) * 3.5, it.d + 22 + i * 4, Math.round(it.rush.hp * hs)); e.off = (rnd() - 0.5) * 2; }
+    } else if (it.t === 'snipe') {
+      const e = spawnEnemy('sniper', it.x, it.d, Math.round(it.hp * hs)); e.sum = 1.4; e.vm = 1;
     } else if (it.t === 'boss') {
-      const e = spawnEnemy('boss', 0, it.d, it.hp);
-      e.vm = 1; e.off = 0; e.minHp = it.minHp;
+      const e = spawnEnemy('boss', 0, it.d, Math.round(it.hp * hs));
+      e.vm = 1; e.off = 0; e.minHp = Math.round(it.minHp * hs);
+      Object.assign(e, { eng: 0, mt: 2.5, st: 5, ct: 6, cw: 0, dash: 0, ret: 0, wt: 5, ww: 0 }); // 보스 공격 시계
       S.boss = e;
       ev({ t: 'boss' });
     }
@@ -472,7 +518,8 @@ function createSim(seed, op, carry) {
   function applyGate(g) {
     g.taken = true;
     const n0 = total();
-    if (g.v > 0) {
+    if (g.div) killN(n0 - Math.floor(n0 / g.div), 'gate');
+    else if (g.v > 0) {
       const room = Math.max(0, Math.min(g.v, CFG.MAX - S.soldiers.length)); // 길에 설 자리만큼만 병사로, 나머지는 바로 예비로
       for (let i = 0; i < room; i++) addSoldier(clamp(S.x + (rnd() - 0.5) * 3, g.x0 + 0.4, g.x1 - 0.4), g.d - 0.5 - rnd() * 2);
       S.reserve += g.v - room;
@@ -483,6 +530,60 @@ function createSim(seed, op, carry) {
     }
     reform();
     ev({ t: 'gate', v: g.v, x: clamp(S.x, g.x0 + 1, g.x1 - 1), d: g.d, n: total() - n0 });
+  }
+
+  /* 거대 경비 로봇 — 분대 앞줄까지 걸어와 막아선다(지나쳐 가지 않는다). 쓰러뜨려야만 검문소 문이 열린다.
+   * 작전마다 공격이 하나씩 는다: 소환(1) · 미사일(2) · 방패(3) · 돌진(4) · 충격파(5). 오래 끌수록(eng) 공격이 잦아진다. */
+  function bossAct(e, dt) {
+    const F = S.F, rel = e.d - S.d, near = rel < 45;
+    let hurt = false;
+    if (near) e.eng += dt;
+    const rage = 1 + e.eng / 20, stand = S.d + F.rd + e.r * 0.4; // stand: 분대 앞줄에 붙어 서는 자리 — 더 뒤로는 못 간다
+    if (e.dash > 0) { // 돌진 — 앞줄에 부딪히면 한꺼번에 쓰러뜨리고 뒤로 물러난다
+      e.dash -= dt; e.d -= 12 * dt;
+      if (e.d <= stand || e.dash <= 0) {
+        e.dash = 0; e.ret = 6;
+        const k = killN(3 + Math.ceil(total() * 0.04), 'boss'); hurt = true;
+        ev({ t: 'bslam', x: e.x, d: Math.max(e.d, stand), n: k });
+      }
+    } else if (e.ret > 0) { const m = Math.min(e.ret, 4 * dt); e.d += m; e.ret -= m; }
+    else if (e.cw <= 0) e.d -= ETYPE.boss.v * dt;
+    if (e.d < stand) e.d = stand;
+    // 소환
+    e.sum -= dt * rage;
+    if (e.sum <= 0 && rel < 50) {
+      e.sum = 3.2;
+      for (let q = 0; q < 5; q++) spawnEnemy('grunt', e.x + (rnd() - 0.5) * 7, e.d - 1 - rnd() * 2, e.minHp);
+      ev({ t: 'summon', x: e.x, d: e.d });
+    }
+    if (!near) return hurt;
+    // 미사일 — 분대 자리에 떨어진다. 빨간 표시가 뜨면 옆으로 피하자
+    if (op >= 2) {
+      e.mt -= dt * rage;
+      if (e.mt <= 0) {
+        e.mt = Math.max(2.4, 4.6 - 0.2 * op);
+        for (let q = 0; q < 3; q++) S.missiles.push({ x0: e.x + (q - 1) * 2, d0: e.d, x: clamp(S.x + (q - 1) * 1.6 + (rnd() - 0.5), -HALF + 0.5, HALF - 0.5), d: S.d + (rnd() - 0.3) * F.rd, t: -q * 0.15, T: 1.6 });
+        ev({ t: 'missile', x: e.x, d: e.d });
+      }
+    }
+    // 방패 — 켜져 있는 동안은 총알이 거의 안 들어간다
+    if (op >= 3) {
+      if (e.sh > 0) e.sh = Math.max(0, e.sh - dt);
+      else { e.st -= dt; if (e.st <= 0) { e.st = Math.max(4.5, 8 - 0.3 * op); e.sh = 2.6; ev({ t: 'shield', x: e.x, d: e.d }); } }
+    }
+    // 돌진 — 0.9초 몸을 웅크렸다가 앞으로 내달린다
+    if (op >= 4 && e.dash <= 0 && e.ret <= 0) {
+      if (e.cw > 0) { e.cw -= dt; if (e.cw <= 0) { e.cw = 0; e.dash = 1.6; e.ct = Math.max(5, 9 - 0.3 * op); } }
+      else { e.ct -= dt * rage; if (e.ct <= 0) { e.cw = 0.9; ev({ t: 'chargewarn', x: e.x, d: e.d }); } }
+    }
+    // 충격파 — 1.1초 뒤 땅을 내리쳐 분대 전체를 흔든다(피할 수 없다)
+    if (op >= 5) {
+      if (e.ww > 0) {
+        e.ww -= dt;
+        if (e.ww <= 0) { e.ww = 0; e.wt = Math.max(4, 7 - 0.25 * op); const k = killN(3 + Math.ceil(total() * 0.05), 'boss'); hurt = true; ev({ t: 'stomp', x: e.x, d: e.d, n: k }); }
+      } else { e.wt -= dt * rage; if (e.wt <= 0) { e.ww = 1.1; ev({ t: 'stompwarn', x: e.x, d: e.d }); } }
+    }
+    return hurt;
   }
 
   function step(dt) {
@@ -499,6 +600,8 @@ function createSim(seed, op, carry) {
     S.hold = !!boss && boss.d - (S.d + F.rd) < 18;
     S.v += ((S.hold ? 0 : CFG.SPEED) - S.v) * Math.min(1, 5 * dt);
     S.d += S.v * dt;
+    if (boss && S.d > boss.d - F.rd - 1) { S.d = boss.d - F.rd - 1; S.v = 0; } // 보스가 살아 있으면 그 앞을 못 지나간다
+    if (!S.bossDead && S.d > CFG.LEN - 2) { S.d = CFG.LEN - 2; S.v = 0; } // 검문소 문은 보스를 쓰러뜨려야 열린다
 
     while (S.si < COURSE.length && COURSE[S.si].d <= S.d + 62) {
       const it = COURSE[S.si++];
@@ -533,7 +636,9 @@ function createSim(seed, op, carry) {
       let dead = b.life <= 0;
       if (!dead) for (const g of S.gates) {
         if (g.on && pd < g.d && b.d >= g.d && b.x > g.x0 && b.x < g.x1) {
-          g.acc += b.wt; g.pulse = 1;
+          g.pulse = 1;
+          if (g.div) { dead = true; break; } // ÷ 게이트는 쏴도 그대로
+          g.acc += b.wt;
           while (g.acc >= gateCost(g)) { g.acc -= gateCost(g); g.v++; g.k++; }
           dead = true; break;
         }
@@ -552,7 +657,7 @@ function createSim(seed, op, carry) {
         if (dd > e.r + 0.5 || dd < -e.r - 0.5) continue;
         const dx = e.x - b.x, rr = e.r + 0.14;
         if (dx * dx + dd * dd < rr * rr) {
-          e.hp -= b.dmg; e.flash = 1;
+          e.hp -= e.sh > 0 ? b.dmg * 0.12 : b.dmg; e.flash = 1; // 보스 방패가 켜져 있으면 거의 안 들어간다
           if (e.hp <= 0) killEnemy(e, false);
           dead = true; break;
         }
@@ -566,10 +671,10 @@ function createSim(seed, op, carry) {
     for (let j = 0; j < en.length; j++) {
       const e = en[j];
       if (e.hp <= 0) continue;
-      const T = ETYPE[e.type];
-      e.d -= T.v * e.vm * dt;
+      const T = ETYPE[e.type], isBoss = e.type === 'boss';
+      if (isBoss) { if (bossAct(e, dt)) dirty = true; } else e.d -= T.v * e.vm * dt;
       const rel = e.d - S.d;
-      if (rel < 45) {
+      if (rel < 45 && T.steer > 0) {
         const tx = clamp(S.x + e.off, -HALF + e.r, HALF - e.r);
         e.x += clamp(tx - e.x, -T.steer * dt, T.steer * dt);
       }
@@ -584,12 +689,13 @@ function createSim(seed, op, carry) {
       }
       e.ph += dt * (5 + T.v);
       if (e.flash > 0) e.flash = Math.max(0, e.flash - dt * 6);
-      if (e.type === 'boss') {
+      // 저격 로봇 — 사거리 안에 들면 몇 초마다 분대를 쏜다(분대가 클수록 한 번에 더 많이)
+      if (e.type === 'sniper' && rel < 42 && rel > F.rd + 2) {
         e.sum -= dt;
-        if (e.sum <= 0 && rel < 50) {
-          e.sum = 3.2;
-          for (let q = 0; q < 5; q++) spawnEnemy('grunt', e.x + (rnd() - 0.5) * 7, e.d - 1 - rnd() * 2, e.minHp);
-          ev({ t: 'summon', x: e.x, d: e.d });
+        if (e.sum <= 0) {
+          e.sum = Math.max(1.5, 2.8 - 0.12 * op);
+          const k = killN(1 + Math.ceil(total() * 0.012), 'enemy'); dirty = true;
+          ev({ t: 'snipe', x: e.x, d: e.d, tx: S.x, td: S.d + F.rd * 0.5, n: k });
         }
       }
       e.cd -= dt;
@@ -598,25 +704,28 @@ function createSim(seed, op, carry) {
         for (let i = 0; i < sol.length; i++) {
           const s = sol[i], dx = s.x - e.x, dd = s.d - e.d;
           if (dx * dx + dd * dd < rr) {
-            killSoldier(i, e.type === 'boss' ? 'boss' : 'enemy'); dirty = true;
+            killSoldier(i, isBoss ? 'boss' : 'enemy'); dirty = true;
+            if (isBoss && e.eng > 6) killN(Math.floor(e.eng / 6), 'boss'); // 오래 끌면 한 번에 더 많이
             if (T.ram > 0) { e.hp -= e.max * T.ram; if (e.hp <= 0) killEnemy(e, true); }
             e.cd = T.gap;
             break;
           }
         }
       }
-      if (rel < -F.rd - 8) e.hp = -1; // 지나쳐 간 적
+      if (!isBoss && rel < -F.rd - 8) e.hp = -1; // 지나쳐 간 적(보스는 절대 지나쳐 가지 않는다)
     }
     for (let j = en.length - 1; j >= 0; j--) if (en[j].hp <= 0) { en[j] = en[en.length - 1]; en.pop(); }
 
     // 바리케이드에 부딪힌 분대원
     for (const br of S.barrs) {
       if (!br.on || Math.abs(br.d - S.d) > F.rd + 3) continue;
-      const ram = Math.max(4, br.max * 0.08);
+      const ram = Math.max(4, br.max * (br.trap ? 0.02 : 0.08)); // 함정은 잘 안 부서지고
       for (let i = sol.length - 1; i >= 0; i--) {
         const s = sol[i];
+        if (!s) continue; // 함정에 여럿이 한꺼번에 쓰러지면 줄이 짧아진다
         if (s.d > br.d - 0.8 && s.d < br.d + 0.6 && s.x > br.x0 - 0.3 && s.x < br.x1 + 0.3) {
           killSoldier(i, 'barr'); dirty = true;
+          if (br.trap) killN(2, 'barr'); // 부딪힐 때마다 더 많이 잃는다
           br.hp -= ram; br.pulse = 1;
           if (br.hp <= 0) { breakBarr(br, true); break; }
         }
@@ -655,9 +764,20 @@ function createSim(seed, op, carry) {
       }
     }
 
+    // 보스 미사일 — 떨어진 자리에 분대가 있으면 맞는다
+    for (let i = S.missiles.length - 1; i >= 0; i--) {
+      const m = S.missiles[i];
+      m.t += dt;
+      if (m.t < m.T) continue;
+      const hit = Math.abs(m.x - S.x) < S.F.rx + 0.7 && m.d > S.d - S.F.rd - 1 && m.d < S.d + S.F.rd + 1;
+      const k = hit ? killN(2 + Math.ceil(total() * 0.015), 'boss') : 0;
+      ev({ t: 'mland', x: m.x, d: m.d, n: k });
+      S.missiles[i] = S.missiles[S.missiles.length - 1]; S.missiles.pop();
+    }
+    if (S.bossDead) S.missiles.length = 0;
     if (sol.length === 0) { S.phase = 'lose'; S.why = S.lastHit || 'enemy'; ev({ t: 'lose', why: S.why }); return; }
     if (total() > S.maxN) S.maxN = total();
-    if (S.d >= CFG.LEN) { S.phase = 'win'; ev({ t: 'win' }); }
+    if (S.bossDead && S.d >= CFG.LEN) { S.phase = 'win'; ev({ t: 'win' }); } // 보스를 쓰러뜨리고 문을 지나야만 작전 완료
   }
 
   return {
@@ -1147,16 +1267,17 @@ function buildStage(S) {
 function drawGate(gv) {
   const g = gv.g, L = gv.L, c = L.g;
   c.clearRect(0, 0, 512, 256);
-  big(c, signed(g.v), 256, 136, 178, '#ffffff', 'rgba(8,12,26,.9)', 22);
+  big(c, g.div ? '÷' + g.div : signed(g.v), 256, 136, 178, '#ffffff', 'rgba(8,12,26,.9)', 22);
   L.tx.needsUpdate = true;
-  const col = gateColor(g.v); gv.panel.material.color.setHex(col); gv.beam.material.color.setHex(col);
+  const col = g.div ? GATE_MINUS : gateColor(g.v); gv.panel.material.color.setHex(col); gv.beam.material.color.setHex(col);
 }
 function drawBarr(bv) {
   const c = bv.L.g, b = bv.b;
   c.clearRect(0, 0, 256, 176);
   c.fillStyle = 'rgba(10,14,28,.88)'; c.fillRect(22, 6, 212, 108); c.strokeStyle = '#ffd21f'; c.lineWidth = 6; c.strokeRect(22, 6, 212, 108);
   big(c, String(Math.max(1, Math.ceil(b.hp))), 128, 64, b.hp >= 1000 ? 70 : 84, '#ffd21f');
-  big(c, `구출 +${b.free}`, 128, 146, 38, '#7dffb0', 'rgba(8,12,26,.9)', 8);
+  if (b.trap) big(c, '함정', 128, 146, 40, '#ff6b78', 'rgba(8,12,26,.9)', 8);
+  else big(c, `구출 +${b.free}`, 128, 146, 38, '#7dffb0', 'rgba(8,12,26,.9)', 8);
   bv.L.tx.needsUpdate = true;
 }
 function drawPick(pv, text, col) {
@@ -1170,18 +1291,78 @@ function drawPick(pv, text, col) {
 // 큰 로봇 머리 위 체력 숫자
 const hpLabels = [];
 for (let i = 0; i < 6; i++) { const L = makeLabel(160, 72, 2.4, 1.08, false); L.mesh.visible = false; L.mesh.renderOrder = 3; scene.add(L.mesh); hpLabels.push({ L, id: 0, hp: -1 }); }
-function drawHp(h, hp) {
+const HPCOL = { brute: '#c58cff', sniper: '#5ef0ff', rusher: '#ffe14d' };
+function drawHp(h, hp, type) {
   const c = h.L.g; c.clearRect(0, 0, 160, 72);
-  c.fillStyle = 'rgba(10,14,28,.85)'; c.fillRect(6, 6, 148, 60); c.strokeStyle = '#c58cff'; c.lineWidth = 5; c.strokeRect(6, 6, 148, 60);
-  big(c, String(hp), 80, 38, 44, '#ffffff'); h.L.tx.needsUpdate = true;
+  c.fillStyle = 'rgba(10,14,28,.85)'; c.fillRect(6, 6, 148, 60); c.strokeStyle = HPCOL[type] || '#c58cff'; c.lineWidth = 5; c.strokeRect(6, 6, 148, 60);
+  big(c, hp >= 10000 ? Math.round(hp / 1000) + 'k' : String(hp), 80, 38, 44, '#ffffff'); h.L.tx.needsUpdate = true;
 }
+
+/* ---------- 새 위협 · 보스 공격 그림 ---------- */
+// 저격 광선 — 잠깐 번쩍이는 빨간 줄
+const beams = [];
+for (let i = 0; i < 4; i++) {
+  const m = new T.Mesh(new T.BoxGeometry(1, 1, 1), new T.MeshBasicMaterial({ color: 0xff3b5c, transparent: true, opacity: 0.9, blending: T.AdditiveBlending, depthWrite: false, fog: false }));
+  m.visible = false; scene.add(m); beams.push({ m, life: 0 });
+}
+function beam(x0, y0, z0, x1, y1, z1) {
+  const b = beams.find(q => q.life <= 0) || beams[0];
+  b.m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); b.m.lookAt(x1, y1, z1);
+  b.m.scale.set(0.13, 0.13, Math.hypot(x1 - x0, y1 - y0, z1 - z0)); b.life = 0.3; b.m.visible = true;
+}
+// 보스 미사일 · 떨어질 자리 표시(빨간 고리)
+const MCAP = 30;
+const misMesh = inst(new T.SphereGeometry(0.38, 8, 6), new T.MeshBasicMaterial({ color: 0xff7a3d, fog: false }), MCAP, false);
+const ringTex = tex(64, 64, g => { g.fillStyle = 'rgba(255,255,255,.22)'; g.beginPath(); g.arc(32, 32, 27, 0, 7); g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 5; g.beginPath(); g.arc(32, 32, 27, 0, 7); g.stroke(); });
+const markMesh = inst(new T.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ map: ringTex, color: 0xff3b30, transparent: true, depthWrite: false }), MCAP, false);
+markMesh.renderOrder = 1;
+// 보스 방패 · 충격파 고리
+const shieldMesh = new T.Mesh(new T.SphereGeometry(4.6, 20, 14), new T.MeshBasicMaterial({ color: 0x5ab8ff, transparent: true, opacity: 0.24, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+shieldMesh.position.set(0, 4, 0); shieldMesh.visible = false; boss.g.add(shieldMesh);
+const stompRing = new T.Mesh(new T.RingGeometry(0.86, 1, 48).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xff3b30, transparent: true, opacity: 0.75, depthWrite: false, side: T.DoubleSide }));
+stompRing.visible = false; stompRing.renderOrder = 1; scene.add(stompRing);
+// 검문소 문 — 보스가 살아 있는 동안 닫혀 있다가, 쓰러뜨리면 양옆으로 열린다
+const door = (() => {
+  const g = new T.Group(); g.position.set(0, 0, dz(LEN) + 0.5); scene.add(g);
+  const dtex = hazardTex.clone(); dtex.wrapS = T.RepeatWrapping; dtex.repeat.set(2.2, 1.6); dtex.needsUpdate = true;
+  const mat = new T.MeshLambertMaterial({ map: dtex });
+  const panels = [-1, 1].map(s => { const m = new T.Mesh(B(HALF, 3.4, 0.35), mat); m.position.set(s * HALF / 2, 1.7, 0); g.add(m); return m; });
+  const lampMat = new T.MeshBasicMaterial({ color: 0xff2a2a });
+  const lamp = new T.Mesh(Sp(0.36, 12, 8), lampMat); lamp.position.set(0, 3.85, 0.2); g.add(lamp);
+  return { g, panels, lampMat, open: 0, opening: false };
+})();
+function resetDoor() { door.open = 0; door.opening = false; door.lampMat.color.setHex(0xff2a2a); for (const [i, p] of door.panels.entries()) p.position.x = (i ? 1 : -1) * HALF / 2; }
+// 예비 병력 군중 — 대열 뒤에 빽빽이 서는 가벼운 병사(한 번에 그린다). 화질에 따라 최대 수가 바뀐다
+const crowdGeo = merge([
+  part(B(0.46, 0.5, 0.3), 0x5f9a48, 0, 0.58, 0),
+  part(B(0.4, 0.34, 0.26), 0x3c6a34, 0, 0.17, 0),
+  part(Sp(0.17, 6, 4), 0xf3c9a0, 0, 0.95, 0),
+  part(new T.SphereGeometry(0.23, 7, 3, 0, Math.PI * 2, 0, Math.PI / 2), 0x3f7d3b, 0, 0.99, 0),
+  part(B(0.08, 0.08, 0.42), 0x262c3a, 0.13, 0.64, -0.24),
+]);
+const CROWDMAX = 900;
+const crowd = inst(crowdGeo, charMat, CROWDMAX, true); // 색 칸을 둬야 같은 재질을 쓰는 다른 무리와 그리기 방식이 맞는다
+// 예비 병력 깃발 — 「+12,340 예비 병력」
+const flag = makeLabel(320, 150, 3.6, 1.69, false); flag.mesh.visible = false; flag.mesh.renderOrder = 3; scene.add(flag.mesh); flag.n = -1; flag.at = 0;
+function drawFlag(n) {
+  const c = flag.g; c.clearRect(0, 0, 320, 150);
+  c.fillStyle = 'rgba(10,14,28,.88)'; c.fillRect(6, 6, 308, 138); c.strokeStyle = '#3ddc97'; c.lineWidth = 6; c.strokeRect(6, 6, 308, 138);
+  const txt = '+' + Math.round(n).toLocaleString('ko-KR');
+  c.font = `${FONTW} 70px ${FONT}`; const w = c.measureText(txt).width;
+  big(c, txt, 160, 62, w > 280 ? Math.floor(70 * 280 / w) : 70, '#ffffff');
+  big(c, '예비 병력', 160, 118, 30, '#7dffb0'); flag.tx.needsUpdate = true;
+}
+// 화질 — 느리면 자동으로 한 단계씩 낮춘다(화면 선명도 · 군중 수)
+const QUAL = [{ pr: 2, crowd: 900 }, { pr: 1.5, crowd: 500 }, { pr: 1, crowd: 250 }];
+let qi = ((window.matchMedia && matchMedia('(pointer:coarse)').matches) || navigator.maxTouchPoints > 0) && Math.min(window.innerWidth, window.innerHeight) < 600 ? 1 : 0, qT = 0, qN = 0; // 휴대폰은 한 단계 낮게 시작
+function applyQual() { renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUAL[qi].pr)); resize(); }
 
 /* ================= 화면: 진행 · 효과 · 계기판 · 소리 · 조작 ================= */
 /* ---------- 헬스키퍼 아케이드 연결 ----------
  * ?hk=1 로 열리면 「아케이드 모드」. 한 판 = 분대가 전멸할 때까지 이어지는 연속 작전(작전 1 → 2 → 3 …).
  * hk:start 는 판 처음 한 번만, hk:score 는 전멸해서 결과 화면이 뜰 때 한 번, 진행 중에는 2초마다 hk:live(지금 그만두면 받을 점수).
  * 점수
- *   작전을 깰 때마다: 3,000 + 별 하나에 500 + 살아남은 분대원 × 20 + 작전 번호 × 1,000(보너스)
+ *   작전을 깰 때마다(보스를 쓰러뜨려야 깬다): 3,000 + 별 하나에 500 + 200 × √살아남은 인원 + 작전 번호 × 1,000(보너스)
  *   지금 작전: 진행률(1% 단위 내림) × 15
  *   합계는 1,000,000 점을 넘지 않는다(아케이드 최고 점수 상한)
  */
@@ -1194,7 +1375,8 @@ const starsFor = n => n >= 130 ? 3 : n >= 80 ? 2 : 1;
 // 작전 하나를 깼을 때 점수
 function clearScore(op, n) {
   const st = starsFor(n);
-  return { op, n, stars: st, pts: 3000 + st * 500 + n * 20 + op * 1000 };
+  const surv = Math.round(200 * Math.sqrt(n)); // 살아남은 분대원 — 200 × √인원(인원이 폭증해도 완만하게)
+  return { op, n, stars: st, surv, pts: 3000 + st * 500 + surv + op * 1000 };
 }
 // 한 판 기록 — 지금 작전 번호 · 깬 작전들 · 쌓인 점수
 const RUN = { op: 1, cleared: [], banked: 0 };
@@ -1204,12 +1386,12 @@ const liveScore = prog => Math.min(SCORE_CAP, RUN.banked + progPct(prog) * 15); 
 function calcScore(prog) {
   const p = progPct(prog), k = RUN.cleared.length, lines = [];
   if (k) {
-    const st = RUN.cleared.reduce((a, c) => a + c.stars, 0), n = RUN.cleared.reduce((a, c) => a + c.n, 0), ob = RUN.cleared.reduce((a, c) => a + c.op, 0);
-    lines.push(`깬 작전 ${k}개 × 3,000 = ${fmt(k * 3000)}`, `별 합계 ${st}개 × 500 = ${fmt(st * 500)}`, `작전마다 살아남은 분대원 합계 ${fmt(n)}명 × 20 = ${fmt(n * 20)}`,
+    const st = RUN.cleared.reduce((a, c) => a + c.stars, 0), sv = RUN.cleared.reduce((a, c) => a + c.surv, 0), ob = RUN.cleared.reduce((a, c) => a + c.op, 0);
+    lines.push(`깬 작전 ${k}개 × 3,000 = ${fmt(k * 3000)}`, `별 합계 ${st}개 × 500 = ${fmt(st * 500)}`, `살아남은 분대원 점수(작전마다 200 × √인원) = ${fmt(sv)}`,
       `작전 보너스 (${k > 4 ? `1+2+…+${k}` : RUN.cleared.map(c => c.op).join('+')}) × 1,000 = ${fmt(ob * 1000)}`);
   }
   lines.push(`작전 ${RUN.op} 진행률 ${p}% × 15 = ${fmt(p * 15)}`);
-  if (!k) lines.push('검문소를 깨면 3,000 + 별 × 500 + 생존 분대원 × 20 + 작전 번호 × 1,000 을 받고 다음 작전으로');
+  if (!k) lines.push('보스를 쓰러뜨리면 3,000 + 별 × 500 + 200 × √생존 인원 + 작전 번호 × 1,000 을 받고 다음 작전으로');
   const score = liveScore(prog);
   if (score >= SCORE_CAP) lines.push(`최고 점수 상한 ${fmt(SCORE_CAP)}점`);
   return { score, lines };
@@ -1333,9 +1515,17 @@ function onEvent(e) {
       burst(e.x, 1.4, -e.d, 30, WEAPONS[e.lvl].color, 8, 0.13, 0.7, 4); sfx.weapon(); pulse($('pWeapon'));
       break;
     case 'bonus': floatText(`+${e.n} 보급병`, 'plus', e.x, 2.4, -e.d); sfx.plus(); break;
-    case 'boss': banner('거대 경비 로봇 접근!', 2200); sfx.siren(); $('bossBar').classList.add('on'); break;
+    case 'boss': banner('거대 경비 로봇 접근!' + (BOSS_ATK[S.op] ? ` 새 공격: ${BOSS_ATK[S.op]}` : ''), 2400); sfx.siren(); $('bossBar').classList.add('on'); break;
+    case 'snipe': beam(e.x, 1.5 * ETYPE.sniper.scale, -e.d, e.tx, 0.8, -e.td); burst(e.tx, 0.8, -e.td, 12, 0xff3b5c, 5, 0.12, 0.4, 2); if (e.n) floatText(`−${fmt(e.n)} 저격`, 'minus', e.tx, 2.6, -e.td); tone('sawtooth', 1400, 300, 0.18, 0.08); addShake(0.15); break;
+    case 'missile': tone('square', 200, 700, 0.35, 0.06); break;
+    case 'mland': burst(e.x, 0.5, -e.d, e.n ? 26 : 12, 0xff8a3d, 8, 0.18, 0.6, 3); if (e.n) { floatText(`−${fmt(e.n)}`, 'minus', e.x, 2.4, -e.d); addShake(0.3); } if (gap('ml', 90)) sfx.boom(e.n ? 0.6 : 0.3); break;
+    case 'shield': floatText('방패!', 'weapon', e.x, 8, -e.d); tone('sine', 300, 900, 0.3, 0.1); break;
+    case 'chargewarn': floatText('돌진!', 'minus', e.x, 8, -e.d); tone('sawtooth', 120, 260, 0.5, 0.1); break;
+    case 'bslam': burst(e.x, 1, -e.d + 2, 40, 0xffb060, 10, 0.2, 0.8, 4); if (e.n) floatText(`−${fmt(e.n)}`, 'minus', S.x, 3, -S.d - 2); sfx.boom(1); addShake(0.6); break;
+    case 'stompwarn': floatText('충격파!', 'minus', e.x, 8, -e.d); break;
+    case 'stomp': for (let i = 0; i < 8; i++) burst(e.x + Math.cos(i) * 4, 0.4, -e.d + Math.sin(i) * 4, 8, 0xff5a3a, 9, 0.2, 0.6, 2); if (e.n) floatText(`−${fmt(e.n)}`, 'minus', S.x, 3, -S.d - 2); sfx.boom(1.2); addShake(0.8); break;
     case 'summon': burst(e.x, 0.5, -e.d + 2, 16, 0xff5a4a, 6, 0.16, 0.5, 2); break;
-    case 'bossdie': boss.dying = 1.4; sfx.boom(1.4); addShake(0.9); $('bossBar').classList.remove('on'); banner('검문소 돌파!', 1600); break;
+    case 'bossdie': boss.dying = 1.4; sfx.boom(1.4); addShake(0.9); $('bossBar').classList.remove('on'); banner('검문소 돌파! 문이 열려요', 1600); door.opening = true; door.lampMat.color.setHex(0x3ddc97); break;
     case 'win': { // 검문소 돌파 — 점수를 쌓고 잠깐 뒤 다음 작전으로
       const c = clearScore(S.op, sim.total());
       RUN.cleared.push(c); RUN.banked = Math.min(SCORE_CAP, RUN.banked + c.pts);
@@ -1361,7 +1551,13 @@ function hud() {
     hudC.w = S.weapon; $('wName').textContent = WEAPONS[S.weapon].name;
     Array.from($('wPips').children).forEach((p, i) => p.classList.toggle('on', i <= S.weapon));
   }
-  if (S.boss) { const k = Math.max(0, Math.ceil(S.boss.hp / S.boss.max * 100)); if (k !== hudC.boss) { hudC.boss = k; $('bossFill').style.width = k + '%'; } }
+  if (S.boss) {
+    const k = Math.max(0, S.boss.hp / S.boss.max * 100), hp = Math.max(0, Math.ceil(S.boss.hp)), shd = S.boss.sh > 0;
+    if (hp !== hudC.boss || shd !== hudC.sh) {
+      hudC.boss = hp; hudC.sh = shd; $('bossFill').style.width = k.toFixed(1) + '%';
+      $('bossHp').textContent = `${fmt(hp)} / ${fmt(S.boss.max)}` + (shd ? ' · 방패' : ''); $('bossBar').classList.toggle('shield', shd);
+    }
+  }
 }
 
 /* ---------- 판 흐름 ---------- */
@@ -1372,7 +1568,8 @@ function showCourse() {
   parts.length = 0; boss.g.visible = false; boss.dying = 0; endAt = -1; shake = 0; lastWeapon = -1;
   hudC.n = hudC.d = hudC.w = hudC.boss = -1;
   $('bossBar').classList.remove('on');
-  $('bossBar').querySelector('span').textContent = S.op > 1 ? `거대 경비 로봇 · 작전 ${S.op}` : '거대 경비 로봇';
+  $('bossName').textContent = S.op > 1 ? `거대 경비 로봇 · 작전 ${S.op}` : '거대 경비 로봇'; $('bossHp').textContent = ''; $('bossBar').classList.remove('shield');
+  resetDoor(); flag.n = -1; flag.mesh.visible = false;
   for (const gv of gateViews) drawGate(gv);
   for (const bv of barrViews) drawBarr(bv);
   setSignsOp(S.op);
@@ -1388,7 +1585,7 @@ function nextOp() { // 다음 작전 — 분대 인원 · 무기 · 기록을 �
   sim = createSim(seed++, RUN.op, { n: sim.total(), weapon: S.weapon, kills: S.kills, freed: S.freed, lost: S.lost, maxN: S.maxN });
   showCourse();
   sim.start(); acc = 0; liveAt = tsec + 2;
-  banner(`작전 ${RUN.op} · 로봇 강화!`, 1700);
+  banner(`작전 ${RUN.op}` + (THREATS[RUN.op] ? ` · 새 위협: ${THREATS[RUN.op]}` : ' · 로봇 강화!'), 2200);
 }
 function showMenu() {
   setPause(false); roundOn = false; newSim();
@@ -1532,6 +1729,19 @@ function sync(dt) {
     }
   }
   commit(solBody, n); commit(solLegL, n); commit(solLegR, n);
+  // 예비 병력 군중 + 깃발
+  const cn = running || cheer ? Math.min(S.reserve, QUAL[qi].crowd) : 0, CCOL = 12, csx = 4.4 / (CCOL - 1), csd = 0.46;
+  const ccx = clamp(S.x, -HALF + 2.6, HALF - 2.6), cd0 = S.d - F.rd * 0.8 - 0.4, crowdDepth = Math.ceil(cn / CCOL) * csd;
+  for (let i = 0; i < cn; i++) {
+    const r = (i / CCOL) | 0, c = i - r * CCOL;
+    const y = Math.abs(Math.sin(t * 8 + i * 1.7)) * 0.07 * run + (cheer ? Math.abs(Math.sin(t * 7 + i)) * 0.4 : 0);
+    put(crowd, i, ccx + (c - (CCOL - 1) / 2) * csx + (r & 1 ? csx / 2 : -csx / 4), y, -(cd0 - r * csd), 0, 0, 0, SOLN * 0.95);
+  }
+  commit(crowd, cn);
+  if (S.reserve > 0 && (running || cheer)) {
+    if (flag.n !== S.reserve && tsec - flag.at > 0.2) { flag.n = S.reserve; flag.at = tsec; drawFlag(S.reserve); }
+    flag.mesh.visible = true; flag.mesh.position.set(ccx, 3.4 + Math.min(4, crowdDepth * 0.12), -(cd0 - Math.min(crowdDepth, 6) * 0.5)); flag.mesh.rotation.x = -0.35;
+  } else flag.mesh.visible = false;
 
   // 적
   let m = 0, hi = 0;
@@ -1546,9 +1756,9 @@ function sync(dt) {
     put(enLegR, m, e.x + 0.16 * sc, 0.36 * sc + y, z, -sw, Math.PI, 0, sc);
     tint(enBody, m, r, g, b); tint(enLegL, m, r, g, b); tint(enLegR, m, r, g, b);
     if (sh < SHCAP) put(shadows, sh++, e.x, 0.02, z, 0, 0, 0, sc * 1.1);
-    if (e.type === 'brute' && hi < hpLabels.length) {
+    if ((e.type === 'brute' || e.type === 'sniper' || e.type === 'rusher') && hi < hpLabels.length) {
       const h = hpLabels[hi++], hp = Math.ceil(e.hp);
-      if (h.hp !== hp) { h.hp = hp; drawHp(h, hp); }
+      if (h.hp !== hp || h.type !== e.type) { h.hp = hp; h.type = e.type; drawHp(h, hp, e.type); }
       h.L.mesh.visible = true; h.L.mesh.position.set(e.x, sc * 1.55 + 0.8, z); h.L.mesh.rotation.x = -0.3;
     }
     m++;
@@ -1564,7 +1774,11 @@ function sync(dt) {
     boss.legs[0].rotation.x = w * 0.42; boss.legs[1].rotation.x = -w * 0.42;
     boss.arms[0].rotation.x = -w * 0.3 - 0.15; boss.arms[1].rotation.x = w * 0.3 - 0.15;
     boss.body.position.y = Math.abs(Math.cos(bs.ph * 0.9)) * 0.16; boss.body.rotation.z = w * 0.03;
-    for (const mt of boss.mats) mt.emissive.setRGB(bs.flash * 0.5, bs.flash * 0.12, bs.flash * 0.08);
+    const warn = bs.cw > 0 ? 0.35 + 0.35 * Math.abs(Math.sin(t * 22)) : 0; // 돌진 직전엔 빨갛게 번쩍
+    for (const mt of boss.mats) mt.emissive.setRGB(bs.flash * 0.5 + warn, bs.flash * 0.12, bs.flash * 0.08);
+    shieldMesh.visible = bs.sh > 0; if (bs.sh > 0) { shieldMesh.material.opacity = 0.18 + 0.1 * Math.sin(t * 10); shieldMesh.scale.setScalar(1 + Math.sin(t * 6) * 0.03); }
+    if (bs.ww > 0) { const k = 1 - bs.ww / 1.1, R = 2 + k * (bs.d - S.d + F.rd + 2); stompRing.visible = true; stompRing.position.set(bs.x, 0.06, -bs.d); stompRing.scale.setScalar(R); stompRing.material.opacity = 0.35 + 0.5 * k; }
+    else stompRing.visible = false;
     boss.core.scale.setScalar(1 + Math.sin(t * 9) * 0.12 + bs.flash * 0.25);
     if (sh < SHCAP) put(shadows, sh++, bs.x, 0.02, -bs.d, 0, 0, 0, 7);
   } else if (boss.dying > 0) {
@@ -1573,7 +1787,23 @@ function sync(dt) {
     if (Math.random() < 0.7) { burst(boss.x + (Math.random() - 0.5) * 4, 1 + Math.random() * 5, -boss.d + (Math.random() - 0.5) * 2, 10, Math.random() < 0.5 ? 0xffb060 : 0xff4a3a, 9, 0.24, 0.7, 3); if (gap('bx', 160)) sfx.boom(0.6); }
     if (boss.dying <= 0) { boss.g.visible = false; burst(boss.x, 2, -boss.d, 80, 0xffd27a, 14, 0.3, 1.1, 5); }
   } else boss.g.visible = false;
+  if (!bs || bs.hp <= 0) { shieldMesh.visible = false; stompRing.visible = false; }
   commit(shadows, sh);
+  // 미사일 — 보스 팔에서 솟았다가 표시된 자리로 떨어진다
+  { let q = 0;
+    for (const ms of S.missiles) {
+      if (q >= MCAP) break;
+      const u = clamp(ms.t / ms.T, 0, 1);
+      put(markMesh, q, ms.x, 0.05, -ms.d, 0, 0, 0, 1.6 + (1 - u) * 1.2);
+      if (ms.t > 0) put(misMesh, q, ms.x0 + (ms.x - ms.x0) * u, (1 - u) * 5.5 + Math.sin(Math.PI * u) * 8, -(ms.d0 + (ms.d - ms.d0) * u), 0, 0, 0, 1);
+      else put(misMesh, q, 0, -50, 0, 0, 0, 0, 0.01);
+      q++;
+    }
+    commit(markMesh, q); commit(misMesh, q);
+    markMesh.material.opacity = 0.55 + 0.4 * Math.abs(Math.sin(t * 12)); }
+  for (const b of beams) if (b.life > 0) { b.life -= dt; b.m.material.opacity = Math.max(0, b.life / 0.3) * 0.9; if (b.life <= 0) b.m.visible = false; }
+  // 검문소 문
+  if (door.opening && door.open < 1) { door.open = Math.min(1, door.open + dt * 1.1); door.panels.forEach((p, i) => { p.position.x = (i ? 1 : -1) * (HALF / 2 + door.open * HALF * 0.95); }); }
 
   // 총알
   const W = WEAPONS[S.weapon]; let k = 0;
@@ -1624,7 +1854,7 @@ function sync(dt) {
 
   // 카메라
   const asp = camera.aspect, port = clamp(1.1 - asp, 0, 0.6);
-  let back = 8.5 + F.rd * 1.15 + port * 8, hgt = 7 + F.rd * 0.78 + port * 7, ahead = 7 + F.rd * 0.4;
+  let back = 8.5 + F.rd * 1.15 + port * 8 + Math.min(9, crowdDepth * 0.3), hgt = 7 + F.rd * 0.78 + port * 7 + Math.min(9, crowdDepth * 0.3), ahead = 7 + F.rd * 0.4; // 군중이 길수록 조금 더 멀리서 본다
   if (idle) { back = 6.6 + port * 5; hgt = 3.2 + port * 3; ahead = 14; }
   else if (cheer) { back = 7 + F.rd * 0.8 + port * 6; hgt = 4.2 + F.rd * 0.3 + port * 4; ahead = 5; }
   const ck = Math.min(1, dt * 2.6);
@@ -1648,8 +1878,12 @@ function sync(dt) {
 let last = performance.now(), acc = 0, shotsSeen = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+  const raw = Math.max(0, (now - last) / 1000), dt = Math.min(0.05, raw); last = now;
   const S = sim.S;
+  if (S.phase === 'run' && !paused && !document.hidden && raw < 0.5) { // 2초 평균이 40fps 보다 느리면 화질을 한 단계 낮춘다
+    qT += raw; qN++;
+    if (qT >= 2) { if (qT / qN > 1 / 40 && qi < QUAL.length - 1) { qi++; applyQual(); } qT = qN = 0; }
+  }
   if (!paused) {
     tsec += dt;
     if (S.phase === 'run') {
@@ -1677,7 +1911,7 @@ function frame(now) {
 
 function boot(data) {
   if (data && data.muted) setMute(true);
-  resize(); showMenu();
+  applyQual(); showMenu();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { // 글꼴이 늦게 오면 숫자 판을 다시 그린다
     checkFont();
     for (const s of signs) drawSign(s);
