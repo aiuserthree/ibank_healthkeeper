@@ -250,7 +250,7 @@ b{font-weight:inherit}
     </ul>
     <div class="title-row">
       <button class="btn" id="btnStart" type="button">시작하기</button>
-      <span class="hint hint-pc">화면을 끌거나 방향키 · WASD 로 움직여요</span><span class="hint hint-touch">화면을 끌어 움직여요</span>
+      <span class="hint hint-pc">화면을 끌거나 방향키 · WASD 로 움직여요</span><span class="hint hint-touch">손가락으로 화면을 끄는 만큼 구멍이 따라와요</span>
     </div>
     <span class="best" id="best" hidden>내 최고 점수 <b id="bestNum">0</b></span>
   </div>
@@ -1058,7 +1058,7 @@ SC.step = function (g, dt, inp) {
       h = g.holes[i]; if (!h.alive || h.dying > 0) continue;
       if (h.isPlayer) {
         var ix = inp ? inp.x : 0, iz = inp ? inp.z : 0, m = Math.hypot(ix, iz); if (m > 1) { ix /= m; iz /= m; }
-        var sp = SC.playerSpeed(g, h), kk = 1 - Math.exp(-14 * dt);
+        var sp = SC.playerSpeed(g, h), kk = 1 - Math.exp(-((inp && inp.k) || 14) * dt);
         h.vx += (ix * sp - h.vx) * kk; h.vz += (iz * sp - h.vz) * kk; h.x += h.vx * dt; h.z += h.vz * dt;
       } else aiStep(g, h, dt);
       h.r += (h.tr - h.r) * (1 - Math.exp(-6 * dt));
@@ -1414,6 +1414,13 @@ SC.Renderer = function (canvas) {
     if (Math.abs(S - shadowS) > shadowS * 0.08) { shadowS = S; var sc2 = sun.shadow.camera; sc2.left = -S; sc2.right = S; sc2.top = S; sc2.bottom = -S; sc2.updateProjectionMatrix(); }
     sun.target.position.copy(camLook); sun.position.set(camLook.x - 70, 150, camLook.z + 55);
   };
+  // 화면 한 점(px) 아래 땅(높이 0) 자리 — 휴대폰 손가락 따라가기에 쓴다
+  var _g = new T.Vector3();
+  this.ground = function (sx, sy, out) {
+    _g.set(sx / W * 2 - 1, -(sy / Hh) * 2 + 1, 0.5).unproject(camera).sub(camera.position);
+    if (_g.y > -1e-4) return false;
+    var t = -camera.position.y / _g.y; out.x = camera.position.x + _g.x * t; out.z = camera.position.z + _g.z * t; return true;
+  };
   this.render = function () { renderer.render(scene, camera); };
   this.dom = canvas;
 };
@@ -1521,7 +1528,7 @@ function startRun() {
 function startArea() {
   var A = AREAS[run.area], i;
   game = SC.createGame(run.area, run.up); R.load(game); R.setCam('follow');
-  mode = 'intro'; introT = AUTO ? 0.4 : 2.0; paused = false; botSt = {}; combo = 0;
+  mode = 'intro'; introT = AUTO ? 0.4 : 2.0; paused = false; botSt = {}; combo = 0; stopJoy(); touch.seen = false;
   only(null); show('hud', true); show('warn', false); clearLabels();
   var no = (run.area + 1) + '구역', goal = Math.round(game.goal * 100);
   $('areaNo').textContent = no; $('areaName').textContent = A.name;
@@ -1665,31 +1672,70 @@ function handleEvents() {
     if (e.t === 'eat') { sfx.eat(e.r); popAcc += e.v; if (e.r > 3) R.shake(Math.min(1.2, e.r * 0.12)); }
     else if (e.t === 'tier') { toast('이제 ' + e.name + '도 삼켜요'); sfx.tier(); R.pulse(game.player); }
     else if (e.t === 'eatHole') { toast(e.name + ' 꿀꺽! +200'); sfx.rival(); R.shake(0.5); R.pulse(game.player); popAcc += 20; }
-    else if (e.t === 'playerEaten') { toast(e.name + '에게 삼켜졌어요 · ' + SC.TUNE.eatenPenalty + '초 잃음', true); sfx.eaten(); R.shake(1.4); stopJoy(); }
+    else if (e.t === 'playerEaten') { toast(e.name + '에게 삼켜졌어요 · ' + SC.TUNE.eatenPenalty + '초 잃음', true); sfx.eaten(); R.shake(1.4); stopJoy(); touch.seen = false; }
     else if (e.t === 'won') endArea(true);
     else if (e.t === 'lost') endArea(false);
   }
   ev.length = 0;
 }
 
-// ── 조작 — 화면을 끌면 그 방향으로(가상 스틱), 또는 방향키 · WASD
+// ── 조작 — PC 마우스는 끌면 그 방향으로(가상 스틱), 키보드는 방향키 · WASD.
+// 휴대폰(손가락 · 펜)은 표시 없이 「끈 만큼」 구멍이 따라 움직인다: 손가락이 움직인 만큼(손가락 아래 땅 기준) 목표 자리를 옮기고,
+// 구멍은 그 자리로 빠르게 미끄러져 간다. 손가락이 멈추면 구멍도 곧 멈추고, 떼면 남은 거리를 짧게 줄여 자연스럽게 선다.
+// (카메라가 구멍을 따라가므로 「손가락 바로 아래로」 가게 하면 끝없이 달아난다 — 그래서 끈 만큼 옮기는 방식)
 var canvas = $('c'), joyEl = $('joy'), knob = joyEl.firstElementChild, joy = { on: false, id: null, ox: 0, oy: 0, x: 0, y: 0 }, keys = {}, JOY_R = 50;
-function stopJoy() { joy.on = false; joy.x = joy.y = 0; joyEl.hidden = true; }
+var touch = { on: false, id: null, sx: 0, sy: 0, px: 0, py: 0, tx: 0, tz: 0, seen: false }, TOUCH_GAIN = 1.3, _ga = { x: 0, z: 0 }, _gb = { x: 0, z: 0 };
+function stopJoy() {
+  joy.on = false; joy.x = joy.y = 0; joyEl.hidden = true;
+  if (touch.on) touchLeash(0.35);
+  touch.on = false; touch.id = null;
+}
+// 목표 자리가 구멍에서 너무 멀어지지 않게(빠르게 크게 휘저어도 튀지 않게) — 구멍 크기에 맞춘 줄 길이
+function touchLeash(k) {
+  var p = game && game.player; if (!p) return;
+  var dx = touch.tx - p.x, dz = touch.tz - p.z, d = Math.hypot(dx, dz), L = (2.2 + p.r * 1.4) * k;
+  if (d > L) { touch.tx = p.x + dx / d * L; touch.tz = p.z + dz / d * L; }
+}
+function touchMove() {
+  // 이번 그림의 카메라로 앞뒤 두 점을 함께 재야, 그 사이 카메라가 움직인 몫이 섞이지 않는다
+  if (touch.px === touch.sx && touch.py === touch.sy) return;
+  if (R.ground(touch.px, touch.py, _ga) && R.ground(touch.sx, touch.sy, _gb)) {
+    touch.tx += (_gb.x - _ga.x) * TOUCH_GAIN; touch.tz += (_gb.z - _ga.z) * TOUCH_GAIN;
+    var H = game.H - game.player.r - 0.3; touch.tx = Math.max(-H, Math.min(H, touch.tx)); touch.tz = Math.max(-H, Math.min(H, touch.tz));
+    touchLeash(1);
+  }
+  touch.px = touch.sx; touch.py = touch.sy;
+}
 canvas.addEventListener('pointerdown', function (e) {
-  if (mode !== 'play' || paused || joy.on) return;
+  if (mode !== 'play' || paused) return;
+  if (e.pointerType === 'touch' || e.pointerType === 'pen') {
+    if (touch.on || joy.on) return;
+    var p = game.player;
+    touch.on = true; touch.id = e.pointerId; touch.sx = touch.px = e.clientX; touch.sy = touch.py = e.clientY;
+    if (!touch.seen || Math.hypot(touch.tx - p.x, touch.tz - p.z) > 0.5 + p.r) { touch.tx = p.x; touch.tz = p.z; }
+    touch.seen = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault(); return;
+  }
+  if (joy.on || touch.on) return;
   joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.x = joy.y = 0;
   joyEl.style.transform = 'translate(' + joy.ox + 'px,' + joy.oy + 'px)'; knob.style.transform = ''; joyEl.hidden = false;
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
   e.preventDefault();
 });
 canvas.addEventListener('pointermove', function (e) {
+  if (touch.on && e.pointerId === touch.id) {
+    // 한 그림 사이에 여러 번 와도 마지막 자리만 쓴다 — 실제 옮기기는 input() 에서 한 걸음마다
+    var ev = e.getCoalescedEvents ? e.getCoalescedEvents() : null, last = ev && ev.length ? ev[ev.length - 1] : e;
+    touch.sx = last.clientX; touch.sy = last.clientY; return;
+  }
   if (!joy.on || e.pointerId !== joy.id) return;
   var dx = e.clientX - joy.ox, dy = e.clientY - joy.oy, d = Math.hypot(dx, dy);
   if (d > JOY_R) { joy.ox += dx * (d - JOY_R) / d; joy.oy += dy * (d - JOY_R) / d; dx = e.clientX - joy.ox; dy = e.clientY - joy.oy; d = JOY_R; joyEl.style.transform = 'translate(' + joy.ox + 'px,' + joy.oy + 'px)'; }
   if (d < 5) { joy.x = joy.y = 0; } else { var m = Math.min(1, (d - 5) / (JOY_R - 14)); joy.x = dx / d * m; joy.y = dy / d * m; }
   knob.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
 });
-function joyUp(e) { if (joy.on && e.pointerId === joy.id) stopJoy(); }
+function joyUp(e) { if ((joy.on && e.pointerId === joy.id) || (touch.on && e.pointerId === touch.id)) stopJoy(); }
 canvas.addEventListener('pointerup', joyUp); canvas.addEventListener('pointercancel', joyUp); canvas.addEventListener('lostpointercapture', joyUp);
 canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 var KEYMAP = { ArrowLeft: 'l', KeyA: 'l', ArrowRight: 'r', KeyD: 'r', ArrowUp: 'u', KeyW: 'u', ArrowDown: 'd', KeyS: 'd' };
@@ -1703,7 +1749,13 @@ window.addEventListener('blur', function () { keys = {}; stopJoy(); });
 var inp = { x: 0, z: 0 };
 function input(dt) {
   if (AUTO) return SC.bot(game, botSt, dt);
-  inp.x = (keys.r ? 1 : 0) - (keys.l ? 1 : 0) + joy.x; inp.z = (keys.d ? 1 : 0) - (keys.u ? 1 : 0) + joy.y;
+  inp.x = (keys.r ? 1 : 0) - (keys.l ? 1 : 0) + joy.x; inp.z = (keys.d ? 1 : 0) - (keys.u ? 1 : 0) + joy.y; inp.k = 0;
+  if (touch.seen && !inp.x && !inp.z) {
+    if (touch.on) touchMove();
+    var p = game.player, dx = touch.tx - p.x, dz = touch.tz - p.z, d = Math.hypot(dx, dz), sp = SC.playerSpeed(game, p);
+    if (d > 0.02) { var m = Math.min(1, d * 9 / sp); inp.x = dx / d * m; inp.z = dz / d * m; } else if (!touch.on) touch.seen = false;
+    inp.k = 24;
+  }
   return inp;
 }
 
