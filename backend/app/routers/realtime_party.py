@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/play", tags=["play-rt-party"])
 
-LIVE = ("OPEN", "RACING")
+LIVE = ("OPEN", "RACING", "GRACE")  # GRACE — 끝난 뒤 잠깐(결과 화면에서 다시 하기 소식)
 
 
 async def load_party_seat(party_id: int, member_id: int):

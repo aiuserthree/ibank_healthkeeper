@@ -240,6 +240,35 @@ class PartyFlow(unittest.TestCase):
         self.assertEqual(sorted(x["id"] for x in out), [2, 3, 4, 5, 6, 7])
         self.assertFalse(any(x.get("recent") for x in out[1:]))
 
+    def test_mansion_result(self):
+        data, _ = self.call(party.create, 1, "mansion", [2, 3])
+        pid = data["id"]
+        self.call(party.accept, 2, pid)
+        self.call(party.start, 1, pid, [2], 1)
+        self.now_ms[0] = int(time.time() * 1000) + 60_000
+        with self.assertRaises(AppError):  # 3분 전에는 안 받는다
+            self.call(party.report, 1, pid, {"winner": 1, "stars": [3, 9, 1, 0, 2, 5], "rounds": 4, "sec": 60})
+        self.now_ms[0] = int(time.time() * 1000) + 600_000
+        with self.assertRaises(AppError):  # 1등이 별조각 최다가 아님
+            self.call(party.report, 1, pid, {"winner": 0, "stars": [3, 9, 1, 0, 2, 5], "rounds": 4, "sec": 600})
+        good = {"winner": 1, "stars": [3, 9, 1, 0, 2, 5], "rounds": 4, "sec": 600}
+        self.call(party.report, 1, pid, good)
+        out = self.call(party.report, 2, pid, good)
+        self.assertEqual((out["status"], out["endReason"], out["winner"]["id"]), ("DONE", "WIN", 2))
+        self.assertEqual(out["final"]["stars"], [3, 9, 1, 0, 2, 5])
+        ov = self.call(party.overview, 2, "mansion")
+        self.assertEqual(ov["ranking"]["me"]["wins"], 1)
+        # 공동 1등이면 winner None → 무승부
+        data, _ = self.call(party.create, 1, "mansion", [2])
+        pid = data["id"]
+        self.call(party.accept, 2, pid)
+        self.call(party.start, 1, pid, [2], 1)
+        self.now_ms[0] = int(time.time() * 1000) + 600_000
+        tie = {"winner": None, "stars": [9, 9, 1, 0, 2, 5], "rounds": 3, "sec": 600}
+        self.call(party.report, 1, pid, tie)
+        out = self.call(party.report, 2, pid, tie)
+        self.assertEqual(out["endReason"], "DRAW")
+
     def test_rt_seat(self):
         data, _ = self.call(party.create, 1, "bumpervs", [2, 3])
         pid = data["id"]

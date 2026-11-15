@@ -802,6 +802,8 @@ async def inbox(db: AsyncSession, member: Member) -> dict:
     from app.services import party as party_service
 
     for game in party_service.PARTY_GAMES:
+        if game not in out and game_visible(game):
+            out[game] = {"myTurn": 0, "incoming": 0}  # 여러 명 대전만 있는 게임(두뇌 저택)
         if game in out:
             try:
                 out[game]["incoming"] += await party_service.incoming_count(db, member, game)

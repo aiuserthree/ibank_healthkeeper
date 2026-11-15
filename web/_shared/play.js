@@ -294,6 +294,7 @@ window.HKPlay = (function () {
     rummy: ["#9a3412", "#f59e0b"],
     alkkagi: ["#1f2937", "#a16207"],
     watersort: ["#0e7490", "#a855f7"],
+    mansion: ["#1e1b4b", "#a78bfa"],
     bumpervs: ["#7c2d12", "#fb923c"],
     jellyvs: ["#3b1d6e", "#ff7ac8"],
     holecity: ["#2b2f3a", "#ff6b1a"],

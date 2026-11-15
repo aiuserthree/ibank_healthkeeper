@@ -36,7 +36,7 @@ from app.services.game import _give_stamp, ensure_open, game_visible
 
 logger = logging.getLogger(__name__)
 
-PARTY_GAMES = ("bumpervs",)
+PARTY_GAMES = ("bumpervs", "mansion")  # 선다운 범퍼스 대전 · 한밤의 두뇌 저택
 MAX_SEATS = 6  # 트랙에 설 수 있는 차 — 사람(주인 포함) 최대 6명, 남는 자리는 컴퓨터
 OPEN_HOURS = 2  # 대기실이 열려 있는 시간 — 그 안에 출발하지 않으면 EXPIRED
 RACE_HOURS = 1  # 출발 뒤 결과를 기다리는 최대 시간
@@ -46,10 +46,16 @@ LIMIT_SEC = 180
 TRACKS = 13
 MIN_FINISH = (27, 30, 35, 43, 49, 37, 32, 34, 35, 30, 31, 32, 37)  # versus_bumpervs 와 같은 값 — 부스트를 내내 받아도 못 내는 기록
 MAX_OPEN_PER_HOST = 3
+RT_GRACE_SEC = 180  # 판이 끝난 뒤에도 실시간 통로를 열어 두는 시간
 LIVE = ("OPEN", "RACING")
 IN_SEAT = ("HOST", "JOINED")
 
+MANSION_MIN_SEC = 180  # 두뇌 저택 — 출발 뒤 이만큼 지나야 결과를 받는다(라운드 3~4개 · 한 판 10~15분)
+MANSION_MAX_SEC = 40 * 60
+MANSION_MAX_STARS = 100_000
+
 REASONS = {
+    "WIN": "별조각 1등",
     "FINISH": "결승선",
     "FARTHER": "시간 끝 · 가장 멀리 감",
     "BOT": "컴퓨터가 1등",
@@ -159,7 +165,7 @@ def _judge(p: GameParty) -> None:
         p.end_reason = "MISMATCH"
         return
     base = next(r for r in reps if (r.get("winner"), r.get("track")) == (winner, track))
-    final = {k: base.get(k) for k in ("winner", "order", "dist", "track", "sec")}
+    final = {k: base.get(k) for k in ("winner", "order", "dist", "track", "sec", "stars", "rounds") if k in base}
     st["final"] = final
     st["agreed"] = [i for i in players if str(i) in rep and (rep[str(i)].get("winner"), rep[str(i)].get("track")) == (winner, track)]
     p.state = st
@@ -167,7 +173,10 @@ def _judge(p: GameParty) -> None:
         p.end_reason = "DRAW"
     elif 0 <= winner < len(players):
         p.winner_id = players[winner]
-        p.end_reason = "FINISH" if (final.get("order") or [None] * 6)[winner] is not None else "FARTHER"
+        if p.game == "mansion":
+            p.end_reason = "WIN"
+        else:
+            p.end_reason = "FINISH" if (final.get("order") or [None] * 6)[winner] is not None else "FARTHER"
     else:
         p.end_reason = "BOT"
 
@@ -192,7 +201,7 @@ async def _sweep(db: AsyncSession) -> None:
 
 
 async def _stamp_agreed(db: AsyncSession, p: GameParty) -> None:
-    if p.end_reason not in ("FINISH", "FARTHER", "BOT", "DRAW"):
+    if p.end_reason not in ("FINISH", "FARTHER", "WIN", "BOT", "DRAW"):
         return
     today = today_kst()
     for mid in (p.state or {}).get("agreed") or []:
@@ -428,6 +437,35 @@ def _clean(data: dict, cars: int, start_ms: int) -> dict:
     return {"winner": winner, "order": order, "dist": dist, "track": track, "sec": sec, "at": _now_ms()}
 
 
+def _clean_mansion(data: dict, seats: int, start_ms: int) -> dict:
+    """두뇌 저택 결과 — {"winner": 1등 자리 번호 | None(같은 별조각 공동 1등), "stars": [자리마다 별조각], "rounds": 라운드 수, "sec": 판 길이}."""
+    if not isinstance(data, dict):
+        raise_app_error("PARTY_BAD_RESULT")
+    stars = data.get("stars")
+    if not isinstance(stars, list) or len(stars) != seats:
+        raise_app_error("PARTY_BAD_RESULT")
+    clean = []
+    for v in stars:
+        if isinstance(v, bool) or not isinstance(v, int) or not -MANSION_MAX_STARS <= v <= MANSION_MAX_STARS:
+            raise_app_error("PARTY_BAD_RESULT")
+        clean.append(v)
+    rounds = data.get("rounds")
+    if isinstance(rounds, bool) or not isinstance(rounds, int) or not 1 <= rounds <= 8:
+        raise_app_error("PARTY_BAD_RESULT")
+    sec = round(_num(data.get("sec")), 1)
+    if not 0 < sec <= MANSION_MAX_SEC:
+        raise_app_error("PARTY_BAD_RESULT")
+    top = max(clean)
+    best = [i for i, v in enumerate(clean) if v == top]
+    winner = data.get("winner")
+    want = best[0] if len(best) == 1 else None
+    if winner != want or isinstance(winner, bool):
+        raise_app_error("PARTY_BAD_RESULT")  # 1등은 별조각이 가장 많은 자리여야 한다
+    if _now_ms() - start_ms < MANSION_MIN_SEC * 1000:
+        raise_app_error("PARTY_TOO_SOON")
+    return {"winner": winner, "stars": clean, "rounds": rounds, "sec": sec, "at": _now_ms()}
+
+
 async def report(db: AsyncSession, member: Member, party_id: int, data: dict) -> dict:
     ensure_open(grace=True, member=member)
     p = await _get(db, party_id, lock=True)
@@ -440,7 +478,8 @@ async def report(db: AsyncSession, member: Member, party_id: int, data: dict) ->
     rep = dict(st.get("rep") or {})
     if str(member.id) not in rep:
         cars = len(players) + len(st.get("bots") or [])  # 늘 6대(사람 + 컴퓨터)
-        rep[str(member.id)] = _clean(data, cars, int(st.get("at") or 0))
+        clean = _clean_mansion if p.game == "mansion" else _clean
+        rep[str(member.id)] = clean(data, cars, int(st.get("at") or 0))
         st["rep"] = rep
         p.state = st
         if len(rep) == 1:
@@ -473,7 +512,10 @@ async def overview(db: AsyncSession, member: Member, game: str) -> dict:
     ).all()
     ids = [pid for pid, _ in my]
     if not ids:
-        return {"invites": [], "open": [], "recent": []}
+        out = {"invites": [], "open": [], "recent": []}
+        if game == "mansion":
+            out["ranking"] = await ranking(db, member, game)
+        return out
     live = (
         await db.execute(select(GameParty).where(GameParty.id.in_(ids), GameParty.game == game, GameParty.status.in_(LIVE)))
     ).scalars().all()
@@ -486,11 +528,14 @@ async def overview(db: AsyncSession, member: Member, game: str) -> dict:
     seats = await _seats(db, [p.id for p in [*live, *done]])
     people = await _people(db, {x for p in [*live, *done] for x in (p.host_id, p.winner_id, *(s.member_id for s in seats[p.id]))})
     items = [_payload(p, seats[p.id], people, member.id) for p in live]
-    return {
+    out = {
         "invites": [x for x in items if x["mySeat"] == "INVITED" and x["status"] == "OPEN"],
         "open": [x for x in items if x["mySeat"] in IN_SEAT],
         "recent": [_payload(p, seats[p.id], people, member.id) for p in done],
     }
+    if game == "mansion":  # 1:1 대전이 없는 게임 — 순위표도 여기서
+        out["ranking"] = await ranking(db, member, game)
+    return out
 
 
 async def incoming_count(db: AsyncSession, member: Member, game: str) -> int:
@@ -513,7 +558,7 @@ async def ranking_wins(db: AsyncSession, game: str) -> dict:
     ).scalars().all()
     wins: dict = {}
     for p in rows:
-        if p.end_reason not in ("FINISH", "FARTHER"):
+        if p.end_reason not in ("FINISH", "FARTHER", "WIN"):
             continue
         others = tuple(sorted(int(x) for x in (p.state or {}).get("players") or [] if int(x) != p.winner_id))
         if not others:
@@ -523,15 +568,35 @@ async def ranking_wins(db: AsyncSession, game: str) -> dict:
     return wins
 
 
+async def ranking(db: AsyncSession, member: Member, game: str) -> dict:
+    """여러 명 대전만 있는 게임(두뇌 저택)의 순위 — 1등만 1승(같은 사람들과 하루에 여러 번 이겨도 1승). 패는 세지 않는다."""
+    wins = await ranking_wins(db, game)
+    people = {i: x for i, x in (await _people(db, set(wins))).items() if x.status == MemberStatus.ACTIVE}
+    table = [{**_person(x), "wins": len(wins.get(i, ())), "losses": 0} for i, x in people.items()]
+    table.sort(key=lambda r: (-r["wins"], r["name"]))
+    rank, prev = 0, None
+    for n, row in enumerate(table, 1):
+        if row["wins"] != prev:
+            rank, prev = n, row["wins"]
+        row["rank"] = rank
+    return {"top": table[:20], "me": next((r for r in table if r["id"] == member.id), None)}
+
+
 async def seat_for_rt(db: AsyncSession, party_id: int, member_id: int) -> Optional[tuple]:
-    """실시간 통로용 — (역할 host|guest, 판 상태, 들어온 사람 id 들). 내 자리가 아니면 None."""
-    p = (await db.execute(select(GameParty.host_id, GameParty.status, GameParty.game).where(GameParty.id == party_id))).first()
+    """실시간 통로용 — (역할 host|guest, 판 상태, 들어온 사람 id 들). 내 자리가 아니면 None.
+    끝난 판(DONE)도 끝난 뒤 RT_GRACE_SEC 동안은 「GRACE」로 돌려줘 통로를 열어 둔다 — 결과 화면에서 「같은 사람들과 다시」 소식을 주고받게."""
+    p = (
+        await db.execute(select(GameParty.host_id, GameParty.status, GameParty.game, GameParty.finished_at).where(GameParty.id == party_id))
+    ).first()
     if p is None or p[2] not in PARTY_GAMES:
         return None
+    status = p[1]
+    if status == "DONE" and p[3] is not None and (now_kst() - _aware(p[3])).total_seconds() < RT_GRACE_SEC:
+        status = "GRACE"
     rows = (
         await db.execute(select(GamePartySeat.member_id, GamePartySeat.status).where(GamePartySeat.party_id == party_id))
     ).all()
     seated = [mid for mid, st in rows if st in IN_SEAT]
     if member_id not in seated:
         return None
-    return ("host" if member_id == p[0] else "guest", p[1], seated)
+    return ("host" if member_id == p[0] else "guest", status, seated)

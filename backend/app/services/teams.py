@@ -1264,7 +1264,7 @@ async def send_test_chat_to_member(
 
 # ── 대전 게임(오목 · 체스) ─────────────────────────────────────────
 
-MATCH_GAME_NAME = {"gomoku": "오목", "chess": "체스", "baseball": "숫자 야구", "boxes": "칸 따먹기", "quizduel": "1:1 퀴즈", "gostop": "고스톱", "memory": "도형 짝맞추기", "soccer": "헤딩 축구", "volley": "배구", "rummy": "타일 러미", "alkkagi": "알까기", "bumpervs": "범퍼카 대전", "jellyvs": "젤리 숲 대전"}
+MATCH_GAME_NAME = {"gomoku": "오목", "chess": "체스", "baseball": "숫자 야구", "boxes": "칸 따먹기", "quizduel": "1:1 퀴즈", "gostop": "고스톱", "memory": "도형 짝맞추기", "soccer": "헤딩 축구", "volley": "배구", "rummy": "타일 러미", "alkkagi": "알까기", "bumpervs": "범퍼카 대전", "jellyvs": "젤리 숲 대전", "mansion": "두뇌 저택"}
 
 
 def match_page_url(game: str, match_id: Optional[int] = None) -> str:
@@ -1372,8 +1372,8 @@ def render_party_invited_body(*, game: str, party_id: int, target: Member, host:
     url = party_page_url(game, party_id)
     due = f"{_datetime_label(deadline_at)}까지 출발하지 않으면 대기실이 닫혀요. " if deadline_at else ""
     return (
-        f"<p><strong>[헬스키퍼]</strong> {name} 여러 명 경주 초대</p>"
-        f"<p>{html.escape(target.name)}님, {_who(host)}이 여러 명이 함께 달리는 {name}에 초대했어요.</p>"
+        f"<p><strong>[헬스키퍼]</strong> {name} 여러 명 {'게임' if game == 'mansion' else '경주'} 초대</p>"
+        f"<p>{html.escape(target.name)}님, {_who(host)}이 여러 명이 함께{'하는' if game == 'mansion' else ' 달리는'} {name}에 초대했어요.</p>"
         f"<p>{due}들어가기는 아케이드가 열린 시간에만 할 수 있어요.</p>"
         f'<p><a href="{url}">대기실 열기</a>에서 들어가거나 거절해 주세요.</p>'
     )
