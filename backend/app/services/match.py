@@ -483,20 +483,51 @@ async def search_members(db: AsyncSession, member: Member, q: str) -> list:
         like = f"%{q.replace('%', '').replace('_', '')}%"
         stmt = stmt.where(or_(Member.name.ilike(like), Member.department.ilike(like)))
         return [_person(p) for p in (await db.execute(stmt)).scalars().all()]
-    # 검색어가 없으면 — 최근에 같이 한 동료(1:1 대전 · 여러 명 경주)를 맨 위에, 나머지는 이름순으로 채운다
+    # 검색어가 없으면 — 이름순(가나다)으로만 채우면 김씨만 줄줄이 나온다. 같이 할 만한 사람부터:
+    #   ① 최근에 같이 한 동료(1:1 대전 · 여러 명 경주) ② 같은 부서 ③ 요즘(7일) 아케이드를 한 동료(최근 순) ④ 나머지는 최근 로그인 순
+    from app.models import GamePlay
+
+    out, seen = [], set()
+
+    def add(rows, tag):
+        for p in rows:
+            if len(out) >= 20:
+                return
+            if p.id in seen:
+                continue
+            seen.add(p.id)
+            out.append({**_person(p), "tag": tag, **({"recent": True} if tag == "recent" else {})})
+
     recent = await _recent_partners(db, member.id)
-    picked = []
     if recent:
         rows = {
             p.id: p
             for p in (await db.execute(stmt.where(Member.id.in_(recent)).limit(len(recent)))).scalars().all()
         }
-        picked = [rows[i] for i in recent if i in rows][:RECENT_PARTNERS]
-    rest = (await db.execute(stmt.where(Member.id.not_in([p.id for p in picked] or [0])))).scalars().all()
-    return [{**_person(p), "recent": True} for p in picked] + [_person(p) for p in rest][: max(0, 20 - len(picked))]
+        add([rows[i] for i in recent if i in rows][:RECENT_PARTNERS], "recent")
+    if member.department:
+        add((await db.execute(stmt.where(Member.department == member.department))).scalars().all(), "team")
+    if len(out) < 20:
+        last = (
+            select(GamePlay.member_id, func.max(GamePlay.played_at).label("t"))
+            .where(GamePlay.played_at >= now_kst() - timedelta(days=ACTIVE_DAYS))
+            .group_by(GamePlay.member_id)
+            .subquery()
+        )
+        add(
+            (await db.execute(stmt.join(last, last.c.member_id == Member.id).order_by(None).order_by(last.c.t.desc()).limit(40))).scalars().all(),
+            "active",
+        )
+    if len(out) < 20:
+        add(
+            (await db.execute(stmt.order_by(None).order_by(Member.last_login_at.desc().nullslast(), Member.name).limit(40))).scalars().all(),
+            "",
+        )
+    return out
 
 
 RECENT_PARTNERS = 10  # 목록 맨 위에 둘 최근 상대 수
+ACTIVE_DAYS = 7  # 「요즘 아케이드」 — 이 기간 안에 한 판이라도 한 동료
 RECENT_DAYS = 30
 
 
@@ -798,7 +829,7 @@ async def inbox(db: AsyncSession, member: Member) -> dict:
             "myTurn": sum(1 for m in mine if _my_turn_safe(m, member.id)),
             "incoming": sum(1 for m in mine if m.status == "PENDING" and m.opponent_id == member.id),
         }
-    # 여러 명 대전 초대(선다운 범퍼스 대전) — 받은 도전 수에 더한다
+    # 여러 명 대전 초대(선다운 범퍼스 · 두뇌 저택 · 젤리 숲) — 받은 도전 수에 더한다
     from app.services import party as party_service
 
     for game in party_service.PARTY_GAMES:
@@ -828,7 +859,7 @@ async def _ranking(db: AsyncSession, member: Member, game: str) -> dict:
         losses.setdefault(loser, set()).add((m.winner_id, day))
     from app.services import party as party_service
 
-    if game in party_service.PARTY_GAMES:  # 여러 명 대전 — 1등만 1승(같은 사람들과 하루에 여러 번 이겨도 1승), 패는 세지 않는다
+    if game in party_service.PARTY_GAMES:  # 여러 명 대전(범퍼스 · 젤리 숲) — 1등만 1승(같은 사람들과 하루에 여러 번 이겨도 1승), 패는 세지 않는다
         for winner_id, keys in (await party_service.ranking_wins(db, game)).items():
             wins.setdefault(winner_id, set()).update(keys)
     people = {i: p for i, p in (await _people(db, set(wins) | set(losses))).items() if p.status == MemberStatus.ACTIVE}
