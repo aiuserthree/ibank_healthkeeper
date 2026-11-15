@@ -29,13 +29,22 @@ window.HKCafe = (function () {
     { id: "latte", name: "카페라떼", cat: "coffee", price: 1500, prep: 158, pop: 1.1, g: 2, need: 2 },
     { id: "cookie", name: "버터 쿠키", cat: "dessert", price: 1200, prep: 60, pop: 1.0, g: 3, need: 1 },
     { id: "greentea", name: "따뜻한 녹차", cat: "tea", price: 1300, prep: 105, pop: 0.95, g: 4, need: 1 },
+    { id: "peachtea", name: "복숭아 아이스티", cat: "tea", price: 1700, prep: 98, pop: 1.1, g: 5, need: 2 },
     { id: "cake", name: "딸기 케이크", cat: "dessert", price: 2600, prep: 90, pop: 1.25, g: 6, need: 2 },
+    { id: "cappuccino", name: "카푸치노", cat: "coffee", price: 2000, prep: 160, pop: 1.15, g: 7, need: 3 },
     { id: "ade", name: "레몬 에이드", cat: "tea", price: 1900, prep: 128, pop: 1.2, g: 8, need: 2 },
+    { id: "muffin", name: "초코 머핀", cat: "dessert", price: 2100, prep: 72, pop: 1.22, g: 9, need: 3 },
     { id: "vanilla", name: "바닐라 라떼", cat: "coffee", price: 2400, prep: 172, pop: 1.3, g: 10, need: 4 },
+    { id: "matcha", name: "말차 라떼", cat: "tea", price: 2600, prep: 125, pop: 1.32, g: 11, need: 3 },
     { id: "macaron", name: "알록달록 마카롱", cat: "dessert", price: 2200, prep: 68, pop: 1.4, g: 12, need: 4 },
+    { id: "caramel", name: "캐러멜 마키아토", cat: "coffee", price: 3000, prep: 182, pop: 1.42, g: 13, need: 5 },
     { id: "yuja", name: "꿀 유자차", cat: "tea", price: 2300, prep: 112, pop: 1.35, g: 14, need: 4 },
+    { id: "tiramisu", name: "티라미수", cat: "dessert", price: 3200, prep: 95, pop: 1.46, g: 15, need: 5 },
     { id: "tart", name: "과일 타르트", cat: "dessert", price: 3500, prep: 105, pop: 1.5, g: 16, need: 5 },
+    { id: "grapefruit", name: "자몽 허니 블랙티", cat: "tea", price: 3600, prep: 138, pop: 1.56, g: 17, need: 6 },
+    { id: "coldbrew", name: "구름 크림 콜드브루", cat: "coffee", price: 3900, prep: 168, pop: 1.62, g: 18, need: 6 },
     { id: "sunset", name: "옥상 노을 라떼", cat: "coffee", price: 4300, prep: 195, pop: 1.7, g: 19, need: 6 },
+    { id: "starcake", name: "옥상 별빛 케이크", cat: "dessert", price: 4800, prep: 120, pop: 1.8, g: 20, need: 7 },
   ];
   const MENU_BY = Object.fromEntries(MENU.map((m) => [m.id, m]));
 
@@ -93,7 +102,7 @@ window.HKCafe = (function () {
     { sales: 38000000, fac: 37 }, { sales: 60000000, fac: 39 }, { sales: 100000000, fac: 41 },
   ];
   const facCapAt = (g) => Math.min(8, 2 + Math.floor(g / 3)); // 등급마다 올릴 수 있는 시설 최고 레벨
-  const menuSlotsAt = (g) => (g >= 9 ? 4 : 3);
+  const menuSlotsAt = (g) => (g >= 17 ? 6 : g >= 13 ? 5 : g >= 9 ? 4 : 3); // 진열 칸: 3 → 등급 9에 4 → 13에 5 → 17에 6
   const buildSlotsAt = (g) => (g >= 10 ? 3 : g >= 3 ? 2 : 1);
 
   // ── 도우미 ────────────────────────────────────────────────────
@@ -948,7 +957,8 @@ window.HKCafe = (function () {
       c.save(); const [tx, ty] = P(0.01, 5.95, 48.5); c.translate(tx, ty); c.transform(1, -0.5, 0, 1, 0, 0);
       c.fillStyle = "rgba(255,255,255,.9)"; c.font = "800 4.6px Pretendard, 'Apple SD Gothic Neo', sans-serif"; c.textAlign = "left"; c.textBaseline = "middle"; c.fillText("오늘의 메뉴", 0, 0);
       const catC = { coffee: "#ffcf9a", dessert: "#ffb3c8", tea: "#b8f0c8" };
-      s.menu.slice(0, 4).forEach((id, i) => { const m = MENU_BY[id]; if (!m) return; c.fillStyle = catC[m.cat]; circ(c, 1.5, 5.2 + i * 3.9, 1.1); c.fillStyle = "rgba(255,255,255,.75)"; c.fillRect(4, 4.8 + i * 3.9, 14 + ((i * 7) % 9), 0.8); });
+      const onB = s.menu.filter((id) => MENU_BY[id]).slice(0, 6), stB = onB.length > 4 ? 11.7 / (onB.length - 1) : 3.9, rB = onB.length > 4 ? 0.9 : 1.1;
+      onB.forEach((id, i) => { const m = MENU_BY[id]; c.fillStyle = catC[m.cat]; circ(c, 1.5, 5.2 + i * stB, rB); c.fillStyle = "rgba(255,255,255,.75)"; c.fillRect(4, 4.8 + i * stB, 14 + ((i * 7) % 9), 0.8); });
       c.restore();
       // 진짜 시각 시계
       const [kx, ky] = P(0.01, 7.4, 52); c.fillStyle = "#fffaf3"; ell(c, kx, ky, 5.2, 6); c.strokeStyle = "#c98a55"; c.lineWidth = 1; c.beginPath(); c.ellipse(kx, ky, 5.2, 6, 0, 0, Math.PI * 2); c.stroke();
@@ -1200,6 +1210,15 @@ window.HKCafe = (function () {
       yuja: `${sh}${mug(`<path d="M22 32h32v28a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7z" fill="#f6a623" opacity=".92"/><g fill="#ffd54a"><rect x="28" y="44" width="9" height="2.4" rx="1.2" transform="rotate(-20 32 45)"/><rect x="40" y="52" width="9" height="2.4" rx="1.2" transform="rotate(15 44 53)"/><rect x="31" y="58" width="7" height="2.2" rx="1.1"/></g>`, "#ffc24a")}${steamSvg(38)}`,
       tart: `<ellipse cx="40" cy="66" rx="28" ry="6" fill="#5a2d14" opacity=".12"/><ellipse cx="40" cy="58" rx="27" ry="9.5" fill="#c9884a"/><ellipse cx="40" cy="54" rx="27" ry="9.5" fill="#e9ad66"/><ellipse cx="40" cy="53" rx="22" ry="7" fill="#fff1c9"/><circle cx="31" cy="52" r="4.2" fill="#8bc34a"/><circle cx="31" cy="52" r="2.4" fill="#c5e1a5"/><circle cx="48" cy="51" r="4.2" fill="#8bc34a"/><circle cx="48" cy="51" r="2.4" fill="#c5e1a5"/><path d="M38 47c2.6 0 4.4 2 3.8 4.6-.6 2.4-2.6 3.6-3.8 4.2-1.2-.6-3.2-1.8-3.8-4.2-.6-2.6 1.2-4.6 3.8-4.6z" fill="#ef3b4f"/><g fill="#3f51b5"><circle cx="42" cy="57" r="1.8"/><circle cx="35" cy="57.5" r="1.8"/><circle cx="45" cy="55" r="1.6"/></g><circle cx="53" cy="55" r="2.4" fill="#ffb74d"/>`,
       sunset: `${sh}${glass(`<path d="M27.6 30h24.8l-2.5 35.4a3 3 0 0 1-3 2.6H32.6a3 3 0 0 1-3-2.6z" fill="url(#${u})"/>`)}<path d="M25 25c0-8 30-8 30 0z" fill="#fff7ee"/><circle cx="52" cy="20" r="6.5" fill="#ffcf3f"/><path d="M45 20h14" stroke="#ff9a3c" stroke-width="1.2"/><defs><linearGradient id="${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb35c"/><stop offset=".5" stop-color="#ff7a8a"/><stop offset="1" stop-color="#8a5cd6"/></linearGradient></defs>`,
+      peachtea: `${sh}${glass(`<path d="M27.3 34h25.4l-2.2 31.4a3 3 0 0 1-3 2.6H32.5a3 3 0 0 1-3-2.6z" fill="#ffb38a"/><rect x="31" y="40" width="8" height="8" rx="2" fill="#fff" opacity=".6" transform="rotate(-10 35 44)"/><rect x="40" y="48" width="7" height="7" rx="2" fill="#fff" opacity=".5" transform="rotate(12 43 51)"/><g fill="#fff" opacity=".7"><circle cx="36" cy="60" r="1.1"/><circle cx="44" cy="62" r=".9"/></g>`)}<path d="M36 33L30 9" stroke="#7ee0cf" stroke-width="3.2" stroke-linecap="round"/><path d="M45 25a8 8 0 0 1 16 0z" fill="#ff8a65"/><path d="M47.5 25a5.5 5.5 0 0 1 11 0z" fill="#ffd0a8"/><path d="M53 17c1-3 4-4 6-3-1 2-3 3-6 3z" fill="#6aa84f"/>`,
+      cappuccino: `${sh}${mug(`<path d="M22 44h32v16a7 7 0 0 1-7 7H29a7 7 0 0 1-7-7z" fill="#a8693f"/><path d="M22 30h32v14H22z" fill="#fff6ea"/>`, "#fffaf2")}<path d="M22 28c0-10 32-10 32 0z" fill="#fffaf2"/><g fill="#b07040"><circle cx="33" cy="24" r=".9"/><circle cx="39" cy="21.5" r=".9"/><circle cx="45" cy="24.5" r=".9"/><circle cx="41" cy="26" r=".8"/><circle cx="36" cy="26.5" r=".7"/></g>`,
+      muffin: `${sh}<path d="M24 46h32l-4 22H28z" fill="#ff9a6b"/><g stroke="#e8774a" stroke-width="1.4"><path d="M29 47l1.6 20"/><path d="M34.5 47l.8 20"/><path d="M40 47v20"/><path d="M45.5 47l-.8 20"/><path d="M51 47l-1.6 20"/></g><path d="M20 47c0-17 40-17 40 0 0 3-40 3-40 0z" fill="#7a4526"/><path d="M26 40c3-6 10-8 14-8" stroke="#a0643a" stroke-width="2.4" fill="none" stroke-linecap="round" opacity=".7"/><g fill="#3e2010"><circle cx="31" cy="42" r="1.6"/><circle cx="40" cy="38" r="1.6"/><circle cx="48" cy="42" r="1.6"/><circle cx="44" cy="34.5" r="1.3"/><circle cx="35" cy="35" r="1.3"/></g>`,
+      matcha: `${sh}${glass(`<path d="M27.6 30h24.8l-2.5 35.4a3 3 0 0 1-3 2.6H32.6a3 3 0 0 1-3-2.6z" fill="url(#${u})"/>`)}<ellipse cx="40" cy="30" rx="12.4" ry="2.4" fill="#fffdf6"/><path d="M40 27c-5-1-8 2-7 5 4 1 7-1 7-5z" fill="#7cb342"/><path d="M40 27l-5 4" stroke="#558b2f" stroke-width=".8"/><defs><linearGradient id="${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffdf6"/><stop offset=".38" stop-color="#eef4dc"/><stop offset=".52" stop-color="#9ccc65"/><stop offset="1" stop-color="#5f9a3a"/></linearGradient></defs>`,
+      caramel: `${sh}${glass(`<path d="M27.6 30h24.8l-2.5 35.4a3 3 0 0 1-3 2.6H32.6a3 3 0 0 1-3-2.6z" fill="url(#${u})"/>`)}<path d="M25 25c0-9 30-9 30 0z" fill="#fffaf2"/><path d="M27 23l5-4 5 4 5-4 5 4 5-4" stroke="#d98a2b" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><defs><linearGradient id="${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3e0"/><stop offset=".35" stop-color="#f0c890"/><stop offset=".7" stop-color="#b8743c"/><stop offset="1" stop-color="#7a4220"/></linearGradient></defs>`,
+      tiramisu: `<ellipse cx="40" cy="68" rx="24" ry="4.5" fill="#5a2d14" opacity=".13"/><path d="M20 40l20 8v18l-20-8z" fill="#f6e6cc"/><path d="M60 40l-20 8v18l20-8z" fill="#ead2ac"/><path d="M20 46l20 8v4l-20-8zM60 46l-20 8v4l20-8z" fill="#8a5232"/><path d="M20 54l20 8v2.4l-20-8zM60 54l-20 8v2.4l20-8z" fill="#8a5232" opacity=".8"/><path d="M20 40l20-8 20 8-20 8z" fill="#7a4526"/><g fill="#4a2410" opacity=".55"><circle cx="34" cy="39" r=".9"/><circle cx="42" cy="36" r=".9"/><circle cx="46" cy="41" r=".9"/><circle cx="38" cy="43" r=".8"/><circle cx="30" cy="41" r=".7"/></g><path d="M41 37c2-5 7-5 8-2-2 2-5 3-8 2z" fill="#6aa84f"/>`,
+      grapefruit: `${sh}${glass(`<path d="M27.3 34h25.4l-2.2 31.4a3 3 0 0 1-3 2.6H32.5a3 3 0 0 1-3-2.6z" fill="url(#${u})"/><path d="M31 50c3-2 6-2 9 0" stroke="#fff" stroke-width="1.4" opacity=".5" fill="none"/>`)}<circle cx="53" cy="24" r="8.5" fill="#ff7a6b"/><circle cx="53" cy="24" r="6.6" fill="#ffb3a0"/><path d="M53 17.4v13.2M46.4 24h13.2M48.3 19.3l9.4 9.4M57.7 19.3l-9.4 9.4" stroke="#ff7a6b" stroke-width="1"/><defs><linearGradient id="${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffd28a"/><stop offset=".5" stop-color="#e8704a"/><stop offset="1" stop-color="#a8402a"/></linearGradient></defs>`,
+      coldbrew: `${sh}${glass(`<path d="M27.6 30h24.8l-2.5 35.4a3 3 0 0 1-3 2.6H32.6a3 3 0 0 1-3-2.6z" fill="#5a3018"/><rect x="31" y="42" width="8" height="8" rx="2" fill="#fff" opacity=".28" transform="rotate(-12 35 46)"/><rect x="40" y="52" width="7" height="7" rx="2" fill="#fff" opacity=".22" transform="rotate(10 43 55)"/>`)}<g fill="#fffdf8"><circle cx="31" cy="26" r="6"/><circle cx="40" cy="22" r="7.5"/><circle cx="49" cy="26" r="6"/><rect x="25" y="25" width="30" height="6.5" rx="3.2"/></g><path d="M34 22a6 6 0 0 1 6-4" stroke="#dfe7f0" stroke-width="1.6" fill="none" stroke-linecap="round"/>`,
+      starcake: `<ellipse cx="40" cy="68" rx="26" ry="5" fill="#5a2d14" opacity=".13"/><ellipse cx="40" cy="62" rx="24" ry="6.5" fill="#2f3a7a"/><rect x="16" y="44" width="48" height="18" fill="#3d4a9a"/><ellipse cx="40" cy="44" rx="24" ry="6.5" fill="#5a68c8"/><path d="M16 46c3 4 6 4 8 0s5 4 8 0 5 4 8 0 5 4 8 0 5 4 8 0 5 4 8 0" stroke="#fff4c0" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M0-3l.9 2 2.1.2-1.6 1.4.5 2.1L0 1.6-1.9 2.7l.5-2.1L-3-.8l2.1-.2z" fill="#ffd54a" transform="translate(24 54) scale(1)"/><path d="M0-3l.9 2 2.1.2-1.6 1.4.5 2.1L0 1.6-1.9 2.7l.5-2.1L-3-.8l2.1-.2z" fill="#ffd54a" transform="translate(40 56) scale(1.2)"/><path d="M0-3l.9 2 2.1.2-1.6 1.4.5 2.1L0 1.6-1.9 2.7l.5-2.1L-3-.8l2.1-.2z" fill="#ffd54a" transform="translate(55 53) scale(1)"/><path d="M0-3l.9 2 2.1.2-1.6 1.4.5 2.1L0 1.6-1.9 2.7l.5-2.1L-3-.8l2.1-.2z" fill="#ffd54a" transform="translate(32 43) scale(0.8)"/><path d="M0-3l.9 2 2.1.2-1.6 1.4.5 2.1L0 1.6-1.9 2.7l.5-2.1L-3-.8l2.1-.2z" fill="#ffd54a" transform="translate(49 44) scale(0.8)"/><rect x="38.5" y="29" width="3" height="13" rx="1" fill="#ffe8a0"/><path d="M40 21c2.4 3 2.4 5.4 0 6.8-2.4-1.4-2.4-3.8 0-6.8z" fill="#ff9a3c"/>`,
     }[id] || "";
     return `<svg viewBox="0 0 80 80" width="${size}" height="${size}" aria-hidden="true">${art}</svg>`;
   }
@@ -1630,8 +1649,8 @@ window.HKCafe = (function () {
       const on = S.menu.filter((id) => menuOk(S, MENU_BY[id]));
       const best = bestMenu(S), isBest = best.length === on.length && best.every((x) => on.includes(x));
       return head("메뉴", `<span class="mgx-chip">진열 ${on.length} / ${slots}칸</span>`) + `<div class="mgx-card cf-shelf">
-          <div class="cf-shelf__row">${Array.from({ length: slots }, (_, i) => { const m = MENU_BY[on[i]]; return m ? `<div class="cf-slot is-on">${drinkSvg(m.id, 44)}<span>${esc(m.name)}</span></div>` : `<div class="cf-slot">${G.plus}<span>빈 칸</span></div>`; }).join("")}</div>
-          ${slots < 4 ? `<div class="cf-mini">등급 9부터 진열 칸이 4칸이 돼요</div>` : ""}
+          ${(slots > 4 ? [[0, 3], [3, slots]] : [[0, slots]]).map(([a, z]) => `<div class="cf-shelf__row${slots > 4 ? " is-3" : ""}">${Array.from({ length: z - a }, (_, j) => { const m = MENU_BY[on[a + j]]; return m ? `<div class="cf-slot is-on">${drinkSvg(m.id, 44)}<span>${esc(m.name)}</span></div>` : `<div class="cf-slot">${G.plus}<span>빈 칸</span></div>`; }).join("")}</div>`).join("")}
+          ${(() => { const ng = [9, 13, 17].find((g) => g > S.grade); return ng ? `<div class="cf-mini">등급 ${ng}부터 진열 칸이 ${menuSlotsAt(ng)}칸이 돼요</div>` : ""; })()}
           <button type="button" class="mgx-btn is-soft is-sm is-wide" data-act="bestmenu" ${isBest ? "disabled" : ""}>${ic("wand-sparkles", 16)} ${isBest ? "지금이 가장 많이 버는 조합이에요" : "가장 많이 버는 조합으로 진열"}</button>
           <div class="cf-mini">메뉴 매력 ${r.appeal.toFixed(2)} · 손님 한 명이 평균 ${won(r.avgPrice)} 써요. 여러 가지를 진열할수록 손님이 더 와요.</div>
         </div>
@@ -1785,8 +1804,8 @@ window.HKCafe = (function () {
       } else if (act === "menu") {
         const res = toggleMenu(S, id);
         if (res === "full") HKUI.toast("진열 칸이 가득 찼어요. 하나를 먼저 내려 주세요", "info");
-        else { changed(false); if (res === "on") HKFx.bump(root.querySelector(".cf-shelf__row")); }
-      } else if (act === "bestmenu") { S.menu = bestMenu(S); HKUI.toast("가장 많이 버는 조합으로 진열했어요"); changed(false); HKFx.bump(root.querySelector(".cf-shelf__row")); }
+        else { changed(false); if (res === "on") HKFx.bump(root.querySelector(".cf-shelf") || root.querySelector(".cf-shelf__row")); }
+      } else if (act === "bestmenu") { S.menu = bestMenu(S); HKUI.toast("가장 많이 버는 조합으로 진열했어요"); changed(false); HKFx.bump(root.querySelector(".cf-shelf") || root.querySelector(".cf-shelf__row")); }
       else if (act === "hire") {
         const st = STAFF_BY[id], cost = (STAFF_SLOTS[S.staff.length] || {}).cost;
         if (hire(S, id)) { payFx(b, cost); HKUI.toast(`${jo(st.name, "이/가")} 함께 일하게 됐어요`); changed(true); HKFx.confetti({ ...pt(b), n: 30, colors: CONFETTI }); }
@@ -1981,7 +2000,7 @@ window.HKCafe = (function () {
           <p><b>손님</b> — 시간당 손님은 「찾아오는 손님(평판 × 메뉴 매력)」, 「좌석이 받을 수 있는 손님」, 「주문 받을 수 있는 손님」 중 가장 작은 수예요. 시설 탭 위와 장면 오른쪽 아래에서 무엇이 모자란지 알려 줘요.</p>
           <p><b>수입</b> — 팔린 만큼 카운터 위 말풍선(쌓인 수입)에 모여요. 시간당 수입 × ${CAP_HOURS}시간이 차면 가득 차서 쉬어요. 받으면 다시 장사해요.</p>
           <p><b>시설</b> — Lv 3부터는 실제 시간이 걸려요(2분~1시간). 공사는 처음엔 한 곳, 등급 3부터 두 곳, 등급 10부터 세 곳 동시에 할 수 있어요. 장면 속 물건을 누르면 그 시설로 가요.</p>
-          <p><b>메뉴</b> — 등급과 시설 레벨로 열려요. 진열 칸(3칸, 등급 9부터 4칸)에 놓은 것만 팔아요.</p>
+          <p><b>메뉴</b> — 등급과 시설 레벨로 열려요. 진열 칸(3칸, 등급 9부터 4칸 · 13부터 5칸 · 17부터 6칸)에 놓은 것만 팔아요.</p>
           <p><b>알바생</b> — 등급 3 · 7 · 11에 자리가 하나씩 열려요. 장사한 시간만큼 저절로 레벨이 올라요.</p>
           <p><b>카페 등급</b> — 누적 매출과 시설 레벨 합이 모두 채워지면 올라요. 등급 ${MAX_GRADE}이 1차 완주예요.</p>
           <p><b>쉬어도 괜찮아요</b> — 며칠 안 들어와도 카페는 망가지지 않아요. 수입은 가득 찬 채로, 주문은 3일치까지 기다려요.</p>
