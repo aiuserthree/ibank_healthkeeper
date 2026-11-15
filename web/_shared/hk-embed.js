@@ -25,9 +25,10 @@
  * - 회원 이름 · 메일 같은 개인 정보는 게임 쪽으로 보내지 않는다.
  */
 window.HKEmbed = (() => {
-  function mount({ key, src, origin, title }) {
+  function mount({ key, src, origin, title, wide }) {
     HKPlay.mountGame({
       key,
+      wide,
       setup(stage, ctx) {
         stage.innerHTML = `<div class="hk-embed" style="position:relative;width:100%;height:100%;min-height:360px;border-radius:16px;overflow:hidden;background:#0f172a">
             <iframe class="hk-embed__frame" title="${HKUI.escapeHtml(title || ctx.game.title || key)}" src="${HKUI.escapeHtml(src)}"

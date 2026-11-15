@@ -539,7 +539,7 @@ window.HKPlay = (function () {
     }
   }
 
-  async function mountGame({ key, setup }) {
+  async function mountGame({ key, setup, wide }) {
     let game = null;
     let period = "today";
     const restartFns = [];
@@ -1117,7 +1117,7 @@ window.HKPlay = (function () {
         loadBoard();
         setup(stage, ctx);
         armRun();
-        fitStage(stage);
+        fitStage(stage, wide);
         bindDrawer();
     }
   }
@@ -1175,8 +1175,9 @@ window.HKPlay = (function () {
 
   // 모든 게임을 같은 크기의 창 안에 — 창 높이는 화면 가운데 영역 높이, 폭은 높이 × FRAME_RATIO
   // (출근길 대작전·비타민 3매치 비율). 화면이 좁으면 화면 폭에 맞춘다. 게임들은 창 크기에 맞춰 다시 그린다
+  // wide: 가로로 넓게 보는 게임(3D 레이싱 등) — 창 폭을 가운데 영역 폭 가득 쓴다(휴대폰은 원래도 폭 가득이라 같다)
   const FRAME_RATIO = 0.88;
-  function fitStage(stage) {
+  function fitStage(stage, wide) {
     const main = document.getElementById("hk-pf-main");
     const frame = stage.parentElement;
     function fit() {
@@ -1185,7 +1186,7 @@ window.HKPlay = (function () {
       const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
       const padH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
       const H = Math.max(360, main.clientHeight - padV);
-      const W = Math.max(280, Math.min(main.clientWidth - padH, Math.round(H * FRAME_RATIO)));
+      const W = Math.max(280, wide ? main.clientWidth - padH : Math.min(main.clientWidth - padH, Math.round(H * FRAME_RATIO)));
       if (frame.style.width === `${W}px` && frame.style.height === `${H}px`) return;
       frame.style.width = `${W}px`;
       frame.style.height = `${H}px`;
