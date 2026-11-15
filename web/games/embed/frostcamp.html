@@ -5536,7 +5536,7 @@ addEventListener('keydown', e => {
 addEventListener('keyup', e => { keys[e.code] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 /* 화면 누르기 — 기다림 없이 바로 반응
-   · 누르는 순간 그 땅 지점으로 바로 걸어가기 시작한다(꾹 누르고 있으면 그곳까지 가서 부드럽게 멈춤, 손가락을 옮기면 목적지도 따라감)
+   · (꾹 누르면 그쪽으로 가는 기능은 2026-11-15 뺌 — 누르기만 하면 그대로, 끌어야 움직인다)
    · 누르고 0.28초 안에 14px 넘게 끌면 가상 막대로 바뀐다: 끈 방향으로 걷고, 막대 끝을 넘으면 막대가 손가락을 따라와 반대로 끌면 바로 돌아선다
    · 나무를 누르면 나무 곁에서 멈춰 도끼질, 동그라미를 누르면 그 안에서 멈춰 내려놓기 · 가져가기 */
 const DRAG_T = 280, DRAG_PX = 14, STICK_R = 40;
@@ -5553,19 +5553,27 @@ function holdAim(cx, cy) { // 누른 화면 점 → 땅 위 점(광선과 바닥
   hold.best = 1e9; hold.bt = performance.now(); hold.stuck = false;
   holdMark.position.set(hold.tx, .06, hold.tz); holdMark.visible = true;
 }
+// 사파리(아이폰)에서 두 번 누르기 · 길게 누르기로 확대 · 돋보기 · 글자 고르기가 켜지지 않게 — 단추 · 입력칸은 그대로
+(() => {
+  let last = 0;
+  const skip = t => t && t.closest && t.closest('button, a, input, textarea, select');
+  document.addEventListener('touchend', e => { if (skip(e.target)) return; const n = Date.now(); if (n - last < 350) e.preventDefault(); last = n; }, { passive: false });
+  for (const t of ['dblclick', 'gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, e => e.preventDefault(), { passive: false });
+  for (const t of ['contextmenu', 'selectstart']) document.addEventListener(t, e => { if (!skip(e.target)) e.preventDefault(); });
+})();
 cv.addEventListener('pointerdown', e => {
   if (!canMove() || hold.st) return;
-  hold.st = 'go'; hold.id = e.pointerId; hold.t0 = performance.now(); hold.x0 = e.clientX; hold.y0 = e.clientY;
+  // 누르기만 해서는 움직이지 않는다(꾹 누르면 그쪽으로 가는 기능은 뺌) — 끌면 가상 막대
+  hold.st = 'pend'; hold.id = e.pointerId; hold.t0 = performance.now(); hold.x0 = e.clientX; hold.y0 = e.clientY;
   joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dz = 0; G.markT = 0;
   try { cv.setPointerCapture(e.pointerId); } catch (_) {}
-  holdAim(e.clientX, e.clientY);
 });
 cv.addEventListener('pointermove', e => {
   if (!hold.st || e.pointerId !== hold.id) return;
-  if (hold.st === 'go') {
-    if (performance.now() - hold.t0 < DRAG_T && Math.hypot(e.clientX - hold.x0, e.clientY - hold.y0) > DRAG_PX) { // 빠르게 끌었다 → 가상 막대
+  if (hold.st === 'pend') {
+    if (Math.hypot(e.clientX - hold.x0, e.clientY - hold.y0) > 8) { // 끌기 시작 → 가상 막대
       hold.st = 'drag'; joy.on = true; joy.id = e.pointerId; holdMark.visible = false; stick.style.display = 'block';
-    } else { if (Math.hypot(e.clientX - hold.mx, e.clientY - hold.my) > 3) holdAim(e.clientX, e.clientY); return; }
+    } else return;
   }
   let dx = e.clientX - joy.ox, dy = e.clientY - joy.oy; const d = Math.hypot(dx, dy), m = STICK_R;
   if (d > m) { joy.ox = e.clientX - dx / d * m; joy.oy = e.clientY - dy / d * m; dx = dx / d * m; dy = dy / d * m; } // 막대가 손가락을 따라온다
@@ -5646,7 +5654,7 @@ function menuCard() {
     <li><b>온기</b>가 떨어지면 모닥불 곁에서 녹여요. 눈보라 속에 모닥불이 꺼진 채 10초가 지나면 끝나요.</li>
     <li>장마다 건물 넷과 특별 목표를 마치면 얼음 문이 열려 다음 장으로 가요. 모두 <b>8장</b>이에요.</li></ol>
     ${ARC ? '<p class="note">장마다 시간을 새로 받아요(1장 7분 · 2~4장 5분 30초 · 5~6장 6분 · 7~8장 6분 30초). 빨리 깰수록 남은 시간이 점수가 돼요.</p>' : ''}
-    <p class="keys">${coarse ? '움직이기: 화면을 끌면 그 방향으로 · 가고 싶은 곳을 꾹 누르고 있으면 그곳까지 걸어가요' : '움직이기: WASD · 방향키 · 마우스로 끌기 · 가고 싶은 곳을 꾹 누르고 있기'}</p>
+    <p class="keys">${coarse ? '움직이기: 화면을 끌면 그 방향으로 걸어가요' : '움직이기: WASD · 방향키 · 마우스로 끌기'}</p>
     <button id="play" data-act="start">시작</button>`);
 }
 function startRound() {
@@ -5659,7 +5667,6 @@ function startRound() {
 const chTitle = () => `<small>${ci + 1}장 / ${CHAPTERS.length}</small><b>${CH().title}</b><span>${CH().sub}</span>`;
 function beginChapter() { // 이야기가 끝나면 이 장을 시작한다
   mode = 'play'; last = performance.now(); G.time = 0; sites[0].activate(); updateQuest(0, true);
-  if (coarse && ci === 0) later(4.5, () => toast('가고 싶은 곳을 <b>꾹 누르고</b> 있으면 그곳까지 걸어가요'));
   const ch = CH(); toast(`${ICON.hammer} <b>${ci + 1}장</b> ${ch.sites.map(o => o.name).join(' · ')} 짓기${ARC ? ' · ' + mmss(ch.time) : ''}`, 'good');
 }
 // 얼음 문을 지나면: 이번 장 점수를 쌓고 → 다음 장 땅을 새로 깔고 → 이야기 → 시작 (마지막 장이면 엔딩)
