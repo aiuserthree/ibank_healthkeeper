@@ -355,7 +355,7 @@ window.HKJellyVs = (function () {
 .jv-msg{font-size:12.5px;text-shadow:0 1px 4px rgba(8,4,26,.95);white-space:nowrap;text-align:center}
 .jv-msg.is-ok{color:#7dffd0;font-weight:800;font-size:14px}
 .jv-msg.is-bad{color:#ff8a95;font-weight:800;font-size:14px}
-.jv-dash{position:absolute;right:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);pointer-events:auto;width:86px;height:86px;border-radius:50%;border:0;color:#b9add9;
+.jv-dash{position:absolute;left:14px;bottom:calc(env(safe-area-inset-bottom,0px) + 14px);pointer-events:auto;width:86px;height:86px;border-radius:50%;border:0;color:#b9add9;
   background:radial-gradient(circle at 35% 30%,#3b2f7a,#1d1548);box-shadow:inset 0 0 0 3px rgba(255,255,255,.12),0 6px 18px rgba(8,4,26,.5);display:none;flex-direction:column;align-items:center;justify-content:center;gap:3px;font:800 13px/1 inherit;touch-action:none;-webkit-tap-highlight-color:transparent}
 .jv-root.is-touch .jv-dash{display:flex}
 .jv-dash svg{width:28px;height:28px;fill:#6f63a8}
