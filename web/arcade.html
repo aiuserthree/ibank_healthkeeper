@@ -52,6 +52,40 @@
       return `점심 11:30~13:00 · 퇴근 후 18:00~ · 주말·공휴일`;
     }
 
+    // 새 게임 소개 영상 — 맨 위 큰 화면 배경에 소리 없이 자동 재생(26초 반복). 장면마다 게임 이름 · 바로가기를 띄운다.
+    // 영상은 직접 녹화해 만든 것(/assets/promo/new-games.mp4 · 3.6MB). 동작 줄이기 · 데이터 절약 설정이면 영상 대신 그림 벽 그대로.
+    const REEL = { src: "/assets/promo/new-games.mp4?v=1", poster: "/assets/promo/new-games.jpg?v=1",
+      ch: [["sundown", 0], ["nightsquad", 2.75], ["holecity", 5.5], ["herorush", 8.25], ["kitsune", 11], ["vinyl", 13.75], ["jelly", 16.5], ["eggfarm", 19.25], ["frostcamp", 22]] };
+    const reelOk = () => {
+      try { if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return false; } catch (_) { /* 그대로 */ }
+      const c = navigator.connection; return !(c && c.saveData);
+    };
+    function bindReel(root, games) {
+      const v = root.querySelector(".hk-aa-reel"), now = root.querySelector("#aa-reel-now");
+      if (!v || !now) return;
+      const hero = v.closest(".hk-aa-hero"), titles = {};
+      games.forEach((g) => { titles[g.key] = g.title; });
+      const ch = REEL.ch.filter(([k]) => titles[k]);
+      let cur = "";
+      const paint = () => {
+        const t = v.currentTime || 0;
+        let k = ch.length ? ch[0][0] : "";
+        for (const [key, at] of ch) if (t + 0.3 >= at) k = key;
+        if (!k || k === cur) return;
+        cur = k; now.href = `/games/${k}`; now.querySelector("b").textContent = titles[k];
+        now.classList.remove("is-in"); void now.offsetWidth; now.classList.add("is-in");
+      };
+      v.addEventListener("timeupdate", paint);
+      v.addEventListener("playing", () => { hero.classList.add("is-reel"); paint(); });
+      v.addEventListener("error", () => { hero.classList.remove("is-reel"); v.remove(); now.remove(); });
+      // 화면 밖 · 숨긴 창이면 멈춘다(배터리 · 성능)
+      let seen = true;
+      const sync = () => { if (seen && !document.hidden) { const p = v.play(); if (p && p.catch) p.catch(() => {}); } else v.pause(); };
+      if ("IntersectionObserver" in window) new IntersectionObserver((es) => { seen = es[0].isIntersecting; sync(); }).observe(hero);
+      document.addEventListener("visibilitychange", sync);
+      sync();
+    }
+
     function heroHtml(games, st) {
       const keys = games.map((g) => g.key);
       const row = (shift) => {
@@ -61,8 +95,10 @@
       };
       // 업무 시간에도 버튼은 그대로 — 누르면 안내 창 (아래 click 처리)
       const cta = `<a class="hk-aa-pill" href="#aa-together" data-scroll="aa-together" data-play>지금 플레이</a>`;
+      const reel = reelOk() ? `<video class="hk-aa-reel" src="${REEL.src}" poster="${REEL.poster}" muted autoplay loop playsinline preload="auto" disablepictureinpicture aria-hidden="true" tabindex="-1"></video>
+          <a class="hk-aa-reel__now" id="aa-reel-now" href="/games/${REEL.ch[0][0]}"><span>${HKUI.icon("sparkles", 14, "currentColor")} 새로 나왔어요</span><b></b><em>하러 가기 ›</em></a>` : "";
       return `<div class="hk-aa-hero">
-          <div class="hk-aa-wall" aria-hidden="true">${row(0)}${row(4)}${row(8)}${row(2)}${row(6)}${row(10)}</div>
+          <div class="hk-aa-wall" aria-hidden="true">${row(0)}${row(4)}${row(8)}${row(2)}${row(6)}${row(10)}</div>${reel}
           <div class="hk-aa-hero__in">
             <h1 class="hk-aa-logo">아케이드</h1>
             <span class="hk-aa-tag">점심엔, 한 판</span>
@@ -863,6 +899,7 @@
           const games = allGames.filter((g) => !SERIES_ONLY.includes(g.key));
           body.innerHTML = heroHtml(games, st) + offersHtml(st) + stampHtml(sp) + `<div class="hk-aa-wrap" id="aa-notices"></div>` + trioHtml() + `<div class="hk-aa-wrap"><div id="aa-raid" style="margin-top:20px" hidden></div></div>` + newHtml(games) + collectionHtml(games, allGames) + dailyHtml(games) + weeklyHtml(wk) + faqHtml() + wishHtml(games) + endHtml();
           pauseOffscreen(body);
+          bindReel(body, games);
           bindFind(body);
           bindNew(body);
           bindHof(body);
