@@ -1,4 +1,4 @@
-"""동료 고르기 목록(검색어 없음) 순서 — ① 최근 함께 ② 같은 부서 ③ 요즘 아케이드(최근 순) ④ 최근 로그인 순.
+"""동료 고르기 목록(검색어 없음) 순서 — ① 최근 함께 ② 같은 부서 ③ 요즘 아케이드(최근 순) ④ 나머지 전체 가나다순(20명 제한 없음).
 이름순(가나다)만으로 채우면 김씨만 줄줄이 나오던 것을 막는다.
   cd /tmp && PYTHONPATH=<저장소>/backend <파이썬> -m unittest discover -s <저장소>/backend/tests -p "test_member_search.py" -v
 """
@@ -88,9 +88,19 @@ class MemberSearch(unittest.TestCase):
                 return out, found
 
         out, found = run(self.loop, go())
-        self.assertEqual([x["id"] for x in out], [5, 6, 7, 8, 4, 3, 2])
+        self.assertEqual([x["id"] for x in out], [5, 6, 7, 2, 3, 4, 8])  # 김가 · 김나 · 김다 · 정로그인 — 가나다
         self.assertEqual([x["tag"] for x in out[:3]], ["team", "active", "active"])
         self.assertEqual(sorted(x["id"] for x in found), [2, 3, 4])  # 이름 검색은 그대로
+
+    def test_whole_list_without_query(self):
+        async def go():
+            async with self.Session() as db:
+                for i in range(1, 41):
+                    db.add(Member(id=i, email=f"u{i}@3ibank.com", name=f"사람{i:02d}", department="부서", status=MemberStatus.ACTIVE, entra_oid=f"oid-{i}"))
+                await db.commit()
+                return await match_service.search_members(db, await db.get(Member, 1), "")
+        out = run(self.loop, go())
+        self.assertEqual(len(out), 39)  # 나 빼고 전부 — 20명에서 끊지 않는다
 
 
 if __name__ == "__main__":

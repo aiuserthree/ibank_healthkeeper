@@ -483,16 +483,14 @@ async def search_members(db: AsyncSession, member: Member, q: str) -> list:
         like = f"%{q.replace('%', '').replace('_', '')}%"
         stmt = stmt.where(or_(Member.name.ilike(like), Member.department.ilike(like)))
         return [_person(p) for p in (await db.execute(stmt)).scalars().all()]
-    # 검색어가 없으면 — 이름순(가나다)으로만 채우면 김씨만 줄줄이 나온다. 같이 할 만한 사람부터:
-    #   ① 최근에 같이 한 동료(1:1 대전 · 여러 명 경주) ② 같은 부서 ③ 요즘(7일) 아케이드를 한 동료(최근 순) ④ 나머지는 최근 로그인 순
+    # 검색어가 없으면 — 같이 할 만한 사람부터 앞에, 그 뒤로 전체 직원(몇 명이든 다):
+    #   ① 최근에 같이 한 동료(1:1 대전 · 여러 명 경주) ② 같은 부서 ③ 요즘(7일) 아케이드를 한 동료(최근 순) ④ 나머지 전체 가나다순
     from app.models import GamePlay
 
     out, seen = [], set()
 
     def add(rows, tag):
         for p in rows:
-            if len(out) >= 20:
-                return
             if p.id in seen:
                 continue
             seen.add(p.id)
@@ -506,23 +504,19 @@ async def search_members(db: AsyncSession, member: Member, q: str) -> list:
         }
         add([rows[i] for i in recent if i in rows][:RECENT_PARTNERS], "recent")
     if member.department:
-        add((await db.execute(stmt.where(Member.department == member.department))).scalars().all(), "team")
-    if len(out) < 20:
-        last = (
-            select(GamePlay.member_id, func.max(GamePlay.played_at).label("t"))
-            .where(GamePlay.played_at >= now_kst() - timedelta(days=ACTIVE_DAYS))
-            .group_by(GamePlay.member_id)
-            .subquery()
-        )
-        add(
-            (await db.execute(stmt.join(last, last.c.member_id == Member.id).order_by(None).order_by(last.c.t.desc()).limit(40))).scalars().all(),
-            "active",
-        )
-    if len(out) < 20:
-        add(
-            (await db.execute(stmt.order_by(None).order_by(Member.last_login_at.desc().nullslast(), Member.name).limit(40))).scalars().all(),
-            "",
-        )
+        add((await db.execute(stmt.where(Member.department == member.department).limit(None))).scalars().all(), "team")
+    # 요즘 아케이드 — 7일 안에 한 판이라도 한 동료, 최근에 한 사람부터
+    last = (
+        select(GamePlay.member_id, func.max(GamePlay.played_at).label("t"))
+        .where(GamePlay.played_at >= now_kst() - timedelta(days=ACTIVE_DAYS))
+        .group_by(GamePlay.member_id)
+        .subquery()
+    )
+    add(
+        (await db.execute(stmt.join(last, last.c.member_id == Member.id).order_by(None).order_by(last.c.t.desc()).limit(None))).scalars().all(),
+        "active",
+    )
+    add((await db.execute(stmt.limit(None))).scalars().all(), "")  # 나머지 전체 — 가나다순
     return out
 
 
