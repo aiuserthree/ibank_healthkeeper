@@ -29,9 +29,12 @@
   document.addEventListener("contextmenu", (e) => { if (!isFree(e.target)) e.preventDefault(); });
 
   const css = document.createElement("style");
+  // touch-action 은 물려받지 않아 모든 요소에(단추 · 칸을 두 번 눌러도 확대 안 됨). 게임이 따로 정한 값(none 등)은 그대로 이긴다(* 는 가장 약한 규칙)
+  // 글자 고르기 끄기는 !important — 게임 CSS 가 뒤에서 켜도 돋보기가 안 나오게(입력칸만 예외)
   css.textContent =
-    "html{-webkit-text-size-adjust:100%;touch-action:manipulation}" +
-    "html,body,body *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}" +
-    "input,textarea,select,[contenteditable],[contenteditable] *{-webkit-touch-callout:default;-webkit-user-select:text;user-select:text}";
+    "html{-webkit-text-size-adjust:100%}" +
+    "*,*::before,*::after{touch-action:manipulation}" +
+    "html,body,body *{-webkit-touch-callout:none!important;-webkit-user-select:none!important;user-select:none!important}" +
+    "input,textarea,select,[contenteditable],[contenteditable] *{-webkit-touch-callout:default!important;-webkit-user-select:text!important;user-select:text!important}";
   (document.head || document.documentElement).appendChild(css);
 })();
