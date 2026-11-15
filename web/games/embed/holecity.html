@@ -251,7 +251,7 @@ b{font-weight:inherit}
     </ul>
     <div class="title-row">
       <button class="btn" id="btnStart" type="button">시작하기</button>
-      <span class="hint hint-pc">화면을 끌거나 방향키 · WASD 로 움직여요</span><span class="hint hint-touch">손가락으로 화면을 끄는 만큼 구멍이 따라와요</span>
+      <span class="hint hint-pc">화면을 끌거나 방향키 · WASD 로 움직여요</span><span class="hint hint-touch">손가락으로 끄는 만큼 구멍이 똑같이 움직여요</span>
     </div>
     <span class="best" id="best" hidden>내 최고 점수 <b id="bestNum">0</b></span>
   </div>
@@ -309,7 +309,7 @@ var TUNE = SC.TUNE = {
   r0: 0.6,            // 내 구멍 시작 반지름(강화 전)
   speed: 8.8,         // 내 구멍 기본 빠르기 — 커질수록 speedGrow 만큼씩 빨라진다(최대 speedMax)
   speedGrow: 1.0, speedMax: 16.5,
-  touchBoost: 1.8,    // 휴대폰 손가락 따라가기는 손 가는 대로 빠르게 — 최고 빠르기 × 이 배수(PC 키보드 · 마우스는 1)
+  touchStep: 2.5,     // 휴대폰 손가락 직접 이동 — 1/60초 한 걸음에 옮길 수 있는 최대 거리(+ 구멍 반지름 × 0.8). 사람 손가락은 다 따라가고, 순간이동만 막는다
   growK: 1.2,         // 크기 = 시작 크기 × (1 + 삼킨 양 ÷ growK) ^ growP
   growP: 0.42,
   rivalEff: 0.5,      // 라이벌은 같은 걸 먹어도 이만큼만 자란다
@@ -1059,9 +1059,18 @@ SC.step = function (g, dt, inp) {
     for (i = 0; i < g.holes.length; i++) {
       h = g.holes[i]; if (!h.alive || h.dying > 0) continue;
       if (h.isPlayer) {
-        var ix = inp ? inp.x : 0, iz = inp ? inp.z : 0, m = Math.hypot(ix, iz); if (m > 1) { ix /= m; iz /= m; }
-        var sp = SC.playerSpeed(g, h) * Math.min(3, (inp && inp.boost) || 1), kk = 1 - Math.exp(-((inp && inp.k) || 14) * dt);
-        h.vx += (ix * sp - h.vx) * kk; h.vz += (iz * sp - h.vz) * kk; h.x += h.vx * dt; h.z += h.vz * dt;
+        if (inp && inp.touch) {
+          // 휴대폰: 손가락이 끈 땅 거리만큼 그 자리에서 바로 옮긴다(가속 · 관성 없음). 크게 옮길 때는 잘게 나눠 지나는 길의 물건도 삼킨다
+          var mx = inp.mx || 0, mz = inp.mz || 0, ml = Math.hypot(mx, mz), cap = TUNE.touchStep + h.r * 0.8;
+          if (ml > cap) { mx *= cap / ml; mz *= cap / ml; ml = cap; }
+          var ns = Math.max(1, Math.ceil(ml / Math.max(0.25, h.r * 0.6))), sl = Math.max(1, g.H - h.r - 0.3);
+          for (k = 1; k <= ns; k++) { h.x = clamp(h.x + mx / ns, -sl, sl); h.z = clamp(h.z + mz / ns, -sl, sl); if (k < ns) swallow(g, h); }
+          h.vx = h.vz = 0;
+        } else {
+          var ix = inp ? inp.x : 0, iz = inp ? inp.z : 0, m = Math.hypot(ix, iz); if (m > 1) { ix /= m; iz /= m; }
+          var sp = SC.playerSpeed(g, h), kk = 1 - Math.exp(-14 * dt);
+          h.vx += (ix * sp - h.vx) * kk; h.vz += (iz * sp - h.vz) * kk; h.x += h.vx * dt; h.z += h.vz * dt;
+        }
       } else aiStep(g, h, dt);
       h.r += (h.tr - h.r) * (1 - Math.exp(-6 * dt));
       lim = Math.max(1, g.H - h.r - 0.3); h.x = clamp(h.x, -lim, lim); h.z = clamp(h.z, -lim, lim);
@@ -1530,7 +1539,7 @@ function startRun() {
 function startArea() {
   var A = AREAS[run.area], i;
   game = SC.createGame(run.area, run.up); R.load(game); R.setCam('follow');
-  mode = 'intro'; introT = AUTO ? 0.4 : 2.0; paused = false; botSt = {}; combo = 0; stopJoy(); touch.seen = false;
+  mode = 'intro'; introT = AUTO ? 0.4 : 2.0; paused = false; botSt = {}; combo = 0; stopJoy();
   only(null); show('hud', true); show('warn', false); clearLabels();
   var no = (run.area + 1) + '구역', goal = Math.round(game.goal * 100);
   $('areaNo').textContent = no; $('areaName').textContent = A.name;
@@ -1674,7 +1683,7 @@ function handleEvents() {
     if (e.t === 'eat') { sfx.eat(e.r); popAcc += e.v; if (e.r > 3) R.shake(Math.min(1.2, e.r * 0.12)); }
     else if (e.t === 'tier') { toast('이제 ' + e.name + '도 삼켜요'); sfx.tier(); R.pulse(game.player); }
     else if (e.t === 'eatHole') { toast(e.name + ' 꿀꺽! +200'); sfx.rival(); R.shake(0.5); R.pulse(game.player); popAcc += 20; }
-    else if (e.t === 'playerEaten') { toast(e.name + '에게 삼켜졌어요 · ' + SC.TUNE.eatenPenalty + '초 잃음', true); sfx.eaten(); R.shake(1.4); stopJoy(); touch.seen = false; }
+    else if (e.t === 'playerEaten') { toast(e.name + '에게 삼켜졌어요 · ' + SC.TUNE.eatenPenalty + '초 잃음', true); sfx.eaten(); R.shake(1.4); stopJoy(); }
     else if (e.t === 'won') endArea(true);
     else if (e.t === 'lost') endArea(false);
   }
@@ -1682,40 +1691,22 @@ function handleEvents() {
 }
 
 // ── 조작 — PC 마우스는 끌면 그 방향으로(가상 스틱), 키보드는 방향키 · WASD.
-// 휴대폰(손가락 · 펜)은 표시 없이 「끈 만큼」 구멍이 따라 움직인다: 손가락이 움직인 만큼(손가락 아래 땅 기준) 목표 자리를 옮기고,
-// 구멍은 그 자리로 빠르게 미끄러져 간다. 손가락이 멈추면 구멍도 곧 멈추고, 떼면 남은 거리를 짧게 줄여 자연스럽게 선다.
-// (카메라가 구멍을 따라가므로 「손가락 바로 아래로」 가게 하면 끝없이 달아난다 — 그래서 끈 만큼 옮기는 방식)
+// 휴대폰(손가락 · 펜)은 표시 없이 물건을 집어 끄는 것처럼 1:1 로 옮긴다: 손가락이 화면에서 움직인 만큼을 지금 카메라로 땅 거리로 바꿔
+// 그만큼 구멍을 바로 옮기고, 손가락이 멈추면 구멍도 그 순간 선다. 손가락 움직임은 그림 한 장마다 모아 다음 규칙 걸음에 한 번에 넣는다.
 var canvas = $('c'), joyEl = $('joy'), knob = joyEl.firstElementChild, joy = { on: false, id: null, ox: 0, oy: 0, x: 0, y: 0 }, keys = {}, JOY_R = 50;
-var touch = { on: false, id: null, sx: 0, sy: 0, px: 0, py: 0, tx: 0, tz: 0, seen: false }, TOUCH_GAIN = 1.5, _ga = { x: 0, z: 0 }, _gb = { x: 0, z: 0 };
-function stopJoy() {
-  joy.on = false; joy.x = joy.y = 0; joyEl.hidden = true;
-  if (touch.on) touchLeash(0.5);
-  touch.on = false; touch.id = null;
-}
-// 목표 자리가 구멍에서 너무 멀어지지 않게(빠르게 크게 휘저어도 튀지 않게) — 구멍 크기에 맞춘 줄 길이
-function touchLeash(k) {
-  var p = game && game.player; if (!p) return;
-  var dx = touch.tx - p.x, dz = touch.tz - p.z, d = Math.hypot(dx, dz), L = (1.4 + p.r * 1.0) * k;
-  if (d > L) { touch.tx = p.x + dx / d * L; touch.tz = p.z + dz / d * L; }
-}
-function touchMove() {
-  // 이번 그림의 카메라로 앞뒤 두 점을 함께 재야, 그 사이 카메라가 움직인 몫이 섞이지 않는다
-  if (touch.px === touch.sx && touch.py === touch.sy) return;
-  if (R.ground(touch.px, touch.py, _ga) && R.ground(touch.sx, touch.sy, _gb)) {
-    touch.tx += (_gb.x - _ga.x) * TOUCH_GAIN; touch.tz += (_gb.z - _ga.z) * TOUCH_GAIN;
-    var H = game.H - game.player.r - 0.3; touch.tx = Math.max(-H, Math.min(H, touch.tx)); touch.tz = Math.max(-H, Math.min(H, touch.tz));
-    touchLeash(1);
-  }
+var touch = { on: false, id: null, sx: 0, sy: 0, px: 0, py: 0, mx: 0, mz: 0 }, TOUCH_GAIN = 1.0, _ga = { x: 0, z: 0 }, _gb = { x: 0, z: 0 };
+function stopJoy() { joy.on = false; joy.x = joy.y = 0; joyEl.hidden = true; touch.on = false; touch.id = null; touch.mx = touch.mz = 0; }
+// 그림 한 장마다: 앞 자리 → 지금 자리를 같은 카메라로 땅에 비춰 그 차이를 쌓는다(카메라가 움직인 몫은 섞이지 않는다)
+function touchFlush() {
+  if (!touch.on || (touch.px === touch.sx && touch.py === touch.sy)) return;
+  if (R.ground(touch.px, touch.py, _ga) && R.ground(touch.sx, touch.sy, _gb)) { touch.mx += (_gb.x - _ga.x) * TOUCH_GAIN; touch.mz += (_gb.z - _ga.z) * TOUCH_GAIN; }
   touch.px = touch.sx; touch.py = touch.sy;
 }
 canvas.addEventListener('pointerdown', function (e) {
   if (mode !== 'play' || paused) return;
   if (e.pointerType === 'touch' || e.pointerType === 'pen') {
     if (touch.on || joy.on) return;
-    var p = game.player;
-    touch.on = true; touch.id = e.pointerId; touch.sx = touch.px = e.clientX; touch.sy = touch.py = e.clientY;
-    if (!touch.seen || Math.hypot(touch.tx - p.x, touch.tz - p.z) > 0.5 + p.r) { touch.tx = p.x; touch.tz = p.z; }
-    touch.seen = true;
+    touch.on = true; touch.id = e.pointerId; touch.sx = touch.px = e.clientX; touch.sy = touch.py = e.clientY; touch.mx = touch.mz = 0;
     try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
     e.preventDefault(); return;
   }
@@ -1727,7 +1718,7 @@ canvas.addEventListener('pointerdown', function (e) {
 });
 canvas.addEventListener('pointermove', function (e) {
   if (touch.on && e.pointerId === touch.id) {
-    // 한 그림 사이에 여러 번 와도 마지막 자리만 쓴다 — 실제 옮기기는 input() 에서 한 걸음마다
+    // 한 그림 사이에 여러 번 와도 마지막 자리만 쓴다 — 땅 거리로 바꾸는 건 그림마다 touchFlush() 에서
     var ev = e.getCoalescedEvents ? e.getCoalescedEvents() : null, last = ev && ev.length ? ev[ev.length - 1] : e;
     touch.sx = last.clientX; touch.sy = last.clientY; return;
   }
@@ -1751,14 +1742,10 @@ window.addEventListener('blur', function () { keys = {}; stopJoy(); });
 var inp = { x: 0, z: 0 };
 function input(dt) {
   if (AUTO) return SC.bot(game, botSt, dt);
-  inp.x = (keys.r ? 1 : 0) - (keys.l ? 1 : 0) + joy.x; inp.z = (keys.d ? 1 : 0) - (keys.u ? 1 : 0) + joy.y; inp.k = 0; inp.boost = 1;
-  if (touch.seen && !inp.x && !inp.z) {
-    if (touch.on) touchMove();
-    // 목표까지 남은 거리에 비례한 빠르기(0.05초 만에 따라붙는 꼴, 넘치지 않게 출렁임은 줄였다) — 최고 빠르기는 PC 의 touchBoost 배
-    var p = game.player, dx = touch.tx - p.x, dz = touch.tz - p.z, d = Math.hypot(dx, dz), sp = SC.playerSpeed(game, p) * SC.TUNE.touchBoost;
-    if (d > 0.02) { var m = Math.min(1, d * 20 / sp); inp.x = dx / d * m; inp.z = dz / d * m; } else if (!touch.on) touch.seen = false;
-    inp.k = 50; inp.boost = SC.TUNE.touchBoost;
-  }
+  inp.x = (keys.r ? 1 : 0) - (keys.l ? 1 : 0) + joy.x; inp.z = (keys.d ? 1 : 0) - (keys.u ? 1 : 0) + joy.y;
+  // 손가락이 닿아 있고 키보드를 안 쓰면 손가락 직접 이동 — 쌓인 거리를 이번 걸음에 다 쓴다(손가락이 멈추면 0 → 구멍도 바로 선다)
+  inp.touch = touch.on && !inp.x && !inp.z; inp.mx = inp.touch ? touch.mx : 0; inp.mz = inp.touch ? touch.mz : 0;
+  if (inp.touch) touch.mx = touch.mz = 0;
   return inp;
 }
 
@@ -1799,6 +1786,7 @@ function frame(now) {
   if (!paused) {
     if (mode === 'intro') { introT -= dt; if (introT <= 0) beginPlay(); }
     acc += dt * FAST;
+    if (mode === 'play') touchFlush();
     while (acc >= STEP && n < 6 * FAST) { SC.step(game, STEP, mode === 'play' ? input(STEP) : null); acc -= STEP; n++; if (mode === 'play') handleEvents(); }
     if (n === 6 * FAST) acc = 0;
     if (mode !== 'play') game.events.length = 0;
