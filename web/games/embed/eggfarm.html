@@ -782,6 +782,38 @@ function beep(f,d,type,vol){if(!actx||muted||QUIET)return;try{const o=actx.creat
   g.gain.value=vol||0.05;g.gain.exponentialRampToValueAtTime(0.0001,actx.currentTime+d);o.connect(g);g.connect(actx.destination);o.start();o.stop(actx.currentTime+d);}catch(e){}}
 $('mute').innerHTML=ICO.on;
 $('mute').addEventListener('click',()=>{muted=!muted;$('mute').innerHTML=muted?ICO.off:ICO.on;});
+/* ---------- 배경음악 — 직접 지은 밝은 농장 노래(우쿨렐레 같은 뜯는 화음 · 통통 베이스 · 흔드는 셰이커 · 휘파람 같은 가락).
+   판이 진행되는 동안만 흐르고, 멈춤 · 끝 · 창 숨김 · 소리 끔이면 부드럽게 줄어든다. 효과음보다 작게 ---------- */
+const BGM={g:null,next:0,step:0,noise:null};
+const BG_E8=60/112/2;
+const bgF=m=>440*Math.pow(2,(m-69)/12);
+const BG_CH=[[60,64,67],[57,60,64],[53,57,60],[55,59,62]],BG_BASS=[48,45,41,43];
+const BG_MEL=[ // 8분음표 64칸(A 32 + B 32), -1 = 쉼
+  72,-1,76,79, 76,-1,74,72,  69,-1,72,76, 74,-1,72,69,  65,-1,69,72, 74,72,69,-1,  67,-1,71,74, 72,-1,71,67,
+  79,-1,79,76, 74,76,79,-1,  81,-1,79,76, 72,-1,74,-1,  77,76,74,72, 69,-1,72,74,  76,-1,74,71, 72,-1,-1,-1];
+function bgmWant(){return !!actx&&!muted&&!paused&&!document.hidden&&(mode==='play'||mode==='story'||(mode==='free'&&S.started));}
+function bgmNote(f,t,d,type,vol,att){const o=actx.createOscillator(),g=actx.createGain();o.type=type;o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+(att||0.012));g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+  o.connect(g);g.connect(BGM.g);o.start(t);o.stop(t+d+0.05);}
+function bgmShake(t,vol){if(!BGM.noise){const n=actx.sampleRate*0.08,b=actx.createBuffer(1,n,actx.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=(Math.random()*2-1)*(1-i/n);BGM.noise=b;}
+  const s=actx.createBufferSource(),f=actx.createBiquadFilter(),g=actx.createGain();s.buffer=BGM.noise;f.type='highpass';f.frequency.value=6500;g.gain.value=vol;
+  s.connect(f);f.connect(g);g.connect(BGM.g);s.start(t);}
+function bgmTick(){
+  if(!actx)return;
+  if(!bgmWant()){if(BGM.g&&BGM.next){const t=actx.currentTime;BGM.g.gain.cancelScheduledValues(t);BGM.g.gain.setTargetAtTime(0,t,0.12);BGM.next=0;}return;}
+  if(!BGM.g){BGM.g=actx.createGain();BGM.g.gain.value=0;BGM.g.connect(actx.destination);}
+  const now=actx.currentTime;
+  if(!BGM.next||BGM.next<now-0.3){BGM.next=now+0.08;BGM.g.gain.cancelScheduledValues(now);BGM.g.gain.setTargetAtTime(1,now,0.25);}
+  while(BGM.next<now+0.3){
+    const t=BGM.next,i=BGM.step%64,bar=((i>>3)&3),beat=i&7;
+    const m=BG_MEL[i];if(m>=0){bgmNote(bgF(m),t,BG_E8*1.7,'triangle',0.05);bgmNote(bgF(m+12),t,BG_E8*0.9,'sine',0.012);}
+    if(beat===0||beat===4)bgmNote(bgF(BG_BASS[bar]+(beat===4?7:0)),t,BG_E8*1.8,'triangle',0.075,0.006);
+    if(beat===2||beat===3||beat===6||(beat===7&&bar===3)){for(let k=0;k<3;k++)bgmNote(bgF(BG_CH[bar][k]),t+k*0.012,BG_E8*0.8,'square',0.008,0.004);}
+    bgmShake(t,beat%2?0.02:0.035);
+    BGM.next+=BG_E8;BGM.step++;
+  }
+}
+setInterval(bgmTick,90);
 
 /* ---------- upgrade pads ---------- */
 const PADS=[
