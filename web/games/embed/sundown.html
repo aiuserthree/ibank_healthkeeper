@@ -62,6 +62,7 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 #home>.wallet{grid-area:wallet;align-self:start}
 .tracks{grid-area:tracks;display:flex;gap:12px;overflow-x:auto;padding:8px 2px 6px;scroll-snap-type:x proximity;scrollbar-width:none}
 .tracks::-webkit-scrollbar{display:none}
+@media (pointer:fine){.tracks{cursor:grab}.tracks.drag{cursor:grabbing;scroll-snap-type:none}.tracks.drag .stub{pointer-events:none}}
 .stub{flex:0 0 auto;width:min(236px,64vw);display:grid;grid-template-columns:1fr 32px;text-align:left;background:var(--cream);color:var(--ink);border-radius:10px;scroll-snap-align:start;transition:transform .15s,background .15s;
   -webkit-mask:radial-gradient(circle 9px at 0 50%,#0000 97%,#000) 0 0/51% 100% no-repeat,radial-gradient(circle 9px at 100% 50%,#0000 97%,#000) 100% 0/51% 100% no-repeat;
   mask:radial-gradient(circle 9px at 0 50%,#0000 97%,#000) 0 0/51% 100% no-repeat,radial-gradient(circle 9px at 100% 50%,#0000 97%,#000) 100% 0/51% 100% no-repeat}
@@ -2634,6 +2635,19 @@ function renderHome(){
   if(cur&&cur.scrollIntoView){try{cur.scrollIntoView({block:'nearest',inline:'nearest'});}catch(e){}}
   syncSound();
 }
+/* PC — 트랙 칸을 마우스로 잡아 끌어 옆으로 넘긴다(휴대폰은 원래 손가락으로 밀림). 끌었으면 손을 뗄 때 칸이 눌리지 않게, 휠도 옆으로 */
+(function(){
+  const el=$('trackList');let d=null;
+  el.addEventListener('pointerdown',e=>{if(e.pointerType!=='mouse'||e.button!==0)return;d={x:e.clientX,sl:el.scrollLeft,moved:false,id:e.pointerId};});
+  el.addEventListener('pointermove',e=>{if(!d||e.pointerId!==d.id)return;const dx=e.clientX-d.x;
+    if(!d.moved&&Math.abs(dx)>6){d.moved=true;el.classList.add('drag');try{el.setPointerCapture(e.pointerId);}catch(_){}}
+    if(d.moved){el.scrollLeft=d.sl-dx;e.preventDefault();}});
+  const up=e=>{if(!d||(e&&e.pointerId!==d.id))return;const was=d.moved;d=null;el.classList.remove('drag');
+    if(was){const stop=ev=>{ev.stopPropagation();ev.preventDefault();};el.addEventListener('click',stop,true);setTimeout(()=>el.removeEventListener('click',stop,true),0);}};
+  el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);el.addEventListener('lostpointercapture',up);
+  el.addEventListener('dragstart',e=>e.preventDefault());
+  el.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&el.scrollWidth>el.clientWidth){el.scrollLeft+=e.deltaY;e.preventDefault();}},{passive:false});
+})();
 function renderGarage(){
   $('walletG').textContent=fmt(save.tickets);
   const sel=game.preview||save.racer,rl=$('racerList');
