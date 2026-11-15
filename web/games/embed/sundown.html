@@ -909,17 +909,36 @@ function populate(tr){
   for(const m of tr.mk.haz){
     if(m.type==='boat')hz.push({type:'boat',s:m.s,T:def.boatT,A:1.2,ph:rnd()*TAU});
     else if(m.type==='hammer')hz.push({type:'hammer',s:m.s,side:m.a[0],T:2.6,ph:(hamN++)*.85,prev:1});
-    else if(m.type==='cups')hz.push({type:'cups',s:m.s,u0:m.a[0],R:m.a[1],n:m.a[2],w:(rnd()<.5?-1:1)*def.cupW,ph:rnd()*TAU,center:false});
-    else if(m.type==='cups2'){for(const sd of [-1,1])hz.push({type:'cups',s:m.s,u0:sd*3.5,R:2.5,n:2,w:sd*def.cupW*1.2,ph:rnd()*TAU,center:false});}
-    else if(m.type==='cupsBig')hz.push({type:'cups',s:m.s,u0:0,R:4.5,n:3,w:(rnd()<.5?-1:1)*def.cupW*.85,ph:rnd()*TAU,center:true});
+    // 찻잔 — 길 한쪽에만 놓는다(반대쪽 절반은 늘 비어 있어 피해 갈 수 있다). 2줄 찻잔은 왼쪽 · 오른쪽을 앞뒤로 엇갈려 지그재그로 피한다
+    else if(m.type==='cups'){const sd=m.a[0]?Math.sign(m.a[0]):(rnd()<.5?-1:1);hz.push({type:'cups',s:m.s,u0:sd*3.6,R:Math.min(2.3,m.a[1]),n:Math.min(3,m.a[2]),w:(rnd()<.5?-1:1)*def.cupW*1.15,ph:rnd()*TAU,center:false});}
+    else if(m.type==='cups2'){const sd=rnd()<.5?-1:1;for(const k of [-1,1])hz.push({type:'cups',s:m.s+k*15,u0:k*sd*3.6,R:2.2,n:2,w:k*sd*def.cupW*1.2,ph:rnd()*TAU,center:false});}
+    else if(m.type==='cupsBig'){const sd=rnd()<.5?-1:1;hz.push({type:'cups',s:m.s,u0:sd*3.4,R:2.6,n:3,w:(rnd()<.5?-1:1)*def.cupW*.95,ph:rnd()*TAU,center:true});}
   }
-  const nearHz=(s,d)=>{for(const h of hz){if(Math.abs(h.s-s)<d+(h.type==='cups'?h.R:0))return true;}return false;};
+  const nearHz=(s,d)=>{for(const h of hz){if(Math.abs(h.s-s)<d+(h.type==='cups'?h.R:h.type==='spinbar'?h.L:0))return true;}return false;};
+  // 새 장애물 3종(굴러오는 대형 공 · 튀어 오르는 기둥 · 회전 막대) — 트랙을 셋으로 나눠 구간마다 하나씩, 곧고 평평한 빈 자리에(같은 씨앗이라 대전 두 쪽이 같다)
+  {
+    const kinds=['roller','pillars','spinbar'];
+    for(let i=kinds.length-1;i>0;i--){const j=(rnd()*(i+1))|0;const x=kinds[i];kinds[i]=kinds[j];kinds[j]=x;}
+    const padNear=s=>{for(const p of tr.mk.pads)if(Math.abs(p-s)<26)return true;return false;};
+    const flat=s=>{for(let k=-16;k<=16;k++){const f=tr.FL[(s+k)|0];if(f===undefined||f!==0)return false;}return true;};
+    const a0=200,span=(tr.finish-120-a0)/3;
+    for(let q=0;q<3;q++){
+      const c=[];
+      for(let s=a0+q*span;s<a0+(q+1)*span;s+=6){if(flat(s)&&!padNear(s)&&!nearHz(s,44))c.push(s);}
+      if(!c.length)continue;
+      const s=c[(rnd()*c.length)|0],ty=kinds[q];
+      if(ty==='roller')hz.push({type:'roller',s:s,R:2,A:5,T:2.5+rnd()*.7,ph:rnd()});
+      else if(ty==='pillars')hz.push({type:'pillars',s:s,T:2.3+rnd()*.5,ph:rnd()});
+      else hz.push({type:'spinbar',s:s,u0:(rnd()<.5?-1:1)*2.8,L:4.6,w:(rnd()<.5?-1:1)*(1.6+rnd()*.4),ph:rnd()*TAU}); // 한쪽으로 치우친 회전 막대 — 반대쪽 끝 차선은 늘 비어 있다
+    }
+  }
   const items=[];
   for(let s0=190;s0<tr.finish-80;s0+=def.itemGap){
     let s=s0,ok=false;
-    for(let k=0;k<30;k++,s+=5){if(tr.FL[s|0]===0&&tr.FL[(s|0)+4]===0&&!nearHz(s,16)){ok=true;break;}}
+    for(let k=0;k<30;k++,s+=5){if(tr.FL[s|0]===0&&tr.FL[(s|0)+4]===0&&tr.FL[(s|0)+14]===0&&!nearHz(s,16)&&!nearHz(s+10,16)){ok=true;break;}}
     if(!ok)continue;
-    for(const u of [-4,0,4]){rnd();items.push({s:s,u:u,type:'box',on:true,cd:0,grp:null});} // 상자 — 무엇이 나올지는 먹을 때 순위로 정한다
+    // 상자 — 길 폭 가득 5칸 × 앞뒤 2줄(여러 명이 와도 거의 다 먹는다, 먹히면 1.5초 뒤 다시). 무엇이 나올지는 먹을 때 순위로 정한다
+    for(const ds of [0,10])for(const u of ds?[-4.2,-1.4,1.4,4.2,0]:[-5.6,-2.8,0,2.8,5.6]){if(ds&&u===0)continue;items.push({s:s+ds,u:u,type:'box',on:true,cd:0,grp:null});}
   }
   const nearIt=(s,d)=>{for(const it of items){if(Math.abs(it.s-s)<d)return true;}return false;};
   const tix=[];
@@ -968,8 +987,30 @@ function hammerAngle(hz,t){
   x-=.16;if(x<.5)return 0;
   x-=.5;return UP*smooth(x/.75);
 }
+const PIL_U=[-4.6,0,4.6];
+function rollerU(hz,t){return hz.A*Math.sin(TAU*(t/hz.T+hz.ph));}
+function pillarUp(hz,t,j){ // 0(숨음) ~ 1(다 올라옴) — 세 기둥이 1/3 박자씩 엇갈려 늘 한 줄 이상 비어 있다
+  const x=((t/hz.T+hz.ph+j/3)%1+1)%1;
+  return x<.07?smooth(x/.07):x<.4?1:x<.47?1-smooth((x-.4)/.07):0;
+}
 function hzHit(hz,t,s,u,h,m){
   const ds=s-hz.s;
+  if(hz.type==='roller'){
+    if(Math.abs(ds)>hz.R+1.4+m||h>hz.R*2)return false;
+    return Math.abs(u-rollerU(hz,t))<hz.R+1.1+m;
+  }
+  if(hz.type==='pillars'){
+    if(Math.abs(ds)>2.5+m||h>2.4)return false;
+    for(let j=0;j<3;j++){if(pillarUp(hz,t,j)>.5&&Math.abs(u-PIL_U[j])<2.3+m)return true;}
+    return false;
+  }
+  if(hz.type==='spinbar'){
+    if(Math.abs(ds)>hz.L+1.8+m||h>2.2)return false;
+    const uu=u-hz.u0;
+    if(ds*ds+uu*uu<(1.9+m)*(1.9+m))return true;
+    const a=hz.w*t+hz.ph,dx=Math.sin(a),dy=Math.cos(a),pp=clamp(ds*dx+uu*dy,-hz.L,hz.L),ex=ds-pp*dx,ey=uu-pp*dy;
+    return ex*ex+ey*ey<(1.4+m)*(1.4+m);
+  }
   if(hz.type==='boat'){
     if(Math.abs(ds)>3+m||h>2.6)return false;
     const phi=hz.A*Math.sin(TAU*t/hz.T+hz.ph);
@@ -991,7 +1032,7 @@ function hzHit(hz,t,s,u,h,m){
   return false;
 }
 function hzDanger(hz,t,u,m,v){
-  if(hz.type==='cups'){for(let so=-hz.R;so<=hz.R+.01;so+=hz.R/2){if(hzHit(hz,t+so/v,hz.s+so,u,0,m))return true;}return false;}
+  if(hz.type==='cups'||hz.type==='spinbar'){const R=hz.type==='cups'?hz.R:hz.L;for(let so=-R;so<=R+.01;so+=R/3){if(hzHit(hz,t+so/v,hz.s+so,u,0,m))return true;}return false;}
   return hzHit(hz,t,hz.s,u,0,m);
 }
 
@@ -1118,7 +1159,14 @@ function getItemGeos(){
   const wd=new Bake();
   for(let k=0;k<4;k++)wd.add(G.torThin,k%2?0x9fe8ff:0xffffff,mat(0,-.9+k*.75,0,.6+k*.38,.6+k*.38,12,Math.PI/2,0,0));
   wd.add(G.cylLo,0xcff4ff,mat(0,0,0,.25,3,.25));
-  itemGeos={rocket:r.geo(),shield:s.geo(),blast:b.geo(),box:x.geo(),popcorn:pc.geo(),candy:cd.geo(),wind:wd.geo()};
+  const fw=new Bake(); // 불꽃 미사일 — 분홍 줄무늬 몸통 · 금빛 별 머리 · 날개
+  fw.add(G.cyl,0xff5af0,mat(0,0,0,.42,1.6,.42,Math.PI/2,0,0),[0xffffff,14]);fw.add(G.cone,0xffc533,mat(0,0,1.15,.45,.7,.45,Math.PI/2,0,0));
+  for(let k=0;k<4;k++){const a=k*TAU/4;fw.add(G.box,0x48e4ff,mat(Math.cos(a)*.45,Math.sin(a)*.45,-.6,.08,.5,.6,0,0,a));}
+  fw.add(G.sphLo,0xfff27a,mat(0,0,-.95,.35));
+  const mt=new Bake(); // 별똥별 — 불타는 바위 + 노란 속
+  mt.add(G.ico,0xff7a2a,mat(0,0,0,1.5));mt.add(G.ico,0xffc533,mat(0,.2,0,1.05,1.05,1.05,.5,.3,0));mt.add(G.sphLo,0xfff2d8,mat(0,.3,0,.6));
+  for(let k=0;k<5;k++){const a=k*TAU/5;mt.add(G.cone,0xff4d5e,mat(Math.cos(a)*.7,1.3,Math.sin(a)*.7,.45,1.6,.45));}
+  itemGeos={rocket:r.geo(),shield:s.geo(),blast:b.geo(),box:x.geo(),popcorn:pc.geo(),candy:cd.geo(),wind:wd.geo(),firework:fw.geo(),meteor:mt.geo()};
   for(const k in itemGeos)itemGeos[k].userData={keep:true};
   return itemGeos;
 }
@@ -1165,7 +1213,7 @@ function makeHammer(hz){
   return g;
 }
 function makeCups(hz){
-  const g=new THREE.Group(),B=new Bake(),PR=hz.R+1.9,geos=getCupGeos();
+  const g=new THREE.Group(),B=new Bake(),PR=hz.R+1.5,geos=getCupGeos();
   B.add(G.cyl,0x7a3fa0,mat(0,.09,0,PR,.18,PR));
   B.add(G.circ,0xfff2d8,mat(0,.2,0,PR,PR,1,-Math.PI/2,0,0),[0xff8fb8,3]);
   g.add(B.mesh(MAT.lit));
@@ -1182,6 +1230,63 @@ function makeCups(hz){
     for(let j=0;j<cups.length;j++)cups[j].rotation.y=t*3.2*(j&1?1:-1);
     if(mid)mid.rotation.y=t*2.4;
   };
+  return g;
+}
+
+/* 굴러오는 대형 공 — 길을 가로질러 오가며 구른다(줄무늬 비치볼). 바닥에 오가는 길 표시 */
+function makeRoller(hz){
+  const g=new THREE.Group(),B=new Bake();
+  for(const x of [-7.6,7.6]){B.add(G.cyl,0x5b2f7d,mat(x,1.6,0,.5,3.2,.5));B.add(G.sph,0xffc533,mat(x,3.4,0,.6));}
+  for(let k=-6;k<=6;k+=2)B.add(G.box,(k/2)&1?0xffffff:0xff4d5e,mat(k,.05,0,2,.06,.5));
+  g.add(B.mesh(MAT.lit));
+  const ball=new THREE.Group(),R=hz.R,BB=new Bake();
+  BB.add(G.sph,0xffffff,mat(0,0,0,R));
+  const cols=[0xff4d5e,0xffc533,0x48a8ff,0x5ad86a];
+  for(let k=0;k<4;k++)BB.add(G.tor,cols[k],mat(0,0,0,R*.97,R*.97,R*1.4,0,k*Math.PI/4,0));
+  BB.add(G.sph,0xff4192,mat(0,R*.98,0,R*.22,R*.08,R*.22));BB.add(G.sph,0xff4192,mat(0,-R*.98,0,R*.22,R*.08,R*.22));
+  ball.add(BB.mesh(MAT.lit));g.add(ball);
+  const sh=new THREE.Mesh(G.circ,new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.22,depthWrite:false}));sh.material.userData={own:true};
+  sh.rotation.x=-Math.PI/2;sh.position.y=.08;sh.scale.set(R*1.1,R*1.1,1);g.add(sh);
+  hz.update=t=>{const u=rollerU(hz,t);ball.position.set(-u,R+.05,0);ball.rotation.set(0,0,u/R);sh.position.x=-u;};
+  return g;
+}
+/* 튀어 오르는 기둥 3개 — 1/3 박자씩 엇갈려 올라온다. 올라오기 직전 구멍 둘레가 빨갛게 깜빡인다 */
+function makePillars(hz){
+  const g=new THREE.Group(),B=new Bake();
+  for(const u of PIL_U){B.add(G.cyl,0x2a1838,mat(-u,.05,0,1.6,.1,1.6));}
+  g.add(B.mesh(MAT.lit));
+  const P=new Bake();
+  P.add(G.cyl,0xff4192,mat(0,0,0,1.25,2.6,1.25),[0xffffff,24]);
+  P.add(G.cyl,0xffc533,mat(0,1.35,0,1.35,.2,1.35));P.add(G.sph,0xfff27a,mat(0,1.5,0,.6,.45,.6));
+  const pg=P.geo(),pills=[],rings=[];
+  for(const u of PIL_U){
+    const m=new THREE.Mesh(pg,MAT.lit);m.position.set(-u,-1.4,0);g.add(m);pills.push(m);
+    const rm=new THREE.MeshBasicMaterial({color:0xff3b4f,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});rm.userData={own:true};
+    const r=new THREE.Mesh(G.torThin,rm);r.rotation.x=Math.PI/2;r.position.set(-u,.12,0);r.scale.set(1.75,1.75,3);g.add(r);rings.push(r);
+  }
+  hz.update=t=>{
+    for(let j=0;j<3;j++){
+      const up=pillarUp(hz,t,j);pills[j].position.y=-1.4+2.75*up;pills[j].visible=up>.02;
+      const x=((t/hz.T+hz.ph+j/3)%1+1)%1,warn=x>.82?((x*30|0)&1?1:.3):0;
+      rings[j].material.opacity=Math.max(warn,up>.5?.5:0);
+    }
+  };
+  return g;
+}
+/* 회전 막대 — 가운데 기둥에서 긴 막대가 빙글빙글. 막대가 길과 나란할 때 양옆으로 지나간다 */
+function makeSpinbar(hz){
+  const g=new THREE.Group(),B=new Bake();
+  B.add(G.cyl,0x7a3fa0,mat(0,.09,0,hz.L+.3,.18,hz.L+.3));
+  B.add(G.circ,0xfff2d8,mat(0,.2,0,hz.L+.1,hz.L+.1,1,-Math.PI/2,0,0),[0x9fe8ff,3]);
+  B.add(G.cyl,0xffc533,mat(0,1.6,0,1.1,3.2,1.1),[0xff4192,12]);
+  B.add(G.cone,0xff4192,mat(0,3.8,0,1.3,1.4,1.3));B.add(G.sph,0xfff27a,mat(0,4.6,0,.45));
+  g.add(B.mesh(MAT.lit));
+  const rotor=new THREE.Group();rotor.position.y=1.3;
+  const R=new Bake();
+  R.add(G.box,0x48e4ff,mat(0,0,0,hz.L*2,.7,.7),[0xffffff,6]);
+  for(const x of [-hz.L,hz.L]){R.add(G.sph,0xff4d5e,mat(x,0,0,.75));R.add(G.torThin,0xffc533,mat(x,0,0,.8,.8,3,0,0,Math.PI/2));}
+  rotor.add(R.mesh(MAT.lit));g.add(rotor);
+  hz.update=t=>{rotor.rotation.y=hz.w*t+hz.ph;};
   return g;
 }
 
@@ -1273,7 +1378,7 @@ function stepParticles(dt){
 const game={state:'home',trackIdx:-1,time:0,raceTime:0,countdown:0,lastCount:0,order:[],finishT:0,tix:0,tixTrick:0,tixLost:0,combo:0,comboT:0,paused:false,orbit:.7,shake:0,auto:false,preview:null,garageFrom:'home',hints:{},hintT:0,result:null,rush:0};
 const input={pid:null,ax:0,pAccel:false,pSteer:0,keys:{},kSteer:0,accel:false,steer:0};
 let world=null,track=null,cars=[],player=null,hazards=[],items=[],tix=[],pads=[],dyn=[],fx=[],tixMesh=null;
-const _m4=new THREE.Matrix4(),_q1=new THREE.Quaternion(),_q2=new THREE.Quaternion(),_v1=new V3(),_v2=new V3(),_one=new V3(1,1,1);
+const _qI=new THREE.Quaternion(),_m4=new THREE.Matrix4(),_q1=new THREE.Quaternion(),_q2=new THREE.Quaternion(),_v1=new V3(),_v2=new V3(),_one=new V3(1,1,1);
 const _zero=new THREE.Matrix4().makeScale(0,0,0);
 const S0=mkS(),S1=mkS();
 
@@ -1460,8 +1565,8 @@ function buildWorld(idx){
   /* hazards */
   hazards=tr.hazards;
   for(const hz of hazards){
-    const g=hz.type==='boat'?makeBoat(hz):hz.type==='hammer'?makeHammer(hz):makeCups(hz);
-    surf(tr,hz.s,hz.type==='cups'?hz.u0:0,0,S);g.position.copy(S.pos);basisQuat(S,g.quaternion);
+    const g=hz.type==='boat'?makeBoat(hz):hz.type==='hammer'?makeHammer(hz):hz.type==='roller'?makeRoller(hz):hz.type==='pillars'?makePillars(hz):hz.type==='spinbar'?makeSpinbar(hz):makeCups(hz);
+    surf(tr,hz.s,hz.u0||0,0,S);g.position.copy(S.pos);basisQuat(S,g.quaternion);
     hz.grp=g;world.add(g);
   }
   /* 길가 풍경 — 빛 받는 덩어리(B) · 스스로 빛나는 덩어리(E) · 전구 점으로 굽는다. 가로등 · 장식 · 원경은 트랙 분위기(th)마다 다르다 */
@@ -1718,7 +1823,7 @@ function aiStats(v){return {vmax:v,acc:21,hand:13,driftRate:.85,boostMul:1.27,bo
 function baseStats(){return {vmax:45,acc:20,hand:15,driftRate:1,boostMul:1.3,boostDur:1,spinoutDur:1,ticketLoss:3,scrape:.8,magnet:1,spinTix:1,shieldT:8};}
 function resetCar(c){
   Object.assign(c,{h:0,vy:0,v:0,uVel:0,air:false,airT:0,spins:0,spinning:false,spinP:0,spinDir:1,spinYaw:0,boostT:0,shield:0,armed:0,invuln:0,
-    spinout:0,spinoutMax:1,squash:0,driftT:0,driftDir:1,driftGrace:0,driftVis:0,steerVis:0,lastSteer:0,scrape:false,padCd:0,bumpCd:0,finished:false,finishT:0,rb:1,slots:[],slowT:0,starT:0,magT:0,itemHeld:0,aiItemT:0});
+    spinout:0,spinoutMax:1,squash:0,driftT:0,driftDir:1,driftGrace:0,driftVis:0,steerVis:0,lastSteer:0,scrape:false,padCd:0,bumpCd:0,finished:false,finishT:0,rb:1,slots:[],slowT:0,starT:0,magT:0,ghostT:0,itemHeld:0,aiItemT:0});
   c.ai={home:0,wf:.4+Math.random()*.5,wp:Math.random()*TAU,t:Math.random()*.1,lane:0,dec:new Map(),brakeT:0,greed:Math.random(),trick:false,trickDir:1,tubeAmp:Math.random()<.5?0:6+Math.random()*10,out:{accel:true,steer:0}};
 }
 function gridCars(){
@@ -1775,7 +1880,7 @@ function nearPlayer(c,d){return Math.abs(c.s-player.s)<d;}
 function boost(c,d){c.boostT=Math.max(c.boostT,d*c.st.boostDur);}
 function addTix(n,trick){game.tix+=n;if(trick)game.tixTrick+=n;}
 
-const HIT_TXT={hammer:'납작해졌어요!',boat:'바이킹에 쿵!',cups:'찻잔에 걸렸어요!',blast:'펑! 맞았어요',pop:'팝콘 폭탄에 맞았어요!',trap:'솜사탕에 미끄러졌어요!',wind:'회오리에 휘말렸어요!',star:'무지개 별에 튕겼어요!'};
+const HIT_TXT={hammer:'납작해졌어요!',boat:'바이킹에 쿵!',cups:'찻잔에 걸렸어요!',roller:'대형 공에 쿵!',pillars:'튀어나온 기둥에 쿵!',spinbar:'회전 막대에 맞았어요!',fire:'불꽃 미사일에 맞았어요!',meteor:'별똥별에 맞았어요!',blast:'펑! 맞았어요',pop:'팝콘 폭탄에 맞았어요!',trap:'솜사탕에 미끄러졌어요!',wind:'회오리에 휘말렸어요!',star:'무지개 별에 튕겼어요!'};
 function hit(c,kind){
   if(c.invuln>0||c.finished)return false;
   surf(track,c.s,c.u,1+c.h,S1);
@@ -1788,7 +1893,7 @@ function hit(c,kind){
   c.v*=kind==='blast'?.5:.38;c.invuln=c.spinout+1.3;c.driftT=0;c.boostT=0;
   if(kind==='hammer')c.squash=1;
   vsEv('hit',c,kind);
-  burst(S1.pos,16,[0xffc533,0xff4192,0xfff2d8],11,.55,14);
+  burst(S1.pos,16,[0xffc533,0xff4192,0xfff2d8],11,.55,14);kindFx(kind,S1.pos);
   if(c.isPlayer){
     const lost=Math.min(game.tix,c.st.ticketLoss);
     if(lost>0){game.tix-=lost;game.tixLost+=lost;burst(S1.pos,lost*4,0xffc533,8,.8,20);}
@@ -1810,8 +1915,8 @@ function blast(c){
 }
 /* ================= 아이템 — 상자를 지나면 무작위 아이템이 「아이템 칸」(2칸)에 들어가고, 원할 때 첫 칸부터 쓴다 =================
    나오는 확률은 순위로 정한다 — 앞설수록 방패 · 함정, 뒤처질수록 센 아이템(회오리 · 무지개 별은 뒤처진 차만). 컴퓨터 차도 상황을 보고 쓴다 */
-const ITEM_KEYS=['rocket','shield','blast','popcorn','candy','wind','magnet','star','balloon'];
-const ITEM_CODE='rsbpcwmtl'; // 대전 스냅숏에서 칸을 짧게 적는 글자(ITEM_KEYS 순서)
+const ITEM_KEYS=['rocket','shield','blast','popcorn','candy','wind','magnet','star','balloon','thunder','firework','ghost','meteor'];
+const ITEM_CODE='rsbpcwmtlzfgo'; // 대전 스냅숏에서 칸을 짧게 적는 글자(ITEM_KEYS 순서)
 const ITEM_SLOTS=3; // 아이템 칸 수 — 원하는 칸을 골라 쓴다
 const ITEM={
   rocket:{n:'로켓 부스트',ic:'🚀',col:0xff8a3c},
@@ -1822,7 +1927,11 @@ const ITEM={
   wind:{n:'회오리 바람',ic:'🌪️',col:0x9fe8ff},
   magnet:{n:'자석',ic:'🧲',col:0xd8d8f0},
   star:{n:'무지개 별',ic:'🌈',col:0xfff27a},
-  balloon:{n:'물풍선',ic:'💧',col:0x48a8ff}
+  balloon:{n:'물풍선',ic:'💧',col:0x48a8ff},
+  thunder:{n:'번개 구름',ic:'⚡',col:0xfff04a},
+  firework:{n:'불꽃 미사일',ic:'🎆',col:0xff5af0},
+  ghost:{n:'유령 망토',ic:'👻',col:0xc9a8ff},
+  meteor:{n:'별똥별 비',ic:'☄️',col:0xff7a2a}
 };
 const ITEM_COL={box:0xffc533};for(const k in ITEM)ITEM_COL[k]=ITEM[k].col;
 const slotsCode=c=>c.slots.map(k=>ITEM_CODE[ITEM_KEYS.indexOf(k)]).join('');
@@ -1834,7 +1943,8 @@ function leaderFor(c){let best=null;for(const o of cars){if(o===c||o.finished)co
 /* 순위로 고르기 — f: 0(1등) ~ 1(꼴찌) */
 function rollItem(c){
   const n=cars.length,f=n>1?clamp((c.place-1)/(n-1),0,1):0,first=c.place===1;
-  const w={rocket:10+20*f,shield:22-14*f,blast:10,popcorn:12,candy:22-16*f,wind:(!first&&f>=.5)?8*f:0,magnet:first?0:4+12*f,star:f>=.6?3*f:0,balloon:first?2:6+6*f};
+  const w={rocket:10+20*f,shield:22-14*f,blast:10,popcorn:12,candy:22-16*f,wind:(!first&&f>=.5)?8*f:0,magnet:first?0:4+12*f,star:f>=.6?3*f:0,balloon:first?2:6+6*f,
+    thunder:f>=.5?7*f:0,firework:first?0:6+6*f,ghost:first?2:5+5*f,meteor:first?3:6+4*f};
   let tot=0;for(const k in w)tot+=w[k];
   let r=Math.random()*tot;for(const k in w){r-=w[k];if(r<=0)return k;}
   return 'shield';
@@ -1855,6 +1965,35 @@ function wet(o){
   o.slowT=2.5;o.boostT=0;vsEv('wet',o);burst(S1.pos,22,[0x48a8ff,0xcff4ff],9,.55,10);
   if(o.isPlayer){toast('물풍선에 젖었어요!');Snd.pop();game.shake=Math.max(game.shake,.4);}
 }
+/* 화려한 효과 — 번개 줄기 · 불꽃놀이 · 별똥별 충격파(host · guest 모두 그린다) */
+function boltFx(pos){
+  const B=new Bake();let x=pos.x,y=pos.y+34,z=pos.z;
+  for(let k=0;k<9;k++){
+    const nx=pos.x+(k<8?(Math.random()-.5)*4.5:0),ny=pos.y+34-(k+1)*34/9,nz=pos.z+(k<8?(Math.random()-.5)*4.5:0);
+    beam(B,x,y,z,nx,ny,nz,.38,0xfffbd0);beam(B,x,y,z,nx,ny,nz,.9,0xfff04a);x=nx;y=ny;z=nz;
+  }
+  const m=new THREE.Mesh(B.geo(),new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  scene.add(m);fx.push({m:m,t:0,d:.45,bolt:true});
+  burst(pos,26,[0xfff04a,0xffffff,0x9fe8ff],12,.5,6);
+}
+function fireworkFx(pos){
+  const cols=[0xff4192,0xffc533,0x48e4ff,0xa5e02b,0xff5af0,0xffffff];
+  for(let k=0;k<3;k++){_v1.copy(pos);_v1.y+=2+k*2.5;burst(_v1,28,cols[(k*2)%6],16,.9,7);burst(_v1,14,cols[(k*2+1)%6],9,1.1,5);}
+  ringFx(pos,_qI,0xff5af0);
+}
+function meteorFx(pos){
+  burst(pos,40,[0xff7a2a,0xffc533,0xff4d5e,0xfff2d8],15,.8,16);
+  ringFx(pos,_qI,0xff7a2a);ringFx(pos,_qI,0xffc533);
+}
+function kindFx(kind,pos){if(kind==='fire')fireworkFx(pos);else if(kind==='meteor')meteorFx(pos);}
+function zap(o){
+  if(o.finished)return;
+  surf(track,o.s,o.u,1+o.h,S1);boltFx(S1.pos);vsEv('zap',o);
+  if(o.invuln>0)return;
+  if(o.shield>0){o.shield=0;o.invuln=1.2;burst(S1.pos,18,0x48e4ff,9,.5,6);vsEv('shd',o);if(o.isPlayer){toast('방패가 막아 줬어요');Snd.pop();}return;}
+  o.slowT=Math.max(o.slowT,2.4);o.boostT=0;o.squash=Math.max(o.squash,.7);
+  if(o.isPlayer){toast('번개에 맞아 느려졌어요!');Snd.hit();game.shake=Math.max(game.shake,.7);}
+}
 function useItem(c,idx){
   if(!c.slots.length||c.finished||c.spinout>0||game.state!=='race'||game.paused)return false;
   idx=Math.max(0,Math.min(c.slots.length-1,idx|0)); // 고른 칸(없는 칸이면 가장 가까운 칸)
@@ -1871,6 +2010,24 @@ function useItem(c,idx){
   else if(k==='magnet'){c.magT=3.2;if(me)Snd.pickup();}
   else if(k==='star'){c.starT=5;c.invuln=Math.max(c.invuln,5);boost(c,4);if(me)Snd.boost();}
   else if(k==='balloon'){const g=aheadOf(c,160);if(g)wet(g);}
+  else if(k==='thunder'){for(const o of cars){if(o===c||o.finished)continue;const d=o.s-c.s;if(d>0&&d<320)zap(o);}if(me){Snd.blast();game.shake=Math.max(game.shake,.4);}}
+  else if(k==='firework'){const g=aheadOf(c,220)||leaderFor(c);if(g)addObj({k:'firework',s:c.s+2,u:c.u,h:2.2,v:Math.max(c.v,30)+90,t:7,own:c,tgt:g});if(me)Snd.boost();}
+  else if(k==='ghost'){
+    c.ghostT=5;c.invuln=Math.max(c.invuln,5);boost(c,1.2);
+    const g=aheadOf(c,160);
+    if(g&&g.slots.length&&c.slots.length<ITEM_SLOTS){const st=g.slots.splice((Math.random()*g.slots.length)|0,1)[0];c.slots.push(st);vsEv('steal',g,st);vsEv('stole',c,st);
+      if(me)setTimeout(()=>toast(ITEM[st].ic+' '+ITEM[st].n+'을(를) 훔쳤어요!'),500);if(g.isPlayer)toast('유령이 아이템을 훔쳐 갔어요!');}
+    if(me)Snd.boost();
+  }
+  else if(k==='meteor'){
+    for(let i=0;i<6;i++){
+      let ts=c.s+45+i*24+Math.random()*10,tu=(Math.random()*2-1)*5.4;
+      const o=aheadOf(c,200);if(o&&i%2===0){ts=o.s+o.v*(.9+i*.2);tu=o.u;}
+      if(ts>track.finish+20)continue;
+      const fall=.9+i*.22;addObj({k:'meteor',s:ts,u:clamp(tu,-6,6),h:46,vh:46/fall,v:0,t:fall+.05,own:c});
+    }
+    if(me)Snd.boost();
+  }
   if(me)toast(ITEM[k].n+'!');
   return true;
 }
@@ -1885,6 +2042,18 @@ function stepObjs(dt){
     }else if(o.k==='popcorn'){
       o.s+=o.v*dt;
       for(const c of cars){if(c===o.own||c.finished)continue;if(Math.abs(c.s-o.s)<2.6&&Math.abs(udiff(c.u,o.u))<2.3&&c.h<3){hit(c,'pop');o.t=0;break;}}
+    }else if(o.k==='firework'){
+      const g=o.tgt;
+      if(!g||g.finished)o.t=0;
+      else{o.s+=o.v*dt;o.u+=udiff(g.u,o.u)*Math.min(1,4*dt);o.h+=(1.4+g.h-o.h)*Math.min(1,3*dt);if(o.s>=g.s-1.2){if(!hit(g,'fire')){surf(track,g.s,g.u,2+g.h,S1);fireworkFx(S1.pos);}o.t=0;}}
+    }else if(o.k==='meteor'){
+      o.h-=o.vh*dt;
+      if(o.h<=0){
+        surf(track,o.s,o.u,.4,S1);meteorFx(S1.pos);vsEv('boom',o.own,[r1(o.s),r2(o.u)]);
+        for(const c of cars){if(c===o.own||c.finished)continue;if(Math.abs(c.s-o.s)<4.2&&Math.abs(udiff(c.u,o.u))<3.6&&c.h<3)hit(c,'meteor');}
+        if(nearPlayer(o.own,80))Snd.blast();
+        o.t=0;
+      }
     }else if(o.k==='candy'){
       if(o.grace>0)o.grace-=dt;
       for(const c of cars){if(c.finished||(c===o.own&&o.grace>0))continue;if(Math.abs(c.s-o.s)<2.4&&Math.abs(udiff(c.u,o.u))<2.4&&c.h<1.2){hit(c,'trap');o.t=0;break;}}
@@ -1909,6 +2078,10 @@ function aiWants(c,k,ahead){
   if(k==='wind'||k==='star')return true;
   if(k==='magnet')return !!(ahead&&ahead.s-c.s<70);
   if(k==='balloon')return !!ahead;
+  if(k==='thunder'){for(const o of cars)if(o!==c&&!o.finished&&o.s>c.s&&o.s-c.s<320)return true;return false;}
+  if(k==='firework')return !!(ahead||leaderFor(c));
+  if(k==='ghost'){if(ahead&&ahead.slots.length&&ahead.s-c.s<150)return true;for(const hz of hazards){const d=hz.s-c.s;if(d>10&&d<45)return true;}return c.itemHeld>4;}
+  if(k==='meteor')return !!(ahead&&ahead.s-c.s<150);
   return false;
 }
 /* 컴퓨터 — 가진 칸 가운데 지금 쓰기 알맞은 것을 골라 쓴다(오래 들고 있으면 첫 칸이라도 쓴다) */
@@ -1920,7 +2093,7 @@ function aiItems(c,dt){
   if(c.itemHeld>9||c.slots.length>=ITEM_SLOTS)useItem(c,0);
 }
 /* 던진 것 그리기 — 모두 같은 도형 · 재질을 함께 쓰는 고정 묶음(트랙을 바꿔도 새로 만들지 않음) */
-const objPool=[];
+const objPool=[],markPool=[];let nMark=0;
 function renderObjs(list,tau){
   const ig=getItemGeos();
   for(let i=0;i<list.length;i++){
@@ -1928,9 +2101,16 @@ function renderObjs(list,tau){
     if(!m){m=new THREE.Mesh(ig.popcorn,MAT.unlit);m.frustumCulled=false;scene.add(m);objPool.push(m);}
     const geo=ig[o.k]||ig.popcorn;if(m.geometry!==geo)m.geometry=geo;
     surf(track,o.s+(o.v||0)*(tau||0),o.u,o.h,S1);m.position.copy(S1.pos);basisQuat(S1,m.quaternion);
-    m.rotateY(game.time*(o.k==='wind'?9:o.k==='popcorn'?6:1.2));m.visible=true;
+    if(o.k!=='firework')m.rotateY(game.time*(o.k==='wind'?9:o.k==='popcorn'?6:o.k==='meteor'?4:1.2));m.visible=true;
+    if(o.k==='firework'){m.rotateZ(game.time*12);for(let q=0;q<2;q++){_v1.copy(S1.pos).addScaledVector(S1.t,-1.4);emit(_v1.x,_v1.y,_v1.z,(Math.random()-.5)*5,(Math.random()-.5)*5,(Math.random()-.5)*5,.5,[0xff5af0,0xffc533,0x48e4ff,0xffffff][(Math.random()*4)|0],0);}}
+    else if(o.k==='meteor'){
+      for(let q=0;q<3;q++)emit(S1.pos.x+(Math.random()-.5)*1.6,S1.pos.y+1+Math.random()*2,S1.pos.z+(Math.random()-.5)*1.6,(Math.random()-.5)*2,6+Math.random()*4,(Math.random()-.5)*2,.5,Math.random()<.5?0xff7a2a:0xffc533,0);
+      let mk=markPool[nMark];if(!mk){const mm=new THREE.MeshBasicMaterial({map:TEX.target,color:0xff4d3a,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthWrite:false});mm.userData={own:true};mk=new THREE.Mesh(G.plane,mm);mk.frustumCulled=false;scene.add(mk);markPool.push(mk);}
+      nMark++;surf(track,o.s,o.u,.12,S1);mk.position.copy(S1.pos);basisQuat(S1,mk.quaternion);mk.rotateX(-Math.PI/2);const sc=3.2+Math.sin(game.time*14)*.5;mk.scale.set(sc*1.6,sc*1.6,1);mk.material.opacity=.45+.35*clamp(1-o.h/46,0,1);mk.visible=true;
+    }
   }
   for(let i=list.length;i<objPool.length;i++)objPool[i].visible=false;
+  for(let i=nMark;i<markPool.length;i++)markPool[i].visible=false;nMark=0;
 }
 /* 누르기 — 원하는 칸을 골라 쓴다. PC: E · Shift = 1번 칸, 1 · 2 · 3 = 그 칸 / 휴대폰: 왼쪽 아래 칸 단추.
    guest 는 누른 누적 횟수(u)와 최근 누른 칸 번호들(k)을 host 로 보낸다 */
@@ -1945,7 +2125,8 @@ function itemPress(idx){
 /* HUD — 아이템 칸 3개(같은 칸 정보 — 대전 guest 는 스냅숏의 내 칸). 새로 들어오면 짧게 돌아가다 멈추고 반짝, 쓰면 뒤 칸이 앞으로, 처음 얻은 종류는 한 줄 설명 */
 const slotHud={key:null,roll:[0,0,0],seen:{},tipT:0};
 const ITEM_TIP={rocket:'앞으로 쭉 질주해요',shield:'한 번 막아 줘요(8초)',blast:'둘레의 차를 튕겨요',popcorn:'앞 차에 던져요',candy:'뒤에 떨어뜨려 미끄러지게 해요',
-  wind:'1등 차를 찾아가 돌려요',magnet:'앞 차 쪽으로 끌려가며 빨라져요',star:'잠깐 무적 — 부딪힌 차를 튕겨요',balloon:'앞 차를 느리게 해요'};
+  wind:'1등 차를 찾아가 돌려요',magnet:'앞 차 쪽으로 끌려가며 빨라져요',star:'잠깐 무적 — 부딪힌 차를 튕겨요',balloon:'앞 차를 느리게 해요',
+  thunder:'앞선 차 모두에게 번개를 내려 느리게 해요',firework:'앞 차를 쫓아가 펑 터져요',ghost:'5초 동안 다 통과하고 앞 차 아이템을 훔쳐요',meteor:'앞길에 별똥별 여섯 개를 떨어뜨려요'};
 function replay(el,cls){el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);}
 function tickSlots(dt){
   const p=player,sl=p.slots||[],key=sl.join(',');
@@ -2000,7 +2181,7 @@ function aiInput(c,dt){
     const look=Math.max(26,c.v*1.25);
     if(ai.greed>.4){for(const it of items){if(!it.on)continue;const d=it.s-c.s;if(d>3&&d<look&&Math.abs(it.u-c.u)<4.5){lane=it.u;break;}}}
     for(const hz of hazards){
-      const d=hz.s-c.s,reach=hz.type==='cups'?hz.R+3:3;
+      const d=hz.s-c.s,reach=hz.type==='cups'?hz.R+3:hz.type==='spinbar'?hz.L+3:3;
       if(d<-reach-1||d>look)continue;
       let dec=ai.dec.get(hz);
       if(dec===undefined){dec=Math.random()<tr.def.mistake?0:1;ai.dec.set(hz,dec);}
@@ -2037,6 +2218,7 @@ function stepCar(c,dt,inp){
   if(c.boostT>0)c.boostT-=dt;
   if(c.slowT>0)c.slowT-=dt;
   if(c.starT>0)c.starT-=dt;
+  if(c.ghostT>0)c.ghostT-=dt;
   if(c.padCd>0)c.padCd-=dt;
   if(c.bumpCd>0)c.bumpCd-=dt;
   if(c.squash>0)c.squash=Math.max(0,c.squash-dt*1.5);
@@ -2115,6 +2297,7 @@ function collideCars(){
     if(ds>3.3||ds<-3.3)continue;
     let du=a.u-b.u;if(du>half)du-=2*half;else if(du<-half)du+=2*half;
     if(du>2.2||du<-2.2||Math.abs(a.h-b.h)>1.6)continue;
+    if(a.ghostT>0||b.ghostT>0)continue; // 유령 망토 — 부딪히지 않고 지나간다
     if(a.starT>0&&b.starT<=0)hit(b,'star');else if(b.starT>0&&a.starT<=0)hit(a,'star'); // 무지개 별 — 부딪힌 차를 튕긴다
     const sg=du>=0?1:-1,push=(2.2-Math.abs(du))*.5;
     const kick=VS.on?8:5;a.u+=sg*push;b.u-=sg*push;a.uVel+=sg*kick;b.uVel-=sg*kick;
@@ -2164,7 +2347,7 @@ function stepRace(dt){
   for(const it of items){
     if(!it.on){it.cd-=dt;if(it.cd<=0){it.on=true;it.grp.visible=true;}continue;}
     for(const c of cars){
-      if(Math.abs(c.s-it.s)<2.5&&Math.abs(c.u-it.u)<1.9&&c.h<2.6&&!c.finished&&c.slots.length<ITEM_SLOTS){it.on=false;it.cd=5;it.grp.visible=false;gainItem(c);break;} // 칸이 꽉 차면 안 먹힌다
+      if(Math.abs(c.s-it.s)<2.5&&Math.abs(c.u-it.u)<1.9&&c.h<2.6&&!c.finished&&c.slots.length<ITEM_SLOTS){it.on=false;it.cd=1.5;it.grp.visible=false;gainItem(c);break;} // 칸이 꽉 차면 안 먹힌다
     }
   }
   const p=player;
@@ -2209,16 +2392,18 @@ function placeCar(c,dt){
   b.rotation.set(c.air?clamp(-c.vy*.012,-.3,.3):0,yaw,c.steerVis*.1+c.driftDir*.12*c.driftVis);
   b.position.y=c.h;
   const sq=smooth(c.squash);b.scale.set(1+.25*sq,1-.55*sq,1+.25*sq);
-  b.visible=!(c.invuln>0&&c.spinout<=0&&!c.finished&&(Math.floor(game.time*14)&1));
+  b.visible=c.ghostT>0?((Math.floor(game.time*20)%3)!==0):!(c.invuln>0&&c.spinout<=0&&!c.finished&&(Math.floor(game.time*14)&1));
   const boosting=c.boostT>0;
   c.mFlame.visible=boosting;
   if(boosting)c.mFlame.scale.set(1,1,.8+Math.random()*.5);
-  c.mShield.visible=c.shield>0||c.starT>0;
-  if(c.mShield.visible){c.mShield.material.opacity=.2+.1*Math.sin(game.time*8);c.mShield.material.color.setHex(c.starT>0?[0xff5a5a,0xffd84a,0x5ad86a,0x5ab0ff][((game.time*10)|0)&3]:0x58e8ff);}
+  c.mShield.visible=c.shield>0||c.starT>0||c.ghostT>0;
+  if(c.mShield.visible){c.mShield.material.opacity=(c.ghostT>0?.32:.2)+.1*Math.sin(game.time*8);c.mShield.material.color.setHex(c.ghostT>0?0xb98cff:c.starT>0?[0xff5a5a,0xffd84a,0x5ad86a,0x5ab0ff][((game.time*10)|0)&3]:0x58e8ff);}
   c.mRing.visible=c.armed>0;
   if(c.armed>0){const r=2.3+.3*Math.sin(game.time*10);c.mRing.scale.set(r,r,r);}
   c.mUnder.material.opacity=.7*clamp(1-c.h/9,.25,1);
   if(dt<=0)return;
+  if(c.ghostT>0&&dt>0&&Math.random()<.6){_v1.copy(S1.pos).addScaledVector(S1.n,1+c.h+Math.random()*1.5);emit(_v1.x,_v1.y,_v1.z,(Math.random()-.5)*4,2+Math.random()*2,(Math.random()-.5)*4,.6,Math.random()<.5?0xc9a8ff:0xffffff,-2);}
+  if(c.starT>0&&dt>0&&Math.random()<.7){_v1.copy(S1.pos).addScaledVector(S1.n,.6+c.h).addScaledVector(S1.t,-2);emit(_v1.x,_v1.y,_v1.z,(Math.random()-.5)*2,1.5,(Math.random()-.5)*2,.7,[0xff5a5a,0xffd84a,0x5ad86a,0x5ab0ff,0xb98cff][(Math.random()*5)|0],0);}
   if(boosting&&Math.random()<.8){
     _v1.copy(S1.pos).addScaledVector(S1.n,.7+c.h).addScaledVector(S1.t,-2.3);
     emit(_v1.x,_v1.y,_v1.z,(Math.random()-.5)*3-S1.t.x*8,Math.random()*2,(Math.random()-.5)*3-S1.t.z*8,.35,Math.random()<.5?0xff8a3c:0xffe08a,0);
@@ -2315,6 +2500,7 @@ function tickHud(dt){
   if(p.slowT>0){key+='w';html+='<span class="chip sh">젖었어요</span>';}
   if(p.magT>0){key+='m'+Math.ceil(p.magT);html+='<span class="chip bo">자석 '+Math.ceil(p.magT)+'초</span>';}
   if(p.starT>0){key+='t'+Math.ceil(p.starT);html+='<span class="chip bl">무지개 별 '+Math.ceil(p.starT)+'초</span>';}
+  if(p.ghostT>0){key+='g'+Math.ceil(p.ghostT);html+='<span class="chip sh">유령 '+Math.ceil(p.ghostT)+'초</span>';}
   if(key!==hud.chips){hud.chips=key;$('hChips').innerHTML=html;}
   tickSlots(dt);
   const lv=p.driftT>2.1?3:p.driftT>1.25?2:p.driftT>.55?1:0;
@@ -2351,7 +2537,7 @@ function resetRace(){
   for(const hz of hazards)hz.prev=1;
   for(const f of fx){scene.remove(f.m);f.m.material.dispose();}
   fx=[];
-  objs=[];VS.gobjs=[];for(const m of objPool)m.visible=false;slotHud.key=null;slotHud.roll=[0,0,0];slotHud.tipT=0;$('itemTip').hidden=true;
+  objs=[];VS.gobjs=[];for(const m of objPool)m.visible=false;for(const m of markPool)m.visible=false;slotHud.key=null;slotHud.roll=[0,0,0];slotHud.tipT=0;$('itemTip').hidden=true;
   Object.assign(game,{raceTime:0,order:[],tix:0,tixTrick:0,tixLost:0,combo:0,comboT:0,shake:0,hints:{},hintT:0,result:null});
   hud.place=0;hud.tix=-1;hud.chips='x';hud.drift=-1;hud.time=-1;
   camInit=false;camU=player.u;
@@ -2619,7 +2805,7 @@ function update(dt){
     const f=fx[i];f.t+=dt;
     const k=f.t/f.d;
     if(k>=1){scene.remove(f.m);f.m.material.dispose();fx.splice(i,1);continue;}
-    f.m.scale.setScalar(2+17*k);f.m.material.opacity=1-k;
+    if(f.bolt)f.m.material.opacity=(1-k)*(Math.random()<.35?.35:1);else{f.m.scale.setScalar(2+17*k);f.m.material.opacity=1-k;}
   }
   stepParticles(dt);
   tickCamera(dt);
@@ -2812,10 +2998,11 @@ function vsSnap(force){
   if(!force&&now-VS.lastSnap<VS_SNAP_MS)return;
   VS.lastSnap=now;
   const cs=cars.map(c=>[r1(c.s),r2(c.u),r2(c.h),r1(c.v),r1(c.uVel),c.air?1:0,r1(c.vy),r2(Math.max(0,c.spinout)),r2(c.spinoutMax),r2(Math.max(0,c.boostT)),r1(Math.max(0,c.shield)),r1(Math.max(0,c.armed)),
-    r2(c.driftT),c.driftDir,c.spinning?r2(c.spinP):-1,c.spinDir,r2(c.squash),r2(Math.max(0,c.invuln)),c.finished?r2(c.finishT):-1,r2(c.lastSteer||0),c.lastAccel?1:0,c.spins|0,r2(Math.max(0,c.slowT)),r2(Math.max(0,c.starT)),slotsCode(c),r1(Math.max(0,c.magT))]);
+    r2(c.driftT),c.driftDir,c.spinning?r2(c.spinP):-1,c.spinDir,r2(c.squash),r2(Math.max(0,c.invuln)),c.finished?r2(c.finishT):-1,r2(c.lastSteer||0),c.lastAccel?1:0,c.spins|0,r2(Math.max(0,c.slowT)),r2(Math.max(0,c.starT)),slotsCode(c),r1(Math.max(0,c.magT)),r1(Math.max(0,c.ghostT||0))]);
   let it='';for(const x of items)it+=x.on?'1':'0';
   const ph=PH[game.state];if(ph===undefined)return;
-  const ob=objs.map(o=>[o.k==='popcorn'?'p':o.k==='candy'?'c':'w',r1(o.s),r2(o.u),r1(o.k==='candy'?0:o.v)]);
+  const OK={popcorn:'p',candy:'c',wind:'w',firework:'f',meteor:'m'};
+  const ob=objs.map(o=>[OK[o.k]||'w',r1(o.s),r2(o.u),r1(o.k==='candy'||o.k==='meteor'?0:o.v),r1(o.h)]);
   const d={e:VS.e,ph:ph,cd:r2(game.countdown),t:r2(game.time),rt:r2(game.raceTime),c:cs,it:it,ob:ob,fz:game.paused?1:0,ho:r2(VS.hold),ev:VS.evq};
   VS.evq=[];
   vsPost({type:'vs:snap',d:d});
@@ -2892,14 +3079,14 @@ function vsGuestStep(dt){
     c.driftT=b[12];c.driftDir=b[13]||1;c.spinning=b[14]>=0;c.spinP=c.spinning?Math.min(.99,b[14]+tau/.44):0;c.spinDir=b[15]||1;
     c.squash=Math.max(0,b[16]-tau*1.5);c.invuln=Math.max(0,b[17]-tau);
     c.finished=fin;c.finishT=fin?b[18]:0;c.lastSteer=mine&&!fin?steer:b[19];c.spins=b[21];
-    c.slowT=Math.max(0,(b[22]||0)-tau);c.starT=Math.max(0,(b[23]||0)-tau);c.slots=slotsFrom(b[24]);c.magT=Math.max(0,(b[25]||0)-tau);
+    c.slowT=Math.max(0,(b[22]||0)-tau);c.starT=Math.max(0,(b[23]||0)-tau);c.slots=slotsFrom(b[24]);c.magT=Math.max(0,(b[25]||0)-tau);c.ghostT=Math.max(0,(b[26]||0)-tau);
   }
   // 순위 — 들어온 차는 들어온 순서, 아니면 앞선 차
   const arr=cars.slice().sort((a,b)=>(a.finished&&b.finished)?a.finishT-b.finishT:a.finished?-1:b.finished?1:b.s-a.s);
   for(let i=0;i<arr.length;i++)arr[i].place=i+1;
   // 던진 것 · 함정 — host 가 알려 준 자리(움직이는 것은 지난 시간만큼 앞으로)
-  const KO={p:'popcorn',c:'candy',w:'wind'};VS.gtau=frozen?0:Math.min(.4,age);
-  VS.gobjs=Array.isArray(L.ob)?L.ob.filter(o=>Array.isArray(o)&&KO[o[0]]).slice(0,24).map(o=>({k:KO[o[0]],s:+o[1]||0,u:+o[2]||0,v:+o[3]||0,h:o[0]==='c'?.15:o[0]==='p'?1.2:1.6})):[];
+  const KO={p:'popcorn',c:'candy',w:'wind',f:'firework',m:'meteor'};VS.gtau=frozen?0:Math.min(.4,age);
+  VS.gobjs=Array.isArray(L.ob)?L.ob.filter(o=>Array.isArray(o)&&KO[o[0]]).slice(0,24).map(o=>({k:KO[o[0]],s:+o[1]||0,u:+o[2]||0,v:+o[3]||0,h:o[4]!==undefined?+o[4]||0:o[0]==='c'?.15:o[0]==='p'?1.2:1.6})):[];
   if(L.it&&L.it.length===items.length){
     for(let i=0;i<items.length;i++){const on=L.it.charCodeAt(i)===49;if(items[i].on!==on){items[i].on=on;items[i].grp.visible=on;}}
   }
@@ -2911,10 +3098,14 @@ function vsPlayEv(ev){
   if(!c||!track)return;
   const mine=c===player;
   surf(track,c.s,c.u,1+c.h,S1);
-  if(k==='hit'){burst(S1.pos,16,[0xffc533,0xff4192,0xfff2d8],11,.55,14);if(mine){game.shake=1;Snd.hit();toast(HIT_TXT[a]||HIT_TXT.blast);}}
+  if(k==='hit'){burst(S1.pos,16,[0xffc533,0xff4192,0xfff2d8],11,.55,14);kindFx(a,S1.pos);if(mine){game.shake=1;Snd.hit();toast(HIT_TXT[a]||HIT_TXT.blast);}}
   else if(k==='shd'){burst(S1.pos,18,0x48e4ff,9,.5,6);if(mine){toast('방패가 막아 줬어요');Snd.pop();}}
   else if(k==='get'){burst(S1.pos,10,ITEM_COL.box,7,.4,4);if(mine)Snd.pickup();}
-  else if(k==='use'){if(ITEM[a]){burst(S1.pos,14,ITEM[a].col,8,.45,4);if(mine){toast(ITEM[a].n+'!');if(a==='rocket'||a==='star'||a==='wind')Snd.boost();else Snd.pickup();}}}
+  else if(k==='zap'){boltFx(S1.pos);if(mine&&c.invuln<=0&&c.shield<=0){toast('번개에 맞아 느려졌어요!');Snd.hit();game.shake=Math.max(game.shake,.7);}}
+  else if(k==='boom'){if(Array.isArray(a)){surf(track,+a[0]||0,+a[1]||0,.4,S1);meteorFx(S1.pos);if(Math.abs((+a[0]||0)-player.s)<80)Snd.blast();}}
+  else if(k==='steal'){if(mine)toast('유령이 아이템을 훔쳐 갔어요!');}
+  else if(k==='stole'){if(mine&&ITEM[a])toast(ITEM[a].ic+' '+ITEM[a].n+'을(를) 훔쳤어요!');}
+  else if(k==='use'){if(ITEM[a]){burst(S1.pos,14,ITEM[a].col,8,.45,4);if(mine){toast(ITEM[a].n+'!');if(a==='rocket'||a==='star'||a==='wind'||a==='firework'||a==='ghost'||a==='meteor')Snd.boost();else if(a==='thunder')Snd.blast();else Snd.pickup();}}}
   else if(k==='wet'){burst(S1.pos,22,[0x48a8ff,0xcff4ff],9,.55,10);if(mine){toast('물풍선에 젖었어요!');Snd.pop();game.shake=Math.max(game.shake,.4);}}
   else if(k==='blast'){ringFx(c.root.position,c.root.quaternion,0xff4192);Snd.blast();if(mine)toast('범퍼 폭발!');else game.shake=Math.max(game.shake,.5);}
   else if(k==='trick'){if(mine){const tk=2*(a|0);toast((a|0)>1?'회전 ×'+a:'회전!');void tk;Snd.trick();}burst(S1.pos,8,0xfff2d8,6,.35,8);}
