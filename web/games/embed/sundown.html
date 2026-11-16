@@ -2881,8 +2881,9 @@ const VS_LIMIT=180,VS_SNAP_MS=66,VS_START=31,VS_MAX=6;
 const vsGrace=()=>cars.length>=3?20:12; // 누구든 처음 들어온 뒤 기다리는 시간
 const VS_LEVEL={easy:39,normal:42.5,hard:45.5};
 VS.on=VSM;Object.assign(VS,{role:'solo',me:0,track:0,rids:['bunny','fox'],names:['나','상대'],bots:[1],humans:1,level:'normal',e:0,remote:{},evq:[],snaps:[],seq:0,
-  lastSnap:0,ended:false,endT:0,firstT:0,freeze:{},hold:0,rtt:120,useN:0,useK:'',useU:{},gobjs:[],gtau:0,avatars:[],autoIn:{accel:false,steer:0},lastIn:null,lastInT:0,err:[],shown:-1,stale:false,auto:false,keys:{}});
+  lastSnap:0,ended:false,endT:0,firstT:0,freeze:{},hold:0,rtt:120,off:null,offFz:false,jit:20,rT:null,lastL:null,evd:[],ih:[],useN:0,useK:'',useU:{},gobjs:[],gtau:0,avatars:[],autoIn:{accel:false,steer:0},lastIn:null,lastInT:0,err:[],shown:-1,stale:false,auto:false,keys:{}});
 const DEVHOST=/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)||/\.(test|localhost)$/.test(location.hostname);
+if(VSM&&DEVHOST)window.__sdv={VS:VS,game:game,get cars(){return cars;}}; // 시험(개발 주소만) — 대전 끊김 재기용
 function vsEv(k,c,a){if(VS.on&&VS.role==='host'&&VS.evq.length<48)VS.evq.push(a===undefined?[k,c.id]:[k,c.id,a]);}
 /* 이름표 — 동그란 프로필 사진 + 이름. 사진이 없거나 못 불러오면 이름 첫 글자(레이서 색 동그라미), 컴퓨터는 로봇 표시 + 「컴퓨터 ○○」.
    사진 주소는 같은 사이트의 /api/ · /assets/ 로 시작할 때만 쓴다(다른 사이트 주소는 무시). 불러오면 캔버스에 다시 그려 텍스처를 갱신한다 */
@@ -2957,7 +2958,7 @@ function vsSetup(o){
   VS.level=VS_LEVEL[o.level]?o.level:'normal';
   VS.e=Number(o.e)||0;VS.auto=!!o.auto&&DEVHOST;game.auto=VS.auto;
   if(typeof o.mute==='boolean'){save.mute=o.mute;Snd.setMute(save.mute);}
-  Object.assign(VS,{snaps:[],seq:0,evq:[],ended:false,endT:0,firstT:0,freeze:{},hold:0,err:[],shown:-1,stale:false,remote:{},lastIn:null,result:null,useN:0,useK:'',useU:{},gobjs:[],gtau:0});
+  Object.assign(VS,{snaps:[],seq:0,evq:[],off:null,offFz:false,jit:20,rT:null,lastL:null,evd:[],ih:[],ended:false,endT:0,firstT:0,freeze:{},hold:0,err:[],shown:-1,stale:false,remote:{},lastIn:null,result:null,useN:0,useK:'',useU:{},gobjs:[],gtau:0});
   game.paused=false;show('pause',false);$('hint').hidden=true;game.hintT=0;
   loadTrack(VS.track);vsCars();resetRace();
   setState('vswait');
@@ -3010,7 +3011,7 @@ const PH={countdown:0,race:1,finish:2};
 function vsSnap(force){
   const now=performance.now();
   if(!force&&now-VS.lastSnap<VS_SNAP_MS)return;
-  VS.lastSnap=now;
+  VS.lastSnap=force||now-VS.lastSnap>2*VS_SNAP_MS?now:VS.lastSnap+VS_SNAP_MS; // 남는 시간을 넘겨 화면 빠르기와 상관없이 고르게(초당 15번)
   const cs=cars.map(c=>[r1(c.s),r2(c.u),r2(c.h),r1(c.v),r1(c.uVel),c.air?1:0,r1(c.vy),r2(Math.max(0,c.spinout)),r2(c.spinoutMax),r2(Math.max(0,c.boostT)),r1(Math.max(0,c.shield)),r1(Math.max(0,c.armed)),
     r2(c.driftT),c.driftDir,c.spinning?r2(c.spinP):-1,c.spinDir,r2(c.squash),r2(Math.max(0,c.invuln)),c.finished?r2(c.finishT):-1,r2(c.lastSteer||0),c.lastAccel?1:0,c.spins|0,r2(Math.max(0,c.slowT)),r2(Math.max(0,c.starT)),slotsCode(c),r1(Math.max(0,c.magT)),r1(Math.max(0,c.ghostT||0))]);
   let it='';for(const x of items)it+=x.on?'1':'0';
@@ -3023,12 +3024,15 @@ function vsSnap(force){
 }
 /* guest — 받은 상태를 앞으로 내다보기(입력 · 차선 힘 · 터널 · 벽만 — 부딪힘 · 장애물은 host 가 정한다) */
 const _PS=mkS(),VST=baseStats();
-function vsPredict(b,tau,acc,steer,cst){
+// H · t0 를 주면(내 차) 조작을 지금 것 하나가 아니라 그때그때 누른 기록(H = [[내 시각 ms, 달리기, 방향] …])으로 다시 돌린다 — t0 = 시작 때 내 시각
+function vsPredict(b,tau,acc,steer,cst,H,t0){
   let s=b[0],u=b[1],v=b[3],uv=b[4],sp=b[7],bo=b[9];
   const air=b[5]===1,st=cst||VST,half=Math.PI*TUBE_R;
-  let left=Math.min(.4,Math.max(0,tau));
+  let left=Math.min(.8,Math.max(0,tau)),el=0,hi=0;
   while(left>1e-4){
     const dt=Math.min(1/60,left);left-=dt;
+    if(H&&H.length){const tm=t0+el*1000;while(hi<H.length-1&&H[hi+1][0]<=tm)hi++;acc=H[hi][1];steer=H[hi][2];}
+    el+=dt;
     surf(track,s,u,0,_PS);
     const k=_PS.k,inTube=(_PS.fl&F_TUBE)!==0;
     let stv=steer;const belt=!air&&(_PS.fl&F_BELT)!==0;
@@ -3046,14 +3050,71 @@ function vsPredict(b,tau,acc,steer,cst){
   }
   return [s,u,v,uv];
 }
+/* guest — 받은 소식(스냅숏)으로 그리기
+   · 시계: 소식마다 「받은 때 - host 시계(t)」를 재서 가장 빨리 온 값(망 흔들림을 뺀 값)을 기준(VS.off)으로 삼는다 → 소식이 들쭉날쭉 와도 매끄러운 host 시계
+   · 남의 차: 그 시계보다 vsDelay()초(흔들림에 따라 0.1~0.3초) 늦은 때의 앞뒤 소식 사이를 이어 그린다(보간) — 소식이 늦게 와도 멈추거나 튀지 않는다.
+     늦게 그린 만큼은 달리는 방향(s)으로 「속도 × 늦은 시간」을 더해 내 차와 같은 때로 맞춘다(나란히 달리면 나란히 보이게)
+   · 내 차: 마지막 소식에서 지금 내 조작으로 왕복 지연만큼 앞으로 내다본다
+   · 새 소식으로 그릴 자리가 바뀌면 같은 때의 옛 자리와 새 자리 차이를 기억했다가 0.1초쯤에 걸쳐 줄인다(뚝 튀지 않게) */
+function vsSnapIn(s){
+  const now=performance.now(),P=VS.snaps[VS.snaps.length-1];
+  s.recv=now;
+  if(P&&s.t<P.t-1e-3){if(P.t-s.t<1)return;VS.snaps.length=0;VS.off=null;VS.rT=null;} // 순서가 바뀐 옛 소식은 버리고, 크게 거꾸로면 host 시계가 처음부터 다시(새 출발)
+  s.seq=++VS.seq;
+  VS.snaps.push(s);if(VS.snaps.length>40)VS.snaps.shift();
+  // 멈춤(fz) · 다시 출발 세기(ho) 동안은 host 시계가 서 있다 → 기준을 재지 않고, 풀린 뒤 첫 소식으로 다시 잡는다
+  const off=now-s.t*1000;
+  if(s.fz===1||s.ho>0)VS.offFz=true;
+  else if(VS.off===null||VS.offFz||(P&&now-P.recv>1000)){VS.off=off;VS.offFz=false;VS.rT=null;}
+  else if(off<VS.off){VS.jit*=.95;VS.off=off;}
+  else{const x=off-VS.off;VS.jit+=(Math.min(x,400)-VS.jit)*.05;VS.off+=x*.01;}
+}
+const vsDelay=()=>clamp(VS_SNAP_MS/1000+.025+2*VS.jit/1000,.1,.3);
+function vsMineIn(b,fin,ph){ // 내 차 — 지금 내 조작
+  if(fin)return [false,clamp(-b[1]/4,-1,1)];
+  const ia=game.auto?VS.autoIn:input;return [ph===1&&!!ia.accel,ph===1?ia.steer:0];
+}
+function vsFwd(b,tau,mine,ph,cst){ // 소식 하나(차 한 대)에서 tau 초 앞으로
+  const fin=b[18]>=0;let acc=b[20]===1,steer=b[19];
+  // 내 차 — host 가 아직 못 받은 내 조작(tau 초 동안 누른 기록)을 차례로 다시 돌린다
+  if(mine&&!fin&&ph===1)return vsPredict(b,tau,acc,steer,cst,VS.ih,performance.now()-tau*1000);
+  if(mine){const x=vsMineIn(b,fin,ph);acc=x[0];steer=x[1];}else if(fin){acc=false;steer=clamp(-b[1]/4,-1,1);}
+  return vsPredict(b,tau,acc,steer,cst);
+}
+function vsAt(i,T,cst){ // 남의 차 — host 시각 T 의 자리 [s, u, h, v, uVel, 기준 소식 줄, 그 소식 뒤 지난 초]
+  const S=VS.snaps,half=Math.PI*TUBE_R;let k=S.length-1;
+  while(k>0&&S[k].t>T)k--;
+  const A=S[k],a=A.c[i],B=S[k+1];
+  if(T<=A.t)return [a[0],a[1],a[2],a[3],a[4],a,0];
+  if(B&&B.t>A.t+1e-4){
+    const b=B.c[i],f=(T-A.t)/(B.t-A.t);
+    if(Math.abs(b[0]-a[0])<40){
+      let du=b[1]-a[1];if(du>half)du-=2*half;else if(du<-half)du+=2*half;
+      let u=a[1]+du*f;if(u>half)u-=2*half;else if(u<-half)u+=2*half;
+      return [a[0]+(b[0]-a[0])*f,u,a[2]+(b[2]-a[2])*f,a[3]+(b[3]-a[3])*f,a[4]+(b[4]-a[4])*f,a,T-A.t];
+    }
+    return f<.5?[a[0],a[1],a[2],a[3],a[4],a,T-A.t]:[b[0],b[1],b[2],b[3],b[4],b,T-B.t]; // 크게 뛴 곳(다시 놓기 등)은 잇지 않는다
+  }
+  // 다음 소식이 아직 안 왔다 — 마지막 소식에서 내다본다(최대 0.4초)
+  const tau=Math.min(.4,T-A.t),p=vsFwd(a,tau,false,A.ph,cst);
+  return [p[0],p[1],a[5]===1?Math.max(0,a[2]+a[6]*tau-.5*G_AIR*tau*tau):0,p[2],p[3],a,tau];
+}
 function vsGuestStep(dt){
   const L=VS.snaps[VS.snaps.length-1];
   if(!L)return;
   const now=performance.now(),age=(now-L.recv)/1000;
-  const frozen=L.fz===1||L.ho>0;
-  const tau=frozen||L.ph===0?0:Math.min(.4,age+VS.rtt/1000);
+  const frozen=L.fz===1||L.ho>0,rtt=VS.rtt/1000;
+  const hostNow=VS.off===null?L.t+Math.min(.4,age):(now-VS.off)/1000; // 가장 빨리 온 길 기준 host 시계
+  // 남의 차를 그릴 host 시각(VS.rT) — 목표(hostNow - 지연)를 따라가되 빠르기는 ±10% 안에서만 바꾼다(크게 어긋나면 바로 맞춤)
+  const tgt=hostNow-vsDelay();let reset=false;
+  if(VS.rT===null||Math.abs(tgt-VS.rT)>.5){VS.rT=tgt;reset=true;}
+  else if(!frozen)VS.rT+=dt*(1+clamp((tgt-VS.rT)*2,-.1,.1));
+  if(VS.rT>L.t+.4)VS.rT=L.t+.4;
+  if(frozen&&VS.rT>L.t)VS.rT=L.t;
+  if(VS.rT<VS.snaps[0].t)VS.rT=VS.snaps[0].t;
+  const rT=VS.rT,lead=frozen||L.ph===0?0:Math.min(.45,hostNow-rT+rtt); // 남의 차를 내 차와 같은 때로 맞출 시간
   // 시계 — 장애물(바이킹 · 망치 · 찻잔)은 host 시계로 움직인다
-  const tt=L.t+(frozen?0:Math.min(.4,age+VS.rtt/2000));
+  const tt=frozen?L.t:Math.min(L.t+.4,hostNow+rtt/2);
   if(Math.abs(game.time-tt)>.25)game.time=tt;else game.time+=(tt-game.time)*Math.min(1,6*dt);
   game.raceTime=L.rt+(L.ph===1&&!frozen?Math.min(.4,age):0);
   // 단계 — 세기 · 경주 · 끝
@@ -3067,32 +3128,60 @@ function vsGuestStep(dt){
   // 다시 출발 세기(멈췄다 이어 갈 때)
   if(L.ho>0){const n=Math.max(1,Math.ceil(L.ho-Math.min(.4,age)));if(VS.shown!==n){VS.shown=n;$('count').textContent=n;show('count',true);Snd.beep(false);}}
   else if(VS.shown>0){VS.shown=-1;show('count',false);if(game.state==='race'){toast('다시 출발!');Snd.beep(true);}}
-  const half=Math.PI*TUBE_R,newSnap=L.seq!==VS.applied;
-  VS.applied=L.seq;
+  // 내 조작 기록(최근 1초) — 내 차를 내다볼 때 다시 돌린다
+  {const ia=game.auto?VS.autoIn:input,H=VS.ih;H.push([now,!!ia.accel,clamp(ia.steer||0,-1,1)]);let n=0;while(n<H.length-1&&H[n+1][0]<now-1000)n++;if(n)H.splice(0,n);}
+  const half=Math.PI*TUBE_R,newSnap=L.seq!==VS.applied,Pv=VS.lastL&&VS.lastL!==L?VS.lastL:null;
+  VS.applied=L.seq;VS.lastL=L;
+  // 남의 차 일(부딪힘 · 아이템 …) — 그 차를 그 때로 그릴 때 보여 준다
+  while(VS.evd.length&&(VS.evd[0][0]<=rT||now-VS.evd[0][1]>600))vsPlayEv(VS.evd.shift()[2]);
   for(let i=0;i<cars.length;i++){
-    const c=cars[i],b=L.c[i];if(!b)continue;
-    const mine=i===VS.me,fin=b[18]>=0;
-    let acc=b[20]===1,steer=b[19];
-    if(fin){acc=false;steer=clamp(-b[1]/4,-1,1);}
-    else if(mine){const ia=game.auto?VS.autoIn:input;acc=L.ph===1&&!!ia.accel;steer=L.ph===1?ia.steer:0;}
-    const p=vsPredict(b,tau,acc,steer,c.bot?c.st:null);
-    // 새 소식이 오면 그동안 그린 자리와의 차이를 기억했다가 0.15초쯤에 걸쳐 줄인다(뚝 튀지 않게)
-    let e=VS.err[i];
-    if(newSnap&&e&&e.has){
-      let du=e.u-p[1];if(du>half)du-=2*half;else if(du<-half)du+=2*half;
-      const ds=e.s-p[0];
+    const c=cars[i],b0=L.c[i];if(!b0)continue;
+    const mine=i===VS.me,cst=c.bot?c.st:null;
+    let e=VS.err[i];if(!e)e=VS.err[i]={ds:0,du:0,has:false,s:0,u:0,lo:0};
+    let s,u,h,v,uv,b,tau;
+    if(mine){
+      const tm=frozen||L.ph===0?0:clamp(hostNow-L.t+rtt,0,.8),p=vsFwd(b0,tm,true,L.ph,cst); // 소식이 늦어도 멈춰 보이지 않게 0.8초까지 내다본다
+      // 새 소식 — 같은 때 옛 소식으로 본 자리와의 차이
+      if(newSnap&&Pv&&Pv.c[i]&&e.has&&!reset){
+        const to=frozen||Pv.ph===0?0:clamp(hostNow-Pv.t+rtt,0,.8),q=vsFwd(Pv.c[i],to,true,Pv.ph,cst);
+        let du=q[1]-p[1];if(du>half)du-=2*half;else if(du<-half)du+=2*half;
+        const ds=q[0]-p[0];
+        if(Math.abs(e.ds+ds)<10&&Math.abs(e.du+du)<4){e.ds+=ds;e.du+=du;}else{e.ds=0;e.du=0;}
+      }
+      s=p[0];u=p[1];v=p[2];uv=p[3];b=b0;tau=tm;
+      h=b0[5]===1?Math.max(0,b0[2]+b0[6]*tm-.5*G_AIR*tm*tm):0;
+      e.lo=0;
+    }else{
+      const r=vsAt(i,rT,cst);
+      // 새 소식 — 마지막 소식에서 내다보던 중이었으면 그 자리와 이은 자리의 차이
+      if(newSnap&&Pv&&Pv.c[i]&&e.has&&!reset&&rT>Pv.t){
+        const tp=Math.min(.4,rT-Pv.t),q=vsFwd(Pv.c[i],tp,false,Pv.ph,cst);
+        let du=q[1]-r[1];if(du>half)du-=2*half;else if(du<-half)du+=2*half;
+        const ds=q[0]-r[0];
+        if(Math.abs(e.ds+ds)<10&&Math.abs(e.du+du)<4){e.ds+=ds;e.du+=du;}else{e.ds=0;e.du=0;}
+      }
+      s=r[0];u=r[1];h=r[2];v=r[3];uv=r[4];b=r[5];tau=r[6];
+      const fin=b[18]>=0;
+      // 부딪혀 갑자기 느려져도 앞당긴 몫은 천천히(그 차 속도의 절반까지만) 줄여 차가 서 버린 듯 보이지 않게
+      e.lo+=Math.max(-.5*Math.max(0,v)*dt,((fin?0:Math.max(0,v)*lead)-e.lo)*Math.min(1,5*dt));
+      s+=e.lo;
+    }
+    if(reset&&e.has){ // 시계를 크게 맞춘 때 — 그리던 자리에서 이어 간다
+      let du=e.u-u;if(du>half)du-=2*half;else if(du<-half)du+=2*half;
+      const ds=e.s-s;
       if(Math.abs(ds)<10&&Math.abs(du)<4){e.ds=ds;e.du=du;}else{e.ds=0;e.du=0;}
     }
-    if(!e)e=VS.err[i]={ds:0,du:0,has:false,s:0,u:0};
     const k=Math.exp(-11*dt);e.ds*=k;e.du*=k;
-    c.s=p[0]+e.ds;c.u=p[1]+e.du;c.v=p[2];c.uVel=p[3];
+    let cs=s+e.ds;
+    if(!mine&&e.has&&!frozen&&v>1&&cs<e.s&&e.s-cs<10)cs=e.s; // 달리는 남의 차가 뒤로 밀려 보이지 않게(부딪혀 갑자기 느려질 때)
+    c.s=cs;c.u=u+e.du;c.v=v;c.uVel=uv;
     e.s=c.s;e.u=c.u;e.has=true;
-    c.air=b[5]===1;c.vy=b[6];
-    c.h=c.air?Math.max(0,b[2]+b[6]*tau-.5*G_AIR*tau*tau):0;
+    c.air=b[5]===1;c.vy=b[6];c.h=h;
     c.spinout=Math.max(0,b[7]-tau);c.spinoutMax=b[8]||1;c.boostT=Math.max(0,b[9]-tau);c.shield=Math.max(0,b[10]-tau);c.armed=b[11];
     c.driftT=b[12];c.driftDir=b[13]||1;c.spinning=b[14]>=0;c.spinP=c.spinning?Math.min(.99,b[14]+tau/.44):0;c.spinDir=b[15]||1;
     c.squash=Math.max(0,b[16]-tau*1.5);c.invuln=Math.max(0,b[17]-tau);
-    c.finished=fin;c.finishT=fin?b[18]:0;c.lastSteer=mine&&!fin?steer:b[19];c.spins=b[21];
+    const fin=b[18]>=0;
+    c.finished=fin;c.finishT=fin?b[18]:0;c.lastSteer=mine&&!fin?vsMineIn(b,fin,L.ph)[1]:b[19];c.spins=b[21];
     c.slowT=Math.max(0,(b[22]||0)-tau);c.starT=Math.max(0,(b[23]||0)-tau);c.slots=slotsFrom(b[24]);c.magT=Math.max(0,(b[25]||0)-tau);c.ghostT=Math.max(0,(b[26]||0)-tau);
   }
   // 순위 — 들어온 차는 들어온 순서, 아니면 앞선 차
@@ -3204,9 +3293,9 @@ if(VS.on){
       const s=d.d;
       if(VS.role!=='guest'||!s||!Array.isArray(s.c)||s.c.length!==cars.length)return;
       if(VS.e&&s.e!==VS.e)return; // 다른 경주의 소식
-      s.recv=performance.now();s.seq=++VS.seq;
-      VS.snaps.push(s);if(VS.snaps.length>4)VS.snaps.shift();
-      if(Array.isArray(s.ev))for(const ev of s.ev)vsPlayEv(ev);
+      vsSnapIn(s);
+      // 일 — 내 차 일 · 자리로 알리는 일(운석)은 바로, 남의 차 일은 그 차를 그 때로 그릴 때(vsGuestStep)
+      if(Array.isArray(s.ev))for(const ev of s.ev){if(!Array.isArray(ev))continue;if(ev[1]===VS.me||(ev[0]==='bump'&&ev[2]===VS.me)||ev[0]==='boom')vsPlayEv(ev);else if(VS.evd.length<200)VS.evd.push([s.t,s.recv,ev]);}
     }
     else if(t==='vs:end'){if(VS.role==='guest'&&!VS.ended){VS.ended=true;setState('finish');game.finishT=1e9;}}
     else if(t==='vs:freeze')vsFreeze(!!d.on,d.why,d.hold);

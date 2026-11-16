@@ -1130,6 +1130,7 @@
           const from = Number(m.from);
           if (!(from > 0)) return;
           if (!seated().includes(from)) { refreshSoon(); if (S.phase === "wait") return; } // 대기실에 새로 들어온 사람 — 자리 정보를 다시 받아 온다
+          if (m.t === "ping") { send({ t: "pong", c: m.c, to: from }); return; }
           if (m.t === "hi") {
             if (okRid(m.rid)) S.rids[from] = m.rid;
             if (S.phase === "wait") S.rd[from] = m.rd ? 1 : 0;
@@ -1149,6 +1150,7 @@
           }
         } else {
           if (m.from !== "host") return;
+          if (m.t === "pong") { const ms = performance.now() - Number(m.c); if (ms >= 0 && ms < 5000) toFrame({ type: "vs:rtt", ms }); return; }
           if (m.t === "lb") {
             S.gotLb = true;
             if (m.ph === "wait" && S.phase !== "wait" && S.phase !== "end") { S.phase = "wait"; screen = "ready"; setPlaying(false); }
@@ -1178,6 +1180,8 @@
           } else if (S.phase === "wait" || (S.phase === "race" && !S.e)) {
             if (!S.gotLb || now - S.lastHi > 3000) { S.lastHi = now; send({ t: "hi", rid: S.rids[S.me], rd: S.rd[S.me] ? 1 : 0 }); }
           }
+          // 손님 — 연 사람까지 왕복 지연 재기(본체가 내 차를 그만큼 앞으로 내다본다)
+          if (!isHost() && S.phase === "race" && !(now - (S.lastPing || 0) < 2000)) { S.lastPing = now; send({ t: "ping", c: now }); }
         }, 600);
         paint();
       }
