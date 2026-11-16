@@ -46,7 +46,7 @@
           document.getElementById("error-box").style.display = "block";
           document.getElementById("error-box").innerHTML = HKUI.alertBox("danger", "로그인 실패", HKUI.escapeHtml(err));
         }
-        document.getElementById("sso-btn").onclick = () => {
+        const start = () => {
           document.getElementById("sso-card").innerHTML = `<div style="padding:20px 4px;text-align:center">
             <span class="hk-spin"></span>
             <p style="font-size:15px;font-weight:600;color:var(--color-midnight-navy);margin:16px 0 4px">Teams 계정으로 인증 중…</p>
@@ -55,6 +55,16 @@
           const returnTo = HKUI.queryParam("returnTo") || HKRoutes.reserve;
           window.location.href = "/api/auth/sso/login?returnTo=" + encodeURIComponent(returnTo);
         };
+        document.getElementById("sso-btn").onclick = start;
+        // Teams 메시지 링크처럼 로그인이 없는 브라우저로 들어와 이 화면으로 넘어왔으면(returnTo) 단추를 누르지 않아도 바로 시작 —
+        // 그 브라우저에 회사 계정이 이미 있으면 Microsoft 가 묻지 않고 바로 돌려보내 원래 화면이 열린다.
+        // 실패해서 돌아왔거나(error) 방금(2분 안) 자동으로 해 봤으면 다시 하지 않는다(되풀이 방지)
+        let tried = 0;
+        try { tried = Number(sessionStorage.getItem("hk-auto-sso") || 0); } catch (_) { /* 저장 못 해도 단추는 그대로 */ }
+        if (HKUI.queryParam("returnTo") && !err && Date.now() - tried > 120000) {
+          try { sessionStorage.setItem("hk-auto-sso", String(Date.now())); } catch (_) { /* 위와 같음 */ }
+          start();
+        }
       },
     });
   </script>

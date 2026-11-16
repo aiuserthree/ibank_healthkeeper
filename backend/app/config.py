@@ -29,7 +29,7 @@ class Settings(BaseSettings):
 
     session_cookie_name: str = "hk_session"
     admin_session_cookie_name: str = "hk_admin_session"
-    session_max_age: int = 86400 * 7
+    session_max_age: int = 86400 * 30  # 회원 로그인 유지 — 쓸 때마다 다시 30일로 늘어난다(core/session.touch_member_session)
     admin_session_remember_max_age: int = 86400 * 30
     admin_session_short_max_age: int = 86400
 

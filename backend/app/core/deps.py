@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.core.errors import raise_app_error
-from app.core.session import get_admin_session, get_member_session
+from app.core.session import get_admin_session, get_member_session, touch_member_session
 from app.database import get_db, get_redis
 from app.models import AdminUser, Member, MemberStatus
 
@@ -36,7 +36,17 @@ async def get_current_member(
     member = result.scalar_one_or_none()
     if not member or member.status == MemberStatus.WITHDRAWN:
         raise_app_error("UNAUTHORIZED", 401)
+    await _keep_alive(request, redis, session_id, hk_session)
     return member
+
+
+async def _keep_alive(request: Request, redis: Redis, session_id: str, cookie: Optional[str]) -> None:
+    """쓰고 있는 로그인 기한 늘리기 — 쿠키로 들어온 세션이면 응답에서 쿠키 기한도 늘린다(main.py 미들웨어)."""
+    try:
+        if await touch_member_session(redis, session_id) and cookie:
+            request.state.hk_session_refresh = session_id
+    except Exception:  # noqa: BLE001 — 기한 늘리기가 실패해도 요청은 그대로
+        pass
 
 
 async def get_current_active_member(
@@ -83,4 +93,5 @@ async def get_optional_active_member(
     member = result.scalar_one_or_none()
     if not member or member.status != MemberStatus.ACTIVE:
         return None
+    await _keep_alive(request, redis, session_id, hk_session)
     return member

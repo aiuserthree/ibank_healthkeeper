@@ -45,6 +45,18 @@ async def create_admin_session(redis: Redis, admin_id: int, *, max_age: int | No
     return session_id
 
 
+async def touch_member_session(redis: Redis, session_id: str) -> bool:
+    """쓰고 있는 로그인은 끊기지 않게 — 남은 기간이 하루 넘게 줄었으면 다시 session_max_age 로 늘린다.
+    늘렸으면 True(그 응답에서 쿠키 기한도 같이 늘린다). 하루에 한 번 정도만 늘어나 Redis · 쿠키를 자주 건드리지 않는다."""
+    settings = get_settings()
+    key = _member_key(session_id)
+    ttl = await redis.ttl(key)
+    if ttl is None or ttl < 0 or ttl > settings.session_max_age - 86400:
+        return False
+    await redis.expire(key, settings.session_max_age)
+    return True
+
+
 async def get_member_session(redis: Redis, session_id: str) -> dict[str, Any] | None:
     raw = await redis.get(_member_key(session_id))
     if not raw:

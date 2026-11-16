@@ -159,6 +159,22 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+    @app.middleware("http")
+    async def _keep_login_cookie(request, call_next):
+        # 쓰고 있는 로그인 — 세션 기한을 늘린 요청이면 쿠키 기한도 같이 늘린다(로그인 뒤 정해진 날에 끊기지 않게)
+        response = await call_next(request)
+        sid = getattr(request.state, "hk_session_refresh", None)
+        if sid:
+            response.set_cookie(
+                key=settings.session_cookie_name,
+                value=sid,
+                httponly=True,
+                secure=settings.cookie_secure,
+                samesite="lax",
+                max_age=settings.session_max_age,
+            )
+        return response
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
