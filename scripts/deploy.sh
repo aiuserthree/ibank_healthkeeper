@@ -188,6 +188,12 @@ TEAMS_SENDER_REFRESH_TOKEN="$(preserve_or TEAMS_SENDER_REFRESH_TOKEN "${TEAMS_SE
 PUBLIC_DATA_PORTAL_SERVICE_KEY="$(preserve_or PUBLIC_DATA_PORTAL_SERVICE_KEY "${PUBLIC_DATA_PORTAL_SERVICE_KEY:-}")"
 # 그룹웨어 휴가 받는 입구 비밀값 — 서버 .env 에 한 번 넣어 두면 배포 때 그대로 둔다(비면 입구 꺼짐)
 LEAVE_SYNC_TOKEN="$(preserve_or LEAVE_SYNC_TOKEN "${LEAVE_SYNC_TOKEN:-}")"
+# 그룹웨어 DB(읽기 전용) — 서버가 직접 휴가를 읽을 때 쓴다. 서버 .env 에 한 번 넣어 두면 배포 때 그대로 둔다(비면 서버 직접 읽기 꺼짐)
+GW_DB_HOST="$(preserve_or GW_DB_HOST "")"
+GW_DB_PORT="$(preserve_or GW_DB_PORT 5432)"
+GW_DB_NAME="$(preserve_or GW_DB_NAME postgres)"
+GW_DB_USER="$(preserve_or GW_DB_USER "")"
+GW_DB_PASSWORD="$(preserve_or GW_DB_PASSWORD "")"
 
 # TRANSFER_WINDOW_BYPASS 등 로컬 전용 플래그는 운영 .env 에 쓰지 않음
 mkdir -p /opt/healthkeeper/app/backend
@@ -223,7 +229,13 @@ TEAMS_SENDER_EMAIL=${TEAMS_SENDER_EMAIL}
 TEAMS_SENDER_REFRESH_TOKEN=${TEAMS_SENDER_REFRESH_TOKEN}
 PUBLIC_DATA_PORTAL_SERVICE_KEY=${PUBLIC_DATA_PORTAL_SERVICE_KEY}
 LEAVE_SYNC_TOKEN=${LEAVE_SYNC_TOKEN}
+GW_DB_HOST=${GW_DB_HOST}
+GW_DB_PORT=${GW_DB_PORT}
+GW_DB_NAME=${GW_DB_NAME}
+GW_DB_USER=${GW_DB_USER}
+GW_DB_PASSWORD=${GW_DB_PASSWORD}
 EOF
+chmod 600 "$APP_ENV"
 echo "==> backend/.env: SSO_PROVIDER=${SSO_PROVIDER} DEBUG=false (local mock/debug not applied)"
 
 cd /opt/healthkeeper/app/backend

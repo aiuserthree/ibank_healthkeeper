@@ -79,6 +79,17 @@ class Settings(BaseSettings):
     # 사내망 맥의 scripts/gw-leave-sync.py 가 X-Leave-Sync-Token 헤더로 같은 값을 보낸다
     leave_sync_token: str = ""
 
+    # 그룹웨어 DB(읽기 전용) — 채워져 있으면 헬스키퍼 서버가 평일 07~19시 10분마다 직접 휴가를 읽는다(services/gw_leave.py).
+    # 비어 있으면 끔(예전처럼 사내망 맥이 위 입구로 보낸다). 값은 서버 backend/.env 에만 두고, 화면 · 로그에 남기지 않는다
+    gw_db_host: str = ""
+    gw_db_port: int = 5432
+    gw_db_name: str = "postgres"
+    gw_db_user: str = ""
+    gw_db_password: str = ""
+
+    def gw_ready(self) -> bool:
+        return bool(self.gw_db_host and self.gw_db_user and self.gw_db_password)
+
     def allowed_email_domains(self) -> list[str]:
         """SSO_ALLOWED_DOMAIN — 쉼표 구분 (예: ibank.co.kr,digitalworks.co.kr)."""
         return [d.strip().lower() for d in self.sso_allowed_domain.split(",") if d.strip()]

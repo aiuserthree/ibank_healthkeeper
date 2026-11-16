@@ -14,6 +14,7 @@ from app.routers import admin, auth, health, play, realtime_party, realtime_ws, 
 from app.routers import raid
 from app.routers import mgmt
 from app.routers import internal
+from app.services import gw_leave as gw_leave_service
 from app.services import leave as leave_service
 from app.services import scheduler as sched
 
@@ -114,6 +115,13 @@ def _schedule_jobs() -> None:
         _async_job("leave_cache", leave_service.job_refresh_cache),
         CronTrigger(minute="*"),
         id="j12_leave_cache",
+        replace_existing=True,
+    )
+    # 그룹웨어 휴가 — 서버가 직접 읽기(설정 GW_DB_* 가 있을 때만), 평일 07~19시 10분마다
+    scheduler.add_job(
+        _async_job("gw_leave_sync", gw_leave_service.job_gw_leave_sync),
+        CronTrigger(day_of_week="mon-fri", hour="7-19", minute="*/10"),
+        id="j13_gw_leave_sync",
         replace_existing=True,
     )
 
