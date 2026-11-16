@@ -2,7 +2,7 @@
  * 꿀꺽 젤리 숲 대전 — 3D 숲 · 젤리 두 마리 · 실시간 통신 (화면은 web/games/jellyvs.html, 서버 엔진은 backend/app/services/versus_jellyvs.py)
  * 그림 · 물리 · 조작은 혼자 하기 본체 web/games/embed/jelly.html 에서 가져왔다(three.js 는 /_shared/jellyvs-three.js — 같은 r128).
  *
- *   HKJellyVs.create(container, opts) → { start, destroy, pause, resume, isPaused, isOver, phase, setReady, requestPause, setLink, lobby, debug, devSet, devAuto }
+ *   HKJellyVs.create(container, opts) → { start, destroy, pause, resume, isPaused, isOver, phase, setReady, requestPause, setLink, lobby, debug, devSet, devAuto, devPilot, devRun }
  *   opts.mode       "cpu"(컴퓨터 젤리와 연습) | "host"(도전한 사람 — 판을 계산) | "guest"(받은 사람 — 받아 그림) | "demo"(첫 화면 뒤 구경)
  *   opts.level      cpu — "easy" | "normal" | "hard"
  *   opts.me · opts.rival   { name }
@@ -10,7 +10,7 @@
  *   opts.onEnd(res) 판이 끝나면 한 번 — { winner: "host"|"guest"|"draw", size: [주인, 손님](×100 정수), eaten, sec, me: 0|1, win, draw, friends: [주인, 손님], bites: [주인, 손님] }
  *   opts.onEvent(e) { type: "lobby", phase, paused, pausedBy: "me"|"rival", pausedWhy, ready: [나, 상대], peer, host } — 준비 · 멈춤 상태가 바뀔 때
  *   opts.isMuted()  소리를 끌지
- *   opts.dev        시험용 devSet · devAuto 를 연다
+ *   opts.dev        시험용 devSet · devAuto · devPilot(사람 흉내 봇이 자리를 대신 조작) · devRun(초 — 그리기 없이 판을 빨리 돌림)을 연다
  *   opts.party      여러 명 대전(host · guest 와 함께) — { me: 내 자리(주인 0), names: [자리마다 이름 6], avatars: [6], bots: [컴퓨터 자리 …] }
  *                   젤리 6마리. 손님이 보낸 것은 net.onMessage(fn) 의 fn(msg, 보낸 자리)로, 주인은 net.send(obj, 받을 자리) 로 한 사람에게만 보낼 수 있다.
  *                   onEnd(res) — { party: true, winner: 자리 | null, size: [6](×100), sec, map, friends, bites, kills, died: [6], me, win, draw, place, order }
@@ -671,6 +671,7 @@ window.HKJellyVs = (function () {
       pz: 0, pzBy: 0, pzWhy: "", ready: J.map(() => 0), resumeT: 0, evId: 0, ev: [], spawnRef: 0, warn30: false, safeSaid: false, lastTick: 99, rel: 0,
     };
     let localPaused = false; // 컴퓨터와 — 내가 멈춤
+    let devPilot = null; // 시험용(opts.dev) — fn(자리, devView) → { x, z, dash } | null
     let destroyed = false, endFired = false, link = "ok", devAuto = false, rtt = 120, lastSnapAt = 0, myReady = 0;
     let camX = 0, camZ = 18, camZoom = 1.3, shake = 0, slow = 1;
     const hostRng = mulberry(S.seed ^ 0x5bd1e995);
@@ -893,41 +894,99 @@ window.HKJellyVs = (function () {
     }
 
     // ───── 컴퓨터 젤리 (연습 · 구경 · 시험 자동 조작)
-    const brain = J.map(() => ({ t: 0, x: 0, z: 0 }));
-    const LV = { easy: { th: 0.45, mag: 0.72, dash: 0, aggr: 0.35 }, normal: { th: 0.28, mag: 0.88, dash: 0.5, aggr: 0.75 }, hard: { th: 0.16, mag: 1, dash: 1, aggr: 1 } };
+    const devView = { J, all, food, S, steer: (x, z, r, dx, dz) => MK.steer(x, z, r, dx, dz), world: () => WORLD, SAFE, PVP, EAT };
+    // 사람이 이길 만하게 — 사람보다 조금 늦게 반응하고(th · lag), 조금 느리고(mag), 화면만큼만 먹이를 보고(sight),
+    // 먹이를 덜 따지고(greed), 젤리를 가까이 있을 때만 · 잠깐만 쫓고(aggr · chaseR · chaseT · rest), 위험을 늦게 알아채고(notice · fleeR),
+    // 가끔 엉뚱한 먹이로 가거나 머뭇거린다(wrong · idle). 고른 먹이는 먹거나 사라질 때까지 따라간다(사람처럼 — 매번 가장 좋은 것으로 바꾸지 않는다).
+    //   easy 초보도 이김 · normal 반반 · hard 잘해야 이김 · party 여러 명 대전 빈자리(easy 와 normal 사이, 사람을 덜 노린다 — human)
+    const LV = {
+      easy:   { th: 0.5,  lag: 0.34, mag: 0.7,  sight: 10, greed: 1,    hunt: 5,  aggr: 0.12, chaseR: 6,  chaseT: 2,   rest: 5,   notice: 0.45, fleeR: 3,   dash: 0,    wrong: 0.2,  idle: 0.1,  human: 1 },
+      normal: { th: 0.38, lag: 0.24, mag: 0.84, sight: 13.5, greed: 1.3, hunt: 7.5, aggr: 0.3,  chaseR: 8.5, chaseT: 2.8, rest: 3.8, notice: 0.7,  fleeR: 4,   dash: 0.25, wrong: 0.1,  idle: 0.045, human: 1 },
+      hard:   { th: 0.29, lag: 0.18, mag: 0.92, sight: 17, greed: 1.5,  hunt: 9,  aggr: 0.45, chaseR: 10, chaseT: 3.4, rest: 3,   notice: 0.84, fleeR: 4.8, dash: 0.5,  wrong: 0.06, idle: 0.025, human: 1 },
+      party:  { th: 0.42, lag: 0.26, mag: 0.84, sight: 13, greed: 1.3,  hunt: 8,  aggr: 0.3,  chaseR: 8,  chaseT: 2.6, rest: 4,   notice: 0.62, fleeR: 3.5, dash: 0.15, wrong: 0.12, idle: 0.06, human: 0.45 },
+    };
+    const brain = J.map(() => ({ t: 0, x: 0, z: 0, q: [], tgt: null, chase: null, chaseT: 0, rest: 0, fleeing: null, pt: 0 }));
+    const isHumanSeat = (q) => !(party ? botSeat[q.idx] : mode === "cpu" ? q.idx === 1 : false);
     function botThink(j, lv, dt) {
-      const B = brain[j.idx]; B.t -= dt; if (B.t > 0) return;
-      B.t = lv.th + Math.random() * 0.1;
-      const safe = S.playT >= SAFE;
-      let o = party ? null : J[1 - j.idx];
-      if (party) { let bd = 30; for (const q of J) { if (q === j || q.state !== "ok" || q.inv > 0 || !(j.s > q.s * PVP)) continue; const d = Math.hypot(q.x - j.x, q.z - j.z); if (d < bd) { bd = d; o = q; } } } // 가장 가까운 삼킬 수 있는 젤리
-      let gx = 0, gz = 0, best = 1e9, flee = null, fleeD = 1e9;
+      const B = brain[j.idx];
+      if (S.playT < B.pt) { B.q.length = 0; B.tgt = B.chase = B.fleeing = null; B.chaseT = B.rest = 0; B.t = 0; } // 새 판
+      B.pt = S.playT;
+      if (B.rest > 0) B.rest -= dt;
+      if (B.chase) { B.chaseT += dt; if (B.chaseT > lv.chaseT) { B.chase = null; B.chaseT = 0; B.rest = lv.rest; } } // 오래 쫓았다 — 지쳐서 쉰다
+      // 정한 방향은 lag 초 뒤에 손에 닿는다(반응이 늦다)
+      while (B.q.length && B.q[0].at <= S.playT) { const d = B.q.shift(); B.x = d.x; B.z = d.z; if (d.dash) B.dashNow = true; }
+      B.t -= dt; if (B.t > 0) return;
+      B.t = lv.th * (0.8 + Math.random() * 0.5);
+      const d = botDecide(j, lv, B);
+      B.q.push({ at: S.playT + lv.lag * (0.7 + Math.random() * 0.6), ...d });
+      if (B.q.length > 6) B.q.shift();
+    }
+    function botDecide(j, lv, B) {
+      if (j.state !== "ok") return { x: 0, z: 0 };
+      const safe = mode !== "demo" && S.playT >= SAFE;
+      const R = Math.random();
+      if (R < lv.idle) return { x: 0, z: 0 }; // 머뭇거림
+      let gx = 0, gz = 0, dash = false, flee = null, fleeD = 1e9;
       for (const c of all) {
         if (c === j || c.state !== "ok") continue;
         const d = Math.hypot(c.x - j.x, c.z - j.z) - c.s - j.s;
-        const danger = c.isJ ? mode !== "demo" && safe && c.s > j.s * PVP && j.inv <= 0 : c.s > j.s * EAT && j.inv <= 0 && c.calm <= 0;
-        if (danger && d < 6 + c.s && d < fleeD) { flee = c; fleeD = d; }
+        const danger = c.isJ ? safe && c.s > j.s * PVP && j.inv <= 0 : c.s > j.s * EAT && j.inv <= 0 && c.calm <= 0;
+        if (danger && d < lv.fleeR + c.s * 0.8 && d < fleeD) { flee = c; fleeD = d; }
       }
-      if (flee) {
+      if (flee && (B.fleeing === flee || Math.random() < lv.notice)) { // 늦게 알아챌 때도 있다
+        B.fleeing = flee; B.tgt = null; B.chase = null;
         gx = j.x - flee.x; gz = j.z - flee.z;
-        if (fleeD < 2.2 && Math.random() < lv.dash) { B.dashNow = true; }
+        if (fleeD < 2 && Math.random() < lv.dash) dash = true;
       } else {
-        if (mode !== "demo" && safe && o && j.s > o.s * PVP && o.state === "ok" && Math.random() < lv.aggr) { gx = o.x - j.x; gz = o.z - j.z; best = 0; if (Math.hypot(gx, gz) < 6 + j.s && Math.random() < lv.dash) B.dashNow = true; }
-        else {
-          for (const c of all) {
-            if (c.isJ || c.state !== "ok" || !(j.s > c.s * EAT)) continue;
-            const d = Math.hypot(c.x - j.x, c.z - j.z) * (c.isBoss ? 0.5 : 0.8);
-            if (d < best && d < 26) { best = d; gx = c.x - j.x; gz = c.z - j.z; }
+        B.fleeing = null;
+        // 쫓을 젤리 — 가까이 있을 때만, 쉬는 중이 아닐 때만. 사람 자리는 덜 노린다(lv.human)
+        let o = null;
+        if (safe && B.rest <= 0) {
+          if (B.chase && B.chase.state === "ok" && B.chase.inv <= 0 && j.s > B.chase.s * PVP && Math.hypot(B.chase.x - j.x, B.chase.z - j.z) < lv.chaseR * 1.3) o = B.chase;
+          else {
+            B.chase = null;
+            let bd = lv.chaseR;
+            for (const q of J) { if (q === j || q.state !== "ok" || q.inv > 0 || !(j.s > q.s * PVP)) continue; const dd = Math.hypot(q.x - j.x, q.z - j.z); if (dd < bd) { bd = dd; o = q; } }
+            if (o && Math.random() < lv.aggr * (isHumanSeat(o) ? lv.human : 1)) { B.chase = o; B.chaseT = 0; } else o = null;
           }
-          for (const f of food) {
-            if (!f.alive) continue;
-            const d = Math.hypot(f.x - j.x, f.z - j.z) / (f.type === 1 ? 2.2 : f.type === 2 ? 1.6 : 1);
-            if (d < best) { best = d; gx = f.x - j.x; gz = f.z - j.z; }
+        } else B.chase = null;
+        if (o) { B.tgt = null; gx = o.x - j.x; gz = o.z - j.z; if (Math.hypot(gx, gz) < 4 + j.s && Math.random() < lv.dash * 0.5) dash = true; }
+        else {
+          // 먹이 — 고른 것을 먹거나 사라질 때까지 따라간다
+          let t = B.tgt;
+          const keep = t && (t.isJ !== undefined ? t.state === "ok" && j.s > t.s * EAT : t.alive) && Math.hypot(t.x - j.x, t.z - j.z) < lv.sight * 1.2;
+          if (!keep) {
+            t = null;
+            if (R < lv.idle + lv.wrong) { // 엉뚱한 먹이 — 보이는 것 중 아무거나
+              const seen = food.filter((f) => f.alive && Math.hypot(f.x - j.x, f.z - j.z) < lv.sight);
+              if (seen.length) t = seen[(Math.random() * seen.length) | 0];
+            } else {
+              let best = 1e9;
+              for (const c of all) {
+                if (c.isJ || c.state !== "ok" || !(j.s > c.s * EAT)) continue;
+                const dd = Math.hypot(c.x - j.x, c.z - j.z) * (c.isBoss ? 0.6 : 0.85);
+                if (dd < best && dd < lv.hunt) { best = dd; t = c; }
+              }
+              for (const f of food) {
+                if (!f.alive) continue;
+                const dd = Math.hypot(f.x - j.x, f.z - j.z); if (dd > lv.sight) continue;
+                const sc = dd / (f.type === 1 ? lv.greed : f.type === 2 ? 1 + (lv.greed - 1) * 0.6 : 1);
+                if (sc < best) { best = sc; t = f; }
+              }
+            }
+            B.tgt = t;
+          }
+          if (t) { gx = t.x - j.x; gz = t.z - j.z; }
+          else { // 보이는 먹이가 없다 — 숲 가운데 쪽으로 어슬렁
+            if (!B.wang || Math.random() < 0.3) B.wang = Math.atan2(-j.x, -j.z) + (Math.random() - 0.5) * 2.4;
+            gx = Math.sin(B.wang); gz = Math.cos(B.wang);
           }
         }
       }
-      const [sx, sz] = MK.steer(j.x, j.z, j.s * 0.6, gx / (Math.hypot(gx, gz) || 1), gz / (Math.hypot(gx, gz) || 1)); B.x = sx * lv.mag; B.z = sz * lv.mag;
-      const r = Math.hypot(j.x, j.z); if (r > WORLD - 6) { B.x -= (j.x / r) * 0.6; B.z -= (j.z / r) * 0.6; }
+      const l = Math.hypot(gx, gz) || 1, [sx, sz] = MK.steer(j.x, j.z, j.s * 0.6, gx / l, gz / l);
+      let x = sx * lv.mag, z = sz * lv.mag;
+      const r = Math.hypot(j.x, j.z); if (r > WORLD - 6) { x -= (j.x / r) * 0.6; z -= (j.z / r) * 0.6; }
+      return { x, z, dash };
     }
     function botDrive(j, lv, dt) {
       botThink(j, lv, dt);
@@ -1357,9 +1416,10 @@ window.HKJellyVs = (function () {
         J.forEach((j, i) => {
           if (j.inv > 0) j.inv -= dt;
           if (party && j.state !== "ok") { j.rsp -= dt; if (j.rsp <= 0 && j.state === "dead") respawnJelly(j); return; } // 삼켜졌다 — 다시 태어나기를 기다린다
-          if (mode === "demo" || (mode === "cpu" && i === 1) || botSeat[i] || (devAuto && i === me)) botDrive(j, mode === "demo" ? LV.normal : i === me ? LV.hard : LVL, dt);
+          if (mode === "demo" || (mode === "cpu" && i === 1) || botSeat[i] || (devAuto && i === me)) botDrive(j, mode === "demo" ? LV.normal : i === me ? LV.hard : party ? LV.party : LVL, dt);
           else if (i === me) { j.inx = ix; j.inz = iz; }
           else if (mode === "host" && performance.now() - j.inAt > 1200) { j.inx = 0; j.inz = 0; } // 손님 입력이 끊겼으면 멈춰 선다
+          if (devPilot) { const p = devPilot(i, devView); if (p) { j.inx = p.x; j.inz = p.z; if (p.dash) tryDash(j); } } // 시험용 — 사람 흉내 봇이 대신 조작
           if (j.state === "ok") { moveJelly(j, dt); eatFood(j); }
         });
         if (S.timeLeft <= 0 && mode !== "demo") { S.timeLeft = 0; if (party) endParty(); else endBy(sizeWinner(Math.round(J[0].s * 100), Math.round(J[1].s * 100)), false, -1); }
@@ -1491,6 +1551,15 @@ window.HKJellyVs = (function () {
       debug: () => ({ mode, party: !!party, me, state: J.map((j) => j.state), kills: J.map((j) => j.kills), died: J.map((j) => j.died), map: S.map, phase: S.phase, timeLeft: Math.round(S.timeLeft * 10) / 10, playT: Math.round(S.playT * 10) / 10, pz: S.pz, ready: S.ready.slice(), size: J.map((j) => Math.round(j.s * 100)), pos: J.map((j) => [Math.round(j.x * 10) / 10, Math.round(j.z * 10) / 10]), dash: J.map((j) => j.dash), result: S.result, seed: S.seed, alive: food.filter((f) => f.alive).length, food0: [Math.round(food[0].x * 100) / 100, Math.round(food[0].z * 100) / 100], snapAge: lastSnapAt ? Math.round(performance.now() - lastSnapAt) : null, rtt }),
       devSet(o) { if (!opts.dev || !sim) return; if (o.time !== undefined) S.timeLeft = o.time; if (o.playT !== undefined) S.playT = o.playT; if (o.m) o.m.forEach((v, i) => { if (v) { J[i].m = v; setSize(J[i]); } }); if (o.pos) o.pos.forEach((p, i) => { if (p) { J[i].x = p[0]; J[i].z = p[1]; } }); if (o.inv !== undefined) J.forEach((j) => { j.inv = o.inv; }); },
       devAuto(on) { if (opts.dev) devAuto = !!on; },
+      // 시험용 — 사람 흉내 봇 붙이기 · 화면 그리기 없이 판을 빨리 돌리기(opts.dev 일 때만 — 화면은 localhost · .test 에서만 dev 를 켠다)
+      devPilot(fn) { if (opts.dev && sim) devPilot = typeof fn === "function" ? fn : null; },
+      devRun(sec, step) {
+        if (!opts.dev || !sim) return null;
+        step = step || 1 / 60;
+        if (party && mode === "host" && S.phase === "wait") partyReadyAll();
+        for (let k = 0, n = Math.round(sec / step); k < n && !destroyed && !S.ended; k++) { simStep(step, step); for (const c of all) animate(c, step); }
+        return api.debug();
+      },
     };
     w.session = api;
     return api;
