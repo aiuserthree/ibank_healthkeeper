@@ -1,4 +1,4 @@
-"""여러 명 대전(선다운 범퍼스 최대 6명) — 초대 · 대기실 · 출발 · 결과 판정 · 순위 · 실시간 통로 시험 (실제 Postgres · Redis 없이).
+"""여러 명 대전(선다운 범퍼스 · 두뇌 저택 · 젤리 숲, 최대 6명) — 초대 · 대기실 · 출발 · 결과 판정 · 순위 · 실시간 통로 시험 (실제 Postgres · Redis 없이).
 
 DB 는 SQLite(메모리, aiosqlite), Redis 는 fakeredis 로 대신한다.
 돌리기 (backend/.env 를 읽지 않게 다른 폴더에서):
@@ -268,6 +268,114 @@ class PartyFlow(unittest.TestCase):
         self.call(party.report, 1, pid, tie)
         out = self.call(party.report, 2, pid, tie)
         self.assertEqual(out["endReason"], "DRAW")
+
+    def open_jelly(self, joins=(2, 3), mp=4):
+        data, _ = self.call(party.create, 1, "jellyvs", [2, 3, 4], mp)
+        pid = data["id"]
+        self.assertEqual(data["track"], mp)
+        for g in joins:
+            self.call(party.accept, g, pid)
+        d = self.call(party.start, 1, pid, list(joins), 99)  # 숲은 1 ~ 6 으로 줄인다
+        self.assertEqual((d["status"], d["track"], d["bots"]), ("RACING", 6, list(range(1 + len(joins), 6))))
+        self.now_ms[0] = int(time.time() * 1000) + 125_000  # 출발 2분 5초 뒤
+        return pid
+
+    def test_jelly_result(self):
+        pid = self.open_jelly()
+        good = {"winner": 1, "size": [240, 310, 180, 120, 300, 100], "sec": 120, "map": 6}
+        self.now_ms[0] -= 60_000  # 출발 65초 뒤 — 2분 판이 끝나기 전
+        with self.assertRaises(AppError):
+            self.call(party.report, 1, pid, good)
+        self.now_ms[0] += 60_000
+        bad = [
+            {**good, "winner": 0},  # 가장 큰 젤리가 아님
+            {**good, "winner": None},  # 1 · 2등 차가 1.02배 넘는데 승자 없음
+            {**good, "size": [240, 310, 180]},  # 자리 수가 다름
+            {**good, "size": [240, 310, 180, 120, 300, 10]},  # 너무 작음
+            {**good, "size": [240, 310.5, 180, 120, 300, 100]},  # 정수가 아님
+            {**good, "sec": 30},  # 2분을 다 하지 않음
+            {**good, "map": 9},
+            {**good, "winner": True},
+        ]
+        for b in bad:
+            with self.assertRaises(AppError):
+                self.call(party.report, 1, pid, b)
+        self.call(party.report, 1, pid, good)
+        self.call(party.report, 2, pid, good)
+        out = self.call(party.report, 3, pid, good)
+        self.assertEqual((out["status"], out["endReason"], out["winner"]["id"]), ("DONE", "BIGGEST", 2))
+        self.assertEqual(out["reasonLabel"], "가장 큰 젤리")
+        self.assertEqual(out["final"]["size"], [240, 310, 180, 120, 300, 100])
+        self.assertEqual(out["final"]["map"], 6)
+        self.assertEqual(sorted(x for x, _ in self.stamps), [1, 2, 3])
+        self.assertEqual(set(self.stamps), {(1, "jellyvs"), (2, "jellyvs"), (3, "jellyvs")})
+        self.assertEqual(self.call(party.detail, 2, pid)["result"], "win")
+        self.assertEqual(self.call(party.detail, 3, pid)["result"], "lose")
+
+    def test_jelly_close_bot_and_draw(self):
+        # 1 · 2등 차가 1.02배 미만 → 승자 없음
+        pid = self.open_jelly(joins=(2,))
+        tie = {"winner": None, "size": [300, 295, 100, 100, 100, 100], "sec": 120, "map": 6}
+        with self.assertRaises(AppError):
+            self.call(party.report, 1, pid, {**tie, "winner": 0})
+        self.call(party.report, 1, pid, tie)
+        out = self.call(party.report, 2, pid, tie)
+        self.assertEqual((out["endReason"], out["winner"], out["reasonLabel"]), ("DRAW", None, "크기가 거의 같아 승자 없음"))
+        # 컴퓨터 젤리(자리 3)가 1등 → 승 없음
+        pid = self.open_jelly(joins=(2,))
+        bot = {"winner": 3, "size": [200, 150, 100, 400, 100, 100], "sec": 119.5, "map": 6}
+        self.call(party.report, 1, pid, bot)
+        out = self.call(party.report, 2, pid, bot)
+        self.assertEqual((out["endReason"], out["winner"]), ("BOT", None))
+        self.assertEqual(run(self._jelly_wins()), {})
+
+    async def _jelly_wins(self):
+        async with self.Session() as db:
+            return await party.ranking_wins(db, "jellyvs")
+
+    def test_jelly_ranking_and_inbox(self):
+        from app.services import match as match_service
+        pid = self.open_jelly(joins=(2, 3))
+        good = {"winner": 2, "size": [240, 120, 330, 120, 300, 100], "sec": 120, "map": 6}
+        for who in (1, 2, 3):
+            out = self.call(party.report, who, pid, good)
+        self.assertEqual(out["winner"]["id"], 3)
+        self.assertEqual(list(run(self._jelly_wins())), [3])
+        # 같은 사람들과 같은 날 또 이겨도 1승
+        pid = self.open_jelly(joins=(2, 3))
+        for who in (1, 2, 3):
+            self.call(party.report, who, pid, good)
+        async def rank():
+            async with self.Session() as db:
+                m = await db.get(Member, 1)
+                return await match_service._ranking(db, m, "jellyvs")
+        r = run(rank())
+        self.assertEqual([(x["id"], x["wins"], x["losses"]) for x in r["top"]], [(3, 1, 0)])
+        # 받은 초대 수(아케이드 알림)
+        self.call(party.create, 1, "jellyvs", [5], 1)
+        async def inbox():
+            async with self.Session() as db:
+                m = await db.get(Member, 5)
+                with mock.patch.object(match_service, "game_visible", lambda g: True):
+                    return await match_service.inbox(db, m)
+        self.assertEqual(run(inbox())["jellyvs"]["incoming"], 1)
+        ov = self.call(party.overview, 5, "jellyvs")
+        self.assertEqual(len(ov["invites"]), 1)
+        self.assertNotIn("ranking", ov)  # 젤리 숲 순위는 1:1 대전 순위(match)에 더해 보여 준다
+
+    def test_jelly_invite_text(self):
+        from app.services import teams
+        host, target = self.people[0], self.people[1]
+        body = teams.render_party_invited_body(game="jellyvs", party_id=7, target=target, host=host, deadline_at=None)
+        self.assertIn("젤리 숲 여러 명 대전 초대", body)
+        self.assertIn("여러 명이 함께하는 젤리 숲 대전에 초대했어요", body)
+        self.assertIn("/games/jellyvs#p7", body)
+        old = teams.render_party_invited_body(game="bumpervs", party_id=8, target=target, host=host, deadline_at=None)
+        self.assertIn("범퍼카 대전 여러 명 경주 초대", old)  # 다른 게임 문구는 그대로
+        self.assertIn("함께 달리는 범퍼카 대전에", old)
+        mn = teams.render_party_invited_body(game="mansion", party_id=9, target=target, host=host, deadline_at=None)
+        self.assertIn("두뇌 저택 여러 명 게임 초대", mn)
+        self.assertIn("함께하는 두뇌 저택에", mn)
 
     def test_rt_seat(self):
         data, _ = self.call(party.create, 1, "bumpervs", [2, 3])

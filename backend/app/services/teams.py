@@ -1367,13 +1367,21 @@ def party_page_url(game: str, party_id: int) -> str:
     return f"{get_settings().app_base_url.rstrip('/')}/games/{game}#p{party_id}"
 
 
+# 여러 명 대전 초대 문구 — (제목 이름, 제목 꼬리, 본문 「여러 명이 함께 ○○ □□에」)
+PARTY_INVITE_WORDS = {
+    "mansion": ("두뇌 저택", "게임", "하는 두뇌 저택"),
+    "jellyvs": ("젤리 숲", "대전", "하는 젤리 숲 대전"),
+}
+
+
 def render_party_invited_body(*, game: str, party_id: int, target: Member, host: Member, deadline_at: Optional[datetime]) -> str:
     name = MATCH_GAME_NAME.get(game, "대전")
+    title, kind, body = PARTY_INVITE_WORDS.get(game, (name, "경주", f" 달리는 {name}"))
     url = party_page_url(game, party_id)
     due = f"{_datetime_label(deadline_at)}까지 출발하지 않으면 대기실이 닫혀요. " if deadline_at else ""
     return (
-        f"<p><strong>[헬스키퍼]</strong> {name} 여러 명 {'게임' if game == 'mansion' else '경주'} 초대</p>"
-        f"<p>{html.escape(target.name)}님, {_who(host)}이 여러 명이 함께{'하는' if game == 'mansion' else ' 달리는'} {name}에 초대했어요.</p>"
+        f"<p><strong>[헬스키퍼]</strong> {title} 여러 명 {kind} 초대</p>"
+        f"<p>{html.escape(target.name)}님, {_who(host)}이 여러 명이 함께{body}에 초대했어요.</p>"
         f"<p>{due}들어가기는 아케이드가 열린 시간에만 할 수 있어요.</p>"
         f'<p><a href="{url}">대기실 열기</a>에서 들어가거나 거절해 주세요.</p>'
     )

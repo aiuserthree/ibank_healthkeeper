@@ -11,9 +11,15 @@
  *   opts.onEvent(e) { type: "lobby", phase, paused, pausedBy: "me"|"rival", pausedWhy, ready: [나, 상대], peer, host } — 준비 · 멈춤 상태가 바뀔 때
  *   opts.isMuted()  소리를 끌지
  *   opts.dev        시험용 devSet · devAuto 를 연다
+ *   opts.party      여러 명 대전(host · guest 와 함께) — { me: 내 자리(주인 0), names: [자리마다 이름 6], avatars: [6], bots: [컴퓨터 자리 …] }
+ *                   젤리 6마리. 손님이 보낸 것은 net.onMessage(fn) 의 fn(msg, 보낸 자리)로, 주인은 net.send(obj, 받을 자리) 로 한 사람에게만 보낼 수 있다.
+ *                   onEnd(res) — { party: true, winner: 자리 | null, size: [6](×100), sec, map, friends, bites, kills, died: [6], me, win, draw, place, order }
  *
  * 규칙: 2분(ROUND) 동안 먹고 자라기. 상대보다 1.2배(PVP) 넘게 크면 부딪혀 삼킨다 → 즉시 승. 처음 15초(SAFE)는 서로 못 삼킨다.
  *       2분 뒤 큰 쪽 승, 1.02배(EVEN) 미만 차이면 무승부. 대시 중 · 물린 직후는 삼켜지지 않는다. 가시대왕은 둘 다에게 위협.
+ * 여러 명(opts.party): 6마리가 원을 그려 출발. 1.2배 넘게 크면 삼키지만 판은 끝나지 않는다 — 삼켜진 젤리는 3초(RESPAWN) 뒤 처음 크기로
+ *       숲 가장자리 빈 곳에서 다시 태어나 잠깐 무적(깜빡임). 2분 뒤 가장 큰 젤리 1등(2등과 1.02배 미만 차이면 1등 없음 — 서버 party._clean_jelly 와 같은 셈).
+ *       주인 화면이 숨으면 모두 멈추고, 돌아오면 3초 세고 이어 간다. 손님 화면이 숨으면 그 젤리만 멈춰 선다.
  * 동기화: host 가 초당 15번 상태(젤리 둘 · 숲 친구 · 먹을 것 · 알림)를 보내고, guest 는 120ms 늦게 보간해 그린다.
  *         guest 의 내 젤리는 내 입력으로 먼저 움직이고(예측) host 값으로 부드럽게 맞춘다. 먹을 것 자리는 host 시드로 둘이 같게 만든다.
  */
@@ -35,9 +41,13 @@ window.HKJellyVs = (function () {
   const EAT = 1.12, BOSS_S = 4.6, RIVAL_CAP = BOSS_S * 0.84, MAXDASH = 3, COUNT = 3, END_T = 1.8;
   const N_BERRY = 96, N_SHROOM = 28, N_ORB = 8, N_FOOD = N_BERRY + N_SHROOM + N_ORB, N_FRIEND = 12;
   const START = [[-14, 10], [14, 10]]; // 주인 · 손님 시작 자리 (좌우 대칭)
-  const JCOL = [0xff7ac8, 0x5fd4ff]; // 주인 분홍 · 손님 하늘
+  const JCOL = [0xff7ac8, 0x5fd4ff, 0xffd23a, 0x6ee87a, 0xb08cff, 0xff9a4d]; // 주인 분홍 · 손님 하늘 (여러 명: 노랑 · 초록 · 보라 · 주황)
+  const PARTY_N = 6, RESPAWN = 3, RESPAWN_INV = 2.5; // 여러 명 — 6마리 · 삼켜지면 3초 뒤 다시 태어나 2.5초 무적
   const SNAP_MS = 66, SLOW_SNAP_MS = 250, INTERP_MS = 120;
   const sizeWinner = (h, g) => { const big = Math.max(h, g), small = Math.min(h, g); if (big * 100 < small * Math.round(EVEN * 100)) return "draw"; return h > g ? "host" : "guest"; };
+  // 여러 명 — 크기 순(큰 쪽부터) 자리 번호 · 1등 자리(2등과 1.02배 미만 차이면 null — 서버 party._clean_jelly 와 같은 셈)
+  const sizeOrder = (size) => size.map((_, i) => i).sort((a, b) => size[b] - size[a] || a - b);
+  const partyWinner = (size) => { const o = sizeOrder(size); return size[o[0]] * 100 >= size[o[1]] * Math.round(EVEN * 100) ? o[0] : null; };
   const pspd = (s) => 9 + 1.4 * (s - 1);
   const rspd = (s) => 8.6 + 0.55 * (s - 1);
   const r1 = (v) => Math.round(v * 10);
@@ -53,6 +63,7 @@ window.HKJellyVs = (function () {
     return MK.foodPos(seeded(seed, i, gen), pad); // 맵마다 퍼짐이 다르다 · 장애물은 피한다
   }
   const ALPH = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  const J_BOTS = (bots) => { const o = []; (Array.isArray(bots) ? bots : []).forEach((i) => { if (Number.isInteger(i) && i > 0 && i < PARTY_N) o[i] = true; }); return o; };
   let MK = null; // 맵 도구 (buildWorld 에서 만든다)
 
   // ───────── 숲 고르기(맵) — 대전 web/_shared/jellyvs-vs.js 와 혼자 하기 web/games/embed/jelly.html 에 같은 글이 들어 있다(한쪽을 고치면 다른 쪽도 같이)
@@ -392,6 +403,15 @@ window.HKJellyVs = (function () {
 .jv-banner.mint{color:#7dffd0}.jv-banner.bad{color:#ff5d6c}
 .jv-big{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:64px;font-weight:900;pointer-events:none;text-shadow:0 4px 0 #2a1650,0 0 20px rgba(18,13,43,.9);display:none}
 .jv-hold{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);padding:10px 18px;border-radius:14px;background:rgba(18,13,43,.85);font-size:16px;font-weight:800;pointer-events:none;display:none;white-space:nowrap}
+.jv-board{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:2px;width:150px;padding:6px 8px;border-radius:14px;background:rgba(18,13,43,.78);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.08);font-size:12px}
+.jv-board div{display:flex;align-items:center;gap:5px;min-width:0;height:18px;padding:0 4px;border-radius:6px}
+.jv-board div.is-me{background:rgba(255,255,255,.16);font-weight:800}
+.jv-board div.is-out{opacity:.5}
+.jv-board b{width:12px;font-weight:800;color:#b9add9;text-align:center}
+.jv-board i{flex-shrink:0;width:9px;height:9px;border-radius:50%}
+.jv-board span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jv-board em{font-style:normal;font-weight:800}
+@media (max-width:560px){.jv-board{top:134px;right:6px;width:124px;padding:4px 6px;font-size:11px}.jv-board div{height:16px}}
 @media (max-width:560px){.jv-stat b{font-size:17px}.jv-tl{top:116px}.jv-timer{font-size:26px}.jv-tc{width:min(70%,340px)}.jv-msg{font-size:11.5px}.jv-msg.is-ok,.jv-msg.is-bad{font-size:12.5px}}
 `;
   function injectCss() { if (document.getElementById("jv-css")) return; const s = document.createElement("style"); s.id = "jv-css"; s.textContent = CSS; document.head.appendChild(s); }
@@ -533,6 +553,8 @@ window.HKJellyVs = (function () {
     // all: 0 주인 젤리 · 1 손님 젤리 · 2 가시대왕 · 3~ 숲 친구 (둘이 같은 번호를 쓴다)
     const all = [makeEnt("jelly", 0, JCOL[0]), makeEnt("jelly", 1, JCOL[1]), makeEnt("boss", 2)];
     for (let i = 0; i < N_FRIEND; i++) all.push(makeEnt(RKINDS[(i >> 1) % 4], 3 + i));
+    const extra = JCOL.slice(2).map((col, k) => makeEnt("jelly", 3 + N_FRIEND + k, col)); // 여러 명 때만 쓰는 젤리 넷(자리 2 ~ 5) — 1:1 꾸밈이 바뀌지 않게 맨 뒤에 만든다
+    extra.forEach((j) => { j.g.root.visible = false; });
     RNG = Math.random;
 
     // 맵 바꾸기 — 숲을 다시 만들고 먹을 것 색을 맵에 맞춘다. 바뀌었으면 true
@@ -545,7 +567,7 @@ window.HKJellyVs = (function () {
       }
       return changed;
     }
-    W0 = { canvas, renderer, scene, camera, all, food, M, KIND_COL, BERRY_COL, SHROOM_COL, C, burst, updateParticles, clearParticles, updateFlies: (t) => MK.update(t), updateFoodVisuals, setMap, mapId: 1, session: null, last: 0, raf: 0, tG: 0 };
+    W0 = { canvas, renderer, scene, camera, all, extra, food, M, KIND_COL, BERRY_COL, SHROOM_COL, C, burst, updateParticles, clearParticles, updateFlies: (t) => MK.update(t), updateFoodVisuals, setMap, mapId: 1, session: null, last: 0, raf: 0, tG: 0 };
     return W0;
   }
 
@@ -573,21 +595,31 @@ window.HKJellyVs = (function () {
     const w = buildWorld();
     if (w.session) w.session.destroy();
     const mode = opts.mode || "cpu";
-    if (mode !== "guest") w.setMap(opts.map || 1); // guest 는 주인이 보낸 맵을 쓴다
+    if (mode !== "guest" || (opts.party && opts.map)) w.setMap(opts.map || 1); // guest 는 주인이 보낸 맵을 쓴다(여러 명 손님은 출발 소식에 맵이 있다)
     const online = mode === "host" || mode === "guest";
     const sim = mode !== "guest"; // 판을 직접 계산하는 쪽
-    const me = mode === "guest" ? 1 : 0, rv = 1 - me;
+    const party = online && opts.party && typeof opts.party === "object" ? opts.party : null; // 여러 명 대전
+    const NJ = party ? PARTY_N : 2;
+    const botSeat = party ? J_BOTS(party.bots) : [];
+    const me = party ? (mode === "host" ? 0 : clamp(party.me | 0, 1, NJ - 1)) : mode === "guest" ? 1 : 0, rv = party ? (me ? 0 : 1) : 1 - me;
     const touch = !!opts.touch;
     mutedFn = typeof opts.isMuted === "function" ? opts.isMuted : () => false;
-    const { all, food, M, C: Cc, burst, renderer, camera, scene } = w;
-    const J = [all[0], all[1]], boss = all[2], friends = all.slice(3);
+    const { food, M, C: Cc, burst, renderer, camera, scene } = w;
+    // all: 0 ~ NJ-1 젤리(자리 번호) · NJ 가시대왕 · 그 뒤 숲 친구 — idx 는 이 판의 번호(두 화면이 같은 번호를 쓴다)
+    const J = party ? [w.all[0], w.all[1], ...w.extra] : [w.all[0], w.all[1]];
+    const all = [...J, ...w.all.slice(2)];
+    all.forEach((c, i) => { c.idx = i; });
+    w.extra.forEach((j) => { j.g.root.visible = false; });
+    const boss = all[NJ], friends = all.slice(NJ + 1);
     // 머리 위 이름표의 프로필 사진 — 사진이 없으면 이름 첫 글자 동그라미
     const face = (p, name) => {
       const url = p && typeof p.avatarUrl === "string" && /^\/(api|assets)\//.test(p.avatarUrl) ? p.avatarUrl : "";
       const ch = esc(String(name || "?").trim().charAt(0) || "?");
       return `<span class="jv-face">${ch}${url ? `<img src="${esc(url)}" alt="" onerror="this.style.display='none'">` : ""}</span>`;
     };
-    const names = [mode === "guest" ? (opts.rival && opts.rival.name) || "상대" : (opts.me && opts.me.name) || "나", mode === "guest" ? (opts.me && opts.me.name) || "나" : (opts.rival && opts.rival.name) || (mode === "cpu" ? "컴퓨터" : "상대")];
+    const names = party ? J.map((_, k) => (k === me ? (opts.me && opts.me.name) || "나" : String((party.names && party.names[k]) || (botSeat[k] ? "컴퓨터 젤리" : "동료")).slice(0, 20)))
+      : [mode === "guest" ? (opts.rival && opts.rival.name) || "상대" : (opts.me && opts.me.name) || "나", mode === "guest" ? (opts.me && opts.me.name) || "나" : (opts.rival && opts.rival.name) || (mode === "cpu" ? "컴퓨터" : "상대")];
+    const callName = (k) => (party && botSeat[k] ? names[k] : `${names[k]}님`); // 사람은 「님」을 붙여 부른다
     const hex = (n) => `#${n.toString(16).padStart(6, "0")}`;
 
     // 화면 글
@@ -599,20 +631,22 @@ window.HKJellyVs = (function () {
     root.innerHTML = `<div class="jv-hud">
         <div class="jv-tl"><div class="jv-stats"><div class="jv-stat"><b data-v="size">1.0</b><span>내 크기</span></div><div class="jv-stat"><b data-v="eat">0</b><span>삼킨 친구</span></div></div><span class="jv-pips" data-v="pips2"><i></i><i></i><i></i></span></div>
         <div class="jv-tc"><div class="jv-timer" data-v="timer">2:00</div>
-          <div class="jv-names"><span>${esc(names[me])} <b data-v="ms">1.0</b></span><span><b data-v="rs">1.0</b> ${esc(names[rv])}</span></div>
-          <div class="jv-duel"><i class="jv-duel__me" data-v="dm"></i><i class="jv-duel__rv" data-v="dr"></i></div>
-          <div class="jv-msg" data-v="msg"></div></div>
+          ${party ? "" : `<div class="jv-names"><span>${esc(names[me])} <b data-v="ms">1.0</b></span><span><b data-v="rs">1.0</b> ${esc(names[rv])}</span></div>
+          <div class="jv-duel"><i class="jv-duel__me" data-v="dm"></i><i class="jv-duel__rv" data-v="dr"></i></div>`}
+          <div class="jv-msg" data-v="msg"></div></div>${party ? `<div class="jv-board" data-v="board" aria-label="크기 순위"></div>` : ""}
         <button type="button" class="jv-dash" data-v="dash" aria-label="대시"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v11h3v9l7-12h-4l4-8z"/></svg><span class="jv-pips" data-v="pips"><i></i><i></i><i></i></span>대시</button>
-        <div class="jv-keys">움직이기 <kbd>WASD</kbd> <kbd>방향키</kbd> · 대시 <kbd>Space</kbd> · 멈춤 <kbd>P</kbd></div>
+        <div class="jv-keys">움직이기 <kbd>WASD</kbd> <kbd>방향키</kbd> · 대시 <kbd>Space</kbd>${party ? "" : " · 멈춤 <kbd>P</kbd>"}</div>
         <div class="jv-pops" data-v="pops"></div>
-        <div class="jv-tag me" data-v="tagme">${face(opts.me, (opts.me && opts.me.name) || "나")}나</div><div class="jv-tag" data-v="tagrv">${face(opts.rival, names[rv])}${esc(names[rv])}</div>
+        <div class="jv-tag me" data-v="tagme">${face(opts.me, (opts.me && opts.me.name) || "나")}나</div>${party
+          ? J.map((_, k) => (k === me ? "" : `<div class="jv-tag" data-v="tag${k}"><i class="jvp-tdot" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${hex(JCOL[k])}"></i>${botSeat[k] ? "" : face({ avatarUrl: party.avatars && party.avatars[k] }, names[k])}${esc(names[k])}</div>`)).join("")
+          : `<div class="jv-tag" data-v="tagrv">${face(opts.rival, names[rv])}${esc(names[rv])}</div>`}
         <div class="jv-arrow" data-v="arrow"><em></em><span></span></div>
         <div class="jv-banner" data-v="banner"></div><div class="jv-big" data-v="big"></div><div class="jv-hold" data-v="hold"></div>
       </div><div class="jv-stick" data-v="stick"><i></i></div>`;
     root.insertBefore(w.canvas, root.firstChild);
     container.appendChild(root);
     const $ = (k) => root.querySelector(`[data-v="${k}"]`);
-    const el = { size: $("size"), eat: $("eat"), timer: $("timer"), ms: $("ms"), rs: $("rs"), dm: $("dm"), dr: $("dr"), msg: $("msg"), dash: $("dash"), pips: [...$("pips").children], pips2: [...$("pips2").children], pops: $("pops"), tagme: $("tagme"), tagrv: $("tagrv"), arrow: $("arrow"), banner: $("banner"), big: $("big"), hold: $("hold"), stick: $("stick") };
+    const el = { size: $("size"), eat: $("eat"), timer: $("timer"), ms: $("ms"), rs: $("rs"), dm: $("dm"), dr: $("dr"), msg: $("msg"), dash: $("dash"), pips: [...$("pips").children], pips2: [...$("pips2").children], pops: $("pops"), tagme: $("tagme"), tagrv: $("tagrv"), arrow: $("arrow"), banner: $("banner"), big: $("big"), hold: $("hold"), stick: $("stick"), board: $("board"), tags: J.map((_, k) => $(`tag${k}`)) };
     const popEls = [];
     for (let i = 0; i < 10; i++) { const d = document.createElement("div"); d.className = "jv-pop"; d.style.opacity = 0; d.t = 0; el.pops.appendChild(d); popEls.push(d); }
     let popI = 0;
@@ -634,7 +668,7 @@ window.HKJellyVs = (function () {
     const S = {
       map: w.mapId, seed: (Math.random() * 2147483647) | 0, epoch: Math.random().toString(36).slice(2, 8),
       phase: mode === "demo" ? "play" : "wait", timeLeft: ROUND, playT: 0, countT: 0, endT: 0, result: null, ended: false,
-      pz: 0, pzBy: 0, pzWhy: "", ready: [0, 0], resumeT: 0, evId: 0, ev: [], spawnRef: 0, warn30: false, safeSaid: false, lastTick: 99, rel: 0,
+      pz: 0, pzBy: 0, pzWhy: "", ready: J.map(() => 0), resumeT: 0, evId: 0, ev: [], spawnRef: 0, warn30: false, safeSaid: false, lastTick: 99, rel: 0,
     };
     let localPaused = false; // 컴퓨터와 — 내가 멈춤
     let destroyed = false, endFired = false, link = "ok", devAuto = false, rtt = 120, lastSnapAt = 0, myReady = 0;
@@ -645,8 +679,19 @@ window.HKJellyVs = (function () {
     const setSize = (c) => { c.s = Math.sqrt(c.m); };
     function placeFood(f) { const p = foodPos(S.seed, f.i, f.gen % 31); f.x = p.x; f.z = p.z; }
     function resetFood() { for (const f of food) { f.gen = 0; f.alive = true; f.pop = 1; f.t = 0; placeFood(f); } }
+    // 여러 명 — 6마리 출발 자리: 숲 가운데 둘레에 고르게(좌우 대칭 · 0번이 카메라 쪽). 장애물 · 가시대왕 자리(0, -34)는 피한다
+    function partyStarts() {
+      for (const r of [17, 15, 19, 13, 21, 11]) {
+        for (const base of [Math.PI / 2, Math.PI / 2 + Math.PI / 6]) {
+          const pts = J.map((_, i) => { const a = base + (i * TAU) / NJ; return [Math.round(Math.cos(a) * r * 10) / 10, Math.round(Math.sin(a) * r * 10) / 10]; });
+          if (pts.every(([x, z]) => !MK.blocked(x, z, 3) && Math.hypot(x, z + 34) > 12)) return pts;
+        }
+      }
+      return J.map((_, i) => { const a = Math.PI / 2 + (i * TAU) / NJ; return [Math.cos(a) * 17, Math.sin(a) * 17]; });
+    }
     function resetJellies() {
-      J.forEach((j, i) => { j.x = START[i][0]; j.z = START[i][1]; j.vx = j.vz = 0; j.m = 1; setSize(j); j.ds = 1; j.state = "ok"; j.yaw = Math.PI; j.g.root.visible = true; j.gulp = 0; j.eater = null; j.dash = 1; j.dashT = 0; j.dashDx = 0; j.dashDz = -1; j.inv = 0; j.eat = 0; j.bites = 0; j.inx = 0; j.inz = 0; j.lastD = 0; j.inAt = performance.now(); });
+      const st = party ? partyStarts() : START;
+      J.forEach((j, i) => { j.x = st[i][0]; j.z = st[i][1]; j.vx = j.vz = 0; j.m = 1; setSize(j); j.ds = 1; j.state = "ok"; j.yaw = party ? Math.atan2(-j.x, -j.z) : Math.PI; j.kills = 0; j.died = 0; j.rsp = 0; j.g.root.visible = true; j.gulp = 0; j.eater = null; j.dash = 1; j.dashT = 0; j.dashDx = 0; j.dashDz = -1; j.inv = 0; j.eat = 0; j.bites = 0; j.inx = 0; j.inz = 0; j.lastD = 0; j.inAt = performance.now(); });
     }
     function spotFriend(c, s, minD) {
       for (let k = 0; k < 30; k++) {
@@ -665,7 +710,7 @@ window.HKJellyVs = (function () {
       }
     }
     function spawnFriend(c) {
-      const ref = J[(S.spawnRef ^= 1)], ps = ref.s, danger = ps * 1.25 < RIVAL_CAP && srand(1) < 0.3;
+      const ref = J[(S.spawnRef = (S.spawnRef + 1) % NJ)], ps = ref.s, danger = ps * 1.25 < RIVAL_CAP && srand(1) < 0.3;
       const s = clamp(danger ? ps * srand(1.25, 1.7) : ps * srand(0.42, 0.8), 0.5, RIVAL_CAP);
       readyFriend(c, s, 0); spotFriend(c, s, 16 + s);
       if (S.phase === "play") burst(c.x, 0.4, c.z, 8, Cc(w.KIND_COL[c.kind]), 4, 5);
@@ -711,6 +756,36 @@ window.HKJellyVs = (function () {
       j.x = big.x + dx * (big.s + j.s + 0.4); j.z = big.z + dz * (big.s + j.s + 0.4); j.vx = dx * 20; j.vz = dz * 20;
       pushEv("b", j.idx, big.idx);
     }
+    // 여러 명 — 젤리가 젤리를 삼킨다(판은 이어 간다). 삼켜진 젤리는 RESPAWN 초 뒤 다시 태어난다
+    function eatJelly(big, sm) {
+      sm.state = "dying"; sm.t = 0; sm.eater = big; sm.rsp = RESPAWN; sm.died++; sm.dashT = 0; sm.vx = sm.vz = 0; sm.inx = sm.inz = 0;
+      grow(big, sm.m * 0.5); big.kills++;
+      pushEv("j", big.idx, sm.idx);
+    }
+    function respawnSpot(j) {
+      let best = null, bestD = -1e9;
+      for (let k = 0; k < 28; k++) {
+        const a = srand(TAU), r = WORLD - srand(5, 10), x = Math.cos(a) * r, z = Math.sin(a) * r;
+        if (MK.blocked(x, z, 2.5)) continue;
+        let dmin = 1e9;
+        for (const o of all) { if (o === j || o.state !== "ok" || (!o.isJ && !o.isBoss && o.s < 1.2)) continue; dmin = Math.min(dmin, Math.hypot(o.x - x, o.z - z) - o.s * 1.2); }
+        if (dmin > bestD) { bestD = dmin; best = [x, z]; }
+      }
+      return best || [0, WORLD - 8];
+    }
+    function respawnJelly(j) {
+      const [x, z] = respawnSpot(j);
+      j.x = x; j.z = z; j.vx = j.vz = 0; j.m = 1; setSize(j); j.ds = 0.3; j.state = "ok"; j.inv = RESPAWN_INV; j.eater = null; j.gulp = 0;
+      j.dash = Math.max(j.dash, 1); j.dashT = 0; j.yaw = Math.atan2(-x, -z); j.g.root.visible = true;
+      pushEv("r", j.idx, (Math.round(x) + 100) * 1000 + (Math.round(z) + 100));
+    }
+    function endParty() {
+      if (S.phase !== "play") return;
+      const size = J.map((j) => (j.state === "ok" ? Math.round(j.s * 100) : 100)); // 삼켜져 다시 태어나기 전이면 처음 크기
+      S.result = { party: true, winner: partyWinner(size), size, eaten: false, sec: ROUND, map: S.map, friends: J.map((j) => j.eat), bites: J.map((j) => j.bites), kills: J.map((j) => j.kills), died: J.map((j) => j.died) };
+      S.phase = "end"; S.endT = 0;
+      handleEnd();
+    }
     function endBy(winner, eaten, by) {
       if (S.phase !== "play") return;
       const size = [Math.round(J[0].s * 100), Math.round(J[1].s * 100)];
@@ -727,7 +802,13 @@ window.HKJellyVs = (function () {
           const b = L[k]; if (b.state !== "ok" || (b.isJ && S.phase !== "play")) continue;
           const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz) || 1e-4, big = a.s >= b.s ? a : b, sm = big === a ? b : a;
           if (a.isJ && b.isJ) {
-            if (mode !== "demo" && S.playT >= SAFE && big.s > sm.s * PVP) { if (d < big.s * 0.82 + sm.s * 0.18 && sm.dashT <= 0 && sm.inv <= 0) { endBy(big.idx === 0 ? "host" : "guest", true, big.idx); return; } continue; }
+            if (mode !== "demo" && S.playT >= SAFE && big.s > sm.s * PVP) {
+              if (d < big.s * 0.82 + sm.s * 0.18 && sm.dashT <= 0 && sm.inv <= 0) {
+                if (party) { eatJelly(big, sm); if (a.state !== "ok") break; continue; }
+                endBy(big.idx === 0 ? "host" : "guest", true, big.idx); return;
+              }
+              continue;
+            }
           } else if (big.s > sm.s * EAT) {
             if (d < big.s * 0.82 + sm.s * 0.18) {
               if (sm.isJ) { if (sm.inv <= 0 && sm.dashT <= 0 && big.calm <= 0) bite(big, sm); }
@@ -812,12 +893,14 @@ window.HKJellyVs = (function () {
     }
 
     // ───── 컴퓨터 젤리 (연습 · 구경 · 시험 자동 조작)
-    const brain = [{ t: 0, x: 0, z: 0 }, { t: 0, x: 0, z: 0 }];
+    const brain = J.map(() => ({ t: 0, x: 0, z: 0 }));
     const LV = { easy: { th: 0.45, mag: 0.72, dash: 0, aggr: 0.35 }, normal: { th: 0.28, mag: 0.88, dash: 0.5, aggr: 0.75 }, hard: { th: 0.16, mag: 1, dash: 1, aggr: 1 } };
     function botThink(j, lv, dt) {
       const B = brain[j.idx]; B.t -= dt; if (B.t > 0) return;
       B.t = lv.th + Math.random() * 0.1;
-      const o = J[1 - j.idx], safe = S.playT >= SAFE;
+      const safe = S.playT >= SAFE;
+      let o = party ? null : J[1 - j.idx];
+      if (party) { let bd = 30; for (const q of J) { if (q === j || q.state !== "ok" || q.inv > 0 || !(j.s > q.s * PVP)) continue; const d = Math.hypot(q.x - j.x, q.z - j.z); if (d < bd) { bd = d; o = q; } } } // 가장 가까운 삼킬 수 있는 젤리
       let gx = 0, gz = 0, best = 1e9, flee = null, fleeD = 1e9;
       for (const c of all) {
         if (c === j || c.state !== "ok") continue;
@@ -829,7 +912,7 @@ window.HKJellyVs = (function () {
         gx = j.x - flee.x; gz = j.z - flee.z;
         if (fleeD < 2.2 && Math.random() < lv.dash) { B.dashNow = true; }
       } else {
-        if (mode !== "demo" && safe && j.s > o.s * PVP && o.state === "ok" && Math.random() < lv.aggr) { gx = o.x - j.x; gz = o.z - j.z; best = 0; if (Math.hypot(gx, gz) < 6 + j.s && Math.random() < lv.dash) B.dashNow = true; }
+        if (mode !== "demo" && safe && o && j.s > o.s * PVP && o.state === "ok" && Math.random() < lv.aggr) { gx = o.x - j.x; gz = o.z - j.z; best = 0; if (Math.hypot(gx, gz) < 6 + j.s && Math.random() < lv.dash) B.dashNow = true; }
         else {
           for (const c of all) {
             if (c.isJ || c.state !== "ok" || !(j.s > c.s * EAT)) continue;
@@ -919,7 +1002,17 @@ window.HKJellyVs = (function () {
         burst(sm.x, sm.s * 0.8, sm.z, type === "k" ? 60 : 14, Cc(w.KIND_COL[sm.kind] || 0xffffff), 5 + sm.s * 2, 6 + sm.s);
         if (type === "c") return;
         if (mine) { SFX.gulp(); pop(type === "k" ? "가시대왕 꿀꺽!" : "꿀꺽!", sm.x, j.s * 2 + 1, sm.z, type === "k" ? "mint" : ""); if (!reduceMotion) shake = Math.max(shake, 0.12 + sm.s * 0.03); }
-        if (type === "k") banner(mine ? "가시대왕을 삼켰어요! 몸이 크게 자라요" : `${names[a]}님이 가시대왕을 삼켰어요`, mine ? "mint" : "bad", 2.6);
+        if (type === "k") banner(mine ? "가시대왕을 삼켰어요! 몸이 크게 자라요" : `${callName(a)}이 가시대왕을 삼켰어요`, mine ? "mint" : "bad", 2.6);
+      } else if (type === "j") { // 여러 명 — a 가 b 를 삼켰다
+        const sm = J[b]; if (!sm || !j) return;
+        burst(sm.x, sm.s * 0.8, sm.z, 26, Cc(JCOL[b]), 6 + sm.s * 2, 7);
+        if (mine) { SFX.gulp(); pop(`꿀꺽! ${names[b]}`, sm.x, j.s * 2 + 1, sm.z, "mint"); if (!reduceMotion) shake = Math.max(shake, 0.3); }
+        else if (b === me) { SFX.hurt(); banner(`${callName(a)}에게 꿀꺽 삼켜졌어요 · 3초 뒤 다시 태어나요`, "bad", 2.6); if (!reduceMotion) shake = 0.55; if (!sim) sm.rsp = RESPAWN; }
+      } else if (type === "r") { // 여러 명 — a 가 다시 태어났다 (b = 자리)
+        if (!j) return;
+        const x = Math.floor(b / 1000) - 100, z = (b % 1000) - 100;
+        burst(x, 0.6, z, 18, Cc(JCOL[a]), 5, 6);
+        if (mine) { banner("다시 태어났어요! 잠깐은 안 삼켜져요", "mint", 1.8); SFX.ready(); }
       } else if (type === "b") {
         burst(j.x, j.s, j.z, 22, Cc(JCOL[a]), 7, 7);
         if (mine) { SFX.hurt(); pop("아야!", j.x, j.s * 2 + 1.2, j.z, "bad"); if (!reduceMotion) shake = 0.55; }
@@ -930,6 +1023,7 @@ window.HKJellyVs = (function () {
 
     // ───── 끝
     function myRes(r) {
+      if (r.party) { const order = sizeOrder(r.size); return { ...r, me, win: r.winner === me, draw: r.winner == null, mySize: r.size[me], place: order.indexOf(me) + 1, order, names: names.slice() }; }
       const win = r.winner !== "draw" && (r.winner === "host") === (me === 0);
       return { ...r, me, win, draw: r.winner === "draw", mySize: r.size[me], rivalSize: r.size[rv] };
     }
@@ -937,7 +1031,8 @@ window.HKJellyVs = (function () {
       const r = S.result; if (!r) return;
       stopInput();
       const out = myRes(r);
-      if (out.draw) banner("크기가 거의 같아요 — 무승부", "", 2.4);
+      if (r.party) banner(out.win ? "1등! 가장 큰 젤리예요" : out.draw ? "시간 끝! 크기가 거의 같아 1등이 없어요" : `시간 끝! ${out.place}등이에요`, out.win ? "mint" : out.place <= 3 ? "" : "bad", 2.4);
+      else if (out.draw) banner("크기가 거의 같아요 — 무승부", "", 2.4);
       else if (r.eaten) banner(out.win ? "꿀꺽! 상대를 삼켰어요" : "꿀꺽 삼켜졌어요…", out.win ? "mint" : "bad", 2.4);
       else banner("시간 끝!", out.win ? "mint" : "bad", 2);
       if (out.win) SFX.win(); else if (!out.draw) SFX.lose(); else SFX.ready();
@@ -951,11 +1046,12 @@ window.HKJellyVs = (function () {
 
     // ───── 통신
     const net = opts.net;
-    function send(m) { try { return !!(net && net.send(m)); } catch (_) { return false; } }
+    function send(m, to) { try { return !!(net && net.send(m, to)); } catch (_) { return false; } } // to: 여러 명 — 받을 자리(주인만)
     let lastSnap = 0, lastIn = 0, lastInSig = "", lastPing = 0, lastHi = 0;
     function snapshot() {
-      const j = J.map((q) => [r1(q.x), r1(q.z), r1(q.vx), r1(q.vz), Math.round(q.s * 100), q.dash, q.dashT > 0 ? 1 : 0, r1(Math.max(0, q.inv)), q.eat, q.bites, q.state === "ok" ? 0 : 1]);
-      const c = all.slice(2).map((q) => [r1(q.x), r1(q.z), Math.round(q.s * 100), q.state === "ok" ? 0 : q.state === "spawn" ? 1 : q.state === "dead" ? 2 : 3 + (q.eater ? q.eater.idx : 0)]);
+      // 젤리: [x, z, vx, vz, 크기, 대시, 대시 중, 무적, 삼킨 친구, 물림, 상태(0 · 1 — 여러 명은 1 + 삼킨 젤리 자리), (여러 명) 삼킨 젤리, 삼켜진 횟수]
+      const j = J.map((q) => { const a = [r1(q.x), r1(q.z), r1(q.vx), r1(q.vz), Math.round(q.s * 100), q.dash, q.dashT > 0 ? 1 : 0, r1(Math.max(0, q.inv)), q.eat, q.bites, q.state === "ok" ? 0 : party ? 1 + (q.eater && q.eater.isJ ? q.eater.idx : 0) : 1]; if (party) a.push(q.kills, q.died); return a; });
+      const c = all.slice(NJ).map((q) => [r1(q.x), r1(q.z), Math.round(q.s * 100), q.state === "ok" ? 0 : q.state === "spawn" ? 1 : q.state === "dead" ? 2 : 3 + (q.eater ? q.eater.idx : 0)]);
       let f = ""; for (const q of food) f += ALPH[(q.gen % 31) * 2 + (q.alive ? 1 : 0)];
       const now = performance.now();
       const ev = S.ev.filter((e) => now - e[4] < 900).map((e) => e.slice(0, 4));
@@ -973,18 +1069,24 @@ window.HKJellyVs = (function () {
     function pauseBy(who, why) {
       if (S.phase === "end" || S.pz) return;
       if (S.phase !== "play" && S.phase !== "count") return;
-      if (S.phase === "count") { S.phase = "wait"; S.countT = 0; S.ready = [0, 0]; return; }
-      S.pz = 1; S.pzBy = who; S.pzWhy = why || "pause"; S.ready = [0, 0]; S.resumeT = 0; stopInput(); sendSnap();
+      if (party && S.phase === "count") return; // 여러 명 — 셋 세는 중에는 멈추지 않는다(화면이 돌아오면 이어서 센다)
+      if (S.phase === "count") { S.phase = "wait"; S.countT = 0; S.ready = J.map(() => 0); return; }
+      S.pz = 1; S.pzBy = who; S.pzWhy = why || "pause"; S.ready = J.map(() => 0); S.resumeT = 0; stopInput(); sendSnap();
     }
     function checkReady() {
-      if (S.phase === "wait" && S.ready[0] && S.ready[1] && S.countT <= 0) { resetWorld(); S.phase = "count"; S.countT = COUNT; S.lastCount = 4; sendSnap(); }
-      else if (S.pz && S.ready[0] && S.ready[1] && S.resumeT <= 0) { S.resumeT = COUNT; S.lastCount = 4; sendSnap(); }
+      const ok = S.ready.every((v) => v); // 1:1 은 두 사람, 여러 명은 들어온 사람 모두(컴퓨터 자리는 늘 준비)
+      if (S.phase === "wait" && ok && S.countT <= 0) { resetWorld(); S.phase = "count"; S.countT = COUNT; S.lastCount = 4; sendSnap(); }
+      else if (S.pz && ok && S.resumeT <= 0) { S.resumeT = COUNT; S.lastCount = 4; sendSnap(); }
     }
+    // 여러 명 주인 — 사람 자리는 손님 화면이 「hi」를 보내면 준비. 너무 오래 안 오면(PARTY_WAIT_MS) 기다리지 않고 시작한다
+    const PARTY_WAIT_MS = 9000;
+    let partyWaitUntil = 0;
+    function partyReadyAll() { S.ready = J.map(() => 1); checkReady(); }
     // guest — 받은 상태를 쌓아 두고 120ms 늦게 그린다
     const buf = [];
     let gEpoch = null, gSeed = null, corr = { x: 0, z: 0 };
     function guestReset(ep) {
-      gEpoch = ep; buf.length = 0; S.result = null; S.phase = "wait"; endFired = false; S.ended = false; myReady = 0; dashCount = 0; lastInSig = "";
+      gEpoch = ep; buf.length = 0; S.result = null; S.phase = "wait"; endFired = false; S.ended = false; myReady = party ? 1 : 0; dashCount = 0; lastInSig = "";
       resetJellies(); seenEv.clear();
     }
     function applySnap(m) {
@@ -996,9 +1098,9 @@ window.HKJellyVs = (function () {
       S.phase = ["wait", "count", "play", "end"][m.ph] || "wait";
       if (prevPhase === "wait" && S.phase === "count") { resetWorld(); }
       S.timeLeft = m.tl / 10; S.playT = m.pt / 10; S.countT = m.cn / 10; S.resumeT = m.pz ? m.cn / 10 : 0;
-      S.ready = [m.rd[0] ? 1 : 0, m.rd[1] ? 1 : 0]; // [주인, 손님]
-      if ((S.phase === "play" && !m.pz) || (!S.pz && m.pz)) myReady = 0; // 시작했거나 새로 멈췄다 — 준비는 다시 눌러야
-      if ((S.phase === "wait" || m.pz) && !m.rd[1] && myReady && performance.now() - (S.myReadyAt || 0) > 1500) send({ t: "rd", on: 1 }); // 내 준비가 아직 안 닿았다
+      S.ready = Array.isArray(m.rd) ? m.rd.map((v) => (v ? 1 : 0)) : J.map(() => 0); // [주인, 손님 …]
+      if (!party && ((S.phase === "play" && !m.pz) || (!S.pz && m.pz))) myReady = 0; // 시작했거나 새로 멈췄다 — 준비는 다시 눌러야
+      if (!party && (S.phase === "wait" || m.pz) && !m.rd[me] && myReady && performance.now() - (S.myReadyAt || 0) > 1500) send({ t: "rd", on: 1 }); // 내 준비가 아직 안 닿았다
       if (!S.pz && m.pz) stopInput();
       S.pz = m.pz; S.pzBy = m.pb; S.pzWhy = m.pw;
       // 먹을 것
@@ -1012,24 +1114,33 @@ window.HKJellyVs = (function () {
       if (buf.length > 10) buf.shift();
       // 내 젤리는 예측 — 주인 값으로 부드럽게 맞춘다
       const mj = m.j[me], j = J[me];
+      if (party) { // 여러 명 — 삼켜짐 · 다시 태어남
+        J.forEach((q, k) => {
+          const st = m.j[k] && m.j[k][10];
+          if (st && q.state === "ok") { q.state = "dying"; q.t = 0; q.eater = J[st - 1] || null; q.rsp = RESPAWN; q.vx = q.vz = 0; }
+          else if (!st && q.state !== "ok") { q.state = "ok"; q.eater = null; q.ds = 0.3; q.g.root.visible = true; q.x = m.j[k][0] / 10; q.z = m.j[k][1] / 10; if (k !== me) buf.forEach((b) => { if (b.j[k]) { b.j[k] = m.j[k]; } }); }
+          if (m.j[k] && m.j[k].length > 12) { q.kills = m.j[k][11]; q.died = m.j[k][12]; }
+        });
+      }
       const lat = clamp(rtt / 1000, 0.03, 0.4);
       const tx = mj[0] / 10 + (mj[2] / 10) * lat, tz = mj[1] / 10 + (mj[3] / 10) * lat;
       const newInv = mj[7] / 10;
       if (S.phase !== "play" || Math.hypot(tx - j.x, tz - j.z) > 6 || (newInv > j.inv + 1 && j.inv < 1)) { j.x = mj[0] / 10; j.z = mj[1] / 10; corr.x = corr.z = 0; }
       else { corr.x = tx - j.x; corr.z = tz - j.z; }
       j.m = Math.pow(mj[4] / 100, 2); setSize(j); j.dash = mj[5]; j.inv = newInv; j.eat = mj[8]; j.bites = mj[9];
-      const oj = m.j[rv], o = J[rv]; o.eat = oj[8]; o.bites = oj[9]; o.dash = oj[5]; o.dashT = oj[6] ? 0.2 : 0; o.inv = oj[7] / 10; o.m = Math.pow(oj[4] / 100, 2); setSize(o);
+      J.forEach((o, k) => { if (k === me || !m.j[k]) return; const oj = m.j[k]; o.eat = oj[8]; o.bites = oj[9]; o.dash = oj[5]; o.dashT = oj[6] ? 0.2 : 0; o.inv = oj[7] / 10; o.m = Math.pow(oj[4] / 100, 2); setSize(o); });
+      const oj = m.j[rv], o = J[rv];
       // 친구 상태
       m.c.forEach((q, i) => {
-        const c = all[2 + i]; if (!c) return;
+        const c = all[NJ + i]; if (!c) return;
         c.m = Math.pow(q[2] / 100, 2); setSize(c);
         const st = q[3] === 0 ? "ok" : q[3] === 1 ? "spawn" : q[3] === 2 ? "dead" : "dying";
         if (st === "dying" && c.state !== "dying") { c.t = 0; c.eater = all[q[3] - 3] || null; }
         if ((st === "spawn" || st === "ok") && (c.state === "dead" || c.state === "dying")) { c.x = q[0] / 10; c.z = q[1] / 10; c.ds = st === "spawn" ? 0.01 : c.s; c.g.root.visible = true; }
         c.state = st;
       });
-      if (oj[10] && o.state === "ok" && m.en && m.en.eaten) { o.state = "dying"; o.t = 0; o.eater = J[me]; }
-      if (mj[10] && j.state === "ok" && m.en && m.en.eaten) { j.state = "dying"; j.t = 0; j.eater = J[rv]; }
+      if (!party && oj[10] && o.state === "ok" && m.en && m.en.eaten) { o.state = "dying"; o.t = 0; o.eater = J[me]; }
+      if (!party && mj[10] && j.state === "ok" && m.en && m.en.eaten) { j.state = "dying"; j.t = 0; j.eater = J[rv]; }
       (m.ev || []).forEach(handleEv);
       if (m.en && !S.result) { S.result = m.en; S.phase = "end"; S.endT = 0; handleEnd(); }
     }
@@ -1039,19 +1150,22 @@ window.HKJellyVs = (function () {
       let a = buf[0], b = buf[buf.length - 1], k = 1;
       for (let i = buf.length - 1; i > 0; i--) { if (buf[i - 1].at <= rt) { a = buf[i - 1]; b = buf[i]; k = clamp((rt - a.at) / Math.max(1, b.at - a.at), 0, 1.2); break; } }
       const mix = (p, q) => { const x = lerp(p[0], q[0], k) / 10, z = lerp(p[1], q[1], k) / 10; return Math.hypot(q[0] - p[0], q[1] - p[1]) / 10 > 8 ? [q[0] / 10, q[1] / 10] : [x, z]; };
-      const o = J[rv], [ox, oz] = mix(a.j[rv], b.j[rv]); o.x = ox; o.z = oz; o.vx = b.j[rv][2] / 10; o.vz = b.j[rv][3] / 10;
-      for (let i = 0; i < b.c.length; i++) { const c = all[2 + i]; if (!c || c.state === "dead") continue; const p = a.c[i] || b.c[i], q = b.c[i]; if (c.state === "dying") continue; const [x, z] = mix(p, q); c.vx = (q[0] - p[0]) / 10 / Math.max(0.03, (b.at - a.at) / 1000); c.vz = (q[1] - p[1]) / 10 / Math.max(0.03, (b.at - a.at) / 1000); c.x = x; c.z = z; }
+      J.forEach((o, k) => { if (k === me || !a.j[k] || !b.j[k]) return; const [ox, oz] = mix(a.j[k], b.j[k]); o.x = ox; o.z = oz; o.vx = b.j[k][2] / 10; o.vz = b.j[k][3] / 10; });
+      for (let i = 0; i < b.c.length; i++) { const c = all[NJ + i]; if (!c || c.state === "dead") continue; const p = a.c[i] || b.c[i], q = b.c[i]; if (c.state === "dying") continue; const [x, z] = mix(p, q); c.vx = (q[0] - p[0]) / 10 / Math.max(0.03, (b.at - a.at) / 1000); c.vz = (q[1] - p[1]) / 10 / Math.max(0.03, (b.at - a.at) / 1000); c.x = x; c.z = z; }
     }
     if (net && typeof net.onMessage === "function") {
-      net.onMessage((m) => {
+      net.onMessage((m, seat) => {
         if (destroyed || !m || typeof m !== "object") return;
         if (mode === "host") {
-          if (m.t === "hi") { if (S.phase === "wait" || S.pz) { S.ready[1] = m.rd ? 1 : 0; checkReady(); } sendSnap(); }
+          const k = party ? seat : 1; // 보낸 자리 — 1:1 은 늘 손님(1)
+          if (!Number.isInteger(k) || k < 1 || k >= NJ || botSeat[k]) return;
+          if (party && (m.t === "rd" || m.t === "pz" || m.t === "away")) return; // 여러 명은 준비 · 멈춤을 대기실 · 주인이 맡는다
+          if (m.t === "hi") { if (S.phase === "wait" || S.pz) { S.ready[k] = m.rd ? 1 : 0; checkReady(); } if (party) send(snapshot(), k); else sendSnap(); }
           else if (m.t === "rd") { if (S.phase === "wait" || S.pz) { S.ready[1] = m.on ? 1 : 0; checkReady(); sendSnap(); } }
-          else if (m.t === "in") { const j = J[1]; j.inx = clamp((m.x | 0) / 10, -1, 1); j.inz = clamp((m.z | 0) / 10, -1, 1); j.inAt = performance.now(); if ((m.d | 0) > j.lastD) { j.lastD = m.d | 0; tryDash(j); } }
+          else if (m.t === "in") { const j = J[k]; j.inx = clamp((m.x | 0) / 10, -1, 1); j.inz = clamp((m.z | 0) / 10, -1, 1); j.inAt = performance.now(); if ((m.d | 0) > j.lastD) { j.lastD = m.d | 0; tryDash(j); } }
           else if (m.t === "pz") pauseBy(1, "pause");
           else if (m.t === "away") pauseBy(1, "away");
-          else if (m.t === "ping") send({ t: "pong", c: m.c });
+          else if (m.t === "ping") send({ t: "pong", c: m.c }, k);
         } else if (mode === "guest") {
           if (m.t === "s" && typeof m.ph === "number" && Array.isArray(m.j) && Array.isArray(m.c) && typeof m.f === "string") applySnap(m);
           else if (m.t === "pong" && typeof m.c === "number") rtt = clamp(performance.now() - m.c, 10, 1500);
@@ -1059,7 +1173,13 @@ window.HKJellyVs = (function () {
       });
     }
     const onVis = () => {
-      if (destroyed || !document.hidden) return;
+      if (destroyed) return;
+      if (party) { // 여러 명 — 주인이 숨으면 모두 멈추고, 돌아오면 3초 세고 이어 간다(손님이 숨으면 그 젤리만 멈춰 선다)
+        if (mode !== "host") return;
+        if (document.hidden) pauseBy(0, "away"); else if (S.pz && S.pzWhy === "away") { w.last = performance.now(); partyReadyAll(); }
+        return;
+      }
+      if (!document.hidden) return;
       if (mode === "host") pauseBy(0, "away");
       else if (mode === "guest" && S.phase === "play") send({ t: "away" });
     };
@@ -1070,7 +1190,7 @@ window.HKJellyVs = (function () {
     function lobbyInfo() {
       const rd = S.ready;
       return { phase: S.phase === "count" ? "wait" : S.phase, counting: S.phase === "count" || S.resumeT > 0, paused: !!S.pz, pausedBy: S.pz ? (S.pzBy === me ? "me" : "rival") : null, pausedWhy: S.pz ? S.pzWhy || "pause" : null,
-        ready: [mode === "guest" ? (myReady ? 1 : 0) : rd[me], rd[rv]], peer: link === "ok", host: mode === "host", map: S.map };
+        ready: party ? rd.slice() : [mode === "guest" ? (myReady ? 1 : 0) : rd[me], rd[rv]], peer: link === "ok", host: mode === "host", map: S.map, party: !!party };
     }
     function lobbyTick() {
       if (!online) return;
@@ -1130,25 +1250,44 @@ window.HKJellyVs = (function () {
       setText("timer", `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`);
       const low = sec <= 10 && S.phase === "play"; if (hudLast.low !== low) { hudLast.low = low; el.timer.classList.toggle("is-low", low); }
       const a = J[me], b = J[rv];
-      setText("size", a.s.toFixed(1)); setText("eat", a.eat.toLocaleString("ko-KR")); setText("ms", a.s.toFixed(1)); setText("rs", b.s.toFixed(1));
-      const tot = a.s + b.s, pa = Math.round((a.s / tot) * 100);
-      if (hudLast.pa !== pa) { hudLast.pa = pa; el.dm.style.width = `${pa}%`; el.dr.style.width = `${100 - pa}%`; }
+      setText("size", a.s.toFixed(1)); setText("eat", a.eat.toLocaleString("ko-KR"));
+      if (party) updateBoard();
+      else {
+        setText("ms", a.s.toFixed(1)); setText("rs", b.s.toFixed(1));
+        const tot = a.s + b.s, pa = Math.round((a.s / tot) * 100);
+        if (hudLast.pa !== pa) { hudLast.pa = pa; el.dm.style.width = `${pa}%`; el.dr.style.width = `${100 - pa}%`; }
+      }
       const dk = `${a.dash}.${a.dashT > 0}`;
       if (hudLast.dk !== dk) { hudLast.dk = dk; el.pips.forEach((e, i) => e.classList.toggle("on", i < a.dash)); el.pips2.forEach((e, i) => e.classList.toggle("on", i < a.dash)); el.dash.classList.toggle("is-ready", a.dash > 0); }
       let msg = "", cls = "";
       const safeLeft = SAFE - S.playT;
-      if (S.phase === "play" && safeLeft > 0) msg = `${Math.ceil(safeLeft)}초 뒤부터 서로 삼킬 수 있어요`;
+      if (party) {
+        const near = (f) => J.some((q) => q !== a && q.state === "ok" && f(q) && Math.hypot(q.x - a.x, q.z - a.z) < 12 + q.s + a.s);
+        if (S.phase === "play" && a.state !== "ok") { msg = `꿀꺽 삼켜졌어요 · ${Math.max(1, Math.ceil(a.rsp || 0))}초 뒤 다시 태어나요`; cls = "is-bad"; }
+        else if (S.phase === "play" && safeLeft > 0) msg = `${Math.ceil(safeLeft)}초 뒤부터 서로 삼킬 수 있어요`;
+        else if (S.phase === "play" && a.inv <= 0 && near((q) => q.s > a.s * PVP && q.inv <= 0)) { msg = "조심! 가까이에 나를 삼킬 수 있는 젤리가 있어요"; cls = "is-bad"; }
+        else if (S.phase === "play" && near((q) => a.s > q.s * PVP && q.inv <= 0)) { msg = "가까운 젤리를 삼킬 수 있어요!"; cls = "is-ok"; }
+        else if (S.phase === "play") msg = `나보다 ${PVP}배 작은 젤리는 꿀꺽 · 2분 뒤 가장 큰 젤리가 1등`;
+      } else if (S.phase === "play" && safeLeft > 0) msg = `${Math.ceil(safeLeft)}초 뒤부터 서로 삼킬 수 있어요`;
       else if (S.phase === "play" && a.s > b.s * PVP) { msg = "지금 상대를 삼킬 수 있어요!"; cls = "is-ok"; }
       else if (S.phase === "play" && b.s > a.s * PVP) { msg = "조심! 상대가 나를 삼킬 수 있어요"; cls = "is-bad"; }
       else if (S.phase === "play") msg = `상대보다 ${PVP}배 크면 꿀꺽 · 2분 뒤 큰 쪽 승리`;
       if (hudLast.msg !== msg + cls) { hudLast.msg = msg + cls; el.msg.textContent = msg; el.msg.className = `jv-msg ${cls}`; }
       if (S.phase === "play") {
         if (safeLeft <= 0 && !S.safeSaid) { S.safeSaid = true; banner("이제 서로 삼킬 수 있어요", "", 1.8); SFX.ready(); }
-        const rel = a.s > b.s * PVP ? 1 : b.s > a.s * PVP ? -1 : 0;
+        const rel = party ? 0 : a.s > b.s * PVP ? 1 : b.s > a.s * PVP ? -1 : 0;
         if (safeLeft <= 0 && rel !== S.rel) { S.rel = rel; if (rel === 1) { banner("상대보다 커졌어요! 지금 삼키세요", "mint", 2.2); SFX.ready(); } else if (rel === -1) banner("상대가 더 커졌어요! 피하세요", "bad", 2.2); }
         if (!S.warn30 && S.timeLeft <= 30) { S.warn30 = true; banner("30초 남았어요", "bad", 1.6); SFX.ready(); }
         if (sec <= 10 && sec < S.lastTick && sec > 0) { S.lastTick = sec; SFX.tick(); }
       }
+    }
+    // 여러 명 — 오른쪽 위 크기 순위(삼켜진 젤리는 처음 크기로 친다)
+    function updateBoard() {
+      const sz = J.map((q) => (q.state === "ok" ? Math.round(q.s * 100) : 100)), order = sizeOrder(sz);
+      const sig = order.map((i) => `${i}:${sz[i]}:${J[i].state === "ok" ? 1 : 0}`).join(",");
+      if (hudLast.board === sig) return;
+      hudLast.board = sig;
+      el.board.innerHTML = order.map((i, k) => `<div class="${i === me ? "is-me" : ""}${J[i].state !== "ok" ? " is-out" : ""}"><b>${k + 1}</b><i style="background:${hex(JCOL[i])}"></i><span>${esc(i === me ? "나" : names[i])}</span><em>${J[i].state === "ok" ? (sz[i] / 100).toFixed(1) : "…"}</em></div>`).join("");
     }
     function project(x, y, z) { v3.set(x, y, z).project(camera); return v3; }
     function updateTags() {
@@ -1156,6 +1295,19 @@ window.HKJellyVs = (function () {
       const a = J[me], b = J[rv];
       const pa = project(a.x, a.ds * 2.4 + 0.5, a.z);
       if (show && a.state === "ok" && pa.z < 1) { el.tagme.style.display = "block"; el.tagme.style.transform = `translate(${((pa.x * 0.5 + 0.5) * VW).toFixed(1)}px,${((-pa.y * 0.5 + 0.5) * VH).toFixed(1)}px) translate(-50%,-100%)`; } else el.tagme.style.display = "none";
+      if (party) { // 다른 젤리 이름표 — 화면 안에 있을 때만 · 고리와 같은 색
+        el.arrow.style.display = "none";
+        const safe = S.playT >= SAFE && S.phase === "play";
+        J.forEach((q, k) => {
+          const t = el.tags[k]; if (!t) return;
+          const pq = project(q.x, q.ds * 2.4 + 0.5, q.z), on = q.state === "ok" && pq.z < 1 && Math.abs(pq.x) < 0.96 && Math.abs(pq.y) < 0.94;
+          if (!on) { if (t.style.display !== "none") t.style.display = "none"; return; }
+          const c = safe && a.state === "ok" && a.s > q.s * PVP && q.inv <= 0 ? "ok" : safe && a.state === "ok" && q.s > a.s * PVP ? "bad" : "";
+          t.style.display = "inline-flex"; t.className = `jv-tag ${c}`;
+          t.style.transform = `translate(${((pq.x * 0.5 + 0.5) * VW).toFixed(1)}px,${((-pq.y * 0.5 + 0.5) * VH).toFixed(1)}px) translate(-50%,-100%)`;
+        });
+        return;
+      }
       const safe = S.playT >= SAFE && S.phase === "play", ok = safe && a.s > b.s * PVP, bad = safe && b.s > a.s * PVP;
       const cls = ok ? "ok" : bad ? "bad" : "";
       const pb = project(b.x, b.ds * 2.4 + 0.5, b.z);
@@ -1176,7 +1328,10 @@ window.HKJellyVs = (function () {
       let big = "", hold = "";
       if (S.phase === "count") big = String(Math.max(1, Math.ceil(S.countT)));
       else if (S.pz && S.resumeT > 0) big = String(Math.max(1, Math.ceil(S.resumeT)));
-      if (mode === "guest" && S.phase !== "end" && (!lastSnapAt || now - lastSnapAt > 1500)) hold = link !== "ok" ? "상대를 기다리는 중…" : lastSnapAt ? "연결이 불안정해요…" : "연결하는 중…";
+      if (mode === "guest" && S.phase !== "end" && (!lastSnapAt || now - lastSnapAt > 1500)) hold = link !== "ok" ? (party ? "연 사람을 기다리는 중…" : "상대를 기다리는 중…") : lastSnapAt ? "연결이 불안정해요…" : "연결하는 중…";
+      else if (party && S.pz && !(S.resumeT > 0)) hold = mode === "host" ? "잠깐 멈췄어요" : "연 사람 화면이 잠깐 멈췄어요 · 돌아오면 3초 뒤 이어 가요";
+      else if (party && mode === "host" && S.phase === "wait") hold = "모두 들어오기를 기다리는 중…";
+      else if (party && mode === "guest" && S.phase === "wait" && lastSnapAt) hold = "모두 들어오면 시작해요…";
       if (hudLast.big !== big) { hudLast.big = big; el.big.textContent = big; el.big.style.display = big ? "block" : "none"; }
       if (hudLast.hold !== hold) { hudLast.hold = hold; el.hold.textContent = hold; el.hold.style.display = hold ? "block" : "none"; }
     }
@@ -1184,15 +1339,16 @@ window.HKJellyVs = (function () {
     // ───── 한 걸음
     const LVL = LV[opts.level] || LV.normal;
     function simStep(rdt, dt) {
+      if (party && mode === "host" && S.phase === "wait" && partyWaitUntil && performance.now() > partyWaitUntil) { partyWaitUntil = 0; partyReadyAll(); }
       const live = playing();
       if (S.phase === "count" && !localPaused) {
         S.countT -= rdt;
         const n = Math.ceil(S.countT); if (n < S.lastCount && n > 0) { S.lastCount = n; SFX.tick(); }
-        if (S.countT <= 0) { S.countT = 0; S.phase = "play"; S.ready = [0, 0]; SFX.go(); banner("꿀꺽! 시작", "", 1.4); sendSnap(); }
+        if (S.countT <= 0) { S.countT = 0; S.phase = "play"; S.ready = J.map(() => 0); SFX.go(); banner("꿀꺽! 시작", "", 1.4); sendSnap(); }
       }
       if (S.pz && S.resumeT > 0) {
         S.resumeT -= rdt; const n = Math.ceil(S.resumeT); if (n < S.lastCount && n > 0) { S.lastCount = n; SFX.tick(); }
-        if (S.resumeT <= 0) { S.resumeT = 0; S.pz = 0; S.ready = [0, 0]; sendSnap(); }
+        if (S.resumeT <= 0) { S.resumeT = 0; S.pz = 0; S.ready = J.map(() => 0); sendSnap(); }
       }
       if (S.pz || localPaused || S.phase === "count") return;
       if (live) {
@@ -1200,12 +1356,13 @@ window.HKJellyVs = (function () {
         const [ix, iz] = myInput();
         J.forEach((j, i) => {
           if (j.inv > 0) j.inv -= dt;
-          if (mode === "demo" || (mode === "cpu" && i === 1) || (devAuto && i === me)) botDrive(j, mode === "demo" ? LV.normal : i === me ? LV.hard : LVL, dt);
+          if (party && j.state !== "ok") { j.rsp -= dt; if (j.rsp <= 0 && j.state === "dead") respawnJelly(j); return; } // 삼켜졌다 — 다시 태어나기를 기다린다
+          if (mode === "demo" || (mode === "cpu" && i === 1) || botSeat[i] || (devAuto && i === me)) botDrive(j, mode === "demo" ? LV.normal : i === me ? LV.hard : LVL, dt);
           else if (i === me) { j.inx = ix; j.inz = iz; }
           else if (mode === "host" && performance.now() - j.inAt > 1200) { j.inx = 0; j.inz = 0; } // 손님 입력이 끊겼으면 멈춰 선다
           if (j.state === "ok") { moveJelly(j, dt); eatFood(j); }
         });
-        if (S.timeLeft <= 0 && mode !== "demo") { S.timeLeft = 0; endBy(sizeWinner(Math.round(J[0].s * 100), Math.round(J[1].s * 100)), false, -1); }
+        if (S.timeLeft <= 0 && mode !== "demo") { S.timeLeft = 0; if (party) endParty(); else endBy(sizeWinner(Math.round(J[0].s * 100), Math.round(J[1].s * 100)), false, -1); }
         if (mode === "demo" && S.timeLeft <= 0) { resetWorld(); S.phase = "play"; }
       } else if (S.phase === "end") {
         S.endT += rdt;
@@ -1228,6 +1385,7 @@ window.HKJellyVs = (function () {
         const j = J[me];
         if (devAuto) botDrive(j, LV.hard, dt); else { const [ix, iz] = myInput(); j.inx = ix; j.inz = iz; }
         if (j.inv > 0) j.inv -= dt;
+        if (party && j.state !== "ok") j.rsp = Math.max(0, (j.rsp || 0) - dt);
         if (j.state === "ok") moveJelly(j, dt);
         // 주인 값으로 부드럽게 (예측 · 보정)
         const k = 1 - Math.exp(-8 * dt); j.x += corr.x * k; j.z += corr.z * k; corr.x *= 1 - k; corr.z *= 1 - k;
@@ -1280,6 +1438,8 @@ window.HKJellyVs = (function () {
       start() {
         if (destroyed) return;
         if (mode === "cpu") { S.ready = [1, 1]; resetWorld(); S.phase = "count"; S.countT = COUNT; S.lastCount = 4; }
+        if (party && mode === "host") { S.ready = J.map((_, i) => (i === 0 || botSeat[i] ? 1 : 0)); partyWaitUntil = performance.now() + PARTY_WAIT_MS; checkReady(); }
+        if (party && mode === "guest") myReady = 1; // 여러 명 손님 — 대기실에서 이미 준비했다
         cancelAnimationFrame(w.raf); w.last = performance.now(); w.raf = requestAnimationFrame(loop);
       },
       destroy() {
@@ -1306,10 +1466,10 @@ window.HKJellyVs = (function () {
         else { myReady = on; S.myReadyAt = performance.now(); send({ t: "rd", on }); }
         lobbyTick();
       },
-      requestPause() { if (!online || S.phase !== "play" || S.pz) return; if (mode === "host") pauseBy(0, "pause"); else send({ t: "pz" }); },
+      requestPause() { if (!online || party || S.phase !== "play" || S.pz) return; if (mode === "host") pauseBy(0, "pause"); else send({ t: "pz" }); },
       setLink(kind) {
         link = kind;
-        if (mode === "host") {
+        if (mode === "host" && !party) {
           if (kind !== "ok") { if (S.phase === "wait") S.ready[1] = 0; else if (S.phase === "play" || S.phase === "count") pauseBy(1, "link"); }
           else sendSnap();
         }
@@ -1328,7 +1488,7 @@ window.HKJellyVs = (function () {
         lobbyTick();
         return true;
       },
-      debug: () => ({ mode, phase: S.phase, timeLeft: Math.round(S.timeLeft * 10) / 10, playT: Math.round(S.playT * 10) / 10, pz: S.pz, ready: S.ready.slice(), size: J.map((j) => Math.round(j.s * 100)), pos: J.map((j) => [Math.round(j.x * 10) / 10, Math.round(j.z * 10) / 10]), dash: J.map((j) => j.dash), result: S.result, seed: S.seed, alive: food.filter((f) => f.alive).length, food0: [Math.round(food[0].x * 100) / 100, Math.round(food[0].z * 100) / 100], snapAge: lastSnapAt ? Math.round(performance.now() - lastSnapAt) : null, rtt }),
+      debug: () => ({ mode, party: !!party, me, state: J.map((j) => j.state), kills: J.map((j) => j.kills), died: J.map((j) => j.died), map: S.map, phase: S.phase, timeLeft: Math.round(S.timeLeft * 10) / 10, playT: Math.round(S.playT * 10) / 10, pz: S.pz, ready: S.ready.slice(), size: J.map((j) => Math.round(j.s * 100)), pos: J.map((j) => [Math.round(j.x * 10) / 10, Math.round(j.z * 10) / 10]), dash: J.map((j) => j.dash), result: S.result, seed: S.seed, alive: food.filter((f) => f.alive).length, food0: [Math.round(food[0].x * 100) / 100, Math.round(food[0].z * 100) / 100], snapAge: lastSnapAt ? Math.round(performance.now() - lastSnapAt) : null, rtt }),
       devSet(o) { if (!opts.dev || !sim) return; if (o.time !== undefined) S.timeLeft = o.time; if (o.playT !== undefined) S.playT = o.playT; if (o.m) o.m.forEach((v, i) => { if (v) { J[i].m = v; setSize(J[i]); } }); if (o.pos) o.pos.forEach((p, i) => { if (p) { J[i].x = p[0]; J[i].z = p[1]; } }); if (o.inv !== undefined) J.forEach((j) => { j.inv = o.inv; }); },
       devAuto(on) { if (opts.dev) devAuto = !!on; },
     };
@@ -1338,5 +1498,5 @@ window.HKJellyVs = (function () {
 
   // 맵 목록(화면 카드용) — { id, name, tip, chip: [색 셋] }
   const MAPS = JELLY_MAPS.map((m) => ({ id: m.id, name: m.name, tip: m.tip, chip: m.chip.slice() }));
-  return { create, sizeWinner, ROUND, SAFE, PVP, EVEN, JCOL, MAPS, available: () => !!window.THREE };
+  return { create, sizeWinner, partyWinner, sizeOrder, ROUND, SAFE, PVP, EVEN, JCOL, PARTY_N, RESPAWN, MAPS, available: () => !!window.THREE };
 })();
