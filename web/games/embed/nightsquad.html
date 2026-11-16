@@ -231,7 +231,7 @@ h2{font-size:clamp(30px,6vw,42px);line-height:1.05}
     <h1 class="disp">야간 분대 작전 <em>3D</em></h1>
     <p class="lead">병사 4명으로 출발합니다. 좌우로 움직여 좋은 문을 고르고 위험을 피하며 분대를 불려, 검문소의 거대 경비 로봇을 쓰러뜨리면 다음 작전으로 이어져요. 작전마다 위협이 늘고, 분대가 전멸하면 끝나요.</p>
     <ul class="rules">
-      <li><span class="tile t-gate disp"><span>+5</span><span>&minus;3</span></span><span><b>숫자 게이트</b> — 파랑은 추가, 빨강은 감소. 쏘면 오르지만 빨강은 「바닥」까지만 줄고 파랑이 안 돼요. 양쪽에 걸치면 둘 다 적용돼요.</span></li>
+      <li><span class="tile t-gate disp"><span>+5</span><span>&minus;3</span></span><span><b>숫자 게이트</b> — 파랑은 추가, 빨강은 감소. 맞히면 1씩 오르고, 빨강도 계속 맞히면 파랑이 돼요. 두 문에 걸치면 더 많이 들어간 쪽 문만 적용돼요.</span></li>
       <li><span class="tile t-barr disp"><span>40</span></span><span><b>숫자 바리케이드</b> — 쏴서 0으로 만들면 갇힌 병사가 합류해요. 부딪히면 병력을 잃어요.</span></li>
       <li><span class="tile t-laser disp"><span>레이저</span></span><span><b>레이저 울타리</b> — 쏴도 안 없어지는 빨간 빛줄. 닿은 만큼 잃으니 빈 쪽으로 피하세요.</span></li>
       <li><span class="tile t-item"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2l7 10-7 10-7-10z" fill="currentColor"/></svg></span><span><b>특수 아이템 · 아이템 칸 3개</b> — 빛나는 보석 상자를 지나가면 칸에 담겨요. <b>1 · 2 · 3</b> 키(Space · E 는 첫 칸), 휴대폰은 오른쪽 아래 단추로 원할 때 써요.</span></li>
@@ -286,10 +286,7 @@ const CFG = {
   BV: 46,         // 총알 속도 (m/s)
   LEN: 506,       // 결승선
   STEP: 1 / 60,
-  GATE_G: 1.17,   // 게이트 값이 1 오를 때마다 다음 +1 에 드는 명중 수가 이 배수로 늘어난다
-  RED_G: 1.5,     // 빨강 게이트는 오를수록 더 빨리 비싸진다 — 몇 발 만에 바닥(처음 값의 40%)에 닿아 멈추지 않고, 다가오는 동안 조금씩 줄어든다
-  RED_C: 2,       // 빨강 게이트 첫 +1 에 드는 명중 수 배수(코스의 c × 이 값)
-  RED_FLOOR: 0.4, // 빨강 게이트는 쏴도 처음 값의 이 비율(반올림)보다 덜 나빠지지 않는다 — 파랑으로 뒤집히지 않는다
+  GATE_G: 1.17,   // 게이트 값이 1 오를 때마다 다음 +1 에 드는 명중 수가 이 배수로 늘어난다(cec4e90 이전과 같음 — 빨강 · 파랑 똑같이)
   BUDGET: 340,
   SLOTS: 3,       // 아이템 칸 수 — 꽉 차면 새 아이템 상자는 줍지 못하고 길에 남는다    // 초당 총알 수 상한 — 넘으면 총알 수를 줄이고 한 발의 위력을 그만큼 올린다
 };
@@ -352,7 +349,7 @@ const STAGE = [
  *   분대 크기로 오르는 부분(작전 2 부터): 인원이 120명을 넘으면 적 · 보스 체력 × (인원/120)^0.5, 적 수 × (인원/120)^0.15(최대 ×1.6),
  *                          빨강 게이트 감소 × (출발 인원/100)^0.5, 바리케이드 체력 × (출발 인원/120)^0.4
  *   새 위협(작전마다 하나씩): 2 ÷ 게이트 · 3 레이저 울타리 늘어남 · 4 저격 로봇 · 5 돌진 로봇 · 6 함정 바리케이드, 7 부터는 수가 늘어난다
- *   가운데에 가만히 있으면 손해 — 빨강 게이트는 쏴도 처음 값의 40% 아래로는 줄지 않고(파랑이 되지 않는다), 양쪽에 걸치면 둘 다 적용.
+ *   게이트는 맞힐수록 1씩 오른다(빨강도 계속 맞히면 파랑이 된다). 두 문에 걸치면 분대원이 더 많이 들어간 쪽 문 하나만 적용.
  *     레이저 울타리(작전 1 부터 1개 → 작전 4 부터 4개 · 7 부터 5개)는 주로 가운데를 막고, 닿은 비율만큼 전체 인원의 25~60%가 쓰러진다
  *   보스 새 공격(작전마다 하나씩): 2 미사일 · 3 방패 · 4 돌진 · 5 충격파 — 오래 끌수록 공격이 잦아지고 세진다
  *   중간 보스 「망치 파쇄기」(작전 2 부터, 작전 2~6 한 번 · 7 부터 두 번): 길을 막고 서서 망치 팔을 들어 올렸다가(예고 · 빨간 띠)
@@ -513,7 +510,8 @@ function formation(n) {
   return { n, rx, rd, ox, od, sp: 0.42, cols: 0, grid: false };
 }
 
-const gateCost = g => g.v < 0 ? g.c * CFG.RED_C * Math.pow(CFG.RED_G, g.k) : g.c * Math.pow(CFG.GATE_G, g.k);
+
+const gateCost = g => g.c * Math.pow(CFG.GATE_G, g.k);
 
 // carry: 앞 작전에서 이어받는 것(분대 인원 · 무기 · 누적 기록). 없으면 처음 출발
 function createSim(seed, op, carry) {
@@ -540,9 +538,8 @@ function createSim(seed, op, carry) {
     if (it.t === 'gate') {
       pid++;
       const big = op >= 2 ? Math.pow(Math.max(1, all0 / 100), 0.5) : 1; // 큰 분대일수록 빨강 게이트가 더 깎는다
-      // cap: 쏴서 오를 수 있는 끝 — 빨강은 처음 값의 40%(반올림, −1 은 0 까지)까지만 줄고 파랑이 되지 않는다(가운데에서 양쪽을 다 쏴 올리는 꼼수 막기)
       const mk = (o, side) => { if (!o) return; const v = o.v < 0 ? Math.round(o.v * big) : o.v; S.gates.push({
-        id: ++uid, pid, d: it.d, side, v, v0: o.v, c: o.c, k: 0, acc: 0, on: true, taken: false, pulse: 0, div: o.div || 0, cap: v < 0 ? -Math.round(-v * CFG.RED_FLOOR) || 0 : 1e9,
+        id: ++uid, pid, d: it.d, side, v, v0: o.v, c: o.c, k: 0, acc: 0, on: true, taken: false, pulse: 0, div: o.div || 0,
         x0: side < 0 ? -HALF : side > 0 ? 0.2 : -HALF, x1: side < 0 ? -0.2 : side > 0 ? HALF : HALF,
       }); };
       mk(it.L, -1); mk(it.R, 1); mk(it.M, 0);
@@ -873,9 +870,8 @@ function createSim(seed, op, carry) {
         if (g.on && pd < g.d && b.d >= g.d && b.x > g.x0 && b.x < g.x1) {
           g.pulse = 1;
           if (g.div) { dead = true; break; } // ÷ 게이트는 쏴도 그대로
-          g.acc += b.wt;
-          if (g.v >= g.cap) { g.acc = 0; dead = true; break; } // 바닥에 닿은 빨강 — 더는 안 줄어든다(화면에 「바닥」 표시)
-          while (g.acc >= gateCost(g) && g.v < g.cap) { g.acc -= gateCost(g); g.v++; g.k++; }
+          g.acc += b.wt; // 맞힌 만큼 쌓여 1씩 오른다 — 빨강도 계속 맞히면 0 을 지나 파랑이 된다(막대 없이 숫자만)
+          while (g.acc >= gateCost(g)) { g.acc -= gateCost(g); g.v++; g.k++; }
           dead = true; break;
         }
       }
@@ -976,17 +972,19 @@ function createSim(seed, op, carry) {
     if (dirty) reform();
     F = S.F;
 
-    // 게이트 통과 — 분대 맨 앞이 닿는 순간. 분대원이 서 있는 쪽 게이트가 적용되고,
-    // 양쪽에 걸쳐 있으면(어느 쪽이든 열 중 셋 넘게) 둘 다 적용된다 — 가운데로 밀고 가면 손해
+    // 게이트 통과 — 분대 맨 앞이 닿는 순간. 두 문에 걸쳐 있으면 분대원이 더 많이 들어간 쪽 문 하나만 적용된다
+    // (같으면 분대 중심이 있는 쪽, 중심도 정확히 가운데면 더 나쁜 쪽)
     const front = S.d + F.rd * 0.92;
     for (const g of S.gates) {
       if (!g.on || front < g.d) continue;
       const pair = S.gates.filter(q => q.pid === g.pid);
       for (const q of pair) q.on = false;
       if (pair.length > 1) {
-        let l = 0; for (let i = 0; i < sol.length; i++) if (sol[i].x < 0) l++;
-        const fl = l / Math.max(1, sol.length);
-        for (const q of pair) if (q.side < 0 ? fl >= 0.3 : fl <= 0.7) applyGate(q);
+        let l = 0, r = 0; for (let i = 0; i < sol.length; i++) { if (sol[i].x < 0) l++; else if (sol[i].x > 0) r++; }
+        const side = l > r ? -1 : r > l ? 1 : S.x > 0.05 ? 1 : S.x < -0.05 ? -1 : 0;
+        const val = o => o.div ? -1e9 : o.v; // 정확히 가운데(같은 수 · 중심도 가운데)면 더 나쁜 쪽 — 가운데 버티기 꼼수 막기
+        const q = side ? pair.find(o => o.side === side) || pair[0] : pair.reduce((m, o) => val(o) < val(m) ? o : m);
+        applyGate(q);
       } else if (S.x > g.x0 - 0.4 && S.x < g.x1 + 0.4) applyGate(g);
       F = S.F;
     }
@@ -1492,7 +1490,7 @@ function buildStage(S) {
     for (const s of [-1, 1]) { const p = new T.Mesh(postGeo, postMat); p.position.x = s * w / 2; grp.add(p); }
     const L = makeLabel(512, 256, w * 0.94, w * 0.47, false); L.mesh.material.userData.own = true; L.mesh.material.userData.ownMap = true; L.mesh.userData.own = true;
     L.mesh.position.set(0, 1.85, 0.08); L.mesh.renderOrder = 3; grp.add(L.mesh);
-    return { g, grp, panel, beam, L, v: null, p: 0, fade: 0, bump: 0, pend: 0, popT: 0, bar: -1, floor: false };
+    return { g, grp, panel, beam, L, v: null, p: 0, fade: 0, bump: 0, pend: 0, popT: 0 };
   });
   barrViews = S.barrs.map(b => {
     const w = b.x1 - b.x0, grp = new T.Group(); grp.position.set((b.x0 + b.x1) / 2, 0, -b.d); stage.add(grp);
@@ -1574,13 +1572,7 @@ function drawGate(gv) {
   const g = gv.g, L = gv.L, c = L.g;
   c.clearRect(0, 0, 512, 256);
   big(c, g.div ? '÷' + g.div : signed(g.v), 256, 122, 170, '#ffffff', 'rgba(8,12,26,.9)', 22);
-  // 아래 줄 — 다음 +1 까지 채워지는 막대(맞힐 때마다 차오른다) · 바닥에 닿은 빨강은 「바닥」 · ÷ 는 「쏴도 그대로」
-  if (g.div) big(c, '쏴도 그대로', 256, 230, 46, '#ffd0d4', 'rgba(8,12,26,.9)', 8);
-  else if (gv.floor) big(c, '바닥 · 더 안 줄어요', 256, 230, 44, '#ffd0d4', 'rgba(8,12,26,.9)', 8);
-  else if (gv.bar > 0) {
-    c.fillStyle = 'rgba(8,12,26,.85)'; c.fillRect(126, 218, 260, 24);
-    c.fillStyle = g.v < 0 ? '#ffb3bb' : '#bfe3ff'; c.fillRect(131, 223, 250 * gv.bar, 14);
-  }
+  if (g.div) big(c, '쏴도 그대로', 256, 230, 46, '#ffd0d4', 'rgba(8,12,26,.9)', 8); // ÷ 는 맞혀도 숫자가 안 바뀐다
   L.tx.needsUpdate = true;
   const col = g.div ? GATE_MINUS : gateColor(g.v); gv.panel.material.color.setHex(col); gv.beam.material.color.setHex(col);
 }
@@ -2439,10 +2431,9 @@ function sync(dt) {
   for (const gv of gateViews) {
     const g = gv.g;
     if (g.on) {
-      const fl = !g.div && g.v < 0 && g.v >= g.cap, bar = g.div || fl || !g.acc ? 0 : Math.min(9, Math.floor(clamp(g.acc / gateCost(g), 0, 0.999) * 10)) / 10;
-      if (gv.v !== g.v || gv.bar !== bar || gv.floor !== fl) {
+      if (gv.v !== g.v) {
         if (gv.v !== null && g.v > gv.v) { gv.bump = 1; gv.pend += g.v - gv.v; } // 쏴서 올랐다 — 숫자가 튕기고 「+1」이 떠오른다
-        gv.v = g.v; gv.bar = bar; gv.floor = fl; drawGate(gv);
+        gv.v = g.v; drawGate(gv);
       }
       if (g.pulse) { gv.p = 1; g.pulse = 0; }
       gv.p = Math.max(0, gv.p - dt * 7); gv.bump = Math.max(0, gv.bump - dt * 4.5); gv.popT -= dt;
