@@ -1,4 +1,4 @@
-"""새 게임 소개 영상 — 게임마다 실제로 켜서 조작하며 7초씩 녹화(GPU 헤드리스 크롬, 1280×720, CDP 화면 받기). 결과: raw/<게임>/ 프레임 → build.py 앞에 ffmpeg 로 raw/<게임>.mp4 를 만든다.
+"""새 게임 소개 영상 — 게임마다 실제로 켜서 조작하며 7초씩(ringcatch · hoops 는 10초) 녹화(GPU 헤드리스 크롬, 1280×720, CDP 화면 받기). 결과: raw/<게임>/ 프레임 → build.py 앞에 ffmpeg 로 raw/<게임>.mp4 를 만든다.
    ffmpeg -f concat -safe 0 -i raw/<게임>/list.txt -vf "fps=30,scale=1280:720,format=yuv420p" -c:v libx264 -crf 18 raw/<게임>.mp4 """
 import json, pathlib, mimetypes, base64, math, sys, time
 from playwright.sync_api import sync_playwright
@@ -11,8 +11,29 @@ def handle(route):
     if not p.exists(): return route.fulfill(status=404, body="")
     return route.fulfill(status=200, content_type=mimetypes.guess_type(str(p))[0] or "text/html", body=p.read_bytes())
 WASD = "wasd"
+REC = {"ringcatch": 10.0, "hoops": 10.0}  # 녹화 길이(초) — 없으면 7초
+# 옥상 링 캐치 — 가장 먼저 골대 높이에 닿을 공의 떨어질 x 를 계산해 골대를 그 밑으로(림에 안 닿게 가운데로 받아 「완벽」 연속 → 불꽃 공)
+RC_AUTO = """(()=>{const R=window.__rc;if(!R)return 'no __rc';const HH=R.W.hoop.root.position.y;
+  const tick=()=>{requestAnimationFrame(tick);if(R.state!=='play')return;let best=null;
+    for(const b of R.W.balls){if(b.st!=='fly')continue;const g=b.g||18,a=-g/2,bb=b.v.y,c=b.p.y-HH,D=bb*bb-4*a*c;if(D<0)continue;
+      const t=(-bb-Math.sqrt(D))/(2*a);if(t<0)continue;if(!best||t<best.t)best={t,x:b.p.x+b.v.x*t};}
+    if(best)R.W.hxT=best.x;};tick();return 'ok';})()"""
+# 옥상 덩크슛 — 지금 골대에서 다음 골대 림 한가운데로 내려 꽂히는 (각도, 힘)을 찾는다(벽 튕김 · 림 양 끝에 스치는 길은 빼서 「완벽」 연속 → 불꽃 공)
+HOOPS_SOLVE = """(()=>{const H=window.__hoops;if(!H||H.state!=='play')return null;const A=H.A;if(A.phase!=='rest'||!A.cur||!A.tgt)return null;
+  const WX=5,BR=0.42,RR=0.98,GA=27,VMIN=8,VMAX=25.5,DEG=Math.PI/180,c=A.cur,t=A.tgt;let best=null;
+  for(let ad=-70;ad<=70;ad+=1)for(let pw=0.2;pw<=1.0;pw+=0.01){const ang=ad*DEG,sp=VMIN+(VMAX-VMIN)*pw;
+    let x=c.x-Math.sin(ang)*0.42,y=c.y-Math.cos(ang)*0.42,vx=Math.sin(ang)*sp,vy=Math.cos(ang)*sp,ok=true,hit=null;const dt=1/240;
+    for(let i=0;i<240*3;i++){const py=y;vy-=GA*dt;x+=vx*dt;y+=vy*dt;if(x>WX-BR||x<-WX+BR){ok=false;break;}
+      if(Math.min(Math.hypot(x-t.x-RR,y-t.y),Math.hypot(x-t.x+RR,y-t.y))<BR+0.09+0.06){ok=false;break;}
+      if(py>t.y&&y<=t.y){hit={x,vy};break;}}
+    if(!ok||!hit||hit.vy>-4)continue;const e=Math.abs(hit.x-t.x)+pw*0.08;if(!best||e<best.e)best={e,ang,pw,err:Math.abs(hit.x-t.x)};}
+  if(!best||best.err>0.25)return null;const full=Math.max(120,Math.min(300,Math.min(innerWidth,innerHeight)*0.36));
+  return {dx:-Math.sin(best.ang)*best.pw*full,dy:Math.cos(best.ang)*best.pw*full,err:best.err};})()"""
 GAMES = [
-  # key, url, localStorage, start clicks(text), warmup ms, drive
+  # key, url, localStorage, start clicks(text), warmup ms, drive — 가장 새 게임을 맨 위에
+  # ringcatch · hoops 는 창 밖에서 열면 생기는 확인용 손잡이(window.__rc · window.__hoops)로 공 자리를 읽어 자동 조작
+  ("ringcatch", "/games/embed/ringcatch.html", {"ringcatch3d.v1": json.dumps({"seen":True,"mute":True})}, ["#btnStart"], 2500, "ringcatch"),
+  ("hoops", "/games/embed/hoops.html", {"hoops3d.v1": json.dumps({"seenA":True,"mute":True})}, ["#btnStart"], 600, "hoops"),
   ("sundown", "/games/embed/sundown.html", {"sundown-bumpers-v1": json.dumps({"unlocked":13,"track":4,"seenHelp":True,"mute":True})}, ["출발하기"], 4200, "race"),
   ("holecity", "/games/embed/holecity.html", {}, ["시작하기"], 2500, "wasd"),
   ("jelly", "/games/embed/jelly.html", {}, ["시작"], 3000, "wasd"),
@@ -43,6 +64,7 @@ with sync_playwright() as p:
             pg.wait_for_timeout(400)
         pg.mouse.move(640, 360)
         if drive == "race": pg.keyboard.down("ArrowUp")
+        if drive == "ringcatch": errs.append("auto:" + str(pg.evaluate(RC_AUTO)))
         pg.wait_for_timeout(warm)
         cdp = ctx.new_cdp_session(pg); frames=[]
         cdp.on("Page.screencastFrame", lambda f: (frames.append((f["metadata"]["timestamp"], f["data"])), cdp.send("Page.screencastFrameAck", {"sessionId": f["sessionId"]})))
@@ -53,7 +75,8 @@ with sync_playwright() as p:
                 if k not in keys: pg.keyboard.up(k); held.discard(k)
             for k in keys:
                 if k not in held: pg.keyboard.down(k); held.add(k)
-        while time.time() - t0 < 7.0:
+        rec = REC.get(key, 7.0)
+        while time.time() - t0 < rec:
             t = time.time() - t0
             if drive == "wasd":
                 a = t * 1.3
@@ -68,6 +91,16 @@ with sync_playwright() as p:
                 hold(["ArrowRight"] if st > .55 else ["ArrowLeft"] if st < -.55 else [])
             elif drive == "lr":
                 hold(["ArrowRight"] if math.sin(t*1.4) > 0 else ["ArrowLeft"])
+            elif drive == "hoops":
+                sol = pg.evaluate(HOOPS_SOLVE)
+                if sol:  # 당기는 동안 점선이 보이게 0.6초에 걸쳐 끌고, 잠깐 멈췄다 놓는다
+                    x0, y0 = 640, 420
+                    pg.mouse.move(x0, y0); pg.mouse.down()
+                    for k in range(1, 19):
+                        f = k / 18; pg.mouse.move(x0 + sol["dx"] * f, y0 + sol["dy"] * f); pg.wait_for_timeout(33)
+                    pg.wait_for_timeout(250); pg.mouse.up(); pg.wait_for_timeout(900)
+                elif pg.evaluate("window.__hoops&&window.__hoops.state") == "stage":
+                    pg.keyboard.press("Space")
             elif drive == "jump":
                 if int(t*10) % 9 == 0: pg.keyboard.press("Space")
             pg.wait_for_timeout(50)
@@ -84,7 +117,7 @@ with sync_playwright() as p:
                 dur = (lines[i+1][1]-ts) if i+1 < len(lines) else 1/30
                 fh.write(f"file '{n}'\nduration {max(0.001,dur):.4f}\n")
             if lines: fh.write(f"file '{lines[-1][0]}'\n")
-        fps = len(frames)/7.0
+        fps = len(frames)/rec
         print(key, "frames", len(frames), f"~{fps:.1f}fps", errs[:3]); sys.stdout.flush()
         ctx.close()
     b.close()

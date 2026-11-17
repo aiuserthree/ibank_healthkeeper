@@ -3,7 +3,7 @@
 web/arcade.html 의 REEL.ch(장면 시작 초)와 ?v= 숫자를 맞춘다(아래가 출력해 준다)."""
 import subprocess, pathlib
 HERE = pathlib.Path(__file__).parent
-ORDER = [("sundown", 1.6), ("nightsquad", 0.6), ("holecity", 2.2), ("herorush", 2.6), ("kitsune", 3.0), ("vinyl", 0.8), ("jelly", 1.5), ("eggfarm", 2.2), ("frostcamp", 1.8)]  # (게임, 녹화에서 시작할 초)
+ORDER = [("ringcatch", 3.2), ("hoops", 6.6), ("sundown", 1.6), ("nightsquad", 0.6), ("holecity", 2.2), ("herorush", 2.6), ("kitsune", 3.0), ("vinyl", 0.8), ("jelly", 1.5), ("eggfarm", 2.2), ("frostcamp", 1.8)]  # (게임, 녹화에서 시작할 초) — 가장 새 게임이 맨 앞
 L, D = 3.2, 0.45
 inputs, parts = [], []
 for i, (g, st) in enumerate(ORDER):
