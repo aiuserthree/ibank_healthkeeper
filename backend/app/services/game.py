@@ -9,6 +9,7 @@ from datetime import date, datetime, timedelta
 
 from redis.asyncio import Redis
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import raise_app_error
@@ -486,12 +487,13 @@ async def last_week_board(db: AsyncSession) -> dict:
 
 # ── 참여 도장 — 하루에 한 판이라도 끝까지 하면 도장 1개(일반 · PLAY), 한 달에 STAMP_GOAL 개면 무적 쿠폰 1장(월 1장)
 # 대전 승리 보너스(WIN) — 사내 동료(사람)와의 대전에서 이기면 그날 1개 더. 하루 최대 2개(일반 1 + 보너스 1), 순서 상관없음.
-#   같은 두 사람 사이 보너스는 한 달에 한 번(누가 이기든) — 서로 져 주기 막기.
+#   상대가 누구든 한 사람이 한 달(한국 달력 월)에 받는 대전 보너스는 WIN_BONUS_MONTHLY_CAP 개까지.
 #   1:1 대전은 match._stamp_both, 여러 명 대전은 party._stamp_agreed 에서 give_win_bonus 를 부른다(대전 결과 처리 공통 지점 —
-#   새 대전 게임도 따로 적지 않아도 들어간다). 이긴 판으로 칠지는 순위(ranking)와 같은 잣대.
+#   새 대전 게임도 따로 적지 않아도 들어간다). 이긴 판 잣대는 순위 1승보다 엄격 — match._bonus_win · party._bonus_beaten.
 STAMP_GOAL = 10
 STAMP_PLAY = "PLAY"  # 일반 참여 도장
 STAMP_WIN = "WIN"  # 대전 승리 보너스
+WIN_BONUS_MONTHLY_CAP = 5  # 한 사람이 한 달에 받을 수 있는 대전 승리 보너스 도장 수
 # 판 길이 제한 없음 — 일찍 죽어 끝난 판도 도장. 다만 게임 화면에서 판을 시작한 기록(run)은 있어야 한다 (점수만 보내는 꼼수 막기)
 STAMP_MIN_SEC = 0
 ARCADE_COUPON_DAYS = 30  # 아케이드 쿠폰 사용 기한 — 받은 날부터 30일
@@ -550,6 +552,9 @@ async def stamp_status(db: AsyncSession, member: Member, day: date | None = None
         "goal": STAMP_GOAL,
         "today": any(d == day and k == STAMP_PLAY for d, k in zip(dates, kinds)),  # 오늘 일반 도장을 받았는지
         "todayBonus": any(d == day and k == STAMP_WIN for d, k in zip(dates, kinds)),  # 오늘 대전 승리 보너스를 받았는지
+        # 이번 달(한국 달력 월) 받은 대전 승리 보너스 수 · 한 달 한도
+        "winMonth": sum(1 for d, k in zip(dates, kinds) if k == STAMP_WIN and (d.year, d.month) == (day.year, day.month)),
+        "winMonthCap": WIN_BONUS_MONTHLY_CAP,
         "done": done,  # 오늘 10개를 채워 쿠폰을 받았다 — 내일부터 새 판
         "coupon": bool(this_month),  # 이번 달 아케이드 쿠폰을 받았는지
         "pending": filled >= STAMP_GOAL and bool(this_month),  # 10개 다 찼지만 이번 달 몫은 받아서 다음 달 1일에
@@ -626,41 +631,20 @@ def _month_range(day: date) -> tuple[date, date]:
     return start, end
 
 
-def _ids(text: str | None) -> set[int]:
-    return {int(x) for x in (text or "").split(",") if x.strip().isdigit()}
-
-
-async def _bonus_partners(db: AsyncSession, member_id: int, rivals, day: date, skip_ref: str | None = None) -> set[int]:
-    """rivals 가운데 그달(day 가 든 달) member_id 와 이미 대전 승리 보너스를 주고받은 사람 — 누가 이겼든(방향 상관없이).
-
-    판정은 보너스 도장 줄의 이긴 상대(rivals) 칸으로 — 「member 가 x 를 이겨 받음」 또는 「x 가 member 를 이겨 받음」.
-    여러 명 대전 보너스는 그 판에 함께 한 사람 전원이 rivals 에 들어가 있어 전원과 주고받은 것으로 친다.
-    skip_ref: 이 판으로 받은 줄은 빼고 본다(결과 화면 표시용).
-    """
-    rivals = {int(x) for x in rivals}
-    if not rivals:
-        return set()
+async def win_bonus_month_count(db: AsyncSession, member_id: int, day: date) -> int:
+    """day 가 든 달(한국 달력 월)에 member_id 가 받은 대전 승리 보너스 도장 수."""
     start, end = _month_range(day)
-    rows = (
-        await db.execute(
-            select(ArcadeStamp.member_id, ArcadeStamp.rivals, ArcadeStamp.ref).where(
+    return int(
+        await db.scalar(
+            select(func.count()).select_from(ArcadeStamp).where(
+                ArcadeStamp.member_id == member_id,
                 ArcadeStamp.kind == STAMP_WIN,
                 ArcadeStamp.stamp_date >= start,
                 ArcadeStamp.stamp_date < end,
-                ArcadeStamp.member_id.in_([member_id, *rivals]),
             )
         )
-    ).all()
-    used: set[int] = set()
-    for who, beaten, ref in rows:
-        if skip_ref is not None and ref == skip_ref:
-            continue
-        beaten = _ids(beaten)
-        if who == member_id:
-            used |= beaten & rivals
-        elif member_id in beaten:
-            used.add(who)
-    return used
+        or 0
+    )
 
 
 async def give_win_bonus(
@@ -668,56 +652,71 @@ async def give_win_bonus(
 ) -> dict:
     """대전 승리 보너스 — 사내 동료(사람)를 이긴 판이면 그날 도장 1개 더 (하루 1개, 일반 도장과 따로 · 순서 상관없음).
 
-    부르는 쪽(match._stamp_both · party._stamp_agreed)이 「사람을 이긴 판」인지 순위와 같은 잣대로 가린 뒤 부른다.
+    부르는 쪽(match._stamp_both · party._stamp_agreed)이 보너스 줄 판인지(match._bonus_win · party._bonus_beaten — 순위 1승보다 엄격) 가린 뒤 부른다.
     같은 상대를 하루에 여러 번 이겨도 — 보너스는 하루 1개라 그날 처음 이긴 판 하나만 받는다.
-    같은 두 사람 사이 보너스는 한 달(한국 달력 월)에 한 번 — 누가 이기든 그달 이미 주고받았으면 없다(서로 져 주기 막기).
-      1:1 은 이긴 상대 한 명, 여러 명 대전은 함께 한 사람(컴퓨터 제외) 중 그달 아직 안 주고받은 사람이 1명이라도 있어야 한다.
-      받으면 그 판에 함께 한 사람 전원(rivals)을 근거 칸에 남겨 전원과 주고받은 것으로 친다.
+    한 사람이 한 달(한국 달력 월)에 받는 보너스는 WIN_BONUS_MONTHLY_CAP 개까지 — 상대가 누구든 상관없다.
     판정 근거로 ref(match:<id> · party:<id>)와 이긴 상대(rivals)를 도장 줄에 남긴다(관리자 확인용).
     도장판이 꽉 차 다음 달 쿠폰을 기다리는 동안(pending)에는 일반 도장처럼 쌓지 않는다.
     """
-    rivals = sorted({int(x) for x in rivals})
+    rivals = sorted({int(x) for x in rivals} - {member.id})  # 나 자신은 상대가 아니다
+    if not rivals:  # 자기 자신과의 판 — 보너스 없음
+        st = await stamp_status(db, member, today)
+        return {
+            "new": False, "already": False, "full": False,
+            "month": await win_bonus_month_count(db, member.id, today), "monthCap": WIN_BONUS_MONTHLY_CAP,
+            "count": st["count"], "goal": st["goal"], "coupon": False, "pending": st["pending"],
+        }
+    # 한 사람의 보너스 지급을 줄 세운다(Postgres 행 잠금) — 거의 동시에 끝난 두 판이 하루 1개 · 월 한도를 함께 넘지 않게
+    await db.execute(select(Member.id).where(Member.id == member.id).with_for_update())
     issued = await _issue_arcade_coupon_if_due(db, member, today)
     has = await db.scalar(
         select(func.count()).select_from(ArcadeStamp).where(
             ArcadeStamp.member_id == member.id, ArcadeStamp.stamp_date == today, ArcadeStamp.kind == STAMP_WIN
         )
     )
+    month = await win_bonus_month_count(db, member.id, today)
     new = False
-    pair = False  # 이번 달 이 동료(들)와는 이미 보너스를 주고받음
-    if not has:
-        pair = not (set(rivals) - await _bonus_partners(db, member.id, rivals, today))
-    if not has and not pair and not (await stamp_status(db, member, today))["pending"]:
-        db.add(
-            ArcadeStamp(
-                member_id=member.id, stamp_date=today, game=key, kind=STAMP_WIN,
-                ref=ref[:40], rivals=",".join(str(x) for x in rivals)[:200] or None,
-            )
-        )
-        await db.flush()
-        new = True
-        issued = await _issue_arcade_coupon_if_due(db, member, today) or issued
-    if new or issued:
-        await db.commit()
+    full = not has and month >= WIN_BONUS_MONTHLY_CAP  # 이번 달 대전 보너스를 다 받음
+    if not has and not full and not (await stamp_status(db, member, today))["pending"]:
+        try:
+            async with db.begin_nested():  # 같은 날 보너스 줄이 먼저 들어갔으면(유니크 키) 이 줄만 되돌리고 「오늘 이미」로
+                db.add(
+                    ArcadeStamp(
+                        member_id=member.id, stamp_date=today, game=key, kind=STAMP_WIN,
+                        ref=ref[:40], rivals=",".join(str(x) for x in rivals)[:200] or None,
+                    )
+                )
+                await db.flush()
+        except IntegrityError:
+            has = 1
+            month = await win_bonus_month_count(db, member.id, today)
+        else:
+            new = True
+            month += 1
+            issued = await _issue_arcade_coupon_if_due(db, member, today) or issued
+    await db.commit()  # 늘 커밋해 잠금을 바로 푼다(부르는 쪽은 판 결과를 이미 커밋했거나 곧 커밋한다)
     st = await stamp_status(db, member, today)
     return {
-        "new": new, "already": bool(has), "pair": pair,
+        "new": new, "already": bool(has), "full": full,
+        "month": month, "monthCap": WIN_BONUS_MONTHLY_CAP,
         "count": st["count"], "goal": st["goal"], "coupon": issued, "pending": st["pending"],
     }
 
 
-async def win_bonus_state(db: AsyncSession, member_id: int, ref: str, rivals, finished_at: datetime | None) -> str | None:
-    """대전 결과 화면에 띄울 보너스 표시 — "got"(이 판으로 받음) · "already"(오늘은 다른 판으로 이미 받음) ·
-    "pair"(이번 달 이 동료와는 이미 보너스를 주고받음) · None(표시 없음).
+async def win_bonus_state(db: AsyncSession, member_id: int, ref: str, won_human: bool, finished_at: datetime | None) -> dict:
+    """대전 결과 화면에 띄울 보너스 표시 — {"winBonus": ..., "winBonusMonth": {"count", "cap"} | None}.
 
-    rivals: 내가 이긴 사람들(순위에 1승으로 세는 판일 때만, 컴퓨터 제외). 비었으면 — 컴퓨터전 · 진 판 · 비긴 판 — None.
-    오늘 끝나지 않은 판도 None.
+    winBonus: "got"(이 판으로 받음) · "already"(오늘은 다른 판으로 이미 받음) ·
+      "full"(이번 달 대전 보너스를 한도만큼 다 받음) · None(표시 없음).
+    winBonusMonth: 이번 달 받은 보너스 수 · 한도(winBonus 가 있을 때만) — 「이번 달 n/5」 표시용.
+    won_human: 내가 사람을 이긴 판(순위에 1승으로 세는 판)인지. 컴퓨터전 · 진 판 · 비긴 판 · 오늘 끝나지 않은 판은 None.
     """
-    if not rivals or finished_at is None:
-        return None
+    none = {"winBonus": None, "winBonusMonth": None}
+    if not won_human or finished_at is None:
+        return none
     day = finished_at.astimezone(KST).date() if finished_at.tzinfo else finished_at.date()
     if day != today_kst():
-        return None
+        return none
     refs = (
         await db.execute(
             select(ArcadeStamp.ref).where(
@@ -725,13 +724,16 @@ async def win_bonus_state(db: AsyncSession, member_id: int, ref: str, rivals, fi
             )
         )
     ).scalars().all()
+    month = await win_bonus_month_count(db, member_id, day)
     if ref in refs:
-        return "got"
-    if refs:
-        return "already"
-    if not ({int(x) for x in rivals} - await _bonus_partners(db, member_id, rivals, day, skip_ref=ref)):
-        return "pair"
-    return None  # 아직 안 찍혔거나 도장판이 꽉 차 기다리는 중
+        state = "got"
+    elif refs:
+        state = "already"
+    elif month >= WIN_BONUS_MONTHLY_CAP:
+        state = "full"
+    else:
+        return none  # 아직 안 찍혔거나 도장판이 꽉 차 기다리는 중
+    return {"winBonus": state, "winBonusMonth": {"count": month, "cap": WIN_BONUS_MONTHLY_CAP}}
 
 
 async def stage_stamp(db: AsyncSession, redis: Redis, member: Member, key: str) -> dict:

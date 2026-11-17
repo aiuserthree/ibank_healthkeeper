@@ -53,8 +53,9 @@ window.HKMatch = (function () {
   // 대전 승리 보너스 꼬리표 — 사람을 이긴 판(서버 winBonus)만. 컴퓨터전 · 진 판 · 비긴 판은 아무것도 없다
   function bonusTag(m) {
     if (!m || m.status !== "DONE") return "";
-    if (m.winBonus === "got") return `<span class="gk__bonus is-got"><b>도장 +1</b>대전 승리 보너스</span>`;
-    if (m.winBonus === "pair") return `<span class="gk__bonus" title="이번 달 이 동료와는 이미 보너스를 받았어요"><b>대전 보너스</b>이번 달 이 동료와는 이미 받았어요</span>`;
+    const mo = m.winBonusMonth && m.winBonusMonth.cap ? `${m.winBonusMonth.count}/${m.winBonusMonth.cap}` : "";
+    if (m.winBonus === "got") return `<span class="gk__bonus is-got"${mo ? ` title="이번 달 대전 보너스 ${mo}"` : ""}><b>도장 +1</b>대전 승리 보너스${mo ? ` · 이번 달 ${mo}` : ""}</span>`;
+    if (m.winBonus === "full") return `<span class="gk__bonus" title="이번 달 대전 보너스를 다 받았어요${mo ? ` (${mo})` : ""}"><b>대전 보너스</b>이번 달은 다 받았어요${mo ? ` (${mo})` : ""}</span>`;
     if (m.winBonus === "already") return `<span class="gk__bonus" title="오늘 대전 보너스는 이미 받았어요"><b>대전 보너스</b>오늘은 이미 받았어요</span>`;
     return "";
   }

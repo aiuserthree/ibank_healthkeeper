@@ -245,16 +245,40 @@ def _beaten(p: GameParty) -> tuple:
     return tuple(sorted(int(x) for x in (p.state or {}).get("players") or [] if int(x) != p.winner_id))
 
 
+def _bonus_beaten(p: GameParty) -> tuple:
+    """대전 승리 보너스를 줄 판이면 1등이 이긴 사람들, 아니면 빈 튜플 — 순위 1승(_beaten)보다 엄격하다(순위 · 전적은 그대로).
+
+    사람 참가자 전원이 결과를 보냈고 모두 같은 결과일 때만(agreed == players). 다수 보고로만 정해졌거나
+    (보내지 않은 사람 · 다른 결과를 보낸 사람이 있음) 판 자리가 겹치면 보너스 없음.
+    """
+    beaten = _beaten(p)
+    if not beaten:
+        return ()
+    st = p.state or {}
+    players = [int(x) for x in st.get("players") or []]
+    agreed = {int(x) for x in st.get("agreed") or []}
+    if len(set(players)) != len(players) or set(players) != agreed or int(p.winner_id) in beaten:
+        return ()
+    return beaten
+
+
+def _kst_day(dt):
+    if dt is None:
+        return None
+    return dt.astimezone(KST).date() if dt.tzinfo else dt.date()
+
+
 async def _stamp_agreed(db: AsyncSession, p: GameParty) -> None:
     if p.end_reason not in ("FINISH", "FARTHER", "WIN", "BIGGEST", "BOT", "DRAW"):
         return
     today = today_kst()
-    # 대전 승리 보너스 — 사람이 2명 이상인 판(나 + 동료 1명 이상)에서 1등. 여러 명 대전 게임 전부가 여기를 지난다
-    others = _beaten(p)
+    # 대전 승리 보너스 — 사람이 2명 이상인 판(나 + 동료 1명 이상)에서 1등, 사람 전원의 결과가 같을 때만(_bonus_beaten).
+    # 여러 명 대전 게임 전부가 여기를 지난다. 보너스 날짜는 판이 끝난 시각(한국 날짜)
+    others = _bonus_beaten(p)
     if others:
         w = await db.get(Member, int(p.winner_id))
         if w is not None and w.status == MemberStatus.ACTIVE:
-            await give_win_bonus(db, w, p.game, today, f"party:{p.id}", others)
+            await give_win_bonus(db, w, p.game, _kst_day(p.finished_at) or today, f"party:{p.id}", others)
     for mid in (p.state or {}).get("agreed") or []:
         m = await db.get(Member, int(mid))
         if m is not None and m.status == MemberStatus.ACTIVE:
@@ -300,9 +324,11 @@ async def _view(db: AsyncSession, member: Member, p: GameParty) -> dict:
 
 
 async def _with_bonus(db: AsyncSession, member: Member, p: GameParty, out: dict) -> dict:
-    """결과 화면용 대전 승리 보너스 표시 — got · already · pair · None (match._view 와 같은 값)."""
-    out["winBonus"] = await win_bonus_state(
-        db, member.id, f"party:{p.id}", _beaten(p) if p.winner_id == member.id else (), p.finished_at
+    """결과 화면용 대전 승리 보너스 표시 — winBonus(got · already · full · None) · winBonusMonth (match._view 와 같은 값)."""
+    out.update(
+        await win_bonus_state(
+            db, member.id, f"party:{p.id}", bool(_bonus_beaten(p)) and p.winner_id == member.id, p.finished_at
+        )
     )
     return out
 

@@ -70,7 +70,7 @@ import copy
 import importlib
 import logging
 import random
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 import chess
@@ -95,6 +95,10 @@ ACCEPT_HOURS = 24  # 받은 도전을 기다리는 시간
 MOVE_HOURS = 24  # 한 수를 기다리는 시간 — 넘기면 기한을 넘긴 쪽의 패
 MAX_OPEN = 10  # 한 사람이 게임마다 동시에 걸어 둘 수 있는 대국
 MIN_MOVES = 10  # 기권·시간 초과는 이만큼 둔 판만 도장과 순위에 반영 — 바로 기권해 도장·승수를 얻지 못하게
+# 대전 승리 보너스만 더 엄격하게(순위 · 전적 · 일반 도장은 그대로) — 짜고 주고받기 · 빈 판 막기
+WIN_BONUS_MIN_SEC = 60  # 판 시작(수락) 뒤 이만큼 지나 끝난 판만 보너스. 결과를 보고하는 게임은 엔진의 MIN_PLAY_SEC 을 쓴다
+WIN_BONUS_MIN_MOVES = 10  # 오목 · 체스는 둘이 합쳐 이만큼 둔 판만 보너스
+WIN_BONUS_NO_REASONS = ("RESIGN", "TIMEOUT", "TIMEOUT_DRAW")  # 기권 · 나가기 · 시간 초과로 끝난 승은 보너스 없음
 RANK_SIZE = 20
 WAIT_SECONDS = 20  # 상대 수를 기다리는 한 번의 요청 — 그 안에 판이 바뀌면 바로 돌려준다
 BOT_NAME = {"easy": "컴퓨터 · 쉬움", "normal": "컴퓨터 · 보통", "hard": "컴퓨터 · 어려움"}
@@ -277,7 +281,7 @@ def _start_engine(m: GameMatch, eng, players: tuple) -> None:
     """엔진 게임 판을 차린다 — 수락할 때 · 컴퓨터전을 시작할 때."""
     now = now_kst()
     m.deadline_at = None  # 받은 도전의 기한은 끝 — next_deadline 이 판 기한을 새로 잡는다
-    m.state = {**(eng.start(m, tuple(players), random.Random()) or {}), "_v": 0}
+    m.state = {**(eng.start(m, tuple(players), random.Random()) or {}), "_v": 0, "_at": int(now.timestamp() * 1000)}
     m.deadline_at = _next_deadline(m, eng, now)
 
 
@@ -456,13 +460,51 @@ def _human_win(m: GameMatch) -> bool:
     return m.status == "DONE" and not m.bot and m.opponent_id is not None and m.winner_id is not None and _counts(m)
 
 
+def _started_at(m: GameMatch) -> Optional[datetime]:
+    """판이 시작된(수락된) 시각 — state["_at"](epoch ms). 그 전에 시작한 판은 도전을 건 시각(created_at, 더 이르다)."""
+    at = (m.state or {}).get("_at")
+    if isinstance(at, (int, float)) and not isinstance(at, bool):
+        return datetime.fromtimestamp(at / 1000, tz=KST)
+    return m.created_at
+
+
+def _bonus_min_sec(m: GameMatch) -> int:
+    eng = _engine(m.game)
+    return int(getattr(eng, "MIN_PLAY_SEC", WIN_BONUS_MIN_SEC)) if eng is not None else WIN_BONUS_MIN_SEC
+
+
+def _bonus_win(m: GameMatch) -> bool:
+    """대전 승리 보너스를 줄 판 — 순위 1승(_human_win)에 더해:
+    서로 다른 두 사람 · 끝까지 둔 판(기권 · 시간 초과 승 제외) · 시작 뒤 WIN_BONUS_MIN_SEC(보고형 게임은 MIN_PLAY_SEC) 이상 ·
+    오목 · 체스는 WIN_BONUS_MIN_MOVES 수 이상. 결과를 보고하는 게임은 엔진 counts 가 두 사람 보고가 맞은 판만 센다."""
+    if not _human_win(m) or m.challenger_id == m.opponent_id or m.end_reason in WIN_BONUS_NO_REASONS:
+        return False
+    if _engine(m.game) is None and len(m.moves or []) < WIN_BONUS_MIN_MOVES:
+        return False
+    start, end = _started_at(m), m.finished_at
+    if start is None or end is None:
+        return False
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=KST)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=KST)
+    return (end - start).total_seconds() >= _bonus_min_sec(m)
+
+
+def _kst_day(dt: Optional[datetime]) -> Optional[date]:
+    if dt is None:
+        return None
+    return dt.astimezone(KST).date() if dt.tzinfo else dt.date()
+
+
 async def _view(db: AsyncSession, member: Member, m: GameMatch) -> dict:
     out = _payload(m, member.id, await _people(db, {m.challenger_id, m.opponent_id}), board=True)
-    # 대전 승리 보너스 표시 — got(이 판으로 도장 +1) · already(오늘 대전 보너스는 이미 받음) ·
-    # pair(이번 달 이 동료와는 이미 받음) · None(컴퓨터전 · 진 판 등)
-    won = _human_win(m) and m.winner_id == member.id
-    out["winBonus"] = await win_bonus_state(
-        db, member.id, f"match:{m.id}", [_rival_id(m, member.id)] if won else [], m.finished_at
+    # 대전 승리 보너스 표시 — winBonus: got(이 판으로 도장 +1) · already(오늘 대전 보너스는 이미 받음) ·
+    # full(이번 달 대전 보너스를 다 받음) · None(컴퓨터전 · 진 판 등), winBonusMonth: 이번 달 받은 수 · 한도
+    out.update(
+        await win_bonus_state(
+            db, member.id, f"match:{m.id}", _bonus_win(m) and m.winner_id == member.id, m.finished_at
+        )
     )
     return out
 
@@ -643,7 +685,7 @@ async def accept(db: AsyncSession, member: Member, match_id: int) -> dict:
     ensure_open(member=member)
     await _sweep(db, member.id)
     m = await _get(db, member, match_id, lock=True)
-    if m.status != "PENDING" or m.opponent_id != member.id:
+    if m.status != "PENDING" or m.opponent_id != member.id or m.challenger_id == member.id:
         raise_app_error("MATCH_NOT_PENDING")
     m.status = "ACTIVE"
     m.black_id = random.choice((m.challenger_id, m.opponent_id))
@@ -651,6 +693,8 @@ async def accept(db: AsyncSession, member: Member, match_id: int) -> dict:
     eng = _engine(m.game)
     if eng is not None:  # 엔진 게임은 여기서 판을 차린다 — 먼저 하는 사람은 black_id
         _start_engine(m, eng, (m.black_id, _rival_id(m, m.black_id)))
+    else:  # 오목 · 체스 — 판 시작 시각만 적어 둔다(대전 승리 보너스 최소 시간)
+        m.state = {"_at": int(now_kst().timestamp() * 1000)}
     challenger = await db.get(Member, m.challenger_id)
     notify = []
     if challenger is not None:
@@ -691,10 +735,12 @@ async def _stamp_both(db: AsyncSession, m: GameMatch, member: Member) -> Optiona
         return None
     today = today_kst()
     bonus = None
-    if _human_win(m):
+    if _bonus_win(m):
         winner = member if m.winner_id == member.id else await db.get(Member, m.winner_id)
         if winner is not None:
-            bonus = await give_win_bonus(db, winner, m.game, today, f"match:{m.id}", [_rival_id(m, m.winner_id)])
+            # 보너스 날짜는 판이 끝난 시각(한국 날짜) — 결과 화면(win_bonus_state)과 같은 날
+            day = _kst_day(m.finished_at) or today
+            bonus = await give_win_bonus(db, winner, m.game, day, f"match:{m.id}", [_rival_id(m, m.winner_id)])
     mine = await _give_stamp(db, member, m.game, today)
     if bonus is not None and m.winner_id == member.id:
         mine = {**mine, "bonus": bonus, "coupon": bool(mine.get("coupon") or bonus.get("coupon"))}
@@ -727,9 +773,12 @@ async def _engine_move(m: GameMatch, eng, member_id: int, seq: int, data: Option
         raise_app_error("MATCH_STALE")
     now = now_kst()
     v = _seq(m)
+    at = (m.state or {}).get("_at")
     m.state = copy.deepcopy(m.state or {})  # JSON 칸은 새 객체를 넣어야 바뀐 줄 안다 — 엔진은 이 복사본을 고친다
     outcome = eng.act(m, member_id, data if isinstance(data, dict) else {}, now)
     _after_act(m, eng, outcome, now, v)
+    if at is not None:  # 엔진이 state 를 새 dict 로 바꿔도 시작 시각은 남긴다
+        m.state.setdefault("_at", at)
     if m.bot:
         await _bot_turns(m, eng)
 
