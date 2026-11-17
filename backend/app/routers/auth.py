@@ -86,9 +86,22 @@ async def sso_login(
     return RedirectResponse(url=url, status_code=302)
 
 
+def _mock_sso_enabled() -> bool:
+    """개발용 가짜 로그인(mock)은 로그인 방식이 mock 일 때만 — get_sso_provider 와 같은 잣대(entra 가 아니면 mock).
+    entra(운영)에서는 /sso/mock · /sso/mock/complete 가 404, 콜백도 가짜 로그인 값을 받지 않는다."""
+    return get_settings().sso_provider != "entra"
+
+
+def _require_mock_sso() -> None:
+    if not _mock_sso_enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+
+
 @router.get("/sso/mock", response_class=HTMLResponse)
 async def sso_mock_page(state: str = Query(...)):
     from app.services.sso import MockSSOProvider
+
+    _require_mock_sso()
 
     users_html = ""
     for u in MockSSOProvider.MOCK_USERS:
@@ -136,6 +149,7 @@ async def sso_mock_complete(
     position: str = Query(""),
     redis: Redis = Depends(get_redis_client),
 ):
+    _require_mock_sso()
     if not await redis.get(f"{STATE_PREFIX}{state}"):
         return _login_error_redirect("로그인 세션이 만료되었습니다. 다시 시도해주세요.")
 
@@ -169,7 +183,7 @@ async def sso_callback(
     return_to = stored.get("returnTo", settings.sso_success_path)
     verifier = stored.get("verifier", "")
 
-    mock_claims = await pop_sso_code(redis, code)
+    mock_claims = await pop_sso_code(redis, code) if _mock_sso_enabled() else None  # 가짜 로그인 값은 mock 모드에서만
     if mock_claims:
         claims = mock_claims
     else:
