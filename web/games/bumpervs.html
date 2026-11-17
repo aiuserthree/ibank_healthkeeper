@@ -353,7 +353,7 @@
     function showMenu() {
       closeConn();
       screen = "menu"; playing = null; setPlaying(false); pauseBtn.hidden = true;
-      toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"] });
+      toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"], avatars: [me.avatarUrl || null, null] });
       showOver(`<div class="bv-card" role="dialog" aria-label="선다운 범퍼스 대전 시작">
           <div class="bv-head">
             <span class="bv-logo">${icon("car-front", 26, "#fff")}</span>
@@ -404,7 +404,7 @@
       closeLayer();
       const botRid = RID.filter((r) => r !== pref.rid)[Math.floor(Math.random() * 5)];
       playing = { mode: "cpu", online: false, track: pref.track, level: pref.level, rival: { name: `컴퓨터(${LEVEL_NAME[pref.level]})` } };
-      toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, botRid], names: [me.name, playing.rival.name], level: pref.level, auto: AUTO, mute: HKSound.isMuted() });
+      toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, botRid], names: [me.name, playing.rival.name], avatars: [me.avatarUrl || null, null], level: pref.level, auto: AUTO, mute: HKSound.isMuted() });
       toFrame({ type: "vs:go" });
       hideOver();
       screen = "play"; setPlaying(true); pauseBtn.hidden = false; pauseBtn.disabled = false;
@@ -1165,7 +1165,7 @@
         if (sig === shownSetup) return;
         shownSetup = sig;
         const rids = [S.rids[S.me], ...partyBotRids([S.rids[S.me]]).slice(0, PMAX - 1)];
-        toFrame({ type: "vs:setup", role: "solo", track: S.track, rids, names: [me.name, ...Array(PMAX - 1).fill("컴퓨터")], me: 0, e: 0, mute: HKSound.isMuted() });
+        toFrame({ type: "vs:setup", role: "solo", track: S.track, rids, names: [me.name, ...Array(PMAX - 1).fill("컴퓨터")], avatars: [me.avatarUrl || null, ...Array(PMAX - 1).fill(null)], me: 0, e: 0, mute: HKSound.isMuted() });
       }
       const lbMsg = () => ({ t: "lb", ph: S.phase, track: S.track, roster: seated().map((id) => ({ id, here: id === S.me || S.here.has(id), rd: id === S.me ? 1 : S.rd[id] ? 1 : 0, rid: S.rids[id] || null })) });
       function hostChanged() { if (!isHost()) return; send(lbMsg()); frameWait(); paint(); }
@@ -1195,6 +1195,7 @@
         if (i < 0) { S.phase = "out"; screen = "lost"; showOver(cardHtml("flag", "이번 경주에는 빠졌어요", "준비하기 전에 출발했어요", `<button type="button" class="hk-btn hk-btn--primary" data-act="plobby">여러 명 경주 목록</button>`)); return; }
         const nm = g.names.map((x, k) => (k === i ? me.name : x));
         const av = Array.isArray(g.avatars) ? g.avatars.map((u) => (typeof u === "string" && /^\/(api|assets)\//.test(u) ? u : null)) : [];
+        if (!av[i] && /^\/(api|assets)\//.test(me.avatarUrl)) av[i] = me.avatarUrl; // 내 자리 사진이 안 왔으면 내 것으로(내 차 위 이름표)
         toFrame({ type: "vs:setup", role: isHost() ? "host" : "guest", track: S.track, rids: g.rids.slice(), names: nm, avatars: av, me: i, bots: g.bots.slice(), level: "normal", e: S.e, auto: AUTO, mute: HKSound.isMuted() });
         toFrame({ type: "vs:go" });
         shownSetup = "";
@@ -1480,8 +1481,8 @@
       if (!b || b.disabled) return;
       if (b.dataset.mode) { pref.mode = b.dataset.mode; savePref(); HKSound.play("select"); paintMenu(); b.blur(); return; }
       if (b.dataset.level) { pref.level = b.dataset.level; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
-      if (b.dataset.track) { pref.track = Number(b.dataset.track); savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"] }); b.blur(); return; }
-      if (b.dataset.rid) { pref.rid = b.dataset.rid; savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"] }); b.blur(); return; }
+      if (b.dataset.track) { pref.track = Number(b.dataset.track); savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"], avatars: [me.avatarUrl || null, null] }); b.blur(); return; }
+      if (b.dataset.rid) { pref.rid = b.dataset.rid; savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"], avatars: [me.avatarUrl || null, null] }); b.blur(); return; }
       if (b.dataset.otrack) { if (sess && sess.setTrack) sess.setTrack(Number(b.dataset.otrack)); HKSound.play("tap"); return; }
       if (b.dataset.orid) { if (sess && sess.setRid) sess.setRid(b.dataset.orid); HKSound.play("tap"); return; }
       if (b.id === "bv-go") { if (pref.mode === "online") showOnlineLobby(); else if (pref.mode === "party") showPartyLobby(); else startPractice(); return; }

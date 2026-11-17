@@ -3321,15 +3321,20 @@ function markOver(c,lift,col,sc,op){
   if(!sp){const sm=new THREE.SpriteMaterial({map:TEX.target,color:col,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});sm.userData={own:true};sp=new THREE.Sprite(sm);sp.frustumCulled=false;scene.add(sp);sprPool.push(sp);}
   nSpr++;sp.material.color.setHex(col);sp.material.opacity=op;sp.visible=true;
   sp.position.copy(c.root.position);_v1.set(0,1,0).applyQuaternion(c.root.quaternion);sp.position.addScaledVector(_v1,lift+(c.h||0));sp.scale.set(sc,sc,1);
+  if(c===player)ME_OV.warn=1; // 내 차 머리 위 경고(잠금 · 축포 예고) — 내 이름표는 옅게(vsTick)
 }
+/* 내 차 머리 위에 지금 떠 있는 것 — 그림(badgeOver) 맨 위 높이 · 경고(markOver) 여부. renderObjs 가 매 화면 비우고 다시 채운다(대전 내 이름표가 그 위로 피함) */
+const ME_OV={top:0,warn:0};
 /* 머리 위 그림(가면 · 리본 매듭) — 카메라를 향하는 스프라이트, 보통 섞기(빛나지 않고 그림 그대로) */
 function badgeOver(c,lift,tex,sc,op,rot){
   let sp=badgePool[nBadge];
   if(!sp){const sm=new THREE.SpriteMaterial({map:tex,transparent:true,opacity:op,depthWrite:false,fog:false});sm.userData={own:true};sp=new THREE.Sprite(sm);sp.frustumCulled=false;scene.add(sp);badgePool.push(sp);}
   nBadge++;if(sp.material.map!==tex)sp.material.map=tex;sp.material.opacity=op;sp.material.rotation=rot||0;sp.visible=true;
   sp.position.copy(c.root.position);_v1.set(0,1,0).applyQuaternion(c.root.quaternion);sp.position.addScaledVector(_v1,lift+(c.h||0));sp.scale.set(sc,sc,1);
+  if(c===player)ME_OV.top=Math.max(ME_OV.top,lift+sc/2);
 }
 function renderObjs(list,tau){
+  ME_OV.top=0;ME_OV.warn=0;
   const ig=getItemGeos(),guest=VS.on&&VS.role==='guest';
   for(let i=0;i<list.length;i++){
     const o=list[i];let m=objPool[i];
@@ -5017,22 +5022,22 @@ function vsAvatarOk(u){
   if(typeof u!=='string'||!u||u.length>500)return null;
   try{const x=new URL(u,location.href);if(x.origin!==location.origin||!/^\/(api|assets)\//.test(x.pathname))return null;return x.pathname+x.search;}catch(e){return null;}
 }
+const ME_TAG_K=.7,ME_TAG_BOT=3.5,ME_TAG_TOP=5.5,ME_TAG_Y=3.8; // 내 이름표 — 크기 배율 · 아래 끝 최저(방패 3.2m 위) · 아래 끝 최고 · 처음 가운데 높이
 function vsLabel(c,name,avatar,me){
   const W=512,H=128,cv=document.createElement('canvas');cv.width=W;cv.height=H;
   const g=cv.getContext('2d'),col=css(RACERS[c.rid].car),FONT='800 54px Pretendard, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
   const bot=!me&&(c.bot||/^컴퓨터/.test(String(name||'')));
-  let t=me?'나':String(name||'상대');
+  let t=String(name||(me?'나':'상대'));
   if(bot&&t==='컴퓨터')t='컴퓨터 '+RACERS[c.rid].name;
   if(t.length>9)t=t.slice(0,9)+'…';
   let img=null;
   const draw=()=>{
     g.clearRect(0,0,W,H);g.font=FONT;
-    const R=50,tw=Math.min(W-2*R-44,g.measureText(t).width),w=me?tw+64:2*R+tw+40,x=(W-w)/2,y=8,h=2*R+4;
+    const R=50,tw=Math.min(W-2*R-44,g.measureText(t).width),w=2*R+tw+40,x=(W-w)/2,y=8,h=2*R+4;
     // 바탕 알약
     g.fillStyle='rgba(26,10,43,.86)';g.beginPath();g.moveTo(x+h/2,y);g.arcTo(x+w,y,x+w,y+h,h/2);g.arcTo(x+w,y+h,x,y+h,h/2);g.arcTo(x,y+h,x,y,h/2);g.arcTo(x,y,x+w,y,h/2);g.closePath();g.fill();
     g.lineWidth=6;g.strokeStyle=me?'#ffc533':col;g.stroke();
     g.fillStyle='#fff2d8';g.textBaseline='middle';
-    if(me){g.textAlign='center';g.fillText(t,W/2,y+h/2+3);return;}
     // 동그라미 — 사진 · 첫 글자 · 로봇
     const cx=x+R+4,cy=y+h/2;
     g.save();g.beginPath();g.arc(cx,cy,R-4,0,TAU);g.closePath();g.clip();
@@ -5047,9 +5052,10 @@ function vsLabel(c,name,avatar,me){
   draw();
   const tex=new THREE.CanvasTexture(cv);
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false,fog:false}));
-  sp.userData={w:me?3.2:8.8,h:me?.8:2.2,y0:me?4.6:5.6};sp.scale.set(sp.userData.w,sp.userData.h,1);sp.position.set(0,me?4.6:5.6,0);sp.renderOrder=5;
+  // 내 것(me) — 다른 차 것의 70% 크기, 방패 위(아래 끝 3.5m)에서 시작해 머리 위 그림이 있으면 그 위로 비킨다(vsTick)
+  sp.userData={w:8.8*(me?ME_TAG_K:1),h:2.2*(me?ME_TAG_K:1),y0:me?ME_TAG_Y:5.6,me:!!me,y:me?ME_TAG_Y:5.6};sp.scale.set(sp.userData.w,sp.userData.h,1);sp.position.set(0,sp.userData.y0,0);sp.renderOrder=5;
   c.root.add(sp);c.label=sp;
-  const url=me?null:vsAvatarOk(avatar);
+  const url=vsAvatarOk(avatar);
   if(url){const im=new Image();im.decoding='async';im.onload=()=>{if(c.label!==sp)return;img=im;draw();tex.needsUpdate=true;};im.onerror=()=>{};im.src=url;}
 }
 function vsCars(){
@@ -5059,7 +5065,7 @@ function vsCars(){
     const bot=VS.bots.indexOf(i)>=0;
     const c=Object.assign({id:i,rid:rid,isPlayer:i===VS.me,bot:bot,remote:VS.role==='host'&&i!==VS.me&&!bot},buildCarModel(rid));
     scene.add(c.root);cars.push(c);
-    if(i!==VS.me)vsLabel(c,VS.names[i],VS.avatars[i]); // 내 차가 아닌 차마다 프로필 사진 + 이름
+    vsLabel(c,VS.names[i],VS.avatars[i],i===VS.me); // 차마다 프로필 사진 + 이름(내 차는 작게 — vsTick)
   });
   player=cars[VS.me];
   buildDots();gridCars();
@@ -5429,6 +5435,18 @@ function vsTick(dt){
   camera.updateMatrixWorld();
   for(const c of cars){
     const L=c.label;if(!L)continue;
+    if(L.userData.me){ // 내 이름표 — 늘 화면 안이라 가까움 숨김 · 가장자리 붙이기 없음. 같은 크기 규칙만 쓰고, 머리 위 그림 위로 비키며 경고가 뜨면 옅게
+      c.root.updateMatrixWorld(true);_v1.set(0,L.userData.y,0);c.root.localToWorld(_v1);
+      _v2.copy(_v1).applyMatrix4(camera.matrixWorldInverse);const d=-_v2.z;
+      if(d<1.5){L.visible=false;continue;}
+      const k=Math.min(d/34,4),hh=L.userData.h*k/2,top=ME_OV.top>0?ME_OV.top+.15:0;
+      const want=clamp(top,ME_TAG_BOT,ME_TAG_TOP)+hh,over=top>ME_TAG_TOP;
+      L.userData.y+=(want-L.userData.y)*Math.min(1,10*dt);
+      L.position.set(0,(c.h||0)+L.userData.y,0);
+      L.scale.set(L.userData.w*k,L.userData.h*k,1);
+      const op=ME_OV.warn||over?.3:1;L.material.opacity+=(op-L.material.opacity)*Math.min(1,10*dt);L.visible=true;
+      continue;
+    }
     const near=player&&c!==player&&c.root.position.distanceToSquared(player.root.position)<64;
     c.root.updateMatrixWorld(true);_v1.set(0,L.userData.y0,0);c.root.localToWorld(_v1);
     _v2.copy(_v1).applyMatrix4(camera.matrixWorldInverse);const d=-_v2.z; // 카메라 앞쪽 깊이
