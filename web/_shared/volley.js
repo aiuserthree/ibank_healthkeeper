@@ -874,10 +874,15 @@
     const rs = mode === "host" && opts.resume && typeof opts.resume === "object" ? opts.resume : null;
     const okInt = (v, hi) => Number.isInteger(v) && v >= 0 && v <= hi;
     const pair = (a, hi) => Array.isArray(a) && a.length === 2 && okInt(a[0], hi) && okInt(a[1], hi);
+    // 이어지는 판은 「경기를 준비해 주세요」(목표 점수를 바꿀 수 있는 경기 전 화면) 대신 그 점수 그대로 서브 자리에서 멈춘 상태로 띄운다
+    // — 두 사람 모두 「계속 준비」를 누르면 3초 뒤 이어 간다(일시정지와 같음). 손님 선수 모습은 손님이 처음 알려 줄 때 한 번 받는다
+    let takeLook = false;
     if (rs && (rs.tg === 7 || rs.tg === 15) && pair(rs.sc, rs.tg - 1) && (rs.sv === 0 || rs.sv === 1) && pair(rs.sp, 9999) && pair(rs.ss, 9999) && okInt(rs.be, 9999) && rs.sec >= 0 && rs.sec < 7200) {
-      S = newState(rs.tg, rs.sv, "wait");
+      S = newState(rs.tg, rs.sv, "serve");
       S.score = rs.sc.slice(); S.spikes = rs.sp.slice(); S.serves = rs.ss.slice(); S.best = rs.be;
       S.f = Math.round(rs.sec / DT);
+      S.pz = 1; S.pzBy = 0; S.pzWhy = "link";
+      takeLook = true;
     }
     // 선수 모습 — 혼자 · 둘이 · 구경: opts.looks [왼쪽, 오른쪽]. 온라인: opts.look 은 내 모습(상대 모습은 상대가 알려 준다)
     let myLook = okLook(opts.look) ? opts.look : mySide;
@@ -1097,9 +1102,12 @@
           if (m.t === "hi") {
             guestIn = now; guestAway = false;
             syncRemote(m);
-            if (S.phase === "wait" && okLook(m.c)) S.looks[1] = m.c; // 손님이 고른 선수 (경기 전에만 바뀐다)
+            if ((S.phase === "wait" || takeLook) && okLook(m.c)) { S.looks[1] = m.c; takeLook = false; } // 손님이 고른 선수 (경기 전 · 이어 가는 판 처음에만 바뀐다)
             if (S.phase === "wait" || S.pz) { S.ready[1] = m.rd && (m.u | 0) >= unGen ? 1 : 0; checkReady(); }
             send({ t: "go", e: epoch });
+            // 지금 상태를 바로 보낸다 — 일시정지 중에는 상태(s)를 안 보내고 멈춤(hold)만 보내서, 그때 들어온 손님은
+            // 점수 · 단계를 몰라 0:0 「경기를 준비해 주세요」로 보였다
+            send(packState());
           } else if (m.t === "ch") {
             // 손님이 선수를 바꿈 — 경기 전에만. 바꾸면 두 사람 준비가 풀린다 (레퍼런스 친구 대전과 같음)
             guestIn = now;

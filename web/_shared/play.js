@@ -294,6 +294,7 @@ window.HKPlay = (function () {
     rummy: ["#9a3412", "#f59e0b"],
     alkkagi: ["#1f2937", "#a16207"],
     watersort: ["#0e7490", "#a855f7"],
+    hoops: ["#c2410c", "#ff5a36"],
     mansion: ["#1e1b4b", "#a78bfa"],
     bumpervs: ["#7c2d12", "#fb923c"],
     jellyvs: ["#3b1d6e", "#ff7ac8"],
@@ -472,7 +473,7 @@ window.HKPlay = (function () {
       <div class="hk-play-result__text">
         <b>${title} · ${formatScore(game, result.score)}</b>
         <span>${ranks.join(" · ") || (result.counted ? "순위를 불러오는 중이에요" : "오늘의 도전은 첫 기록만 순위에 들어가요")}${result.best != null && !result.newBest ? ` · 내 최고 ${formatScore(game, result.best)}` : ""}</span>`) +
-      `${result.stamp ? `<span class="hk-play-result__stamp${result.stamp.new ? " is-new" : ""}">${HKUI.icon("stamp", 13, "currentColor")} ${result.stamp.new ? "오늘 도장 쾅!" : result.stamp.today ? "오늘 도장은 이미 찍었어요" : result.stamp.pending ? "도장판이 꽉 찼어요" : "게임 화면에서 시작한 판만 도장이 찍혀요"} · ${result.stamp.pending ? `도장 <b>${result.stamp.goal}개 완성</b> · 쿠폰은 다음 달 1일에` : `도장 <b>${result.stamp.count}/${result.stamp.goal}</b>`}</span>` : ""}
+      `${result.stamp ? stampHtml(result.stamp, practice) : ""}
       </div>
       <button type="button" class="hk-play-result__close" aria-label="닫기" data-esc-close>${HKUI.icon("x", 16, "currentColor")}</button>`;
     const close = () => {
@@ -504,6 +505,13 @@ window.HKPlay = (function () {
     requestAnimationFrame(() => el.classList.add("is-in"));
     // 예전 7초는 길어서 다음 판을 가렸다 — 3초 뒤 저절로 사라짐 (연습 판 안내는 읽을 수 있게 8초)
     resultTimer = setTimeout(close, practice ? 8000 : 3000);
+  }
+
+  // 결과 띠의 도장 한 줄 — 연습 판 안내(큰 띠)는 길게, 보통 결과 띠(머리 막대 안 한 줄)는 짧게(전체 글은 마우스를 올리면 보인다)
+  function stampHtml(st, long) {
+    const full = `${st.new ? "오늘 도장 쾅!" : st.today ? "오늘 도장은 이미 찍었어요" : st.pending ? "도장판이 꽉 찼어요" : "게임 화면에서 시작한 판만 도장이 찍혀요"} · ${st.pending ? `도장 <b>${st.goal}개 완성</b> · 쿠폰은 다음 달 1일에` : `도장 <b>${st.count}/${st.goal}</b>`}`;
+    const short = st.pending ? `도장 <b>${st.goal}개 완성</b>` : `${st.new ? "도장 쾅! " : "도장 "}<b>${st.count}/${st.goal}</b>`;
+    return `<span class="hk-play-result__stamp${st.new ? " is-new" : ""}" title="${HKUI.escapeHtml(full.replace(/<[^>]+>/g, ""))}">${HKUI.icon("stamp", 13, "currentColor")} ${long ? full : short}</span>`;
   }
 
   // 오늘의 도전 게임에서 저장은 됐지만 순위에 안 들어간 판(그날 두 번째 시작부터) — 저장 실패와는 다르다
@@ -551,7 +559,9 @@ window.HKPlay = (function () {
     //  - Esc: 게임 중 일시정지 (게임이 onPause 로 등록한 함수), 일시정지 화면에서 다시 누르면 이어 하기
     let canRestart = false;
     const pauseFns = [];
-    const GO_TEXT = /시작|출발|출근하기|도전|계속하기|이어서|다시 하기|다시 달리기|준비/;
+    // 시작 · 다시 하기 단추 글자 — 그 말로 「시작하는」 짧은 단추(「출발하기」 · 「계속하기」)이거나, 그 말로 「끝나는」 단추(「게임 시작」 · 「경기 준비」)만.
+    // 예전에는 글자 어디에든 들어 있으면 눌러서, 퀴즈 보기(「새로 일을 시작하다」)나 「도전 취소」 · 「준비 취소」도 단추로 알았다
+    const GO_TEXT = /^(?:[▶▷→»›]\s*)?(?:시작|출발|출근하기|계속하기|이어서|다시\s*(?:하기|달리기|도전|시작)|도전(?:하기)?$|준비(?:\s*완료)?$)|(?:시작|출발|도전|다시\s*하기|준비)(?:하기)?\s*[!▶▷→»›]?$/;
     const RESUME_TEXT = /계속하기|이어서/;
     // 순위표는 판이 끝났을 때만 오른쪽에서 열린다 — 새 판을 시작하면 닫는다
     let runNo = 0; // 새 판마다 1씩 — 순위를 받아 오는 사이에 새 판이 시작됐으면 열지 않는다
@@ -587,20 +597,57 @@ window.HKPlay = (function () {
       else if (resumeFn && resumeFn()) return;
       else pauseFns.forEach((fn) => fn());
     }
-        function visibleButton(re) {
+    // 퀴즈 · 고르기 보기 단추 — 글자가 「시작 · 준비」로 끝나도 시작 단추가 아니다
+    const OPTION_BTN = "[data-opts] button, [data-opt], [data-i], [role=group] button, [class*=__opt], [class*=-opt], [class*=choice]";
+    const isGoButton = (b, re) => {
+      if (!b || b.tagName !== "BUTTON" || b.matches(OPTION_BTN)) return false;
+      const label = (b.textContent || "").replace(/\s+/g, " ").trim();
+      return label.length <= 12 && re.test(label);
+    };
+    function visibleButton(re) {
       const stageEl = document.getElementById("hk-play-stage");
       if (!stageEl) return null;
       return [...stageEl.querySelectorAll("button")].find((b) => {
-        // 짧은 버튼 글자만 (퀴즈 보기처럼 긴 글자에 '시작'이 섞여 있어도 누르지 않게)
-        const label = (b.textContent || "").replace(/\s+/g, " ").trim();
-        if (b.disabled || label.length > 12 || !re.test(label)) return false;
+        // 짧은 진짜 단추 글자만 (퀴즈 보기처럼 긴 글자 · 보기 단추에 '시작'이 섞여 있어도 누르지 않게)
+        if (b.disabled || !isGoButton(b, re)) return false;
         const r = b.getBoundingClientRect();
         return r.width > 0 && r.height > 0 && getComputedStyle(b).visibility !== "hidden";
       });
     }
+    // 떠 있는 확인 창 — 판 위에 덮인 .hk-dialog__overlay (맨 위 것)
+    function openDialog() {
+      const all = document.querySelectorAll(".hk-dialog__overlay");
+      for (let i = all.length - 1; i >= 0; i--) if (!all[i].hidden && getComputedStyle(all[i]).display !== "none") return all[i];
+      return null;
+    }
+    // 확인 창이 있으면 스페이스 · 엔터 · Esc 는 창이 받는다: 초점이 창 단추에 있으면 브라우저가 그 단추를 누르고,
+    // 없으면 창의 첫 단추(계속하기 · 취소처럼 안전한 쪽)로 초점만 옮긴다. Esc 는 「계속하기 · 취소 · 닫기」로 창을 닫는다.
+    // 어느 경우든 뒤의 게임에는 키를 넘기지 않는다. 처리했으면 true
+    function dialogKey(e) {
+      const dlg = openDialog();
+      if (!dlg) return false;
+      const k = e.key;
+      if (k !== " " && e.code !== "Space" && k !== "Enter" && k !== "Escape") return false;
+      e.stopImmediatePropagation();
+      const t = e.target;
+      if (t && dlg.contains(t) && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable) && k !== "Escape") return true; // 의견 적는 칸 — 띄어쓰기 · 줄바꿈 그대로
+      if (k === "Escape") {
+        e.preventDefault();
+        if (!e.repeat) dlg.querySelector('[data-leave="stay"], [data-act="cancel"], [data-rclose], [data-close], .hk-practice-ask [data-ok]')?.click();
+        return true;
+      }
+      const a = document.activeElement;
+      if (a && dlg.contains(a) && a.matches("button, a, [role=button], [data-act]")) return true; // 브라우저가 초점 단추를 누른다
+      e.preventDefault();
+      const first = dlg.querySelector(".hk-dialog__actions button:not([disabled])") || dlg.querySelector("button:not([disabled])");
+      if (first) first.focus({ preventScroll: true });
+      return true;
+    }
     window.addEventListener(
       "keydown",
       (e) => {
+        // 확인 창(그만할까요? · HKUI.confirmDialog 등)이 떠 있으면 판 쪽 키 처리는 건너뛴다 — 뒤 판의 「계속하기」가 눌리거나 판이 다시 돌지 않게
+        if (dialogKey(e)) return;
         if (e.repeat) return;
         if (e.code === "Escape") {
           e.preventDefault();
@@ -618,6 +665,14 @@ window.HKPlay = (function () {
         }
         const t = e.target;
         if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+        // 「다음 …」 단추가 보이면 그쪽이 먼저 (통통 짐볼 연습 통과 화면처럼 「다시 하기」와 함께 있을 때) — no-zoom.js 가 찾아 누른다
+        const next = window.HKNextKey && window.HKNextKey.find();
+        if (next) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          window.HKNextKey.press(next);
+          return;
+        }
         if (canRestart) {
           e.preventDefault();
           e.stopImmediatePropagation();
@@ -636,14 +691,8 @@ window.HKPlay = (function () {
     // 판 안을 눌러 새 판을 시작했으면 스페이스 재시작은 꺼진다 (순위표·머리·그만하기 버튼을 누른 건 상관없음)
     // 게임 화면에서 두 손가락 확대(iOS 사파리)는 막는다 — 게임 조작 중 화면이 커지지 않게
     document.addEventListener("gesturestart", (e) => e.preventDefault());
-    // 빠르게 연달아 톡톡 쳐도 화면이 확대되지 않게 — 짧은 간격의 두 번째 터치 끝을 막는다 (버튼·입력창은 그대로)
-    let lastTouchEnd = 0;
-    document.addEventListener("touchend", (e) => {
-      const now = Date.now();
-      const ui = e.target.closest && e.target.closest("button, a, input, select, textarea, label");
-      if (!ui && now - lastTouchEnd < 400 && e.target.closest && e.target.closest(".hk-pf")) e.preventDefault();
-      lastTouchEnd = now;
-    }, { passive: false });
+    // 빠르게 연달아 톡톡 쳐도 화면이 확대되지 않게 하는 일은 /_shared/no-zoom.js 가 맡는다(모든 게임 페이지가 불러 쓴다).
+    // 예전에는 여기서도 0.4초 안의 두 번째 터치 끝을 막아, 단추가 아닌 칸(지뢰찾기 칸 · 오목 판 등)의 빠른 두 번째 누르기가 무시됐다
     window.addEventListener("pointerdown", (e) => {
       const stageEl = document.getElementById("hk-play-stage");
       if (stageEl && stageEl.contains(e.target) && !e.target.closest(".hk-quit-btn, .hk-endbar")) canRestart = false;
@@ -731,6 +780,8 @@ window.HKPlay = (function () {
         goQuit();
       });
       document.body.appendChild(overlay);
+      // 스페이스 · 엔터가 뒤 판이 아니라 이 창의 「계속하기」에 가게
+      setTimeout(() => overlay.querySelector('[data-leave="stay"]')?.focus({ preventScroll: true }), 0);
     }
     // 기록 남기고 나가기 뒤 — 같은 창에서 내 결과와 사내 순위(오늘·이번 주)를 보여 주고, 나가기는 버튼으로
     function showLeaveResult(overlay, result) {
@@ -1109,8 +1160,7 @@ window.HKPlay = (function () {
           "click",
           (e) => {
             const b = e.target.closest && e.target.closest("button");
-            const label = b ? (b.textContent || "").replace(/\s+/g, " ").trim() : "";
-            if (b && label.length <= 12 && GO_TEXT.test(label)) setPlaying(true);
+            if (isGoButton(b, GO_TEXT)) setPlaying(true);
           },
           true
         );
