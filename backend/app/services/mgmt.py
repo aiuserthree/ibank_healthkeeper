@@ -40,6 +40,8 @@ MGMT_GAMES: dict[str, MgmtGame] = {
         MgmtGame("farm", "옥상 텃밭", "출근 전에 심고 점심 · 퇴근 후에 거둬 텃밭을 넓혀요", "sprout"),
         # 아케이드 「햇살 농장 3D」의 이야기 모드 진행 — 매니지먼트 목록에는 안 보인다
         MgmtGame("eggfarm", "햇살 농장 이야기", "햇살 농장 3D 이야기 모드 진행", "egg", listed=False),
+        # 아케이드 「옥상 덩크슛」의 별 · 가진 공 · 고른 공 · 미션 진행 — 매니지먼트 목록에는 안 보인다
+        MgmtGame("hoops", "옥상 덩크슛 공 상점", "옥상 덩크슛 별 · 공 모으기", "dribbble", listed=False),
     )
 }
 
@@ -49,9 +51,44 @@ register_messages(
     {
         "MGMT_STALE": "다른 창이나 기기에서 먼저 저장했어요. 최신 상태를 다시 불러올게요.",
         "MGMT_TOO_BIG": "저장할 내용이 너무 커요. 화면을 새로 불러 주세요.",
+        "MGMT_BAD_STATE": "저장할 수 없는 값이 있어요. 화면을 새로 불러 주세요.",
     },
-    {"MGMT_STALE": 409, "MGMT_TOO_BIG": 413},
+    {"MGMT_STALE": 409, "MGMT_TOO_BIG": 413, "MGMT_BAD_STATE": 422},
 )
+
+
+# 옥상 덩크슛 공 상점 저장 — 값 검사(상한만. 별을 판 점수와 엮어 검증하지는 않는다)
+HOOPS_SKIN_COUNT = 64  # 공 번호 0 ~ 63 (지금 30종 · 늘어날 여유)
+HOOPS_MAX_STARS = 200_000
+HOOPS_MAX_STAT = 1_000_000
+HOOPS_STAT_KEYS = ("best", "bestCombo", "bestBounceCombo", "bestMade", "bestRunScore", "bestStage", "totalStars")
+
+
+def _int_in(v, lo: int, hi: int) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and lo <= v <= hi
+
+
+def check_hoops_state(state: dict) -> bool:
+    """별 수 · 가진 공 · 고른 공 · 미션 기록이 말이 되는지. 모르는 칸은 받지 않는다."""
+    allowed = {"stars", "owned", "skin", "summary", *HOOPS_STAT_KEYS}
+    if not isinstance(state, dict) or set(state) - allowed:
+        return False
+    if not _int_in(state.get("stars", 0), 0, HOOPS_MAX_STARS):
+        return False
+    owned = state.get("owned", [0])
+    if not isinstance(owned, list) or not owned or len(owned) > HOOPS_SKIN_COUNT or len(set(owned)) != len(owned):
+        return False
+    if not all(_int_in(i, 0, HOOPS_SKIN_COUNT - 1) for i in owned):
+        return False
+    skin = state.get("skin", 0)
+    if not _int_in(skin, 0, HOOPS_SKIN_COUNT - 1) or skin not in owned:
+        return False
+    if not all(_int_in(state.get(k, 0), 0, HOOPS_MAX_STAT) for k in HOOPS_STAT_KEYS):
+        return False
+    return state.get("summary") is None
+
+
+STATE_CHECKS = {"hoops": check_hoops_state}
 
 
 def _game(key: str) -> MgmtGame:
@@ -114,6 +151,9 @@ async def save(db: AsyncSession, member: Member, key: str, state: dict, version:
     game_service.ensure_open(grace=True, member=member)
     if len(json.dumps(state, ensure_ascii=False).encode("utf-8")) > MAX_STATE_BYTES:
         raise_app_error("MGMT_TOO_BIG", 413)
+    check = STATE_CHECKS.get(key)
+    if check and not check(state):
+        raise_app_error("MGMT_BAD_STATE", 422)
     now = now_kst()
     if version == 0:
         # 처음 저장 — 같은 판을 두 창에서 동시에 처음 저장해도 한 줄만 생기게(나머지는 MGMT_STALE)
