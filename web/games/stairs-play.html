@@ -676,6 +676,8 @@
     document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
   })();
   function tellStart(){ if(inLounge) window.parent.postMessage({ type: 'hk-game-start' }, location.origin); }
+  // 멈춤 상태를 바깥 틀에 알린다 — 바깥에서 Esc · 일시정지 단추를 누르면 이어 하기가 되게
+  function tellPaused(on){ if(inLounge) window.parent.postMessage({ type: 'hk-paused', on: !!on }, location.origin); }
   function loadMuted(){
     try{ return localStorage.getItem('hk-play-muted') === '1'; }catch(e){ return false; }
   }
@@ -700,6 +702,7 @@
         if((state === 'playing' || state === 'ready') && !startVisible) openCatPicker();
         return;
       }
+      if(e.data.type === 'hk-resume'){ closeCatPicker(); return; } // 공통 틀의 이어 하기(바깥 Esc · 휴대폰 머리 일시정지 단추)
       if(e.data.type !== 'hk-mute') return;
       muted = !!e.data.muted;
       if(master) master.gain.value = muted ? 0 : 0.5;
@@ -981,6 +984,7 @@
   function openCatPicker(){
     if(state === 'falling' || state === 'over' || catPaused) return;
     catPaused = true;
+    tellPaused(true);
     if(window.__renderSkins) window.__renderSkins();
     elCatPick.classList.remove('hidden');
     document.getElementById('catPickGo').focus();
@@ -990,6 +994,7 @@
     elCatPick.classList.add('hidden');
     inputLockUntil = performance.now() + 250; // 닫는 클릭이 계단 입력으로 이어지지 않게
     catPaused = false;
+    tellPaused(false);
     elCatBtn.blur();
   }
   ['pointerdown', 'click'].forEach(function(t){
@@ -1236,7 +1241,10 @@
   }
   window.addEventListener('pagehide', persistPending);
   document.addEventListener('visibilitychange', function(){
-    if(document.visibilityState === 'hidden') persistPending();
+    if(document.visibilityState !== 'hidden') return;
+    persistPending();
+    // 창을 숨기면(다른 탭 · 화면 잠금) 일시정지 창을 열어 둔다 — 돌아오자마자 기운이 줄지 않게
+    if((state === 'playing' || state === 'ready') && !startVisible) openCatPicker();
   });
   // 리더보드 모듈이 알려주는 최고 기록 계단까지 경로를 미리 생성
   window.addEventListener('gyedan:ensure', function(e){
