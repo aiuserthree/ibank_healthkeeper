@@ -149,36 +149,233 @@ function tone(f,d,type,v,f2){
   }catch(e){}
 }
 
-/* ---------- 단계 (미리 만들어 검사한 판) ----------
+/* ---------- 판 (판마다 무작위로 새로 만든다) ----------
    차는 앞뒤(자기 축)로만 움직인다. 끌면 그쪽으로 막힐 때까지 미끄러져 멈추고, 판 가장자리까지 비어 있고 그 자리에 펜스가 없으면
-   주차장을 빠져나가 바깥 도로를 따라 떠난다. 판은 생성기로 만들어 「모든 차를 뺄 수 있는지 · 최소 몇 번 끌어야 하는지」를
-   너비 우선 탐색으로 확인한 뒤 넣었다(아래 solve 로 브라우저에서도 다시 확인할 수 있다).
+   주차장을 빠져나가 바깥 도로를 따라 떠난다.
+   새 게임 · 다시 하기마다 씨앗을 새로 뽑고, 단계마다 그 씨앗으로 판을 새로 만든다(같은 판 안에서 「다시」는 같은 판).
+   만든 판은 풀이기(solve, 너비 우선 탐색)로 「모든 차를 뺄 수 있는지 · 최소 몇 번 끌어야 하는지」를 재서
+   그 단계 띠(SPEC) 안일 때만 쓴다. 만드는 일은 되도록 뒤쪽 일꾼(Web Worker)이 다음 단계 판을 미리 해 두고,
+   못 쓰는 환경이면 화면 쪽에서 정해진 시간 안에 만든다.
+   LEVELS: 손으로(생성기로 미리) 만들어 검사해 둔 15판 — 띠의 기준 · 자리 옮기기 판의 씨앗 · 안전망으로 쓴다.
    L: N 판 크기, c 차 [길이, 가로?, 행, 열, 앞이+쪽?], o 소품 [칸, 종류], f 펜스(변:줄), p 주차 요원 길 [가로?, 첫 칸, 칸 수], m 최소 끌기 수 */
 const DIRS=[[1,0],[0,1],[-1,0],[0,-1]];
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};} // 도시 모양용
 const LEVELS=[{"N":5,"c":[[2,1,1,2,0],[2,1,2,1,0],[2,0,1,0,1],[2,0,1,4,1]],"o":[[16,2]],"f":[],"p":null,"m":4},{"N":5,"c":[[2,1,2,2,0],[2,0,2,4,0],[2,0,0,3,1],[2,1,4,3,1],[2,1,3,2,0]],"o":[[16,2],[11,0]],"f":["3:3","3:4"],"p":null,"m":5},{"N":6,"c":[[2,1,1,2,1],[2,1,1,4,1],[2,0,4,3,1],[3,1,0,1,1],[2,0,1,1,1],[2,1,3,2,0],[2,0,3,4,1]],"o":[[26,1],[19,2]],"f":["1:3","1:4","0:1","0:2"],"p":null,"m":7},{"N":6,"c":[[2,1,2,0,0],[2,0,3,5,0],[2,0,2,2,0],[2,1,4,1,0],[2,1,4,3,1],[3,1,5,3,1],[2,0,1,5,1],[2,0,0,1,0]],"o":[[8,2],[21,1],[9,2]],"f":["2:2","2:3","2:4","3:1","3:2"],"p":null,"m":8},{"N":6,"c":[[2,1,5,0,0],[2,1,4,1,1],[2,0,3,3,1],[2,0,2,2,0],[2,1,5,2,1],[2,1,5,4,1],[3,0,0,3,0],[2,1,3,0,0]],"o":[[7,3],[8,2]],"f":["3:2","3:3","2:3","2:4","2:5"],"p":[0,10,3],"m":8},{"N":7,"c":[[2,1,6,2,0],[3,0,0,2,1],[2,0,3,1,1],[2,1,6,0,0],[2,1,6,4,0],[2,0,5,6,1],[2,0,4,0,0],[2,0,0,0,1],[2,1,4,3,1],[3,1,3,2,0],[2,0,2,0,0]],"o":[[17,3],[33,3],[26,3]],"f":["3:0","3:1","3:2","2:5","2:6"],"p":[1,38,3],"m":11},{"N":7,"c":[[2,0,3,1,1],[2,0,2,5,0],[2,0,5,3,0],[2,1,3,2,0],[3,0,0,0,1],[2,1,6,0,0],[2,0,0,6,0],[2,1,0,4,1],[2,1,0,1,1],[2,0,5,5,1]],"o":[[18,0],[25,3],[15,3]],"f":["1:4","1:5","2:5","2:6","1:2","1:3"],"p":[0,30,3],"m":11},{"N":7,"c":[[2,0,1,5,0],[2,0,2,2,0],[2,0,2,1,1],[2,1,3,3,0],[2,0,5,4,1],[2,0,0,6,1],[2,1,0,4,0],[2,1,1,3,1],[2,1,5,1,0],[3,1,0,0,1],[3,0,1,0,0],[4,1,6,0,1]],"o":[[9,1],[8,0],[17,3],[26,2]],"f":["2:1","2:2","2:4","2:5","1:4","1:5"],"p":[1,30,5],"m":14},{"N":8,"c":[[2,0,6,2,1],[2,0,6,1,1],[2,0,4,4,1],[2,0,4,1,0],[2,0,3,5,1],[2,0,2,4,1],[2,1,5,2,0],[2,1,2,5,0],[3,1,2,0,0],[2,1,0,6,1],[2,1,6,3,0],[3,1,6,5,1],[2,1,5,5,0],[4,0,1,7,1]],"o":[[35,3],[12,0],[30,2],[14,3]],"f":["1:1","1:2","1:3","0:4","0:5","0:6","2:2","2:3"],"p":[1,25,3],"m":17},{"N":8,"c":[[2,0,6,0,0],[2,1,7,2,1],[2,0,2,4,1],[2,0,3,3,1],[2,0,1,6,0],[2,0,6,1,0],[3,1,4,0,1],[2,1,0,1,0],[2,1,6,3,1],[2,1,4,4,1],[3,0,3,6,1],[3,1,0,4,0],[2,1,7,5,0],[4,0,0,7,1],[2,1,6,5,0],[2,1,3,0,0]],"o":[[18,0],[12,2],[45,3],[10,1],[19,2]],"f":["2:3","2:4","2:5","0:5","0:6","0:7","1:0","1:1","1:2","3:2","3:3"],"p":[1,40,4],"m":20},{"N":8,"c":[[2,0,2,4,0],[2,0,2,3,1],[2,1,4,3,1],[2,1,6,3,0],[3,0,5,7,1],[2,1,2,6,0],[2,0,4,2,1],[4,0,0,0,0],[2,1,5,3,1],[2,1,6,5,0],[3,1,3,5,0],[2,1,3,1,1],[2,0,4,6,1],[2,1,0,5,0],[2,0,4,5,1]],"o":[[33,2],[11,3],[12,1],[50,3]],"f":["0:2","0:3","1:5","1:6","1:7","0:0","0:1"],"p":[0,41,3],"m":21},{"N":9,"c":[[2,1,8,2,0],[2,1,4,7,0],[2,1,8,4,1],[2,0,1,0,0],[2,1,4,5,1],[2,0,2,1,1],[2,1,2,2,0],[2,0,7,6,1],[2,0,2,4,0],[2,1,8,0,1],[3,0,4,0,0],[2,0,6,2,1],[4,1,0,0,0],[3,1,1,1,1],[4,0,4,4,1],[3,0,6,8,1],[3,0,4,3,0],[2,0,4,2,1],[2,0,7,7,0],[2,0,5,7,0]],"o":[[13,2],[64,1],[59,3],[29,2],[66,2],[68,2]],"f":["0:3","0:4","0:0","0:1","2:7","2:8","1:6","1:7","1:8"],"p":[0,5,4],"m":23},{"N":9,"c":[[2,0,7,8,0],[2,1,1,7,0],[2,1,6,0,1],[2,1,8,6,0],[2,0,7,0,1],[2,1,6,2,1],[2,0,3,1,1],[2,1,6,5,1],[2,0,4,0,0],[4,1,2,5,1],[2,0,6,7,0],[2,1,8,4,0],[3,1,8,1,1],[4,0,3,8,0],[2,0,0,0,0],[2,1,2,3,1],[3,0,0,1,1],[2,0,2,0,1],[3,1,1,3,0],[2,1,4,6,1]],"o":[[68,2],[32,0],[47,3],[69,1],[38,1],[50,0]],"f":["3:1","3:2","3:3","1:6","1:7","1:8","3:0","0:1","0:2","0:3","2:5","2:6","2:7"],"p":[0,31,5],"m":24},{"N":9,"c":[[2,1,7,2,1],[3,0,0,1,0],[2,1,3,2,1],[2,0,3,4,1],[2,0,4,3,1],[2,0,3,1,1],[3,1,0,6,0],[2,1,5,1,1],[2,0,1,2,1],[2,1,7,4,1],[4,0,1,0,1],[2,1,1,3,0],[2,0,5,5,1],[2,1,0,4,1],[2,1,0,2,1],[2,0,1,5,1],[3,0,4,6,1],[4,0,5,8,0],[2,1,7,6,0]],"o":[[58,3],[57,3],[15,1],[33,2],[61,1]],"f":["2:6","2:7","0:0","0:1","3:0","3:1","3:2","2:5"],"p":[0,16,4],"m":24},{"N":9,"c":[[2,0,3,3,1],[2,1,1,0,1],[2,0,0,4,0],[2,1,1,2,0],[2,0,4,1,1],[2,1,6,3,1],[2,1,3,0,1],[2,0,4,4,0],[2,0,6,8,1],[2,1,7,6,0],[3,0,1,7,1],[2,0,2,4,1],[3,0,4,7,0],[2,0,6,1,1],[2,0,3,2,0],[3,1,7,2,0],[2,0,6,0,1],[4,1,8,5,0]],"o":[[42,3],[41,2],[68,1],[59,3],[60,2]],"f":["1:0","1:1","2:1","2:2","2:3","1:2","3:3","3:4","3:7","3:8"],"p":[1,19,3],"m":25}];
-// 15단계 뒤로는 뒤쪽 판 다섯 개를 뒤집거나(좌우) 돌려(대각선) 다시 쓴다 — 모양만 바뀌고 풀이 수는 같다
-function levelData(L){
-  const base=L<=LEVELS.length?LEVELS[L-1]:LEVELS[LEVELS.length-5+((L-LEVELS.length-1)%5)];
-  const tf=L<=LEVELS.length?0:1+(Math.floor((L-LEVELS.length-1)/5)%3);
-  const N=base.N;
-  let cars=base.c.map(([len,h,r,c,f])=>({len,h,r,c,f})),obs=base.o.map(([i,k])=>({i,k})),fence=base.f.slice(),cop=null;
-  if(base.p){const [h,first,n]=base.p;cop={h,cells:[...Array(n)].map((_,k)=>h?first+k:first+k*N)};}
-  const mir=()=>{cars.forEach(c=>{if(c.h){c.c=N-c.len-c.c;c.f=1-c.f;}else c.c=N-1-c.c;});
-    obs.forEach(o=>{o.i=Math.floor(o.i/N)*N+(N-1-o.i%N);});
-    fence=fence.map(k=>{const [s,l]=k.split(':').map(Number);return s===0?'2:'+l:s===2?'0:'+l:s+':'+(N-1-l);});
-    if(cop)cop.cells=cop.cells.map(i=>Math.floor(i/N)*N+(N-1-i%N)).sort((a,b)=>a-b);};
-  const tr=()=>{cars.forEach(c=>{const r=c.r;c.r=c.c;c.c=r;c.h=1-c.h;});
-    obs.forEach(o=>{o.i=(o.i%N)*N+Math.floor(o.i/N);});
-    fence=fence.map(k=>{const [s,l]=k.split(':').map(Number);return [1,0,3,2][s]+':'+l;});
-    if(cop){cop.h=1-cop.h;cop.cells=cop.cells.map(i=>(i%N)*N+Math.floor(i/N)).sort((a,b)=>a-b);}};
-  if(tf&1)mir();if(tf&2)tr();
-  const fs={};fence.forEach(k=>fs[k]=1);
-  return {N,cars,obs,fence:fs,cop,minMoves:base.m};
-}
-// 판 규칙(게임 · 검사 공용)
+// 판 만들기 묶음 — 화면 쪽과 뒤쪽 일꾼(Worker)이 같은 코드를 쓴다(일꾼에는 이 함수의 글자를 그대로 넘긴다)
+function TrafficGen(LEVELS){
+'use strict';
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+const now=()=>(typeof performance!=='undefined'?performance.now():Date.now());
+/* 단계 띠: N 판 크기, c 차 대수 [최소,최대], b 버스(3칸), t 트럭(4칸), o 소품, f 펜스 조각(2~3칸), p 주차 요원,
+   m 최소 끌기 수 [최소,최대], r 자리 옮기기 필요(1 이면 꼭 1번 이상, 0 이면 옮기기 없이 빼는 순서만 맞으면 됨),
+   d 연쇄 깊이 최소(바로 빠질 수 있는 차를 한꺼번에 빼는 「차례」 수 — 클수록 순서를 더 따져야 함), z 처음에 바로 빠지는 차 최대.
+   값은 예전 15판을 재서 정했다(최소 끌기 4 · 5 · 7 · 8 · 8 · 11 · 11 · 14 · 17 · 20 · 21 · 23 · 24 · 24 · 25, 옮기기는 7단계부터). */
+const SPEC=[
+  {N:5,c:[4,4],  b:0,t:0,o:1,f:0,p:0,m:[4,4],  r:0,d:2,z:2},
+  {N:5,c:[5,5],  b:0,t:0,o:2,f:1,p:0,m:[5,5],  r:0,d:3,z:2},
+  {N:6,c:[7,7],  b:1,t:0,o:2,f:2,p:0,m:[7,7],  r:0,d:7,z:1},
+  {N:6,c:[8,8],  b:1,t:0,o:3,f:2,p:0,m:[8,8],  r:0,d:7,z:2},
+  {N:6,c:[8,8],  b:1,t:0,o:2,f:2,p:1,m:[8,8],  r:0,d:6,z:1},
+  {N:7,c:[10,11],b:2,t:0,o:3,f:2,p:1,m:[10,11],r:0,d:7,z:1},
+  {N:7,c:[10,11],b:1,t:0,o:3,f:3,p:1,m:[11,12],r:1,d:3,z:3},
+  {N:7,c:[12,12],b:2,t:1,o:4,f:3,p:1,m:[13,15],r:1,d:3,z:3},
+  {N:8,c:[14,14],b:2,t:1,o:4,f:4,p:1,m:[16,18],r:1,d:3,z:3},
+  {N:8,c:[15,16],b:3,t:1,o:5,f:4,p:1,m:[19,21],r:1,d:3,z:3},
+  {N:8,c:[15,16],b:2,t:1,o:4,f:3,p:1,m:[20,22],r:1,d:3,z:3},
+  {N:9,c:[19,20],b:4,t:2,o:6,f:4,p:1,m:[22,24],r:1,d:3,z:3},
+  {N:9,c:[19,20],b:3,t:2,o:6,f:5,p:1,m:[23,25],r:1,d:3,z:3},
+  {N:9,c:[19,20],b:3,t:2,o:5,f:4,p:1,m:[23,25],r:1,d:3,z:3},
+  {N:9,c:[18,19],b:3,t:1,o:5,f:4,p:1,m:[24,26],r:1,d:3,z:3}];
+// 16단계부터는 11~15단계 띠를 돌아가며 쓴다(판은 매번 새로)
+const specIdx=L=>L<=SPEC.length?L-1:SPEC.length-5+((L-SPEC.length-1)%5);
+const specOf=L=>SPEC[specIdx(L)];
 function cellsOf(car,pos,N){const o=[];for(let k=0;k<car.len;k++)o.push(car.h?car.r*N+pos+k:(pos+k)*N+car.c);return o;}
 const posOf=car=>car.h?car.c:car.r;
+// 판 그대로 복사(fence 는 {'변:줄':1})
+const copyLv=lv=>({N:lv.N,cars:lv.cars.map(c=>({len:c.len,h:c.h,r:c.r,c:c.c,f:c.f})),obs:lv.obs.map(o=>({i:o.i,k:o.k})),
+  fence:Object.assign({},lv.fence),cop:lv.cop?{h:lv.cop.h,cells:lv.cop.cells.slice()}:null});
+function baseLevel(k){const b=LEVELS[k],N=b.N;let cop=null;
+  if(b.p){const [h,first,n]=b.p;cop={h,cells:[...Array(n)].map((_,q)=>h?first+q:first+q*N)};}
+  const fence={};b.f.forEach(x=>fence[x]=1);
+  return {N,cars:b.c.map(([len,h,r,c,f])=>({len,h,r,c,f})),obs:b.o.map(([i,k])=>({i,k})),fence,cop};}
+// 뒤집기 · 돌리기(tf 비트: 1 좌우, 2 대각선, 4 위아래) — 모양만 바뀌고 풀이 수는 같다
+function xform(src,tf){
+  const lv=copyLv(src),N=lv.N;let fence=Object.keys(lv.fence);const cop=lv.cop;
+  const fix=f=>f.map(k=>k.split(':').map(Number));
+  if(tf&1){lv.cars.forEach(c=>{if(c.h){c.c=N-c.len-c.c;c.f=1-c.f;}else c.c=N-1-c.c;});
+    lv.obs.forEach(o=>{o.i=Math.floor(o.i/N)*N+(N-1-o.i%N);});
+    fence=fix(fence).map(([s,l])=>(s===0?2:s===2?0:s)+':'+(s===0||s===2?l:N-1-l));
+    if(cop)cop.cells=cop.cells.map(i=>Math.floor(i/N)*N+(N-1-i%N));}
+  if(tf&4){lv.cars.forEach(c=>{if(!c.h){c.r=N-c.len-c.r;c.f=1-c.f;}else c.r=N-1-c.r;});
+    lv.obs.forEach(o=>{o.i=(N-1-Math.floor(o.i/N))*N+o.i%N;});
+    fence=fix(fence).map(([s,l])=>(s===1?3:s===3?1:s)+':'+(s===1||s===3?l:N-1-l));
+    if(cop)cop.cells=cop.cells.map(i=>(N-1-Math.floor(i/N))*N+i%N);}
+  if(tf&2){lv.cars.forEach(c=>{const r=c.r;c.r=c.c;c.c=r;c.h=1-c.h;});
+    lv.obs.forEach(o=>{o.i=(o.i%N)*N+Math.floor(o.i/N);});
+    fence=fix(fence).map(([s,l])=>[1,0,3,2][s]+':'+l);
+    if(cop){cop.h=1-cop.h;cop.cells=cop.cells.map(i=>(i%N)*N+Math.floor(i/N));}}
+  if(cop)cop.cells.sort((a,b)=>a-b);
+  lv.fence={};fence.forEach(k=>lv.fence[k]=1);return lv;
+}
+/* 빠른 풀이기: 판 정보를 배열로 펴 두고, 상태는 차마다 위치(-1 은 빠져나감) */
+function prep(lv){
+  const N=lv.N,n=lv.cars.length,len=new Int8Array(n),h=new Int8Array(n),line=new Int8Array(n),fp=new Int8Array(n),fm=new Int8Array(n),base=new Int8Array(N*N).fill(-1);
+  lv.cars.forEach((c,i)=>{len[i]=c.len;h[i]=c.h;line[i]=c.h?c.r:c.c;fp[i]=lv.fence[(c.h?0:1)+':'+line[i]]?1:0;fm[i]=lv.fence[(c.h?2:3)+':'+line[i]]?1:0;});
+  for(const o of lv.obs)base[o.i]=-2;
+  return {N,n,len,h,line,fp,fm,base};
+}
+const cellP=(P,i,k)=>P.h[i]?P.line[i]*P.N+k:k*P.N+P.line[i];
+function fillP(P,st){const g=P.base.slice();for(let i=0;i<P.n;i++)if(st[i]>=0)for(let k=0;k<P.len[i];k++)g[cellP(P,i,st[i]+k)]=i;return g;}
+// i 차를 sgn 쪽으로 끌면 멈추는 위치, 빠져나가면 -1 (펜스가 있는 끝에서는 멈춘다)
+function slideP(P,g,st,i,sgn){const N=P.N,L=P.len[i];let q=st[i];
+  for(;;){const nx=sgn>0?q+L:q-1;if(nx<0||nx>=N)return (sgn>0?P.fp[i]:P.fm[i])?q:-1;if(g[cellP(P,i,nx)]!==-1)return q;q+=sgn;}}
+const outP=(P,g,st,i)=>{for(let k=0;k<P.len[i];k++)g[cellP(P,i,st[i]+k)]=-1;st[i]=-1;};
+// 지금 빠질 수 있는 차는 모두 뺀다(빼기는 손해가 없으니 최소 수를 셀 때 먼저 해도 된다)
+function closP(P,st,g){let ch=true;while(ch){ch=false;for(let i=0;i<P.n;i++)if(st[i]>=0&&(slideP(P,g,st,i,1)<0||slideP(P,g,st,i,-1)<0)){outP(P,g,st,i);ch=true;}}}
+const allOut=st=>{for(let i=0;i<st.length;i++)if(st[i]>=0)return false;return true;};
+const left=st=>{let n=0;for(let i=0;i<st.length;i++)if(st[i]>=0)n++;return n;};
+const keyP=st=>String.fromCharCode.apply(null,st.map(v=>v+1));
+// 최소 「자리 옮기기」 수(빼기가 아닌 끌기) — 너비 우선 탐색. 최소 끌기 수 = 차 수 + 이 값.
+// 못 풀면 repos -1 (cap: 살펴볼 상태 수 상한, maxRepos: 이보다 많이 옮겨야 하면 그만 — 띠를 넘는 판은 어차피 안 쓴다)
+function solve(lv,cap,maxRepos){
+  cap=cap||400000;if(maxRepos==null)maxRepos=99;
+  const P=prep(lv),s0=Int8Array.from(lv.cars.map(posOf)),g0=fillP(P,s0);closP(P,s0,g0);
+  if(allOut(s0))return {repos:0,moves:P.n};
+  const seen=new Set([keyP(s0)]);let fr=[s0],d=0;
+  while(fr.length){d++;if(d>maxRepos)return {repos:-1,deep:true};const nf=[];
+    for(const s of fr){const g=fillP(P,s);
+      for(let i=0;i<P.n;i++){if(s[i]<0)continue;
+        for(let sg=1;sg>=-1;sg-=2){const to=slideP(P,g,s,i,sg);if(to<0||to===s[i])continue;
+          const t=s.slice();t[i]=to;const tg=g.slice();
+          for(let k=0;k<P.len[i];k++)tg[cellP(P,i,s[i]+k)]=-1;for(let k=0;k<P.len[i];k++)tg[cellP(P,i,to+k)]=i;
+          closP(P,t,tg);if(allOut(t))return {repos:d,moves:P.n+d};
+          const k=keyP(t);if(seen.has(k))continue;seen.add(k);nf.push(t);if(seen.size>cap)return {repos:-1,capped:true};}}}
+    fr=nf;}
+  return {repos:-1};
+}
+// 판 재기: 최소 끌기 수 · 옮기기 수 · 처음 바로 빠지는 차(z) · 연쇄 깊이(d). 못 풀면 {fail}
+function rate(lv,cap,maxRepos){
+  const r=solve(lv,cap,maxRepos);if(r.repos<0)return {fail:true};
+  const P=prep(lv),st=Int8Array.from(lv.cars.map(posOf)),g=fillP(P,st);let z=0,d=0;
+  for(;;){const out=[];for(let i=0;i<P.n;i++)if(st[i]>=0&&(slideP(P,g,st,i,1)<0||slideP(P,g,st,i,-1)<0))out.push(i);
+    if(!d)z=out.length;if(!out.length)break;out.forEach(i=>outP(P,g,st,i));d++;}
+  return {moves:r.moves,repos:r.repos,z,d};
+}
+// 띠에 얼마나 못 미치는지(0 이면 합격). 못 풀거나 · 띠를 넘거나 · 옮기기가 없어야 하는데 있으면 Infinity
+function missOf(S,e){
+  if(e.fail||e.moves>S.m[1]||(!S.r&&e.repos>0))return Infinity;
+  return 10*Math.max(0,S.m[0]-e.moves)+(S.r&&e.repos<1?10:0)+3*Math.max(0,S.d-e.d)+2*Math.max(0,e.z-S.z);
+}
+const CAP=1500;
+const rateS=(S,lv)=>rate(lv,CAP,S.m[1]-lv.cars.length);
+// 주차 요원 길과 같은 줄을 따라 움직이는 차는 두지 않는다(요원이 비킬 데가 없어 못 지나감)
+function copLane(lv,car){const p=lv.cop;if(!p)return false;const c0=p.cells[0],N=lv.N;return p.h?(car.h&&car.r===Math.floor(c0/N)):(!car.h&&car.c===c0%N);}
+// 막힌 칸(소품 · 요원 길 · 차, skip 번째 차는 빼고)
+function busyGrid(lv,skip){const N=lv.N,g=new Int8Array(N*N);for(const o of lv.obs)g[o.i]=1;if(lv.cop)for(const i of lv.cop.cells)g[i]=1;
+  lv.cars.forEach((c,j)=>{if(j!==skip)for(const x of cellsOf(c,posOf(c),N))g[x]=1;});return g;}
+function fits(lv,car,g){const N=lv.N,p=posOf(car);if(p<0||p+car.len>N)return false;if(car.h?car.r<0||car.r>=N:car.c<0||car.c>=N)return false;
+  if(copLane(lv,car))return false;for(const x of cellsOf(car,p,N))if(g[x])return false;return true;}
+function randCar(N,len,rnd){const h=rnd()<0.5?1:0,a=Math.floor(rnd()*N),b=Math.floor(rnd()*(N-len+1));return {len,h,r:h?a:b,c:h?b:a,f:rnd()<0.5?1:0};}
+// 소품은 가장자리 줄을 빼고, 서로 붙지 않게
+const obsOk=(lv,i,me)=>{const N=lv.N,c=i%N,r=Math.floor(i/N);return c>0&&r>0&&c<N-1&&r<N-1&&!lv.obs.some(q=>q!==me&&Math.abs(q.i%N-c)+Math.abs(Math.floor(q.i/N)-r)<2);};
+function copPath(N,len,rnd){const h=rnd()<0.5?1:0,line=1+Math.floor(rnd()*(N-2)),st=Math.floor(rnd()*(N-len+1));
+  return {h,cells:[...Array(len)].map((_,k)=>h?line*N+st+k:(st+k)*N+line)};}
+// 무작위로 하나 바꾸기: 차 한 칸 밀기 · 차를 다른 자리로(방향도 무작위) · 소품 옮기기 · 펜스 한 칸 옮기기 · 요원 길 옮기기 · 2칸 차 빼기/더하기
+function mutate(S,lv,rnd){
+  const N=lv.N,R=n=>Math.floor(rnd()*n),nv=copyLv(lv),x=rnd(),k=R(nv.cars.length);
+  if(x<0.3){const c=nv.cars[k],s=rnd()<0.5?1:-1;if(c.h)c.c+=s;else c.r+=s;return fits(nv,c,busyGrid(nv,k))?nv:null;}
+  if(x<0.72){const g=busyGrid(nv,k);for(let t=0;t<20;t++){const c=randCar(N,nv.cars[k].len,rnd);if(fits(nv,c,g)){nv.cars[k]=c;return nv;}}return null;}
+  if(x<0.82){if(!nv.obs.length)return null;const o=nv.obs[R(nv.obs.length)],i=R(N*N);if(busyGrid(nv,-1)[i]||!obsOk(nv,i,o))return null;o.i=i;return nv;}
+  if(x<0.9){const ks=Object.keys(nv.fence);if(!ks.length)return null;const kk=ks[R(ks.length)],[s,l]=kk.split(':').map(Number);
+    const nk=rnd()<0.6?s+':'+Math.max(0,Math.min(N-1,l+(rnd()<0.5?1:-1))):R(4)+':'+R(N);if(nv.fence[nk])return null;delete nv.fence[kk];nv.fence[nk]=1;return nv;}
+  if(x<0.95){if(!nv.cop)return null;const cop=copPath(N,nv.cop.cells.length,rnd);nv.cop=null;const g=busyGrid(nv,-1);
+    if(cop.cells.some(i=>g[i]))return null;nv.cop=cop;return nv.cars.some(c=>copLane(nv,c))?null:nv;}
+  if(nv.cars.length>S.c[0]&&nv.cars[k].len===2&&rnd()<0.5){nv.cars.splice(k,1);return nv;}
+  if(nv.cars.length<S.c[1]){const g=busyGrid(nv,-1);for(let t=0;t<20;t++){const c=randCar(N,2,rnd);if(fits(nv,c,g)){nv.cars.push(c);return nv;}}}
+  return null;
+}
+// 처음부터 무작위로 놓기(옮기기가 없는 1~6단계): 요원 길 → 소품 → 펜스 → 차(긴 차부터)
+function randomBoard(S,rnd){
+  const N=S.N,R=n=>Math.floor(rnd()*n),lv={N,cars:[],obs:[],fence:{},cop:S.p?copPath(N,3+R(Math.min(3,N-4)),rnd):null};
+  for(let t=0;t<S.o*30&&lv.obs.length<S.o;t++){const i=R(N*N);if(lv.cop&&lv.cop.cells.includes(i)||!obsOk(lv,i,null))continue;lv.obs.push({i,k:R(4)});}
+  for(let t=0;t<S.f;t++){const s=R(4),len=2+R(2),st=R(N-len+1);for(let k=0;k<len;k++)lv.fence[s+':'+(st+k)]=1;}
+  const lens=[];for(let k=0;k<S.t;k++)lens.push(4);for(let k=0;k<S.b;k++)lens.push(3);while(lens.length<S.c[1])lens.push(2);
+  for(const len of lens){const g=busyGrid(lv,-1);let put=false;
+    for(let t=0;t<60&&!put;t++){const c=randCar(N,len,rnd);if(fits(lv,c,g)){lv.cars.push(c);put=true;}}if(!put)return null;}
+  return lv;
+}
+const pools=SPEC.map(()=>[]); // 이번에 만든 판도 다음 판의 씨앗으로(같은 단계 띠끼리)
+/* 판 하나 만들기(조금씩 돌려 쓰는 generator — yield 마다 잠깐 쉰다). out.cur 에 지금까지 만든 「쓸 수 있는 판」이 늘 들어 있다.
+   1~6단계(옮기기 없음): 처음부터 무작위로 놓고, 띠에 못 미치면 하나씩 바꿔 보며 맞춘다.
+   7단계부터(옮기기 필요): 무작위 판에서 「옮겨야만 풀리는 판」이 나올 확률이 아주 낮아(수천 판에 한 판 꼴),
+   검사된 판(예전 판 · 이번에 만든 판) 하나를 무작위로 뒤집거나 돌린 뒤, 띠 안에 머무는 동안만 받아들이며
+   차 · 소품 · 펜스 · 요원 길을 수백 번 무작위로 바꿔 새 판으로 만든다. */
+function* genLevel(L,seed,out,opt){
+  opt=opt||{};const S=specOf(L),si=specIdx(L),rnd=mulberry32(seed),t0=now();let evals=0;
+  const done=(lv,e,src)=>{const res=copyLv(lv);res.minMoves=e.moves;res.repos=e.repos;res.src=src;res.evals=evals;res.ms=Math.round(now()-t0);
+    if(opt.chain!==false){const p=pools[si];p.push(copyLv(lv));if(p.length>6)p.shift();}return res;};
+  const pick=()=>{const p=pools[si];const src=p.length&&rnd()<0.7?p[Math.floor(rnd()*p.length)]:baseLevel(si);return xform(src,Math.floor(rnd()*8));};
+  const seed0=pick(),e0=rateS(S,seed0);
+  out.cur=missOf(S,e0)===0?Object.assign(copyLv(seed0),{minMoves:e0.moves,repos:e0.repos,src:'seed'}):null;
+  if(!S.r){
+    for(let tries=0;tries<40&&evals<3000;tries++){
+      let lv=randomBoard(S,rnd);yield 0;if(!lv)continue;let e=rateS(S,lv),miss=missOf(S,e),stale=0;evals++;
+      if(miss===Infinity)continue;
+      while(miss>0&&stale<150){yield 0;const nv=mutate(S,lv,rnd);if(!nv){stale++;continue;}const ne=rateS(S,nv),nm=missOf(S,ne);evals++;
+        if(nm<=miss){stale=nm<miss?0:stale+1;lv=nv;e=ne;miss=nm;}else stale++;}
+      if(miss===0)return done(lv,e,'random');
+    }
+  }
+  if(!out.cur)return null; // 씨앗도 못 쓰면(그럴 일은 없다) 부르는 쪽이 안전망으로
+  let lv=seed0,e=e0;const ACC=opt.steps||150;let acc=0;
+  for(let it=0;it<ACC*12&&acc<ACC;it++){yield 0;const nv=mutate(S,lv,rnd);if(!nv)continue;const ne=rateS(S,nv);evals++;
+    // 띠 안이면 받아들이되, 쉬워지는 쪽(최소 끌기 수가 줄어드는 쪽)은 셋에 하나만 — 띠 아래 끝으로만 몰리지 않게
+    if(missOf(S,ne)===0&&(ne.moves>=e.moves||rnd()<0.33)){lv=nv;e=ne;acc++;out.cur=Object.assign(copyLv(lv),{minMoves:e.moves,repos:e.repos,src:'walk'});}}
+  return done(lv,e,'walk');
+}
+// 정해진 시각(deadline)까지 만들어 보고, 못 끝내면 그때까지 만든 쓸 수 있는 판 · 그것도 없으면 검사된 판을 뒤집거나 돌려서
+function makeLevel(L,seed,opt){
+  opt=opt||{};const out={cur:null},it=genLevel(L,seed,out,opt),t0=now();let r;
+  for(;;){r=it.next();if(r.done)break;if(opt.deadline&&now()>opt.deadline)break;}
+  if(r.done&&r.value)return r.value;
+  if(out.cur){out.cur.ms=Math.round(now()-t0);out.cur.src+='-cut';return out.cur;}
+  const fb=xform(baseLevel(specIdx(L)),seed&7);const e=rate(fb);return Object.assign(fb,{minMoves:e.moves,repos:e.repos,src:'fallback',ms:Math.round(now()-t0)});
+}
+return {SPEC,specOf,specIdx,cellsOf,posOf,baseLevel,xform,copyLv,solve,rate,missOf,copLane,genLevel,makeLevel,pools};
+}
+const GEN=TrafficGen(LEVELS);
+const {specOf,cellsOf,posOf,solve}=GEN;
+// 예전 15판(시험 · 비교용): levelData(L) 은 L단계 예전 판
+function levelData(L){const lv=GEN.baseLevel(GEN.specIdx(L));lv.minMoves=solve(lv).moves;return lv;}
+/* 판 대 주기: 이번 게임의 씨앗(runSeed) + 단계 → 판 씨앗. 만든 판은 boards 에 두어 「다시」는 같은 판.
+   다음 단계 판은 지금 단계를 시작할 때 뒤쪽 일꾼에게 미리 부탁하고, 아직 안 왔으면 화면 쪽에서 SYNC_MS 안에 만든다. */
+// 개발 주소(localhost · *.test)에서만: ?seed=숫자 로 씨앗 고정(같은 씨앗이면 매 게임 같은 판)
+const DEV=/^(localhost|127\.0\.0\.1|\[::1\])$|\.(localhost|test)$/.test(location.hostname);
+const DEV_SEED=(()=>{if(!DEV)return null;const m=/[?&]seed=(\d+)/.exec(location.search);return m?(+m[1])>>>0:null;})();
+const SYNC_MS=250;
+let runSeed=0,runId=0;const boards={},asked={},genLog=[]; // genLog: 시험용 기록(최근 것만)
+const logGen=x=>{genLog.push(x);if(genLog.length>40)genLog.shift();};
+const seedOf=(run,L)=>{let x=(run^Math.imul(L,0x9E3779B1))>>>0;x=Math.imul(x^x>>>16,0x85ebca6b);x=Math.imul(x^x>>>13,0xc2b2ae35);return (x^x>>>16)>>>0;};
+function newRun(){
+  runId++;for(const k in boards)delete boards[k];for(const k in asked)delete asked[k];
+  if(DEV_SEED!=null){runSeed=DEV_SEED;return;}
+  try{runSeed=crypto.getRandomValues(new Uint32Array(1))[0];}catch(e){runSeed=(Math.random()*4294967296)>>>0;}
+}
+let worker=null;
+try{ // 뒤쪽 일꾼: 판 만들기 묶음(TrafficGen)의 글자를 그대로 넘겨 같은 코드로 만든다
+  const src='const GEN=('+TrafficGen.toString()+')('+JSON.stringify(LEVELS)+');'+
+    'onmessage=e=>{const d=e.data;const lv=GEN.makeLevel(d.L,d.seed,{chain:d.chain});postMessage({run:d.run,L:d.L,lv});};';
+  const url=URL.createObjectURL(new Blob([src],{type:'text/javascript'}));worker=new Worker(url);
+  worker.onmessage=e=>{const d=e.data;if(d.run!==runId||boards[d.L])return;d.lv.via='worker';boards[d.L]=d.lv;logGen({L:d.L,src:d.lv.src,ms:d.lv.ms,via:'worker',moves:d.lv.minMoves});};
+  worker.onerror=()=>{worker=null;};
+}catch(e){worker=null;}
+function askBoard(L){if(!worker||boards[L]||asked[L])return;asked[L]=1;worker.postMessage({run:runId,L,seed:seedOf(runSeed,L),chain:DEV_SEED==null});}
+function boardFor(L){
+  if(!boards[L]){const t=performance.now();const lv=GEN.makeLevel(L,seedOf(runSeed,L),{deadline:t+SYNC_MS,chain:DEV_SEED==null});
+    lv.via='main';lv.ms=Math.round(performance.now()-t);boards[L]=lv;logGen({L,src:lv.src,ms:lv.ms,via:'main',moves:lv.minMoves});}
+  return boards[L];
+}
+// 예전 판 규칙 함수(시험 도구용 — 게임은 moveCar 가 같은 규칙으로 움직인다)
 function slide(st,i,sgn,lv,occ){
   const {N,fence}=lv,car=lv.cars[i],p=st[i];let q=p;
   for(;;){
@@ -192,20 +389,6 @@ function occOf(st,lv){const occ=new Int16Array(lv.N*lv.N).fill(-1);for(const o o
   lv.cars.forEach((car,i)=>{if(st[i]>=0)for(const x of cellsOf(car,st[i],lv.N))occ[x]=i;});return occ;}
 function closure(st,lv){let ch=true;while(ch){ch=false;const occ=occOf(st,lv);
   for(let i=0;i<st.length;i++){if(st[i]<0)continue;if(slide(st,i,1,lv,occ).exit||slide(st,i,-1,lv,occ).exit){st[i]=-1;ch=true;break;}}}return st;}
-// 최소 「자리 옮기기」 수(빼기가 아닌 끌기) — 너비 우선 탐색. 최소 끌기 수 = 차 수 + 이 값. 못 풀면 -1
-function solve(lv,cap){
-  cap=cap||400000;const s0=closure(lv.cars.map(posOf),lv);if(s0.every(v=>v<0))return {repos:0,moves:lv.cars.length};
-  const seen=new Set([s0.join(',')]);let fr=[s0],d=0;
-  while(fr.length){d++;const nf=[];
-    for(const s of fr){const occ=occOf(s,lv);
-      for(let i=0;i<s.length;i++){if(s[i]<0)continue;
-        for(const g of [1,-1]){const r=slide(s,i,g,lv,occ);if(r.exit||!r.moved)continue;
-          const t=s.slice();t[i]=r.to;closure(t,lv);if(t.every(v=>v<0))return {repos:d,moves:lv.cars.length+d};
-          const k=t.join(',');if(seen.has(k))continue;seen.add(k);nf.push(t);if(seen.size>cap)return {repos:-1,capped:true};}}}
-    fr=nf;}
-  return {repos:-1};
-}
-// 새 요소가 처음 나오는 단계(안내 한 줄)
 const INTRO={fence:2,bus:3,wand:4,cop:5,truck:8};
 
 /* ---------- three setup ---------- */
@@ -679,7 +862,7 @@ function carCenter(car,off){const m=car.pos+(off||0)+(car.len-1)/2;return car.h?
 function setPos(car){const [x,z]=carCenter(car,car.off);car.g.position.set(x,0,z);}
 function buildLevel(){
   scene.remove(world);world=new THREE.Group();scene.add(world); // 차 도형 · 재질은 공유 캐시라 버리지 않는다
-  const lv=lvData=levelData(save.level);N=lv.N;
+  const lv=lvData=boardFor(save.level);N=lv.N;askBoard(save.level+1);
   buildCity(N);
   home=new Array(N*N).fill(null);block=new Array(N*N).fill(null);active=[];bumps=0;combo=0;bestCombo=0;earned=0;locked=false;
   if(mode==='free')wands=3;
@@ -705,7 +888,7 @@ function buildLevel(){
     return car;
   });
   remaining=cars.length;fitCamera();hud();setCombo();
-  {const nN=levelData(save.level+1).N;if(nN!==N)warmCity(nN);}
+  {const nN=specOf(save.level+1).N;if(nN!==N)warmCity(nN);}
   $('help').style.opacity=save.level===1&&mode!=='menu'?0.75:0;
   if(mode!=='menu')introTip();
 }
@@ -916,7 +1099,7 @@ function levelClear(){
   if(perfect)rows+='<tr><td>퍼펙트!</td><td>+'+fmt(perfect)+'</td></tr>';
   else if(bumps===0&&wandUsed)rows+='<tr class="muted"><td>치우기를 써서 퍼펙트 보너스 없음</td><td>+0</td></tr>';
   save.level++;persist();
-  {const nN=levelData(save.level).N;if(nN!==N)setTimeout(()=>prepareCity(nN),300);}
+  {const nN=specOf(save.level).N;if(nN!==N)setTimeout(()=>prepareCity(nN),300);}
   setVal('coins',fmt(save.coins));$('combo').classList.remove('on');
   if(ARC){
     cleared++;
@@ -938,12 +1121,12 @@ function showMenu(){
 }
 function toMenu(){
   mode='menu';paused=false;$('pauseOv').classList.remove('on');
-  save.level=1;save.coins=0;timeLeft=ROUND;cleared=0;wands=3;
+  save.level=1;save.coins=0;timeLeft=ROUND;cleared=0;wands=3;newRun();
   buildLevel();locked=true;hud();showMenu();
 }
 function startRun(){
   mode='play';paused=false;$('pauseOv').classList.remove('on');
-  save.level=1;save.coins=0;timeLeft=ROUND;cleared=0;reported=false;wands=3;
+  save.level=1;save.coins=0;timeLeft=ROUND;cleared=0;reported=false;wands=3;newRun(); // 새 게임 · 다시 하기마다 새 씨앗 → 판이 매번 다르다
   hideCard();buildLevel();hud();
   hk({type:'hk:start'});live();tone(600,0.12,'sine',0.08);
 }
@@ -1117,10 +1300,12 @@ function frame(now){
   if(shake>0&&!paused){shake-=dt;camera.position.set(b.x+(Math.random()-.5)*shake,b.y+(Math.random()-.5)*shake,b.z);}else camera.position.copy(b);
   renderer.render(scene,camera);requestAnimationFrame(frame);
 }
-if(ARC){toMenu();hk({type:'hk:ready'});}else buildLevel();
+if(ARC){toMenu();hk({type:'hk:ready'});}else{newRun();buildLevel();}
 requestAnimationFrame(frame);
 if(!ARC||!inFrame){ // 단독으로 열었을 때만(점수가 헬스키퍼로 가지 않음) 시험용 손잡이
   window.__hk={camera,get N(){return N;},get cop(){return cop;},copCells,LEVELS,levelData,solve,startRun,blockerAt,carCenter,axisScreen,get lv(){return lvData;},
+    GEN,specOf,slide,occOf,closure,posOf,genLog,boards,get runSeed(){return runSeed;},get worker(){return !!worker;},
+    startAt(L){startRun();save.level=L;timeLeft=stageTime(L);buildLevel();hud();}, // 시험용: L단계부터
     get obs(){return obsList;},useWand,get wands(){return wands;}};
   window.__game={get cars(){return cars;},moveCar,get home(){return home;},get remaining(){return remaining;},update,
     get score(){return save.coins;},get level(){return save.level;},get mode(){return mode;},get timeLeft(){return timeLeft;},get cleared(){return cleared;},
