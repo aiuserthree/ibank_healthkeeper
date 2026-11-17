@@ -81,6 +81,29 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 .pips i.on{background:var(--ember);border-color:var(--ember)}
 .stub[aria-pressed="true"]{background:var(--marigold);transform:translateY(-6px)}
 .stub.locked{background:#b9a7c9;color:#3b2550;cursor:not-allowed}
+/* 트랙 카드 그림(생성 그림 /assets/games/sundown/track-card-NN-v1.webp) — 보이는 카드부터 뒤에서 불러와 .main 바탕에 깐다.
+   글씨 · 미니맵 선 · 잠김 표시는 코드가 위에 그린다. 그림이 붙기 전 · 못 불러오면 .art 가 안 붙어 지금 모습 그대로 */
+.stub .main{position:relative;isolation:isolate}
+.stub .art{position:absolute;inset:-2px 0 -2px -8px;z-index:-1;overflow:hidden;display:none;pointer-events:none}
+.stub .art img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;-webkit-user-drag:none;user-select:none}
+.stub .art::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,rgba(26,10,43,.92) 0,rgba(26,10,43,.8) 52%,rgba(26,10,43,.5) 80%,rgba(26,10,43,.3) 100%),linear-gradient(0deg,rgba(26,10,43,.55) 0,rgba(26,10,43,0) 42%)}
+.stub .art svg{position:absolute;right:6px;top:50%;width:30%;height:58%;transform:translateY(-50%);overflow:visible;z-index:1;opacity:.28} /* 오른쪽 끝 30% · 옅게 — 글 밑을 지나도 글이 먼저 읽히게 */
+.stub .art svg path{fill:none;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.stub .art svg .o{stroke:rgba(26,10,43,.6);stroke-width:4}
+.stub .art svg .l{stroke:#fff2d8;stroke-width:1.8}
+.stub .art svg circle{fill:#ff4192;stroke:#1a0a2b;stroke-width:1.5;vector-effect:non-scaling-stroke}
+.stub .art .lock{position:absolute;right:8px;top:8px;width:24px;height:24px;border-radius:50%;background:rgba(26,10,43,.85);border:2px solid rgba(255,242,216,.7);display:none;place-items:center;z-index:2}
+.stub.art .art{display:block}
+.stub.art .main{color:var(--cream);text-shadow:0 1px 2px rgba(26,10,43,.95),0 0 6px rgba(26,10,43,.6)}
+.stub.art .no{opacity:.9;color:var(--marigold)}
+.stub.art .pips i{border-color:var(--cream)}
+.stub.art .pips i.on{border-color:var(--ember)}
+.stub.art[aria-pressed="true"] .art{box-shadow:inset 0 0 0 3px var(--marigold)}
+.stub.art.locked{background:#9c8bb0}
+.stub.art.locked .art img{filter:grayscale(.85) brightness(.62)}
+.stub.art.locked .art .lock{display:grid}
+.stub.art.locked .art svg{opacity:.18}
+.stub.art.locked .main{color:#e6dcef}
 .cta{grid-area:cta;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 .how{font-weight:700;font-size:14px;opacity:.9;flex:1 1 220px}
 
@@ -134,7 +157,53 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 .h-chips{position:absolute;left:16px;bottom:18px;display:flex;gap:8px;flex-wrap:wrap}
 .chip{font-family:var(--font-display);font-size:12px;letter-spacing:.06em;line-height:1;padding:7px 10px;border-radius:999px;background:var(--hud-bg);border:2px solid currentColor}
 .chip.sh{color:var(--cyan)}.chip.bl{color:var(--pink)}.chip.bo{color:var(--marigold)}
-/* 아이템 칸 3개 — 원하는 칸을 골라 쓴다. PC: 왼쪽 위 HUD 칸(아이콘 + 이름 + 키 1 · 2 · 3, E · Shift 는 찬 칸 가운데 가장 앞 칸),
+.chip.cc{color:#a5e02b}.chip.bad{color:#c9a8ff}
+/* 경고 층(아이템 0b) — 화면 테두리 맥박 · 위 가운데 띠(진행 막대 · 바퀴 수 아래) · 뒤쪽 모서리 화살표(크기 = 가까움).
+   칸 · 순위 · 바퀴 · 미니맵 · 휴대폰 칸 단추는 가리지 않는다 */
+.blind-fx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none} /* 색종이 분수 — 가장자리 덮개(가운데 원은 비움) */
+.warn-edge{position:absolute;inset:0;pointer-events:none;opacity:0;border:10px solid transparent;transition:opacity .15s}
+.warn-edge.on{opacity:1;animation:wpulse .45s ease-in-out infinite alternate}
+.warn-edge.k-lock{border-image:repeating-linear-gradient(45deg,#ff4192 0 14px,#ffc533 14px 28px) 10}
+.warn-edge.k-gold{border:10px dashed #ffc533} /* 축포 예고 — 점선(색 말고도 리본 분홍 실선과 구분) + 띠 글 */
+.warn-edge.k-gold.on{animation-name:wpulse2}
+@keyframes wpulse2{0%{opacity:.6}100%{opacity:1}}
+.warn-edge.k-wind{border-color:#b98cff}
+.warn-edge.k-near{border-color:transparent transparent #fff04a;border-bottom-width:16px} /* 직사 근접(팝콘) — 아래 테두리만 노랗게 */
+.warn-edge.k-ribbon{border-color:#ff7ac0}
+@keyframes wpulse{0%{opacity:.3}100%{opacity:1}}
+.warn-band{position:absolute;left:50%;top:76px;transform:translateX(-50%);max-width:min(46vw,420px);padding:5px 14px 6px;border-radius:12px;background:rgba(58,18,80,.9);border:2px solid #b98cff;
+  font-family:var(--font-display);font-weight:800;font-size:14px;line-height:1.2;text-align:center;color:var(--cream);text-shadow:var(--hud-ol);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.warn-arrow{position:absolute;bottom:22%;width:46px;height:46px;pointer-events:none;opacity:0;transform-origin:50% 100%}
+.warn-arrow.l{left:4%}.warn-arrow.r{right:4%}
+.warn-arrow::before{content:'';position:absolute;inset:0;background:var(--wc,#ff4192);clip-path:polygon(50% 0,100% 62%,70% 62%,70% 100%,30% 100%,30% 62%,0 62%);filter:drop-shadow(0 0 6px var(--wc,#ff4192))}
+@media (max-width:760px){.warn-band{top:126px;max-width:calc(100vw - 150px);font-size:13px}}
+@media (pointer:coarse){.warn-arrow.l{left:140px}}
+@media (pointer:coarse) and (max-height:560px){.warn-arrow{bottom:146px}.warn-arrow.l{left:4%}.warn-arrow.r{right:160px}} /* 가로 휴대폰 — 칩 줄 위, 오른쪽은 미니맵 왼쪽 */
+html.rm .warn-edge.on{animation:none}
+@media (prefers-reduced-motion:reduce){.warn-edge.on,.warn-edge.k-gold.on{animation:none}}
+/* 칸 「✕」 — 지금 못 쓰는 칸을 눌렀을 때(대상 없음 · 묶임 · 도는 중) 0.6초 흔들림 */
+.slot.no,.ib.no{animation:noShake .6s ease-out}
+.slot.no::after,.ib.no::after{content:'✕';position:absolute;inset:0;display:grid;place-items:center;font-size:44px;font-weight:900;line-height:1;color:#ff5a6e;text-shadow:0 0 8px rgba(0,0,0,.7);animation:noFade .6s ease-out forwards;pointer-events:none}
+@keyframes noShake{0%,100%{transform:none}20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(3px)}}
+@keyframes noFade{0%{opacity:1}100%{opacity:0}}
+html.rm .slot.no,html.rm .ib.no{animation:none}
+/* 훔쳐 간 칸 — 보라 빛으로 흔들리다 빈다(아이템 2단계) */
+.slot.stolen,.ib.stolen{animation:noShake .6s ease-out,stolenGlow .9s ease-out}
+@keyframes stolenGlow{0%{box-shadow:0 0 26px #b98cff}100%{box-shadow:0 0 0 transparent}}
+.slot.stolen::after,.ib.stolen::after{content:'';position:absolute;inset:-3px;border-radius:inherit;border:3px solid #b98cff;animation:noFade .8s ease-out forwards;pointer-events:none}
+html.rm .slot.stolen,html.rm .ib.stolen{animation:none}
+/* 스프링 범퍼 칸 — 돌거나 묶이거나 떠 있는 동안 「이 칸 번호를 누르면 풀려요」(아이템 3단계) — 테두리 초록 깜빡임 */
+.slot.cure,.ib.cure{border-color:#6ee38a;animation:cureBlink .5s steps(2,jump-none) infinite}
+@keyframes cureBlink{0%{box-shadow:0 0 6px #6ee38a}100%{box-shadow:0 0 28px #6ee38a}}
+html.rm .slot.cure,html.rm .ib.cure{animation:none;box-shadow:0 0 18px #6ee38a}
+/* 아이템 그림 — 생성 아이콘 묶음(1024², 칸 200 · 5×4)을 불러오면 이모지 대신 칸마다 배경 위치만 바꿔 쓴다(못 불러오면 이모지 그대로).
+   크기와 상관없이 맞게 백분율로: 배경 크기 512%, 위치 = 칸 왼쪽 위 / 200 / 4.12 */
+.ic-img{display:inline-block;background-repeat:no-repeat;background-size:512% 512%;vertical-align:middle}
+html.icons-img .ic-img{background-image:url(/assets/games/sundown/item-icons-v1.webp)}
+.slot i.ic-img{width:44px;height:44px;min-height:44px;font-size:0}
+.ib i.ic-img{width:34px;height:34px;min-height:34px;font-size:0}
+.item-tip .ic-img{width:24px;height:24px;margin:-4px 4px 0 0}
+/* 아이템 칸 3개 — 원하는 칸을 골라 쓴다. PC: 왼쪽 위 HUD 칸(아이콘 + 이름 + 키 1 · 2 · 3, E 는 지금 쓸 수 있는 칸 중 가장 앞 칸),
    휴대폰: 왼쪽 가장자리에 칸 단추 3개를 세로로(왼손 엄지 — 오른손은 달리기 · 방향 끌기), 누르면 그 칸을 바로 쓴다 */
 .h-slots{position:absolute;left:16px;top:108px;display:flex;gap:10px;align-items:flex-start}
 .slot{position:relative;width:86px;height:86px;border-radius:16px;background:rgba(26,10,43,.82);border:3px solid var(--marigold);box-shadow:0 0 14px rgba(255,197,51,.4);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
@@ -172,7 +241,8 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 @media (pointer:coarse) and (max-height:560px){ /* 가로로 눕힌 휴대폰 — 칸 단추를 가로로 */
   .item-pad{flex-direction:row}
   .ib{width:100px;height:60px}.ib i{font-size:26px;min-height:26px}.ib b{font-size:12px}
-  .item-tip{left:16px;bottom:104px}
+  .ib i.ic-img{width:30px;height:30px;min-height:30px}
+  .item-tip{left:16px;bottom:144px} /* 칩 줄(아래 104px · 높이 약 30px) 위로 — 처음 얻은 설명이 방해 칩을 가리지 않게 */
   .h-chips{bottom:104px}
   .hint{bottom:110px}
 }
@@ -295,6 +365,8 @@ html.rm #rush{display:none}
   </section>
 
   <section id="hud" hidden>
+    <canvas class="blind-fx" id="blindFx" aria-hidden="true" hidden></canvas>
+    <div class="warn-edge" id="warnEdge" aria-hidden="true"></div>
     <div class="h-place"><b id="hPlace">6</b><sup id="hOrd">등</sup><small id="hOf">6명 중</small></div>
     <div class="h-prog" id="hProg" aria-hidden="true"></div>
     <div class="h-lap" id="hLap"><b id="hLapN">1</b> / <span id="hLapT">3</span> 바퀴</div>
@@ -305,6 +377,8 @@ html.rm #rush{display:none}
       <button class="icon-btn" id="btnPause" type="button" aria-label="일시정지">II</button>
     </div>
     <div class="h-chips" id="hChips"></div>
+    <div class="warn-band" id="warnBand" role="status" hidden></div>
+    <div class="warn-arrow l" id="warnL" aria-hidden="true"></div><div class="warn-arrow r" id="warnR" aria-hidden="true"></div>
     <div class="h-slots" aria-label="아이템 칸"><div class="slot empty" id="slot0"><i></i><b>비어 있음</b><kbd>1</kbd></div><div class="slot empty" id="slot1"><i></i><b>비어 있음</b><kbd>2</kbd></div><div class="slot empty" id="slot2"><i></i><b>비어 있음</b><kbd>3</kbd></div></div>
     <div class="item-pad" aria-label="아이템 칸 — 눌러서 쓰기"><button class="ib off empty" id="ib0" data-i="0" type="button"><em>1</em><i></i><b>비어 있음</b></button><button class="ib off empty" id="ib1" data-i="1" type="button"><em>2</em><i></i><b>비어 있음</b></button><button class="ib off empty" id="ib2" data-i="2" type="button"><em>3</em><i></i><b>비어 있음</b></button></div>
     <div class="item-tip" id="itemTip" role="status" hidden></div>
@@ -332,7 +406,7 @@ html.rm #rush{display:none}
   <section id="pause" class="panel-wrap" hidden>
     <div class="panel">
       <h2>잠깐 멈춤</h2>
-      <p>누르고 있으면 달리고, 떼면 느려지고, 좌우로 끌면 방향을 바꿔요. 굽은 길에서 안쪽으로 꺾고 버티면 드리프트 부스트가 모여요. 점프해서 공중에 떴을 때 좌우로 세게 끌면 빙글 돌아 티켓을 받아요. 길 위 선물 상자를 지나면 아이템이 칸(3칸)에 들어가요 — 원하는 칸을 골라 써요. PC 는 1 · 2 · 3 키(E · Shift 는 찬 칸 가운데 가장 앞 칸 — 칸 번호는 그대로), 휴대폰은 왼쪽 칸 단추를 눌러요. 뒤처질수록 센 아이템이 잘 나와요.</p>
+      <p>누르고 있으면 달리고, 떼면 느려지고, 좌우로 끌면 방향을 바꿔요. 굽은 길에서 안쪽으로 꺾고 버티면 드리프트 부스트가 모여요. 점프해서 공중에 떴을 때 좌우로 세게 끌면 빙글 돌아 티켓을 받아요. 길 위 선물 상자를 지나면 아이템이 칸(3칸)에 들어가요 — 원하는 칸을 골라 써요. PC 는 1 · 2 · 3 키(E 는 지금 쓸 수 있는 칸 중 가장 앞 칸 — 칸 번호는 그대로), 휴대폰은 왼쪽 칸 단추를 눌러요. 뒤처질수록 센 아이템이 잘 나와요.</p>
       <p class="arc-note" id="pauseArc" hidden>중간에 나가면 이번 판 점수는 없어요.</p>
       <div class="gfx-set">
         <span class="lbl" id="gfxLbl">그래픽</span>
@@ -680,6 +754,21 @@ const Snd={ctx:null,out:null,
   slam(v){this.noise(.25,.3*v,300,60);this.tone(90,.3,'sine',.4*v,40);},
   pop(){this.tone(1200,.2,'sine',.14,300);this.noise(.15,.15,3000,800);},
   blast(){this.noise(.6,.3,200,2400);this.tone(120,.5,'square',.1,40);},
+  // 아이템 2단계 경고 소리 — 축포 휘파람(올라감) · 잠금 「삐-삐-삐」 · 팝콘 「톡」 · 폭발 부풀기 「쀼웅」 · 잼 비행 「휘이~」 · 착지 「철퍽」 · 집게 「철컥」 · 줄 끊김 「팅」
+  whistle(){this.tone(700,.85,'sine',.07,2200);this.tone(1400,.85,'sine',.03,4000);},
+  lock(){for(let i=0;i<3;i++)this.tone(1568,.07,'square',.06,0,i*.17);},
+  tok(n){this.tone(1500+(n||0)*300,.04,'square',.045);},
+  swell(){this.tone(260,.32,'sine',.13,900);},
+  fly(){this.tone(900,.7,'sine',.05,500);},
+  splat(){this.noise(.25,.26,1200,200);this.tone(140,.18,'sine',.16,70);},
+  clack(){this.tone(1800,.04,'square',.07);this.tone(1300,.05,'square',.07,0,.06);},
+  ting(){this.tone(2400,.18,'triangle',.08);},
+  // 아이템 3단계 — 바람개비 순풍 「휘이잉」(낮게 깔리는 바람) · 스프링 「뾰잉~」 · 통 튀기 착지 「통」
+  breeze(){this.noise(.9,.16,300,1100);this.tone(330,.8,'sine',.04,440);},
+  boing(){this.tone(220,.32,'sine',.16,880);this.tone(440,.22,'triangle',.06,1320,.05);},
+  thud(){this.tone(130,.16,'sine',.2,70);},
+  jack(){this.tone(110,.22,'sine',.26,60);this.tone(392,.16,'square',.07,1568,.06);this.tone(784,.12,'triangle',.06,0,.2);}, // 광대 북 — 「둥」 + 「뿅」
+  confetti(){this.noise(.18,.2,4000,1500);for(let i=0;i<4;i++)this.tone(1760+i*330,.07,'triangle',.05,0,.05+i*.06);}, // 색종이 — 「팡」 + 반짝 사르르
   fanfare(win){const n=win?[523,659,784,1047,784,1047]:[523,659,784];n.forEach((f,i)=>this.tone(f,i===n.length-1?.6:.16,'square',.09,0,i*.15));},
   music(){
     const c=this.ctx,self=this;
@@ -1291,7 +1380,19 @@ function getItemGeos(){
   const mt=new Bake(); // 별똥별 — 불타는 바위 + 노란 속
   mt.add(G.ico,0xff7a2a,mat(0,0,0,1.5));mt.add(G.ico,0xffc533,mat(0,.2,0,1.05,1.05,1.05,.5,.3,0));mt.add(G.sphLo,0xfff2d8,mat(0,.3,0,.6));
   for(let k=0;k<5;k++){const a=k*TAU/5;mt.add(G.cone,0xff4d5e,mat(Math.cos(a)*.7,1.3,Math.sin(a)*.7,.45,1.6,.45));}
-  itemGeos={rocket:r.geo(),shield:s.geo(),blast:b.geo(),box:x.geo(),popcorn:pc.geo(),candy:cd.geo(),wind:wd.geo(),firework:fw.geo(),meteor:mt.geo()};
+  const bl=new Bake(); // 딸기잼 풍선 — 분홍 풍선 속 딸기잼, 꼭지에 딸기 잎
+  bl.add(G.sph,0xff5a8a,mat(0,0,0,.95,1.1,.95));bl.add(G.sphLo,0xd8204a,mat(0,-.25,0,.62));
+  for(let k=0;k<5;k++){const a=k*TAU/5;bl.add(G.cone,0x5ad86a,mat(Math.cos(a)*.22,1.12,Math.sin(a)*.22,.16,.34,.16,Math.sin(a)*.9,0,-Math.cos(a)*.9));}
+  bl.add(G.cone,0xff5a8a,mat(0,-1.15,0,.2,.28,.2,Math.PI,0,0));
+  const jk=new Bake(); // 깜짝 광대 북 — 보라 · 민트 줄무늬 북, 금 테, 위로 광대 모자 끝(노랑 상자 모양은 쓰지 않음)
+  jk.add(G.cyl,0xa77bff,mat(0,.55,0,1.5,1.1,1.5),[0x5ee6c8,8]);jk.add(G.cyl,0xfff2d8,mat(0,1.12,0,1.42,.06,1.42));
+  jk.add(G.torThin,0xffc533,mat(0,1.1,0,1.52,1.52,2.4,Math.PI/2,0,0));jk.add(G.torThin,0xffc533,mat(0,.02,0,1.52,1.52,2.4,Math.PI/2,0,0));
+  jk.add(G.cone,0xff4d6e,mat(.15,1.45,0,.32,.62,.32,0,0,-.25),[0xfff27a,3]);jk.add(G.sphLo,0xfff27a,mat(.29,1.78,0,.16));
+  const cf=new Bake(); // 색종이 분수 — 작은 금색 분수대에서 색종이가 솟음(구름 모양은 쓰지 않음)
+  cf.add(G.cyl,0xffc533,mat(0,.18,0,1.5,.36,1.5),[0xfff2d8,10]);cf.add(G.cyl,0x4fe0c8,mat(0,.38,0,1.25,.06,1.25));
+  cf.add(G.cylLo,0xffd84a,mat(0,.85,0,.22,1,.22));cf.add(G.cyl,0xffc533,mat(0,1.35,0,.7,.16,.7));cf.add(G.sphLo,0xfff2d8,mat(0,1.55,0,.22));
+  {const cc=[0xff4192,0x48e4ff,0xfff27a,0xa5e02b,0xff8a3c,0xc9a8ff];for(let k=0;k<10;k++){const a=k*2.3,r=.3+(k%3)*.22;cf.add(G.box,cc[k%6],mat(Math.cos(a)*r,1.8+(k%4)*.32,Math.sin(a)*r,.2,.05,.13,a,k,0));}}
+  itemGeos={rocket:r.geo(),shield:s.geo(),blast:b.geo(),box:x.geo(),popcorn:pc.geo(),candy:cd.geo(),wind:wd.geo(),firework:fw.geo(),meteor:mt.geo(),balloon:bl.geo(),jack:jk.geo(),confetti:cf.geo()};
   for(const k in itemGeos)itemGeos[k].userData={keep:true};
   return itemGeos;
 }
@@ -1581,7 +1682,7 @@ function disposeWorld(){
   });
   scene.remove(world);world=null;
   banners.length=0;
-  for(const f of fx){scene.remove(f.m);f.m.material.dispose();if(f.bolt)f.m.geometry.dispose();}
+  for(const f of fx){scene.remove(f.m);f.m.material.dispose();}
   fx=[];clearRings();
 }
 function ferris(x,z,ry,rad){
@@ -2048,6 +2149,18 @@ function buildMap(tr){
 function drawMap(){
   const cv=$('hMap');if(!cv||!MAP.bg||!track)return;
   const g=cv.getContext('2d');g.clearRect(0,0,cv.width,cv.height);g.drawImage(MAP.bg,0,0);
+  // 아이템 점 — 날아가는 회오리(보라) · 잼 착지 자리(분홍) · 별똥별 낙하 자리(주황) · 함정(작게)
+  const ol=VS.on&&VS.role==='guest'?(VS.gobjs||[]):objs;
+  for(const o of ol){
+    let s0=o.s,col,R=4;
+    if(o.k==='wind'){col='#b98cff';R=5;}
+    else if(o.k==='balloon'){s0=o.ls!==undefined?o.ls:(+o.x1||o.s);col='#ff5a8a';R=5;}
+    else if(o.k==='meteor'){col='#ff8a3c';}
+    else if(OBJ_TRAP[o.k]){col=o.k==='jack'?'#a77bff':o.k==='confetti'?'#4fe0c8':'#ff9fd8';R=2.5;}
+    else continue;
+    const j=clamp(lapS(track,s0)|0,0,track.L-1),q=MAP.f(track.P[j*3],track.P[j*3+2]);
+    g.beginPath();g.arc(q[0],q[1],R,0,TAU);g.fillStyle=col;g.fill();g.lineWidth=1.5;g.strokeStyle='#1a0a2b';g.stroke();
+  }
   const list=cars.slice().sort((a,b)=>(a.isPlayer?1:0)-(b.isPlayer?1:0)); // 내 차를 맨 위에
   for(const c of list){
     const i=clamp(lapS(track,c.s)|0,0,track.L-1),q=MAP.f(track.P[i*3],track.P[i*3+2]),R=c.isPlayer?9:6;
@@ -2071,14 +2184,20 @@ function playerStats(rid){
   const u=save.up;
   return {vmax:45+2.4*u.engine+(rid==='penguin'?2:0),acc:20+2.2*u.engine,hand:15+1.6*u.tires,driftRate:(1+.12*u.tires)*(rid==='fox'?1.25:1),
     boostMul:1.3+.035*u.boost,boostDur:1+.1*u.boost,spinoutDur:(1-.1*u.bumper)*(rid==='panda'?.65:1),ticketLoss:3-Math.floor(u.bumper/2),
-    scrape:.8-.08*u.bumper,magnet:rid==='pig'?1.7:1,spinTix:rid==='frog'?2:1,shieldT:8+u.bumper};
+    scrape:.8-.08*u.bumper,magnet:rid==='pig'?1.7:1,spinTix:rid==='frog'?2:1,shieldT:6+u.bumper}; // 방패 6초(아이템 2단계 — 8 · 7 · 8 에서 2씩 줄임)
 }
-function aiStats(v){return {vmax:v,acc:21,hand:13,driftRate:.85,boostMul:1.27,boostDur:.75,spinoutDur:1,ticketLoss:0,scrape:.8,magnet:1,spinTix:1,shieldT:7};}
+function aiStats(v){return {vmax:v,acc:21,hand:13,driftRate:.85,boostMul:1.27,boostDur:.75,spinoutDur:1,ticketLoss:0,scrape:.8,magnet:1,spinTix:1,shieldT:5};}
 // 대전 — 두 사람 모두 같은 기본 성능(해금 · 업그레이드 · 레이서 특기 없음)
-function baseStats(){return {vmax:45,acc:20,hand:15,driftRate:1,boostMul:1.3,boostDur:1,spinoutDur:1,ticketLoss:3,scrape:.8,magnet:1,spinTix:1,shieldT:8};}
+function baseStats(){return {vmax:45,acc:20,hand:15,driftRate:1,boostMul:1.3,boostDur:1,spinoutDur:1,ticketLoss:3,scrape:.8,magnet:1,spinTix:1,shieldT:6};}
 function resetCar(c){
   Object.assign(c,{h:0,vy:0,v:0,uVel:0,air:false,airT:0,spins:0,spinning:false,spinP:0,spinDir:1,spinYaw:0,boostT:0,shield:0,armed:0,invuln:0,
-    spinout:0,spinoutMax:1,squash:0,driftT:0,driftDir:1,driftGrace:0,driftVis:0,steerVis:0,lastSteer:0,scrape:false,padCd:0,bumpCd:0,finished:false,finishT:0,rb:1,slots:slotsNew(),slowT:0,starT:0,magT:0,ghostT:0,itemHeld:0,aiItemT:0});
+    spinout:0,spinoutMax:1,squash:0,driftT:0,driftDir:1,driftGrace:0,driftVis:0,steerVis:0,lastSteer:0,scrape:false,padCd:0,bumpCd:0,finished:false,finishT:0,rb:1,slots:slotsNew(),slowT:0,starT:0,magT:0,ghostT:0,itemHeld:0,aiItemT:0,
+    // 아이템 0b — 새 효과 칸(아직 쓰는 아이템 없음 · 대전 스냅숏 27 · 28번), 면역(끝난 뒤 남은 초), 무력화 기록 · 맞기 보류
+    tieT:0,revT:0,revW:0,maskT:0,maskW:0,blindT:0,pwT:0,airLock:0,thW:0,thS:0,immRev:0,immMask:0,immBlind:0,immGlob:0,liteT:0,magPull:false,cc:[],pend:null,ccOn:false,lastGot:'',
+    // 아이템 2단계 — 로켓 첫 펀치 · 방패 끝 0.2초 여유 · 집게 줄(대상 · 끊김 셈)
+    punchT:0,shG:0,magTgt:null,magCut:0,
+    // 아이템 3단계 — 스프링 통 튀기 중(재주 넘기 없음) · 스핀/묶임이 끝난 경주 시각(늦게 도착한 손님 스프링은 「끊기」로 봄)
+    hop:false,spinEnd:-9,tieEnd:-9,jk:false});
   c.ai={home:0,wf:.4+Math.random()*.5,wp:Math.random()*TAU,t:Math.random()*.1,lane:0,dec:new Map(),brakeT:0,greed:Math.random(),trick:false,trickDir:1,tubeAmp:Math.random()<.5?0:6+Math.random()*10,out:{accel:true,steer:0}};
 }
 function gridCars(){
@@ -2137,17 +2256,51 @@ function fxFar(s){return !!(player&&track&&Math.abs(lapD(track,s,player.s))>FX_F
 function boost(c,d){c.boostT=Math.max(c.boostT,d*c.st.boostDur);}
 function addTix(n,trick){game.tix+=n;if(trick)game.tixTrick+=n;}
 
-const HIT_TXT={hammer:'납작해졌어요!',boat:'바이킹에 쿵!',cups:'찻잔에 걸렸어요!',roller:'대형 공에 쿵!',pillars:'튀어나온 기둥에 쿵!',spinbar:'회전 막대에 맞았어요!',fire:'불꽃 미사일에 맞았어요!',meteor:'별똥별에 맞았어요!',blast:'펑! 맞았어요',pop:'팝콘 폭탄에 맞았어요!',trap:'솜사탕에 미끄러졌어요!',wind:'회오리에 휘말렸어요!',star:'무지개 별에 튕겼어요!'};
+/* 아이템 0b — 공정성 바탕
+   · 맞기 보류(원격 사람 차만): host 가 대전 손님 차에 아이템 적중을 정하면 0.12초 미뤘다가 확정한다 — 그 사이 손님이 누른 방패 · 별 · 망토가 도착하면 막힌다.
+     한 차에 보류는 하나만(보류 중 두 번째 적중은 무시 — 어차피 맞은 뒤 무적이 이어짐). 장애물 · 차끼리 부딪힘 · host 본인 · 컴퓨터는 보류 없음
+   · 무력화 상한: 최근 8초 동안 못 움직인 시간(스핀 · 묶임 · 공중 1배, 반전 · 가면 0.5배) 합이 3초에 닿으면 창이 풀릴 때까지
+     아이템 스핀은 「가벼운 맞음」(속도 ×0.8, 0.4초, 스핀 없음), 반전 · 가면은 안 붙음(ccBlocks). 장애물은 그대로 돌지만 시간은 센다 */
+const VS_PEND=.12,CC_WIN=8,CC_MAX=3,CC_N=8;
+const ITEM_HIT={fire:1,meteor:1,blast:1,pop:1,trap:1,wind:1,star:1};
+function ccSum(c){const t0=game.raceTime-CC_WIN;let n=0;for(const e of c.cc)if(e[0]>t0)n+=e[1];return n;}
+function ccAdd(c,sec,w){c.cc.push([game.raceTime,sec*w]);while(c.cc.length>CC_N)c.cc.shift();}
+function ccCapped(c){return ccSum(c)>=CC_MAX-1e-6;}
+function ccBlocks(c){return ccCapped(c);} // 반전 · 가면 같은 붙는 방해가 지금 안 붙는가 — 아직 쓰는 곳 없음, 5단계(리본 · 가면) · 6단계(소용돌이)에서 씀
+function pendHit(c,fn){
+  if(!(VS.on&&VS.role==='host'&&c.remote))return false;
+  if(!c.pend)c.pend={t:VS_PEND,f:fn};
+  return true;
+}
+function stepPend(c,dt){if(!c.pend)return;c.pend.t-=dt;if(c.pend.t<=0){const f=c.pend.f;c.pend=null;f();}}
+function liteHit(c,kind){ // 무력화 상한에 걸린 차 — 돌지 않고 잠깐 느려지기만
+  c.v*=.8;c.liteT=.4;c.invuln=.4+1.3;c.squash=Math.max(c.squash,.35);
+  vsEv('lite',c,kind);
+  surf(track,c.s,c.u,1+c.h,S1);if(!fxFar(c.s))burst(S1.pos,8,[0xa5e02b,0xfff2d8],8,.4,8);
+  if(c.isPlayer){Snd.bump();game.shake=Math.max(game.shake,.35);toast('살짝 맞았어요 — 연속 보호 중');}
+  return true;
+}
+const HIT_TXT={/* 아이템 2단계 이름 */hammer:'납작해졌어요!',boat:'바이킹에 쿵!',cups:'찻잔에 걸렸어요!',roller:'대형 공에 쿵!',pillars:'튀어나온 기둥에 쿵!',spinbar:'회전 막대에 맞았어요!',fire:'불꽃 미사일에 맞았어요!',meteor:'별똥별에 맞았어요!',blast:'펑! 맞았어요',pop:'팝콘 폭탄에 맞았어요!',trap:'솜사탕에 미끄러졌어요!',wind:'회오리에 휘말렸어요!',star:'무지개 퍼레이드에 튕겼어요!'};
+/* 비눗방울 방패 — 켜져 있거나 꺼진 지 0.2초 안이면(끝나기 직전에 맞아도) 한 번 막고 사라진다. S1 은 부른 쪽이 맞은 차 자리로 맞춰 둔다 */
+function shieldBlock(c){
+  if(!(c.shield>0||c.shG>0))return false;
+  c.shield=0;c.shG=0;c.invuln=1.2;if(!fxFar(c.s))burst(S1.pos,18,0x48e4ff,9,.5,6);vsEv('shd',c);
+  if(c.isPlayer){toast('비눗방울이 막아 줬어요');Snd.pop();}
+  return true;
+}
 function hit(c,kind){
   if(c.invuln>0||c.finished)return false;
+  if(ITEM_HIT[kind]&&pendHit(c,()=>hitNow(c,kind)))return true; // 대전 손님 차 — 0.12초 뒤 확정(그 사이 방패가 오면 막힘)
+  return hitNow(c,kind);
+}
+function hitNow(c,kind){
+  if(c.invuln>0||c.finished)return false;
   surf(track,c.s,c.u,1+c.h,S1);
-  if(c.shield>0){
-    c.shield=0;c.invuln=1.2;if(!fxFar(c.s))burst(S1.pos,18,0x48e4ff,9,.5,6);vsEv('shd',c);
-    if(c.isPlayer){toast('방패가 막아 줬어요');Snd.pop();}
-    return false;
-  }
-  c.spinout=c.st.spinoutDur*(kind==='blast'?.75:1);c.spinoutMax=c.spinout;
+  if(shieldBlock(c))return false;
+  if(ITEM_HIT[kind]&&ccCapped(c))return liteHit(c,kind); // 무력화 상한 — 아이템은 가벼운 맞음(장애물은 그대로 돈다)
+  c.spinout=c.st.spinoutDur*(kind==='blast'?.75:kind==='wind'?1.2:1);c.spinoutMax=c.spinout; // 회오리는 1.2초 빙글
   c.v*=kind==='blast'?.5:.38;c.invuln=c.spinout+1.3;c.driftT=0;c.boostT=0;
+  ccAdd(c,c.spinout,1);
   if(kind==='hammer')c.squash=1;
   vsEv('hit',c,kind);
   if(!fxFar(c.s)){burst(S1.pos,16,[0xffc533,0xff4192,0xfff2d8],11,.55,14);kindFx(kind,S1.pos);}
@@ -2177,31 +2330,56 @@ function clearRings(){for(const r of ringPool){r.on=false;r.m.visible=false;}}
 function blast(c){
   vsEv('blast',c);
   if(!fxFar(c.s))ringFx(c.root.position,c.root.quaternion,0xff4192);
-  for(const o of cars){if(o!==c&&Math.abs(lapD(track,o.s,c.s))<17)hit(o,'blast');} // 바퀴 안 거리 — 한 바퀴 차이 나는 차도 옆에 있으면 맞는다
+  for(const o of cars){if(o!==c&&Math.abs(lapD(track,o.s,c.s))<BLAST_S&&Math.abs(udiff(o.u,c.u))<BLAST_U)hit(o,'blast');} // 바퀴 안 거리 — 한 바퀴 차이 나는 차도 옆에 있으면 맞는다
   boost(c,.5);
   if(nearPlayer(c,60)){Snd.blast();if(c.isPlayer)toast('범퍼 폭발!');else game.shake=Math.max(game.shake,.5);}
 }
 /* ================= 아이템 — 상자를 지나면 무작위 아이템이 「아이템 칸」(3칸) 가운데 가장 앞 빈 칸에 들어가고, 칸 번호는 쓸 때까지 그대로다 =================
-   나오는 확률은 순위로 정한다 — 앞설수록 방패 · 함정, 뒤처질수록 센 아이템(회오리 · 무지개 별은 뒤처진 차만). 컴퓨터 차도 상황을 보고 쓴다 */
-const ITEM_KEYS=['rocket','shield','blast','popcorn','candy','wind','magnet','star','balloon','thunder','firework','ghost','meteor'];
-const ITEM_CODE='rsbpcwmtlzfgo'; // 대전 스냅숏에서 칸을 짧게 적는 글자(ITEM_KEYS 순서)
+   나오는 확률은 순위 그룹 표(rollTable — 아래)로 정한다 — 앞설수록 방패 · 함정, 뒤처질수록 가속 · 1등 저격. 컴퓨터 차도 상황을 보고 쓴다 */
+const ITEM_KEYS=['rocket','shield','blast','popcorn','candy','wind','magnet','star','balloon','thunder','firework','ghost','meteor','pinwheel','spring','jack','confetti']; // 앞 13개는 예전 순서 그대로(옛 화면 손님 — ITEM_OLD_N)
+const ITEM_CODE='rsbpcwmtlzfgonkje'; // 대전 스냅숏에서 칸을 짧게 적는 글자(ITEM_KEYS 순서)
 const ITEM_SLOTS=3; // 아이템 칸 수 — 원하는 칸을 골라 쓴다
 const ITEM={
   rocket:{n:'로켓 부스트',ic:'🚀',col:0xff8a3c},
-  shield:{n:'방패',ic:'🛡️',col:0x48e4ff},
+  shield:{n:'비눗방울 방패',ic:'🫧',col:0x48e4ff},
   blast:{n:'범퍼 폭발',ic:'💥',col:0xff4192},
   popcorn:{n:'팝콘 폭탄',ic:'🍿',col:0xffe14a},
   candy:{n:'솜사탕 함정',ic:'🍭',col:0xff9fd8},
   wind:{n:'회오리 바람',ic:'🌪️',col:0x9fe8ff},
-  magnet:{n:'자석',ic:'🧲',col:0xd8d8f0},
-  star:{n:'무지개 별',ic:'🌈',col:0xfff27a},
-  balloon:{n:'물풍선',ic:'💧',col:0x48a8ff},
-  thunder:{n:'번개 구름',ic:'⚡',col:0xfff04a},
+  magnet:{n:'뽑기 집게',ic:'🪝',col:0xffd25a},
+  star:{n:'무지개 퍼레이드',ic:'🎏',col:0xfff27a},
+  balloon:{n:'딸기잼 풍선',ic:'🍓',col:0xff5a8a},
+  thunder:{n:'하늘 축포',ic:'🎉',col:0xffc84a},
   firework:{n:'불꽃 미사일',ic:'🎆',col:0xff5af0},
-  ghost:{n:'유령 망토',ic:'👻',col:0xc9a8ff},
-  meteor:{n:'별똥별 비',ic:'☄️',col:0xff7a2a}
+  ghost:{n:'마술사 망토',ic:'🎩',col:0xc9a8ff},
+  meteor:{n:'별똥별 비',ic:'☄️',col:0xff7a2a},
+  pinwheel:{n:'바람개비 순풍',ic:'🎐',col:0x8ad8ff}, // 아이템 3단계(새)
+  spring:{n:'스프링 범퍼',ic:'🪀',col:0x6ee38a},
+  jack:{n:'깜짝 광대 북',ic:'🥁',col:0xa77bff}, // 아이템 4단계(새) — 설치 함정
+  confetti:{n:'색종이 분수',ic:'⛲',col:0x4fe0c8}
 };
 const ITEM_COL={box:0xffc533};for(const k in ITEM)ITEM_COL[k]=ITEM[k].col;
+/* 아이템 그림 — 생성 아이콘 묶음(/assets/games/sundown/item-icons-v1.webp, 1024² · 칸 200 · 5×4, 칸 순서 = 설계서 2-9 ①~⑳).
+   그림은 칸 안의 물건만 — 칸 테두리 · 종류색은 코드(CSS). 3초 안에 못 불러오면(실패 · 시간 초과) 지금 이모지 그대로 */
+const ICON_CELL={rocket:[12,12],pinwheel:[212,12],magnet:[412,12],shield:[612,12],star:[812,12],spring:[12,212],popcorn:[212,212],balloon:[412,212],blast:[612,212],meteor:[812,212],
+  firework:[12,412],ribbon:[212,412],wind:[412,412],mask:[612,412],thunder:[812,412],swirl:[12,612],candy:[212,612],jack:[412,612],confetti:[612,612],ghost:[812,612]};
+const ICON={ok:false,url:'/assets/games/sundown/item-icons-v1.webp'};
+const iconPos=k=>{const c=ICON_CELL[k];return c?(c[0]/200/4.12*100).toFixed(3)+'% '+(c[1]/200/4.12*100).toFixed(3)+'%':'';};
+/* <i> 하나에 아이템 그림 — 그림을 불러왔으면 배경 칸, 아니면 이모지 글자 */
+function setIcon(el,k){
+  if(ICON.ok&&k&&ICON_CELL[k]){if(el.className!=='ic-img')el.className='ic-img';el.textContent='';el.style.backgroundPosition=iconPos(k);}
+  else{if(el.className)el.className='';el.style.backgroundPosition='';el.textContent=k&&ITEM[k]?ITEM[k].ic:'';}
+}
+(function iconLoad(){
+  try{
+    const img=new Image();let done=false;
+    const fin=ok=>{if(done)return;done=true;if(!ok)return;ICON.ok=true;document.documentElement.classList.add('icons-img');try{slotHud.key=null;}catch(e){}for(const id of ['slot0','slot1','slot2','ib0','ib1','ib2']){const el=document.getElementById(id);if(el)el.dataset.v='';}};
+    const to=setTimeout(()=>fin(false),3000);
+    img.onerror=()=>{clearTimeout(to);fin(false);};
+    img.onload=()=>{const go=()=>{clearTimeout(to);fin(img.naturalWidth>0);};if(img.decode)img.decode().then(go,go);else go();};
+    img.src=ICON.url;
+  }catch(e){}
+})();
 /* 칸은 번호가 고정 — 늘 ITEM_SLOTS 칸(빈 칸은 null). 쓰면 그 칸만 비고 뒤 칸은 당겨지지 않는다. 새 아이템은 가장 낮은 빈 칸에 */
 const slotsNew=()=>{const o=[];for(let i=0;i<ITEM_SLOTS;i++)o.push(null);return o;};
 const slotCount=c=>{let n=0;for(const k of c.slots)if(k)n++;return n;};
@@ -2215,43 +2393,130 @@ function behindOf(c,d){for(const o of cars){if(o===c||o.finished)continue;const 
 /* 바로 앞(바퀴 안 거리) — 순위가 아니라 실제로 앞에 붙어 있는 차(집게 끌기 · 팝콘 겨누기). 순위로 고르는 대상(미사일 · 회오리 · 풍선)은 aheadOf · leaderFor 그대로 */
 function aheadNear(c,d){let best=null,bd=d;for(const o of cars){if(o===c||o.finished)continue;const ds=lapD(track,o.s,c.s);if(ds>0&&ds<bd){bd=ds;best=o;}}return best;}
 function leaderFor(c){let best=null;for(const o of cars){if(o===c||o.finished)continue;if(!best||o.s>best.s)best=o;}return best&&best.s>c.s?best:null;}
-/* 순위로 고르기 — f: 0(1등) ~ 1(꼴찌) */
+/* ================= 뽑기(아이템 설계서 3절) — 순위 그룹 표 + 보정 8가지. rollTable 은 순수 함수(게임 상태를 읽지 않음) — 개발 주소 ?dev=items 에서 1만 번 분포를 본다 =================
+   표 열 순서: G1(1등) · G2(상위) · G3(중위) · G4(하위) · A(1:1 앞선 사람) · B(1:1 뒤진 사람). 단위 %(열마다 합 100).
+   아직 게임에 없는 아이템(ITEM 에 없는 키)은 0 으로 보고 나머지로 다시 나눈다 → 새 아이템을 붙이면 표 값이 그대로 살아난다 */
+const ROLL_COL={G1:0,G2:1,G3:2,G4:3,A:4,B:5};
+const ROLL_TAB={
+  rocket:[9,11,14,18,8,18],pinwheel:[8,6,7,8,8,8],magnet:[0,6,8,10,0,10],
+  shield:[26,12,6,2,24,4],star:[2,2,3,6,2,4],spring:[6,7,5,6,8,6],
+  popcorn:[0,10,7,3,0,8],balloon:[0,8,7,4,0,7],blast:[9,6,4,2,10,3],meteor:[0,4,6,5,0,5],
+  firework:[0,9,9,6,0,9],ribbon:[0,7,6,4,0,6],
+  wind:[0,2,5,7,0,3],mask:[0,0,3,6,0,3],
+  thunder:[0,0,3,6,0,2],swirl:[0,2,3,4,0,2],
+  candy:[18,4,1,0,18,0],jack:[13,2,0,0,13,0],confetti:[9,1,0,0,9,0],
+  ghost:[0,1,3,3,0,2]
+};
+const ROLL_ACC={rocket:1,pinwheel:1,magnet:1},ROLL_DIRECT={popcorn:1,balloon:1,firework:1,ribbon:1},ROLL_SNIPE={wind:1,mask:1},ROLL_GLOB={thunder:1,swirl:1},
+  ROLL_NEEDT={firework:1,ribbon:1,wind:1,mask:1,thunder:1,swirl:1}; // 앞에 차가 없으면 0 — 조준 · 추적 · 저격 · 전체
+const ROLL_SNIPE_CD=10,ROLL_SNIPE_CD2=8,ROLL_GLOB_CD=6; // 저격 쿨다운(1:1 은 8초) · 전체 효과 쿨다운
+/* 그룹 — 2대는 A(1등) · B, 3대 이상은 f=(순위-1)/(차 수-1): 1등 G1, f≤0.4 G2, f<0.8 G3, 나머지 G4 */
+function rollGroup(place,n){
+  if(n<=1||place<=1)return n===2?'A':'G1';
+  if(n===2)return 'B';
+  const f=(place-1)/(n-1);
+  return f<=.4?'G2':f<.8?'G3':'G4';
+}
+/* 순수 함수 — group: 'G1'~'G4' · 'A' · 'B'. ctx(모두 없어도 됨):
+   keys 쓸 수 있는 키(기본 ITEM_KEYS 중 ITEM 에 있는 것) · old 옛 화면 차(앞 ITEM_OLD_N 키만) · mix 1등 표와 반씩 섞기(1등에 d<15 로 붙은 2등)
+   d 1등과의 거리 · snipe 저격 쿨다운 중(날아가는 저격 포함) · glob 전체 효과 쿨다운 중 · fin 1등이 마지막 바퀴 결승 250 안
+   noT 앞에 차 없음 · traps 내가 깐 함정 수 · last 바로 전에 받은 키 · slots 지금 칸(받기 전)
+   돌려줌: {키: 확률(합 1)} — 확률이 0 인 키는 빠진다. 다 0 이면 보정 5(연속 방지)를 풀고 다시, 그래도 0 이면 {rocket:1} */
+function rollTable(group,ctx){
+  ctx=ctx||{};
+  const col=ROLL_COL[group]!=null?ROLL_COL[group]:0,mcol=ctx.mix?(group==='A'||group==='B'?ROLL_COL.A:ROLL_COL.G1):-1;
+  const keys=ctx.keys||ITEM_KEYS,w={};
+  for(let i=0;i<keys.length;i++){
+    const k=keys[i],row=ROLL_TAB[k];
+    if(!row||!ITEM[k])continue;
+    if(ctx.old&&i>=ITEM_OLD_N)continue; // 보정 8 — 옛 화면 차는 앞 13키만
+    let x=mcol>=0?(row[col]+row[mcol])/2:row[col]; // 보정 1 — 1등에 붙은 2등은 1등 표와 반씩
+    const d=ctx.d||0;
+    if(d>250){if(ROLL_ACC[k])x*=1.8;else if(k==='star')x*=1.5;else if(ROLL_DIRECT[k])x*=.8;} // 보정 1 — 거리
+    else if(d>120&&ROLL_ACC[k])x*=1.4;
+    if(ctx.snipe&&ROLL_SNIPE[k])x=0; // 보정 2 — 저격 쿨다운
+    if(ctx.glob&&ROLL_GLOB[k])x=0; // 보정 3 — 전체 효과 쿨다운
+    if(ctx.fin&&ROLL_SNIPE[k])x*=.5; // 보정 4 — 결승 직전
+    if(ctx.noT&&ROLL_NEEDT[k])x=0; // 보정 7 — 대상 없음
+    if((ctx.traps|0)>=3&&OBJ_TRAP[k])x*=.3; // 보정 6 — 함정 과잉
+    if(x>0)w[k]=x;
+  }
+  // 보정 5 — 연속 방지: 바로 전 것 빼기, 칸에 같은 것 2개면 빼기, 스프링은 1개만
+  const v={};let tv=0,tw=0;
+  const sl=ctx.slots||[];
+  for(const k in w){
+    tw+=w[k];
+    if(k===ctx.last)continue;
+    let n=0;for(const q of sl)if(q===k)n++;
+    if(n>=2||(k==='spring'&&n>=1))continue;
+    v[k]=w[k];tv+=w[k];
+  }
+  const use=tv>0?v:w,tot=tv>0?tv:tw;
+  if(!(tot>0))return {rocket:1};
+  const o={};for(const k in use)o[k]=use[k]/tot;
+  return o;
+}
+function rollPick(tab,r){let x=(r==null?Math.random():r);let k0='rocket';for(const k in tab){k0=k;x-=tab[k];if(x<0)return k;}return k0;}
+/* 게임 상태 → ctx(host · 혼자 하기만) */
+function rollCtx(c){
+  const ld=leaderFor(c),n=cars.length,rt=game.raceTime;
+  let traps=0,fly=false;
+  for(const o of objs){if(o.own===c&&OBJ_TRAP[o.k])traps++;if(ROLL_SNIPE[o.k])fly=true;}
+  const top=ld||c,lastLap=lapNo(track,top.s)>=track.laps&&track.finish-top.s<250;
+  return {old:!!(c.remote&&!(c.ver>=VS_IV)),mix:c.place===2&&!!ld&&ld.s-c.s<15,d:ld?ld.s-c.s:0,snipe:fly||rt<(game.cdSnipe||0),glob:rt<(game.cdGlob||0),
+    fin:lastLap,noT:!ld,traps:traps,last:c.lastGot||'',slots:c.slots};
+}
 function rollItem(c){
-  const n=cars.length,f=n>1?clamp((c.place-1)/(n-1),0,1):0,first=c.place===1;
-  const w={rocket:10+20*f,shield:22-14*f,blast:10,popcorn:12,candy:22-16*f,wind:(!first&&f>=.5)?8*f:0,magnet:first?0:4+12*f,star:f>=.6?3*f:0,balloon:first?2:6+6*f,
-    thunder:f>=.5?7*f:0,firework:first?0:6+6*f,ghost:first?2:5+5*f,meteor:first?3:6+4*f};
-  let tot=0;for(const k in w)tot+=w[k];
-  let r=Math.random()*tot;for(const k in w){r-=w[k];if(r<=0)return k;}
-  return 'shield';
+  const ctx=rollCtx(c);
+  // 앞에 달리는 차가 없으면(앞선 차가 모두 결승) 1등 표 — place 는 결승한 차를 앞에 세서, 그대로 두면 앞으로 쏘는 아이템이 나왔다
+  const g=rollGroup(ctx.noT?1:c.place,cars.length);
+  return rollPick(rollTable(g,ctx));
+}
+/* 저격 · 전체 효과를 누구든 쓰면 모든 차의 뽑기에서 잠시 뺀다(보정 2 · 3) */
+function rollUsed(k){
+  if(ROLL_SNIPE[k])game.cdSnipe=game.raceTime+(cars.length===2?ROLL_SNIPE_CD2:ROLL_SNIPE_CD);
+  if(ROLL_GLOB[k])game.cdGlob=game.raceTime+ROLL_GLOB_CD;
 }
 function gainItem(c){
-  const at=slotFree(c);if(at<0)return;const k=rollItem(c);c.slots[at]=k;c.itemHeld=0;
+  const at=slotFree(c);if(at<0)return;const k=rollItem(c);c.slots[at]=k;c.itemHeld=0;c.lastGot=k;
   vsEv('get',c,k);
   surf(track,c.s,c.u,1.4,S1);if(!fxFar(c.s))burst(S1.pos,10,ITEM_COL.box,7,.4,4);
   if(c.isPlayer)Snd.pickup(); // 처음 얻은 종류는 HUD 가 한 줄 설명을 띄운다
 }
 /* 던진 것 · 떨어뜨린 것 — host · 혼자 하기만 계산한다(guest 는 스냅숏으로 그린다) */
 let objs=[];
-function addObj(o){if(objs.length>=24)objs.shift();objs.push(o);}
-function wet(o){
+const OBJ_MAX=32,OBJ_TRAP={candy:1,jack:1,confetti:1};
+/* 아이템 2단계 수치 — 폭발 부풀기 0.3초 · 둘레 앞뒤 14 · 좌우 6, 잼 겨누기 앞 70 · 비행 1.0초 · 반경 5 · 2.0초, 미사일 잠금 0.6초, 결승 80 안 회오리는 띄우지 않고 0.6초 감속 */
+const BLAST_ARM=.3,BLAST_S=14,BLAST_U=6,JAM_AIM=70,JAM_FLY=1,JAM_R=5,JAM_SLOW=2,FW_LOCK=.6,WIND_FIN=80;
+/* 물체 상한 32 — 넘으면 가장 오래된 함정 → 가장 오래된 별똥별 → 그 밖 가장 오래된 것 순으로 지운다(날아가는 공격이 함정 때문에 사라지지 않게) */
+function addObj(o){
+  if(objs.length>=OBJ_MAX){
+    let j=objs.findIndex(x=>OBJ_TRAP[x.k]);
+    if(j<0)j=objs.findIndex(x=>x.k==='meteor');
+    objs.splice(j<0?0:j,1);
+  }
+  objs.push(o);
+}
+/* 감속 맞음 — 딸기잼 범벅(2.0초) · 결승 직전 회오리(0.6초, kind 'w'). 스핀 없음, 부스트 취소, 드리프트 게이지 비움. 방패로 막힘 */
+const SLOW_TXT={jam:'딸기잼 범벅! 끈적끈적 느려져요',w:'회오리가 스쳐 지나갔어요'};
+function wet(o,sec,kind){
   if(o.invuln>0||o.finished)return;
+  sec=sec||2;kind=kind||'jam';
+  if(pendHit(o,()=>wetNow(o,sec,kind)))return;
+  wetNow(o,sec,kind);
+}
+function wetNow(o,sec,kind){
+  if(o.invuln>0||o.finished)return;
+  sec=sec||2;kind=kind||'jam';
   surf(track,o.s,o.u,1+o.h,S1);
   const far=fxFar(o.s);
-  if(o.shield>0){o.shield=0;o.invuln=1.2;if(!far)burst(S1.pos,18,0x48e4ff,9,.5,6);vsEv('shd',o);if(o.isPlayer){toast('방패가 막아 줬어요');Snd.pop();}return;}
-  o.slowT=2.5;o.boostT=0;vsEv('wet',o);if(!far)burst(S1.pos,22,[0x48a8ff,0xcff4ff],9,.55,10);
-  if(o.isPlayer){toast('물풍선에 젖었어요!');Snd.pop();game.shake=Math.max(game.shake,.4);}
+  if(shieldBlock(o))return;
+  o.slowT=Math.max(o.slowT,sec);o.boostT=0;o.driftT=0;
+  if(kind==='jam')vsEv('wet',o);else vsEv('wet',o,kind);
+  if(!far)burst(S1.pos,22,kind==='jam'?[0xff4d6e,0xff9fb8,0xfff2d8]:[0xb98cff,0xfff2d8],9,.55,10);
+  if(o.isPlayer){toast(SLOW_TXT[kind]||SLOW_TXT.jam);Snd.pop();game.shake=Math.max(game.shake,.4);}
 }
-/* 화려한 효과 — 번개 줄기 · 불꽃놀이 · 별똥별 충격파(host · guest 모두 그린다) */
-function boltFx(pos){
-  const B=new Bake();let x=pos.x,y=pos.y+34,z=pos.z;
-  for(let k=0;k<9;k++){
-    const nx=pos.x+(k<8?(Math.random()-.5)*4.5:0),ny=pos.y+34-(k+1)*34/9,nz=pos.z+(k<8?(Math.random()-.5)*4.5:0);
-    beam(B,x,y,z,nx,ny,nz,.38,0xfffbd0);beam(B,x,y,z,nx,ny,nz,.9,0xfff04a);x=nx;y=ny;z=nz;
-  }
-  const m=new THREE.Mesh(B.geo(),new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
-  scene.add(m);fx.push({m:m,t:0,d:.45,bolt:true});
-  burst(pos,26,[0xfff04a,0xffffff,0x9fe8ff],12,.5,6);
-}
+/* 화려한 효과 — 불꽃놀이 · 별똥별 충격파(host · guest 모두 그린다). 번개 줄기는 하늘 축포(skyBurstFx)로 바뀜 */
 function fireworkFx(pos){
   const cols=[0xff4192,0xffc533,0x48e4ff,0xa5e02b,0xff5af0,0xffffff];
   for(let k=0;k<3;k++){_v1.copy(pos);_v1.y+=2+k*2.5;burst(_v1,28,cols[(k*2)%6],16,.9,7);burst(_v1,14,cols[(k*2+1)%6],9,1.1,5);}
@@ -2262,65 +2527,288 @@ function meteorFx(pos){
   ringFx(pos,_qI,0xff7a2a);ringFx(pos,_qI,0xffc533);
 }
 function kindFx(kind,pos){if(kind==='fire')fireworkFx(pos);else if(kind==='meteor')meteorFx(pos);}
+/* 하늘 축포 — 예고(thW 0.9초)가 끝나면 머리 위에서 터진다: 1.6초 ×0.62 · 조향 ×0.6(thS) · 부스트 취소 · 찌그러짐, 스핀 없음.
+   예고 중 켠 방패 · 퍼레이드 · 망토가 막는다. 큰 국화는 0.6초 안에 3개까지(나머지는 작은 반짝임) */
+const TH_SLOW=1.6,TH_WARN=.9,TH_RANGE=400;
+let skyBig=[];
+function skyBurstFx(pos){
+  const now=game.time;skyBig=skyBig.filter(t=>now-t<.6);
+  _v1.copy(pos);_v1.y+=4.5;
+  if(skyBig.length<3){skyBig.push(now);burst(_v1,26,[0xffc533,0xff4192,0xfff2d8],13,.85,5);burst(_v1,10,[0xffe08a,0xffffff],7,1.1,3);ringFx(_v1,_qI,0xffc533);}
+  else burst(_v1,8,[0xffc533,0xfff2d8],6,.5,4);
+}
 function zap(o){
   if(o.finished)return;
   const far=fxFar(o.s);
-  surf(track,o.s,o.u,1+o.h,S1);if(!far)boltFx(S1.pos);vsEv('zap',o);
+  surf(track,o.s,o.u,1+o.h,S1);if(!far)skyBurstFx(S1.pos);vsEv('zap',o);
   if(o.invuln>0)return;
-  if(o.shield>0){o.shield=0;o.invuln=1.2;if(!far)burst(S1.pos,18,0x48e4ff,9,.5,6);vsEv('shd',o);if(o.isPlayer){toast('방패가 막아 줬어요');Snd.pop();}return;}
-  o.slowT=Math.max(o.slowT,2.4);o.boostT=0;o.squash=Math.max(o.squash,.7);
-  if(o.isPlayer){toast('번개에 맞아 느려졌어요!');Snd.hit();game.shake=Math.max(game.shake,.7);}
+  if(pendHit(o,()=>zapNow(o)))return;
+  zapNow(o);
+}
+function zapNow(o){
+  if(o.invuln>0||o.finished)return;
+  surf(track,o.s,o.u,1+o.h,S1);
+  if(shieldBlock(o))return;
+  o.slowT=Math.max(o.slowT,TH_SLOW);o.thS=Math.max(o.thS,TH_SLOW);o.boostT=0;o.driftT=0;o.squash=Math.max(o.squash,.7);
+  if(o.isPlayer){toast('하늘 축포에 맞아 느려졌어요!');Snd.hit();game.shake=Math.max(game.shake,.7);}
 }
 /* 지금 쓸 수 있나 — 대상이 꼭 있어야 하는 아이템(회오리 = 나보다 앞선 1등)은 대상이 없으면 칸에 남는다 */
-function itemUsable(c,k){if(k==='wind')return !!leaderFor(c);return true;}
-const ITEM_NOUSE={wind:'앞선 1등이 없어 회오리를 아껴 둬요'};
+function itemUsable(c,k){if(k==='wind')return !!leaderFor(c);if(k==='firework')return !!fwTarget(c);return true;}
+const ITEM_NOUSE={wind:'앞선 1등이 없어 회오리를 아껴 둬요',firework:'노릴 앞차가 없어요'};
+/* 불꽃 미사일 대상 — 앞 220 안(경주 순서) 앞차 가운데 정면에 가장 가까운 차(앞뒤 거리 + 좌우 어긋남 ×6) */
+function fwTarget(c){let best=null,bs=1e9;for(const o of cars){if(o===c||o.finished)continue;const ds=o.s-c.s;if(ds<=0||ds>=220)continue;const sc=ds+6*Math.abs(udiff(o.u,c.u));if(sc<bs){bs=sc;best=o;}}return best;}
+const guarded=o=>o.shield>0||o.starT>0||o.ghostT>0; // 막고 있는 차(방패 · 퍼레이드 · 망토) — 컴퓨터는 여기에 공격을 낭비하지 않는다
+/* 지금 못 쓰는 까닭 — '' = 쓸 수 있음. 도는 중 · 묶임 · 공중(광대 북 · 회오리)엔 못 쓴다(스프링만 예외), 대상이 꼭 있어야 하는 것은 대상이 없으면 칸에 남는다 */
+function itemBlock(c,k){
+  if(k==='spring')return ''; // 스프링 범퍼 — 도는 중 · 묶임 · 공중에도 쓸 수 있는 유일한 아이템(아이템 3단계)
+  if(c.spinout>0)return 'spin';
+  if(c.tieT>0)return 'tie';
+  if(c.airLock>0)return 'air';
+  if(!itemUsable(c,k))return 'tgt';
+  return '';
+}
+const NOUSE_TXT={tie:'묶여 있는 동안엔 못 써요',air:'공중에 뜬 동안엔 못 써요'};
+function noUseTxt(k,why){return why==='tgt'?(ITEM_NOUSE[k]||'지금은 쓸 수 없어요'):why==='spin'?'':NOUSE_TXT[why]||'지금은 쓸 수 없어요';}
+/* E(-1) = 지금 쓸 수 있는 칸 가운데 가장 앞 칸(앞 칸이 지금 못 쓰는 아이템이면 다음 칸) — 쓸 수 있는 칸이 없으면 찬 칸 가운데 가장 앞 칸(누르면 「✕」) */
+function slotPick(c){for(let i=0;i<ITEM_SLOTS;i++){const k=c.slots[i];if(k&&!itemBlock(c,k))return i;}return slotFirst(c);}
+/* 칸 「✕」 — 0.6초 흔들림 + (까닭이 있으면) 알림 */
+function slotNo(idx,msg){
+  if(idx>=0&&idx<ITEM_SLOTS){replay($('slot'+idx),'no');replay($('ib'+idx),'no');}
+  if(msg)toast(msg);
+}
+function noUse(c,idx,why,k){
+  if(c.isPlayer&&!(VS.on&&VS.role==='guest'))slotNo(idx,noUseTxt(k,why));
+  else if(c.remote)vsEv('nouse',c,idx); // 대전 손님이 누른 것이 host 에서 실패 — 손님 칸에 「✕」
+}
 function useItem(c,idx){
-  if(!slotCount(c)||c.finished||c.spinout>0||game.state!=='race'||game.paused)return false;
-  idx=idx<0?slotFirst(c):idx|0; // -1 = 차 있는 가장 낮은 칸
-  if(idx<0||idx>=ITEM_SLOTS||!c.slots[idx])return false; // 빈 칸이면 아무 일도 없다
-  if(!itemUsable(c,c.slots[idx])){if(c.isPlayer)toast(ITEM_NOUSE[c.slots[idx]]||'지금은 쓸 수 없어요');return false;} // 대상이 없으면 쓰지 않고 칸에 남긴다
+  if(c.finished||game.state!=='race'||game.paused)return false;
+  idx=idx<0?slotPick(c):idx|0; // -1 = 지금 쓸 수 있는 가장 앞 칸
+  if(idx<0||idx>=ITEM_SLOTS||!c.slots[idx]){if(c.remote&&idx>=0&&idx<ITEM_SLOTS)noUse(c,idx,'empty');return false;} // 빈 칸이면 아무 일도 없다(손님 화면이 늦게 본 칸이면 「✕」)
+  const why=itemBlock(c,c.slots[idx]);
+  if(why){noUse(c,idx,why,c.slots[idx]);return false;} // 대상이 없으면 쓰지 않고 칸에 남긴다
   const k=c.slots[idx];c.slots[idx]=null;c.itemHeld=0; // 그 칸만 비운다(다른 칸은 제자리)
-  vsEv('use',c,k);
+  vsEv('use',c,k);rollUsed(k);
   surf(track,c.s,c.u,1.4,S1);if(!fxFar(c.s))burst(S1.pos,14,ITEM[k].col,8,.45,4);
   const me=c.isPlayer;
-  if(k==='rocket'){boost(c,2.2);if(me)Snd.boost();}
-  else if(k==='shield'){c.shield=c.st.shieldT;if(me)Snd.pickup();}
-  else if(k==='blast'){blast(c);}
+  if(k==='rocket'){boost(c,2);c.punchT=.3;if(me)Snd.boost();} // 2.0초 + 처음 0.3초 가속 ×1.5
+  else if(k==='shield'){c.shield=c.st.shieldT;c.shG=0;if(me)Snd.pickup();}
+  else if(k==='blast'){c.armed=BLAST_ARM;vsEv('arm',c);if(nearPlayer(c,60))Snd.swell();} // 0.3초 부풀었다가 터진다(예고) — stepRace 가 터뜨림
   else if(k==='popcorn'){addObj({k:'popcorn',s:c.s+3,u:c.u,h:1.2,v:Math.max(c.v,30)+38,t:2.6,own:c});if(me)Snd.pop();}
-  else if(k==='candy'){addObj({k:'candy',s:Math.max(1,c.s-5),u:c.u,h:.15,v:0,t:25,own:c,grace:1});if(me)Snd.pop();}
+  else if(OBJ_TRAP[k]){trapPut(c,k);if(me)Snd.pop();} // 솜사탕 · 광대 북 · 색종이 분수 — 뒤에 설치(아이템 4단계 공통 규칙)
   else if(k==='wind'){const g=leaderFor(c);if(g)addObj({k:'wind',s:c.s+2,u:c.u,h:1.6,v:140,t:10,own:c,tgt:g});if(me)Snd.boost();}
   else if(k==='magnet'){c.magT=3.2;if(me)Snd.pickup();}
-  else if(k==='star'){c.starT=5;c.invuln=Math.max(c.invuln,5);boost(c,4);if(me)Snd.boost();}
-  else if(k==='balloon'){const g=aheadOf(c,160);if(g)wet(g);}
-  else if(k==='thunder'){for(const o of cars){if(o===c||o.finished)continue;const d=o.s-c.s;if(d>0&&d<320)zap(o);}if(me){Snd.blast();game.shake=Math.max(game.shake,.4);}}
-  else if(k==='firework'){const g=aheadOf(c,220)||leaderFor(c);if(g)addObj({k:'firework',s:c.s+2,u:c.u,h:2.2,v:Math.max(c.v,30)+90,t:7,own:c,tgt:g});if(me)Snd.boost();}
-  else if(k==='ghost'){
-    c.ghostT=5;c.invuln=Math.max(c.invuln,5);boost(c,1.2);
+  else if(k==='star'){c.starT=4;c.invuln=Math.max(c.invuln,4);boost(c,3);if(me)Snd.boost();} // 무지개 퍼레이드 4초
+  else if(k==='balloon'){ // 딸기잼 풍선 — 포물선 1.0초, 앞 70 안 앞차의 1.0초 뒤 자리(없으면 내 앞 45)에 떨어져 반경 5 안 차를 끈적하게
+    const g=aheadOf(c,JAM_AIM);let ls=c.s+45,lu=c.u;
+    if(g){ls=g.s+g.v*JAM_FLY;lu=g.u;}
+    ls=Math.min(ls,track.n-8);lu=clamp(lu,-7,7);
+    addObj({k:'balloon',s:c.s+2,u:c.u,h:1.6,s0:c.s+2,u0:c.u,ls:ls,lu:lu,T:JAM_FLY,v:(ls-c.s-2)/JAM_FLY,t:JAM_FLY,own:c,x1:r1(ls),x2:r2(lu)});
+    if(nearPlayer(c,80)||g===player)Snd.fly();
+  }
+  else if(k==='thunder'){ // 하늘 축포 — 앞 400 안 모두를 지금 정하고, 0.9초 예고 뒤 머리 위에서 터진다(effTick)
+    const ids=[];
+    for(const o of cars){if(o===c||o.finished)continue;const d=o.s-c.s;if(d>0&&d<TH_RANGE&&!(o.thW>0)){o.thW=TH_WARN;ids.push(o.id);if(o.isPlayer)Snd.whistle();}}
+    vsEv('fw',c,ids);
+    if(me){Snd.blast();game.shake=Math.max(game.shake,.4);}
+    if(!fxFar(c.s)){surf(track,c.s,c.u,3,S1);burst(S1.pos,18,[0xffc533,0xfff2d8],10,.6,-4);}
+  }
+  else if(k==='firework'){ // 불꽃 미사일 — 0.6초 잠금(대상 머리 위 과녁판 · 대상 화면 분홍 · 금 테두리) 뒤 발사
+    const g=fwTarget(c);
+    if(g){addObj({k:'lock',s:g.s,u:g.u,h:0,v:0,t:FW_LOCK,own:c,tgt:g});vsEv('lock',g,['firework',c.id]);if(g.isPlayer)Snd.lock();}
+    if(me)Snd.beep(false);
+  }
+  else if(k==='ghost'){ // 마술사 망토 3초 — 통과 · 무적 + 앞 160 안 앞차의 칸 하나를 가져옴
+    c.ghostT=3;c.invuln=Math.max(c.invuln,3);boost(c,1);
     const g=aheadOf(c,160);
-    if(g&&slotCount(g)&&slotFree(c)>=0){const has=[];for(let i=0;i<ITEM_SLOTS;i++)if(g.slots[i])has.push(i);const gi=has[(Math.random()*has.length)|0],st=g.slots[gi];g.slots[gi]=null;c.slots[slotFree(c)]=st;vsEv('steal',g,st);vsEv('stole',c,st);
-      if(me)setTimeout(()=>toast(ITEM[st].ic+' '+ITEM[st].n+'을(를) 훔쳤어요!'),500);if(g.isPlayer)toast('유령이 아이템을 훔쳐 갔어요!');}
+    const oldC=c.remote&&!(c.ver>=VS_IV); // 옛 화면 손님 — 모르는 새 아이템은 훔쳐 오지 않음
+    if(g&&slotCount(g)&&slotFree(c)>=0){const has=[];for(let i=0;i<ITEM_SLOTS;i++)if(g.slots[i]&&!(oldC&&ITEM_KEYS.indexOf(g.slots[i])>=ITEM_OLD_N))has.push(i);if(has.length){const gi=has[(Math.random()*has.length)|0],st=g.slots[gi];g.slots[gi]=null;c.slots[slotFree(c)]=st;vsEv('steal',g,[st,gi]);vsEv('stole',c,st);
+      if(me)setTimeout(()=>toast(ITEM[st].ic+' '+ITEM[st].n+'을(를) 가져왔어요!'),500);if(g.isPlayer)stolenNote(st,gi);}}
     if(me)Snd.boost();
   }
-  else if(k==='meteor'){
-    for(let i=0;i<6;i++){
-      let ts=c.s+45+i*24+Math.random()*10,tu=(Math.random()*2-1)*5.4;
-      const o=aheadOf(c,200);if(o&&i%2===0){ts=o.s+o.v*(.9+i*.2);tu=o.u;}
+  else if(k==='pinwheel'){c.pwT=PW_T;if(me||nearPlayer(c,40))Snd.breeze();} // 바람개비 순풍 5초 — 최고 ×1.12 · 가속 ×1.25 · 벽 긁힘 감속 절반(stepCar)
+  else if(k==='spring')springUse(c);
+  else if(k==='meteor'){ // 별똥별 비 — 다섯 개, 낙하 1.0~2.0초, 짝수 번째는 앞 200 안 앞차 예상 자리
+    for(let i=0;i<5;i++){
+      let ts=c.s+45+i*28+Math.random()*10,tu=(Math.random()*2-1)*5.4;
+      const fall=1+i*.25;
+      const o=aheadOf(c,200);if(o&&i%2===0){ts=o.s+o.v*fall;tu=o.u;}
       if(ts>track.finish+20)continue;
-      const fall=.9+i*.22;addObj({k:'meteor',s:ts,u:clamp(tu,-6,6),h:46,vh:46/fall,v:0,t:fall+.05,own:c});
+      addObj({k:'meteor',s:ts,u:clamp(tu,-6,6),h:46,vh:46/fall,v:0,t:fall+.05,own:c});
     }
     if(me)Snd.boost();
   }
-  if(me)toast(ITEM[k].n+'!');
+  if(me&&k!=='spring')toast(ITEM[k].n+'!'); // 스프링은 springUse 가 무엇을 했는지 알린다
   return true;
 }
+/* 아이템 4단계 — 설치 함정 공통 규칙(솜사탕 · 깜짝 광대 북 · 색종이 분수)
+   · 한 사람 함정은 종류 상관없이 3개까지(넘으면 그 사람 것 중 가장 오래된 것이 사라짐)
+   · 깐 뒤 0.5초 무장 동안 아무도 안 걸리고, 쓴 사람은 1초 동안 안 걸림 · 마술사 망토 중인 차는 밟지 않고 지나감
+   · 판정 앞뒤는 바퀴 안 거리(lapD), 좌우는 udiff — 갈림길 다른 갈래는 안 걸림
+   · 장애물 둘레 ±12(찻잔 · 회전 막대는 닿는 거리까지 더함) · 부스트 발판 · 점프대 입구 ±4 안에는 안 놓임 → 범위 밖 가장 가까운 뒤쪽 자리로(회전컵 피할 길을 함정이 막지 않게)
+   솜사탕: 뒤 5 · 20초 · 밟으면 스핀 / 광대 북: 뒤 5 · 20초 · 밟으면 1.0초 공중(조향 · 아이템 못 씀, 착지 속도 ×0.6, 상한에 공중 시간으로 셈)
+   색종이 분수: 뒤 6 · 15초 · 반경 4.5 · 지나간 차 화면이 2.0초 가장자리부터 가려짐(방패로 못 막음, 속도 손해 없음, 높이 2.5 넘게 뜬 차는 안 걸림, 밟아도 그대로 남음) */
+const TRAP_MAX=3,TRAP_ARM=.5,TRAP_OWN=1,TRAP_HZ=12,TRAP_PAD=4,JACK_AIR=1,JACK_LAND=.6,CONF_R=4.5,CONF_T=2;
+const TRAP_DEF={candy:{back:5,t:20,h:.15},jack:{back:5,t:20,h:0},confetti:{back:6,t:15,h:0}};
+/* 함정을 놓으면 안 되는 구간(바퀴 안 자리 [가운데, 반폭]) — 트랙마다 한 번 만들어 둔다 */
+function trapZones(){
+  const tr=track;if(tr._tz)return tr._tz;
+  const z=[];
+  for(const h of hazards)z.push([h.s,TRAP_HZ+(h.type==='cups'?(h.R||0)+2:h.type==='spinbar'?(h.L||0):0)]);
+  for(const p of pads)z.push([p[0]+5,5+TRAP_PAD]);
+  for(const L of (tr.mk&&tr.mk.lips)||[])z.push([L,TRAP_PAD]);
+  return tr._tz=z;
+}
+function trapZoneAt(s){for(const z of trapZones()){const d=lapD(track,s,z[0]);if(Math.abs(d)<z[1])return [z,d];}return null;}
+function trapSafeS(s){ // 금지 구간 안이면 그 구간 뒤쪽 끝 바로 밖으로(여러 구간이 이어져 있으면 계속 뒤로)
+  for(let k=0;k<8;k++){const r=trapZoneAt(s);if(!r)break;s-=r[1]+r[0][1]+.5;}
+  return Math.max(1,s);
+}
+function trapPut(c,k){
+  const D=TRAP_DEF[k];
+  let mine=0;for(const o of objs)if(o.own===c&&OBJ_TRAP[o.k])mine++;
+  while(mine>=TRAP_MAX){const j=objs.findIndex(o=>o.own===c&&OBJ_TRAP[o.k]);if(j<0)break;objs.splice(j,1);mine--;} // 내 함정 3개 — 가장 오래된 것부터 사라짐
+  const o={k:k,s:trapSafeS(Math.max(1,c.s-D.back)),u:c.u,h:D.h,v:0,t:D.t,own:c,arm:TRAP_ARM,grace:TRAP_OWN};
+  if(k!=='candy')o.x1=TRAP_ARM; // 대전 물체 행 6번째 = 무장 남은 초(광대 북 · 색종이)
+  addObj(o);return o;
+}
+/* 깜짝 광대 북 — 밟으면 1.0초 하늘로(조향 0 · 아이템 못 씀 — airLock), 착지 속도 ×0.6. 방패로 막힘, 무적이면 안 걸림, 대전 손님 차는 0.12초 보류 */
+function jackHit(c){
+  if(c.invuln>0||c.finished)return false;
+  if(pendHit(c,()=>jackNow(c)))return true;
+  return jackNow(c);
+}
+function jackNow(c){
+  if(c.invuln>0||c.finished)return false;
+  surf(track,c.s,c.u,1+c.h,S1);
+  if(shieldBlock(c))return false;
+  if(ccCapped(c))return liteHit(c,'jack'); // 무력화 상한 — 띄우지 않고 가벼운 맞음
+  c.airLock=JACK_AIR;c.jk=true;c.boostT=0;c.punchT=0;c.driftT=0;c.invuln=JACK_AIR+1.3;
+  if(!c.air){c.air=true;c.airT=0;c.spins=0;c.spinning=false;c.spinP=0;}
+  c.vy=Math.max(c.vy,G_AIR*JACK_AIR/2);c.hop=true;c.ai.trick=false; // 1.0초 공중 · 재주 넘기 없음
+  ccAdd(c,JACK_AIR,1);
+  vsEv('jack',c);
+  if(!fxFar(c.s)){burst(S1.pos,26,[0xa77bff,0x5ee6c8,0xfff27a,0xff4d6e],12,.6,14);ringFx(S1.pos,_qI,0xa77bff);}
+  if(c.isPlayer){toast('깜짝 광대 북에 튕겼어요!');Snd.jack();game.shake=Math.max(game.shake,.6);}
+  else if(nearPlayer(c,60))Snd.jack();
+  return true;
+}
+/* 색종이 분수 — 지나간 차 화면을 2.0초 가린다(내 차면 화면 덮개). 방패로 못 막음, 무적 · 색종이 면역(끝난 뒤 2초) · 이미 가려진 차는 안 걸림 */
+function blindHit(c){
+  if(c.invuln>0||c.finished||c.blindT>0||c.immBlind>0)return false;
+  if(pendHit(c,()=>blindNow(c)))return true;
+  return blindNow(c);
+}
+function blindNow(c){
+  if(c.invuln>0||c.finished||c.blindT>0||c.immBlind>0)return false;
+  c.blindT=CONF_T;
+  vsEv('blind',c);
+  surf(track,c.s,c.u,1.6+c.h,S1);
+  if(!fxFar(c.s))burst(S1.pos,30,[0xff4192,0x48e4ff,0xfff27a,0xa5e02b,0xff8a3c,0xc9a8ff],11,.8,6);
+  if(c.isPlayer){toast('색종이에 가려요! 미니맵을 봐요');Snd.confetti();}
+  return true;
+}
+/* 색종이 화면 덮개 — 캔버스 위 2D 캔버스 1장, 조각 최대 80. 가장자리부터 덮고 가운데 원(화면 높이 40%)은 비움.
+   미니맵 · 칸 · 순위 · 바퀴 · 칩은 HUD 에서 이 캔버스 뒤 형제라 그 위에 그려진다. 동작 줄이기면 조각이 떨어지지 않고 옅어지기만 */
+const BLIND={on:false,p:[],last:0,w:0,h:0};
+const BLIND_COL=['#ff4192','#48e4ff','#fff27a','#a5e02b','#ff8a3c','#c9a8ff','#fff2d8'];
+function blindTick(dt){
+  const p=player,cv=$('blindFx');if(!cv||!p)return;
+  const t=game.state==='race'||game.state==='finish'?Math.max(0,p.blindT||0):0;
+  if(t<=0){if(BLIND.on){BLIND.on=false;cv.hidden=true;BLIND.p.length=0;}BLIND.last=0;return;}
+  if(cv.hidden)cv.hidden=false; // 숨긴 채로는 크기가 0 — 먼저 보이게 한 뒤 잰다
+  const W=Math.max(1,cv.clientWidth|0),H=Math.max(1,cv.clientHeight|0),k=Math.min(1,window.devicePixelRatio||1);
+  if(!BLIND.on||BLIND.w!==W||BLIND.h!==H){cv.width=Math.round(W*k);cv.height=Math.round(H*k);BLIND.w=W;BLIND.h=H;}
+  const R0=H*.2;
+  if(!BLIND.on||t>BLIND.last+.2){ // 새로 걸림 — 조각 80개를 가장자리 쪽에 쏟는다
+    BLIND.on=true;cv.hidden=false;BLIND.p.length=0;
+    for(let i=0;i<80;i++){
+      let x=0,y=0;for(let q=0;q<6;q++){x=Math.random()*W;y=Math.random()*H;const dx=x-W/2,dy=y-H/2;if(dx*dx+dy*dy>(R0*1.4)*(R0*1.4))break;}
+      BLIND.p.push({x:x,y:y-H*Math.random()*.06,w:14+Math.random()*26,h:8+Math.random()*12,r:Math.random()*6.3,vr:(Math.random()-.5)*7,vy:H*(.18+Math.random()*.22),vx:(Math.random()-.5)*30,c:BLIND_COL[i%BLIND_COL.length],d:.7+Math.random()*.6});
+    }
+  }
+  BLIND.last=t;
+  const g=cv.getContext('2d'),a=Math.min(1,t/CONF_T*1.6),rm=GFX.rm; // 처음엔 짙고, 끝으로 갈수록 걷힌다
+  g.setTransform(k,0,0,k,0,0);g.clearRect(0,0,W,H);
+  const gr=g.createRadialGradient(W/2,H/2,R0,W/2,H/2,Math.hypot(W,H)/2); // 가장자리 색종이 안개
+  gr.addColorStop(0,'rgba(255,242,250,0)');gr.addColorStop(.35,'rgba(255,214,236,'+(.5*a).toFixed(3)+')');gr.addColorStop(1,'rgba(255,236,190,'+(.92*a).toFixed(3)+')');
+  g.fillStyle=gr;g.fillRect(0,0,W,H);
+  for(const q of BLIND.p){
+    if(!rm){q.y+=q.vy*q.d*dt*(1.6-a);q.x+=q.vx*dt;q.r+=q.vr*dt;}
+    if(q.y>H+30)continue;
+    g.save();g.translate(q.x,q.y);g.rotate(q.r);g.globalAlpha=a;g.fillStyle=q.c;g.fillRect(-q.w/2,-q.h/2,q.w,q.h*Math.abs(Math.cos(q.r*1.3)));g.restore();
+  }
+  g.globalAlpha=1;g.globalCompositeOperation='destination-out'; // 가운데 원은 비운다(앞이 보이게)
+  const hole=g.createRadialGradient(W/2,H/2,R0*.85,W/2,H/2,R0*1.15);hole.addColorStop(0,'rgba(0,0,0,1)');hole.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=hole;g.beginPath();g.arc(W/2,H/2,R0*1.15,0,TAU);g.fill();
+  g.globalCompositeOperation='source-over';
+}
+/* 아이템 3단계 — 바람개비 순풍 · 스프링 범퍼
+   순풍: 5초 최고 ×1.12(다른 가속과 겹치면 큰 것 하나 — accMul) · 가속 ×1.25(부스트 중이면 부스트 쪽) · 벽 긁힘 감속 절반.
+   스프링: ① 스핀 · 묶임 · 공중(광대 북 · 회오리) 중이면 바로 끝냄 — 속도 회복 · 부스트 · 추가 무적 없음(맞은 뒤 무적은 남은 만큼 그대로)
+          ② 붙은 방해(가면 · 반전 · 색종이 · 나를 집은 집게 줄)는 모두 떼고 끝난 뒤 면역(반전 4 · 가면 4 · 색종이 2초)
+          ③ 아무것도 없으면 제자리 통 튀기(공중 0.8초 — 바닥 함정 · 팝콘을 넘음) + 부스트 0.5초
+          잼 · 축포 감속(slowT · 축포 조향 thS)은 풀지 않는다. 대전 손님 차는 스핀 · 묶임이 끝난 지 0.3초 안에 도착한 스프링을 「끊기」로 보고 소모만(튀기지 않음) */
+const PW_T=5,PW_TOP=1.12,PW_ACC=1.25,SPRING_AIR=.8,SPRING_LATE=.3;
+function springUse(c){
+  const me=c.isPlayer;let n=0;
+  if(c.spinout>0){c.spinout=0;n++;}
+  if(c.tieT>0){c.tieT=0;c.tieEnd=game.raceTime;n++;}
+  if(c.airLock>0){c.airLock=0;if(c.jk){c.jk=false;c.vy=Math.min(c.vy,0);}n++;} // 광대 북 공중 — 바로 내려오고 착지 감속 없음
+  if(c.maskT>0||c.maskW>0){c.maskT=0;c.maskW=0;c.immMask=4;n++;}
+  if(c.revT>0||c.revW>0){c.revT=0;c.revW=0;c.immRev=4;n++;}
+  if(c.blindT>0){c.blindT=0;c.immBlind=2;n++;}
+  for(const o of cars){if(o!==c&&o.magT>0&&o.magTgt===c){o.magT=0;o.magTgt=null;o.magCut=0;vsEv('mcut',o);n++;if(o.isPlayer)toast('집게 줄이 끊겼어요');}}
+  const late=!n&&c.remote&&game.raceTime-Math.max(c.spinEnd,c.tieEnd)<SPRING_LATE; // 손님이 돌던 중에 누른 것 — 도착이 늦었을 뿐
+  surf(track,c.s,c.u,.6+c.h,S1);const far=fxFar(c.s);
+  if(n||late){
+    vsEv('cure',c,n);
+    if(!far)burst(S1.pos,18,[0x6ee38a,0xfff2d8,0xff5a5a],10,.5,10);
+    if(me){toast(n?'스프링으로 털어 냈어요!':'스프링!');Snd.boing();}
+    return n;
+  }
+  if(!c.air){c.air=true;c.airT=0;c.vy=G_AIR*SPRING_AIR/2;c.spins=0;c.spinning=false;c.spinP=0;c.hop=true;c.ai.trick=false;}
+  boost(c,.5);vsEv('cure',c,-1);
+  if(!far)burst(S1.pos,12,[0x6ee38a,0xfff2d8],8,.4,12);
+  if(me){toast('통! 튀어 올라요');Snd.boing();}else if(nearPlayer(c,60))Snd.boing();
+  return 0;
+}
+/* 훔쳐 간 칸 — 그 칸이 보라 빛으로 흔들리고 무엇을 가져갔는지 알림(혼자 · host 는 바로, 손님은 steal 이벤트로) */
+function stolenNote(k,idx){
+  if(idx>=0&&idx<ITEM_SLOTS){replay($('slot'+idx),'stolen');replay($('ib'+idx),'stolen');}
+  toast(ITEM[k]?'마술사가 '+ITEM[k].n+'을(를) 가져갔어요!':'마술사가 아이템을 가져갔어요!');
+  Snd.ting();
+}
 /* 매 단계 — 던진 것 움직이기 · 맞히기, 자석 끌기 */
+const _launch=[];
+/* 옛 판 화면(아이템 0b 전 본체)의 원격 손님 — 그 화면은 물체 코드 p · c · w · f · m 만 그린다.
+   안 보이는 새 물체(딸기잼 풍선 · 광대 북 · 색종이)에는 걸리지 않게 한다(배포가 바뀌는 사이에만 생기는 조합) */
+function oldView(c){return !!(c.remote&&!(c.ver>=VS_IV));}
 function stepObjs(dt){
+  _launch.length=0;
   for(let i=objs.length-1;i>=0;i--){
     const o=objs[i];o.t-=dt;
     if(o.k==='wind'){
       const g=o.tgt;
       if(!g||g.finished)o.t=0;
-      else{o.s+=o.v*dt;o.u+=udiff(g.u,o.u)*Math.min(1,3*dt);if(o.s>=g.s-1.5){hit(g,'wind');o.t=0;}}
+      else{
+        o.v=Math.max(g.v,20)+60; // 대상 속도 + 60
+        o.s+=o.v*dt;o.u+=udiff(g.u,o.u)*Math.min(1,3*dt);
+        if(o.s>=g.s-1.5){if(track.finish-g.s<WIND_FIN)wet(g,.6,'w');else hit(g,'wind');o.t=0;} // 결승 80 안 — 띄우지 않고 0.6초 감속만
+      }
+    }else if(o.k==='lock'){ // 미사일 잠금 — 대상을 따라가다 0.6초가 끝나면 쏜 차에서 발사
+      const g=o.tgt;
+      if(!g||g.finished)o.t=0;
+      else{o.s=g.s;o.u=g.u;if(o.t<=0&&o.own&&!o.own.finished)_launch.push(o);}
+    }else if(o.k==='balloon'){ // 잼 풍선 — 포물선 비행 뒤 착지 반경 안 모든 차(쓴 사람 · 높이 3 넘는 차 빼고)
+      const q=clamp(1-o.t/o.T,0,1);
+      o.s=o.s0+(o.ls-o.s0)*q;o.u=o.u0+(o.lu-o.u0)*q;o.h=1.6+20*q*(1-q)-1.3*q;
+      if(o.t<=0){
+        surf(track,o.ls,o.lu,.4,S1);
+        if(!fxFar(o.ls)){burst(S1.pos,24,[0xff4d6e,0xff9fb8,0xfff2d8],10,.55,10);ringFx(S1.pos,_qI,0xff5a8a);}
+        vsEv('splat',o.own,[r1(o.ls),r2(o.lu)]);
+        if(Math.abs(lapD(track,o.ls,player.s))<60)Snd.splat();
+        for(const c of cars){if(c===o.own||c.finished||c.h>3||oldView(c))continue;const ds=lapD(track,c.s,o.ls),du=udiff(c.u,o.lu);if(ds*ds+du*du<JAM_R*JAM_R)wet(c,JAM_SLOW,'jam');}
+      }
     }else if(o.k==='popcorn'){
       o.s+=o.v*dt;
       for(const c of cars){if(c===o.own||c.finished)continue;if(Math.abs(lapD(track,c.s,o.s))<2.6&&Math.abs(udiff(c.u,o.u))<2.3&&c.h<3){hit(c,'pop');o.t=0;break;}}
@@ -2336,84 +2824,162 @@ function stepObjs(dt){
         if(Math.abs(lapD(track,o.s,player.s))<80)Snd.blast(); // 떨어진 자리 기준
         o.t=0;
       }
-    }else if(o.k==='candy'){
+    }else if(OBJ_TRAP[o.k]){ // 설치 함정 — 0.5초 무장(쓴 사람 1초) 뒤, 망토 중인 차는 지나감
       if(o.grace>0)o.grace-=dt;
-      for(const c of cars){if(c.finished||(c===o.own&&o.grace>0))continue;if(Math.abs(lapD(track,c.s,o.s))<2.4&&Math.abs(udiff(c.u,o.u))<2.4&&c.h<1.2){hit(c,'trap');o.t=0;break;}}
+      if(o.arm>0){o.arm-=dt;if(o.k!=='candy')o.x1=o.arm>0?r2(o.arm):0;}
+      else for(const c of cars){
+        if(c.finished||c.ghostT>0||(c===o.own&&o.grace>0))continue;
+        if(o.k!=='candy'&&oldView(c))continue; // 옛 화면 손님에겐 광대 북 · 색종이가 안 보인다 — 밟지 않고 지나감
+        const ds=lapD(track,c.s,o.s),du=udiff(c.u,o.u);
+        if(o.k==='confetti'){if(ds*ds+du*du<CONF_R*CONF_R&&c.h<2.5)blindHit(c);continue;} // 색종이 — 밟아도 남는다(지나가는 차마다)
+        if(Math.abs(ds)<2.4&&Math.abs(du)<2.4&&c.h<1.2){if(o.k==='jack')jackHit(c);else hit(c,'trap');o.t=0;break;}
+      }
     }
     if(o.s>track.n-6)o.t=0;
     if(o.t<=0)objs.splice(i,1);
   }
+  for(const o of _launch){const c=o.own,g=o.tgt;addObj({k:'firework',s:c.s+2,u:c.u,h:2.2,v:Math.max(c.v,30)+90,t:7,own:c,tgt:g});if(c.isPlayer||nearPlayer(c,60))Snd.boost();}
 }
+/* 뽑기 집게 — 앞 100 안 가장 가까운 앞차(마술사 망토 중인 차 빼고)에 줄을 걸어 3.2초 끌려간다. 앞차가 없으면 짧은 부스트 유지.
+   걸린 차가 좌우로 4 넘게 1초 버티면 줄이 끊긴다(방패로는 못 막음) */
+const MAG_R=100,MAG_CUT_U=4,MAG_CUT_T=1;
+function magNear(c){let best=null,bd=MAG_R;for(const o of cars){if(o===c||o.finished||o.ghostT>0)continue;const ds=lapD(track,o.s,c.s);if(ds>0&&ds<bd){bd=ds;best=o;}}return best;}
 function magnetPull(c,dt){
-  if(c.magT<=0)return;
+  c.magPull=false;
+  if(c.magT<=0){c.magTgt=null;c.magCut=0;return;}
   c.magT-=dt;
-  const g=aheadNear(c,90);
-  if(g&&!c.air&&c.spinout<=0){c.u+=udiff(g.u,c.u)*Math.min(1,1.6*dt);c.v=Math.min(c.v+30*dt,c.st.vmax*1.3);}
+  const g=magNear(c);
+  if(g!==c.magTgt){c.magTgt=g;c.magCut=0;}
+  if(g&&!c.air&&c.spinout<=0){
+    if(Math.abs(udiff(g.u,c.u))>MAG_CUT_U){c.magCut+=dt;if(c.magCut>=MAG_CUT_T){c.magT=0;c.magTgt=null;c.magCut=0;vsEv('mcut',c);if(nearPlayer(c,60))Snd.ting();if(c.isPlayer)toast('집게 줄이 끊겼어요');else if(g.isPlayer)toast('집게 줄을 끊었어요!');return;}}
+    else c.magCut=0;
+    c.magPull=true;c.u+=udiff(g.u,c.u)*Math.min(1,1.6*dt);c.v=Math.min(c.v+30*dt,c.st.vmax*1.3);
+  }
   else if(c.spinout<=0)c.boostT=Math.max(c.boostT,.15);
 }
 function aiWants(c,k,ahead){
   if(k==='rocket')return c.itemHeld>1.5;
   if(k==='shield')return c.shield<=0&&c.itemHeld>2;
-  if(k==='blast'){for(const o of cars)if(o!==c&&!o.finished&&Math.abs(lapD(track,o.s,c.s))<10)return true;return false;}
-  if(k==='popcorn'){const a=aheadNear(c,60);return !!(a&&Math.abs(udiff(a.u,c.u))<3);}
+  if(k==='blast'){for(const o of cars)if(o!==c&&!o.finished&&!guarded(o)&&Math.abs(lapD(track,o.s,c.s))<10&&Math.abs(udiff(o.u,c.u))<5)return true;return false;}
+  if(k==='popcorn'){const a=aheadNear(c,60);return !!(a&&!guarded(a)&&Math.abs(udiff(a.u,c.u))<3);}
   if(k==='candy')return !!behindOf(c,30);
-  if(k==='wind')return !!leaderFor(c);
+  if(k==='jack')return !trapZoneAt(c.s-5)&&(!!behindOf(c,30)||(c.place===1&&c.itemHeld>3)); // 장애물 · 발판 둘레에는 안 깖
+  if(k==='confetti'){if(trapZoneAt(c.s-6))return false;if(behindOf(c,40))return true;if(c.place!==1)return false;for(let d=15;d<=45;d+=10)if(Math.abs(track.CV[clamp((c.s+d)|0,0,track.n-1)]||0)>.008)return true;return false;} // 1등이면 커브 직전
+  if(k==='wind'){const g=leaderFor(c);return !!(g&&!guarded(g)&&g.s-c.s>40);}
   if(k==='star')return true;
-  if(k==='magnet')return !!aheadNear(c,70);
-  if(k==='balloon')return !!ahead;
-  if(k==='thunder'){for(const o of cars)if(o!==c&&!o.finished&&o.s>c.s&&o.s-c.s<320)return true;return false;}
-  if(k==='firework')return !!(ahead||leaderFor(c));
+  if(k==='magnet'){const a=aheadNear(c,70);return !!(a&&a.starT<=0&&a.ghostT<=0);}
+  if(k==='balloon'){const a=aheadOf(c,JAM_AIM);return !!(a&&!guarded(a));}
+  if(k==='thunder'){for(const o of cars)if(o!==c&&!o.finished&&!guarded(o)&&o.s>c.s&&o.s-c.s<TH_RANGE)return true;return false;}
+  if(k==='firework'){const g=fwTarget(c);return !!(g&&!guarded(g));}
   if(k==='ghost'){if(ahead&&slotCount(ahead)&&ahead.s-c.s<150)return true;for(const hz of hazards){const d=lapD(track,hz.s,c.s);if(d>10&&d<45)return true;}return c.itemHeld>4;}
   if(k==='meteor')return !!(ahead&&ahead.s-c.s<150);
+  if(k==='pinwheel')return c.spinout<=0; // 스핀이 아니면 바로
+  if(k==='spring')return aiSpring(c);
+  return false;
+}
+/* 컴퓨터 스프링 — 도는 중 · 묶임 0.5초 넘게 남음(어려움만), 붙은 방해(가면 · 반전 · 색종이 · 집게 줄)가 0.3~0.6초 지남(보통 · 어려움),
+   앞 25 안 함정이 내 차선이면 통 튀기. 쉬움은 칸이 꽉 찼을 때만(aiItems 의 칸 꽉 참 처리) */
+const aiLv=()=>VS.on&&VS.level?VS.level:'normal';
+function aiSpring(c){
+  const lv=aiLv();
+  if(c.spinout>.5||c.tieT>.5)return lv==='hard';
+  if(lv==='easy')return false;
+  let stuck=c.maskT>0||c.maskW>0||c.revT>0||c.revW>0||c.blindT>0;
+  for(const o of cars)if(o!==c&&o.magT>0&&o.magTgt===c)stuck=true;
+  if(stuck){c.ai.cureT=(c.ai.cureT||0)+.6;return c.ai.cureT>.3+Math.random()*.3;}
+  c.ai.cureT=0;
+  if(c.air||c.spinout>0||c.tieT>0||c.airLock>0)return false;
+  for(const o of objs){if(!OBJ_TRAP[o.k]||o.own===c)continue;const d=lapD(track,o.s,c.s);if(d>3&&d<25&&Math.abs(udiff(o.u,c.u))<2.6)return true;}
   return false;
 }
 /* 컴퓨터 — 가진 칸 가운데 지금 쓰기 알맞은 것을 골라 쓴다(오래 들고 있거나 칸이 꽉 차면 찬 칸 가운데 가장 앞 칸을 쓴다) */
 function aiItems(c,dt){
-  if(!slotCount(c)||c.finished||c.spinout>0||game.state!=='race')return;
+  if(!slotCount(c)||c.finished||game.state!=='race')return;
+  if(c.spinout>0||c.tieT>0||c.airLock>0){ // 도는 중 · 묶임 · 공중 — 스프링 판단만(아이템 3단계)
+    c.aiItemT-=dt;if(c.aiItemT>0)return;c.aiItemT=.25+Math.random()*.2;
+    const i=c.slots.indexOf('spring');if(i>=0&&aiSpring(c))useItem(c,i);
+    return;
+  }
   c.itemHeld+=dt;c.aiItemT-=dt;if(c.aiItemT>0)return;c.aiItemT=.4+Math.random()*.4;
   const ahead=aheadOf(c,120);
   for(let i=0;i<ITEM_SLOTS;i++){if(c.slots[i]&&aiWants(c,c.slots[i],ahead)&&useItem(c,i))return;}
   // 오래 들었거나 칸이 꽉 차면 「쓸 수 있는 첫 칸」(대상이 없어 남는 칸은 건너뜀) — 쓸 칸이 없으면 기다린다(앞 칸이 막혀 상자를 못 먹는 일 방지)
-  if(c.itemHeld>9||slotFree(c)<0){for(let i=0;i<ITEM_SLOTS;i++){if(c.slots[i]&&itemUsable(c,c.slots[i])&&useItem(c,i))return;}}
+  // 스프링은 칸이 꽉 찼을 때만(오래 들어도 들고 있음 — 붙은 방해를 풀 때 쓰려고)
+  const full=slotFree(c)<0;
+  if(c.itemHeld>9||full){for(let i=0;i<ITEM_SLOTS;i++){const k=c.slots[i];if(k&&(full||k!=='spring')&&!(k==='shield'&&c.shield>0)&&!itemBlock(c,k)&&useItem(c,i))return;}} // 방패가 켜져 있으면 방패 칸은 들고 있음
 }
 /* 던진 것 그리기 — 모두 같은 도형 · 재질을 함께 쓰는 고정 묶음(트랙을 바꿔도 새로 만들지 않음) */
-const objPool=[],markPool=[];let nMark=0;
+const objPool=[],markPool=[],sprPool=[];let nMark=0,nSpr=0;
+/* 바닥 · 머리 위 표시(과녁 그림 한 장을 색 · 크기만 바꿔 돌려 씀) — 별똥별 과녁, 잼 그림자 원, 미사일 잠금 과녁판, 축포 불씨 원 */
+function markGet(col,op){
+  let mk=markPool[nMark];
+  if(!mk){const mm=new THREE.MeshBasicMaterial({map:TEX.target,color:0xff4d3a,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthWrite:false});mm.userData={own:true};mk=new THREE.Mesh(G.plane,mm);mk.frustumCulled=false;scene.add(mk);markPool.push(mk);}
+  nMark++;mk.material.color.setHex(col);mk.material.opacity=op;mk.visible=true;return mk;
+}
+function markGround(s,u,col,sc,op){const mk=markGet(col,op);surf(track,s,u,.12,S1);mk.position.copy(S1.pos);basisQuat(S1,mk.quaternion);mk.rotateX(-Math.PI/2);mk.scale.set(sc,sc,1);}
+/* 머리 위 표시 — 카메라를 향하는 스프라이트(빌보드). 눕힌 판은 카메라보다 높으면 뒷면이라 안 그려지고, 낮아도 옆에서 보면 선 한 줄이 됐다 */
+function markOver(c,lift,col,sc,op){
+  let sp=sprPool[nSpr];
+  if(!sp){const sm=new THREE.SpriteMaterial({map:TEX.target,color:col,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});sm.userData={own:true};sp=new THREE.Sprite(sm);sp.frustumCulled=false;scene.add(sp);sprPool.push(sp);}
+  nSpr++;sp.material.color.setHex(col);sp.material.opacity=op;sp.visible=true;
+  sp.position.copy(c.root.position);_v1.set(0,1,0).applyQuaternion(c.root.quaternion);sp.position.addScaledVector(_v1,lift+(c.h||0));sp.scale.set(sc,sc,1);
+}
 function renderObjs(list,tau){
-  const ig=getItemGeos();
+  const ig=getItemGeos(),guest=VS.on&&VS.role==='guest';
   for(let i=0;i<list.length;i++){
     const o=list[i];let m=objPool[i];
     if(!m){m=new THREE.Mesh(ig.popcorn,MAT.unlit);m.frustumCulled=false;scene.add(m);objPool.push(m);}
-    const geo=ig[o.k]||ig.popcorn;if(m.geometry!==geo)m.geometry=geo;
+    if(o.k==='lock'){ // 미사일 잠금 — 대상 머리 위로 분홍 · 금 과녁판이 내려앉으며 좁혀진다
+      m.visible=false;
+      const tc=guest?cars[o.tg]:o.tgt,left=guest?(+o.x2||0):o.t;
+      if(tc&&tc.root&&!fxFar(tc.s)){const q=clamp(left/FW_LOCK,0,1),bl=(!GFX.rm&&(Math.floor(game.time*12)&1))?1:.75;markOver(tc,2.4+4.5*q,0xff4192,3.2+7*q,.85*bl);markOver(tc,2.45+4.5*q,0xffc533,1.6+3.5*q,.9);}
+      continue;
+    }
+    const geo=ig[o.k];if(!geo){m.visible=false;continue;} // 아직 모양이 없는 물체(뒤 단계 아이템) — 그리지 않음
+    if(m.geometry!==geo)m.geometry=geo;
+    const arm=guest?(+o.x1||0):(o.arm||0);
+    if(o.k==='jack'){const ph=(game.time%.8)/.8,bp=ph<.18?Math.sin(ph/.18*Math.PI):0;m.scale.set(1,arm>0?.6:1+.22*bp,1);} // 0.8초마다 「둥」 들썩(무장 중엔 납작)
+    else if(o.k==='confetti')m.scale.setScalar(arm>0?.7:1);
+    else if(m.scale.x!==1||m.scale.y!==1)m.scale.set(1,1,1);
     surf(track,o.s+(o.v||0)*(tau||0),o.u,o.h,S1);m.position.copy(S1.pos);basisQuat(S1,m.quaternion);
-    if(o.k!=='firework')m.rotateY(game.time*(o.k==='wind'?9:o.k==='popcorn'?6:o.k==='meteor'?4:1.2));m.visible=true;
+    if(o.k!=='firework')m.rotateY(game.time*(o.k==='wind'?9:o.k==='popcorn'?6:o.k==='meteor'?4:o.k==='balloon'?5:1.2));m.visible=true;
     const farO=fxFar(o.s);
     if(o.k==='firework'){m.rotateZ(game.time*12);if(!farO)for(let q=0;q<2;q++){_v1.copy(S1.pos).addScaledVector(S1.t,-1.4);emit(_v1.x,_v1.y,_v1.z,(Math.random()-.5)*5,(Math.random()-.5)*5,(Math.random()-.5)*5,.5,[0xff5af0,0xffc533,0x48e4ff,0xffffff][(Math.random()*4)|0],0);}}
-    else if(o.k==='meteor'){
+    else if(o.k==='confetti'){if(!farO&&arm<=0&&Math.random()<.35){const cc=[0xff4192,0x48e4ff,0xfff27a,0xa5e02b,0xff8a3c][(Math.random()*5)|0];emit(S1.pos.x,S1.pos.y+2,S1.pos.z,(Math.random()-.5)*5,7+Math.random()*4,(Math.random()-.5)*5,.8,cc,9);}}
+    else if(o.k==='meteor'){ // 별똥별 — 주황 과녁 + 떨어질수록 좁혀지는 바깥 고리
       if(!farO)for(let q=0;q<3;q++)emit(S1.pos.x+(Math.random()-.5)*1.6,S1.pos.y+1+Math.random()*2,S1.pos.z+(Math.random()-.5)*1.6,(Math.random()-.5)*2,6+Math.random()*4,(Math.random()-.5)*2,.5,Math.random()<.5?0xff7a2a:0xffc533,0);
-      let mk=markPool[nMark];if(!mk){const mm=new THREE.MeshBasicMaterial({map:TEX.target,color:0xff4d3a,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthWrite:false});mm.userData={own:true};mk=new THREE.Mesh(G.plane,mm);mk.frustumCulled=false;scene.add(mk);markPool.push(mk);}
-      nMark++;surf(track,o.s,o.u,.12,S1);mk.position.copy(S1.pos);basisQuat(S1,mk.quaternion);mk.rotateX(-Math.PI/2);const sc=3.2+Math.sin(game.time*14)*.5;mk.scale.set(sc*1.6,sc*1.6,1);mk.material.opacity=.45+.35*clamp(1-o.h/46,0,1);mk.visible=true;
+      const f=clamp(1-o.h/46,0,1);
+      markGround(o.s,o.u,0xff7a2a,(3.2+Math.sin(game.time*14)*.4)*1.6,.45+.35*f);
+      markGround(o.s,o.u,0xffc533,5.2+9*(1-f),.25+.45*f);
+    }else if(o.k==='balloon'){ // 잼 풍선 — 착지 자리에 분홍 그림자 원(가까워질수록 진해짐)
+      const ls=guest?+o.x1||o.s:o.ls,lu=guest?+o.x2||0:o.lu,f=guest?clamp(1-Math.abs(lapD(track,ls,o.s))/55,0,1):clamp(1-o.t/o.T,0,1);
+      markGround(ls,lu,0xff5a8a,JAM_R*2.45,.25+.6*f);
     }
   }
   for(let i=list.length;i<objPool.length;i++)objPool[i].visible=false;
+  // 하늘 축포 예고 — 대상 머리 위로 금색 불씨 원이 내려온다(thW: host 는 직접, 손님은 스냅숏 효과 묶음)
+  for(const c of cars){if(c.thW>0&&c.root&&!fxFar(c.s)){const q=clamp(c.thW/TH_WARN,0,1);markOver(c,2.2+6*q,0xffc533,GFX.rm?3:2.6+1.2*Math.sin(game.time*16),.6+.4*(1-q));}} // 동작 줄이기: 크기 떨림 없음
   for(let i=nMark;i<markPool.length;i++)markPool[i].visible=false;nMark=0;
+  for(let i=nSpr;i<sprPool.length;i++)sprPool[i].visible=false;nSpr=0;
 }
-/* 누르기 — 원하는 칸을 골라 쓴다. PC: E · Shift = 찬 칸 가운데 가장 앞 칸, 1 · 2 · 3 = 그 칸(빈 칸이면 아무 일 없음) / 휴대폰: 왼쪽 아래 칸 단추.
+/* 누르기 — 원하는 칸을 골라 쓴다. PC: E(· Shift — 주행 개편 때 드리프트로 옮김) = 지금 쓸 수 있는 칸 중 가장 앞 칸, 1 · 2 · 3 = 그 칸(빈 칸이면 아무 일 없음) / 휴대폰: 왼쪽 아래 칸 단추.
    guest 는 누른 누적 횟수(u)와 최근 누른 칸 번호들(k)을 host 로 보낸다 */
 function itemPress(idx){
   if(game.state!=='race'||!player)return;
-  idx=idx<0?slotFirst(player):Math.min(ITEM_SLOTS-1,idx|0); // -1(E · Shift) = 차 있는 가장 낮은 칸
+  idx=idx<0?slotPick(player):Math.min(ITEM_SLOTS-1,idx|0); // -1(E · Shift) = 지금 쓸 수 있는 가장 앞 칸
   if(idx<0||!player.slots[idx])return; // 빈 칸은 아무 일도 없다
   Snd.init();
-  if(!itemUsable(player,player.slots[idx])){toast(ITEM_NOUSE[player.slots[idx]]||'지금은 쓸 수 없어요');return;} // 대상이 없으면 칸에 남는다(guest 도 같은 판단으로 안내만)
+  if(!itemUsable(player,player.slots[idx])){slotNo(idx,noUseTxt(player.slots[idx],'tgt'));return;} // 대상이 없으면 칸에 남는다(guest 도 같은 판단으로 안내만) — 도는 중 · 묶임은 host 가 정해 nouse 로 돌려준다
   if(VS.on&&VS.role==='guest'){VS.useN++;VS.useK=(VS.useK+idx).slice(-4);VS.lastInT=0;return;}
   if(game.paused)return;
   useItem(player,idx);
 }
 /* HUD — 아이템 칸 3개(같은 칸 정보 — 대전 guest 는 스냅숏의 내 칸). 새로 들어오면 짧게 돌아가다 멈추고 반짝, 쓰면 그 칸만 비고 다른 칸은 제자리, 처음 얻은 종류는 한 줄 설명 */
 const slotHud={key:null,roll:[0,0,0],seen:{},tipT:0};
-const ITEM_TIP={rocket:'앞으로 쭉 질주해요',shield:'한 번 막아 줘요(8초)',blast:'둘레의 차를 튕겨요',popcorn:'앞 차에 던져요',candy:'뒤에 떨어뜨려 미끄러지게 해요',
-  wind:'1등 차를 찾아가 돌려요',magnet:'앞 차 쪽으로 끌려가며 빨라져요',star:'잠깐 무적 — 부딪힌 차를 튕겨요',balloon:'앞 차를 느리게 해요',
-  thunder:'앞선 차 모두에게 번개를 내려 느리게 해요',firework:'앞 차를 쫓아가 펑 터져요',ghost:'5초 동안 다 통과하고 앞 차 아이템을 훔쳐요',meteor:'앞길에 별똥별 여섯 개를 떨어뜨려요'};
+const ITEM_TIP={jack:'뒤에 놓아 밟은 차를 하늘로 튕겨요',confetti:'뒤에 놓아 지나간 차 화면을 색종이로 가려요',rocket:'짧고 세게 앞으로 튀어 나가요',shield:'6초 안에 한 번 막아 줘요 — 경고가 뜨면 켜요',blast:'잠깐 부풀었다가 둘레 차를 튕겨요',popcorn:'앞으로 곧게 던져 처음 닿는 차를 돌려요',candy:'뒤에 놓아 밟은 차를 미끄러뜨려요',
+  wind:'1등을 쫓아가 띄워요',magnet:'바로 앞차를 집어 끌려가요 — 걸리면 옆으로 크게 비켜 끊어요',star:'4초 동안 무엇에도 안 걸리고, 부딪힌 차를 튕겨요',balloon:'앞차 앞에 떨어져 둘레 차를 끈적하게 느리게 해요',
+  thunder:'앞선 모두의 머리 위에서 터져 느리게 해요 — 휘파람 소리에 방패!',firework:'앞차를 잠깐 겨눈 뒤 쫓아가 맞혀요',ghost:'3초 동안 모두 통과하고, 앞차 아이템 하나를 가져와요',meteor:'앞길에 별똥별 다섯 개 — 바닥 과녁을 피해요',
+  pinwheel:'5초 동안 조금 더 빠르게, 긁혀도 덜 느려져요',spring:'돌고 있을 때도 써요 — 빙글을 끊고 붙은 것을 털어 내요'};
 function replay(el,cls){el.classList.remove(cls);void el.offsetWidth;el.classList.add(cls);}
 function tickSlots(dt){
   const p=player,sl=p.slots||[],key=sl.map(k=>k||'').join(',');
@@ -2425,25 +2991,29 @@ function tickSlots(dt){
   for(let i=0;i<ITEM_SLOTS;i++){
     const k=sl[i];let ic='',nm='비어 있음',roll=false;
     if(slotHud.roll[i]>0){
-      slotHud.roll[i]-=dt;roll=true;const r=ITEM_KEYS[((game.time*14+i*3)|0)%ITEM_KEYS.length];ic=ITEM[r].ic;nm='…';
+      slotHud.roll[i]-=dt;roll=true;const r=ITEM_KEYS[((game.time*14+i*3)|0)%ITEM_KEYS.length];ic=r;nm='…';
       if(slotHud.roll[i]<=0&&k){ // 멈춤 — 반짝 · 살짝 커지기, 처음 얻은 종류면 한 줄 설명
         replay($('slot'+i),'got');replay($('ib'+i),'got');
-        if(!slotHud.seen[k]){slotHud.seen[k]=1;const t=$('itemTip');t.textContent=ITEM[k].ic+' '+ITEM[k].n+' — '+ITEM_TIP[k];t.hidden=false;slotHud.tipT=2.8;}
+        if(!slotHud.seen[k]){slotHud.seen[k]=1;const t=$('itemTip');t.textContent='';const ii=document.createElement('i');setIcon(ii,k);t.appendChild(ii);t.appendChild(document.createTextNode(' '+ITEM[k].n+' — '+ITEM_TIP[k]));t.hidden=false;slotHud.tipT=2.8;}
       }
-    }else if(k){ic=ITEM[k].ic;nm=ITEM[k].n;}
-    const empty=!k&&!roll,v=ic+nm+roll+empty;
+    }else if(k){ic=k;nm=ITEM[k].n;}
+    const empty=!k&&!roll,v=ic+nm+roll+empty+ICON.ok;
     for(const el of [$('slot'+i),$('ib'+i)]){
       if(el.dataset.v===v)continue;el.dataset.v=v;
       el.classList.toggle('roll',roll);el.classList.toggle('empty',empty);el.classList.toggle('off',empty);
-      el.querySelector('i').textContent=ic;el.querySelector('b').textContent=nm;
+      setIcon(el.querySelector('i'),ic);el.querySelector('b').textContent=nm;
       if(el.tagName==='BUTTON'){if(k&&!roll)el.style.setProperty('--kc','#'+ITEM[k].col.toString(16).padStart(6,'0'));else el.style.removeProperty('--kc');} // 휴대폰 단추: 찬 칸은 종류색 테두리(설계서 1-5, PC 칸은 G4)
       if(el.tagName==='BUTTON')el.setAttribute('aria-label',(i+1)+'번 칸 '+(empty?'비어 있음':nm+' 쓰기'));
     }
   }
+  const stuck=p.spinout>0||p.tieT>0||p.airLock>0;
+  for(let i=0;i<ITEM_SLOTS;i++){const on=stuck&&sl[i]==='spring'&&!(slotHud.roll[i]>0);for(const el of [$('slot'+i),$('ib'+i)])if(el.classList.contains('cure')!==on)el.classList.toggle('cure',on);}
   if(slotHud.tipT>0){slotHud.tipT-=dt;if(slotHud.tipT<=0)$('itemTip').hidden=true;}
 }
 function land(c){
   c.spinning=false;c.spinP=0;c.squash=Math.max(c.squash,.45);
+  if(c.jk){c.jk=false;c.airLock=0;c.v*=JACK_LAND;c.squash=Math.max(c.squash,.8);} // 깜짝 광대 북 — 착지 속도 ×0.6
+  if(c.hop){c.hop=false;if(nearPlayer(c,60)){Snd.thud();if(!fxFar(c.s)&&c.root)ringFx(c.root.position,c.root.quaternion,0xfff2d8);}}
   if(c.spins>0){
     vsEv('trick',c,c.spins);
     boost(c,.45+.3*c.spins);
@@ -2491,6 +3061,7 @@ function aiInput(c,dt){
     ai.lane=lane;
   }
   let lane=ai.lane;
+  if(c.blindT>0)lane+=Math.sin(game.time*4.3+ai.wp)*1.8; // 색종이에 가려짐 — 차선 흔들림 약간
   if(inTube)lane=ai.home*.5+Math.sin(game.time*1.3+ai.wp)*ai.tubeAmp;
   else{for(const o of cars){if(o===c)continue;const d=o.s-c.s;if(d>0&&d<7&&Math.abs(o.u-c.u)<2.3&&o.v<c.v+2){lane+=(c.u>=o.u?1:-1)*2.6;break;}}}
   let steer=(lane-c.u)/3;
@@ -2500,27 +3071,71 @@ function aiInput(c,dt){
   return out;
 }
 
+/* 아이템 0b — 속도 규칙: 아이템 가속은 곱하지 않고 가장 큰 것 하나(부스트 · 순풍 1.12 · 집게 1.3), 벨트는 따로 곱함.
+   감속도 가장 센 것 하나(잼 · 축포 0.62 · 가면 0.65 · 묶임 0.3). 조향: 반전(예고가 끝난 뒤) · 묶임 ×0.5 · 축포 ×0.6 · 공중 0 */
+function accMul(c,st,boosting){return Math.max(boosting?st.boostMul:1,c.pwT>0?PW_TOP:1,c.magPull?1.3:1);}
+function slowMul(c){return Math.min(c.slowT>0?.62:1,c.maskT>0&&c.maskW<=0?.65:1,c.tieT>0?.3:1);}
+function effSteer(c,s){
+  if(c.airLock>0)return 0;
+  if(c.revT>0&&c.revW<=0)s=-s;
+  if(c.tieT>0)s*=.5;
+  if(c.thS>0)s*=.6;
+  return s;
+}
+/* 새 효과 시계 — 반전 · 가면은 예고가 끝난 뒤부터 줄고, 끝나면 면역(반전 4초 · 가면 4초 · 색종이 2초) */
+function effTick(c,dt){
+  if(c.revW>0)c.revW-=dt;else if(c.revT>0){c.revT-=dt;if(c.revT<=0)c.immRev=4;}
+  if(c.maskW>0)c.maskW-=dt;else if(c.maskT>0){c.maskT-=dt;if(c.maskT<=0)c.immMask=4;}
+  if(c.blindT>0){c.blindT-=dt;if(c.blindT<=0)c.immBlind=2;}
+  if(c.tieT>0){c.tieT-=dt;if(c.tieT<=0){c.tieT=0;c.tieEnd=game.raceTime;}}
+  if(c.pwT>0)c.pwT-=dt;
+  if(c.airLock>0)c.airLock-=dt;
+  if(c.thW>0){c.thW-=dt;if(c.thW<=0){c.thW=0;zap(c);}} // 하늘 축포 예고가 끝나면 터진다(host · 혼자 하기만 — 손님은 stepCar 를 안 돈다)
+  if(c.thS>0)c.thS-=dt;
+  if(c.immRev>0)c.immRev-=dt;
+  if(c.immMask>0)c.immMask-=dt;
+  if(c.immBlind>0)c.immBlind-=dt;
+  if(c.immGlob>0)c.immGlob-=dt;
+  if(c.liteT>0)c.liteT-=dt;
+}
+/* 대전 스냅숏 27번(효과 묶음) — 효과가 없으면 0, 있으면 [tieT, revT, revW, maskT, maskW, blindT, pwT, airLock, thW, imm 비트(1 반전 면역 · 2 가면 면역 · 4 색종이 면역 · 8 상한 걸림 · 16 전체 효과 면역)] */
+function effPack(c){
+  const im=(c.immRev>0?1:0)|(c.immMask>0?2:0)|(c.immBlind>0?4:0)|(c.ccOn?8:0)|(c.immGlob>0?16:0);
+  if(!(c.tieT>0||c.revT>0||c.revW>0||c.maskT>0||c.maskW>0||c.blindT>0||c.pwT>0||c.airLock>0||c.thW>0||im))return 0;
+  const p=x=>x>0?r2(x):0;
+  return [p(c.tieT),p(c.revT),p(c.revW),p(c.maskT),p(c.maskW),p(c.blindT),p(c.pwT),p(c.airLock),p(c.thW),im];
+}
+function effUnpack(c,E,thS,tau){ // 손님 — 받은 효과 묶음에서 tau 초 지난 값(반전 · 가면은 예고가 먼저 줄고 그 뒤 본 시간)
+  const g=i=>E?Math.max(0,+E[i]||0):0,two=(w,m)=>{const a=Math.min(w,tau);return [w-a,Math.max(0,m-(tau-a))];};
+  const rv=two(g(2),g(1)),mk=two(g(4),g(3));
+  c.tieT=Math.max(0,g(0)-tau);c.revW=rv[0];c.revT=rv[1];c.maskW=mk[0];c.maskT=mk[1];c.blindT=Math.max(0,g(5)-tau);c.pwT=Math.max(0,g(6)-tau);c.airLock=Math.max(0,g(7)-tau);c.thW=Math.max(0,g(8)-tau);c.thS=Math.max(0,(+thS||0)-tau);
+  const im=E?(+E[9]|0):0;c.immRev=im&1?1:0;c.immMask=im&2?1:0;c.immBlind=im&4?1:0;c.ccOn=!!(im&8);c.immGlob=im&16?1:0;
+}
 function stepCar(c,dt,inp){
   const tr=track,st=c.st;
   surf(tr,c.s,c.u,0,S0);
   const k=S0.k,inTube=(S0.fl&F_TUBE)!==0,curv=S0.c;
   let steer=inp.steer;
   if(c.invuln>0)c.invuln-=dt;
-  if(c.shield>0)c.shield-=dt;
+  if(c.shield>0){c.shield-=dt;if(c.shield<=0)c.shG=.2;}else if(c.shG>0)c.shG-=dt; // 방패가 꺼진 뒤 0.2초는 맞아도 막는다
   if(c.boostT>0)c.boostT-=dt;
+  if(c.punchT>0)c.punchT-=dt;
   if(c.slowT>0)c.slowT-=dt;
   if(c.starT>0)c.starT-=dt;
   if(c.ghostT>0)c.ghostT-=dt;
+  effTick(c,dt);
   if(c.padCd>0)c.padCd-=dt;
   if(c.bumpCd>0)c.bumpCd-=dt;
   if(c.squash>0)c.squash=Math.max(0,c.squash-dt*1.5);
   const boosting=c.boostT>0,belt=!c.air&&(S0.fl&F_BELT)!==0;
-  if(c.spinout>0){c.spinout-=dt;steer=0;c.v+=(st.vmax*.28-c.v)*Math.min(1,3*dt);}
-  else if(inp.accel){
-    const top=(boosting?st.vmax*st.boostMul:st.vmax)*c.rb*(belt?BELT_TOP:1)*(c.slowT>0?.62:1);
-    if(c.v<top)c.v=Math.min(top,c.v+(boosting?st.acc*2.8:st.acc)*(belt?1.6:1)*dt);
+  const spun=c.spinout>0;
+  if(spun){c.spinout-=dt;if(c.spinout<=0)c.spinEnd=game.raceTime;steer=0;c.v+=(st.vmax*.28-c.v)*Math.min(1,3*dt);}
+  else steer=effSteer(c,steer);
+  if(!spun){if(inp.accel){ // 도는 중엔 위에서 속도를 정했으니 가속 · 감속 입력은 건너뜀
+    const top=st.vmax*accMul(c,st,boosting)*c.rb*(belt?BELT_TOP:1)*slowMul(c);
+    if(c.v<top)c.v=Math.min(top,c.v+(boosting?st.acc*2.8:c.pwT>0?st.acc*PW_ACC:st.acc)*(belt?1.6:1)*(c.punchT>0?1.5:1)*dt); // 로켓 첫 0.3초 펀치 · 순풍 가속 ×1.25(부스트 중이면 부스트 쪽)
     else c.v+=(top-c.v)*Math.min(1,1.4*dt);
-  }else c.v+=((belt?st.vmax*.85:6)-c.v)*Math.min(1,1.25*dt);
+  }else c.v+=((belt?st.vmax*.85:6)-c.v)*Math.min(1,1.25*dt);}
   /* lateral */
   let tgt=steer*st.hand;
   if(!c.air)tgt-=curv*c.v*c.v*PUSH;
@@ -2534,11 +3149,11 @@ function stepCar(c,dt,inp){
     const wi=clamp(c.s|0,0,tr.n-1),lim=tr.W[wi]-1.15,md=tr.MED[wi];
     if(c.u>lim||c.u<-lim){
       const sg=c.u>0?1:-1;c.u=sg*lim;
-      if(!c.air&&tgt*sg>1.5){c.scrape=true;c.v-=c.v*st.scrape*dt;}
+      if(!c.air&&tgt*sg>1.5){c.scrape=true;c.v-=c.v*st.scrape*(c.pwT>0?.5:1)*dt;} // 순풍 — 긁힘 감속 절반
       if(c.uVel*sg>0)c.uVel*=.3;
     }else if(md>0&&Math.abs(c.u)<md+1.15&&c.h<1.5){ // 갈림길 가운데 섬 — 있던 쪽으로 밀어낸다
       const sg=c.u>=0?1:-1;c.u=sg*(md+1.15);
-      if(!c.air&&tgt*sg<-1.5){c.scrape=true;c.v-=c.v*st.scrape*dt;}
+      if(!c.air&&tgt*sg<-1.5){c.scrape=true;c.v-=c.v*st.scrape*(c.pwT>0?.5:1)*dt;}
       if(c.uVel*sg<0)c.uVel*=.3;
     }
   }
@@ -2579,7 +3194,7 @@ function stepCar(c,dt,inp){
   if(c.air){
     if(!c.spinning){
       const want=c.isPlayer&&!game.auto?Math.abs(inp.steer)>.5:(c.ai.trick&&c.spins<1);
-      if(want&&c.airT>.05){c.spinning=true;c.spinDir=c.isPlayer&&!game.auto?Math.sign(inp.steer):c.ai.trickDir;c.spinP=0;}
+      if(want&&c.airT>.05&&!c.hop){c.spinning=true;c.spinDir=c.isPlayer&&!game.auto?Math.sign(inp.steer):c.ai.trickDir;c.spinP=0;}
     }else{
       c.spinP+=dt/.44;
       if(c.spinP>=1){c.spinning=false;c.spinP=0;c.spinYaw=0;c.spins++;if(c.isPlayer)Snd.spin(c.spins);}
@@ -2593,8 +3208,8 @@ function collideCars(){
     if(ds>3.3||ds<-3.3)continue;
     let du=a.u-b.u;if(du>half)du-=2*half;else if(du<-half)du+=2*half;
     if(du>2.2||du<-2.2||Math.abs(a.h-b.h)>1.6)continue;
-    if(a.ghostT>0||b.ghostT>0)continue; // 유령 망토 — 부딪히지 않고 지나간다
-    if(a.starT>0&&b.starT<=0)hit(b,'star');else if(b.starT>0&&a.starT<=0)hit(a,'star'); // 무지개 별 — 부딪힌 차를 튕긴다
+    if(a.ghostT>0||b.ghostT>0)continue; // 마술사 망토 — 부딪히지 않고 지나간다
+    if(a.starT>0&&b.starT<=0)hit(b,'star');else if(b.starT>0&&a.starT<=0)hit(a,'star'); // 무지개 퍼레이드 — 부딪힌 차를 튕긴다
     const sg=du>=0?1:-1,push=(2.2-Math.abs(du))*.5;
     const kick=VS.on?8:5;a.u+=sg*push;b.u-=sg*push;a.uVel+=sg*kick;b.uVel-=sg*kick;
     if(Math.abs(ds)>1.2){const rear=ds<0?a:b,front=ds<0?b:a;if(rear.v>front.v){const dv=rear.v-front.v;rear.v-=dv*.6;front.v+=dv*.45;}}
@@ -2628,7 +3243,9 @@ function stepRace(dt){
       inp=aiInput(c,dt);
     }
     c.lastSteer=inp.steer;c.lastAccel=!!inp.accel;
+    stepPend(c,dt);
     stepCar(c,dt,inp);
+    c.ccOn=c.cc.length>0&&ccCapped(c);
     magnetPull(c,dt);
     if(racing&&!c.remote&&(!c.isPlayer||game.auto))aiItems(c,dt);
     if(c.padCd<=0&&!c.air){const ls=lapS(tr,c.s);for(const ps of pads){if(ls>ps[0]&&ls<ps[0]+10&&c.u>=ps[1]&&c.u<=ps[2]){c.padCd=1.2;boost(c,.9);if(c.v<40)c.v=40;vsEv('pad',c);if(c.isPlayer)Snd.boost();break;}}}
@@ -2666,9 +3283,7 @@ function stepRace(dt){
     if(c.armed<=0)continue;
     if(c.finished){c.armed=0;continue;}
     c.armed-=dt;
-    let fire=c.armed<=0;
-    if(!fire){for(const o of cars){if(o!==c&&!o.finished&&Math.abs(lapD(track,o.s,c.s))<12){fire=true;break;}}}
-    if(fire){c.armed=0;blast(c);}
+    if(c.armed<=0){c.armed=0;blast(c);} // 범퍼 폭발 — 0.3초 부풀기(예고)가 끝나면 터진다
   }
   const arr=cars.slice().sort((a,b)=>(a.finished&&b.finished)?a.finishT-b.finishT:a.finished?-1:b.finished?1:b.s-a.s);
   for(let i=0;i<arr.length;i++)arr[i].place=i+1;
@@ -2687,7 +3302,7 @@ function placeCar(c,dt){
   yaw+=c.spinYaw;
   b.rotation.set(c.air?clamp(-c.vy*.012,-.3,.3):0,yaw,c.steerVis*.1+c.driftDir*.12*c.driftVis);
   b.position.y=c.h;
-  const sq=smooth(c.squash);b.scale.set(1+.25*sq,1-.55*sq,1+.25*sq);
+  const sq=smooth(c.squash),sw=c.armed>0?1+.4*clamp(1-c.armed/BLAST_ARM,0,1):1;b.scale.set((1+.25*sq)*sw,(1-.55*sq)*sw,(1+.25*sq)*sw); // 범퍼 폭발 예고 — 0.3초 동안 부푼다
   b.visible=c.ghostT>0?((Math.floor(game.time*20)%3)!==0):!(c.invuln>0&&c.spinout<=0&&!c.finished&&(Math.floor(game.time*14)&1));
   const boosting=c.boostT>0;
   c.mFlame.visible=boosting;
@@ -2695,11 +3310,12 @@ function placeCar(c,dt){
   c.mShield.visible=c.shield>0||c.starT>0||c.ghostT>0;
   if(c.mShield.visible){c.mShield.material.opacity=(c.ghostT>0?.32:.2)+.1*Math.sin(game.time*8);c.mShield.material.color.setHex(c.ghostT>0?0xb98cff:c.starT>0?[0xff5a5a,0xffd84a,0x5ad86a,0x5ab0ff][((game.time*10)|0)&3]:0x58e8ff);}
   c.mRing.visible=c.armed>0;
-  if(c.armed>0){const r=2.3+.3*Math.sin(game.time*10);c.mRing.scale.set(r,r,r);}
+  if(c.armed>0){const r=2.3+.3*Math.sin(game.time*30)+2.5*clamp(1-c.armed/BLAST_ARM,0,1);c.mRing.scale.set(r,r,r);}
   if(dt>0)c.underA+=((boosting||c.driftT>.55?1:0)-c.underA)*Math.min(1,8*dt);
   c.mUnder.material.opacity=.7*c.underA*clamp(1-c.h/9,.25,1)*c.glowF;c.mUnder.visible=c.mUnder.material.opacity>.02;
   if(dt<=0)return;
   if(c.ghostT>0&&dt>0&&Math.random()<.6){_v1.copy(S1.pos).addScaledVector(S1.n,1+c.h+Math.random()*1.5);emit(_v1.x,_v1.y,_v1.z,(Math.random()-.5)*4,2+Math.random()*2,(Math.random()-.5)*4,.6,Math.random()<.5?0xc9a8ff:0xffffff,-2);}
+  if(c.pwT>0&&Math.random()<.5){const g=Math.random()<.5?-1:1;_v1.copy(S1.pos).addScaledVector(S1.n,.9+c.h+Math.random()).addScaledVector(S1.r,g*(1.6+Math.random()*.6));emit(_v1.x,_v1.y,_v1.z,-S1.t.x*14,0,-S1.t.z*14,.3,Math.random()<.7?0xffffff:0x8ad8ff,0);} // 순풍 — 양옆 흰 바람 줄
   if(c.starT>0&&dt>0&&Math.random()<.7){_v1.copy(S1.pos).addScaledVector(S1.n,.6+c.h).addScaledVector(S1.t,-2);emit(_v1.x,_v1.y,_v1.z,(Math.random()-.5)*2,1.5,(Math.random()-.5)*2,.7,[0xff5a5a,0xffd84a,0x5ad86a,0x5ab0ff,0xb98cff][(Math.random()*5)|0],0);}
   if(boosting&&Math.random()<.8){
     _v1.copy(S1.pos).addScaledVector(S1.n,.7+c.h).addScaledVector(S1.t,-2.3);
@@ -2802,12 +3418,21 @@ function tickHud(dt){
   if(p.shield>0){const n=Math.ceil(p.shield);key+='s'+n;html+='<span class="chip sh">방패 '+n+'초</span>';}
   if(p.armed>0){key+='b';html+='<span class="chip bl">폭발 준비</span>';}
   if(p.boostT>0){key+='o';html+='<span class="chip bo">부스트</span>';}
-  if(p.slowT>0){key+='w';html+='<span class="chip sh">젖었어요</span>';}
-  if(p.magT>0){key+='m'+Math.ceil(p.magT);html+='<span class="chip bo">자석 '+Math.ceil(p.magT)+'초</span>';}
-  if(p.starT>0){key+='t'+Math.ceil(p.starT);html+='<span class="chip bl">무지개 별 '+Math.ceil(p.starT)+'초</span>';}
-  if(p.ghostT>0){key+='g'+Math.ceil(p.ghostT);html+='<span class="chip sh">유령 '+Math.ceil(p.ghostT)+'초</span>';}
+  if(p.slowT>0){const th=p.thS>0;key+=th?'W':'w';html+='<span class="chip bad">'+(th?'축포 — 느려요':'잼 범벅')+'</span>';}
+  if(p.magT>0){key+='m'+Math.ceil(p.magT);html+='<span class="chip bo">집게 '+Math.ceil(p.magT)+'초</span>';}
+  if(p.starT>0){key+='t'+Math.ceil(p.starT);html+='<span class="chip bl">퍼레이드 '+Math.ceil(p.starT)+'초</span>';}
+  if(p.ghostT>0){key+='g'+Math.ceil(p.ghostT);html+='<span class="chip sh">망토 '+Math.ceil(p.ghostT)+'초</span>';}
+  if(p.pwT>0){key+='n'+Math.ceil(p.pwT);html+='<span class="chip bo">순풍 '+Math.ceil(p.pwT)+'초</span>';}
+  if(p.tieT>0){key+='y';html+='<span class="chip bad">묶였어요 — 좌우 번갈아</span>';}
+  if(p.revT>0||p.revW>0){key+='v';html+='<span class="chip bad">좌우 반대</span>';}
+  if(p.maskT>0||p.maskW>0){key+='u';html+='<span class="chip bad">가면</span>';}
+  if(p.blindT>0){key+='e';html+='<span class="chip bad">색종이</span>';}
+  if(p.airLock>0){key+='a';html+='<span class="chip bad">하늘로 튕겼어요</span>';}
+  if(p.ccOn){key+='c';html+='<span class="chip cc">연속 보호</span>';}
   if(key!==hud.chips){hud.chips=key;$('hChips').innerHTML=html;}
   tickSlots(dt);
+  warnTick(dt);
+  blindTick(dt);
   const lv=p.driftT>2.1?3:p.driftT>1.25?2:p.driftT>.55?1:0;
   if(lv!==hud.drift){hud.drift=lv;$('hDrift').className='drift'+(lv?' l'+lv:'');}
   game.rush+=((game.state==='race'&&p.boostT>0?1:0)-game.rush)*Math.min(1,6*dt);
@@ -2818,6 +3443,51 @@ function tickHud(dt){
     if(hud.time!==rem){hud.time=rem;const el=$('hTime');el.hidden=false;el.textContent=Math.floor(rem/60)+':'+String(rem%60).padStart(2,'0');el.classList.toggle('low',rem<=20);}
   }
 }
+/* 경고 층 — 매 화면마다 지금 보이는 위협에서 고른다(혼자 · host 는 objs, 손님은 스냅숏 물체).
+   추적 물체(회오리 · 미사일 · 리본 · 가면)가 나를 노리면 뒤쪽 모서리 화살표(가까울수록 큼) + 종류별 테두리, 1등 저격은 위 가운데 띠.
+   축포 예고(thW)는 금 테두리. 뒤 단계는 warnPush(테두리 종류, 띠 글, 초)로 더 얹는다 */
+const WARN={edge:'',band:'',l:-1,r:-1,push:[],tokT:0,mag:false};
+/* na = 화살표 없음(잠금은 날아오는 물체가 아님 — 테두리만) */
+const WARN_OB={wind:{e:'wind',b:'회오리가 쫓아와요',c:'#b98cff'},firework:{e:'lock',c:'#ff5af0'},lock:{e:'lock',c:'#ffc533',na:1},ribbon:{e:'ribbon',c:'#ff7ac0'},mask:{e:'',b:'심술 가면이 날아와요!',c:'#c9a8ff'}};
+function warnPush(edge,band,sec){WARN.push.push({e:edge||'',b:band||'',t:sec||1});}
+function warnTick(dt){
+  const p=player;let edge='',band='',best=[0,0],col=['',''],pop=-1;
+  if(p&&track&&game.state==='race'&&!p.finished){
+    const guest=VS.on&&VS.role==='guest',list=guest?(VS.gobjs||[]):objs;
+    for(const o of list){
+      if(o.k==='popcorn'&&(guest||o.own!==p)){ // 팝콘 근접 — 내 뒤 30 안에서 날아오면 아래 테두리 노랑 + 「톡톡」이 빨라짐
+        const d=-lapD(track,o.s,p.s);
+        if(d>0&&d<30&&Math.abs(udiff(o.u,p.u))<4){if(!edge)edge='near';if(pop<0||d<pop)pop=d;}
+        continue;
+      }
+      const W=WARN_OB[o.k];if(!W)continue;
+      const mine=guest?o.tg===VS.me:o.tgt===p;if(!mine)continue;
+      if(W.na){if(W.e&&!edge)edge=W.e;continue;}
+      const d=-lapD(track,o.s,p.s);if(d<-2||d>160)continue; // 내 뒤 160 안
+      const k=clamp(1-d/160,.35,1),du=udiff(o.u,p.u);
+      for(let side=0;side<2;side++){if((side?du>-1.5:du<1.5)&&k>best[side]){best[side]=k;col[side]=W.c;}} // 바로 뒤(좌우 1.5 안)면 양쪽
+      if(W.e&&!edge)edge=W.e;
+      if(W.b&&!band){band=W.b;if(o.k==='wind'){const cv=(o.v||0)-p.v;band+=' · '+(cv>1?Math.min(9.9,Math.max(0,d)/cv).toFixed(1):'…')+'초';}} // 회오리 — 닿을 때까지 남은 초
+    }
+    if(p.thW>0){if(!edge)edge='gold';if(!band)band='머리 위 축포! 방패로 막아요';} // 금 점선 테두리 + 띠 글(색만으로 알리지 않게)
+    // 뽑기 집게 — 뒤차가 내게 줄을 걸면 「철컥」 + 띠(손님은 집게 쓴 차의 바로 앞이 나인지로 추정)
+    let mag=false;
+    for(const c of cars){if(c===p||!(c.magT>0))continue;if(guest?magNear(c)===p:c.magTgt===p){mag=true;break;}}
+    if(mag&&!band)band='집게가 붙었어요 — 옆으로 크게 비켜요';
+    if(mag&&!WARN.mag)Snd.clack();
+    WARN.mag=mag;
+  }
+  if(pop>=0){WARN.tokT-=dt;if(WARN.tokT<=0){WARN.tokT=.07+.25*pop/30;Snd.tok(pop<10?2:pop<20?1:0);}}else WARN.tokT=0;
+  for(let i=WARN.push.length-1;i>=0;i--){const w=WARN.push[i];w.t-=dt;if(w.t<=0){WARN.push.splice(i,1);continue;}if(w.e&&!edge)edge=w.e;if(w.b&&!band)band=w.b;}
+  if(edge!==WARN.edge){WARN.edge=edge;$('warnEdge').className='warn-edge'+(edge?' on k-'+edge:'');}
+  if(band!==WARN.band){WARN.band=band;const el=$('warnBand');el.textContent=band;el.hidden=!band;}
+  for(let s=0;s<2;s++){
+    const q=Math.round(best[s]*20)/20,key=s?'r':'l';
+    if(q===WARN[key])continue;WARN[key]=q;
+    const el=$(s?'warnR':'warnL');el.style.opacity=q>0?'1':'0';el.style.transform='scale('+(q>0?(.6+.8*q).toFixed(2):'1')+')';if(col[s])el.style.setProperty('--wc',col[s]);
+  }
+}
+function warnClear(){WARN.push.length=0;WARN.edge='x';WARN.band='x';WARN.l=WARN.r=-2;WARN.mag=false;WARN.tokT=0;}
 function tickHints(){
   if(save.seenHelp||game.hintT>0||game.state!=='race')return;
   const hs=game.hints,p=player,tr=track;
@@ -2836,17 +3506,18 @@ function setState(s){
   show('results',s==='results');
   if(s!=='countdown')show('count',false);
   if(s!=='race'&&s!=='countdown'){$('rush').style.opacity=0;$('hint').hidden=true;game.hintT=0;}
+  if(s!=='race'){$('warnEdge').className='warn-edge';$('warnBand').hidden=true;$('warnL').style.opacity='0';$('warnR').style.opacity='0';warnClear();}
 }
 function resetRace(){
   gridCars();
   for(let i=0;i<tix.length;i++)tix[i].got=false;
   for(const it of items){it.on=true;it.cd=0;it.grp.visible=true;}
   for(const hz of hazards)hz.prev=1;
-  for(const f of fx){scene.remove(f.m);f.m.material.dispose();if(f.bolt)f.m.geometry.dispose();}
+  for(const f of fx){scene.remove(f.m);f.m.material.dispose();}
   fx=[];clearRings();
-  objs=[];VS.gobjs=[];for(const m of objPool)m.visible=false;for(const m of markPool)m.visible=false;slotHud.key=null;slotHud.roll=[0,0,0];slotHud.tipT=0;$('itemTip').hidden=true;
-  Object.assign(game,{raceTime:0,order:[],tix:0,tixTrick:0,tixLost:0,combo:0,comboT:0,shake:0,hints:{},hintT:0,result:null});
-  hud.place=0;hud.tix=-1;hud.chips='x';hud.drift=-1;hud.time=-1;hud.lap=-1;hud.ticks=null;
+  objs=[];VS.gobjs=[];for(const m of objPool)m.visible=false;for(const m of markPool)m.visible=false;for(const m of sprPool)m.visible=false;slotHud.key=null;slotHud.roll=[0,0,0];slotHud.tipT=0;$('itemTip').hidden=true;
+  Object.assign(game,{raceTime:0,cdSnipe:0,cdGlob:0,order:[],tix:0,tixTrick:0,tixLost:0,combo:0,comboT:0,shake:0,hints:{},hintT:0,result:null});
+  hud.place=0;hud.tix=-1;hud.chips='x';hud.drift=-1;hud.time=-1;hud.lap=-1;hud.ticks=null;warnClear();
   camInit=false;camU=player.u;
 }
 function startRace(){
@@ -2928,7 +3599,8 @@ function renderHome(){
     b.setAttribute('aria-pressed',String(i===save.track));
     const lv=d.lv||Math.min(5,i+1); // 난이도 점 — 1~5번 트랙은 번호대로, 새 트랙은 def.lv
     let pips='';for(let k=0;k<5;k++)pips+='<i'+(k<lv?' class="on"':'')+'></i>';
-    b.innerHTML='<span class="main"><span class="no">트랙 '+(i+1)+(ARC?' · 점수 ×'+(i+1):'')+'</span><span class="nm">'+d.name+'</span><span class="nt">'+(locked?'「'+TRACKS[i-1].name+'」에서 3등 안에 들면 열려요':d.note)+'</span><span class="ft"><span class="pips" aria-label="난이도 '+lv+' / 5">'+pips+'</span><span>'+(best?'최고 '+ORD[best]:locked?'잠김':'아직 안 달렸어요')+'</span></span></span><span class="tear"><span>입장권</span></span>';
+    b.innerHTML='<span class="main"><span class="no">트랙 '+(i+1)+(ARC?' · 점수 ×'+(i+1):'')+'</span><span class="nm">'+d.name+'</span><span class="nt">'+(locked?'「'+TRACKS[i-1].name+'」에서 3등 안에 들면 열려요':d.note)+'</span><span class="ft"><span class="pips" aria-label="난이도 '+lv+' / 5">'+pips+'</span><span>'+(best?'최고 '+ORD[best]:locked?'잠김':'아직 안 달렸어요')+'</span></span><span class="art" aria-hidden="true"></span></span><span class="tear"><span>입장권</span></span>';
+    trackArt.attach(b,i);
     b.addEventListener('click',()=>{
       if(locked||save.track===i)return;
       save.track=i;persist();loadTrack(i);gridCars();camInit=false;
@@ -2939,8 +3611,72 @@ function renderHome(){
   });
   const cur=el.children[save.track];
   if(cur&&cur.scrollIntoView){try{cur.scrollIntoView({block:'nearest',inline:'nearest'});}catch(e){}}
+  trackArt.watch(el);
   syncSound();
 }
+/* 트랙 카드 그림 + 미니맵 선 — 생성 그림은 카드 바탕만(글씨 · 선 · 잠김 표시는 코드).
+   첫 화면을 막지 않게: 첫 그리기 뒤 쉬는 틈에, 트랙 줄에서 보이는(+ 옆 한 장) 카드부터 하나씩 불러온다.
+   못 불러오면(404 · 시간 초과 · 오류) 그 카드는 .art 를 안 붙여 지금 모습 그대로. 그림은 경주 판정과 무관 */
+function trackShapeD(i,W,H,pad){ // 트랙 i 의 미니맵 선(SVG path d) — 출발 방향이 위, W×H 안에 맞춤(정수 좌표). 대전 화면 표도 이 함수로 만든다
+  const tr=buildTrack(TRACKS[i]);
+  const tx=tr.T[tr.start*3],tz=tr.T[tr.start*3+2],ang=Math.atan2(tx,tz),ca=Math.cos(ang),sa=Math.sin(ang);
+  const pts=[],st=Math.max(6,Math.round(tr.L/64));let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  for(let j=0;j<=tr.L;j+=st){const k=Math.min(j,tr.L-1),x=tr.P[k*3],z=tr.P[k*3+2],q=[x*ca-z*sa,-(x*sa+z*ca)];pts.push(q);if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1];}
+  const k=Math.min((W-2*pad)/(x1-x0||1),(H-2*pad)/(y1-y0||1)),ox=(W-(x1-x0)*k)/2-x0*k,oy=(H-(y1-y0)*k)/2-y0*k;
+  let d='';pts.forEach((q,j)=>{d+=(j?'L':'M')+Math.round(q[0]*k+ox)+' '+Math.round(q[1]*k+oy);});
+  const s0=pts[0];return {d:d+'Z',sx:Math.round(s0[0]*k+ox),sy:Math.round(s0[1]*k+oy)};
+}
+const trackArt=(function(){
+  const ok={},bad={},shape={},cards=[];let io=null,ready=false,busy=0;
+  const url=(i,x2)=>'/assets/games/sundown/track-card-'+String(i+1).padStart(2,'0')+(x2?'@2x':'')+'-v1.webp';
+  const NS='http://www.w3.org/2000/svg';
+  function deco(b,i){ // 미니맵 선 · 잠김 자물쇠(그림이 붙을 때 한 번)
+    const a=b.querySelector('.art');if(!a||a.firstChild)return;
+    if(!shape[i]){try{shape[i]=trackShapeD(i,120,80,6);}catch(e){shape[i]=null;}}
+    const sh=shape[i];
+    const im=document.createElement('img');im.alt='';im.draggable=false;im.decoding='async';
+    im.src=url(i,false);im.srcset=url(i,false)+' 1x, '+url(i,true)+' 2x';
+    a.appendChild(im);
+    if(sh){const sv=document.createElementNS(NS,'svg');sv.setAttribute('viewBox','0 0 120 80');sv.setAttribute('preserveAspectRatio','xMaxYMid meet');
+      sv.innerHTML='<path class="o" d="'+sh.d+'"/><path class="l" d="'+sh.d+'"/><circle cx="'+sh.sx+'" cy="'+sh.sy+'" r="3.2"/>';a.appendChild(sv);}
+    const lk=document.createElement('span');lk.className='lock';
+    lk.innerHTML='<svg width="12" height="13" viewBox="0 0 12 13" aria-hidden="true"><rect x="1" y="5.5" width="10" height="7" rx="1.6" fill="#fff2d8"/><path d="M3.3 5.5V4a2.7 2.7 0 0 1 5.4 0v1.5" fill="none" stroke="#fff2d8" stroke-width="1.8"/></svg>';
+    a.appendChild(lk);
+  }
+  function load(b,i){
+    if(bad[i]||b.dataset.art)return;b.dataset.art='1';
+    if(ok[i]){deco(b,i);b.classList.add('art');return;} // 이미 받은 그림 — 바로
+    busy++;
+    const pre=new Image();pre.decoding='async';let done=false;
+    const fin=good=>{if(done)return;done=true;busy--;clearTimeout(to);
+      if(good){ok[i]=1;for(const c of cards)if(c.i===i&&c.b.isConnected){deco(c.b,i);c.b.classList.add('art');}}
+      else bad[i]=1;
+      pump();};
+    const to=setTimeout(()=>fin(false),8000);
+    pre.onload=()=>{const go=()=>fin(pre.naturalWidth>0);if(pre.decode)pre.decode().then(go,go);else go();};
+    pre.onerror=()=>fin(false);
+    // 화면 배율에 맞는 한 장만(2배 화면은 2배 그림)
+    pre.src=url(i,(window.devicePixelRatio||1)>=1.5);
+  }
+  const vis=new Set();
+  function pump(){ // 한 번에 두 장까지 — 보이는 카드부터
+    if(!ready)return;
+    for(const c of cards){if(busy>=2)return;if(vis.has(c.b)&&c.b.isConnected&&!c.b.dataset.art)load(c.b,c.i);}
+  }
+  function start(){ready=true;pump();}
+  // 첫 그리기 · 3D 준비가 끝난 뒤 쉬는 틈에 시작
+  const kick=()=>{const f=()=>setTimeout(start,250);if(window.requestIdleCallback)requestIdleCallback(f,{timeout:1500});else f();};
+  if(document.readyState==='complete')kick();else addEventListener('load',kick,{once:true});
+  return {
+    attach(b,i){for(let k=cards.length-1;k>=0;k--)if(!cards[k].b.isConnected)cards.splice(k,1);cards.push({b:b,i:i});if(ok[i]){b.dataset.art='1';deco(b,i);b.classList.add('art');}},
+    watch(el){
+      if(!('IntersectionObserver' in window)){for(const c of cards)vis.add(c.b);pump();return;}
+      if(!io)io=new IntersectionObserver(es=>{for(const e of es){if(e.isIntersecting)vis.add(e.target);else vis.delete(e.target);}pump();},{root:el,rootMargin:'0px 260px 0px 260px'});
+      for(const c of cards)if(c.b.parentNode===el)io.observe(c.b);
+    },
+    state(){return {ok:Object.keys(ok).map(Number),bad:Object.keys(bad).map(Number),busy:busy,ready:ready};}
+  };
+})();
 /* PC — 트랙 칸을 마우스로 잡아 끌어 옆으로 넘긴다(휴대폰은 원래 손가락으로 밀림). 끌었으면 손을 뗄 때 칸이 눌리지 않게, 휠도 옆으로 */
 (function(){
   const el=$('trackList');let d=null;
@@ -3057,7 +3793,7 @@ window.addEventListener('keydown',e=>{
   if(racing&&(k==='arrowup'||k==='arrowdown'||k==='arrowleft'||k==='arrowright'||k===' '))e.preventDefault();
   input.keys[k]=true;
   if(e.repeat)return;
-  if((k==='e'||k==='shift'||k==='1'||k==='2'||k==='3')&&racing){e.preventDefault();itemPress(k==='e'||k==='shift'?-1:+k-1);return;} // 아이템 쓰기 — E · Shift = 차 있는 가장 낮은 칸, 1 · 2 · 3 = 그 칸(달리기 ↑ · W · 스페이스, 방향 ← → · A · D 와 안 겹침)
+  if((k==='e'||k==='shift'||k==='1'||k==='2'||k==='3')&&racing){e.preventDefault();itemPress(k==='e'||k==='shift'?-1:+k-1);return;} // 아이템 쓰기 — E · Shift = 지금 쓸 수 있는 가장 앞 칸(slotPick), 1 · 2 · 3 = 그 칸(달리기 ↑ · W · 스페이스, 방향 ← → · A · D 와 안 겹침)
   if(k==='escape'&&ARC&&inFrame){e.preventDefault();if(racing)hk({type:'hk:esc'});return;} // 창 안 Esc 는 헬스키퍼가 멈춤/이어 하기를 정한다
   if(VS.on){if(k==='escape'||k==='p'){e.preventDefault();vsPost({type:'vs:esc'});}return;} // 대전 — 멈춤 · 그만하기는 바깥 화면이 정한다
   if(k==='p'||k==='escape')togglePause();
@@ -3131,8 +3867,8 @@ function update(dt){
   for(let i=fx.length-1;i>=0;i--){
     const f=fx[i];f.t+=dt;
     const k=f.t/f.d;
-    if(k>=1){scene.remove(f.m);f.m.material.dispose();if(f.bolt)f.m.geometry.dispose();fx.splice(i,1);continue;}
-    if(f.bolt)f.m.material.opacity=(1-k)*(Math.random()<.35?.35:1);else{f.m.scale.setScalar(2+17*k);f.m.material.opacity=1-k;}
+    if(k>=1){scene.remove(f.m);f.m.material.dispose();fx.splice(i,1);continue;}
+    f.m.scale.setScalar(2+17*k);f.m.material.opacity=1-k; // 충격파 고리(ringFx)만 남음
   }
   stepRings(dt);
   stepParticles(dt);
@@ -3273,9 +4009,9 @@ function gfxWork(ms){
 const warmGrp=new THREE.Group();warmGrp.visible=false;scene.add(warmGrp);
 (function(){
   const add=m=>{const o=new THREE.Mesh(G.plane,m);o.frustumCulled=false;warmGrp.add(o);};
-  add(new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})); // 번개(boltFx)
   add(new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:1,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})); // 충격파 고리(ringFx)
   add(new THREE.MeshBasicMaterial({map:TEX.target,color:0xff4d3a,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthWrite:false})); // 별똥별 과녁(renderObjs)
+  {const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:TEX.target,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));sp.frustumCulled=false;warmGrp.add(sp);} // 머리 위 표시(markOver)
 })();
 function gfxPrecompile(){
   const t0=performance.now();
@@ -3510,13 +4246,45 @@ try{if(hot&&hot.snapshot)hot.snapshot(()=>({save:JSON.parse(JSON.stringify(save)
 function vsPost(m){if(inFrame){try{window.parent.postMessage(m,HK);}catch(e){}}}
 const r1=x=>Math.round(x*10)/10,r2=x=>Math.round(x*100)/100,r3=x=>Math.round(x*1000)/1000;
 const VS_LIMIT=300,VS_SNAP_MS=66,VS_START=31,VS_MAX=6;
+/* 아이템 0b — 판본. 손님 본체는 vs:in 에 v:VS_IV 를, host 는 스냅숏 d 에 iv:VS_IV 를 싣는다(바깥은 그대로 통과).
+   v 없이 u 가 실린 입력이 오면 「옛 화면」 손님 → host 는 그 차에 처음 13종(ITEM_OLD_N)만 뽑아 준다(모르는 아이템으로 칸이 막히지 않게) */
+const VS_IV=2,ITEM_OLD_N=13;
+/* 물체 코드(스냅숏 ob 행 [코드, s, u, v, h, x1, x2]) — x1 · x2 는 추적 물체(w · f · y · u)의 대상 차 번호 등. 예전 손님은 모르는 코드를 걸러 낸다 */
+const OB_CODE={popcorn:'p',candy:'c',wind:'w',firework:'f',meteor:'m',balloon:'b',ribbon:'y',mask:'u',jack:'j',confetti:'e',lock:'k'};
+const OB_KEY={};for(const k in OB_CODE)OB_KEY[OB_CODE[k]]=k;
 const vsGrace=()=>cars.length>=3?20:12; // 누구든 처음 들어온 뒤 기다리는 시간
 const VS_LEVEL={easy:39,normal:42.5,hard:45.5};
 VS.on=VSM;Object.assign(VS,{role:'solo',me:0,track:0,rids:['bunny','fox'],names:['나','상대'],bots:[1],humans:1,level:'normal',e:0,remote:{},evq:[],snaps:[],seq:0,
-  lastSnap:0,ended:false,endT:0,firstT:0,freeze:{},hold:0,rtt:120,off:null,offFz:false,jit:20,rT:null,lastL:null,evd:[],ih:[],useN:0,useK:'',useU:{},gobjs:[],gtau:0,avatars:[],autoIn:{accel:false,steer:0},lastIn:null,lastInT:0,err:[],shown:-1,stale:false,auto:false,keys:{}});
+  lastSnap:0,ended:false,endT:0,firstT:0,freeze:{},hold:0,rtt:120,off:null,offFz:false,jit:20,rT:null,lastL:null,evd:[],ih:[],useN:0,useK:'',useU:{},gobjs:[],gtau:0,avatars:[],autoIn:{accel:false,steer:0},lastIn:null,lastInT:0,err:[],shown:-1,stale:false,auto:false,keys:{},oldNote:{},hostOld:false});
 const DEVHOST=/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)||/\.(test|localhost)$/.test(location.hostname);
+/* 개발 주소 ?dev=items(이 창 또는 감싼 바깥 화면, 개발 주소만) — 그룹 6개 × 1만 번 뽑기 분포를 콘솔 표로, 아이템 강제 지급 단추(내 차의 가장 낮은 빈 칸, 꽉 차면 1번 칸) */
+const DEV_ITEMS=DEVHOST&&(()=>{const q=/[?&]dev=items(&|$)/;try{if(q.test(location.search))return true;}catch(e){}try{if(window.parent!==window&&q.test(window.parent.location.search))return true;}catch(e){}return false;})();
+function devItemsDist(n,ctx){
+  n=n||10000;const G=['G1','G2','G3','G4','A','B'],cnt={},exp={};
+  for(const g of G){const t=rollTable(g,ctx||{});for(const k in t){(exp[k]=exp[k]||{})[g]=t[k];}for(let i=0;i<n;i++){const k=rollPick(t);(cnt[k]=cnt[k]||{})[g]=((cnt[k]||{})[g]||0)+1;}}
+  const rows={};
+  for(const k of ITEM_KEYS){const r={};for(const g of G){const m=((cnt[k]||{})[g]||0)/n*100,e=((exp[k]||{})[g]||0)*100;r[g]=m.toFixed(1)+' ('+e.toFixed(1)+')';}rows[ITEM[k].n]=r;}
+  return {rows:rows,cnt:cnt,exp:exp,n:n};
+}
+if(DEV_ITEMS){
+  setTimeout(()=>{const r=devItemsDist(10000);console.log('[dev=items] 뽑기 1만 번 × 그룹 6 — 잰 값 %(표 값 %) · 보정 없음');console.table(r.rows);},0);
+  const box=document.createElement('div');
+  box.style.cssText='position:fixed;right:6px;top:170px;z-index:99;display:flex;flex-wrap:wrap;gap:3px;width:150px;padding:4px;background:rgba(20,10,30,.75);border-radius:8px';
+  for(const k of ITEM_KEYS){
+    const b=document.createElement('button');b.type='button';b.tabIndex=-1;b.title=ITEM[k].n;b.textContent=ITEM[k].ic;b.dataset.devItem=k;
+    b.style.cssText='width:32px;height:30px;font-size:17px;border:0;border-radius:6px;background:#fff3;cursor:pointer;padding:0';
+    b.addEventListener('pointerdown',e=>{e.stopPropagation();});
+    b.addEventListener('click',e=>{e.stopPropagation();const c=player;if(!c)return;const i=slotFree(c);c.slots[i<0?0:i]=k;c.lastGot=k;b.blur();});
+    box.appendChild(b);
+  }
+  document.body.appendChild(box);
+}
 if(VSM&&DEVHOST)window.__sdv={VS:VS,game:game,get cars(){return cars;}};
-if(DEVHOST)window.__sdx={get cars(){return cars;},get player(){return player;},get track(){return track;},get objs(){return objs;},game:game,useItem:(c,i)=>useItem(c,i),stepObjs:dt=>stepObjs(dt),blast:c=>blast(c),lapD:(a,b)=>lapD(track,a,b),get pFrameMax(){return pFrameMax;},set pFrameMax(v){pFrameMax=v;},ringPool:ringPool,vsEv:vsEv,vsSnapFit:d=>vsSnapFit(d),vsSnapLen:d=>vsSnapLen(d),aiItems:(c,dt)=>aiItems(c,dt),ringFx:(p,q,col)=>ringFx(p,q,col),hit:(c,k)=>hit(c,k),get VS(){return VS;}}; // 시험(개발 주소만) — 아이템 판정 · 파티클 계수기 확인용
+if(DEVHOST)window.__sdx={get cars(){return cars;},get player(){return player;},get track(){return track;},get objs(){return objs;},game:game,trackArt:trackArt,trackShapeD:trackShapeD,useItem:(c,i)=>useItem(c,i),stepObjs:dt=>stepObjs(dt),blast:c=>blast(c),lapD:(a,b)=>lapD(track,a,b),get pFrameMax(){return pFrameMax;},set pFrameMax(v){pFrameMax=v;},ringPool:ringPool,vsEv:vsEv,vsSnapFit:d=>vsSnapFit(d),vsSnapLen:d=>vsSnapLen(d),aiItems:(c,dt)=>aiItems(c,dt),ringFx:(p,q,col)=>ringFx(p,q,col),hit:(c,k)=>hit(c,k),get VS(){return VS;},
+  addObj:o=>addObj(o),wet:o=>wet(o),zap:o=>zap(o),ccSum:c=>ccSum(c),stepCar:(c,dt,inp)=>stepCar(c,dt,inp),vsPredict:(b,tau,a,s)=>vsPredict(b,tau,a,s),vsSnap:f=>vsSnap(f),effPack:c=>effPack(c),
+  slotPick:c=>slotPick(c),trapPut:(c,k)=>trapPut(c,k),trapSafeS:s=>trapSafeS(s),trapZoneAt:s=>trapZoneAt(s),jackHit:c=>jackHit(c),blindHit:c=>blindHit(c),blindTick:dt=>blindTick(dt),BLIND:BLIND,aiWants:(c,k)=>aiWants(c,k,null),get hazards(){return hazards;},itemPress:i=>itemPress(i),accMul:(c,b)=>accMul(c,c.st,b),slowMul:c=>slowMul(c),effSteer:(c,s)=>effSteer(c,s),warnPush:(e,b,s)=>warnPush(e,b,s),WARN:WARN,OB_CODE:OB_CODE,rollItem:c=>rollItem(c),VS_IV:VS_IV,rollTable:(g,x)=>rollTable(g,x),rollGroup:(p,n)=>rollGroup(p,n),rollCtx:c=>rollCtx(c),rollItem:c=>rollItem(c),rollPick:(t,r)=>rollPick(t,r),ROLL_TAB:ROLL_TAB,rollUsed:k=>rollUsed(k),devItemsDist:(n,x)=>devItemsDist(n,x),gainItem:c=>gainItem(c),ITEM:ITEM,ITEM_KEYS:ITEM_KEYS,
+  magnetPull:(c,dt)=>magnetPull(c,dt),fwTarget:c=>fwTarget(c),markPool:markPool,sprPool:sprPool,warnTick:dt=>warnTick(dt),ICON:ICON,itemUsable:(c,k)=>itemUsable(c,k),
+  springUse:c=>springUse(c),aiSpring:c=>aiSpring(c),itemBlock:(c,k)=>itemBlock(c,k),tickSlots:dt=>tickSlots(dt)}; // 시험(개발 주소만) — 아이템 판정 · 파티클 계수기 확인용
 const VS_EVQ=48,VS_EV_DECO={trick:1,drift:1,bump:1,pad:1,get:1}; // 꾸밈 이벤트 — 큐가 차면 이것부터 밀어낸다(맞음 · 방패 · 결승 같은 중요한 일은 남김)
 function vsEv(k,c,a){
   if(!VS.on||VS.role!=='host')return;
@@ -3601,7 +4369,7 @@ function vsSetup(o){
   VS.level=VS_LEVEL[o.level]?o.level:'normal';
   VS.e=Number(o.e)||0;VS.auto=!!o.auto&&DEVHOST;game.auto=VS.auto;
   if(typeof o.mute==='boolean'){save.mute=o.mute;Snd.setMute(save.mute);}
-  Object.assign(VS,{snaps:[],seq:0,evq:[],off:null,offFz:false,jit:20,rT:null,lastL:null,evd:[],ih:[],ended:false,endT:0,firstT:0,freeze:{},hold:0,err:[],shown:-1,stale:false,remote:{},lastIn:null,result:null,useN:0,useK:'',useU:{},gobjs:[],gtau:0});
+  Object.assign(VS,{snaps:[],seq:0,evq:[],off:null,offFz:false,jit:20,rT:null,lastL:null,evd:[],ih:[],ended:false,endT:0,firstT:0,freeze:{},hold:0,err:[],shown:-1,stale:false,remote:{},lastIn:null,result:null,useN:0,useK:'',useU:{},gobjs:[],gtau:0,oldNote:{},hostOld:false});
   game.paused=false;show('pause',false);$('hint').hidden=true;game.hintT=0;
   loadTrack(VS.track);vsCars();resetRace();
   setState('vswait');
@@ -3656,12 +4424,11 @@ function vsSnap(force){
   if(!force&&now-VS.lastSnap<VS_SNAP_MS)return;
   VS.lastSnap=force||now-VS.lastSnap>2*VS_SNAP_MS?now:VS.lastSnap+VS_SNAP_MS; // 남는 시간을 넘겨 화면 빠르기와 상관없이 고르게(초당 15번)
   const cs=cars.map(c=>[r1(c.s),r2(c.u),r2(c.h),r1(c.v),r1(c.uVel),c.air?1:0,r1(c.vy),r2(Math.max(0,c.spinout)),r2(c.spinoutMax),r2(Math.max(0,c.boostT)),r1(Math.max(0,c.shield)),r1(Math.max(0,c.armed)),
-    r2(c.driftT),c.driftDir,c.spinning?r2(c.spinP):-1,c.spinDir,r2(c.squash),r2(Math.max(0,c.invuln)),c.finished?r2(c.finishT):-1,r2(c.lastSteer||0),c.lastAccel?1:0,c.spins|0,r2(Math.max(0,c.slowT)),r2(Math.max(0,c.starT)),slotsCode(c),r1(Math.max(0,c.magT)),r1(Math.max(0,c.ghostT||0))]);
+    r2(c.driftT),c.driftDir,c.spinning?r2(c.spinP):-1,c.spinDir,r2(c.squash),r2(Math.max(0,c.invuln)),c.finished?r2(c.finishT):-1,r2(c.lastSteer||0),c.lastAccel?1:0,c.spins|0,r2(Math.max(0,c.slowT)),r2(Math.max(0,c.starT)),slotsCode(c),r1(Math.max(0,c.magT)),r1(Math.max(0,c.ghostT||0)),effPack(c),c.thS>0?r2(c.thS):0]);
   let it='';for(const x of items)it+=x.on?'1':'0';
   const ph=PH[game.state];if(ph===undefined)return;
-  const OK={popcorn:'p',candy:'c',wind:'w',firework:'f',meteor:'m'};
-  const ob=objs.map(o=>[OK[o.k]||'w',r1(o.s),r2(o.u),r1(o.k==='candy'||o.k==='meteor'?0:o.v),r1(o.h)]);
-  const d={e:VS.e,ph:ph,cd:r2(game.countdown),t:r2(game.time),rt:r2(game.raceTime),c:cs,it:it,ob:ob,fz:game.paused?1:0,ho:r2(VS.hold),ev:VS.evq};
+  const ob=objs.map(o=>{const r=[OB_CODE[o.k]||'w',r1(o.s),r2(o.u),r1(OBJ_TRAP[o.k]||o.k==='meteor'?0:o.v),r1(o.h)];const x1=o.tgt?o.tgt.id:o.x1,x2=o.k==='lock'?r2(Math.max(0,o.t)):o.x2;if(x1!==undefined){r.push(x1);if(x2!==undefined)r.push(x2);}return r;}); // 잠금 표시(k)는 x2 = 남은 초
+  const d={iv:VS_IV,e:VS.e,ph:ph,cd:r2(game.countdown),t:r2(game.time),rt:r2(game.raceTime),c:cs,it:it,ob:ob,fz:game.paused?1:0,ho:r2(VS.hold),ev:VS.evq};
   VS.evq=[];
   vsSnapFit(d);
   vsPost({type:'vs:snap',d:d});
@@ -3675,7 +4442,7 @@ function vsSnapFit(d){
   d.ev=d.ev.filter(e=>!VS_EV_DECO[e[0]]);
   if(vsSnapLen(d)<=VS_SNAP_CAP)return;
   const hum=cars.filter(c=>!c.bot&&!c.finished);
-  if(hum.length&&track){const keep=[];for(let i=0;i<d.ob.length;i++){const o=objs[i],r=d.ob[i];if(o&&o.k==='candy'&&hum.every(c=>Math.abs(lapD(track,o.s,c.s))>200))continue;keep.push(r);}d.ob=keep;}
+  if(hum.length&&track){const keep=[];for(let i=0;i<d.ob.length;i++){const o=objs[i],r=d.ob[i];if(o&&OBJ_TRAP[o.k]&&hum.every(c=>Math.abs(lapD(track,o.s,c.s))>200))continue;keep.push(r);}d.ob=keep;}
   while(vsSnapLen(d)>VS_SNAP_CAP&&d.ev.length){
     const h=d.ev.length>>1,rest=d.ev.slice(h);d.ev=d.ev.slice(0,h);
     VS.evq=rest.concat(VS.evq);if(VS.evq.length>VS_EVQ)VS.evq.length=VS_EVQ; // 넘긴 이벤트가 먼저(순서 유지) — 큐 상한 안에서
@@ -3687,6 +4454,9 @@ const _PS=mkS(),VST=baseStats();
 function vsPredict(b,tau,acc,steer,cst,H,t0){
   let s=b[0],u=b[1],v=b[3],uv=b[4],sp=b[7],bo=b[9];
   const air=b[5]===1,st=cst||VST,half=Math.PI*TUBE_R;
+  // 아이템 0b — 효과 묶음(27) · 축포 조향(28)도 남은 초를 줄여 가며 적용(가속은 큰 것 하나, 감속은 가장 센 것 하나 — stepCar 와 같은 규칙)
+  const E=Array.isArray(b[27])?b[27]:null;
+  let sl=+b[22]||0,tie=E?+E[0]||0:0,rev=E?+E[1]||0:0,rvW=E?+E[2]||0:0,mk=E?+E[3]||0:0,mkW=E?+E[4]||0:0,pw=E?+E[6]||0:0,al=E?+E[7]||0:0,ths=+b[28]||0;
   let left=Math.min(.8,Math.max(0,tau)),el=0,hi=0;
   while(left>1e-4){
     const dt=Math.min(1/60,left);left-=dt;
@@ -3695,8 +4465,11 @@ function vsPredict(b,tau,acc,steer,cst,H,t0){
     surf(track,s,u,0,_PS);
     const k=_PS.k,inTube=(_PS.fl&F_TUBE)!==0;
     let stv=steer;const belt=!air&&(_PS.fl&F_BELT)!==0;
+    if(sp<=0){if(al>0)stv=0;else{if(rev>0&&rvW<=0)stv=-stv;if(tie>0)stv*=.5;if(ths>0)stv*=.6;}}
+    const sm=Math.min(sl>0?.62:1,mk>0&&mkW<=0?.65:1,tie>0?.3:1),am=Math.max(bo>0?st.boostMul:1,pw>0?PW_TOP:1);
+    if(sl>0)sl-=dt;if(tie>0)tie-=dt;if(rvW>0)rvW-=dt;else if(rev>0)rev-=dt;if(mkW>0)mkW-=dt;else if(mk>0)mk-=dt;if(pw>0)pw-=dt;if(al>0)al-=dt;if(ths>0)ths-=dt;
     if(sp>0){sp-=dt;stv=0;v+=(st.vmax*.28-v)*Math.min(1,3*dt);}
-    else if(acc){const top=(bo>0?st.vmax*st.boostMul:st.vmax)*(belt?BELT_TOP:1)*(b[22]>0?.62:1);if(v<top)v=Math.min(top,v+(bo>0?st.acc*2.8:st.acc)*(belt?1.6:1)*dt);else v+=(top-v)*Math.min(1,1.4*dt);}
+    else if(acc){const top=st.vmax*am*(belt?BELT_TOP:1)*sm;if(v<top)v=Math.min(top,v+(bo>0?st.acc*2.8:pw>0?st.acc*PW_ACC:st.acc)*(belt?1.6:1)*dt);else v+=(top-v)*Math.min(1,1.4*dt);}
     else v+=((belt?st.vmax*.85:6)-v)*Math.min(1,1.25*dt);
     if(bo>0)bo-=dt;
     let tgt=stv*st.hand;
@@ -3842,13 +4615,16 @@ function vsGuestStep(dt){
     const fin=b[18]>=0;
     c.finished=fin;c.finishT=fin?b[18]:0;c.lastSteer=mine&&!fin?vsMineIn(b,fin,L.ph)[1]:b[19];c.spins=b[21];
     c.slowT=Math.max(0,(b[22]||0)-tau);c.starT=Math.max(0,(b[23]||0)-tau);c.slots=slotsFrom(b[24]);c.magT=Math.max(0,(b[25]||0)-tau);c.ghostT=Math.max(0,(b[26]||0)-tau);
+    effUnpack(c,L.iv>=VS_IV&&Array.isArray(b[27])?b[27]:null,L.iv>=VS_IV?b[28]:0,tau); // 새 판 host 만 27 · 28번이 있다
   }
   // 순위 — 들어온 차는 들어온 순서, 아니면 앞선 차
   const arr=cars.slice().sort((a,b)=>(a.finished&&b.finished)?a.finishT-b.finishT:a.finished?-1:b.finished?1:b.s-a.s);
   for(let i=0;i<arr.length;i++)arr[i].place=i+1;
   // 던진 것 · 함정 — host 가 알려 준 자리(움직이는 것은 지난 시간만큼 앞으로)
-  const KO={p:'popcorn',c:'candy',w:'wind',f:'firework',m:'meteor'};VS.gtau=frozen?0:Math.min(.4,age);
-  VS.gobjs=Array.isArray(L.ob)?L.ob.filter(o=>Array.isArray(o)&&KO[o[0]]).slice(0,24).map(o=>({k:KO[o[0]],s:+o[1]||0,u:+o[2]||0,v:+o[3]||0,h:o[4]!==undefined?+o[4]||0:o[0]==='c'?.15:o[0]==='p'?1.2:1.6})):[];
+  VS.gtau=frozen?0:Math.min(.4,age);
+  VS.gobjs=Array.isArray(L.ob)?L.ob.filter(o=>Array.isArray(o)&&OB_KEY[o[0]]).slice(0,OBJ_MAX).map(o=>({k:OB_KEY[o[0]],s:+o[1]||0,u:+o[2]||0,v:+o[3]||0,h:o[4]!==undefined?+o[4]||0:o[0]==='c'?.15:o[0]==='p'?1.2:1.6,
+    tg:Number.isInteger(o[5])?o[5]:-1,x1:o[5],x2:o[6]})):[];
+  if(newSnap&&L.iv===undefined&&!VS.hostOld&&L.ph===1){VS.hostOld=true;if(ITEM_KEYS.length>ITEM_OLD_N)toast('상대 화면이 옛 판이에요');} // 옛 host — 새 칸은 없다(경주는 그대로)
   if(L.it&&L.it.length===items.length){
     for(let i=0;i<items.length;i++){const on=L.it.charCodeAt(i)===49;if(items[i].on!==on){items[i].on=on;items[i].grp.visible=on;}}
   }
@@ -3859,17 +4635,19 @@ function vsPlayEv(ev){
   const k=ev[0],c=cars[ev[1]],a=ev[2];
   if(!c||!track)return;
   const mine=c===player,far=!mine&&fxFar(c.s);
-  if(far&&k!=='fin'&&k!=='steal'&&k!=='stole'&&k!=='boom'&&k!=='bump')return; // 내 차에서 먼 일은 파티클 · 고리 · 소리 생략(상태는 스냅숏으로 맞음)
+  if(far&&k!=='fin'&&k!=='steal'&&k!=='stole'&&k!=='boom'&&k!=='bump'&&k!=='splat'&&k!=='fw')return; // 내 차에서 먼 일은 파티클 · 고리 · 소리 생략(상태는 스냅숏으로 맞음)
   surf(track,c.s,c.u,1+c.h,S1);
   if(k==='hit'){burst(S1.pos,16,[0xffc533,0xff4192,0xfff2d8],11,.55,14);kindFx(a,S1.pos);if(mine){game.shake=1;Snd.hit();toast(HIT_TXT[a]||HIT_TXT.blast);}}
-  else if(k==='shd'){burst(S1.pos,18,0x48e4ff,9,.5,6);if(mine){toast('방패가 막아 줬어요');Snd.pop();}}
+  else if(k==='shd'){burst(S1.pos,18,0x48e4ff,9,.5,6);if(mine){toast('비눗방울이 막아 줬어요');Snd.pop();}}
   else if(k==='get'){burst(S1.pos,10,ITEM_COL.box,7,.4,4);if(mine)Snd.pickup();}
-  else if(k==='zap'){boltFx(S1.pos);if(mine&&c.invuln<=0&&c.shield<=0){toast('번개에 맞아 느려졌어요!');Snd.hit();game.shake=Math.max(game.shake,.7);}}
+  else if(k==='zap'){skyBurstFx(S1.pos);if(mine&&c.invuln<=0&&c.shield<=0){toast('하늘 축포에 맞아 느려졌어요!');Snd.hit();game.shake=Math.max(game.shake,.7);}}
   else if(k==='boom'){if(Array.isArray(a)&&!fxFar(+a[0]||0)){surf(track,+a[0]||0,+a[1]||0,.4,S1);meteorFx(S1.pos);if(Math.abs(lapD(track,+a[0]||0,player.s))<80)Snd.blast();}}
-  else if(k==='steal'){if(mine)toast('유령이 아이템을 훔쳐 갔어요!');}
-  else if(k==='stole'){if(mine&&ITEM[a])toast(ITEM[a].ic+' '+ITEM[a].n+'을(를) 훔쳤어요!');}
-  else if(k==='use'){if(ITEM[a]){burst(S1.pos,14,ITEM[a].col,8,.45,4);if(mine){toast(ITEM[a].n+'!');if(a==='rocket'||a==='star'||a==='wind'||a==='firework'||a==='ghost'||a==='meteor')Snd.boost();else if(a==='thunder')Snd.blast();else Snd.pickup();}}}
-  else if(k==='wet'){burst(S1.pos,22,[0x48a8ff,0xcff4ff],9,.55,10);if(mine){toast('물풍선에 젖었어요!');Snd.pop();game.shake=Math.max(game.shake,.4);}}
+  else if(k==='steal'){if(mine){if(Array.isArray(a))stolenNote(a[0],a[1]|0);else stolenNote(a,-1);}} // 새 host 는 [키, 칸], 옛 host 는 키만
+  else if(k==='stole'){if(mine&&ITEM[a])toast(ITEM[a].ic+' '+ITEM[a].n+'을(를) 가져왔어요!');}
+  else if(k==='use'){if(ITEM[a]){burst(S1.pos,14,ITEM[a].col,8,.45,4);if(mine){if(a!=='spring')toast(ITEM[a].n+'!');if(a==='rocket'||a==='star'||a==='wind'||a==='ghost'||a==='meteor')Snd.boost();else if(a==='thunder')Snd.blast();else if(a==='firework')Snd.beep(false);else if(a==='balloon')Snd.fly();else if(a==='pinwheel')Snd.breeze();else if(a==='jack'||a==='confetti')Snd.pop();else if(a==='spring'){}else if(a!=='blast')Snd.pickup();}}}
+  else if(k==='wet'){const w=a==='w';burst(S1.pos,22,w?[0xb98cff,0xfff2d8]:[0xff4d6e,0xff9fb8,0xfff2d8],9,.55,10);if(mine){toast(SLOW_TXT[w?'w':'jam']);Snd.pop();game.shake=Math.max(game.shake,.4);}}
+  else if(k==='arm'){Snd.swell();} // 범퍼 폭발 예고(부풀기는 스냅숏 armed 로)
+  else if(k==='mcut'){Snd.ting();}
   else if(k==='blast'){ringFx(c.root.position,c.root.quaternion,0xff4192);Snd.blast();if(mine)toast('범퍼 폭발!');else game.shake=Math.max(game.shake,.5);}
   else if(k==='trick'){if(mine){const tk=2*(a|0);toast((a|0)>1?'회전 ×'+a:'회전!');void tk;Snd.trick();}burst(S1.pos,8,0xfff2d8,6,.35,8);}
   else if(k==='drift'){if(mine&&a>=1&&a<=3){toast(['','드리프트 부스트','슈퍼 드리프트','메가 드리프트'][a]);Snd.drift(a);Snd.boost();}}
@@ -3881,6 +4659,16 @@ function vsPlayEv(ev){
     _v1.copy(c.root.position).add(o.root.position).multiplyScalar(.5);_v1.y+=.8;burst(_v1,6,0xfff2d8,6,.3,6);
   }
   else if(k==='pad'){if(mine)Snd.boost();}
+  // 아이템 0b — 새 이벤트 틀(뒤 단계 아이템이 쓴다. 예전 손님은 모르는 종류를 지나친다). 상태는 스냅숏이 정답, 이벤트는 소리 · 불꽃 · 알림만
+  else if(k==='nouse'){if(mine){const ix=a|0,kk=player.slots[ix];slotNo(ix,kk?noUseTxt(kk,player.spinout>0?'spin':player.tieT>0?'tie':player.airLock>0?'air':itemUsable(player,kk)?'':'tgt'):'');}}
+  else if(k==='lite'){burst(S1.pos,8,[0xa5e02b,0xfff2d8],8,.4,8);if(mine){Snd.bump();game.shake=Math.max(game.shake,.35);toast('살짝 맞았어요 — 연속 보호 중');}}
+  else if(k==='lock'){if(mine)Snd.lock();}
+  else if(k==='cure'){burst(S1.pos,18,[0x6ee38a,0xfff2d8,0xff5a5a],10,.5,10);if(mine){toast(a<0?'통! 튀어 올라요':(a|0)>0?'스프링으로 털어 냈어요!':'스프링!');Snd.boing();}else if(nearPlayer(c,60))Snd.boing();} // 스프링 — 값: 뗀 개수(0 = 늦게 온 끊기), -1 = 통 튀기(공중은 스냅숏)
+  else if(k==='jack'){burst(S1.pos,26,[0xa77bff,0x5ee6c8,0xfff27a,0xff4d6e],12,.6,14);ringFx(S1.pos,_qI,0xa77bff);if(mine){toast('깜짝 광대 북에 튕겼어요!');Snd.jack();game.shake=Math.max(game.shake,.6);}else if(nearPlayer(c,60))Snd.jack();}
+  else if(k==='blind'){burst(S1.pos,30,[0xff4192,0x48e4ff,0xfff27a,0xa5e02b,0xff8a3c,0xc9a8ff],11,.8,6);if(mine){toast('색종이에 가려요! 미니맵을 봐요');Snd.confetti();}} // 덮개는 스냅숏 blindT 로
+  else if(k==='tie'||k==='untie'||k==='rev'||k==='mask'||k==='unmask'){burst(S1.pos,12,[0xff7ac0,0xc9a8ff,0xfff2d8],8,.45,6);if(mine)Snd.pop();}
+  else if(k==='fw'){if(Array.isArray(a)&&a.indexOf(VS.me)>=0)Snd.whistle();else if(!far)Snd.blast();if(!far){surf(track,c.s,c.u,3,S1);burst(S1.pos,18,[0xffc533,0xfff2d8],10,.6,-4);}}
+  else if(k==='splat'){if(Array.isArray(a)&&!fxFar(+a[0]||0)){surf(track,+a[0]||0,+a[1]||0,.4,S1);burst(S1.pos,24,[0xff4d6e,0xff9fb8,0xfff2d8],10,.55,10);ringFx(S1.pos,_qI,0xff5a8a);if(Math.abs(lapD(track,+a[0]||0,player.s))<60)Snd.splat();}}
   else if(k==='fin'){
     if(mine){toast(a===1?'1등으로 들어왔어요!':a+'등으로 들어왔어요');Snd.fanfare(a===1);surf(track,c.s,c.u,3,S1);burst(S1.pos,a===1?90:30,[0xff4192,0xffc533,0x48e4ff,0xfff2d8,0xa5e02b],16,1.8,14);}
     else if(a===1)toast(vsFirstTxt(c));
@@ -3930,7 +4718,7 @@ function vsTick(dt){
     const now=performance.now(),ac=a?1:0,sv=r2(clamp(s,-1,1)),P=VS.lastIn||{a:-1,s:9};
     // u = 아이템 쓰기를 누른 누적 횟수 — 모든 vs:in 에 함께 실어 한 번 잃어버려도 다음 소식에서 맞춰진다(host 는 늘어난 만큼만 쓴다)
     // k = 최근 누른 칸 번호들(0 = 1번 칸, 최대 4글자, 마지막 글자가 가장 최근) — u 가 늘어난 만큼 뒤에서부터 읽는다
-    if(ac!==P.a||(Math.abs(sv-P.s)>.04&&now-VS.lastInT>=100)||now-VS.lastInT>300||VS.useN!==P.u){VS.lastIn={a:ac,s:sv,u:VS.useN};VS.lastInT=now;vsPost({type:'vs:in',a:ac,s:sv,u:VS.useN,k:VS.useK});}
+    if(ac!==P.a||(Math.abs(sv-P.s)>.04&&now-VS.lastInT>=100)||now-VS.lastInT>300||VS.useN!==P.u){VS.lastIn={a:ac,s:sv,u:VS.useN};VS.lastInT=now;vsPost({type:'vs:in',a:ac,s:sv,u:VS.useN,k:VS.useK,v:VS_IV});}
     const L=VS.snaps[VS.snaps.length-1],stale=!L||now-L.recv>1200;
     if(stale!==VS.stale){VS.stale=stale;if(stale)hint('상대 연결을 기다리는 중이에요',60);else{$('hint').hidden=true;game.hintT=0;}}
   }
@@ -3950,11 +4738,14 @@ if(VS.on){
       const i=d.i===undefined||d.i===null?1:Number(d.i),c=Number.isInteger(i)?cars[i]:null;
       if(!c||!c.remote)return;
       VS.remote[i]={accel:!!d.a,steer:clamp(Number(d.s)||0,-1,1)};
+      // 판본 — v 가 오면 새 화면(한 번 새 화면이면 그대로), v 없이 u 가 오면 옛 화면(바깥이 대신 보내는 「손 놓음」 입력은 u 가 없어 셈하지 않음)
+      if(Number.isInteger(d.v)&&d.v>=VS_IV)c.ver=d.v;
+      else if(Number.isInteger(d.u)&&!(c.ver>=VS_IV)&&!c.ver){c.ver=1;if(!VS.oldNote[i]&&ITEM_KEYS.length>ITEM_OLD_N){VS.oldNote[i]=1;toast(String(VS.names[i]||'상대')+' 님 화면이 옛 판이에요 — 새로고침하면 새 아이템이 보여요');}}
       // 아이템 쓰기 — u(누른 누적 횟수)가 늘어난 만큼(한 번에 최대 2번) 쓴다
       const un=Number(d.u);
       if(Number.isInteger(un)&&un>=0){
         const last=VS.useU[i]||0,ks=typeof d.k==='string'?d.k.replace(/[^0-2]/g,'').slice(-4):'';
-        if(un>last){for(let n=Math.min(ITEM_SLOTS,un-last);n>0;n--){const ch=ks[ks.length-n];useItem(c,ch===undefined?-1:+ch);}} // k 가 없으면(예전 메시지) 차 있는 가장 낮은 칸
+        if(un>last){for(let n=Math.min(ITEM_SLOTS,un-last);n>0;n--){const ch=ks[ks.length-n];useItem(c,ch===undefined?-1:+ch);}} // k 가 없으면(예전 메시지) 지금 쓸 수 있는 가장 앞 칸(slotPick)
         VS.useU[i]=Math.max(last,un);
       }
     }
@@ -3964,7 +4755,7 @@ if(VS.on){
       if(VS.e&&s.e!==VS.e)return; // 다른 경주의 소식
       vsSnapIn(s);
       // 일 — 내 차 일 · 자리로 알리는 일(운석)은 바로, 남의 차 일은 그 차를 그 때로 그릴 때(vsGuestStep)
-      if(Array.isArray(s.ev))for(const ev of s.ev){if(!Array.isArray(ev))continue;if(ev[1]===VS.me||(ev[0]==='bump'&&ev[2]===VS.me)||ev[0]==='boom')vsPlayEv(ev);else if(VS.evd.length<200)VS.evd.push([s.t,s.recv,ev]);}
+      if(Array.isArray(s.ev))for(const ev of s.ev){if(!Array.isArray(ev))continue;if(ev[1]===VS.me||(ev[0]==='bump'&&ev[2]===VS.me)||ev[0]==='boom'||ev[0]==='splat'||ev[0]==='fw')vsPlayEv(ev);else if(VS.evd.length<200)VS.evd.push([s.t,s.recv,ev]);}
     }
     else if(t==='vs:end'){if(VS.role==='guest'&&!VS.ended){VS.ended=true;setState('finish');game.finishT=1e9;}}
     else if(t==='vs:freeze')vsFreeze(!!d.on,d.why,d.hold);
