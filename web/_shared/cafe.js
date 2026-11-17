@@ -1317,7 +1317,7 @@ window.HKCafe = (function () {
   function mount(root) {
     root.classList.add("mgx", "mgx-shell", "cf");
     const topBar = (withActions) => `<div class="mgx-top cf-top">
-        <a class="mgx-top__back" href="/manage">${ic("chevron-left", 18)}매니지먼트</a>
+        <a class="mgx-top__back" href="/manage" aria-label="매니지먼트 모음으로">${ic("chevron-left", 18)}<span class="mgx-top__backtxt">매니지먼트</span></a>
         <div class="mgx-top__title"><span class="cf-logo" aria-hidden="true">${drinkSvg("latte", 26)}</span><span class="cf-top__name">옥상 쉼터 카페</span><span class="mgx-chip cf-top__chip" id="cf-gchip" hidden></span></div>
         ${withActions ? `<div class="mgx-top__actions">
           <button type="button" class="mgx-icon cf-music" data-act="music" id="cf-music"></button>
@@ -1989,6 +1989,8 @@ window.HKCafe = (function () {
           <div class="cf-mbtns">${i ? `<button type="button" class="mgx-btn is-white" data-tut="prev">이전</button>` : `<button type="button" class="mgx-btn is-white" data-close>건너뛰기</button>`}
           ${i < steps.length - 1 ? `<button type="button" class="mgx-btn" data-tut="next">다음</button>` : `<button type="button" class="mgx-btn" data-close>시작하기</button>`}</div>`;
         HKUI.refreshIcons(m.el);
+        // 스페이스 · 엔터가 「다음 · 시작하기」를 누르게(닫기 X 에 초점이 가 있으면 스페이스 한 번에 안내가 닫혀 버렸다)
+        const go = m.el.querySelector(".cf-mbtns .mgx-btn:not(.is-white)"); if (go) go.focus({ preventScroll: true });
       };
       m.el.addEventListener("click", (e) => { const t = e.target.closest("[data-tut]"); if (!t) return; i += t.dataset.tut === "next" ? 1 : -1; draw(); });
       draw();

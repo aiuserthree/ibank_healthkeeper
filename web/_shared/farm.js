@@ -792,7 +792,7 @@ window.HKFarm = (function () {
     commit(true);
   }
   async function resetAll() {
-    const a = await HKUI.confirmDialog("처음부터 다시 할까요?", "밭 · 창고 · 도구 · 도감 · 레벨이 모두 처음으로 돌아가요.", { confirmLabel: "다음", confirmVariant: "danger" });
+    const a = await HKUI.confirmDialog("처음부터 다시 할까요?", "밭 · 창고 · 도구 · 도감 · 레벨이 모두 처음으로 돌아가요.", { confirmLabel: "처음부터 다시", confirmVariant: "danger" });
     if (!a) return;
     const b = await HKUI.confirmDialog("정말 지울까요?", "<b>되돌릴 수 없어요.</b> 지금까지 가꾼 옥상 텃밭이 모두 사라져요.", { confirmLabel: "모두 지우고 다시 시작", confirmVariant: "danger" });
     if (!b) return;
@@ -916,6 +916,8 @@ window.HKFarm = (function () {
         <div class="fm-modal__btns">${i ? `<button type="button" class="mgx-btn is-white is-lg" data-t="prev">이전</button>` : `<button type="button" class="mgx-btn is-white is-lg" data-t="close">건너뛰기</button>`}
         <button type="button" class="mgx-btn is-lg" data-t="${i === steps.length - 1 ? "close" : "next"}">${i === steps.length - 1 ? "시작하기" : "다음"}</button></div></div>`;
       HKUI.refreshIcons(ov);
+      // 스페이스 · 엔터가 「다음 · 시작하기」를 누르게(마지막 「시작하기」는 공용 스페이스 규칙에 안 걸려 닫히지 않았다)
+      const go = ov.querySelector(`[data-t="${i === steps.length - 1 ? "close" : "next"}"]`); if (go) go.focus({ preventScroll: true });
     };
     const close = () => { ov.remove(); if (!S.tut) { S.tut = true; store.dirty(); } flush(); };
     ov.addEventListener("click", (e) => {
@@ -957,7 +959,7 @@ window.HKFarm = (function () {
   // ══ 화면 ══════════════════════════════════════════════════
   const DOCK = [["seed", "씨앗", "seed"], ["shed", "창고", "crate"], ["orders", "주문", "memo"], ["tools", "도구", "can"], ["dex", "도감", "book"]];
   const topBar = (full) => `<div class="mgx-top fm-top">
-      <a class="mgx-top__back" href="/manage">${ic("chevron-left", 18)}매니지먼트</a>
+      <a class="mgx-top__back" href="/manage" aria-label="매니지먼트 모음으로">${ic("chevron-left", 18)}<span class="mgx-top__backtxt">매니지먼트</span></a>
       <div class="mgx-top__title"><span class="fm-logo">${markSvg}</span><span class="fm-top__name">${TITLE}</span>${full ? `<span class="mgx-chip" id="fm-lvchip"></span><span id="fm-donebadge"></span>` : ""}</div>
       ${full ? `<div class="mgx-top__actions">${window.HKMgmtMusic ? HKMgmtMusic.buttonHtml() : ""}<button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button><button type="button" class="mgx-icon" data-act="more" aria-label="더보기">${ic("ellipsis", 20)}</button></div>` : ""}
     </div>`;

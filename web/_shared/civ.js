@@ -1160,7 +1160,7 @@
   }
 
   const topHtml = (title) => `<div class="mgx-top cv-top">
-      <a class="mgx-top__back" href="/manage">${ic("chevron-left", 18)}매니지먼트</a>
+      <a class="mgx-top__back" href="/manage" aria-label="매니지먼트 모음으로">${ic("chevron-left", 18)}<span class="mgx-top__backtxt">매니지먼트</span></a>
       <div class="mgx-top__title"><span class="cv-logo" aria-hidden="true"></span><span class="cv-ttl">${title || "오피스 타운"}</span><span class="mgx-chip cv-erachip" id="cv-era"></span></div>
       <div class="mgx-top__actions">${window.HKMgmtMusic ? HKMgmtMusic.buttonHtml() : ""}<button type="button" class="mgx-icon" data-act="help" aria-label="도움말">${ic("circle-help", 20)}</button><button type="button" class="mgx-icon" data-act="more" aria-label="더보기">${ic("ellipsis", 20)}</button></div>
     </div>`;
@@ -2170,7 +2170,8 @@
     if (log.staff) rows.push(["users", "var(--c-ap)", "새 직원", log.staff, (v) => `+${num(Math.round(v))}명`]);
     if (log.ap) rows.push(["zap", "var(--c-ap)", "기운", log.ap, (v) => `+${Math.round(v)}`]);
     const ends = [
-      ...log.builds.map((k) => [BLD[k].icon, BCOL[k], `${eul(BLD[k].name)} 다 지었어요`]),
+      // 같은 건물을 여러 곳 지었으면 한 줄로(「직장 보육실 2곳을 다 지었어요」)
+      ...[...new Set(log.builds)].map((k) => { const n = log.builds.filter((x) => x === k).length; return [BLD[k].icon, BCOL[k], n > 1 ? `${BLD[k].name} ${n}곳을 다 지었어요` : `${eul(BLD[k].name)} 다 지었어요`]; }),
       ...log.research.map((k) => [RES[k].icon, "var(--c-idea)", `아이디어 「${RES[k].name}」${bat(RES[k].name) ? "이" : "가"} 나왔어요`]),
       ...(log.tiles.length ? [["map", "#22c55e", `동네에 소문이 나서 땅이 ${log.tiles.length}칸 넓어졌어요`]] : []),
     ];

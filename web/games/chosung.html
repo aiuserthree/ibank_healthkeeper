@@ -55,6 +55,8 @@
 
     /* 결과 띠 (문제마다 1.5초) */
     .gm-cs__fb { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; background: rgba(255,255,255,.96); animation: gm-fade .18s ease-out; }
+    .gm-cs__fb { cursor: pointer; }
+    .gm-cs__fb-skip { font-size: 12px; color: var(--text-muted, #94a3b8); }
     .gm-cs__fb-badge { width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center; }
     .gm-cs__fb-badge.is-ok { background: linear-gradient(135deg, var(--gm-a), var(--gm-b)); }
     .gm-cs__fb-badge.is-ng { background: #94a3b8; }
@@ -116,7 +118,7 @@
 <body>
   <div id="app"></div>
   <script>
-    // [낱말, 분류, 뜻(화면 단서), 해설(정답 뒤), 단계(1 보통 · 2 어려움 · 3 매우 어려움)]
+    // [낱말, 분류, 뜻(화면 단서), 해설(정답 뒤), 단계(1 보통 · 2 어려움 · 3 매우 어려움), 같은 초성의 다른 정답(있으면)]
     // 의학적으로 널리 확립된 상식만. 뜻 문장에는 정답 낱말이 들어가지 않게.
     const BANK = [
       // 1단계 보통
@@ -139,7 +141,7 @@
       ["칼륨", "영양", "바나나·감자·시금치 등에 많은 무기질이에요.", "채소와 과일을 충분히 먹으면 자연스럽게 챙길 수 있어요.", 1],
       ["골다공증", "질환", "뼈의 밀도가 낮아져 쉽게 부러지는 상태예요.", "칼슘·비타민 D를 챙기고 꾸준히 운동하면 예방에 도움이 돼요.", 1],
       ["빈혈", "질환", "피 속 적혈구나 헤모글로빈이 부족한 상태예요.", "어지럼증이 잦다면 검사를 받아 보세요.", 1],
-      ["열사병", "응급", "더운 곳에서 체온 조절이 안 돼 몸이 크게 뜨거워지는 응급 상황이에요.", "무더위엔 물을 자주 마시고 그늘에서 쉬어 주세요.", 1],
+      ["열사병", "응급", "더위에 체온 조절이 무너져 땀이 멎고 체온이 40도를 넘으며 의식이 흐려지는, 온열 질환 가운데 가장 위험한 응급 상황이에요.", "바로 119에 알리고 몸을 식혀 주세요. 무더위엔 물을 자주 마시고 그늘에서 쉬어요.", 1],
       ["저체온증", "응급", "몸의 온도가 35도 아래로 떨어진 상태예요.", "추운 날엔 옷을 겹겹이 입어 몸을 따뜻하게 지켜 주세요.", 1],
       ["심폐소생술", "응급", "심장이 멈춘 사람에게 가슴 압박과 인공호흡을 하는 응급처치예요.", "가슴 압박은 1분에 100~120회 속도로 해요.", 1],
       ["자동심장충격기", "응급", "공공장소에 비치돼 있고 음성 안내를 따라 쓰는 AED의 우리말 이름이에요.", "음성 안내에 따라 일반인 누구나 사용할 수 있어요.", 1],
@@ -169,10 +171,10 @@
       ["과당", "영양", "과일과 꿀에 많은 단맛 성분이에요.", "단 음료로 많이 마시면 지방간 위험을 높일 수 있어요.", 1],
       ["소장", "신체", "위 다음에 이어져 영양분 대부분을 흡수하는 긴 관이에요.", "길이가 수 미터에 이르는 기관이에요.", 1],
       ["대장", "신체", "소화의 마지막 단계에서 수분을 흡수하고 변을 만드는 기관이에요.", "50세가 넘으면 관련 검진을 챙겨 받으세요.", 1],
-      ["십이지장", "신체", "위와 소장 사이를 잇는 시작 부분의 창자예요.", "위궤양과 함께 궤양이 잘 생기는 곳이에요.", 1],
+      ["십이지장", "신체", "위에서 바로 이어지는 작은창자(소장)의 첫 부분이에요.", "위궤양과 함께 궤양이 잘 생기는 곳이에요.", 1],
       ["쓸개", "신체", "간에서 만든 소화액을 모아 두는 작은 주머니예요.", "기름진 음식을 소화할 때 소화액을 내보내요.", 1],
       ["췌장", "신체", "소화액과 인슐린을 만드는 위 뒤쪽의 기관이에요.", "과음은 이 기관의 염증을 일으킬 수 있어요.", 1],
-      ["갑상선", "신체", "목 앞쪽에 있는 나비 모양 기관으로 몸의 대사를 조절해요.", "이곳의 호르몬이 너무 많거나 적으면 몸 상태가 크게 달라져요.", 1],
+      ["갑상선", "신체", "목 앞쪽에 있는 나비 모양 기관으로 몸의 대사를 조절해요.", "이곳의 호르몬이 너무 많거나 적으면 몸 상태가 크게 달라져요. ‘갑상샘’이라고도 해요.", 1, ["갑상샘"]],
       ["식도", "신체", "입에서 삼킨 음식을 위로 보내는 관이에요.", "식사 뒤 바로 누우면 위산이 거슬러 올라올 수 있어요.", 1],
       ["횡격막", "신체", "가슴과 배 사이를 가르며 호흡을 돕는 얇은 근육이에요.", "배로 숨 쉴 때 아래위로 크게 움직여요.", 1],
       ["골반", "신체", "상체를 받치고 다리와 이어 주는 엉덩이 쪽의 뼈대예요.", "다리를 꼬지 않아야 틀어지는 걸 막을 수 있어요.", 1],
@@ -310,7 +312,7 @@
       ["흉추", "신체", "가슴 부분의 등뼈로 열두 개예요.", "뒤로 젖히는 스트레칭이 굽은 등에 도움이 돼요.", 2],
       ["간헐적 단식", "영양", "하루 중 일정 시간에만 먹고 나머지 시간은 굶는 식사법이에요.", "당뇨약을 먹고 있다면 의사와 먼저 상의하세요.", 2],
       ["고지혈증", "질환", "핏속에 기름 성분이 너무 많은 상태를 흔히 이르는 말이에요.", "증상이 없어 건강 검진으로 찾아내는 경우가 많아요.", 2],
-      ["갑상선기능저하증", "질환", "목 앞 기관의 호르몬이 부족해 피로와 추위, 체중 증가가 오는 병이에요.", "약으로 호르몬을 보충해 조절할 수 있어요.", 2],
+      ["갑상선기능저하증", "질환", "목 앞 기관의 호르몬이 부족해 피로와 추위, 체중 증가가 오는 병이에요.", "약으로 호르몬을 보충해 조절할 수 있어요.", 2, ["갑상샘기능저하증"]],
       // 3단계 매우 어려움
       ["기립성저혈압", "질환", "누웠다 일어설 때 피가 아래로 쏠려 핑 어지러운 증상이에요.", "천천히 일어나고 물을 충분히 마셔 보세요.", 3],
       ["심방세동", "질환", "심장 윗부분이 불규칙하게 떨려 뇌졸중 위험을 높이는 부정맥이에요.", "맥이 자주 불규칙하면 심전도 검사를 받아 보세요.", 3],
@@ -356,7 +358,7 @@
       ["승모판", "신체", "좌심방과 좌심실 사이에서 문 역할을 하는 판막이에요.", "이상이 있으면 심장 초음파로 확인해요.", 3],
       ["관상동맥", "신체", "심장 근육 자체에 피를 공급하는 혈관이에요.", "이곳이 막히면 심근경색이 와요.", 3],
       ["심부전", "질환", "심장이 피를 충분히 뿜어내지 못해 숨이 차고 붓는 상태예요.", "짠 음식을 줄이고 꾸준히 치료받아야 해요.", 3],
-      ["갑상선기능항진증", "질환", "목 앞 기관의 호르몬이 넘쳐 체중이 줄고 가슴이 두근거리는 병이에요.", "약이나 방사성 요오드로 치료해요.", 3],
+      ["갑상선기능항진증", "질환", "목 앞 기관의 호르몬이 넘쳐 체중이 줄고 가슴이 두근거리는 병이에요.", "약이나 방사성 요오드로 치료해요.", 3, ["갑상샘기능항진증"]],
       ["쿠싱증후군", "질환", "코르티솔이 너무 많아 얼굴이 둥글어지고 배가 나오는 병이에요.", "스테로이드를 오래 쓰면 생길 수 있어요.", 3],
       ["당화혈색소", "신체", "지난 2~3개월의 평균 혈당을 보여 주는 수치예요.", "당뇨 관리의 대표 지표예요.", 3],
       ["크레아티닌", "신체", "콩팥 기능을 볼 때 쓰는 피검사 수치예요.", "건강 검진 결과표에서 확인해 보세요.", 3],
@@ -393,7 +395,9 @@
     HKPlay.mountGame({
       key: "chosung",
       setup(stage, ctx) {
-        const COUNT = 20, LIMIT = 40, PER_SEC = 2, MAX_TRIES = 3, HINT_COST = 30, FEEDBACK_MS = 1500;
+        const COUNT = 20, LIMIT = 40, PER_SEC = 2, MAX_TRIES = 3, HINT_COST = 30;
+        // 정답 · 해설 보여 주는 시간 — 해설이 길수록 오래(약 2~4초). 눌러서 · 스페이스 · 엔터로 바로 넘길 수도 있다(예전 1.5초 고정)
+        const feedbackMs = (tip) => Math.min(4000, 1800 + 30 * String(tip || "").length);
         // 한 판 안에서 단계가 오른다 — 뒤로 갈수록 낱말이 어렵고 점수가 커진다
         const STEPS = { 1: { n: 10, pts: 100, name: "보통" }, 2: { n: 7, pts: 130, name: "어려움" }, 3: { n: 3, pts: 160, name: "매우 어려움" } };
         const CHO = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
@@ -430,6 +434,7 @@
         let lastSec = 0; // 마지막 5초 똑딱용
         let phase = "intro"; // intro | play | feedback | paused | done
         let lastSubmitAt = 0;
+        let fbAt = 0; // 해설이 뜬 시각
 
         const correctPoints = () => results.reduce((s, r, i) => s + (r.ok ? STEPS[qs[i][4]].pts + r.sec * PER_SEC : 0), 0);
         const totalScore = () => Math.max(0, correctPoints() - hintsTotal * HINT_COST);
@@ -481,6 +486,7 @@
         }
 
         function startGame() {
+          pauseNext = false;
           qs = todaysQuestions();
           idx = 0;
           results = [];
@@ -511,7 +517,7 @@
               <div class="gm-cs__tiles" data-tiles aria-label="초성 ${esc(toCho(word))}"></div>
               <p class="gm-cs__desc">${esc(desc)}</p>
               <form class="gm-cs__form" data-form autocomplete="off">
-                <input class="gm-cs__input" data-input type="text" inputmode="text" enterkeyhint="done" placeholder="정답을 입력하세요" aria-label="정답 입력" maxlength="20" autocomplete="off" autocapitalize="off" spellcheck="false">
+                <input class="gm-cs__input" data-input type="text" inputmode="text" enterkeyhint="done" placeholder="정답을 입력하세요" aria-label="정답 입력" maxlength="20" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
                 <button type="submit" class="gm-cs__go">제출</button>
               </form>
               <p class="gm-cs__msg" data-msg>기회 ${MAX_TRIES}번</p>
@@ -542,6 +548,7 @@
           input.focus({ preventScroll: true });
           lastTs = performance.now();
           raf = requestAnimationFrame(tick);
+          if (pauseNext) { pauseNext = false; pause(); }
         }
 
         function renderTiles() {
@@ -592,7 +599,7 @@
             setMsg("정답을 입력해 주세요", true);
             return;
           }
-          if (guess === norm(qs[idx][0])) {
+          if (guess === norm(qs[idx][0]) || (qs[idx][5] || []).some((a) => guess === norm(a))) {
             finishQuestion(true);
             return;
           }
@@ -642,6 +649,7 @@
           const pts = STEPS[lv].pts;
           const sec = ok ? Math.floor(remainMs / 1000) : 0;
           results[idx] = { ok, sec, why };
+          fbAt = performance.now();
           ctx.sfx(ok ? "success" : why === "skip" ? "whoosh" : "fail");
           const card = stage.querySelector(".gm-cs");
           const title = ok ? "정답이에요!" : why === "time" ? "시간이 다 됐어요" : why === "skip" ? "넘겼어요" : "아쉬워요";
@@ -651,16 +659,34 @@
             <div class="gm-cs__fb-title">${title}</div>
             <div class="gm-cs__fb-word">${esc(word)}</div>
             ${ok ? `<div class="gm-cs__fb-pts">+${pts + sec * PER_SEC}점 (${STEPS[lv].name} ${pts} + 남은 ${sec}초×${PER_SEC})</div>` : ""}
-            <p class="gm-cs__fb-tip">${esc(tip)}</p>`;
+            <p class="gm-cs__fb-tip">${esc(tip)}</p>
+            <span class="gm-cs__fb-skip">${matchMedia("(pointer: coarse)").matches ? "눌러서" : "스페이스·엔터로"} 다음 문제</span>`;
+          fb.onclick = skipFeedback;
           card.appendChild(fb);
           HKUI.refreshIcons(fb);
           stage.querySelector("[data-input]")?.blur();
-          timer = setTimeout(() => {
-            idx++;
-            if (idx < COUNT) showQuestion();
-            else showSummary();
-          }, FEEDBACK_MS);
+          timer = setTimeout(nextQuestion, feedbackMs(tip));
         }
+        function nextQuestion() {
+          idx++;
+          if (idx < COUNT) showQuestion();
+          else showSummary();
+        }
+        function skipFeedback() {
+          if (phase !== "feedback") return;
+          clearTimeout(timer);
+          nextQuestion();
+        }
+        // 해설 중 스페이스 · 엔터 = 다음 문제 (입력칸 초점은 해설이 뜰 때 이미 뺐다)
+        window.addEventListener("keydown", (e) => {
+          if (phase !== "feedback" || e.repeat || (e.code !== "Space" && e.key !== "Enter")) return;
+          const t = e.target;
+          if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
+          // 정답을 낸 엔터가 그대로 해설을 넘기지 않게 — 해설이 뜬 뒤 0.4초부터
+          if (performance.now() - fbAt < 400) { e.preventDefault(); return; }
+          e.preventDefault();
+          skipFeedback();
+        });
 
         // ── 요약 화면 → 기록 저장 ──
         function showSummary() {
@@ -693,10 +719,13 @@
         }
 
         // ── 일시정지 (탭을 떠나면) ──
+        let pauseNext = false; // 해설을 보는 중에 멈추면 다음 문제를 띄우자마자 멈춘다
         function pause() {
+          if (phase === "feedback") { pauseNext = true; return; }
           if (phase !== "play") return;
           stopLoops();
           phase = "paused";
+          stage.querySelector("[data-input]")?.blur();
           const p = document.createElement("div");
           p.className = "gm-cs__pause";
           p.innerHTML = `${HKUI.icon("pause", 30, "#e0508a")}<b>잠시 멈췄어요</b><span style="font-size:14px;color:var(--text-secondary)">돌아오면 이어서 풀 수 있어요</span><button type="button" class="gm-cs__start" data-resume>이어서 하기</button>`;

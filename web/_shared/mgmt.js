@@ -67,7 +67,7 @@ window.HKMgmt = (function () {
       timer = setTimeout(saveNow, t - firstDirty > 8000 ? 0 : 2000);
     }
     async function saveNow({ keepalive = false } = {}) {
-      clearTimeout(timer); firstDirty = 0;
+      clearTimeout(timer); timer = 0; firstDirty = 0; // timer 를 비워야 화면을 숨길 때 바뀐 게 없으면 다시 저장하지 않는다
       if (closed) return;
       if (inflight) { pending = true; return inflight; }
       const body = JSON.stringify({ state: store.state, version: store.version });
@@ -117,12 +117,18 @@ window.HKMgmt = (function () {
     return store;
   }
 
+  // 은/는 — 마지막 글자에 받침이 있으면 「은」(오피스 타운은 · 옥상 텃밭은 · 옥상 쉼터 카페는)
+  function josaEun(w) {
+    const c = String(w).trim().slice(-1).charCodeAt(0);
+    if (c < 0xac00 || c > 0xd7a3) return "은(는)";
+    return (c - 0xac00) % 28 ? "은" : "는";
+  }
   // 업무 시간 안내 — 진행은 계속된다는 것까지
   function closedHtml(opens, title) {
     return `<div class="hk-mg-closed">
         <span class="hk-mg-closed__icon">${window.HKUI ? HKUI.icon("moon", 28, "currentColor") : ""}</span>
         <b>지금은 업무 시간이라 쉬어요</b>
-        <p>${title ? `${title}은(는) ` : ""}점심시간(11:30~13:00) · 18:00 이후 · 9:00 이전 · 주말에 열려요.${opens ? `<br><b>${opens}</b>에 다시 열려요.` : ""}</p>
+        <p>${title ? `${title}${josaEun(title)} ` : ""}점심시간(11:30~13:00) · 18:00 이후 · 9:00 이전 · 주말에 열려요.${opens ? `<br><b>${opens}</b>에 다시 열려요.` : ""}</p>
         <small>걸어 둔 일은 그동안에도 계속 진행돼요.</small>
         <a class="hk-btn hk-btn--secondary" href="/manage">매니지먼트 모음으로</a>
       </div>`;
@@ -139,7 +145,8 @@ window.HKMgmt = (function () {
   // 큰 수 — 12,345 · 1.2만 · 3.4억
   function num(n) {
     n = Math.floor(n || 0);
-    const short = (v, d) => v.toFixed(d).replace(/\.0$/, ""); // 5.0만 → 5만
+    // 5.0만 → 5만 · 1987만 → 1,987만(네 자리부터 쉼표)
+    const short = (v, d) => { const t = v.toFixed(d).replace(/\.0$/, ""); return d ? t : Number(t).toLocaleString("ko-KR"); };
     if (n >= 1e8) return `${short(n / 1e8, n >= 1e9 ? 0 : 1)}억`;
     if (n >= 1e4) return `${short(n / 1e4, n >= 1e5 ? 0 : 1)}만`;
     return n.toLocaleString("ko-KR");

@@ -73,6 +73,8 @@
     .gm-ko__fb.is-ok .gm-ko__fb-head { color: #087a35; }
     .gm-ko__fb.is-ng .gm-ko__fb-head { color: #b42318; }
     .gm-ko__fb-head em { font-style: normal; font-size: 13px; padding: 2px 8px; border-radius: 999px; background: #fff; color: #c2410c; }
+    .gm-ko__fb { cursor: pointer; }
+    .gm-ko__fb-skip { align-self: flex-end; margin-top: 2px; font-size: 12px; color: var(--text-muted, #94a3b8); }
     .gm-ko__fb p { margin: 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary); word-break: keep-all; }
 
     /* 일시정지 */
@@ -610,10 +612,20 @@
       ["loan", 4, "＿＿ 사이즈로 주세요.", "스탠더드", ["스탠다드", "스텐다드"], "외래어 표기법에 따라 ‘스탠더드’로 적어요.", "l25"],
     ];
 
+    // 문제를 푸는 동안 스페이스는 이 게임이 먼저 받는다 — 공통 틀(play.js)의 「시작 · 준비 · 도전」 단추 찾기가
+    // 「새로 일을 시작하다」 · 「겨울을 미리 준비함」 같은 보기를 단추로 알고 눌러 버리지 않게(mountGame 보다 먼저 걸어야 먼저 받는다)
+    let koSpace = null;
+    window.addEventListener("keydown", (e) => {
+      if (e.code !== "Space" || !koSpace || !koSpace(e)) return;
+      e.stopImmediatePropagation();
+    }, true);
+
     HKPlay.mountGame({
       key: "korean",
       setup(stage, ctx) {
-        const COUNT = 20, LIMIT = 20, FEEDBACK_MS = 1500, JUDGE_MS = 180;
+        const COUNT = 20, LIMIT = 20, JUDGE_MS = 180;
+        // 정답 · 해설 보여 주는 시간 — 해설이 길수록 오래(약 2.5~5초). 눌러서 · 스페이스로 바로 넘길 수도 있다(예전 1.5초 고정은 해설을 다 못 읽었다)
+        const feedbackMs = (q) => Math.min(5000, 2400 + 30 * String(q.e || "").length);
         const PER_OK = 100, PER_SEC = 2, STREAK_N = 3, STREAK_BONUS = 50;
         const MIX = { 2: 6, 3: 10, 4: 4 }; // 보통 6 · 어려움 10 · 아주 어려움 4
         const TYPES = {
@@ -785,6 +797,7 @@
         }
 
         function startGame() {
+          pauseNext = false;
           qs = todaysQuestions();
           idx = 0;
           results = [];
@@ -905,13 +918,30 @@
           fb.innerHTML = ok
             ? `<div class="gm-ko__fb-head">${HKUI.icon("check", 18, "currentColor")} 정답이에요! +${pts}점${bonus ? ` <em>${streak}연속 보너스 +${bonus}</em>` : ""}</div><p>${esc(q.e)}</p>`
             : `<div class="gm-ko__fb-head">${HKUI.icon(i < 0 ? "timer-off" : "x", 18, "currentColor")} ${i < 0 ? "시간이 다 됐어요" : "아쉬워요"} · 정답은 ‘${esc(q.a)}’</div><p>${esc(q.e)}</p>`;
+          fb.insertAdjacentHTML("beforeend", `<span class="gm-ko__fb-skip">${coarse ? "눌러서" : "스페이스·클릭으로"} 다음 문제</span>`);
+          fb.onclick = skipFeedback;
           HKUI.refreshIcons(stage);
-          timer = setTimeout(() => {
-            idx++;
-            if (idx < qs.length) showQuestion();
-            else showSummary();
-          }, FEEDBACK_MS);
+          timer = setTimeout(next, feedbackMs(q));
         }
+        function skipFeedback() {
+          if (phase !== "feedback") return;
+          clearTimeout(timer);
+          next();
+        }
+        function next() {
+          idx++;
+          if (idx < qs.length) showQuestion();
+          else showSummary();
+          if (pauseNext && phase === "play") { pauseNext = false; pause(); }
+        }
+        // 문제 화면의 스페이스 — 해설 중이면 다음 문제, 푸는 중이면 화면이 굴러가지 않게만(초점 있는 보기는 브라우저가 누른다)
+        koSpace = (e) => {
+          if (!["play", "judge", "feedback"].includes(phase)) return false;
+          const onBtn = e.target && e.target.closest && e.target.closest("button");
+          if (phase === "feedback" && !e.repeat) { e.preventDefault(); skipFeedback(); }
+          else if (!onBtn) e.preventDefault();
+          return true;
+        };
 
         // ── 요약 화면 → 기록 저장 ──
         function showSummary() {
@@ -958,7 +988,9 @@
         }
 
         // ── 일시정지 (탭을 떠나면) ──
+        let pauseNext = false; // 채점 · 해설 중에 멈추면 다음 문제를 띄우자마자 멈춘다
         function pause() {
+          if (phase === "judge" || phase === "feedback") { pauseNext = true; return; }
           if (phase !== "play") return;
           stopLoops();
           phase = "paused";
