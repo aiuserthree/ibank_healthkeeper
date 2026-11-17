@@ -300,9 +300,9 @@ async def _view(db: AsyncSession, member: Member, p: GameParty) -> dict:
 
 
 async def _with_bonus(db: AsyncSession, member: Member, p: GameParty, out: dict) -> dict:
-    """결과 화면용 대전 승리 보너스 표시 — got · already · None (match._view 와 같은 값)."""
+    """결과 화면용 대전 승리 보너스 표시 — got · already · pair · None (match._view 와 같은 값)."""
     out["winBonus"] = await win_bonus_state(
-        db, member.id, f"party:{p.id}", bool(_beaten(p)) and p.winner_id == member.id, p.finished_at
+        db, member.id, f"party:{p.id}", _beaten(p) if p.winner_id == member.id else (), p.finished_at
     )
     return out
 

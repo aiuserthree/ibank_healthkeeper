@@ -458,9 +458,11 @@ def _human_win(m: GameMatch) -> bool:
 
 async def _view(db: AsyncSession, member: Member, m: GameMatch) -> dict:
     out = _payload(m, member.id, await _people(db, {m.challenger_id, m.opponent_id}), board=True)
-    # 대전 승리 보너스 표시 — got(이 판으로 도장 +1) · already(오늘 대전 보너스는 이미 받음) · None(컴퓨터전 · 진 판 등)
+    # 대전 승리 보너스 표시 — got(이 판으로 도장 +1) · already(오늘 대전 보너스는 이미 받음) ·
+    # pair(이번 달 이 동료와는 이미 받음) · None(컴퓨터전 · 진 판 등)
+    won = _human_win(m) and m.winner_id == member.id
     out["winBonus"] = await win_bonus_state(
-        db, member.id, f"match:{m.id}", _human_win(m) and m.winner_id == member.id, m.finished_at
+        db, member.id, f"match:{m.id}", [_rival_id(m, member.id)] if won else [], m.finished_at
     )
     return out
 

@@ -1,7 +1,8 @@
 /** 헬스키퍼 API 클라이언트 — fetch + 세션 쿠키 */
 window.HKApi = (function () {
   // 대전 승리 보너스 알림 — 1:1 대전(/play/match/…) · 여러 명 대전(/play/party/…) 응답에 winBonus 가 오면 판마다 한 번만 띄운다.
-  // 게임 화면마다 따로 적지 않아도 모든 대전(새 대전 게임 포함)에 나온다. got = 이 판으로 도장 +1, already = 오늘은 이미 받음
+  // 게임 화면마다 따로 적지 않아도 모든 대전(새 대전 게임 포함)에 나온다. got = 이 판으로 도장 +1, already = 오늘은 이미 받음,
+  // pair = 이번 달 이 동료(들)와는 이미 보너스를 주고받음(같은 두 사람 사이는 한 달에 한 번)
   const bonusSeen = new Set();
   function winBonusNote(path, d) {
     const kind = path.startsWith("/play/party/") ? "party" : path.startsWith("/play/match/") ? "match" : "";
@@ -12,6 +13,7 @@ window.HKApi = (function () {
     try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch (_) { /* 저장 못 해도 이번 화면에서 한 번 */ }
     if (d.winBonus === "got") HKUI.toast("도장 +1 · 대전 승리 보너스");
     else if (d.winBonus === "already") HKUI.toast("오늘 대전 보너스는 이미 받았어요");
+    else if (d.winBonus === "pair") HKUI.toast(kind === "party" ? "이번 달 이 동료들과는 이미 보너스를 받았어요" : "이번 달 이 동료와는 이미 보너스를 받았어요");
   }
 
   async function request(path, options = {}) {

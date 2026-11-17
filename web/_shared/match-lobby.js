@@ -54,6 +54,7 @@ window.HKMatch = (function () {
   function bonusTag(m) {
     if (!m || m.status !== "DONE") return "";
     if (m.winBonus === "got") return `<span class="gk__bonus is-got"><b>도장 +1</b>대전 승리 보너스</span>`;
+    if (m.winBonus === "pair") return `<span class="gk__bonus" title="이번 달 이 동료와는 이미 보너스를 받았어요"><b>대전 보너스</b>이번 달 이 동료와는 이미 받았어요</span>`;
     if (m.winBonus === "already") return `<span class="gk__bonus" title="오늘 대전 보너스는 이미 받았어요"><b>대전 보너스</b>오늘은 이미 받았어요</span>`;
     return "";
   }

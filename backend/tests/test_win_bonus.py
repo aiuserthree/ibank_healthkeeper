@@ -90,7 +90,7 @@ class WinBonus(unittest.TestCase):
 
     async def _people(self):
         async with self.Session() as db:
-            for i, name in enumerate(["가", "나", "다", "라"], 1):
+            for i, name in enumerate(["가", "나", "다", "라", "마", "바", "사", "아", "자", "차", "카", "타", "파"], 1):
                 db.add(Member(id=i, email=f"u{i}@3ibank.com", name=name, status=MemberStatus.ACTIVE, entra_oid=f"oid-{i}"))
             await db.commit()
 
@@ -252,6 +252,78 @@ class WinBonus(unittest.TestCase):
         self.assertEqual(self.view(1, mid)["winBonus"], "got")
         self.assertEqual(self.today_count(1), 2)
 
+    # ── 같은 두 사람 사이는 한 달에 한 번 ──
+
+    def wins(self, who):
+        return [r for r in self.stamps(who) if r[1] == "WIN"]
+
+    def test_same_pair_once_a_month(self):
+        self.day[0] = date(2026, 11, 10)
+        m1, _ = self.finish_match(1, 2, winner=1)  # A가 B를 이김 → 보너스
+        self.assertEqual(len(self.wins(1)), 1)
+        self.assertEqual(self.view(1, m1)["winBonus"], "got")
+        self.day[0] = date(2026, 11, 12)
+        m2, mine = self.finish_match(2, 1, winner=2)  # 같은 달 B가 A를 이김 → 없음(방향 상관없이)
+        self.assertEqual(self.wins(2), [])
+        self.assertTrue(mine["bonus"]["pair"])
+        self.assertFalse(mine["bonus"]["new"])
+        self.assertEqual(self.today_count(2), 1)  # 일반 도장은 그대로
+        self.assertEqual(self.view(2, m2)["winBonus"], "pair")
+        self.day[0] = date(2026, 11, 13)
+        m3, _ = self.finish_match(1, 2, winner=1)  # A가 B를 또 → 없음
+        self.assertEqual(self.view(1, m3)["winBonus"], "pair")
+        self.day[0] = date(2026, 11, 14)
+        m4, _ = self.finish_match(1, 3, winner=1)  # 같은 달 다른 날 A가 C를 이김 → 보너스
+        self.assertEqual(self.view(1, m4)["winBonus"], "got")
+        self.assertEqual(len(self.wins(1)), 2)
+        self.day[0] = date(2026, 12, 1)  # 다음 달 1일 — B가 A를 이기면 다시 보너스
+        m5, _ = self.finish_match(2, 1, winner=2)
+        self.assertEqual(self.view(2, m5)["winBonus"], "got")
+        self.assertEqual(len(self.wins(2)), 1)
+
+    def test_month_edge_day(self):
+        self.day[0] = date(2026, 11, 30)  # 그달 마지막 날
+        self.finish_match(1, 2, winner=1)
+        self.assertEqual(len(self.wins(1)), 1)
+        self.day[0] = date(2026, 12, 1)  # 바로 다음 날이 새 달 — 같은 두 사람도 다시 가능
+        self.finish_match(1, 2, winner=1)
+        self.assertEqual(len(self.wins(1)), 2)
+        self.day[0] = date(2026, 12, 31)
+        mid, _ = self.finish_match(2, 1, winner=2)  # 12월 안에서는 이미 주고받음
+        self.assertEqual(self.view(2, mid)["winBonus"], "pair")
+
+    def test_daily_limit_message_wins_over_pair(self):
+        # 오늘 이미 보너스를 받았으면 「오늘 이미」 문구(이번 달 문구보다 먼저)
+        self.finish_match(1, 2, winner=1)
+        mid, _ = self.finish_match(1, 2, winner=1)
+        self.assertEqual(self.view(1, mid)["winBonus"], "already")
+
+    def test_party_some_new_people(self):
+        self.day[0] = date(2026, 11, 10)
+        self.finish_match(1, 2, winner=1)  # 1 ↔ 2 는 이번 달 주고받음
+        self.day[0] = date(2026, 11, 11)
+        pid = self.finish_party([1, 2, 3], winner_seat=0)  # 1등 1 — 2 는 이미, 3 은 새 사람 → 보너스
+        win = self.wins(1)[-1]
+        self.assertEqual((win[2], win[3]), (f"party:{pid}", "2,3"))  # 함께 한 사람 전원과 주고받은 것으로
+        self.day[0] = date(2026, 11, 12)
+        mid, _ = self.finish_match(3, 1, winner=3)  # 이제 3 ↔ 1 도 이번 달 주고받음
+        self.assertEqual(self.view(3, mid)["winBonus"], "pair")
+        self.assertEqual(self.wins(3), [])
+
+    def test_party_all_already(self):
+        self.day[0] = date(2026, 11, 10)
+        self.finish_match(1, 2, winner=1)
+        self.day[0] = date(2026, 11, 11)
+        self.finish_match(3, 1, winner=3)  # 3 이 1 을 이겨도 1 ↔ 3 주고받음
+        self.day[0] = date(2026, 11, 12)
+        pid = self.finish_party([1, 2, 3], winner_seat=0, game="mansion", reason="WIN")  # 1등 1 — 2 · 3 모두 이미 → 없음
+        self.assertEqual(len(self.wins(1)), 1)
+        self.assertEqual(self.today_count(1), 1)
+
+        async def v(db):
+            return await party._view(db, await db.get(Member, 1), await db.get(GameParty, pid))
+        self.assertEqual(self.db(v)["winBonus"], "pair")
+
     # ── 여러 명 대전 ──
 
     def test_party_human_winner(self):
@@ -284,9 +356,9 @@ class WinBonus(unittest.TestCase):
     # ── 쿠폰 · 기존 기록 ──
 
     def test_coupon_in_five_days(self):
-        for i in range(5):
+        for i in range(5):  # 같은 동료와는 한 달에 한 번이라 날마다 다른 동료를 이긴다
             self.day[0] = date(2026, 11, 2) + timedelta(days=i)
-            self.finish_match(1, 2, winner=1)
+            self.finish_match(1, 2 + i, winner=1)
         coupons = self.db(lambda db: self._coupons(db, 1))
         self.assertEqual(coupons, 1)  # 하루 2개 × 5일 = 10개 → 쿠폰 1장
         st = self.db(lambda db: self._status(db, 1))
@@ -295,7 +367,7 @@ class WinBonus(unittest.TestCase):
         # 같은 달에 또 10개를 채워도 쿠폰은 월 1장 — 다 찬 판은 기다림(pending), 그동안은 쌓지 않는다
         for i in range(5, 11):
             self.day[0] = date(2026, 11, 2) + timedelta(days=i)
-            self.finish_match(1, 2, winner=1)
+            self.finish_match(1, 2 + i, winner=1)
         self.assertEqual(self.db(lambda db: self._coupons(db, 1)), 1)
         st = self.db(lambda db: self._status(db, 1))
         self.assertTrue(st["pending"])
