@@ -106,7 +106,7 @@ class PartyFlow(unittest.TestCase):
         for i, t in cars_done.items():
             order[i] = t
         dist = [1.0 if order[i] is not None else 0.5 for i in range(6)]
-        return {"winner": winner, "order": order, "dist": dist, "track": track, "sec": 60.0}
+        return {"winner": winner, "order": order, "dist": dist, "track": track, "sec": 150.0}
 
     def open_race(self, guests=(2, 3, 4), joins=(2, 3), track=1):
         data, notify = self.call(party.create, 1, "bumpervs", list(guests), track)
@@ -145,7 +145,7 @@ class PartyFlow(unittest.TestCase):
 
     def test_human_winner_counts(self):
         pid, d = self.open_race()
-        r = self.result({1: 40.0, 0: 41.0, 3: 42.0}, winner=1)
+        r = self.result({1: 140.0, 0: 141.0, 3: 142.0}, winner=1)
         self.call(party.report, 1, pid, r)
         self.call(party.report, 2, pid, r)
         out = self.call(party.report, 3, pid, r)
@@ -162,7 +162,7 @@ class PartyFlow(unittest.TestCase):
 
     def test_bot_winner_no_win(self):
         pid, d = self.open_race(joins=(2,))
-        r = self.result({4: 38.0, 0: 40.0}, winner=4)
+        r = self.result({4: 138.0, 0: 140.0}, winner=4)
         self.call(party.report, 1, pid, r)
         out = self.call(party.report, 2, pid, r)
         self.assertEqual(out["endReason"], "BOT")
@@ -172,15 +172,15 @@ class PartyFlow(unittest.TestCase):
 
     def test_mismatch_no_count(self):
         pid, d = self.open_race(joins=(2,))
-        self.call(party.report, 1, pid, self.result({0: 40.0}, winner=0))
-        out = self.call(party.report, 2, pid, self.result({1: 40.0}, winner=1))
+        self.call(party.report, 1, pid, self.result({0: 140.0}, winner=0))
+        out = self.call(party.report, 2, pid, self.result({1: 140.0}, winner=1))
         self.assertEqual(out["endReason"], "MISMATCH")
         self.assertEqual(self.stamps, [])
         self.assertEqual(run(self._wins()), {})
 
     def test_majority_and_timeout(self):
         pid, d = self.open_race(joins=(2, 3))
-        good = self.result({0: 40.0}, winner=0)
+        good = self.result({0: 140.0}, winner=0)
         self.call(party.report, 1, pid, good)
         self.call(party.report, 2, pid, good)  # 3 은 안 보냄
         # 기한(첫 보고 + 3분)이 지나면 받은 것으로 판정
@@ -195,24 +195,34 @@ class PartyFlow(unittest.TestCase):
         self.assertEqual(out["winner"]["id"], 1)
         self.assertEqual(sorted(x for x, _ in self.stamps), [1, 2])
 
+    def test_long_three_lap_race_ok(self):
+        # 3바퀴 경주 — 4분 넘게 걸린 정상 판도 시간 초과 · 무효가 아니다(상한 5분)
+        pid, d = self.open_race(joins=(2,))
+        r = {**self.result({1: 251.5, 0: 262.0}, winner=1), "sec": 272.0}
+        self.call(party.report, 1, pid, r)
+        out = self.call(party.report, 2, pid, r)
+        self.assertEqual(out["status"], "DONE")
+        self.assertEqual(out["endReason"], "FINISH")
+
     def test_bad_results(self):
         pid, d = self.open_race(joins=(2,))
         self.now_ms[0] -= 30_000  # 출발 10초 뒤
         with self.assertRaises(AppError):
-            self.call(party.report, 1, pid, self.result({0: 40.0}, winner=0))
+            self.call(party.report, 1, pid, self.result({0: 140.0}, winner=0))
         self.now_ms[0] += 30_000
         bad = [
-            self.result({0: 10.0}, winner=0),  # 너무 빠른 기록
-            self.result({0: 40.0}, winner=1),  # 못 들어온 차가 1등
-            {**self.result({0: 40.0}, winner=0), "order": [40.0]},  # 차 수가 다름
-            {**self.result({0: 40.0}, winner=0), "track": 99},
-            {**self.result({0: 40.0}, winner=0), "winner": True},
+            self.result({0: 98.0}, winner=0),  # 너무 빠른 기록(트랙 1 은 3바퀴에 99초보다 빠를 수 없다)
+            self.result({0: 302.0}, winner=0),  # 경주 시간 상한(5분)을 넘은 기록
+            self.result({0: 140.0}, winner=1),  # 못 들어온 차가 1등
+            {**self.result({0: 140.0}, winner=0), "order": [140.0]},  # 차 수가 다름
+            {**self.result({0: 140.0}, winner=0), "track": 99},
+            {**self.result({0: 140.0}, winner=0), "winner": True},
         ]
         for b in bad:
             with self.assertRaises(AppError):
                 self.call(party.report, 1, pid, b)
         with self.assertRaises(AppError):
-            self.call(party.report, 3, pid, self.result({0: 40.0}, winner=0))  # 달리지 않은 사람
+            self.call(party.report, 3, pid, self.result({0: 140.0}, winner=0))  # 달리지 않은 사람
 
     def test_cancel_and_invite_more(self):
         data, _ = self.call(party.create, 1, "bumpervs", [2])

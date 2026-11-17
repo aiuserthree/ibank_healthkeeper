@@ -180,7 +180,7 @@
     const TRACKS = ["팝콘 퍼레이드", "솜사탕 찻잔 회오리", "네온 등불 루프", "사막 망치 협곡", "그랜드 노을 축제길", "밀림 유적 언덕길", "빗방울 물놀이장", "얼음 성 놀이공원", "별빛 우주 정거장", "바닷속 유리 터널", "장난감 공장 벨트길", "용암 화산 동굴", "구름 위 무지개길"];
     const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
     const LEVEL_NAME = Object.fromEntries(LEVELS);
-    const LIMIT = 180; // 경주 시간 상한(초) — 엔진 versus_bumpervs.LIMIT_SEC 과 같다
+    const LIMIT = 300; // 경주 시간 상한(초, 3바퀴 경주는 보통 2분 남짓) — 엔진 versus_bumpervs.LIMIT_SEC 과 같다
     const PREF_KEY = "hk-bumpervs-pref";
     const pref = { mode: "cpu", level: "normal", track: 0, rid: "bunny" };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY) || "{}")); } catch (_) { /* 처음 */ }
@@ -330,7 +330,7 @@
       const k = (t) => `<kbd>${t}</kbd>`;
       const keys = IS_TOUCH ? "화면을 누르고 있으면 달리고, 떼면 느려져요 · 누른 채 좌우로 끌어 방향을 바꿔요"
         : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · ${k("1")}${k("2")}${k("3")}${k("E")} 아이템 · 마우스로 눌러 끌어도 돼요`;
-      return `<div>${keys}</div><div>레이서는 모양만 달라요(성능은 모두 같아요) · 트랙은 모두 골라 달릴 수 있어요 · 3분 안에 아무도 못 들어오면 더 멀리 간 쪽이 이겨요</div>`;
+      return `<div>${keys}</div><div>레이서는 모양만 달라요(성능은 모두 같아요) · 트랙은 모두 골라 달릴 수 있어요 · 3바퀴를 먼저 돌면 이겨요 · 5분 안에 아무도 못 들어오면 더 멀리 간 쪽이 이겨요</div>`;
     }
     function paintMenu() {
       over.querySelectorAll("[data-mode]").forEach((b) => { const on = b.dataset.mode === pref.mode; b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
@@ -383,8 +383,8 @@
           <h2>선다운 범퍼스 대전 게임 방법</h2>
           <h3>먼저 결승선을 지나면 이겨요</h3>
           <ul>
-            <li>두 사람이 같은 트랙을 나란히 출발해요. 먼저 결승선을 지난 사람이 이겨요.</li>
-            <li>한 사람이 들어온 뒤 12초 안에 상대가 못 들어오면 경주가 끝나요. 3분 안에 둘 다 못 들어오면 더 멀리 간 사람이 이겨요.</li>
+            <li>두 사람이 같은 트랙을 나란히 출발해요. 트랙마다 길 모양이 다른 고리를 3바퀴 돌아, 먼저 결승선을 지난 사람이 이겨요(한 판 보통 2분 남짓).</li>
+            <li>한 사람이 들어온 뒤 12초 안에 상대가 못 들어오면 경주가 끝나요. 5분 안에 둘 다 못 들어오면 더 멀리 간 사람이 이겨요.</li>
             <li>서로 부딪히면 튕겨 나가요. 드리프트 부스트, 바이킹 · 망치 · 찻잔 · 굴러오는 대형 공 · 튀어 오르는 기둥 · 회전 막대 장애물은 혼자 하기와 같아요(어느 장애물이든 피해 갈 틈이 있어요).</li>
             <li>아이템 상자를 지나면 아이템이 칸(3칸)에 담겨요. ${IS_TOUCH ? "화면 왼쪽 칸 단추" : `${k("1")}${k("2")}${k("3")}(또는 ${k("E")} · ${k("Shift")} = 찬 칸 가운데 가장 앞 칸)`}으로 원하는 칸을 골라 써요 — 써도 다른 칸 아이템은 제 번호 그대로예요 — 로켓 부스트 · 방패 · 범퍼 폭발 · 팝콘 폭탄 · 솜사탕 함정 · 회오리 바람 · 자석 · 무지개 별 · 물풍선 · 번개 구름 · 불꽃 미사일 · 유령 망토 · 별똥별 비. 상자는 길 폭 가득 두 줄이라 거의 다 먹을 수 있어요. 뒤처질수록 센 아이템이 잘 나와요.</li>
             <li>레이서는 모양만 달라요. 대전에서는 해금 · 업그레이드 효과 없이 모두 같은 기본 성능으로 달려요. 티켓은 모이지 않아요.</li>
@@ -425,7 +425,7 @@
       const tName = `트랙 ${r.track} · ${TRACKS[r.track - 1] || ""}`;
       const lead = P.online ? `${esc(P.rival.name)}님과의 경주 · ${esc(tName)}` : `${esc(P.rival.name)}와 연습 · ${esc(tName)}`;
       const anyFin = r.order[0] != null || r.order[1] != null;
-      const how = anyFin ? (won ? "먼저 결승선을 지났어요" : draw ? "" : `${esc(P.rival.name)}${P.online ? "님" : ""}이 먼저 들어왔어요`) : `3분 안에 둘 다 못 들어와 ${draw ? "간 거리가 같았어요" : "더 멀리 간 쪽이 이겼어요"}`;
+      const how = anyFin ? (won ? "먼저 결승선을 지났어요" : draw ? "" : `${esc(P.rival.name)}${P.online ? "님" : ""}이 먼저 들어왔어요`) : `5분 안에 둘 다 못 들어와 ${draw ? "간 거리가 같았어요" : "더 멀리 간 쪽이 이겼어요"}`;
       const mine = r.order[mi], theirs = r.order[ri];
       showOver(`<div class="bv-card is-small bv-result" role="dialog" aria-label="경주 결과">
           <span class="bv-badge ${won ? "is-win" : draw ? "" : "is-lose"}">${icon(won ? "trophy" : draw ? "handshake" : "flag", 28)}</span>
