@@ -61,19 +61,38 @@ class OpenNoticeGame(unittest.TestCase):
         body = _body(FIRST)
         self.assertIn("이번 주 게임 · 선다운 범퍼스 대전", body)
         self.assertIn('href="https://hk.example.test/games/bumpervs"', body)
-        for words in ("최대 6명이 한 트랙에서", "빈자리는 컴퓨터", "Teams 로 알림", "13개", "아이템", "점심시간"):
+        for words in ("범퍼카", "1:1", "최대 6명", "빈자리는 컴퓨터"):
             self.assertIn(words, body)
 
     def test_versus_games_mention_win_bonus(self):
-        # 대전 게임(1 ~ 3회)은 「동료를 이기면 그날 도장 2개!」 한 줄 — 혼자 하는 게임(4회부터)에는 넣지 않는다
+        # 사람 대전이 되는 게임은 소개 바로 다음 줄에 굵게 「🏅 동료를 이기면 그날 도장 2개!」 — 혼자 하는 게임에는 넣지 않는다
+        from app.services.match import MATCH_GAMES
+        from app.services.party import PARTY_GAMES
+
         bonus = "동료를 이기면 그날 도장 2개!"
+        versus = set(MATCH_GAMES) | set(PARTY_GAMES)
+        seen_versus = 0
         for i, (key, _, lines) in enumerate(teams.OPEN_NOTICE_GAMES):
             body = _body(FIRST + timedelta(weeks=i))
-            if key in ("bumpervs", "jellyvs", "mansion"):
+            if key in versus:
+                seen_versus += 1
+                self.assertEqual(lines[1], teams.WIN_BONUS_LINE, key)  # 소개 바로 다음 줄
                 self.assertEqual(sum(bonus in x for x in lines), 1, key)
-                self.assertIn(f"<b>{bonus}</b>", body)
+                self.assertIn(f"<b>🏅 {bonus}</b> (보너스는 한 달 5번까지)", body)
             else:
                 self.assertNotIn(bonus, body, key)
+                self.assertNotIn("도장", body.split("이번 주 게임")[1], key)
+        self.assertGreaterEqual(seen_versus, 3)
+
+    def test_short_and_no_win_rule(self):
+        # 소개는 짧게, 승 · 순위 설명은 빼기
+        for i, (key, _, lines) in enumerate(teams.OPEN_NOTICE_GAMES):
+            body = _body(FIRST + timedelta(weeks=i))
+            part = body.split("이번 주 게임")[1]
+            for words in ("1승", "1등", "순위"):
+                self.assertNotIn(words, part, key)
+            self.assertLessEqual(len(lines), 2, key)
+            self.assertEqual(part.count("<br>"), len(lines) + 1, key)  # 제목 줄 + 소개 줄 + 링크
 
     def test_existing_parts_kept_and_game_last(self):
         body = _body(FIRST)
@@ -114,7 +133,7 @@ class OpenNoticeGame(unittest.TestCase):
             self.assertEqual(title, GAMES[key].title)
             self.assertNotIn(key, seen)
             seen.add(key)
-            self.assertTrue(2 <= len(lines) <= 5, key)
+            self.assertTrue(1 <= len(lines) <= 2, key)
             self.assertTrue((WEB / "games" / f"{key}.html").is_file(), key)
             self.assertTrue((WEB / "assets" / "lounge" / f"{key}.jpg").is_file(), key)
         self.assertEqual(teams.game_thumb_url("bumpervs"), "https://hk.example.test/assets/lounge/bumpervs.jpg")
