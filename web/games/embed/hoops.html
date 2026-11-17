@@ -45,6 +45,7 @@ button:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
 #stageProg{color:var(--coral-d);font-weight:800;font-variant-numeric:tabular-nums}
 .hud-right{display:flex;gap:8px;align-items:center}
 .chip.star{padding:7px 12px}
+.chip.star.bump{animation:bump .3s ease-out}
 .chip.star i{font-style:normal;color:#f2a900;font-size:15px}
 .iconbtn{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.9);box-shadow:0 2px 10px rgba(20,30,50,.14);display:grid;place-items:center;font-weight:900;font-size:13px;letter-spacing:1px;color:var(--ink)}
 #bigScore{position:absolute;top:calc(max(10px,env(safe-area-inset-top)) + 44px);left:0;right:0;text-align:center;font-weight:900;font-size:clamp(54px,10.5vh,104px);color:rgba(28,36,51,.26);letter-spacing:-2px;line-height:1;font-variant-numeric:tabular-nums;transition:color .3s}
@@ -526,9 +527,13 @@ function addObs(o){
   }
   o.t=0;A.obs.push(o);return o;
 }
-function addStar(x,y){
+function starFollow(st){if(!st||!st.h||st.got)return;const a=axes(st.h);st.x=st.h.x+a.ux*0.5;st.y=st.h.y+a.uy*0.5;st.m.position.set(st.x,st.y,0.6);}
+function gotStar(st){if(st.got)return;st.got=true;run.stars++;save.stars++;persist();Snd.star();updHud();
+  burst(st.x,st.y,0.6,MOBILE?6:12,{colors:[0xffd23f,0xffffff],star:true,sp:3,size:0.3,g:2});
+  const s=$('starChip');if(s){s.classList.remove('bump');void s.offsetWidth;s.classList.add('bump');}}
+function addStar(x,y,h){
   const m=new THREE.Mesh(new THREE.PlaneGeometry(0.9,0.9),new THREE.MeshBasicMaterial({map:starTex,color:0xffc21a,transparent:true,depthWrite:false}));
-  m.position.set(x,y,0.1);A.scene.add(m);A.stars.push({x,y,m,got:false,t:0});
+  m.position.set(x,y,0.1);A.scene.add(m);const st={x,y,m,got:false,t:0,h:h||null};A.stars.push(st);return st;
 }
 function disposeObj(o){if(!o)return;A.scene.remove(o);o.traverse&&o.traverse(n=>{if(n.geometry&&n.geometry!==rimGeo&&n.geometry!==netGeo&&n.geometry!==ballGeo)n.geometry.dispose();if(n.material&&n.material!==ballMat){if(n.material.map&&n.material.map!==netTex&&n.material.map!==starTex&&n.material.map!==stripeTex&&n.material.map!==dotTex)n.material.map.dispose();n.material.dispose();}});}
 function resetA(){
@@ -566,7 +571,8 @@ function genTarget(prev,L){
   if(L>=4&&!move&&Math.random()<0.25+0.07*(L-4)){ // 도는 막대 — 두 골대 사이
     const mx=(prev.x+x)/2,my=(prev.y+y)/2+0.8;if(Math.abs(mx)<WX-1.5)addObs({type:'spin',x:mx,y:my,len:2.4,ang:0,w:rand(1.3,2.0)*(Math.random()<.5?-1:1)});
   }
-  if(Math.random()<0.38)addStar(clamp(x+rand(-1.2,1.2),-WX+0.8,WX-0.8),y+rand(1.8,3.0));
+  // 별 — 원본처럼 골대 림 바로 위(공이 들어가며 지나가는 자리)에 붙어 다닌다. 골대 셋 중 하나 남짓
+  if(Math.random()<0.4){const st=addStar(x,y,h);starFollow(st);}
   return h;
 }
 function setupA(level){
@@ -640,7 +646,8 @@ function showDotsA(ang,power){
 function catchA(h){
   A.phase='settle';A.settle={h,t:0,fx:A.b.x,fy:A.b.y};h.strV+=5;
   if(h===A.cur){Snd.thud(0.4);return;}
-  // 다음 골대에 들어감 — 점수
+  // 다음 골대에 들어감 — 점수(그 골대 림 위 별도 함께 먹는다)
+  for(const st of A.stars)if(st.h===h&&!st.got)gotStar(st);
   h.frozen=true;
   const perfect=!A.touched;
   if(perfect)run.combo++;else run.combo=0;
@@ -683,7 +690,7 @@ function updA(dt){
     if(h.fall>0.9){disposeObj(h.root);A.hoops.splice(A.hoops.indexOf(h),1);A.falling.splice(i,1);}}
   // 장애물
   for(const o of A.obs){if(o.type==='spin'){o.ang+=o.w*dt;o.mesh.rotation.z=o.ang;}}
-  for(const st of A.stars){st.t+=dt;if(!st.got){st.m.rotation.z=Math.sin(st.t*2)*0.3;st.m.scale.setScalar(1+Math.sin(st.t*4)*0.08);}
+  for(const st of A.stars){st.t+=dt;if(!st.got){starFollow(st);st.m.rotation.z=Math.sin(st.t*2)*0.3;st.m.scale.setScalar(1+Math.sin(st.t*4)*0.08);}
     else{st.m.position.y+=dt*3;st.m.material.opacity=Math.max(0,st.m.material.opacity-dt*2.5);}}
   // 화면 아래로 지나간 것 정리
   const bottom=A.camY-A.hh-3;
@@ -713,8 +720,7 @@ function updA(dt){
         j++;}
       if(A.phase!=='fly')break;
       for(const o of A.obs)if(obsColl(o)){A.touched=true;Snd.bar();}
-      for(const st of A.stars)if(!st.got&&Math.hypot(st.x-A.b.x,st.y-A.b.y)<BR+0.42){st.got=true;run.stars++;save.stars++;persist();Snd.star();updHud();
-        burst(st.x,st.y,0.2,MOBILE?5:10,{colors:[0xffd23f,0xffffff],star:true,sp:3,size:0.3,g:2});}
+      for(const st of A.stars)if(!st.got&&Math.hypot(st.x-A.b.x,st.y-A.b.y)<BR+0.42)gotStar(st);
     }
     if(A.phase==='fly'){
       A.ball.rotation.z-=A.v.x*dt/BR;

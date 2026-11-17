@@ -121,7 +121,8 @@ button:focus-visible{outline:3px solid var(--mint);outline-offset:3px}
 @media (max-width:360px){.mode span{font-size:12px}.card h1{font-size:26px}}
 
 body{background:#f3efe8}
-#bigScore{color:rgba(40,44,52,.62)}
+#bigScore{color:rgba(40,44,52,.62);top:calc(max(10px,env(safe-area-inset-top)) + 40px);font-size:clamp(40px,7.5vh,72px)}
+#comboTag{top:calc(max(10px,env(safe-area-inset-top)) + 46px + clamp(41px,7.65vh,74px))}
 body.hot #bigScore{color:rgba(60,28,10,.55)}
 .slider{position:relative;height:12px;border-radius:999px;background:#e7ebf1;margin:16px 6px 4px}
 .slider i{position:absolute;top:50%;left:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;background:var(--coral);box-shadow:0 3px 0 var(--coral-d);animation:slide 1.6s ease-in-out infinite alternate}
@@ -421,7 +422,9 @@ function hideTip(){clearTimeout(tipTimer);$('tip').hidden=true;}
 /* ═══════════════════════ 옥상 링 캐치 ═══════════════════════ */
 // 세계: 바닥 y=0, 골대는 높이 HH · 깊이 z=0 에 떠 있고 좌우(x)로만 움직인다.
 // 공은 멀리(화면 위쪽, z<0)에서 높게 포물선을 그리며 날아와 골대 높이를 지나 바닥으로 떨어진다.
-const HH=3.0,BRC=0.45,TUBE=0.085,GC=18,XR=3.3;
+const HH=3.0,BRC=0.45,TUBE=0.085,XR=3.3;
+// 공 길 — 꼭대기(높이 YA · 깊이 ZA)를 고정해 날아오는 내내 화면 안(위 점수 아래)에 보이게. 빨라지면 중력을 키워 같은 꼭대기에서 더 빨리 떨어진다
+const YA=7.4,ZA=-7.5,TMAX=1.8;
 const W={scene:new THREE.Scene(),cam:new THREE.PerspectiveCamera(42,1,0.5,300),hx:0,hxT:0,rr:1,balls:[],tint:0,grey:0,spawnT:0,lastX:0};
 (function build(){
   const s=W.scene;s.background=new THREE.Color(0xf3efe8);
@@ -466,16 +469,22 @@ const W={scene:new THREE.Scene(),cam:new THREE.PerspectiveCamera(42,1,0.5,300),h
 function fitW(){
   const asp=VW/VH;W.cam.aspect=asp;W.cam.fov=asp<0.75?50:42;W.cam.updateProjectionMatrix();
   // 원본처럼 골대가 화면 가운데보다 조금 아래, 공은 화면 위쪽(멀리 · 높이)에서 날아온다
-  const Q=new THREE.Vector3(0,3.0,-5),P0=new THREE.Vector3(0,11.5,10);
+  const Q=new THREE.Vector3(0,4.2,-5),P0=new THREE.Vector3(0,12.5,9);
   const dir=Q.clone().sub(P0).normalize();let dist=P0.distanceTo(Q);
-  // 골대 좌우 끝까지 보이고, 공이 나타나는 자리(멀리 위)도 화면 위쪽 안에 들어오도록 뒤로 물린다
-  const spawn=new THREE.Vector3(0,6,-16),edge=new THREE.Vector3(XR+1.4,HH,0),v=new THREE.Vector3();
-  for(let i=0;i<60;i++){
+  // 공 길(나타나는 자리 · 꼭대기)이 위 표시(점수 · 단계 · 연속 문구) 아래에, 골대 좌우 끝이 화면 안에 들어오도록 물린다
+  const hudPx=hudBottomPx()+16,topN=1-2*hudPx/VH;
+  const T=TMAX,tr=T*0.45,tf=T-tr,g=2*(YA-HH)/(tf*tf),vz=-ZA/tf;
+  const R2=BRC*1.6,pts=[new THREE.Vector3(0,YA+R2,ZA),new THREE.Vector3(0,YA-0.5*g*tr*tr+R2,ZA-vz*tr),new THREE.Vector3(XR+1.2,YA-0.5*g*tr*tr+R2,ZA-vz*tr)];
+  const edge=new THREE.Vector3(XR+1.3,HH,0),v=new THREE.Vector3();
+  for(let i=0;i<80;i++){
     W.cam.position.copy(Q).addScaledVector(dir,-dist);W.cam.lookAt(Q);W.cam.updateMatrixWorld();
-    const sy=v.copy(spawn).project(W.cam).y,ex=v.copy(edge).project(W.cam).x;
-    if(sy<0.9&&ex<0.96)break;dist*=1.04;
+    let top=-9;for(const p of pts)top=Math.max(top,v.copy(p).project(W.cam).y);
+    const ex=v.copy(edge).project(W.cam).x,sxp=v.copy(pts[2]).project(W.cam).x;
+    if(top<topN&&ex<0.96&&sxp<0.97)break;dist*=1.03;
   }
 }
+// 위 표시가 차지하는 높이(px) — 점수 글자 크기는 CSS 와 같은 식
+function hudBottomPx(){const top=Math.max(10,0)+40,fs=Math.min(Math.max(40,0.075*VH),72);return top+fs*1.02+6+20;}
 function syncHoop(){W.hoop.root.position.set(W.hx,HH,0);W.hShadow.position.set(W.hx,0.02,0);}
 // 난이도 — 넣은 공 수로 오른다(원본처럼 판 중에 계속). 10골마다 단계
 function diff(){
@@ -493,10 +502,12 @@ function spawnBall(){
   let tx=clamp(W.lastX+rand(-d.spread,d.spread),-XR,XR);
   if(Math.abs(tx-W.lastX)<0.6)tx=clamp(W.lastX+(Math.random()<.5?-1:1)*rand(0.8,1.6),-XR,XR);
   W.lastX=tx;
-  const sx=clamp(tx+rand(-d.drift,d.drift),-XR-2,XR+2),sz=-16,sy=6;
-  const T=d.T*rand(0.95,1.08);
-  b.p.set(sx,sy,sz);
-  b.v.set((tx-sx)/T,(HH-sy+0.5*GC*T*T)/T,(0-sz)/T);
+  const T=Math.min(TMAX,d.T*rand(0.95,1.08)),tr=T*0.45,tf=T-tr;
+  const g=2*(YA-HH)/(tf*tf),vz=-ZA/tf;          // 꼭대기 → 골대: 떨어지는 시간 tf 에 맞춘 중력 · 앞으로 오는 빠르기
+  const sy=YA-0.5*g*tr*tr,sz=ZA-vz*tr;           // 꼭대기 전 tr 초 자리에서 나타남
+  const sx=clamp(tx+rand(-d.drift,d.drift)*0.8,-XR-1.2,XR+1.2);
+  b.g=g;b.p.set(sx,sy,sz);
+  b.v.set((tx-sx)/T,g*tr,vz);
   b.st='fly';b.touched=false;b.t=0;b.fire=run&&run.combo>=3;
   b.m.material.map=b.fire?LAVA_TEX:BASE_TEX;b.m.material.emissive.setHex(b.fire?0x5a1800:0);b.m.material.needsUpdate=true;
   b.m.visible=true;b.sh.visible=true;b.m.position.copy(b.p);
@@ -547,7 +558,7 @@ function updW(dt){
     if(b.st==='off')continue;
     b.t+=dt;const N=4,h=dt/N;
     for(let i=0;i<N;i++){
-      const py=b.p.y;b.v.y-=GC*h;b.p.addScaledVector(b.v,h);
+      const py=b.p.y;b.v.y-=(b.g||18)*h;b.p.addScaledVector(b.v,h);
       if(b.st==='fly'){
         if(rimColl(b)){b.touched=true;Snd.rim(Math.min(1,b.v.length()/12+0.3));}
         const r=Math.hypot(b.p.x-W.hx,b.p.z);
@@ -695,7 +706,7 @@ function frame(now){
 resize();refreshTitle();
 requestAnimationFrame(t=>{last=t;frame(t);});
 hk({type:'hk:ready'});
-if(!inFrame||/[?&]dev=1(&|$)/.test(location.search))window.__rc={get state(){return state;},get run(){return run;},get paused(){return paused;},W,startRun,gameOver,togglePause};
+if(!inFrame||/[?&]dev=1(&|$)/.test(location.search))window.__rc={G:18,get state(){return state;},get run(){return run;},get paused(){return paused;},W,startRun,gameOver,togglePause};
 })();
 </script>
 </body>
