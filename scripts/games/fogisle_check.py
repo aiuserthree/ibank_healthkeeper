@@ -18,6 +18,11 @@
     cd "$REPO" && /usr/bin/python3 scripts/games/fogisle_check.py arcade [--out DIR]
     cd "$REPO" && /usr/bin/python3 scripts/games/fogisle_check.py ui [--out DIR]
     cd "$REPO" && /usr/bin/python3 scripts/games/fogisle_check.py assets [--out DIR]
+    cd "$REPO" && /usr/bin/python3 scripts/games/fogisle_check.py mission --id m1w [--out DIR]        (S10a — 임무 1 지형 걷기)
+    cd "$REPO" && /usr/bin/python3 scripts/games/fogisle_check.py perf --mission m1 --sec 60 [--out DIR]
+    cd "$REPO" && /usr/bin/python3 scripts/games/fogisle_check.py mission --id m1 --diff easy|normal|hard [--out DIR]   (S10b — 임무 1 한 판)
+    cd "$REPO" && /usr/bin/python3 scripts/games/fogisle_check.py mission --id m2w [--out DIR]        (S11a — 임무 2 지형 걷기 · 통로 · 증기 · 폭파 문)
+    cd "$REPO" && /usr/bin/python3 scripts/games/fogisle_check.py perf --mission m2 --sec 60 [--out DIR]   (S11a — 임무 2 지형만)
 
 - 종료 코드 0 = 통과. 마지막 줄은 JSON 요약.
 - 산출물(스크린샷 · 수치)은 --out (기본: 환경 변수 FOGISLE_OUT 또는 /tmp/fogisle-check/).
@@ -43,6 +48,11 @@
                         수류탄 반경 · 엄폐 뒤 무피해 · 쿠킹 퓨즈 3초 · 궤적 점 · 손에서 터짐 · 섬광 반경 8m · 플레이어 흰빛(동작 줄이기 회색) ·
                         효과(예광 · 탄피 · 탄흔 · 점광 · 폭발 빛 · 흔들림 · 붉은 입자 없음) · 첫 폭발 셰이더 새로 안 만듦 · 「훈련장」 클릭 → 과제 6개를 __fps 입력만으로
     perf --blast    S5  실시간 고리 t0 에서 폭발 연속(0.7초마다) 중 33ms 넘는 프레임 0 · 호출 ≤ 60 · 셰이더 새로 안 만듦
+    perf --mission m1 [--sec 60]  S10b  임무 1 실제 판(적 · 아군 · 소품)을 god · 자동 조종으로 실시간: 구역 만들기 각 ≤ 50ms · 합 ≤ 300ms ·
+                        호출 ≤ 150 · 삼각형 ≤ 150k · 구역별 최대 · 동굴 야간투시경 구간 · 동굴 빛 낮춤 · 33ms 초과 1% 이하 · 새벽 하늘 · 생성 무늬
+                        + 등대 켜짐 → 선착장 돌파 20초(회전 빛줄기 · 깨어난 적)도 같은 예산(S10a 지형만 걷기는 mission --id m1w)
+    perf --mission m2 [--sec 60]  S11a  임무 2 지형(시험 작전 m2w — 적 없음)을 god · 자동 조종으로 실시간: 구역 만들기 · 호출 ≤ 150 · 삼각형 ≤ 150k ·
+                        구역별 최대 · 33ms 초과 1% 이하 · 흐린 하늘 · 생성 무늬(salt · rustplate · corrugated …) + 탱크 마당 증기 기둥 10초도 같은 예산
     ai --core       S6  시험 구역 t1: 무리 2개 순찰 · 길찾기(높은 벽 돌아가기 · 줄 당기기 · 캐시 · 단계당 A* ≤ 2) · 40m 안 총성 → 경계(소음기 12m) ·
                         시야 원뿔 + 발견 게이지 → 교전(뒤돈 적은 못 봄) · 반응 시간 뒤 첫 발 빗나감(옆 0.5~1.5m · 탄흔) · 확률 명중 · 토큰 ≤ 3 ·
                         맞으면 엄폐 지점(숨은 머리 = 엄폐물에 맞음) · 엿보며 사격 · 놓치면 추격 → 경계 → 순찰 · 쓰러짐 2.1초 뒤 제거(흐려짐) · 동료 쓰러짐 경계 ·
@@ -52,6 +62,9 @@
                         점수 0~250,000 정수 · 점수식 다시 셈 · 실패 규칙. t2: 시작 연출(입력 버림 · Enter/클릭 건너뛰기 · 시점 복귀) · 목표 줄 · 나침반 ·
                         마커 + 거리 · 화면 밖 화살표 · 자막 2줄(기호 + 이름) · 무전 소리 · 상호작용(F 길게 · 유지 · 줄어듦 · 바라봄) · 웨이브 · 버티기 20초.
                         t0: 실제 키 W 만으로 「표식까지 걷기」 끝
+                    S10b  m1(--diff easy|normal|hard): 위 + 물총새 구역 건너기 · 떨어짐 0 · 첫 처치 ≤ 20초. 보통이면 더: 첫 30초(시작 연출 포함 · 추천 장비 —
+                        첫 사격 ≤ 15 · 첫 처치 ≤ 20 · 경비 교전 없음) · 바탕 소리(파도 · 바람 · 무적) · 음악(은신 → 등대 곡 → 전투 곡) · 등대 소품(빛줄기 회전 ·
+                        체크포인트 복원도 켜짐) · 동굴 밝기 배수 · 야간투시경(밝은 곳 눈부심 / 동굴 증폭 · 깊이 안개) · 0발 명중 절반 · 어려움 트인 곳 쓰러짐 ≥ 1.2초
     arcade          S9  arcade --frame 전부 + 점수 규약(가짜 부모 창 ?hk=1&dev=1&quick=t0): hk:ready → hk:hello → 「바로 출격」 → hk:start 1번 →
                         출격 직후 Space = 점프(hk:start 그대로 1번) → hk:live 2초 간격(정수) → 키 W 만으로 t0 끝 → hk:score 1번(정수 ≤ 250,000 = 판 점수) →
                         결과에서 Space = 「다음 작전」(hk:start) → 멈춤 「임무 그만두기」 → 확인 창 → 실패 점수 hk:score → 「다시 하기」 → 메뉴로 빠지면 먼저 실패 점수 →
@@ -127,6 +140,30 @@ BANNED_WORDS_HANGUL = [
     "러시아", "모스크바", "우크라이나", "미국", "미군",
 ]
 
+
+
+def _easy_counts(sq):
+    """fix3 — 본체 ai dropPlan 과 같은 규칙: 전체 × 0.8(반올림)이 되게, 무리 첫 사람은 남기고 소총수 · 남은 인원 많은 무리 · 뒤쪽부터 뺌."""
+    left = {g: v["n"] for g, v in sq.items()}
+    cand = []
+    for g, v in sq.items():
+        for k in range(1, v["n"]):
+            cand.append((g, k, v["types"][k] == "rifle", len(cand)))
+    total = sum(left.values())
+    n = total - int(total * 0.8 + 0.5)
+    out = set()
+    for rifle_only in (True, False):
+        while n > 0:
+            best = None
+            for c in cand:
+                if (c[0], c[1]) in out or (rifle_only and not c[2]):
+                    continue
+                if best is None or left[c[0]] > left[best[0]] or (left[c[0]] == left[best[0]] and c[3] > best[3]):
+                    best = c
+            if best is None:
+                break
+            out.add((best[0], best[1])); left[best[0]] -= 1; n -= 1
+    return left
 
 def out_dir(args):
     p = pathlib.Path(args.out or DEFAULT_OUT)
@@ -812,9 +849,94 @@ def cmd_arcade(args):
                          f"[창] 오류 0 · 바깥 요청 0 · 없는 파일 0 {s.errors[:4]} {s.external[:3]} {s.missing[:3]}")
             if score_part:
                 ok &= _arcade_score(s, out, notes, summary)
+                ok &= _arcade_missions(s, out, notes, summary)
         finally:
             s.close()
     return finish("arcade", ok, summary, notes)
+
+
+
+def _arcade_missions(s, out, notes, summary):
+    """S11b — 실제 임무 두 판(임무 1 → 임무 2)을 가짜 부모 창 안에서: 고르기 → 장비 → 브리핑 → 「출격」 = hk:start, 판 끝 = hk:score 한 번(= 판 점수).
+    판은 시험 손잡이(__fps — 판을 「시험 판」으로 표시해 신호를 막음) 없이 본체를 바로 움직여 빠르게 끝냄(무적 · 자동 조종 · 8배속).
+    임무 1 완수 → 임무 2 열림 · 결과 「다음 작전」 → 임무 2 브리핑(아직 hk:start 없음) → 「출격」 → hk:start → 끝 hk:score."""
+    ok = True
+    pg = s.page()
+    pg.goto(HOST + PARENT_PATH, wait_until="load")
+    fr = pg.query_selector("#f").content_frame()
+    fl = pg.frame_locator("#f")
+    try:
+        fr.wait_for_function("() => !!(window.__fps && window.__fps.ready)", timeout=8000)
+    except Exception as e:  # noqa: BLE001
+        return _check(notes, False, "[임무 점수] 창 안 ready 실패 " + str(e)[:160])
+    pg.wait_for_timeout(300)
+    full = lambda: pg.evaluate("() => window.__gotT.slice()")  # noqa: E731
+    cnt = lambda ty: sum(1 for x in full() if x["type"] == ty)  # noqa: E731
+    FAST = "() => { FG.player.god = true; FG.weapons.infinite = true; FG.weapons.refill(); FG.mission.autopilot(true); FG.loop.timeScale = 8; FG.loop.renderEvery = 8; return FG.arcade.tainted; }"
+
+    def play(mid, budget):
+        t0 = time.time()
+        while time.time() - t0 < budget and fr.evaluate("() => FG.game.phase") != "result":
+            pg.wait_for_timeout(400)
+        fr.evaluate("() => { FG.loop.timeScale = 1; FG.loop.renderEvery = 1; }")
+        pg.wait_for_timeout(900)   # 결과 뒤 신호가 더 오지 않는지
+        return fr.evaluate("() => ({ ph: FG.game.phase, m: FG.mission.state(), sc: FG.mission.score(), last: FG.ui.state().lastEnd, a: FG.arcade.state(), rec: FG.store.progress.missions[FG.mission.state().id] || null })"), round(time.time() - t0, 1)
+
+    # 1) 임무 1 — 처음 온 회원: m2 잠김
+    fl.locator("#btnSelect").click()
+    _phase_wait(fr, "select")
+    v = fr.evaluate("() => FG.ui.state().unlock")
+    ok &= _check(notes, v.get("m1") and not v.get("m2"), f"[임무 점수] 처음: 해금 {v}(임무 2 잠김)")
+    fl.locator('#selMap .fg-card[data-id="m1"]').click()
+    _phase_wait(fr, "loadout")
+    fl.locator("#btnLoBrief").click()
+    _phase_wait(fr, "briefing")
+    s0 = cnt("hk:start")
+    fl.locator("#btnBfGo").click()
+    ok &= _check(notes, _phase_wait(fr, "play", 4000), "[임무 점수] 고르기 → 장비 → 브리핑 → 「출격」 → play")
+    pg.wait_for_timeout(300)
+    tainted = fr.evaluate(FAST)
+    ok &= _check(notes, cnt("hk:start") == s0 + 1 and not tainted and fr.evaluate("() => FG.mission.state().id") == "m1",
+                 f"[임무 점수] 임무 1 출격 → hk:start 1번 · 시험 판 아님(tainted {tainted})")
+    sc0 = cnt("hk:score")
+    r, real = play("m1", 120)
+    sc_msgs = [x for x in full() if x["type"] == "hk:score"][sc0:]
+    lives = [x for x in full() if x["type"] == "hk:live"]
+    summary["m1run"] = {"score": r["sc"]["total"], "sent": [x["score"] for x in sc_msgs], "t": r["m"]["t"], "real": real}
+    ok &= _check(notes, r["ph"] == "result" and r["m"]["result"] == "success" and len(sc_msgs) == 1 and sc_msgs[0]["score"] == r["sc"]["total"] == r["last"]["total"]
+                 and isinstance(sc_msgs[0]["score"], int) and 0 < sc_msgs[0]["score"] <= 250000 and not r["a"]["runOpen"] and not r["last"]["tainted"],
+                 f"[임무 점수] 임무 1 완수(임무 시계 {r['m']['t']}초 · 실시간 {real}초) → hk:score {[x['score'] for x in sc_msgs]} 한 번 = 판 점수 {r['sc']['total']} = 결과 화면 {r['last']['total']} · hk:live {len(lives)}번")
+    v = fr.evaluate("() => ({ unlock: FG.ui.state().unlock, next: getComputedStyle(document.getElementById('btnNext')).display, rec: FG.store.progress.missions.m1 })")
+    ok &= _check(notes, v["unlock"].get("m2") and v["next"] != "none" and v["rec"] and v["rec"]["cleared"] and v["rec"]["best"] == r["sc"]["total"],
+                 f"[임무 점수] 임무 1 완수 → 임무 2 열림 {v['unlock']} · 「다음 작전」 보임 · 기록 최고 {v['rec'] and v['rec']['best']}")
+    pg.screenshot(path=str(out / "arcade-m1-result.png"))
+    # 2) 「다음 작전」 → 임무 2 브리핑(아직 판 시작 아님) → 「출격」
+    s1 = cnt("hk:start")
+    fl.locator("#btnNext").click()
+    ok_b = _phase_wait(fr, "briefing", 3000)
+    v = fr.evaluate("() => ({ t: document.getElementById('bfTitle').textContent, no: document.getElementById('bfNo').textContent, goals: Array.from(document.querySelectorAll('#bfGoals li')).map(e => e.textContent), sel: FG.ui.state().sel.id })")
+    ok &= _check(notes, ok_b and v["t"] == "짠물 밸브" and v["sel"] == "m2" and cnt("hk:start") == s1 and len(v["goals"]) == 3,
+                 f"[임무 점수] 결과 「다음 작전」 → 임무 2 브리핑 「{v['no']} {v['t']}」 · 목표 {v['goals']} · hk:start 아직 없음")
+    pg.screenshot(path=str(out / "arcade-m2-briefing.png"))
+    fl.locator("#btnBfGo").click()
+    ok &= _check(notes, _phase_wait(fr, "play", 4000), "[임무 점수] 임무 2 「출격」 → play")
+    pg.wait_for_timeout(300)
+    tainted = fr.evaluate(FAST)
+    ok &= _check(notes, cnt("hk:start") == s1 + 1 and not tainted and fr.evaluate("() => FG.mission.state().id") == "m2", "[임무 점수] 임무 2 출격 → hk:start 1번")
+    sc1 = cnt("hk:score")
+    r, real = play("m2", 120)
+    sc_msgs = [x for x in full() if x["type"] == "hk:score"][sc1:]
+    summary["m2run"] = {"score": r["sc"]["total"], "sent": [x["score"] for x in sc_msgs], "t": r["m"]["t"], "real": real}
+    ok &= _check(notes, r["ph"] == "result" and r["m"]["result"] == "success" and len(sc_msgs) == 1 and sc_msgs[0]["score"] == r["sc"]["total"] == r["last"]["total"]
+                 and 0 < sc_msgs[0]["score"] <= 250000 and not r["a"]["runOpen"] and r["rec"] and r["rec"]["cleared"],
+                 f"[임무 점수] 임무 2 완수(임무 시계 {r['m']['t']}초 · 실시간 {real}초) → hk:score {[x['score'] for x in sc_msgs]} 한 번 = 판 점수 {r['sc']['total']} = 결과 화면 {r['last']['total']} · 기록 저장")
+    v = fr.evaluate("() => ({ next: getComputedStyle(document.getElementById('btnNext')).display, unlock: FG.ui.state().unlock, cards: FG.ui.state().cards })")
+    pg.screenshot(path=str(out / "arcade-m2-result.png"))
+    ok &= _check(notes, v["next"] == "none" and v["unlock"].get("m3"),
+                 f"[임무 점수] 임무 2 결과: 다음(임무 3)은 자료가 없어 「다음 작전」 숨김 · 해금 {v['unlock']}")
+    seq = [x["type"] for x in full() if x["type"] in ("hk:start", "hk:score")]
+    ok &= _check(notes, seq[-4:] == ["hk:start", "hk:score", "hk:start", "hk:score"], f"[임무 점수] 두 판 신호 순서 {seq[-4:]}")
+    return ok
 
 
 def _hk_next(fr):
@@ -2217,9 +2339,13 @@ def cmd_perf(args):
     notes = []
     ok = True
     summary = {"sec": args.sec, "mission": args.mission, "quality": args.quality}
-    if args.mission not in (None, "t0"):
-        print("임무 측정(--mission m1 · m4)은 임무가 생기는 S8 · S10 부터 — 지금은 시험 구역 t0 만")
+    if args.mission not in (None, "t0", "m1", "m2"):
+        print("임무 측정은 지금 t0 · m1 · m2(S11a — 임무 2 지형) 만. m4 는 S13 부터")
         return finish("perf", False, {"error": "mission " + str(args.mission)}, [])
+    if args.mission == "m1":
+        return _perf_m1(args)
+    if args.mission == "m2":
+        return _perf_m2(args)
     if args.quality not in ("mid",):
         print("화질 단계(높음 · 낮음 · 자동)는 S14 에서 — 지금은 보통(mid)만")
         return finish("perf", False, {"error": "quality " + str(args.quality)}, [])
@@ -2308,6 +2434,192 @@ def cmd_perf(args):
             pg.wait_for_function("() => window.FG && window.FG.perf && window.FG.game.phase === 'title'", timeout=5000)
             h = pg.evaluate("() => ({ dbg: !!document.getElementById('dbg'), on: FG.perf.dbgOn, fps: !!window.__fps })")
             ok &= _check(notes, not h["dbg"] and not h["on"] and not h["fps"], f"아케이드(?hk=1&dbg=1)에서는 구석 표 없음 · 시험 손잡이 없음 {h}")
+        finally:
+            s.close()
+    return finish("perf", ok, summary, notes)
+
+
+def _perf_m1(args):
+    """S10b — 임무 1 「첫 불빛」 실제 판(적 14 · 아군 · 등대 소품)을 god · 자동 조종(시작 연출 건너뜀)으로 실시간 --sec 초 잰다(해안 교전 · 동굴 야간투시경 · 절벽 · 막사).
+    이어서 등대 켜짐 → 선착장 돌파 구간(회전 빛줄기 · 보트 불빛 · 선착장 적 깨어남)을 20초 더 잰다.
+    두 구간 모두 호출 ≤ 150 · 삼각형 ≤ 150k(보통 화질 예산), 33ms 초과 1% 이하, 구역 만들기 50ms 이하 · 합 300ms 이하, 구역별 최대 호출 · 삼각형,
+    야간투시경 켠 구간 포함, 동굴 안 빛 낮춤, 하늘 · 생성 무늬 붙음, 오류 0. (S10a 의 지형만 걷기는 시험 작전 m1w — mission --id m1w)"""
+    from playwright.sync_api import sync_playwright
+    out = out_dir(args)
+    notes = []
+    ok = True
+    summary = {"sec": args.sec, "mission": "m1", "quality": args.quality}
+    with sync_playwright() as pw:
+        s = Session(pw)
+        try:
+            pg = s.page([HK_SPY])
+            pg.goto(HOST + BODY_URL + "?dbg=1", wait_until="load")
+            r_ok, _ = wait_ready(pg, 5000)
+            ok &= _check(notes, r_ok, "__fps.ready")
+            st0 = pg.evaluate("""() => { const t0 = performance.now(); const okm = __fps.startMission('m1', { seed: 3 }); const ms = performance.now() - t0;
+                __fps.god(true); __fps.infiniteAmmo(true); __fps.autopilot(true);
+                return { ok: okm, ms: +ms.toFixed(1), zones: __fps.world().zones, phase: __fps.state().phase, env: FG.gfx.envState(),
+                    errs: FG.map.loaded.map(id => [id, FG.map.built[id].errors.length]) }; }""")
+            zs = st0["zones"]
+            summary["zones"] = zs
+            summary["startMs"] = st0["ms"]
+            ok &= _check(notes, st0["ok"] and st0["phase"] == "play" and list(zs.keys()) == ["m1z1", "m1z2", "m1z3", "m1z4", "m1z5"],
+                         f"임무 1(실제 판 — 적 · 아군 · 소품) 시작 → play · 구역 {list(zs.keys())} · 자료 오류 {st0['errs']}")
+            ok &= _check(notes, all(v["ms"] <= 50 for v in zs.values()) and sum(v["ms"] for v in zs.values()) <= 300,
+                         "구역 만들기 " + " · ".join(f"{k} {v['ms']}ms(원시 {v['prims']} · 그림 삼각형 {v['visTris']} · 충돌 {v['collTris']} · 메시 {v['meshes']})" for k, v in zs.items())
+                         + f" — 각 ≤ 50ms · 합 {round(sum(v['ms'] for v in zs.values()), 1)}ms ≤ 300ms(시작 전체 {st0['ms']}ms)")
+            ok &= _check(notes, st0["env"]["dyn"] and st0["env"]["fog"][1] <= 140 and not st0["env"]["placeholder"],
+                         f"새벽 분위기: 안개 {st0['env']['fog']} · 노출 {st0['env']['exposure']} · 해 그림자 따라감 · 어두운 곳 {st0['env']['darks']}개 · 자리표시 숨김")
+            # 구역별 최대 호출 · 삼각형 · 야간투시경 · 빛 배수 — 0.25초마다 표본
+            pg.evaluate("""() => { window.__m1 = { by: {}, nvgSamples: 0, nvgCalls: 0, minF: 1, t: [] };
+                window.__m1T = setInterval(() => { const i = FG.gfx.renderer.info.render, P = FG.player.pos; const g = FG.nav.gridAt(P.x, P.z); const z = g ? g.id : '?';
+                    const b = window.__m1.by[z] || (window.__m1.by[z] = { calls: 0, tris: 0, n: 0 }); b.calls = Math.max(b.calls, i.calls); b.tris = Math.max(b.tris, i.triangles); b.n++;
+                    const e = FG.gfx.envState(); window.__m1.minF = Math.min(window.__m1.minF, e.f);
+                    if (FG.nvgView.isOn()) { window.__m1.nvgSamples++; window.__m1.nvgCalls = Math.max(window.__m1.nvgCalls, i.calls); } }, 250); }""")
+            pg.wait_for_timeout(3000)
+            pg.evaluate("() => __fps.perfReset()")
+            pg.wait_for_timeout(int(args.sec * 1000))
+            p = pg.evaluate("() => __fps.perf()")
+            m1 = pg.evaluate("() => { clearInterval(window.__m1T); return window.__m1; }")
+            st = pg.evaluate("() => ({ s: __fps.state(), m: __fps.mission(), a: __fps.assets() })")
+            pg.screenshot(path=str(out / "perf-m1.png"))
+            summary["perf"] = p
+            summary["byZone"] = m1["by"]
+            (out / "perf-m1.json").write_text(json.dumps({"perf": p, "byZone": m1["by"], "zones": zs}, ensure_ascii=False, indent=1))
+            ok &= _check(notes, st["s"]["phase"] in ("play", "result") and p["measured"] >= args.sec * 30 and not st["m"]["autopilot"]["stuck"],
+                         f"실시간 {p['sec']}초 걸으며 측정 · 프레임 {p['measured']}개 · 지금 목표 {st['m']['objective']} · 자리 {st['s']['pos']} · 끼임 {st['m']['autopilot']['stuck']}")
+            ok &= _check(notes, len(m1["by"]) >= 3, f"지나간 구역 {list(m1['by'].keys())}(구역별 최대 호출 · 삼각형 " + " · ".join(f"{k} {v['calls']}/{v['tris']}" for k, v in m1["by"].items()) + ")")
+            ok &= _check(notes, 4 <= m1["nvgSamples"] <= args.sec * 4 * 0.6 and m1["minF"] <= 0.6 and not st["s"].get("nvg"),
+                         f"동굴 구간만 야간투시경 켜고 측정 — 켠 표본 {m1['nvgSamples']}개(0.25초마다) · 그때 최대 호출 {m1['nvgCalls']} · 동굴 빛 배수 최저 {m1['minF']} · 동굴 나와서 끔")
+            ok &= _check(notes, 0 < p["callsMax"] <= 150 and p["trisMax"] <= 150000,
+                         f"그리기 호출 최대 {p['callsMax']} ≤ 150 · 삼각형 최대 {p['trisMax']} ≤ 150,000(보통 화질 예산)")
+            notes.append((True, f"(참고) S10a 지형만 74 / 45.6k → 적 · 아군 · 효과 · 등대 소품이 더해진 지금 {p['callsMax']} / {p['trisMax']}"))
+            ok &= _check(notes, p["over33Pct"] <= 1.0, f"33ms 넘는 프레임 {p['over33']}개 = {p['over33Pct']}% ≤ 1%")
+            ok &= _check(notes, p["ms"]["phys"] <= 0.8, f"이동 · 충돌 sim {p['ms']['phys']}ms/프레임 ≤ 0.8ms(지형 삼각형 많아짐)")
+            notes.append((True, f"(참고 · 헤드리스 M5) 중앙값 {p['ftMed']}ms · 95번째 {p['ftP95']}ms · 최대 {p['ftMax']}ms · fps {p['fpsMed']} · sim {p['ms']['sim']}ms · 그리기 준비 {p['ms']['render']}ms · 힙 {p['heapMB']}MB"))
+            sky = st["a"]["sky"]
+            looks = st["a"]["looks"]
+            ok &= _check(notes, sky["name"] == "dawn" and all(k in looks for k in ("pebbles", "rock", "turf", "plaster", "wetground")),
+                         f"하늘 {sky} · 생성 무늬 {looks}")
+            # 구간 B — 등대 켜짐 → 선착장 돌파(회전 빛줄기 · 보트 불빛 · 깨어난 적 · 관측수 손전등) 20초 실시간
+            pg.evaluate("""() => { __fps.autopilot(false); __fps.skipTo('o5'); const m = FG.map.mark('m1z4.genFront'); __fps.teleport(m[0], m[1] + 0.05, m[2], 0);
+                FG.mission.completeObjective(); __fps.autopilot(true); }""")
+            pg.wait_for_timeout(2500)
+            pg.evaluate("() => __fps.perfReset()")
+            pg.wait_for_timeout(20000)
+            pb = pg.evaluate("() => __fps.perf()")
+            sb = pg.evaluate("() => ({ props: FG.props.state(), m: __fps.mission(), en: __fps.enemies().filter(e => /g_dock|g_quay|g_spot/.test(e.group)).map(e => e.state), pos: __fps.state().pos })")
+            pg.screenshot(path=str(out / "perf-m1-dock.png"))
+            summary["dock"] = {"calls": pb["callsMax"], "tris": pb["trisMax"], "over33": pb["over33"], "ftP95": pb["ftP95"]}
+            ok &= _check(notes, sb["props"]["on"] and sb["props"]["visible"] and pb["measured"] >= 20 * 30,
+                         f"구간 B(등대 켜짐 → 선착장 돌파 20초): 빛줄기 켜짐 {sb['props']['on']} · 선착장 적 {sb['en']} · 목표 {sb['m']['objective'] and sb['m']['objective']['id']} · 결과 {sb['m']['result']} · 자리 {sb['pos']}")
+            ok &= _check(notes, 0 < pb["callsMax"] <= 150 and pb["trisMax"] <= 150000 and pb["over33Pct"] <= 1.0,
+                         f"구간 B 그리기 호출 최대 {pb['callsMax']} ≤ 150 · 삼각형 최대 {pb['trisMax']} ≤ 150,000 · 33ms 초과 {pb['over33']}개 = {pb['over33Pct']}% ≤ 1% (참고 중앙값 {pb['ftMed']}ms · 95번째 {pb['ftP95']}ms)")
+            ok &= _check(notes, not s.errors and not s.external and not s.missing,
+                         f"오류 0 · 바깥 요청 0 · 없는 파일 0 {s.errors[:4]} {s.external[:3]} {s.missing[:3]}")
+        finally:
+            s.close()
+    return finish("perf", ok, summary, notes)
+
+
+def _perf_m2(args):
+    """S11a → S11b — 임무 2 「짠물 밸브」 실제 판(적 27 · 아군 바위 · 소품 — S11a 는 지형만 m2w)을 god · 자동 조종으로 실시간 --sec 초 잰다(둑길 → 정문 마당 → 펌프동 → …).
+    이어서 구간 B 탱크 마당 증기 기둥 10초, 구간 C 45초 버티기(세 방향 웨이브 + 증기) 15초, 구간 D 폭파 뒤 창고 안 교전 10초를 따로 잰다. 호출 ≤ 150 · 삼각형 ≤ 150k(지형만 목표 110 · 110k), 33ms 초과 1% 이하,
+    구역 만들기 각 ≤ 50ms · 합 ≤ 300ms, 구역별 최대 호출 · 삼각형, 흐린 하늘 · 생성 무늬, 오류 0."""
+    from playwright.sync_api import sync_playwright
+    out = out_dir(args)
+    notes = []
+    ok = True
+    summary = {"sec": args.sec, "mission": "m2", "quality": args.quality}
+    with sync_playwright() as pw:
+        s = Session(pw)
+        try:
+            pg = s.page([HK_SPY])
+            pg.goto(HOST + BODY_URL + "?dbg=1", wait_until="load")
+            r_ok, _ = wait_ready(pg, 5000)
+            ok &= _check(notes, r_ok, "__fps.ready")
+            st0 = pg.evaluate("""() => { const t0 = performance.now(); const okm = __fps.startMission('m2', { seed: 3 }); const ms = performance.now() - t0;
+                __fps.god(true); __fps.autopilot(true);
+                return { ok: okm, ms: +ms.toFixed(1), zones: __fps.world().zones, phase: __fps.state().phase, env: FG.gfx.envState(),
+                    errs: FG.map.loaded.map(id => [id, FG.map.built[id].errors.length]), stats: FG.map.stats(), enemies: __fps.enemies().length }; }""")
+            zs = st0["stats"]
+            summary["zones"] = zs
+            summary["startMs"] = st0["ms"]
+            ok &= _check(notes, st0["ok"] and st0["phase"] == "play" and list(zs.keys()) == ["m2z1", "m2z2", "m2z3", "m2z4"] and all(e[1] == 0 for e in st0["errs"]),
+                         f"임무 2 실제 판(적 {st0.get('enemies')}명 · 아군 바위) 시작 → play · 구역 {list(zs.keys())} · 자료 오류 {st0['errs']}")
+            ok &= _check(notes, all(v["ms"] <= 50 for v in zs.values()) and sum(v["ms"] for v in zs.values()) <= 300,
+                         "구역 만들기 " + " · ".join(f"{k} {v['ms']}ms(원시 {v['prims']} · 그림 삼각형 {v['visTris']} · 충돌 {v['collTris']} · 메시 {v['meshes']})" for k, v in zs.items())
+                         + f" — 각 ≤ 50ms · 합 {round(sum(v['ms'] for v in zs.values()), 1)}ms ≤ 300ms(시작 전체 {st0['ms']}ms)")
+            ok &= _check(notes, st0["env"]["dyn"] and st0["env"]["fog"][1] >= 180 and not st0["env"]["placeholder"],
+                         f"흐린 낮 분위기: 안개 {st0['env']['fog']}(임무 1 은 12 ~ 125m — 더 멀리 보임) · 노출 {st0['env']['exposure']} · 해 그림자 따라감 · 어두운 곳(건물 안) {st0['env']['darks']}개")
+            pg.evaluate("""() => { window.__m2 = { by: {} };
+                window.__m2T = setInterval(() => { const i = FG.gfx.renderer.info.render, P = FG.player.pos; const g = FG.nav.gridAt(P.x, P.z); const z = g ? g.id : '?';
+                    const b = window.__m2.by[z] || (window.__m2.by[z] = { calls: 0, tris: 0, n: 0 }); b.calls = Math.max(b.calls, i.calls); b.tris = Math.max(b.tris, i.triangles); b.n++; }, 250); }""")
+            pg.wait_for_timeout(3000)
+            pg.evaluate("() => __fps.perfReset()")
+            pg.wait_for_timeout(int(args.sec * 1000))
+            p = pg.evaluate("() => __fps.perf()")
+            m2 = pg.evaluate("() => { clearInterval(window.__m2T); return window.__m2; }")
+            st = pg.evaluate("() => ({ s: __fps.state(), m: __fps.mission(), a: __fps.assets() })")
+            pg.screenshot(path=str(out / "perf-m2.png"))
+            summary["perf"] = p
+            summary["byZone"] = m2["by"]
+            (out / "perf-m2.json").write_text(json.dumps({"perf": p, "byZone": m2["by"], "zones": zs}, ensure_ascii=False, indent=1))
+            ok &= _check(notes, st["s"]["phase"] in ("play", "result") and p["measured"] >= args.sec * 30 and not st["m"]["autopilot"]["stuck"],
+                         f"실시간 {p['sec']}초 걸으며 측정 · 프레임 {p['measured']}개 · 지금 목표 {st['m']['objective'] and st['m']['objective']['id']} · 자리 {st['s']['pos']} · 끼임 {st['m']['autopilot']['stuck']}")
+            ok &= _check(notes, len(m2["by"]) >= 2, f"지나간 구역 {list(m2['by'].keys())}(적과 싸우며 60초 — 탱크 마당 · 창고는 아래 구간 C · D)(구역별 최대 호출 · 삼각형 " + " · ".join(f"{k} {v['calls']}/{v['tris']}" for k, v in m2["by"].items()) + ")")
+            ok &= _check(notes, 0 < p["callsMax"] <= 150 and p["trisMax"] <= 150000,
+                         f"그리기 호출 최대 {p['callsMax']} ≤ 150 · 삼각형 최대 {p['trisMax']} ≤ 150,000(보통 화질 예산 — 적 · 아군 · 소품 포함)")
+            notes.append((True, f"(참고) 임무 1 실제 판(S10b) 98 / 51.9k · 임무 2 지형만(S11a) 67 / 63.1k → 임무 2 실제 판 {p['callsMax']} / {p['trisMax']}"))
+            ok &= _check(notes, p["over33Pct"] <= 1.0, f"33ms 넘는 프레임 {p['over33']}개 = {p['over33Pct']}% ≤ 1%")
+            ok &= _check(notes, p["ms"]["phys"] <= 0.8, f"이동 · 충돌 sim {p['ms']['phys']}ms/프레임 ≤ 0.8ms")
+            notes.append((True, f"(참고 · 헤드리스 M5) 중앙값 {p['ftMed']}ms · 95번째 {p['ftP95']}ms · 최대 {p['ftMax']}ms · fps {p['fpsMed']} · sim {p['ms']['sim']}ms · 그리기 준비 {p['ms']['render']}ms · 힙 {p['heapMB']}MB"))
+            sky = st["a"]["sky"]
+            looks = st["a"]["looks"]
+            ok &= _check(notes, sky["name"] == "overcast" and all(k in looks for k in ("salt", "rustplate", "corrugated", "concrete", "planks", "burlap", "wetground")),
+                         f"하늘 {sky} · 생성 무늬 {looks}")
+            # 구간 B — 탱크 마당에서 증기 기둥을 보며 10초
+            pg.evaluate("""() => { __fps.autopilot(false); __fps.clearInput(); const v = FG.map.mark('m2z3.vent'), e = FG.map.mark('m2z3.entry');
+                __fps.teleport(e[0], e[1] + 0.05, e[2], 340); __fps.look(340, 8);
+                FG.world.smokeAdd({ id: 'perf', x: v[0], y: v[1], z: v[2], r: 3.4, h: 11, dur: 14 }); }""")
+            pg.wait_for_timeout(1500)
+            pg.evaluate("() => __fps.perfReset()")
+            pg.wait_for_timeout(10000)
+            pb = pg.evaluate("() => __fps.perf()")
+            sb = pg.evaluate("() => FG.props.state().steam")
+            pg.screenshot(path=str(out / "perf-m2-steam.png"))
+            summary["steam"] = {"calls": pb["callsMax"], "tris": pb["trisMax"], "over33": pb["over33"], "puffs": sb["puffs"]}
+            ok &= _check(notes, sb["columns"] == 1 and sb["puffs"] >= 40 and 0 < pb["callsMax"] <= 150 and pb["trisMax"] <= 150000 and pb["over33Pct"] <= 1.0,
+                         f"구간 B(증기 기둥 10초 — 뭉게 {sb['puffs']}개 · 기둥 {sb['columns']}): 호출 최대 {pb['callsMax']} ≤ 150 · 삼각형 {pb['trisMax']} ≤ 150,000 · 33ms 초과 {pb['over33']}개 = {pb['over33Pct']}% (참고 중앙값 {pb['ftMed']}ms)")
+            # 구간 C — 45초 버티기(장치 앞): 앞 무리를 치우고 버티기 목표로 → 웨이브가 차례로 깸 + 증기 기둥 · 15초
+            pg.evaluate("""() => { for (const g of ['g_cause', 'g_yard', 'g_yardN', 'g_pump', 'g_pumpH', 'g_valve', 'g_tank']) __fps.killGroup(g);
+                if (__fps.mission().objective.id === 'o7') { FG.mission.M.defendT = 0; FG.mission.M.objT0 = FG.mission.now(); } else __fps.skipTo('o7');   // 버티기 처음부터(웨이브는 이미 깼으면 그대로)
+                const d = FG.map.mark('m2z3.defend'), v = FG.map.mark('m2z3.vent'); __fps.teleport(d[0], d[1] + 0.05, d[2], 330); __fps.look(330, 4); __fps.autopilot(true);
+                FG.world.smokeAdd({ id: 'perfC', x: v[0], y: v[1], z: v[2], r: 3.4, h: 11, dur: 12 }); }""")
+            pg.wait_for_timeout(13000)
+            pg.evaluate("() => __fps.perfReset()")
+            pg.wait_for_timeout(15000)
+            pc = pg.evaluate("() => __fps.perf()")
+            nc = pg.evaluate("() => ({ alive: __fps.enemies().filter(e => !e.down && /^g_w/.test(e.group)).length, awake: Object.keys(FG.ai.groups).filter(k => /^g_w/.test(k) && !FG.ai.groups[k].dormant), obj: __fps.mission().objective && __fps.mission().objective.id })")
+            pg.screenshot(path=str(out / "perf-m2-defend.png"))
+            summary["defend"] = {"calls": pc["callsMax"], "tris": pc["trisMax"], "over33": pc["over33"], "awake": nc["awake"]}
+            ok &= _check(notes, 0 < pc["callsMax"] <= 150 and pc["trisMax"] <= 150000 and pc["over33Pct"] <= 1.0 and len(nc["awake"]) >= 3 and nc["obj"] in ("o7", "o8"),
+                         f"구간 C(버티기 시작 13초 뒤부터 15초 — 웨이브 깸 {nc['awake']} · 살아 있는 웨이브 적 {nc['alive']} · 목표 {nc['obj']}): 호출 최대 {pc['callsMax']} ≤ 150 · 삼각형 {pc['trisMax']} ≤ 150,000 · 33ms 초과 {pc['over33']}개 = {pc['over33Pct']}% (참고 중앙값 {pc['ftMed']}ms)")
+            # 구간 D — 폭파 뒤 창고 안(선반 사이 교전) 10초
+            pg.evaluate("""() => { __fps.autopilot(false); for (const g of ['g_wSW', 'g_wRoof', 'g_wStair', 'g_wN']) __fps.killGroup(g); __fps.skipTo('o10'); }""")
+            pg.wait_for_timeout(3500)
+            pg.evaluate("""() => { const m = FG.map.mark('m2z4.inside'); __fps.teleport(m[0], m[1] + 0.05, m[2], 0); __fps.look(0, 2); __fps.autopilot(true); }""")
+            pg.wait_for_timeout(1500)
+            pg.evaluate("() => __fps.perfReset()")
+            pg.wait_for_timeout(10000)
+            pd = pg.evaluate("() => __fps.perf()")
+            nd = pg.evaluate("() => ({ open: !FG.world.dynGet('blast').enabled, obj: __fps.mission().objective && __fps.mission().objective.id, pos: __fps.state().pos })")
+            pg.screenshot(path=str(out / "perf-m2-warehouse.png"))
+            summary["warehouse"] = {"calls": pd["callsMax"], "tris": pd["trisMax"], "over33": pd["over33"]}
+            ok &= _check(notes, nd["open"] and 0 < pd["callsMax"] <= 150 and pd["trisMax"] <= 150000 and pd["over33Pct"] <= 1.0,
+                         f"구간 D(폭파 뒤 창고 안 10초 — 문 열림 {nd['open']} · 목표 {nd['obj']}): 호출 최대 {pd['callsMax']} ≤ 150 · 삼각형 {pd['trisMax']} ≤ 150,000 · 33ms 초과 {pd['over33']}개 = {pd['over33Pct']}% (참고 중앙값 {pd['ftMed']}ms)")
+            ok &= _check(notes, not s.errors and not s.external and not s.missing,
+                         f"오류 0 · 바깥 요청 0 · 없는 파일 0 {s.errors[:4]} {s.external[:3]} {s.missing[:3]}")
         finally:
             s.close()
     return finish("perf", ok, summary, notes)
@@ -3091,7 +3403,7 @@ def _score_expect(sc, par, mult=1.0):
         time_ = 0
     else:
         time_ = int(40000 * (1 - (t - par) / (par * 0.8)))
-    acc = int(min(1, sc["hits"] / sc["shots"]) * 30000) if sc["shots"] else 0
+    acc = int(min(1, sc["hits"] / sc["shots"]) * 30000) if sc["shots"] else 15000   # PM 임시 결정 1 — 0발이면 절반
     dmg = int(max(0, 20000 * (1 - sc["taken_raw"] / 600)))
     return time_, acc, dmg
 
@@ -3120,18 +3432,29 @@ def cmd_mission(args):
             ok &= _check(notes, d and d.get("objectives"), f"임무 자료 {mid}: 목표 {[o['id'] + ':' + o['type'] for o in (d or {}).get('objectives', [])]} · 구역 {(d or {}).get('zones')}")
             if not d:
                 return finish("mission", False, summary, notes)
-            started = J("(a) => { const ok = __fps.startMission(a[0], { diff: a[1], seed: 5 }); __fps.god(true); __fps.infiniteAmmo(true); __fps.autopilot(true); __fps.fast(8); return ok; }", [mid, args.diff])
+            # fix3 — 벽시계 대신 sim 단계로 끝까지 돌림(기계가 무거우면 0.25초 넘는 프레임을 버려 fast(8) 이 거의 멈춰 거짓 실패하던 것).
+            # 루프를 멈추고 0.5초씩 단계를 밟다가(한 번에 20번 = sim 10초) 임무가 끝나면 루프를 다시 켜 결과 화면을 기다림
+            started = J("(a) => { const ok = __fps.startMission(a[0], { diff: a[1], seed: 5 }); __fps.god(true); __fps.infiniteAmmo(true); __fps.autopilot(true); __fps.pauseLoop(); return ok; }", [mid, args.diff])
             limit_sum = sum(o.get("limit", 120) for o in d["objectives"])
             t0 = time.time()
-            last = None
-            while time.time() - t0 < limit_sum / 8 + 20:
-                st = J("() => ({ phase: __fps.state().phase, ap: __fps.mission().autopilot.on, obj: __fps.mission().objective })")
-                if st["phase"] == "result" or not st["ap"]:
+            sim_end = None
+            for _ in range(int((limit_sum + 60) / 10) + 1):
+                st = J("""() => { for (let k = 0; k < 20; k++) { const m = __fps.mission(); if (!m || m.state === 'end' || !m.autopilot.on) break; __fps.step(0.5); }
+                    const m = __fps.mission(); return { st: m.state, ap: m.autopilot.on, t: m.t }; }""")
+                sim_end = st
+                if st["st"] == "end" or not st["ap"]:
                     break
-                last = st
-                time.sleep(0.5)
+            J("() => __fps.resumeLoop()")
+            for _ in range(40):
+                if J("() => __fps.state().phase") == "result":
+                    break
+                pg.wait_for_timeout(250)
             real = round(time.time() - t0, 1)
-            J("() => __fps.fast(1)")
+            try:
+                load = os.getloadavg()[0]
+            except OSError:
+                load = None
+            summary["real"] = {"sec": real, "load1": load, "sim": sim_end}
             pg.wait_for_timeout(300)
             res = J("""() => ({ st: __fps.state(), m: __fps.mission(), sc: __fps.score(),
                 ev: __mi.ev(0, ['missionStart', 'objective', 'objDone', 'checkpoint', 'autopilotStuck', 'missionEnd', 'missionWarn']),
@@ -3144,7 +3467,7 @@ def cmd_mission(args):
             elapsed = {e["p"]["id"]: e["p"]["elapsed"] for e in res["ev"] if e["type"] == "objDone"}
             over = [k for k, v in elapsed.items() if v > next(o.get("limit", 120) for o in d["objectives"] if o["id"] == k)]
             ok &= _check(notes, started and res["st"]["phase"] == "result" and m["result"] == "success",
-                         f"god · autopilot · fast(8): phase {res['st']['phase']} · 결과 {m['result']} · 임무 시계 {m['t']}초(실시간 {real}초) · 결과 화면 {res['screen']}")
+                         f"god · autopilot · sim 단계(0.5초씩 — 벽시계 무관): phase {res['st']['phase']} · 결과 {m['result']} · 임무 시계 {m['t']}초(실시간 {real}초) · 결과 화면 {res['screen']}")
             ok &= _check(notes, started_order == ids and done_order == ids, f"목표 순서 = 자료 순서: 시작 {started_order} · 끝 {done_order}")
             ok &= _check(notes, not stuck and not over and not m["warn"], f"autopilotStuck 없음 {stuck[:2]} · 목표 시간 상한 안 {elapsed} · 자료 경고 {m['warn'][:3]}")
             ok &= _check(notes, isinstance(sc["total"], int) and 0 <= sc["total"] <= 250000 and res["rsScore"].replace(",", "") == str(sc["total"]),
@@ -3161,23 +3484,50 @@ def cmd_mission(args):
             ok &= _check(notes, fail[0]["total"] == int(n_obj / n_obj * 30000) and fail[1]["total"] == fail[0]["total"],
                          f"그만두기 · 실패 규칙(끝낸 목표 ÷ 전체 × 30,000) = {fail[0]['total']}")
             pg.screenshot(path=str(out / f"mission-{mid}-result.png"))
+            if mid == "m1":   # S10b — 아군 구역 건너기 · 떨어짐 · 첫 처치(이 판 사건)
+                summary["ally"] = J("() => { const a = __fps.allies().allies[0]; const p = __fps.state().pos; const st = FG.allies.stats; return a ? { d: +Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2]).toFixed(1), crosses: st.crosses, catchups: st.catchups } : null; }")
+                ok &= _check(notes, summary["ally"] and summary["ally"]["d"] <= 20 and summary["ally"]["crosses"] >= 4,
+                             f"물총새가 구역 다섯을 따라옴: 구역 건너기 {summary['ally'] and summary['ally']['crosses']}번 · 따라붙기(안 보일 때 뒤로) {summary['ally'] and summary['ally']['catchups']}번 · 끝날 때 플레이어와 {summary['ally'] and summary['ally']['d']}m")
+                ok &= _check(notes, m.get("falls", 0) == 0, f"떨어짐(맵 밖) {m.get('falls', 0)}번 = 0")
+                fk = J("() => { const ev = __mi.ev(0, ['missionStart', 'enemyDown']); const s0 = ev.filter(e => e.type === 'missionStart').pop(); const e = ev.find(x => x.type === 'enemyDown' && x.t >= s0.t); return e ? +(e.t - s0.t).toFixed(3) : null; }")
+                summary["firstKill"] = fk
+                ok &= _check(notes, fk is not None and fk <= 20, f"첫 처치까지 {fk}초 ≤ 20(자동 조종 · 연출 건너뜀 — 연출 포함 판은 아래 첫 30초 검사)")
+            if mid == "m2":   # S11b — 바위가 구역 넷을 따라옴 · 떨어짐 0 · 정보 조각 둘(자동 조종 경로)
+                summary["ally"] = J("() => { const a = __fps.allies().allies.find(x => x.id === 'bawi'); const p = __fps.state().pos; const st = FG.allies.stats; return a ? { d: +Math.hypot(a.pos[0] - p[0], a.pos[2] - p[2]).toFixed(1), crosses: st.crosses, catchups: st.catchups } : null; }")
+                ok &= _check(notes, summary["ally"] and summary["ally"]["d"] <= 20 and summary["ally"]["crosses"] >= 3,
+                             f"바위가 구역 넷을 따라옴: 구역 건너기 {summary['ally'] and summary['ally']['crosses']}번 · 따라붙기 {summary['ally'] and summary['ally']['catchups']}번 · 끝날 때 플레이어와 {summary['ally'] and summary['ally']['d']}m")
+                ok &= _check(notes, m.get("falls", 0) == 0 and sorted(m["intel"]) == ["0", "1"] and sc["intel"] == 20000,
+                             f"떨어짐 {m.get('falls', 0)}번 = 0 · 정보 조각 {m['intel']}(칠판 「배 시간표」 · 책상 「무전 암호표」) → {sc['intel']}점")
             summary["run"] = {"t": m["t"], "real": real, "score": sc["total"], "elapsed": elapsed, "shots": sc["shots"], "hits": sc["hits"], "kills": sc["kills"]}
             # 난이도별 적 수(gdd-final §5-2): 쉬움 무리마다 −20%(반올림 · 최소 1) · 보통 기준 · 어려움 기준 + 마지막 웨이브(last:true) +2
             pgc = fresh()
             cnt = pgc.evaluate("""(a) => { const out = {}, sq = {};
                 for (const df of ['easy', 'normal', 'hard']) { __fps.startMission(a, { diff: df, seed: 5 }); const c = {};
                     for (const e of __fps.enemies()) c[e.group] = (c[e.group] || 0) + 1; out[df] = c; }
-                for (const z of FG.missions[a].zones) for (const g of (FG.maps[z].squads || [])) sq[g.id] = { n: g.spawn.length, last: !!g.last };
-                return { out, sq }; }""", mid)
-            exp = {}
-            for df, mul in (("easy", 0.8), ("normal", 1.0), ("hard", 1.0)):
-                exp[df] = {g: max(1, min(v["n"], int(v["n"] * mul + 0.5))) + (2 if df == "hard" and v["last"] else 0) for g, v in cnt["sq"].items()}
+                const types = {};
+                for (const df of ['easy', 'normal']) { types[df] = {}; __fps.startMission(a, { diff: df, seed: 5 }); for (const e of __fps.enemies()) types[df][e.type] = (types[df][e.type] || 0) + 1; }
+                if (!FG.missions[a].noActors) for (const z of FG.missions[a].zones) for (const g of (FG.maps[z].squads || [])) sq[g.id] = { n: g.spawn.length, last: !!g.last, types: g.spawn.map((s) => s[4] || g.type) };
+                return { out, sq, types }; }""", mid)
+            exp = {"easy": _easy_counts(cnt["sq"])}
+            for df in ("normal", "hard"):
+                exp[df] = {g: v["n"] + (2 if df == "hard" and v["last"] else 0) for g, v in cnt["sq"].items()}
+            # fix3: 쉬움은 임무 전체 인원 × 0.8(반올림) · 빼는 사람은 소총수부터 — 특수 종류(돌격수 · 방탄 · 관측수) 수는 보통과 같아야
+            sp_e = {k: v for k, v in cnt["types"]["easy"].items() if k != "rifle"}
+            sp_n = {k: v for k, v in cnt["types"]["normal"].items() if k != "rifle"}
+            ok &= _check(notes, sp_e == sp_n and (not cnt["sq"] or sum(cnt["out"]["easy"].values()) == int(sum(v["n"] for v in cnt["sq"].values()) * 0.8 + 0.5)),
+                         f"쉬움 = 임무 전체 × 0.8 → {sum(cnt['out']['easy'].values())}명(보통 {sum(cnt['out']['normal'].values())}), 특수 종류 쉬움 {sp_e} = 보통 {sp_n}(소총수부터 뺌)")
             lasts = [g for g, v in cnt["sq"].items() if v["last"]]
             ok &= _check(notes, cnt["out"] == exp,
                          f"난이도별 적 수 = 자료 × 배율(+어려움 마지막 웨이브 {lasts} +2): " + " · ".join(f"{df} {sum(cnt['out'][df].values())}명 {cnt['out'][df]}" for df in ("easy", "normal", "hard"))
                          + ("" if cnt["out"] == exp else f" / 기대 {exp}"))
             summary["enemies"] = {df: sum(v.values()) for df, v in cnt["out"].items()}
 
+            if mid == "m1" and args.diff == "normal":
+                ok &= _mission_m1_extra(s, fresh, out, notes, summary)
+            if mid == "m2" and args.diff == "normal":
+                ok &= _mission_m2_extra(s, fresh, out, notes, summary)
+            if mid == "m2w":
+                ok &= _mission_m2w_extra(s, fresh, out, notes, summary)
             if mid == "t2":
                 ok &= _mission_t2_extra(s, fresh, out, notes, summary)
             elif mid == "t0":
@@ -3186,6 +3536,368 @@ def cmd_mission(args):
         finally:
             s.close()
     return finish("mission", ok, summary, notes)
+
+
+def _mission_m1_extra(s, fresh, out, notes, summary):
+    """S10b — 임무 1 「첫 불빛」: 첫 30초 약속(시작 연출 포함 · 첫 사격 15초 · 첫 처치 20초), 바탕 소리 · 음악 상태(은신 → 등대 곡 → 전투 곡),
+    등대 켜짐(소품 · 체크포인트 복원), 동굴 어둠 · 야간투시경(밝은 곳 눈부심 · 동굴 증폭 — PM 임시 결정 3), 발견 게이지 밝기 배수,
+    0발 명중 절반(PM 임시 결정 1), 어려움 트인 곳 첫 적 탄 → 쓰러짐 ≥ 1.2초(PM 임시 결정 2)."""
+    ok = True
+    # 1) 첫 30초 — 시작 연출(3초)을 건너뛰지 않고 자동 조종(보통) · 실시간에 가까운 fast(2)
+    pg = fresh(); J = pg.evaluate
+    # 추천 장비(물수제비 + 솜방망이 소음기 — 고르기 카드 rec) 그대로 = 처음 온 회원이 「바로 출격」으로 받는 장비
+    J("() => { const r = FG.missions.catalog[0].rec; __fps.startMission('m1', { diff: 'normal', seed: 5, skipIntro: false, loadout: { primary: r.primary, secondary: r.secondary, attach: { primary: { optic: r.optic, muzzle: r.muzzle, mag: r.mag } } } });"
+      " __fps.god(true); __fps.autopilot(true, { skipCine: false }); __fps.pauseLoop(); }")
+    first = None
+    for _ in range(80):   # fix3 — sim 단계(0.25초 × 4)로 — 기계가 무거워도 같은 결과
+        J("() => { for (let k = 0; k < 4; k++) __fps.step(0.25); }")
+        first = J("() => { const all = __mi.ev(0, ['missionStart', 'cine', 'cineEnd', 'shot', 'enemyDown', 'objDone', 'aiState']); const s0 = all.filter(e => e.type === 'missionStart').pop(); const ev = all.filter(e => e.t >= s0.t); const T = (e) => e ? +(e.t - s0.t).toFixed(3) : null;"
+                  " const sh = ev.find(e => e.type === 'shot' && e.p.by === 'player'); const k = ev.find(e => e.type === 'enemyDown');"
+                  " const o1 = ev.find(e => e.type === 'objDone' && e.p.id === 'o1'); const fight = ev.find(e => e.type === 'aiState' && /^g_beach/.test((FG.ai.get(e.p.id) || { group: 'g_beach' }).group) && ['engage', 'cover'].indexOf(e.p.to) >= 0);"
+                  " return { cine: ev.filter(e => e.type === 'cine').map(e => e.p.name), cineEnd: T(ev.find(e => e.type === 'cineEnd')),"
+                  " shot: T(sh), silenced: sh ? sh.p.silenced : null, kill: T(k), o1: T(o1), guardFight: T(fight), mt: __fps.mission().t }; }")
+        if first["o1"] is not None or first["mt"] > 40:
+            break
+    J("() => __fps.resumeLoop()")
+    summary["first30"] = first
+    ok &= _check(notes, first["cine"] == ["intro"] and first["shot"] is not None and (first["cineEnd"] or 0) <= first["shot"] <= 15 and first["kill"] is not None and first["kill"] <= 20,
+                 f"첫 30초 약속(시작 연출 {first['cine']} 끝 {first['cineEnd']}초 포함 · 추천 장비): 첫 사격 {first['shot']}초 ≤ 15(연출 뒤 — 소음기 {first['silenced']}) · 첫 처치 {first['kill']}초 ≤ 20 · 해변 경비 둘 끝 {first['o1']}초(임무 시계, 자동 조종 · 보통)")
+    ok &= _check(notes, first["silenced"] and first["guardFight"] is None,
+                 f"소음기로 둘 다 처리하면 경비가 교전에 들어가지 않음(교전 시작 {first['guardFight']}) — 은신 유지")
+    pg.screenshot(path=str(out / "mission-m1-first30.png"))
+
+    # 2) 소리 · 음악 상태 · 등대 켜짐 · 체크포인트 복원 · 동굴 · 야간투시경 — 고리는 실시간(화면 쪽 분위기 · 소리가 실제 프레임 간격으로 바뀜)
+    pg = fresh(); J = pg.evaluate
+    J("() => { FG.audio.unlock(); FG.music.unlock(); __fps.startMission('m1', { diff: 'normal', seed: 5 }); __fps.god(true); }")
+    pg.wait_for_timeout(700)
+    r = J("""() => { const a = __fps.audio().amb, mu = __fps.music();
+        return { amb: a, mState: FG.mission.M.music, want: mu.want, mixT: mu.mixTarget, duck: mu.duck ? FG.cfg.MUSIC.DUCK_RADIO : 1, preload: !!mu.tracks.lighthouse, music0: FG.cfg.AUDIO.MUSIC, stealthK: FG.cfg.MUSIC.STEALTH,
+          props: FG.props.state() }; }""")
+    ok &= _check(notes, r["amb"]["kind"] == "sea" and r["amb"]["loops"] == 2,
+                 f"바탕 소리: 새벽 파도 · 바람 고리 {r['amb']['loops']}개 재생(kind {r['amb']['kind']}) · 무적은 26~38초마다(등대가 켜질 때 한 번 더)")
+    ok &= _check(notes, r["mState"] == "stealth" and r["want"] == "combat" and abs(r["mixT"] - r["music0"] * r["stealthK"] * r["duck"]) < 1e-3 and r["preload"],
+                 f"음악: 시작 = 은신(전투 곡 × {r['stealthK']}{' × 무전 중 ' + str(r['duck']) if r['duck'] != 1 else ''} → 목표 크기 {r['mixT']}) · 등대 장면 곡 미리 받기 {r['preload']}")
+    ok &= _check(notes, not r["props"]["on"] and not r["props"]["visible"] and r["props"]["lights"] == 4,
+                 f"등대 켜지기 전: 빛줄기 · 렌즈 꺼짐(보임 {r['props']['visible']}) · 보트 불빛 자리 {r['props']['lights']}개 준비")
+    put = "(a) => { __fps.teleport(a[0], FG.nav.heightAt(a[0], a[1], 0) + 0.05, a[1], a[2]); __fps.look(a[2], 0); FG.weapons.nvg = a[3]; }"
+    J("() => { __fps.killGroup('g_beach'); }")
+    J(put, [0, 6, 0, True]); pg.wait_for_timeout(1600)
+    bright = J("() => ({ light: FG.map.lightAt(0, 1.5, 6), env: FG.gfx.envState(), nvg: __fps.nvg() })")
+    J(put, [-37, 2, 270, False]); pg.wait_for_timeout(2200)
+    caveEye = J("() => ({ light: FG.map.lightAt(-37, 1.3, 2), env: FG.gfx.envState() })")
+    J(put, [-37, 2, 270, True]); pg.wait_for_timeout(1600)
+    caveNvg = J("() => ({ env: FG.gfx.envState(), nvg: __fps.nvg(), amb: __fps.audio().amb })")
+    pg.screenshot(path=str(out / "mission-m1-cave-nvg.png"))
+    J("() => { FG.weapons.nvg = false; }")
+    b, ce, cn = bright, caveEye, caveNvg
+    summary["nvg"] = {"bright": [b["env"]["exposure"], b["nvg"]["glare"]], "cave": [cn["env"]["exposure"], cn["nvg"]["glare"], cn["env"]["fog"][:2]]}
+    ok &= _check(notes, ce["light"] <= 0.55 and ce["env"]["f"] <= 0.75 and b["light"] == 1,
+                 f"동굴 어둠: 그 자리 밝기 배수 {ce['light']}(발견 게이지도 이만큼 느림) · 화면 빛 배수 {ce['env']['f']} / 해변 {b['light']}")
+    ok &= _check(notes, b["nvg"]["on"] and b["nvg"]["glare"] >= 0.6 and b["env"]["exposure"] <= 1.4 and cn["nvg"]["glare"] <= 0.05 and cn["env"]["exposure"] >= 1.85 and cn["env"]["fog"][1] <= 60,
+                 f"야간투시경(PM 임시 결정 3): 밝은 해변 = 눈부심 덮개 {b['nvg']['glare']} · 노출 {b['env']['exposure']}(하얗게 날아가지 않게) / 동굴 = 눈부심 {cn['nvg']['glare']} · 노출 {cn['env']['exposure']} · 빛 증폭(반구광 {cn['env']['hemi']}) · 안개 {cn['env']['fog'][:2]}(굴 안쪽이 어둡게 가라앉는 깊이)")
+    ok &= _check(notes, cn["amb"]["lp"] is not None and cn["amb"]["lp"] < 3000, f"동굴 안 파도 소리 먹먹하게(저역 통과 {cn['amb']['lp']}Hz)")
+    # 등대 켜짐 → 등대 곡 · 연출 · 무적 · 빛줄기 회전 → 체크포인트 cp5 복원도 켜진 채 → 내리막 가운데에서 전투 곡
+    h0 = J("""() => { __fps.skipTo('o5'); const m = FG.map.mark('m1z4.genFront'); __fps.teleport(m[0], m[1] + 0.05, m[2], 0); return __fps.audio().amb.horns; }""")
+    pg.wait_for_timeout(300)
+    J("() => { FG.mission.M.skipCine = false; FG.mission.completeObjective(); }")
+    mu = []
+    for _ in range(8):
+        pg.wait_for_timeout(250)
+        mu.append(J("() => FG.music.state().want"))
+    p1 = J("() => FG.props.state()")
+    pg.wait_for_timeout(600)
+    p2 = J("() => FG.props.state()")
+    pg.screenshot(path=str(out / "mission-m1-lighthouse-cine.png"))
+    cine = J("() => (__mi.ev(0, ['cine']).pop() || {}).p || null")
+    hornsAdd = J("() => __fps.audio().amb.horns") - h0
+    pg.wait_for_timeout(4500)
+    cp = J("() => __fps.mission().checkpoint")
+    J("() => __fps.killPlayer()")
+    pg.wait_for_timeout(2200)
+    p3 = J("() => FG.props.state()")
+    st3 = J("() => __fps.mission()")
+    J("() => { const d1 = FG.map.mark('m1z5.d1mid'); __fps.teleport(d1[0], d1[1] + 0.05, d1[2], 90); }")
+    pg.wait_for_timeout(900)
+    after = J("() => ({ want: FG.music.state().want, m: FG.mission.M.music })")
+    ok &= _check(notes, cine and cine["name"] == "lighthouseOn" and "lighthouse" in mu and hornsAdd >= 1,
+                 f"레버 → 등대 켜짐 연출 {cine} · 음악 {sorted(set(mu))}(등대 장면 곡) · 무적 한 번 울림 {hornsAdd}")
+    ok &= _check(notes, p1["on"] and p2["visible"] and p2["k"] == 1 and p2["beams"] == 2 and p2["ang"] != p1["ang"],
+                 f"등대 소품: 렌즈 · 빛 번짐 · 회전 빛줄기 {p2['beams']}개(밝기 {p2['k']}, 각도 {p1['ang']} → {p2['ang']} — 9초에 한 바퀴) · 보트 불빛 {p2['lights']}")
+    ok &= _check(notes, cp == "cp5" and p3["on"] and st3["flags"].get("lhOn") and st3["objective"] and st3["objective"]["id"] == "o6",
+                 f"체크포인트 {cp} 에서 쓰러졌다 복원 → 등대는 켜진 채(깃발 lhOn {st3['flags'].get('lhOn')}) · 목표 {st3['objective'] and st3['objective']['id']}")
+    ok &= _check(notes, after["want"] == "combat" and after["m"] == "combat",
+                 f"선착장 내리막 가운데 → 전투 곡으로 겹쳐 넘김(음악 상태 {after['m']} · 곡 {after['want']})")
+
+    # 3) 0발로 끝낸 판 명중률 = 절반(PM 임시 결정 1) — 시험 작전 t0(키 W 만으로 걷기)
+    pg = fresh(); J = pg.evaluate
+    r = J("() => { __fps.startMission('t0', { seed: 3 }); __fps.autopilot(true); __fps.pauseLoop(); for (let k = 0; k < 60 && __fps.mission().state !== 'end'; k++) __fps.step(0.5); return __fps.score(); }")
+    ok &= _check(notes, r["result"] == "success" and r["shots"] == 0 and r["accuracy"] == 15000,
+                 f"한 발도 안 쏜 판(t0) 명중률 점수 {r['accuracy']} = 30,000 의 절반(PM 임시 결정 1) · 쏜 탄 {r['shots']}")
+
+    # 4) 어려움 — 트인 마당(t2)에 가만히 서 있을 때 첫 적 탄 → 쓰러짐 ≥ 1.2초(PM 임시 결정 2), 씨앗 8개
+    pg = fresh(); J = pg.evaluate
+    JS = """(a) => { __fps.startMission('t2', { diff: a[0], seed: a[1] }); __fps.pauseLoop(); __fps.god(false); __fps.step(1);
+      __fps.teleport(0, 0, 6, 0); const m0 = __mi.mark(); let tFirst = null, tDown = null;
+      for (let k = 0; k < 600 && tDown === null; k++) { __fps.step(0.05); const ev = __mi.ev(m0, ['enemyShot', 'playerDown']);
+        const f = ev.find(e => e.type === 'enemyShot'); if (f && tFirst === null) tFirst = f.t; const dn = ev.find(e => e.type === 'playerDown'); if (dn) tDown = dn.t; }
+      return tFirst !== null && tDown !== null ? +(tDown - tFirst).toFixed(2) : null; }"""
+    hard = [J(JS, ["hard", sd]) for sd in (3, 5, 7, 11, 13, 17, 19, 23)]
+    norm = [J(JS, ["normal", sd]) for sd in (3, 5, 7, 11)]
+    hv = [x for x in hard if x is not None]
+    summary["idleDown"] = {"hard": hard, "normal": norm}
+    ok &= _check(notes, len(hv) == len(hard) and min(hv) >= 1.2,
+                 f"어려움 트인 곳 첫 적 탄 → 쓰러짐(PM 임시 결정 2): 씨앗 8개 {hard} → 최소 {min(hv) if hv else None}초 ≥ 1.2 · 가운데 {sorted(hv)[len(hv) // 2] if hv else None}초 (보통 참고 {norm})")
+    cfg = J("() => FG.cfg.DIFF.hard")
+    ok &= _check(notes, cfg["react"] == 0.35 and cfg["acc"] == 0.45 and cfg["playerDmg"] == 1.5,
+                 f"반응 · 명중 · 피해 표는 그대로(gdd §5-2): 반응 {cfg['react']} · 명중 {cfg['acc']} · 피해 × {cfg['playerDmg']} — 바꾼 것은 연사 첫 {cfg.get('openN')}발 간격 × {cfg.get('openK')} · 연사 보정 상한 {cfg.get('rampMax')}")
+    ok &= _fix3_m1(fresh, notes, summary)
+    return ok
+
+
+def _fix3_m1(fresh, notes, summary):
+    """fix3 — 임무 1: 구역 이음 따라 걷기(떨어짐 0) · 가장자리 12방향 걷기(맵 밖 0) · 구역 막이(동굴 = o1 뒤 · 선착장 길 = o5 뒤, 탄은 지나감) ·
+    물에 빠짐 = 체크포인트로(쓰러짐 감점 없음) · 잠든 선착장 무리는 탄 · 폭발에 안 맞음."""
+    ok = True
+    pg = fresh(); J = pg.evaluate
+    J("() => { __fps.startMission('m1', { diff: 'normal', seed: 5 }); __fps.god(true); __fps.pauseLoop(); __fps.step(0.3); }")
+    r = J("""() => { const P = FG.player, out = []; let fell = 0; FG.bus.on('fell', () => fell++);
+        const ai = FG.ai.ents.map(e => [e, e.pos.clone()]);
+        const walk = (x, y, z, yaw, sec) => { __fps.teleport(x, y, z, yaw); __fps.clearInput(); __fps.step(0.4); __fps.setInput({ moveZ: 1 }); __fps.step(sec); __fps.clearInput(); __fps.step(0.3); };
+        // ② 구역 막이(먼저 — 오래 걸으면 물총새가 해변 경비를 잡아 o1 이 끝날 수 있음) — o1 전 동굴 입구로 걸으면 막힘, 막이를 지나는 광선은 막히지 않음
+        const obj0 = __fps.mission().objective.id;
+        const cm = FG.map.mark('m1z1.caveMouth'); walk(cm[0], cm[1] + 0.2, cm[2], 270, 3); const caveBefore = +P.pos.x.toFixed(2);
+        const T = THREE; const h = FG.world.ray(new T.Vector3(-17, 1.4, 2), new T.Vector3(-1, 0, 0), 6);
+        const ex = FG.map.mark('m1z4.exitE'); walk(ex[0], ex[1] + 0.2, ex[2], 90, 3); const dockBefore = +P.pos.x.toFixed(2);
+        // ① 절벽 길(m1z3) ↔ 고원(m1z4) 이음: z -58 ~ -22 를 2m 간격으로 동쪽 · 서쪽으로 3초씩
+        for (let z = -58; z <= -22; z += 2) { const f0 = fell; walk(-24, 20, z, 90, 3); if (fell > f0) out.push(['east', z]); }
+        for (let z = -58; z <= -22; z += 2) { const f0 = fell; walk(-16, 30, z, 270, 3); if (fell > f0) out.push(['west', z]); }
+        // ③ 잠든 선착장 무리(g_dock) — 탄 · 폭발에 안 맞음
+        const e = FG.ai.ents.find(x => x.group === 'g_dock'); const hp0 = e.hp;
+        __fps.teleport(e.pos.x - 6, e.pos.y + 0.1, e.pos.z, 90); __fps.step(0.1); __fps.infiniteAmmo(true); __fps.aimAt(e.id, 'torso'); __fps.fireFor(0.5);
+        __fps.explodeAt([e.pos.x + 1, e.pos.y + 0.3, e.pos.z]); __fps.step(0.2); const hp1 = e.hp;
+        // ④ 물에 빠짐 — 맵 밖으로 떨어뜨리면 체크포인트로 · 쓰러짐(downs) 그대로
+        const d0 = FG.mission.M.sc.downs, f0 = FG.mission.M.falls || 0; __fps.teleport(30, -30, 30, 0); __fps.step(3);
+        const d1 = FG.mission.M.sc.downs, f1 = FG.mission.M.falls || 0;
+        return { seam: out, obj0, caveBefore, rayGate: h ? +h.dist.toFixed(2) : null, dockBefore, hp0, hp1, downs: [d0, d1], falls: [f0, f1], state: __fps.mission().state }; }""")
+    summary["fix3m1"] = r
+    ok &= _check(notes, not r["seam"], f"절벽 길 ↔ 고원 이음 따라 걷기(동 · 서 각 19줄, 3초씩): 떨어짐 {r['seam'] or 0}")
+    ok &= _check(notes, r["obj0"] == "o1" and r["caveBefore"] > -20.6 and r["rayGate"] is None and r["dockBefore"] < 20.2,
+                 f"구역 막이({r['obj0']} 중): 해변 경비 전 동굴 입구 막힘(멈춘 x {r['caveBefore']} > -20.6) · 막이 너머 광선 안 막힘({r['rayGate']}) · 레버 전 선착장 길 막힘(x {r['dockBefore']} < 20.2)")
+    ok &= _check(notes, r["hp1"] == r["hp0"], f"잠든 선착장 적은 탄 · 수류탄에 안 맞음: 체력 {r['hp0']} → {r['hp1']}")
+    ok &= _check(notes, r["falls"][1] == r["falls"][0] + 1 and r["downs"][1] == r["downs"][0],
+                 f"물에 빠짐 → 체크포인트로(떨어짐 {r['falls'][0]} → {r['falls'][1]}) · 쓰러짐 감점 없음(downs {r['downs'][0]} → {r['downs'][1]})")
+    # ⑤ 가장자리 — 표식마다 12방향 7초(달리기 · 1초마다 뛰기) 걸어도 구역 밖 · 아래로 떨어짐 0
+    edge = _edge_walk(fresh, 'm1')
+    summary["edge"] = summary.get("edge", {}); summary["edge"]["m1"] = edge
+    ok &= _check(notes, edge["n"] == 0, f"임무 1 가장자리 걷기: 표식 {edge['marks']}개 × 12방향 = {edge['runs']}번 → 구역 밖 · 바다로 떨어짐 {edge['n']}번 {edge['out'][:3]}")
+    return ok
+
+
+EDGE_JS = """(mid) => { __fps.startMission(mid, { diff: 'normal', seed: 5 }); __fps.god(true); __fps.pauseLoop(); __fps.step(0.3);
+  const d = __fps.missionDef(); __fps.killAll();
+  for (const id of ['gateL', 'gateR', 'blast', 'gen', 'caveGate', 'dockGate']) try { __fps.door(id, true); } catch (e) {}
+  const Z = d.zones.map(z => { const D = FG.maps[z]; return { cx: D.origin[0], cz: D.origin[2], hw: D.size[0] / 2, hd: D.size[1] / 2 }; });
+  const inside = (x, z, m) => Z.some(r => Math.abs(x - r.cx) <= r.hw + m && Math.abs(z - r.cz) <= r.hd + m);
+  let fell = 0; FG.bus.on('fell', () => { fell++; });
+  const P = FG.player, M = __fps.marks();
+  const names = Object.keys(M).filter(n => d.zones.some(z => n.startsWith(z + '.')) && !/cam|lamp|boat|gull|look|Look|chimney|leak|vent|roof\\b|roofView|lh\\./.test(n));
+  const out = []; let runs = 0;
+  for (const n of names) { const m = M[n];
+    for (let k = 0; k < 12; k++) { const yaw = k * 30; __fps.teleport(m[0], m[1] + 0.3, m[2], yaw); __fps.clearInput(); __fps.step(0.5); if (!P.onGround) continue;
+      const f0 = fell; runs++; __fps.setInput({ moveZ: 1, sprint: true }); let bad = null;
+      for (let t = 0; t < 28; t++) { if (t % 4 === 1) __fps.press('jump'); __fps.step(0.25);
+        if (!inside(P.pos.x, P.pos.z, 0.5)) { bad = 'outside'; break; } if (P.pos.y < -6) { bad = 'below'; break; } }
+      __fps.clearInput(); __fps.step(0.3); if (fell > f0) bad = bad || 'fell';
+      if (bad) out.push([n, yaw, bad]); } }
+  return { marks: names.length, runs, n: out.length, out: out.slice(0, 10) }; }"""
+
+
+def _edge_walk(fresh, mid):
+    pg = fresh()
+    return pg.evaluate(EDGE_JS, mid)
+
+
+
+def _mission_m2_extra(s, fresh, out, notes, summary):
+    """S11b — 임무 2 「짠물 밸브」: 시작(공장 소리 · 정문 닫힘 · 바위) → 바위가 정문을 엶(마당 무리 깸) → 돌격수 · 방탄 경비 첫 등장 한 줄 안내 →
+    밸브 A · B(F 길게 2초 — 떼면 0.5초 유지 뒤 줄어듦 · 돌리기 시작하면 북문 무리 깸) → 증기 기둥 10초(눈 시선 막음 · 체크포인트 복원에도 남음) →
+    45초 버티기(세 방향 웨이브 시각 · 지붕 위 사수 · 바위 작업 자리) → 폭파 문(바위 기폭 — 문 열림 · 문 안쪽 적 맞음 · 플레이어 안 다침 · 창고 무리 깸) → 정보 조각."""
+    ok = True
+    pg = fresh()
+    J = pg.evaluate
+    say = "(m) => __mi.ev(m, ['say']).map(e => e.p.who + ':' + e.p.text)"
+    hint = "(m) => __mi.ev(m, ['hint']).map(e => e.p.text)"
+    # 0) 시작
+    r = J("""() => { FG.audio.unlock(); __fps.startMission('m2', { diff: 'normal', seed: 5 }); __fps.god(true); __fps.pauseLoop(); __fps.step(0.5);
+        const d = (id) => { const x = FG.world.dynGet(id); return x ? x.enabled : null; };
+        const roof = __fps.enemies().filter(e => e.group === 'g_wRoof');
+        return { amb: FG.mission.M.amb, ambKind: __fps.audio().amb.kind, music: FG.mission.M.music, gateL: d('gateL'), gateR: d('gateR'), blast: d('blast'),
+            ally: (__fps.allies().allies || []).map(a => a.id), roof: roof.map(e => [e.pos[1], e.state]), roofFixed: FG.ai.ents.filter(e => e.group === 'g_wRoof').every(e => e.fixed),
+            dormant: Object.keys(FG.ai.groups).filter(k => FG.ai.groups[k].dormant).sort(), cine: !!FG.missions.m2.cinematics.intro }; }""")
+    ok &= _check(notes, r["amb"] == "factory" and r["gateL"] and r["gateR"] and r["blast"] and r["ally"] == ["bawi"] and r["music"] == "calm",
+                 f"시작: 바탕 소리 {r['amb']}({r['ambKind']}) · 음악 {r['music']} · 정문 문짝 닫힘 {r['gateL']}/{r['gateR']} · 폭파 문 닫힘 {r['blast']} · 아군 {r['ally']} · 시작 연출 {r['cine']}")
+    ok &= _check(notes, r["dormant"] == sorted(["g_yard", "g_valve", "g_wSW", "g_wRoof", "g_wStair", "g_wN", "g_wh"]) and r["roofFixed"] and all(abs(y - 4.5) < 0.2 for y, _ in r["roof"]),
+                 f"잠든 무리 {r['dormant']} · 여과동 지붕 위 사수 {r['roof']}(높이 4.5 · 제자리)")
+    # 1) 정문 — 경비 둘을 치우면 바위가 엶
+    m0 = J("() => __mi.mark()")
+    g = J("""() => { __fps.killGroup('g_cause'); __fps.step(1); const a = FG.allies.ents[0]; const at0 = [a.pos.x, a.pos.z]; __fps.step(4.5);
+        const d = (id) => FG.world.dynGet(id).enabled; return { gateL: d('gateL'), gateR: d('gateR'), flag: !!__fps.mission().flags.gateOpen, yardAwake: !FG.ai.groups.g_yard.dormant,
+          cp: __fps.mission().checkpoint, obj: __fps.mission().objective.id, bawi: [+FG.allies.ents[0].pos.x.toFixed(1), +FG.allies.ents[0].pos.z.toFixed(1)] }; }""")
+    sd = J(say, m0)
+    ok &= _check(notes, not g["gateL"] and not g["gateR"] and g["flag"] and g["yardAwake"] and g["cp"] == "cp1" and g["obj"] == "o2" and any("정문은 내가 연다" in x for x in sd),
+                 f"정문: 경비 둘 처리 → 체크포인트 {g['cp']} · 바위 「정문은 내가 연다…」 → 문짝 열림 · 마당 무리 깸 {g['yardAwake']} · 바위 자리 {g['bawi']}")
+    # 2) 처음 만남 — 돌격수(마당) · 방탄 경비(펌프동): 그 종류가 싸우기 시작하면 바위 한 줄 + 안내 한 줄(한 번만)
+    m1 = J("() => __mi.mark()")
+    J("() => { const m = FG.map.mark('m2z1.gateIn'); __fps.teleport(m[0], m[1] + 0.05, m[2] - 4, 0); __fps.look(0, 0); for (let k = 0; k < 40 && !__mi.ev(__mi.mark() - 400, ['say']).some(e => /두건/.test(e.p.text)); k++) __fps.step(0.25); }")
+    J("() => { __fps.killGroup('g_yard'); __fps.killGroup('g_yardN'); __fps.step(1); const m = FG.map.mark('m2z2.doorS'); __fps.teleport(m[0], m[1] + 0.05, m[2] - 5, 0); __fps.look(0, 0); for (let k = 0; k < 40; k++) __fps.step(0.25); }")
+    sd = J(say, m1); hd = J(hint, m1)
+    rush = [x for x in sd if "두건" in x]; heavy = [x for x in sd if "판때기" in x]
+    ok &= _check(notes, len(rush) == 1 and len(heavy) == 1 and any("돌격수" in x for x in hd) and any("방탄 경비" in x for x in hd),
+                 f"첫 등장 한 줄 안내(gdd §5): 돌격수 — {rush} · 방탄 경비 — {heavy} · 안내 {[x[:18] for x in hd if '돌격수' in x or '방탄' in x]}")
+    # 3) 밸브 A · B — F 길게 2초(떼면 0.5초 유지 뒤 줄어듦), 돌리기 시작하면 북문 무리 깸
+    v = J("""() => { __fps.killGroup('g_pump'); __fps.killGroup('g_pumpH'); __fps.step(1); const o = __fps.mission().objective.id;
+        const f = FG.map.mark('m2z2.valveA.front'); __fps.teleport(f[0], f[1] + 0.05, f[2], 0); __fps.look(0, -15); __fps.step(0.1);
+        const near = __fps.mission().objective.near;
+        __fps.setInput({ interact: true }); __fps.step(1.0); const p1 = __fps.mission().objective.progress; const woke = !FG.ai.groups.g_valve.dormant;
+        __fps.setInput({ interact: false }); __fps.step(0.4); const pKeep = __fps.mission().objective.progress; __fps.step(0.6); const pDrop = __fps.mission().objective.progress;
+        __fps.setInput({ interact: true }); __fps.step(1.8); const oA = __fps.mission().objective.id; __fps.setInput({ interact: false });
+        const fb = FG.map.mark('m2z2.valveB.front'); __fps.teleport(fb[0], fb[1] + 0.05, fb[2], 0); __fps.look(0, -15); __fps.step(0.1);
+        __fps.setInput({ interact: true }); __fps.step(2.2); __fps.setInput({ interact: false }); const oB = __fps.mission().objective.id;
+        __fps.step(0.6); const s0 = FG.world.smoke.length; __fps.step(1.4);
+        const vent = FG.map.mark('m2z3.vent'); const V = THREE.Vector3; const a = new V(vent[0] - 5, 1.6, vent[2]), b = new V(vent[0] + 5, 1.6, vent[2]);
+        return { o, near, p1, woke, pKeep, pDrop, oA, oB, s0, smoke: FG.world.smoke.map(q => [q.id, +(q.t1 - q.t0).toFixed(2)]), los: FG.world.losClear(a, b), sight: FG.world.sightClear(a, b),
+          cp: __fps.mission().checkpoint, props: FG.props.state().steam }; }""")
+    summary["valves"] = v
+    ok &= _check(notes, v["o"] == "o4" and v["near"] and 0.45 <= v["p1"] <= 1.05 and v["woke"] and abs(v["pKeep"] - v["p1"]) < 1e-6 and v["pDrop"] < v["pKeep"] and v["oA"] == "o5" and v["oB"] == "o6",
+                 f"밸브: 앞에서 바라보면 안내(near {v['near']}) · F 1초 = {v['p1']} / 2 · 돌리기 시작 → 북문 무리 깸 {v['woke']} · 떼고 0.4초 유지 {v['pKeep']} → 0.6초 더 지나 {v['pDrop']} · 마저 돌리면 A 끝(→ {v['oA']}) · B 2초 → {v['oB']}")
+    ok &= _check(notes, v["s0"] == 0 and v["smoke"] == [["m2z3.vent", 10.0]] and v["los"] and not v["sight"] and v["cp"] == "cp4",
+                 f"밸브 둘 → 바위 대사 뒤 증기 기둥 {v['smoke']}(10초) · 기둥 너머 탄 시선 {v['los']} / 눈 시선 {v['sight']} · 체크포인트 {v['cp']} · 화면 증기 {v['props']}")
+    # 4) 증기 기둥이 떠 있는 동안 잡은 체크포인트 → 쓰러져 복원해도 같은 남은 시간으로 남음
+    c = J("""() => { FG.mission.M.cp = FG.mission.capture(); const s0 = FG.mission.M.cp.smoke; __fps.step(1); __fps.killPlayer(); __fps.step(2);
+        const st = __fps.mission(); return { snap: s0, now: FG.world.smoke.map(q => [q.id, +(q.t1 - FG.sim.time).toFixed(2)]), restores: st.restores, cap: FG.mission.M.restoreCap.smoke }; }""")
+    ok &= _check(notes, c["snap"] and len(c["snap"]) == 1 and c["restores"] >= 1 and c["cap"] == c["snap"] and c["now"] and abs(c["now"][0][1] - (c["snap"][0][7] - 0.5)) < 0.1,
+                 f"체크포인트 스냅숏에 증기 기둥(남은 {c['snap'] and c['snap'][0][7]}초) · 1초 뒤 쓰러짐 → 1.5초 뒤 복원 = 같은 값 {c['cap'] == c['snap']} · 복원 0.5초 뒤 남은 {c['now']}(되감김)")
+    # 5) 45초 버티기 — 세 방향 웨이브(남서 길 → 지붕 · 계단 13초 → 북쪽 27초, 마지막), 바위는 작업 자리
+    w = J("""() => { __fps.skipTo('o7'); __fps.step(0.2); const d = FG.map.mark('m2z3.defend'); __fps.teleport(d[0], d[1] + 0.05, d[2], 0); __fps.look(0, 0);
+        const awake = (g) => FG.ai.groups[g] && !FG.ai.groups[g].dormant; const T = {}; const t0 = __fps.mission().t;
+        for (let k = 0; k < 200 && __fps.mission().objective && __fps.mission().objective.id === 'o7'; k++) { __fps.step(0.25);
+            for (const g of ['g_wSW', 'g_wRoof', 'g_wStair', 'g_wN']) if (T[g] === undefined && awake(g)) T[g] = +(__fps.mission().t - t0).toFixed(2); }
+        const wk = FG.map.mark('m2z3.work'), b = FG.allies.ents[0];
+        return { T, obj: __fps.mission().objective.id, t: +(__fps.mission().t - t0).toFixed(2), cp: __fps.mission().checkpoint,
+            bawi: +Math.hypot(b.pos.x - wk[0], b.pos.z - wk[2]).toFixed(2), nN: FG.ai.ents.filter(e => e.group === 'g_wN').length }; }""")
+    summary["defend"] = w
+    ok &= _check(notes, 1 <= w["T"].get("g_wSW", 99) <= 2.5 and 12.5 <= w["T"].get("g_wRoof", 99) <= 14 and 12.5 <= w["T"].get("g_wStair", 99) <= 14 and 26.5 <= w["T"].get("g_wN", 99) <= 28
+                 and w["obj"] == "o8" and 44.5 <= w["t"] <= 46 and w["cp"] == "cp6" and w["bawi"] <= 1.6 and w["nN"] == 3,
+                 f"버티기 45초: 웨이브 깨는 시각 {w['T']}(남서 길 · 지붕 · 계단 · 북쪽 — 마지막 웨이브 보통 {w['nN']}명) · {w['t']}초에 끝 → {w['obj']} · 체크포인트 {w['cp']} · 바위는 작업 자리 {w['bawi']}m")
+    # 6) 폭파 문 — 폭약(F 길게 1.5초) → 「귀 막아」 → 2.4초 뒤 문 열림 · 폭발 · 문 안쪽 적 맞음 · 플레이어 안 다침 · 창고 무리 깸
+    m3 = J("() => __mi.mark()")
+    b = J("""() => { for (const g of ['g_wSW', 'g_wRoof', 'g_wStair', 'g_wN', 'g_valve', 'g_tank']) __fps.killGroup(g); __fps.step(2.5); __fps.skipTo('o9'); __fps.step(0.2); const f = FG.map.mark('m2z4.blastFront'), ch = FG.map.mark('m2z4.charge'); __fps.teleport(f[0], f[1] + 0.05, ch[2] + 1.3, 0); __fps.look(0, -5);
+        const hp0 = FG.player.hp; const e0 = FG.ai.ents.filter(e => e.group === 'g_wh').map(e => [e.id, e.hp]);
+        __fps.setInput({ interact: true }); __fps.step(1.7); __fps.setInput({ interact: false }); const o = __fps.mission().objective.id; const closed = FG.world.dynGet('blast').enabled;
+        __fps.step(2.2); FG.player.god = false; __fps.step(0.4); FG.player.god = true; __fps.step(0.4);   // 터지는 순간만 god 끔(폭발이 플레이어를 다치게 하는지)
+        const e1 = FG.ai.ents.filter(e => e.group === 'g_wh').map(e => [e.id, e.hp, e.down]);
+        return { o, closedAfterPlant: closed, open: !FG.world.dynGet('blast').enabled, flag: !!__fps.mission().flags.blastOpen, awake: !FG.ai.groups.g_wh.dormant, hp0, hp1: FG.player.hp, e0, e1, cp: __fps.mission().checkpoint }; }""")
+    ex = J("(m) => __mi.ev(m, ['explode', 'playerHurt']).map(e => [e.type, e.p.kind || null])", m3)
+    sd = J(say, m3)
+    hurt = [e0 for e0, e1 in zip(b["e0"], b["e1"]) if e1[1] < e0[1]]
+    summary["blastDoor"] = {k: b[k] for k in ("o", "open", "awake", "hp0", "hp1")}
+    ok &= _check(notes, b["o"] == "o10" and b["closedAfterPlant"] and b["open"] and b["flag"] and b["awake"] and ["explode", "breach"] in ex and not any(x[0] == "playerHurt" for x in ex)
+                 and b["hp1"] == b["hp0"] and len(hurt) >= 1 and any("귀 막아" in x for x in sd) and b["cp"] == "cp7",
+                 f"폭파 문: 폭약 붙임(→ {b['o']}, 아직 닫힘 {b['closedAfterPlant']}) · 바위 「귀 막아.」 → 문 열림 {b['open']} · 폭발 {[x for x in ex if x[0] == 'explode']} · 문 안쪽 적 맞음 {len(hurt)}명 · 플레이어 체력 {b['hp0']} → {b['hp1']} · 창고 무리 깸 {b['awake']} · 체크포인트 {b['cp']}")
+    # 7) 정보 조각 — 칠판 · 책상 앞에서 바라보고 F 한 번
+    it = J("""() => { const res = []; for (const [mk, at] of [['m2z2.board', 'm2z2.board'], ['m2z4.deskFront', 'm2z4.desk']]) { const m = FG.map.mark(at), f = FG.map.mark(mk);
+            const yaw = mk === at ? 270 : 0; const px = mk === at ? m[0] + 1.4 : f[0], pz = mk === at ? m[2] : f[2];
+            __fps.teleport(px, FG.nav.heightAt(px, pz, 0) + 0.05, pz, 0); __fps.look(Math.atan2(m[0] - px, -(m[2] - pz)) * 180 / Math.PI, -10); __fps.step(0.1);
+            const pr = FG.mission.hudState().intel; __fps.press('interact'); __fps.step(0.1); res.push([at, pr, __fps.mission().intel.slice()]); } return res; }""")
+    ok &= _check(notes, it[0][1] and "배 시간표" in it[0][1] and it[1][1] and "암호표" in it[1][1] and it[1][2] == ["0", "1"],
+                 f"정보 조각: 칠판 「{it[0][1]}」 · 책상 「{it[1][1]}」 → 챙김 {it[1][2]}")
+    # fix3 — 잠든 웨이브 무리(지붕 · 계단)는 o7 전에 탄 · 수류탄에 안 맞음 / 버티기는 작업 자리 반경 밖이면 시간이 멈춤 / 가장자리 걷기
+    pg = fresh(); J = pg.evaluate
+    dm = J("""() => { __fps.startMission('m2', { seed: 5, diff: 'normal' }); __fps.god(true); __fps.infiniteAmmo(true); __fps.pauseLoop();
+        for (const g of ['g_cause', 'g_yard', 'g_yardN', 'g_pump', 'g_pumpH']) __fps.killGroup(g); __fps.skipTo('o6'); __fps.step(0.3);
+        const d = FG.map.mark('m2z3.defend'); __fps.teleport(d[0] - 1.5, FG.nav.heightAt(d[0] - 1.5, d[2] + 1.5, 0) + 0.05, d[2] + 1.5, 70);
+        const e18 = FG.ai.ents.find(x => x.group === 'g_wRoof'), e20 = FG.ai.ents.find(x => x.group === 'g_wStair');
+        const h0 = [e18.hp, e20.hp]; __fps.aimAt(e18.id, 'torso'); __fps.fireFor(0.6); __fps.explodeAt([e20.pos.x + 1, e20.pos.y + 0.3, e20.pos.z]); __fps.step(0.3);
+        const h1 = [e18.hp, e20.hp];
+        __fps.skipTo('o7'); __fps.step(0.2); __fps.teleport(0, 0.2, 20, 0); __fps.step(0.1); const t0 = __fps.mission().objective.defendT; const m0 = __mi.mark(); __fps.step(10);
+        const far = __fps.mission().objective; const hints = __mi.ev(m0, ['hint']).map(e => e.p.text);
+        return { h0, h1, farT0: t0, farT: far.defendT, away: far.away, obj: far.id, hints }; }""")
+    summary["fix3m2"] = dm
+    ok &= _check(notes, dm["h1"] == dm["h0"], f"잠든 웨이브(지붕 사수 · 계단) o7 전 탄 · 수류탄에 안 맞음: 체력 {dm['h0']} → {dm['h1']}")
+    ok &= _check(notes, dm["obj"] == "o7" and dm["farT"] == dm["farT0"] and dm["away"] and any("작업 자리" in x for x in dm["hints"]),
+                 f"버티기: 작업 자리 반경(16m) 밖 둑길에서 10초 → 시간 {dm['farT0']} → {dm['farT']}초 그대로(멈춤 {dm['away']}) · 안내 {dm['hints'][:1]}")
+    edge = _edge_walk(fresh, 'm2')
+    summary["edge"] = summary.get("edge", {}); summary["edge"]["m2"] = edge
+    ok &= _check(notes, edge["n"] == 0, f"임무 2 가장자리 걷기: 표식 {edge['marks']}개 × 12방향 = {edge['runs']}번 → 구역 밖 · 바다로 떨어짐 {edge['n']}번 {edge['out'][:3]}")
+    return ok
+
+
+def _mission_m2w_extra(s, fresh, out, notes, summary):
+    """S11a — 임무 2 지형: 구역 · 흐린 하늘 · 공장 바탕 소리 · 늘 피는 김, 배관 밑 통로(서서 · 앉아서는 막힘 · 달리다 C 슬라이딩으로 들어가 기어서 나옴 ·
+    적 길찾기 칸 막힘), 증기 기둥(적 시야를 막음 — 게이지 그대로 · 기둥이 사라지면 다시 봄 · 탄 · 폭발은 지나감), 폭파 문(닫힘 = 충돌 · 열면 지나감)."""
+    ok = True
+    pg = fresh()
+    J = pg.evaluate
+    info = J("""() => { __fps.startMission('m2w', { seed: 5 }); __fps.god(true); __fps.pauseLoop(); __fps.step(0.5);
+        return { zones: FG.map.loaded.slice(), sky: __fps.assets().sky.name, amb: FG.mission.M.amb, fog: FG.gfx.envState().fog, wisps: FG.props ? FG.props.state().steam.wisps : null,
+            card: !!(FG.missions.m2 && FG.missions.m2.objectives), errs: FG.map.loaded.map(id => FG.map.built[id].errors.length) }; }""")
+    ok &= _check(notes, info["zones"] == ["m2z1", "m2z2", "m2z3", "m2z4"] and info["sky"] == "overcast" and info["amb"] == "factory" and info["card"] and not any(info["errs"]),
+                 f"임무 2 구역 {info['zones']} · 하늘 {info['sky']} · 바탕 소리 {info['amb']}(공장) · 안개 {info['fog']} · 임무 2 정식 자료 있음(S11b — 카드 열림) {info['card']}")
+    # 1) 배관 밑 통로 — 안쪽 높이 1.0m · 길이 4m(펌프동 남쪽 벽)
+    sl = J("""() => { const out = {}; const o = FG.maps.m2z2.origin, mouth = o[2] + 14.2, inner = o[2] + 9.6;
+        const put = (dz) => { __fps.clearInput(); __fps.teleport(o[0] + 8, 0.02, mouth + dz, 0); __fps.look(0, 0); __fps.step(0.05);
+            for (let k = 0; k < 3 && __fps.state().stance !== 'stand'; k++) { __fps.press(__fps.state().stance === 'prone' ? 'prone' : 'crouch'); __fps.step(0.1); } __fps.step(0.2); };
+        put(2); __fps.setInput({ moveZ: 1 }); __fps.step(4); out.walk = +(__fps.state().pos[2] - mouth).toFixed(2);
+        put(2); __fps.press('crouch'); __fps.step(0.4); __fps.setInput({ moveZ: 1 }); __fps.step(5); out.crouch = +(__fps.state().pos[2] - mouth).toFixed(2); out.crouchSt = __fps.state().stance;
+        put(4.2); const n0 = FG.bus.count; __fps.setInput({ moveZ: 1, sprint: true }); __fps.step(0.5); __fps.setInput({ sprint: null }); __fps.press('crouch');
+        __fps.step(1.0); out.slideAt = +(__fps.state().pos[2] - mouth).toFixed(2); out.afterSlide = __fps.state().stance;
+        out.slid = __fps.events(n0).some(e => e.type === 'slide');
+        __fps.setInput({ moveZ: 1 }); __fps.step(4); out.end = +(__fps.state().pos[2] - inner).toFixed(2); out.endSt = __fps.state().stance;
+        out.navMid = FG.nav.walkable(o[0] + 8, mouth - 2); out.navOut = FG.nav.walkable(o[0] + 8, mouth + 2); __fps.clearInput();
+        for (let k = 0; k < 4 && __fps.state().stance !== 'stand'; k++) { __fps.press(__fps.state().stance === 'prone' ? 'prone' : 'crouch'); __fps.step(0.3); }   // 다음 시험은 서서
+        out.stand = __fps.state().stance;
+        return out; }""")
+    summary["slide"] = sl
+    ok &= _check(notes, sl["walk"] >= 0.2 and sl["crouch"] >= 0.2,
+                 f"배관 밑 통로: 서서 걷기 → 입구 앞에서 멈춤({sl['walk']}m) · 앉아 걷기 → 멈춤({sl['crouch']}m, 자세 {sl['crouchSt']}) — 안쪽 높이 1.0 < 앉은 키 1.1")
+    ok &= _check(notes, sl["slid"] and sl["slideAt"] < -0.5 and sl["end"] < 0,
+                 f"달리다 C → 슬라이딩으로 통로 안({sl['slideAt']}m — 슬라이딩 뒤 자세 {sl['afterSlide']}) → 기어서 펌프동 안으로({sl['end']}m 안쪽 · 자세 {sl['endSt']})")
+    ok &= _check(notes, not sl["navMid"] and sl["navOut"], f"길찾기 격자: 통로 안 칸 막힘({sl['navMid']} — 적 · 자동 조종은 문으로) · 입구 앞 칸 걸을 수 있음({sl['navOut']})")
+    # 2) 증기 기둥 — 적 시야 막음(탱크 마당). 적은 남쪽을 보고 서 있고 플레이어는 14m 앞(가운데 증기 구멍)
+    sm = J("""() => { const o = FG.maps.m2z3.origin, V = THREE.Vector3; const vent = FG.map.mark('m2z3.vent');
+        const E = [o[0] - 3, 0, o[2] + 2], P = [o[0] - 1, 0, o[2] + 16];
+        const run = (steam, sec) => { __fps.killAll(); __fps.step(2.3); FG.world.smokeClear();
+            __fps.teleport(P[0], 0.02, P[2], 180); __fps.look(180, 0);
+            if (steam) { FG.world.smokeAdd({ id: 'test', x: vent[0], y: vent[1], z: vent[2], r: 3.4, h: 11, dur: steam }); __fps.step(0.6); }   // 짙어진 뒤
+            const id = __fps.spawnEnemy({ group: 'S', state: 'idle', pos: E, yaw: 180 }); __fps.step(0.05);
+            const g = []; for (let k = 0; k < sec * 4; k++) { __fps.step(0.25); const e = __fps.enemies().find(x => x.id === id); g.push(e ? e.gauge : -1); if (e && e.state !== 'idle' && e.state !== 'alert') break; }
+            const e = __fps.enemies().find(x => x.id === id);
+            return { gauge: g[g.length - 1], max: Math.max(...g), state: e && e.state, n: g.length }; };
+        const a = new V(E[0], 1.6, E[2]), b = new V(P[0], 1.6, P[2]);
+        const out = { open: run(0, 3), steam: run(8, 3) };
+        out.losThrough = FG.world.losClear(a, b); out.sightThrough = FG.world.sightClear(a, b);
+        __fps.step(6); const e2 = __fps.enemies().find(x => x.group === 'S'); out.after = e2 ? { gauge: e2.gauge, state: e2.state } : null;
+        out.smoke = FG.world.smoke.length; return out; }""")
+    summary["steam"] = sm
+    ok &= _check(notes, sl.get("stand") == "stand" and (sm["open"]["max"] >= 0.3 or sm["open"]["state"] not in ("idle", None)),
+                 f"증기 없음: 14m 앞 적이 플레이어를 봄 — 게이지 최대 {sm['open']['max']} · 상태 {sm['open']['state']}")
+    ok &= _check(notes, sm["steam"]["max"] < 0.05 and sm["steam"]["state"] == "idle" and sm["losThrough"] and not sm["sightThrough"],
+                 f"증기 기둥 사이: 3초 동안 못 봄 — 게이지 최대 {sm['steam']['max']} · 상태 {sm['steam']['state']} · 맵 시선 {sm['losThrough']}(탄은 지나감) · 눈 시선 {sm['sightThrough']}")
+    ok &= _check(notes, sm["after"] and (sm["after"]["gauge"] >= 0.3 or sm["after"]["state"] not in ("idle",)),
+                 f"증기가 걷힌 뒤(8초) 다시 봄 — {sm['after']}")
+    # 3) 폭파 문 — 닫힘이면 막힘, 열면 지나감
+    bd = J("""() => { const m = FG.map.mark('m2z4.blastFront'), d = FG.world.dynGet('blast'); const res = { exists: !!d, closed: d && d.enabled };
+        const go = () => { __fps.clearInput(); __fps.teleport(m[0], m[1] + 0.02, m[2], 0); __fps.look(0, 0); __fps.step(0.2); __fps.setInput({ moveZ: 1 }); __fps.step(3); __fps.clearInput(); return +__fps.state().pos[2].toFixed(2); };
+        res.zClosed = go(); FG.world.setDoor('blast', true); __fps.step(0.8); res.zOpen = go(); res.doorZ = FG.map.mark('m2z4.door.blast')[2]; return res; }""")
+    summary["blast"] = bd
+    ok &= _check(notes, bd["exists"] and bd["closed"] and bd["zClosed"] > bd["doorZ"] and bd["zOpen"] < bd["doorZ"] - 2,
+                 f"폭파 문(창고 남쪽): 처음 닫힘 → 앞에서 멈춤(z {bd['zClosed']} · 문 {bd['doorZ']}) · 열면 안으로(z {bd['zOpen']})")
+    for name, (x, z, yaw, pitch, js) in {"m2-causeway": (0, 29.5, 0, 3, ""), "m2-steam": (6, -76, 345, 8, "FG.world.smokeAdd({ id: 'shot', x: 1, y: 0, z: -81.4, r: 3.4, h: 11, dur: 30 });")}.items():
+        J("""(a) => { const [x, z, yaw, pitch, js] = a; __fps.resumeLoop(); __fps.killAll(); __fps.clearInput(); if (js) (new Function(js))();
+            __fps.teleport(x, FG.nav.heightAt(x, z, 0) + 0.05, z, yaw); __fps.look(yaw, pitch); }""", [x, z, yaw, pitch, js])
+        pg.wait_for_timeout(2200)
+        pg.screenshot(path=str(out / f"mission-{name}.png"))
+    return ok
 
 
 def _mission_t0_keys(s, fresh, out, notes, summary):
@@ -3536,9 +4248,14 @@ def cmd_ui(args):
             v = J("() => __fps.ui()")
             cards = v["cards"]
             m_cards = [c for c in cards if c["id"].startswith("m")]
-            ok &= _check(notes, len(m_cards) == 4 and all(c["locked"] and "준비 중" in c["text"] for c in m_cards) and any(c["id"] == "tr" and not c["locked"] for c in cards)
+            # S10b — 임무 1 자료가 생겨 m1 카드는 열림(「준비 중」 아님). S11b — 임무 2 자료가 생겨 m2 는 「잠김」(임무 1 을 끝내면 열림), m3 · m4 는 자료 없음 「준비 중」
+            m1c = next((c for c in m_cards if c["id"] == "m1"), None)
+            m2c = next((c for c in m_cards if c["id"] == "m2"), None)
+            ok &= _check(notes, len(m_cards) == 4 and m1c and not m1c["locked"] and "준비 중" not in m1c["text"]
+                         and m2c and m2c["locked"] and "잠김" in m2c["text"]
+                         and all(c["locked"] and "준비 중" in c["text"] for c in m_cards if c["id"] in ("m3", "m4")) and any(c["id"] == "tr" and not c["locked"] for c in cards)
                          and v["unlock"] == {"m1": True, "m2": False, "m3": False, "m4": False},
-                         f"임무 카드 4개 = 자료 없음 「준비 중」 · 훈련장 카드 · 해금 {v['unlock']} · 섬 지도 그림")
+                         f"임무 카드 4개: m1 열림 「{m1c and m1c['text'][:20]}」 · m2 「{m2c and m2c['text'][:24]}」 · m3 · m4 자료 없음 「준비 중」 · 훈련장 카드 · 해금 {v['unlock']} · 섬 지도 그림")
             try:   # 그림은 FG.assets.paint 의 그림 층(.fg-art)에 — 받은 뒤 나타남
                 pg.wait_for_function("() => { const a = document.querySelector('#selMap > .fg-art'); return !!a && a.classList.contains('on'); }", timeout=4000)
             except Exception:  # noqa: BLE001
@@ -3690,7 +4407,12 @@ def cmd_ui(args):
             v = J("() => ({ title: __ui.btns('scrTitle'), first: __fps.ui().firstVisit, sel: document.getElementById('btnSelect').className })")
             ok &= _check(notes, not v["first"] and v["title"][0].startswith("이어서") and "big" in v["sel"], f"다시 온 회원 타이틀: {v['title'][:2]} · 「작전 고르기」 큰 단추")
             shot(pg, "title-returning")
-            pg.click("#btnQuick"); _phase_wait(pg, "play")
+            # S10b — 임무 1 자료가 생겨 「바로 출격」 대상 = 안 깬 첫 임무 m1(S9 설계대로). 완수 기록은 시험 작전 t0 를 고르기 화면에서(키 W 만)
+            qt = J("() => __fps.ui().quickTarget")
+            ok &= _check(notes, qt == "m1", f"「바로 출격」 대상 = 안 깬 첫 임무 {qt}(S10b 부터 임무 1)")
+            pg.click("#btnSelect"); _phase_wait(pg, "select")
+            pg.click("#selTest button[data-id='t0']"); _phase_wait(pg, "loadout")
+            pg.click("#btnLoGo"); _phase_wait(pg, "play")
             pg.keyboard.down("KeyW")
             t0 = time.time()
             while time.time() - t0 < 8 and J("() => FG.game.phase") != "result":
@@ -4039,7 +4761,7 @@ def main():
     p.add_argument("--out", default=argparse.SUPPRESS)
     p = sub.add_parser("perf", help="실시간 고리 측정(중앙값 · 95번째 · 33ms 초과 · 호출 · 삼각형 · ?dbg=1 표) — S3: 시험 구역 t0 · 보통 화질")
     p.add_argument("--sec", type=float, default=20, help="측정 시간(초, 몸풀기 3초 뒤)")
-    p.add_argument("--mission", default=None, help="임무(m1 · m4 — S8 부터). 지금은 t0 만")
+    p.add_argument("--mission", default=None, help="임무 — t0 · m1(S10b 임무 1 실제 판 + 등대 · 선착장 구간, --sec 60 권장) · m2(S11b 임무 2 실제 판 + 증기 · 버티기 · 창고 구간). m4 는 S13")
     p.add_argument("--quality", default="mid", help="화질(S14 부터 high · low · auto). 지금은 mid 만")
     p.add_argument("--fire", action="store_true", help="걸으며 연사(S4 — 그리기 호출 ≤ 60)")
     p.add_argument("--blast", action="store_true", help="걸으며 0.7초마다 폭발(S5 — 33ms 넘는 프레임 0 · 호출 ≤ 60 · 셰이더 새로 안 만듦)")
