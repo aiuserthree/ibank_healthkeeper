@@ -179,8 +179,11 @@
     @media (max-width: 640px) {
       /* 위 막대 — 게임 옵션 · 게임 방법 · 환경설정 · 전체 화면까지 한 줄에 들어가게 */
       .hk-pf__bar .hk-pf__icon { display: none; }
-      .hk-pf__tools { gap: 5px; }
-      .hk-pf__tools .hk-play-sound { padding: 7px 8px; }
+      .hk-pf__tools { gap: 3px; }
+      .hk-pf__tools .hk-play-sound { padding: 7px 7px; }
+      /* 경기 중엔 단추가 6개라 제목 칸이 좁다 — 단추 밑으로 겹치지 않게 칸 안에서 자른다 */
+      .hk-pf__title { min-width: 0; overflow: hidden; }
+      .hk-pf__title b { display: block; white-space: nowrap; overflow: hidden; }
       .vb-over { padding: 8px; }
       .vb-card { padding: 16px 14px; border-radius: 16px; }
       .vb-card h2 { font-size: 19px; }
@@ -188,8 +191,11 @@
       .vb-mode { padding: 10px 8px; }
       .vb-mode b { font-size: 14px; }
       .vb-mode small { font-size: 11px; }
-      .vb-mode__tag { top: 6px; right: 6px; font-size: 10px; padding: 1px 6px; }
+      .vb-mode__tag { top: 6px; right: 6px; font-size: 11px; padding: 1px 6px; }
       .vb-logo { width: 42px; height: 42px; }
+      /* 코트 고르기 — 좁은 화면에서 「눈 오는 날」이 두 줄로 쪼개지지 않게 색 견본을 글 위로 */
+      .vb-courts button { flex-direction: column; gap: 2px; height: auto; min-height: 40px; padding: 4px 2px; font-size: 12px; white-space: nowrap; }
+      .vb-court { width: 22px; height: 12px; border-radius: 4px; }
     }
     /* 휴대폰 가로 — 위 막대를 얇게 */
     @media (max-height: 520px) and (pointer: coarse) {
@@ -209,7 +215,9 @@
       .vb-btnrow { margin-top: 10px; }
       .vb-mode small { display: none; }
       .vb-mode__ic { display: none; }
-      .vb-row { margin-top: 8px; }
+      .vb-row { margin-top: 5px; }
+      .vb-seg { padding: 3px; }
+      .vb-mode { padding: 8px 12px; } /* 줄이 다섯이라 — 「경기 시작」까지 한 화면에 */
       .vb-go { height: 44px; margin-top: 10px; }
       .vb-seg button { height: 32px; }
       .vb-help { display: none; }
@@ -1026,6 +1034,7 @@
       if (!sent.size) return;
       lobbyPoll = setInterval(async () => {
         if (screen !== "lobby") { clearInterval(lobbyPoll); return; }
+        if (document.hidden) return; // 창을 숨긴 동안은 묻지 않는다(돌아오면 다음 차례에)
         const d = await HKApi.matchOverview(KEY).catch(() => null);
         if (!d || screen !== "lobby") return;
         const m = [...(d.myTurn || []), ...(d.waiting || [])].find((x) => sent.has(x.id) && x.status === "ACTIVE");
@@ -1052,6 +1061,7 @@
       const still = () => screen === "sent" && location.hash === `#m${id}`;
       sentPoll = setInterval(async () => {
         if (!still()) { clearInterval(sentPoll); return; }
+        if (document.hidden) return;
         const d = await HKApi.matchDetail(id).catch(() => null);
         if (!d || !still() || d.status === "ACTIVE") return;
         clearInterval(sentPoll);

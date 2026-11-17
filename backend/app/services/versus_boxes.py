@@ -330,9 +330,9 @@ def choose(st: dict, seat: int, level: str, rnd) -> int:
     caps = bd.caps(d)
     safe = bd.safe(d)
     if level == "easy":
-        if caps and rnd.random() < 0.7:
+        if caps and rnd.random() < 0.85:  # 평범한 사람 흉내 봇에게 거의 늘 지던 것(9할 이상)을 조금 버티게
             return rnd.choice(caps)
-        if safe and rnd.random() < 0.85:
+        if safe and rnd.random() < 0.92:
             return rnd.choice(safe)
         return rnd.choice(free)
     if caps:

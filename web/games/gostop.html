@@ -140,6 +140,7 @@
     .gs-rows .is-mult b { color: #dc2626; }
     .gs-rows .is-sum { font-weight: 900; color: #b45309; }
     .gs-formula { margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--text-secondary); }
+    .gs-card .gs-kook { margin-top: 6px; font-size: 12.5px; color: var(--text-secondary); }
     .gs-card__btns { display: flex; gap: 8px; margin-top: 14px; }
     .gs-card__btns .gs-btn { flex: 1; }
     .gs-card__btns .gs-btn--alt { background: #eef2f7; }
@@ -202,17 +203,17 @@
       .gs-pile { gap: 4px 7px; }
       .gs-pts { min-width: 48px; }
       .gs-pts b { font-size: 22px; }
-      .gs-pts small { font-size: 10px; }
+      .gs-pts small { font-size: 11px; }
       .gs-grp { gap: 3px; }
-      .gs-grp__n { min-width: 22px; padding: 1px 3px; font-size: 10px; }
+      .gs-grp__n { min-width: 22px; padding: 1px 3px; font-size: 11px; }
       .gs-grp__n b { font-size: 12px; }
-      .gs-chip { padding: 1px 5px; font-size: 10px; }
+      .gs-chip { padding: 1px 5px; font-size: 11px; }
       .gs-floor { --off: .27; display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 8px 6px; padding: 2px 0 16px; min-height: calc(var(--sloth) * 2 + 26px); }
       .gs-slot { flex: 0 0 var(--slotw); }
       .gs-deck { order: -1; flex: 0 0 auto; margin: 0 4px; }
       /* 장수는 더미 그림 안쪽에 두 줄로 — 아래로 삐져나가 다음 줄 바닥 패에 가리지 않게 */
       .gs-deck__n { bottom: 7px; padding: 2px 5px 3px; border-radius: 8px; background: rgba(0,0,0,.62); font-size: 11px; line-height: 1.15; text-align: center; z-index: 2; }
-      .gs-deck__n i { display: block; font-size: 10px; font-weight: 700; opacity: .85; }
+      .gs-deck__n i { display: block; font-size: 11px; font-weight: 700; opacity: .85; }
       .gs-hand { gap: 12px 7px; padding: 14px 4px 8px; }
       .gs .gk__vs { gap: 6px; margin-bottom: 8px; }
       .gs .gk__side, .gs .gk__side:not(.is-me) { flex-direction: row; justify-content: flex-start; gap: 6px; padding: 6px 8px; text-align: left; }
@@ -1039,7 +1040,10 @@
       const muls = [...(e.go >= 3 ? [2 ** (e.go - 2)] : []), ...(e.mults || []).map(() => 2)];
       const sum = e.go ? `${e.base} + ${Math.min(e.go, 2)}` : `${e.base}`;
       const formula = `${e.go && muls.length ? `(${sum})` : sum}${muls.map((x) => ` × ${x}`).join("")} = ${fmtN(e.points)}점`;
-      return `<div class="gs-rows">${html}</div>${e.go || (e.mults || []).length ? `<div class="gs-formula">${esc(formula)}</div>` : ""}`;
+      // 국진 — 판 위 점수와 다르게 셌으면(받을 점수가 더 커지는 쪽) 한 줄 알려 준다(판에는 열끗 6장인데 풀이는 7장 · 멍박인 경우 등)
+      const kook = pile.includes(H.KOOKJIN) && n.y != null && H.score(pile).n.y !== n.y
+        ? `<p class="gs-kook">국진(9월 술잔)은 받을 점수가 더 커지는 ${H.score(pile).n.y > n.y ? "<b>쌍피</b>로" : "<b>열끗</b>으로"} 셌어요</p>` : "";
+      return `<div class="gs-rows">${html}</div>${e.go || (e.mults || []).length ? `<div class="gs-formula">${esc(formula)}</div>` : ""}${kook}`;
     }
     function openResult() {
       const modal = document.getElementById("gs-modal");
@@ -1080,7 +1084,9 @@
       if (!head || !match) return;
       const g = view || match.gs;
       const sub = (pile, side) => (pile ? `${H.score(pile).total}점${side && side.go ? ` · ${side.go}고` : ""}` : "");
-      const m = busy && view && match.status === "ACTIVE" ? { ...match, myTurn: view.turn === "me", rivalTurn: view.turn === "rival" } : match;
+      // 보여 주는 중(busy)에는 보여 주는 판 기준 — 판이 막 끝났어도 마지막 차례를 다 보여 줄 때까지 승 · 패 표시를 미룬다
+      const m = busy && view && (match.status === "ACTIVE" || match.status === "DONE")
+        ? { ...match, status: "ACTIVE", result: null, myTurn: view.turn === "me", rivalTurn: view.turn === "rival" } : match;
       head.innerHTML = HKMatch.versus(m, statusText(), g ? { me: sub(g.pile, g.mine), rival: sub(g.rivalPile, g.rival) } : {});
     }
     const muteBtn = () => { const m = HKSound.isMuted(); return `${ICON.mute(m)}<span>${m ? "소리 꺼짐" : "소리 켜짐"}</span>`; };

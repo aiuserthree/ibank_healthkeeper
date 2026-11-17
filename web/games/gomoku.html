@@ -23,9 +23,10 @@
     // 사내 오목 — 도전 → 수락 → 번갈아 두기. 수는 아케이드가 열린 시간에만 둘 수 있고, 한 수 기한은 24시간
     const { esc, REASON, ava, closedNote, due, fail } = HKMatch;
     const GAME = "gomoku";
-        const PLACE_TEXT = matchMedia("(hover: hover) and (pointer: fine)").matches ? "여기에 두기 (Space)" : "여기에 두기"; // PC는 스페이스로도 둔다
+    const PLACE_TEXT = matchMedia("(hover: hover) and (pointer: fine)").matches ? "여기에 두기 (Space)" : "여기에 두기"; // PC는 스페이스로도 둔다
     let root = null, open = { open: true, opensAt: null }, match = null, pick = null, timer = 0, sending = false;
     let waiter = null; // 서버에서 상대 수를 기다리는 요청
+    let touchAt = 0; // 손가락으로 마지막에 누른 때 — 뒤따르는 click 을 한 번 더 받지 않게
     function stopPoll() { clearTimeout(timer); timer = 0; if (waiter) { waiter.abort(); waiter = null; } }
     async function showLobby() {
       stopPoll(); match = null; pick = null;
@@ -88,7 +89,10 @@
           ${note ? `<div class="gk__due">${esc(note)}</div>` : ""}
         </div>`;
       drawBoard();
-      document.getElementById("gk-board").addEventListener("click", tapBoard);
+      const board = document.getElementById("gk-board");
+      // 손가락은 pointerup 으로 받는다 — 자리를 빨리 고쳐 누르면(350ms 안) 공용 no-zoom.js 가 두 번째 click 을 막았다
+      board.addEventListener("pointerup", (e) => { if (e.pointerType === "mouse" || !e.isPrimary) return; touchAt = performance.now(); tapBoard(e); });
+      board.addEventListener("click", (e) => { if (performance.now() - touchAt > 700) tapBoard(e); });
     }
     function tapBoard(e) {
       if (!match || match.status !== "ACTIVE" || !match.myTurn || !open.open || sending) return;
@@ -182,10 +186,11 @@
         window.addEventListener("hashchange", route);
         window.addEventListener("keydown", (e) => {
           if (e.code !== "Space" || !match || document.querySelector(".hk-dialog__overlay")) return;
+          if (e.target && e.target.closest && e.target.closest("button, a, input, textarea, select")) return; // 단추 · 링크 위에서는 그 단추가 받는다
           e.preventDefault(); // 판을 보는 동안 스페이스로 화면이 내려가지 않게
           if (pick && !e.repeat) place();
         });
-        document.addEventListener("visibilitychange", () => { if (!document.hidden && match) showMatch(match.id); });
+        document.addEventListener("visibilitychange", () => { if (!document.hidden && match && !sending) showMatch(match.id); });
         route();
       },
     });
