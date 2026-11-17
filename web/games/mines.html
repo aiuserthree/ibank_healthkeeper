@@ -688,13 +688,28 @@
         };
 
         // ── 입력 ──
+        // 휴대폰 탭은 손을 뗄 때(pointerup) 바로 처리한다 — 공통 틀이 두 번 누르기 확대를 막느라 0.4초 안의 두 번째 터치를
+        // 막아(touchend preventDefault) click 이 안 생기므로, click 만 들으면 칸을 빠르게 연달아 누를 때 두 번째부터 씹혔다
+        let touchDown = null, touchActAt = 0;
         boardEl.addEventListener("pointerdown", (e) => {
           lastPointerType = e.pointerType || "mouse";
           if (cursorOn) { cursorOn = false; drawCursor(); }
+          const el = e.target.closest && e.target.closest("[data-i]");
+          touchDown = e.pointerType === "touch" && el ? { id: e.pointerId, i: +el.dataset.i, x: e.clientX, y: e.clientY } : null;
         });
+        boardEl.addEventListener("pointerup", (e) => {
+          const d = touchDown;
+          touchDown = null;
+          if (!d || e.pointerId !== d.id || state !== "play") return;
+          if (Math.abs(e.clientX - d.x) > 12 || Math.abs(e.clientY - d.y) > 12) return; // 끌어서 스크롤한 것은 누르기가 아니다
+          touchActAt = performance.now();
+          act(d.i);
+        });
+        boardEl.addEventListener("pointercancel", () => { touchDown = null; });
         boardEl.addEventListener("click", (e) => {
           const el = e.target.closest("[data-i]");
           if (!el || state !== "play") return;
+          if (performance.now() - touchActAt < 800) return; // 손 뗄 때 이미 처리한 탭 — 뒤따르는 click 으로 두 번 하지 않게
           act(+el.dataset.i);
           root.focus({ preventScroll: true });
         });
