@@ -1499,6 +1499,17 @@
             });
             const fonts = document.fonts;
             if (fonts && fonts.status !== "loaded" && fonts.ready) fonts.ready.then(go, go); else go();
+          } else if (flipFor !== w.n && w.role === "draw") {
+            // 맞히다가 그릴 차례가 되면 — 답 칸(보드 아래)을 보던 채라 PC(720 높이 등)에서는 보드 위쪽이 사이트 머리 밑에 가려 있다.
+            // 보드 위가 가려졌을 때만 보드가 보이게 올린다(그리던 자리를 함부로 옮기지 않게 아래로는 굴리지 않는다)
+            requestAnimationFrame(() => {
+              const sl = document.getElementById("sk-slot");
+              if (!sl || !w || w.role !== "draw") return;
+              const hdr = document.querySelector(".hk-site-header");
+              const head = hdr && /sticky|fixed/.test(getComputedStyle(hdr).position) ? hdr.getBoundingClientRect().height : 0;
+              const d = sl.getBoundingClientRect().top - head - 12;
+              if (d < 0) window.scrollBy({ top: d, behavior: reduce() ? "auto" : "smooth" });
+            });
           }
           flipFor = w.n;
         } else {

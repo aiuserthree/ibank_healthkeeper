@@ -362,7 +362,8 @@ window.HKCoop = (function () {
       }
     }
     function tickClock() {
-      if (!room) return;
+      // 창을 숨기면 쉰다 — 게임 tick(시간 일 맞추기 /tick 요청 · 초읽기 소리)도 부르지 않는다. 다시 보이면 visibilitychange 가 방을 다시 받는다
+      if (!room || document.hidden) return;
       const el = document.getElementById("er-timer");
       const left = remain();
       if (el && left != null) {
