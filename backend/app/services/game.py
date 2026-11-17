@@ -484,8 +484,13 @@ async def last_week_board(db: AsyncSession) -> dict:
     return await hall_of_fame(db, "week")
 
 
-# ── 참여 도장 — 하루에 한 판이라도 끝까지 하면 도장 1개, 한 달에 STAMP_GOAL 개면 무적 쿠폰 1장(월 1장)
+# ── 참여 도장 — 하루에 한 판이라도 끝까지 하면 도장 1개(일반 · PLAY), 한 달에 STAMP_GOAL 개면 무적 쿠폰 1장(월 1장)
+# 대전 승리 보너스(WIN) — 사내 동료(사람)와의 대전에서 이기면 그날 1개 더. 하루 최대 2개(일반 1 + 보너스 1), 순서 상관없음.
+#   1:1 대전은 match._stamp_both, 여러 명 대전은 party._stamp_agreed 에서 give_win_bonus 를 부른다(대전 결과 처리 공통 지점 —
+#   새 대전 게임도 따로 적지 않아도 들어간다). 이긴 판으로 칠지는 순위(ranking)와 같은 잣대.
 STAMP_GOAL = 10
+STAMP_PLAY = "PLAY"  # 일반 참여 도장
+STAMP_WIN = "WIN"  # 대전 승리 보너스
 # 판 길이 제한 없음 — 일찍 죽어 끝난 판도 도장. 다만 게임 화면에서 판을 시작한 기록(run)은 있어야 한다 (점수만 보내는 꼼수 막기)
 STAMP_MIN_SEC = 0
 ARCADE_COUPON_DAYS = 30  # 아케이드 쿠폰 사용 기한 — 받은 날부터 30일
@@ -510,11 +515,16 @@ async def stamp_status(db: AsyncSession, member: Member, day: date | None = None
     filled 는 보여 주는 값과 상관없이 지금 모으는 판에 실제로 찍힌 수(쿠폰 · 기다림 판정용).
     """
     day = day or today_kst()
-    dates = (
+    rows = (
         await db.execute(
-            select(ArcadeStamp.stamp_date).where(ArcadeStamp.member_id == member.id).order_by(ArcadeStamp.stamp_date)
+            select(ArcadeStamp.stamp_date, ArcadeStamp.kind)
+            .where(ArcadeStamp.member_id == member.id)
+            .order_by(ArcadeStamp.stamp_date, ArcadeStamp.id)
         )
-    ).scalars().all()
+    ).all()
+    # 하루 2개(일반 + 대전 승리)를 받은 날은 그 날짜가 두 번 들어간다 — 도장판도 두 칸
+    dates = [d for d, _ in rows]
+    kinds = [k or STAMP_PLAY for _, k in rows]
     month = f"{day.year:04d}-{day.month:02d}"
     used = await db.scalar(
         select(func.count()).select_from(Coupon).where(Coupon.member_id == member.id, Coupon.source == CouponSource.ARCADE)
@@ -528,14 +538,17 @@ async def stamp_status(db: AsyncSession, member: Member, day: date | None = None
     filled = min(len(card), STAMP_GOAL)
     # 오늘 판을 다 채워 쿠폰으로 바꿨으면(새 판에 아직 하나도 없고, 바꾼 판의 10번째가 오늘) 오늘은 그 판을 그대로 보여 준다
     done = used > 0 and not card and len(dates) >= used * STAMP_GOAL and dates[used * STAMP_GOAL - 1] == day
-    shown = list(dates[(used - 1) * STAMP_GOAL : used * STAMP_GOAL]) if done else card[:STAMP_GOAL]
+    lo = (used - 1) * STAMP_GOAL if done else used * STAMP_GOAL
+    shown = list(dates[lo : lo + STAMP_GOAL])
     return {
         "month": month,
         "days": [d.isoformat() for d in shown],
+        "kinds": kinds[lo : lo + len(shown)],  # days 와 같은 순서 — PLAY(일반) · WIN(대전 승리 보너스)
         "count": STAMP_GOAL if done else filled,
         "filled": filled,
         "goal": STAMP_GOAL,
-        "today": day in set(dates),
+        "today": any(d == day and k == STAMP_PLAY for d, k in zip(dates, kinds)),  # 오늘 일반 도장을 받았는지
+        "todayBonus": any(d == day and k == STAMP_WIN for d, k in zip(dates, kinds)),  # 오늘 대전 승리 보너스를 받았는지
         "done": done,  # 오늘 10개를 채워 쿠폰을 받았다 — 내일부터 새 판
         "coupon": bool(this_month),  # 이번 달 아케이드 쿠폰을 받았는지
         "pending": filled >= STAMP_GOAL and bool(this_month),  # 10개 다 찼지만 이번 달 몫은 받아서 다음 달 1일에
@@ -589,11 +602,13 @@ async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -
     # 지난달에 채워 두고 기다리던 몫부터 받는다 (달이 바뀐 첫 판)
     issued = await _issue_arcade_coupon_if_due(db, member, today)
     has = await db.scalar(
-        select(func.count()).select_from(ArcadeStamp).where(ArcadeStamp.member_id == member.id, ArcadeStamp.stamp_date == today)
+        select(func.count()).select_from(ArcadeStamp).where(
+            ArcadeStamp.member_id == member.id, ArcadeStamp.stamp_date == today, ArcadeStamp.kind == STAMP_PLAY
+        )
     )
     new = False
     if not has and not (await stamp_status(db, member, today))["pending"]:
-        db.add(ArcadeStamp(member_id=member.id, stamp_date=today, game=key))
+        db.add(ArcadeStamp(member_id=member.id, stamp_date=today, game=key, kind=STAMP_PLAY))
         await db.flush()
         new = True
         issued = await _issue_arcade_coupon_if_due(db, member, today) or issued
@@ -601,6 +616,61 @@ async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -
         await db.commit()
     st = await stamp_status(db, member, today)
     return {"new": new, "count": st["count"], "goal": st["goal"], "coupon": issued, "today": st["today"], "pending": st["pending"], "done": st["done"]}
+
+
+async def give_win_bonus(
+    db: AsyncSession, member: Member, key: str, today: date, ref: str, rivals: list[int] | tuple[int, ...]
+) -> dict:
+    """대전 승리 보너스 — 사내 동료(사람)를 이긴 판이면 그날 도장 1개 더 (하루 1개, 일반 도장과 따로 · 순서 상관없음).
+
+    부르는 쪽(match._stamp_both · party._stamp_agreed)이 「사람을 이긴 판」인지 순위와 같은 잣대로 가린 뒤 부른다.
+    같은 상대를 하루에 여러 번 이겨도 — 보너스는 하루 1개라 그날 처음 이긴 판 하나만 받는다.
+    판정 근거로 ref(match:<id> · party:<id>)와 이긴 상대(rivals)를 도장 줄에 남긴다(관리자 확인용).
+    도장판이 꽉 차 다음 달 쿠폰을 기다리는 동안(pending)에는 일반 도장처럼 쌓지 않는다.
+    """
+    issued = await _issue_arcade_coupon_if_due(db, member, today)
+    has = await db.scalar(
+        select(func.count()).select_from(ArcadeStamp).where(
+            ArcadeStamp.member_id == member.id, ArcadeStamp.stamp_date == today, ArcadeStamp.kind == STAMP_WIN
+        )
+    )
+    new = False
+    if not has and not (await stamp_status(db, member, today))["pending"]:
+        db.add(
+            ArcadeStamp(
+                member_id=member.id, stamp_date=today, game=key, kind=STAMP_WIN,
+                ref=ref[:40], rivals=",".join(str(int(x)) for x in rivals)[:200] or None,
+            )
+        )
+        await db.flush()
+        new = True
+        issued = await _issue_arcade_coupon_if_due(db, member, today) or issued
+    if new or issued:
+        await db.commit()
+    st = await stamp_status(db, member, today)
+    return {"new": new, "already": bool(has), "count": st["count"], "goal": st["goal"], "coupon": issued, "pending": st["pending"]}
+
+
+async def win_bonus_state(db: AsyncSession, member_id: int, ref: str, won_human: bool, finished_at: datetime | None) -> str | None:
+    """대전 결과 화면에 띄울 보너스 표시 — "got"(이 판으로 받음) · "already"(오늘은 다른 판으로 이미 받음) · None(표시 없음).
+
+    won_human: 내가 사람을 이긴 판(순위에 1승으로 세는 판)인지. 컴퓨터전 · 진 판 · 비긴 판 · 오늘 끝나지 않은 판은 None.
+    """
+    if not won_human or finished_at is None:
+        return None
+    day = finished_at.astimezone(KST).date() if finished_at.tzinfo else finished_at.date()
+    if day != today_kst():
+        return None
+    refs = (
+        await db.execute(
+            select(ArcadeStamp.ref).where(
+                ArcadeStamp.member_id == member_id, ArcadeStamp.stamp_date == day, ArcadeStamp.kind == STAMP_WIN
+            )
+        )
+    ).scalars().all()
+    if not refs:
+        return None  # 아직 안 찍혔거나 도장판이 꽉 차 기다리는 중
+    return "got" if ref in refs else "already"
 
 
 async def stage_stamp(db: AsyncSession, redis: Redis, member: Member, key: str) -> dict:

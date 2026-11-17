@@ -83,7 +83,7 @@ from app.models import GameMatch, Member, MemberStatus
 from app.services import chess_game, gomoku_ai
 from app.services import teams as teams_service
 from app.services.avatar import member_avatar_url
-from app.services.game import _give_stamp, ensure_open, game_visible
+from app.services.game import _give_stamp, ensure_open, game_visible, give_win_bonus, win_bonus_state
 
 GOMOKU = "gomoku"
 CHESS = "chess"
@@ -113,7 +113,7 @@ GAVE_UP = ("RESIGN", "TIMEOUT", "TIMEOUT_DRAW")  # 끝까지 두지 않은 끝 �
 # 엔진 view 가 덮어쓸 수 없는 키 — 차례 · 결과 · 상대 정보는 이 파일만 정한다
 PROTECTED = frozenset({
     "id", "game", "status", "bot", "opponent", "me", "incoming", "myTurn", "rivalTurn", "moveCount", "seq",
-    "result", "endReason", "reasonLabel", "deadlineAt", "finishedAt", "stamp",
+    "result", "endReason", "reasonLabel", "deadlineAt", "finishedAt", "stamp", "winBonus",
 })
 
 register_messages({"MATCH_NO_BOT": "이 게임은 컴퓨터와 둘 수 없어요."})
@@ -451,8 +451,18 @@ async def _get(db: AsyncSession, member: Member, match_id: int, lock: bool = Fal
     return m
 
 
+def _human_win(m: GameMatch) -> bool:
+    """사람(사내 동료)을 이긴 판 — 순위에 1승으로 세는 판과 같은 잣대(컴퓨터전 · 무승부 · 행동 수가 모자란 기권 · 시간 초과 제외)."""
+    return m.status == "DONE" and not m.bot and m.opponent_id is not None and m.winner_id is not None and _counts(m)
+
+
 async def _view(db: AsyncSession, member: Member, m: GameMatch) -> dict:
-    return _payload(m, member.id, await _people(db, {m.challenger_id, m.opponent_id}), board=True)
+    out = _payload(m, member.id, await _people(db, {m.challenger_id, m.opponent_id}), board=True)
+    # 대전 승리 보너스 표시 — got(이 판으로 도장 +1) · already(오늘 대전 보너스는 이미 받음) · None(컴퓨터전 · 진 판 등)
+    out["winBonus"] = await win_bonus_state(
+        db, member.id, f"match:{m.id}", _human_win(m) and m.winner_id == member.id, m.finished_at
+    )
+    return out
 
 
 def _real_person(p: Member) -> bool:
@@ -671,11 +681,21 @@ async def decline(db: AsyncSession, member: Member, match_id: int) -> dict:
 
 
 async def _stamp_both(db: AsyncSession, m: GameMatch, member: Member) -> Optional[dict]:
-    """끝난 판은 두 사람 모두 오늘 도장을 받는다. 돌려주는 값은 방금 둔 사람의 도장."""
+    """끝난 판은 두 사람 모두 오늘 도장을 받는다. 돌려주는 값은 방금 둔 사람의 도장.
+
+    사람(사내 동료)을 이긴 판이면 이긴 사람은 대전 승리 보너스 도장도 받는다(그날 1개) — 1:1 대전 게임 전부가 여기를 지난다.
+    """
     if not _counts(m):
         return None
     today = today_kst()
+    bonus = None
+    if _human_win(m):
+        winner = member if m.winner_id == member.id else await db.get(Member, m.winner_id)
+        if winner is not None:
+            bonus = await give_win_bonus(db, winner, m.game, today, f"match:{m.id}", [_rival_id(m, m.winner_id)])
     mine = await _give_stamp(db, member, m.game, today)
+    if bonus is not None and m.winner_id == member.id:
+        mine = {**mine, "bonus": bonus, "coupon": bool(mine.get("coupon") or bonus.get("coupon"))}
     rival_id = _rival_id(m, member.id)
     rival = await db.get(Member, rival_id) if rival_id else None
     if rival is not None:
@@ -734,9 +754,9 @@ async def move(
         if m.bot and m.status == "ACTIVE":
             await _bot_reply(m)
     await db.commit()
+    stamp = await _stamp_both(db, m, member) if m.status == "DONE" else None  # 도장을 먼저 — 깨어난 상대 화면이 보너스를 보게
     if not m.bot:
         await _publish(m.id)
-    stamp = await _stamp_both(db, m, member) if m.status == "DONE" else None
     return {**(await _view(db, member, m)), "stamp": stamp}
 
 
@@ -748,9 +768,10 @@ async def resign(db: AsyncSession, member: Member, match_id: int) -> dict:
         raise_app_error("MATCH_NOT_ACTIVE")
     _finish(m, _rival_id(m, member.id), "RESIGN")
     await db.commit()
+    stamp = await _stamp_both(db, m, member)  # 도장을 먼저 — 깨어난 상대(이긴 사람) 화면이 보너스를 보게
     if not m.bot:
         await _publish(m.id)
-    return {**(await _view(db, member, m)), "stamp": await _stamp_both(db, m, member)}
+    return {**(await _view(db, member, m)), "stamp": stamp}
 
 
 async def detail(db: AsyncSession, member: Member, match_id: int) -> dict:

@@ -93,11 +93,14 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
 
     stamps = (
         await db.execute(
-            select(ArcadeStamp.member_id, ArcadeStamp.stamp_date, ArcadeStamp.game).where(
+            select(ArcadeStamp.member_id, ArcadeStamp.stamp_date, ArcadeStamp.game, ArcadeStamp.kind).where(
                 ArcadeStamp.stamp_date >= start, ArcadeStamp.stamp_date <= end
             )
         )
     ).all()
+    # 대전 승리 보너스(kind WIN) — 하루 최대 2개(일반 + 보너스)라 도장 수는 둘 다 센다. 보너스만 따로도 센다
+    win_stamps = sum(1 for r in stamps if r[3] == "WIN")
+    stamps = [(r[0], r[1], r[2]) for r in stamps]
     coupons = (
         await db.execute(
             select(Coupon.member_id, Coupon.issued_at, Coupon.status, Coupon.used_at).where(
@@ -260,6 +263,7 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
             "peakDay": max(daily, key=lambda r: r["members"])["date"] if total else None,
             "stamps": len(stamps),
             "stampMembers": len(stamp_by_member),
+            "stampBonus": win_stamps,
             "couponsIssued": len(coupons),
             "couponsUsed": len(used_in_range),
         },

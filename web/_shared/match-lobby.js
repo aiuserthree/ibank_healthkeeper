@@ -48,7 +48,14 @@ window.HKMatch = (function () {
         ${mark(mine)}${turn(mine) ? `<span class="gk__turn">차례</span>` : ""}
       </div>`;
     const me = m.me || { name: "나", department: "", avatarUrl: null };
-    return `<div class="gk__vs ${res ? `is-${res}` : ""}">${side(me, true, m.myColor)}<div class="gk__vs-mid"><b>VS</b><small>${esc(msg)}</small></div>${side(m.opponent, false, rivalColor)}</div>`;
+    return `<div class="gk__vs ${res ? `is-${res}` : ""}">${side(me, true, m.myColor)}<div class="gk__vs-mid"><b>VS</b><small>${esc(msg)}</small>${bonusTag(m)}</div>${side(m.opponent, false, rivalColor)}</div>`;
+  }
+  // 대전 승리 보너스 꼬리표 — 사람을 이긴 판(서버 winBonus)만. 컴퓨터전 · 진 판 · 비긴 판은 아무것도 없다
+  function bonusTag(m) {
+    if (!m || m.status !== "DONE") return "";
+    if (m.winBonus === "got") return `<span class="gk__bonus is-got"><b>도장 +1</b>대전 승리 보너스</span>`;
+    if (m.winBonus === "already") return `<span class="gk__bonus" title="오늘 대전 보너스는 이미 받았어요"><b>대전 보너스</b>오늘은 이미 받았어요</span>`;
+    return "";
   }
   const section = (title, body) => (body ? `<section class="gk__sec"><h2>${esc(title)}</h2>${body}</section>` : "");
 
@@ -130,5 +137,5 @@ window.HKMatch = (function () {
       else if (challenge) { await HKApi.matchCreate(Number(challenge), game); HKUI.toast("도전장을 보냈어요"); refresh(); }
     } catch (e) { fail(e); }
   }
-  return { esc, REASON, reason, ava, person, closedNote, due, fail, lobby, act, versus };
+  return { esc, REASON, reason, ava, person, closedNote, due, fail, lobby, act, versus, bonusTag };
 })();

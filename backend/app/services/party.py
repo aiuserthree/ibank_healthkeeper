@@ -9,7 +9,7 @@
      차 번호: 0 = 주인, 1 … = players 순서, 그 뒤로 컴퓨터(bots).
   5. 경주가 끝나면 달린 사람마다 결과를 보낸다(report) — 주인 화면이 경주를 계산하고 끝 소식을 모두에게 보내니 결과는 같아야 한다.
      과반이 같은 결과(1등 차 · 트랙)를 보냈으면 그 결과로 끝(DONE). 1등이 사람이면 그 사람 1승, 컴퓨터면 승 없음.
-     같은 결과를 보낸 사람은 오늘 참여 도장. 다 보내지 않아도 첫 보고 뒤 REPORT_WAIT_MIN 이 지나면 그때까지 온 것으로 판정한다.
+     같은 결과를 보낸 사람은 오늘 참여 도장, 사람을 이긴 1등(순위 1승과 같은 잣대)은 대전 승리 보너스 도장도. 다 보내지 않아도 첫 보고 뒤 REPORT_WAIT_MIN 이 지나면 그때까지 온 것으로 판정한다.
   순위 — match._ranking(bumpervs · jellyvs)에 더해진다: 1등만 1승(같은 사람들과 하루에 여러 번 이겨도 1승), 패는 세지 않는다.
   두뇌 저택은 1:1 이 없어 overview 의 ranking 으로 따로 보여 준다.
   젤리 숲 — 6마리가 2분 동안 먹고 자란다. 삼켜진 젤리는 3초 뒤 처음 크기로 다시 태어난다. 끝났을 때 가장 큰 젤리 1등만 1승
@@ -37,7 +37,7 @@ from app.core.time import KST, now_kst, today_kst
 from app.models import GameParty, GamePartySeat, Member, MemberStatus
 from app.services import teams as teams_service
 from app.services.avatar import member_avatar_url
-from app.services.game import _give_stamp, ensure_open, game_visible
+from app.services.game import _give_stamp, ensure_open, game_visible, give_win_bonus, win_bonus_state
 
 logger = logging.getLogger(__name__)
 
@@ -235,10 +235,26 @@ async def _sweep(db: AsyncSession) -> None:
     await db.commit()
 
 
+WIN_REASONS = ("FINISH", "FARTHER", "WIN", "BIGGEST")  # 사람이 1등으로 끝난 판 — 순위 1승 · 대전 승리 보너스
+
+
+def _beaten(p: GameParty) -> tuple:
+    """1등이 이긴 사람들(함께 한 사람, 컴퓨터 제외) — 순위 1승과 같은 잣대. 사람을 이긴 판이 아니면 빈 튜플."""
+    if p.status != "DONE" or p.winner_id is None or p.end_reason not in WIN_REASONS:
+        return ()
+    return tuple(sorted(int(x) for x in (p.state or {}).get("players") or [] if int(x) != p.winner_id))
+
+
 async def _stamp_agreed(db: AsyncSession, p: GameParty) -> None:
     if p.end_reason not in ("FINISH", "FARTHER", "WIN", "BIGGEST", "BOT", "DRAW"):
         return
     today = today_kst()
+    # 대전 승리 보너스 — 사람이 2명 이상인 판(나 + 동료 1명 이상)에서 1등. 여러 명 대전 게임 전부가 여기를 지난다
+    others = _beaten(p)
+    if others:
+        w = await db.get(Member, int(p.winner_id))
+        if w is not None and w.status == MemberStatus.ACTIVE:
+            await give_win_bonus(db, w, p.game, today, f"party:{p.id}", others)
     for mid in (p.state or {}).get("agreed") or []:
         m = await db.get(Member, int(mid))
         if m is not None and m.status == MemberStatus.ACTIVE:
@@ -280,7 +296,15 @@ def _payload(p: GameParty, seats: list, people: dict, member_id: int) -> dict:
 async def _view(db: AsyncSession, member: Member, p: GameParty) -> dict:
     seats = (await _seats(db, [p.id]))[p.id]
     people = await _people(db, {p.host_id, p.winner_id, *(s.member_id for s in seats)})
-    return _payload(p, seats, people, member.id)
+    return await _with_bonus(db, member, p, _payload(p, seats, people, member.id))
+
+
+async def _with_bonus(db: AsyncSession, member: Member, p: GameParty, out: dict) -> dict:
+    """결과 화면용 대전 승리 보너스 표시 — got · already · None (match._view 와 같은 값)."""
+    out["winBonus"] = await win_bonus_state(
+        db, member.id, f"party:{p.id}", bool(_beaten(p)) and p.winner_id == member.id, p.finished_at
+    )
+    return out
 
 
 async def _valid_guests(db: AsyncSession, member: Member, ids) -> list:
@@ -567,7 +591,7 @@ async def detail(db: AsyncSession, member: Member, party_id: int) -> dict:
     if _seat_of(seats, member.id) is None:
         raise_app_error("PARTY_NOT_FOUND", 404)
     people = await _people(db, {p.host_id, p.winner_id, *(s.member_id for s in seats)})
-    return _payload(p, seats, people, member.id)
+    return await _with_bonus(db, member, p, _payload(p, seats, people, member.id))
 
 
 async def overview(db: AsyncSession, member: Member, game: str) -> dict:
@@ -625,9 +649,7 @@ async def ranking_wins(db: AsyncSession, game: str) -> dict:
     ).scalars().all()
     wins: dict = {}
     for p in rows:
-        if p.end_reason not in ("FINISH", "FARTHER", "WIN", "BIGGEST"):
-            continue
-        others = tuple(sorted(int(x) for x in (p.state or {}).get("players") or [] if int(x) != p.winner_id))
+        others = _beaten(p)
         if not others:
             continue
         day = p.finished_at.astimezone(KST).date()

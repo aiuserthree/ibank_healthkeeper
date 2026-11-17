@@ -1,5 +1,19 @@
 /** 헬스키퍼 API 클라이언트 — fetch + 세션 쿠키 */
 window.HKApi = (function () {
+  // 대전 승리 보너스 알림 — 1:1 대전(/play/match/…) · 여러 명 대전(/play/party/…) 응답에 winBonus 가 오면 판마다 한 번만 띄운다.
+  // 게임 화면마다 따로 적지 않아도 모든 대전(새 대전 게임 포함)에 나온다. got = 이 판으로 도장 +1, already = 오늘은 이미 받음
+  const bonusSeen = new Set();
+  function winBonusNote(path, d) {
+    const kind = path.startsWith("/play/party/") ? "party" : path.startsWith("/play/match/") ? "match" : "";
+    if (!kind || d.status !== "DONE" || !d.id || !window.HKUI || !HKUI.toast) return;
+    const key = `hk:winBonus:${kind}:${d.id}`;
+    if (bonusSeen.has(key)) return;
+    bonusSeen.add(key);
+    try { if (sessionStorage.getItem(key)) return; sessionStorage.setItem(key, "1"); } catch (_) { /* 저장 못 해도 이번 화면에서 한 번 */ }
+    if (d.winBonus === "got") HKUI.toast("도장 +1 · 대전 승리 보너스");
+    else if (d.winBonus === "already") HKUI.toast("오늘 대전 보너스는 이미 받았어요");
+  }
+
   async function request(path, options = {}) {
     const res = await fetch("/api" + path, {
       credentials: "include",
@@ -12,6 +26,7 @@ window.HKApi = (function () {
     } catch (_) {
       /* empty */
     }
+    if (res.ok && body && body.data && body.data.winBonus) winBonusNote(path, body.data);
     if (!res.ok) {
       const apiErr = body.error || body.detail?.error || {};
       // FastAPI 기본 422 는 detail 이 배열이라 메시지가 없다 — 영어 상태 글 대신 한국어로

@@ -108,7 +108,8 @@ class GamePlay(Base):
 
 
 class ArcadeStamp(Base):
-    """아케이드 참여 도장 — 하루에 한 판이라도 끝까지 하면 그날 도장 1개 (한 달에 모아 무적 쿠폰)."""
+    """아케이드 참여 도장 — 하루에 한 판이라도 끝까지 하면 그날 도장 1개(kind PLAY),
+    사내 동료와의 대전에서 이기면 그날 1개 더(kind WIN, 대전 승리 보너스) — 하루 최대 2개 (모아서 무적 쿠폰)."""
 
     __tablename__ = "arcade_stamp"
 
@@ -116,15 +117,20 @@ class ArcadeStamp(Base):
     member_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("member.id", ondelete="CASCADE"), nullable=False
     )
-    # KST 날짜 — 하루 하나
+    # KST 날짜 — 종류마다 하루 하나
     stamp_date: Mapped[date] = mapped_column(Date, nullable=False)
     # 그날 도장을 찍게 한 게임 (참고용)
     game: Mapped[str] = mapped_column(String(30), nullable=False)
+    # 종류 — PLAY(일반 참여 도장, 마이그레이션 전 기록도 모두 PLAY) · WIN(대전 승리 보너스)
+    kind: Mapped[str] = mapped_column(String(10), nullable=False, server_default="PLAY", default="PLAY")
+    # 대전 승리 보너스의 판정 근거 — 어떤 판(match:<id> · party:<id>)에서 누구(회원 id, 쉼표로)를 이겼는지. 일반 도장은 비움
+    ref: Mapped[Optional[str]] = mapped_column(String(40), nullable=True)
+    rivals: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = (UniqueConstraint("member_id", "stamp_date", name="uq_arcade_stamp_member_day"),)
+    __table_args__ = (UniqueConstraint("member_id", "stamp_date", "kind", name="uq_arcade_stamp_member_day_kind"),)
 
 
 class GameRequest(Base):

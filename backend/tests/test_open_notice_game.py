@@ -64,6 +64,17 @@ class OpenNoticeGame(unittest.TestCase):
         for words in ("최대 6명이 한 트랙에서", "빈자리는 컴퓨터", "Teams 로 알림", "13개", "아이템", "점심시간"):
             self.assertIn(words, body)
 
+    def test_versus_games_mention_win_bonus(self):
+        # 대전 게임(1 ~ 3회)은 「동료를 이기면 그날 도장 2개!」 한 줄 — 혼자 하는 게임(4회부터)에는 넣지 않는다
+        bonus = "동료를 이기면 그날 도장 2개!"
+        for i, (key, _, lines) in enumerate(teams.OPEN_NOTICE_GAMES):
+            body = _body(FIRST + timedelta(weeks=i))
+            if key in ("bumpervs", "jellyvs", "mansion"):
+                self.assertEqual(sum(bonus in x for x in lines), 1, key)
+                self.assertIn(f"<b>{bonus}</b>", body)
+            else:
+                self.assertNotIn(bonus, body, key)
+
     def test_existing_parts_kept_and_game_last(self):
         body = _body(FIRST)
         self.assertTrue(body.startswith("<p><strong>[헬스키퍼]</strong> 차주 안마 예약 신청 안내</p>"))
@@ -103,7 +114,7 @@ class OpenNoticeGame(unittest.TestCase):
             self.assertEqual(title, GAMES[key].title)
             self.assertNotIn(key, seen)
             seen.add(key)
-            self.assertTrue(2 <= len(lines) <= 4, key)
+            self.assertTrue(2 <= len(lines) <= 5, key)
             self.assertTrue((WEB / "games" / f"{key}.html").is_file(), key)
             self.assertTrue((WEB / "assets" / "lounge" / f"{key}.jpg").is_file(), key)
         self.assertEqual(teams.game_thumb_url("bumpervs"), "https://hk.example.test/assets/lounge/bumpervs.jpg")
