@@ -56,12 +56,19 @@
 
     // 새 게임 소개 영상 — 맨 위 큰 화면 배경에 소리 없이 자동 재생(31초 반복). 장면마다 게임 이름 · 바로가기를 띄운다.
     // 영상은 직접 녹화해 만든 것(/assets/promo/new-games.mp4 · 3.9MB). 동작 줄이기 · 데이터 절약 설정이면 영상 대신 그림 벽 그대로.
+    // 영상을 쓸 때는 처음 그려지는 순간부터 게임 장면 — 그림 벽은 그리지 않고, 포스터(영상 1초 장면)를 큰 화면 배경에 바로 깔아 둔다.
     const REEL = { src: "/assets/promo/new-games.mp4?v=2", poster: "/assets/promo/new-games.jpg?v=2",
       ch: [["ringcatch", 0], ["hoops", 2.75], ["sundown", 5.5], ["nightsquad", 8.25], ["holecity", 11], ["herorush", 13.75], ["kitsune", 16.5], ["vinyl", 19.25], ["jelly", 22], ["eggfarm", 24.75], ["frostcamp", 27.5]] };
     const reelOk = () => {
       try { if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return false; } catch (_) { /* 그대로 */ }
       const c = navigator.connection; return !(c && c.saveData);
     };
+    // 포스터는 게임 목록을 기다리는 동안 미리 받아 둔다(큰 화면이 그려질 때 빈 순간 없이 바로 보이게)
+    if (reelOk()) {
+      const l = document.createElement("link");
+      l.rel = "preload"; l.as = "image"; l.href = REEL.poster; l.setAttribute("fetchpriority", "high");
+      document.head.appendChild(l);
+    }
     function bindReel(root, games) {
       const v = root.querySelector(".hk-aa-reel"), now = root.querySelector("#aa-reel-now");
       if (!v || !now) return;
@@ -78,8 +85,9 @@
         now.classList.remove("is-in"); void now.offsetWidth; now.classList.add("is-in");
       };
       v.addEventListener("timeupdate", paint);
-      v.addEventListener("playing", () => { hero.classList.add("is-reel"); paint(); });
-      v.addEventListener("error", () => { hero.classList.remove("is-reel"); v.remove(); now.remove(); });
+      paint(); // 첫 장면 게임 이름으로 바로
+      // 끝내 재생되지 않거나 오류면 영상 · 이름표만 정리 — 배경에 깔린 포스터(게임 장면)가 그대로 남는다
+      v.addEventListener("error", () => { v.remove(); now.remove(); });
       // 화면 밖 · 숨긴 창이면 멈춘다(배터리 · 성능)
       let seen = true;
       const sync = () => { if (seen && !document.hidden) { const p = v.play(); if (p && p.catch) p.catch(() => {}); } else v.pause(); };
@@ -97,10 +105,12 @@
       };
       // 업무 시간에도 버튼은 그대로 — 누르면 안내 창 (아래 click 처리)
       const cta = `<a class="hk-aa-pill" href="#aa-together" data-scroll="aa-together" data-play>지금 플레이</a>`;
-      const reel = reelOk() ? `<video class="hk-aa-reel" src="${REEL.src}" poster="${REEL.poster}" muted autoplay loop playsinline preload="auto" disablepictureinpicture aria-hidden="true" tabindex="-1"></video>
-          <a class="hk-aa-reel__now" id="aa-reel-now" href="/games/${REEL.ch[0][0]}"><span>${HKUI.icon("sparkles", 14, "currentColor")} 새로 나왔어요</span><b></b><em>하러 가기 ›</em></a>` : "";
-      return `<div class="hk-aa-hero">
-          <div class="hk-aa-wall" aria-hidden="true">${row(0)}${row(4)}${row(8)}${row(2)}${row(6)}${row(10)}</div>${reel}
+      const useReel = reelOk(), first = games.find((g) => g.key === REEL.ch[0][0]);
+      const reel = useReel ? `<video class="hk-aa-reel" src="${REEL.src}" poster="${REEL.poster}" muted autoplay loop playsinline preload="auto" disablepictureinpicture aria-hidden="true" tabindex="-1"></video>
+          <a class="hk-aa-reel__now" id="aa-reel-now" href="/games/${REEL.ch[0][0]}"><span>${HKUI.icon("sparkles", 14, "currentColor")} 새로 나왔어요</span><b>${first ? esc(first.title) : ""}</b><em>하러 가기 ›</em></a>` : "";
+      const wall = useReel ? "" : `<div class="hk-aa-wall" aria-hidden="true">${row(0)}${row(4)}${row(8)}${row(2)}${row(6)}${row(10)}</div>`;
+      return `<div class="hk-aa-hero${useReel ? " is-reel" : ""}"${useReel ? ` style="background-image:url('${REEL.poster}')"` : ""}>
+          ${wall}${reel}
           <div class="hk-aa-hero__in">
             <h1 class="hk-aa-logo">아케이드</h1>
             <span class="hk-aa-tag">점심엔, 한 판</span>
