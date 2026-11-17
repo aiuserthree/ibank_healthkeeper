@@ -100,7 +100,7 @@ GAMES: dict[str, Game] = {
         Game("theater", "심야 극장 안내", "MINI", "꿀알바 시리즈 4화 · 관객이 돌아보면 움직이지 말 것", "clapperboard", "점", 200000),
         Game("milk", "새벽 우유 배달", "MINI", "꿀알바 시리즈 3화 · 규칙이 바뀌는 골목에 우유 넣기", "milk", "명", 200000),
         Game("clown", "광대를 놓치지 마", "MINI", "꿀알바 시리즈 2화 · 빨간 코 광대에게서 눈을 떼지 말 것", "eye", "점", 200000),
-        Game("nightshift", "심야 편의점", "MINI", "손전등으로 비추며 아침 6시까지 벌레를 막아요", "flashlight", "점", 200000),
+        Game("nightshift", "심야 편의점", "MINI", "꿀알바 시리즈 1화 · 손전등으로 비추며 아침 6시까지 벌레를 막아요", "flashlight", "점", 200000),
         Game("coffee", "커피 나르기", "MINI", "레인으로 커피를 밀어 동료에게 · 빈 잔은 받아 내기", "coffee", "점", 1_000_000),
         Game("promote", "승진 합치기", "MINI", "같은 직급을 밀어 합쳐 승진 · 오늘의 인사 판", "briefcase-business", "점", 1_000_000, daily_once=True),
         Game("mines", "칼퇴 지뢰찾기", "MINI", "야근 폭탄을 피해 칼퇴 자리 모두 열기 · 모두 같은 판", "bomb", "점", 1_000_000, daily_once=True),

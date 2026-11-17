@@ -135,8 +135,9 @@
 
         function deliver(side) {
           if (state !== "play") return;
-          // 자전거 바로 옆에 있는 집 — 방금 지나친 금지된 집에 잘못 들어가지 않게 가장 가까운 집을 고른다
-          const h = S.houses.filter((o) => o.side === side && !o.done && o.y > ZONE_TOP - 22 && o.y < ZONE_BOTTOM).sort((a, b) => Math.abs(a.y + 18 - BIKE_Y) - Math.abs(b.y + 18 - BIKE_Y))[0];
+          // 자전거 바로 옆에 있는 집 — 이미 지나친 집(금지라서 그냥 보낸 집)은 멀게 쳐서, 다가오는 집에 넣으려다 뒤의 금지된 집에 들어가지 않게
+          const far = (o) => { const d = o.y + 18 - BIKE_Y; return d > 6 ? d * 3 : Math.abs(d); };
+          const h = S.houses.filter((o) => o.side === side && !o.done && o.y > ZONE_TOP - 22 && o.y < ZONE_BOTTOM).sort((a, b) => far(a) - far(b))[0];
           ctx.sfx("tap");
           S.bottles.push({ x: W / 2, y: BIKE_Y - 6, tx: side ? ROAD_R + 16 : ROAD_L - 16, ty: h ? h.y + 18 : BIKE_Y - 20, t: 0 });
           if (!h) return;
@@ -257,7 +258,7 @@
         // ---------- 흐름 ----------
         function fit() {
           const rect = stage.getBoundingClientRect();
-          const box = stage.parentElement ? stage.parentElement.clientHeight : rect.height;
+          const box = stage.clientHeight || rect.height; // 판 안쪽 높이 — 창(테두리 · 안쪽 여백) 높이로 재면 아래 안내 줄이 잘린다
           const extra = stage.querySelector(".gm-hud").offsetHeight + stage.querySelector(".gm-rule").offsetHeight + stage.querySelector(".gm-note").offsetHeight + 4;
           const k = Math.max(1, Math.min(rect.width / W, (box - extra) / H));
           canvas.style.width = `${Math.floor(W * k)}px`; canvas.style.height = `${Math.floor(H * k)}px`;
@@ -307,7 +308,7 @@
           showOverlay(`<div class="gm-card"><h2>잠깐 쉬는 중</h2><p>${elClock.textContent} · 구독자 <b>${S.score.toLocaleString("ko-KR")}</b>명</p><button type="button" class="gm-go" data-act="resume">계속하기</button></div>`);
         }
         function resume() {
-          if (state !== "paused") return;
+          if (state !== "paused" || document.querySelector(".hk-dialog__overlay")) return; // 나가기 확인 창이 떠 있으면 뒤에서 판이 다시 돌지 않게(스페이스가 「계속하기」를 눌러도)
           overlay.hidden = true;
           state = "play";
           window.HKSound.ambient(true);
@@ -321,7 +322,7 @@
           draw();
           ctx.sfx(won ? "win" : "lose");
           const score = S.score;
-          showOverlay(`<div class="gm-card"><h2>${won ? "아침이 밝았어요" : "오늘 배달 끝"}</h2><p>${won ? "무사히 퇴근했어요!" : `${elClock.textContent}에 그만뒀어요`} · 우유 ${S.done}병</p><div class="gm-big">${score.toLocaleString("ko-KR")}명</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
+          showOverlay(`<div class="gm-card"><h2>${won ? "아침이 밝았어요" : "오늘 배달 끝"}</h2><p>${won ? "무사히 퇴근했어요!" : `${elClock.textContent}까지 배달했어요`} · 우유 ${S.done}병</p><div class="gm-big">${score.toLocaleString("ko-KR")}명</div><button type="button" class="gm-go" data-act="start">다시 하기</button></div>`);
           ctx.submit(score);
         }
         overlay.addEventListener("click", (e) => {
