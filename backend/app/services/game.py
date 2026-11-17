@@ -73,7 +73,7 @@ GAMES: dict[str, Game] = {
         Game("vitamin", "비타민 특공대", "MINI", "달리며 쏘고 뛰어 피하며 바이러스 기지로 · 고전 런앤건 슈팅", "crosshair", "점", 10_000_000, added="2026-11-09"),
         Game("jumper", "점심 원정대", "MINI", "발판을 뛰어넘고 괴물을 밟으며 구내식당 깃발까지 · 고전 점프 액션", "footprints", "점", 10_000_000, added="2026-11-09"),
         Game("rummy", "타일 러미", "MINI", "숫자 타일로 같은 수 · 이어지는 수 묶어 내려놓기 · 먼저 다 내면 승 · 턴제 대전", "rows-3", "승", 1_000_000, added="2026-11-09"),
-        Game("alkkagi", "사내 알까기", "MINI", "내 알을 튕겨 상대 알을 판 밖으로 · 턴제 대전", "disc", "승", 1_000_000, added="2026-11-09"),
+        Game("alkkagi", "사내 알까기", "MINI", "내 알을 튕겨 상대 알을 판 밖으로 · 판마다 바람 · 머그컵 · 턴제 대전", "disc", "승", 1_000_000, added="2026-11-09"),
         Game("watersort", "물병 색 맞추기", "MINI", "같은 색끼리 한 병에 모으기 · 3분 동안 몇 단계나", "flask-conical", "점", 1_000_000, added="2026-11-09"),
         Game("dodge", "업무 폭탄 피하기", "MINI", "사방에서 날아오는 메일·회의 초대 피하기 · 1분 버티면 칼퇴", "mail-warning", "time", 3600),
         Game("bounce", "통통 짐볼", "MINI", "저절로 튀는 짐볼을 좌우로만 굴려 헬스키퍼실까지 · 3코스 30스테이지", "circle-dot", "점", 100_000, lower_better=True, min_score=100, variants=("c2", "c3"), hall_mix_variants=False, stage_stamp=True),
