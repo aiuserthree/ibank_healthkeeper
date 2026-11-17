@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     teams_reminder_retry_backoff_seconds: list[int] = [60, 300, 900]
     teams_open_notice_enabled: bool = True
     teams_open_notice_url: str = "https://healthkeeper.ibank.co.kr/index"
+    # 수요일 오픈 안내 맨 아래 「이번 주 게임」 소개 칸 — 끄면 기존 안내만 나간다(teams.OPEN_NOTICE_GAMES 를 한 주에 하나씩)
+    teams_open_notice_game_enabled: bool = True
     teams_sender_email: str = "healthkeeper@ibank.co.kr"
     teams_sender_refresh_token: str = ""
 

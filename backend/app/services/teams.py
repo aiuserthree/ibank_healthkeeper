@@ -272,6 +272,105 @@ def _open_notice_together_html() -> str:
     )
 
 
+# 「이번 주 게임」 — 수요일 오픈 안내 맨 아래에 게임 하나를 소개한다(2026-11-17 요청).
+# 목록 순서대로 한 주에 하나씩 돌아가고, 끝나면 처음부터. 몇째 주인지는 발송일(수요일)로 정한다:
+# OPEN_NOTICE_GAME_START(첫 회, 2026-11-18 수) = 0번, 그다음 수요일 = 1번 …
+# 첫 회보다 앞선 날짜에는 붙이지 않는다. 설정 TEAMS_OPEN_NOTICE_GAME_ENABLED=false 면 끈다.
+# 소개 문구는 services/game.py 설명 · 게임 화면에 있는 사실만 쓴다. 새 항목은 맨 뒤에 붙인다(앞에 끼우면 순서가 밀린다).
+OPEN_NOTICE_GAME_START = date(2026, 11, 18)
+
+# (게임 키, 보이는 이름, 소개 줄들) — 링크는 {app_base_url}/games/<키>, 그림은 {app_base_url}/assets/lounge/<키>.jpg
+OPEN_NOTICE_GAMES: tuple[tuple[str, str, tuple[str, ...]], ...] = (
+    (
+        "bumpervs",
+        "선다운 범퍼스 대전",
+        (
+            "노을 진 카니발에서 범퍼카로 부딪히며 달리는 레이싱이에요. 동료와 1:1로, 또는 <b>최대 6명이 한 트랙에서</b> 함께 달릴 수 있어요.",
+            "사람이 모자라도 괜찮아요 — <b>빈자리는 컴퓨터</b>가 채워요. 대기실에서 동료를 초대하면 그 동료에게 <b>Teams 로 알림</b>이 가요.",
+            "트랙 <b>13개</b> 중 골라 달리고, 길 위의 선물 상자를 지나면 <b>아이템</b>이 생겨요(팝콘 폭탄 · 솜사탕 함정 등). 1등이면 1승!",
+            "이번 주 점심시간에 옆자리 동료들과 한 판 어때요?",
+        ),
+    ),
+    (
+        "jellyvs",
+        "꿀꺽 젤리 숲 대전",
+        (
+            "열매를 먹고 자라 상대 젤리를 삼키는 대전이에요. 동료와 1:1로, 또는 <b>최대 6명</b>이 함께 해요(빈자리는 컴퓨터).",
+            "숲 6곳 중 골라 2분 동안 가장 크게 자라면 이겨요. 대기실에서 초대하면 Teams 로 알림이 가요.",
+            "점심 먹고 동료들과 누가 제일 커지나 겨뤄 보세요.",
+        ),
+    ),
+    (
+        "mansion",
+        "한밤의 두뇌 저택",
+        (
+            "동료 <b>최대 6명</b>이 라운드마다 다른 두뇌 게임(비밀 입찰 · 협력과 배신 · 소수의 선택 등)을 하며 별조각을 모아 살아남는 게임이에요.",
+            "빈자리는 컴퓨터가 채우고, 1등만 1승이에요. 대기실에서 초대하면 Teams 로 알림이 가요.",
+            "눈치와 머리싸움이 자신 있다면 동료들을 불러 보세요.",
+        ),
+    ),
+    (
+        "ringcatch",
+        "옥상 링 캐치",
+        (
+            "날아오는 농구공 밑으로 골대를 좌우로 옮겨 받아 넣는 게임이에요.",
+            "림에 안 닿고 쏙 들어가면 연속 완벽 +2 +3 … 공은 점점 많아지고 빨라지고, 하나라도 놓치면 끝!",
+            "한 판이 짧아서 커피 한 잔 하며 기록 깨기 좋아요.",
+        ),
+    ),
+    (
+        "hoops",
+        "옥상 덩크슛",
+        (
+            "골대에 앉은 공을 뒤로 당겼다 놓아 위쪽 골대로 건너며 옥상까지 올라가는 게임이에요.",
+            "림에 안 닿으면 연속 완벽, 벽에 튕겨 넣으면 2배. 별을 모아 새 공으로 바꿀 수 있어요.",
+            "단계마다 장애물이 생겨요 — 동료와 순위로 겨뤄 보세요.",
+        ),
+    ),
+    (
+        "kitsune",
+        "여우 신사 정원",
+        (
+            "정원을 하나씩 지나며 점점 세지는 요괴와 너구리 대장을 물리치는 3D 액션 서바이벌이에요.",
+            "스테이지를 넘을수록 강해지는 요괴를 얼마나 버틸 수 있을지 도전해 보세요.",
+        ),
+    ),
+)
+
+
+def open_notice_game_for(notice_date: date | None) -> tuple[str, str, tuple[str, ...]] | None:
+    """발송일(수요일)의 「이번 주 게임」 — 첫 회 전이면 None. 주마다 하나씩, 목록이 끝나면 처음부터."""
+    if notice_date is None or notice_date < OPEN_NOTICE_GAME_START or not OPEN_NOTICE_GAMES:
+        return None
+    week = (notice_date - OPEN_NOTICE_GAME_START).days // 7
+    return OPEN_NOTICE_GAMES[week % len(OPEN_NOTICE_GAMES)]
+
+
+def game_page_url(key: str) -> str:
+    return f"{get_settings().app_base_url.rstrip('/')}/games/{key}"
+
+
+def game_thumb_url(key: str) -> str:
+    """썸네일 그림 주소 — Teams 1:1 메시지(HTML)는 바깥 그림 주소를 보여 주지 않을 수 있어 지금은 본문에 넣지 않고 주소만 둔다."""
+    return f"{get_settings().app_base_url.rstrip('/')}/assets/lounge/{key}.jpg"
+
+
+def _open_notice_game_html(notice_date: date | None) -> str:
+    if not get_settings().teams_open_notice_game_enabled:
+        return ""
+    game = open_notice_game_for(notice_date)
+    if game is None:
+        return ""
+    key, title, lines = game
+    url = game_page_url(key)
+    return (
+        f"<p>&nbsp;</p>"
+        f"<p><strong>🎮 이번 주 게임 · {html.escape(title)}</strong><br>"
+        f"{'<br>'.join(lines)}<br>"
+        f'<a href="{url}">{url}</a></p>'
+    )
+
+
 def render_open_notice_body(
     *,
     name: str,
@@ -320,6 +419,7 @@ def render_open_notice_body(
         f"{health_html}"
         f"<p>&nbsp;</p>"
         f"<p><strong>오늘의 1분 스트레칭 · {tip_title}</strong><br>{tip_body}</p>"
+        f"{_open_notice_game_html(notice_date or now_kst().date())}"
     )
 
 
