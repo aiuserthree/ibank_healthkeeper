@@ -88,11 +88,20 @@ button:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
 .sheet-head h2{font-family:var(--font-display);font-size:22px;color:var(--marigold);flex:1}
 .sheet h3{font-family:var(--font-display);font-size:12px;letter-spacing:.16em;color:var(--cyan);text-transform:uppercase;margin-top:4px}
 .racers{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.racer{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:8px;border-radius:10px;background:var(--plum);border:2px solid transparent;text-align:left;min-width:0}
-.racer[aria-pressed="true"]{border-color:var(--marigold)}
-.racer .sw{width:22px;height:22px;border-radius:50%;border:3px solid var(--cream)}
-.racer b{font-family:var(--font-display);font-size:12px;overflow-wrap:anywhere}
+.racer{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 6px 8px;border-radius:12px;background:var(--plum);border:2px solid transparent;text-align:center;min-width:0;transition:border-color .15s,box-shadow .15s,transform .15s}
+.racer[aria-pressed="true"]{border-color:var(--marigold);box-shadow:0 0 0 2px rgba(255,197,51,.35),0 0 16px rgba(255,197,51,.28)}
+.racer .pic{position:relative;display:block;width:100%;aspect-ratio:1/1;max-height:84px;border-radius:9px;overflow:hidden;
+  background:radial-gradient(circle at 50% 62%,color-mix(in srgb,var(--rg) 55%,transparent) 0,color-mix(in srgb,var(--rc) 30%,transparent) 48%,rgba(0,0,0,0) 72%),rgba(255,242,216,.06)}
+.racer[aria-pressed="true"] .pic{background:radial-gradient(circle at 50% 62%,var(--rg) 0,color-mix(in srgb,var(--rc) 55%,transparent) 50%,rgba(0,0,0,0) 76%),rgba(255,242,216,.1)}
+.racer .face{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.racer .sw{position:absolute;left:50%;top:50%;width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:3px solid var(--cream);background:var(--rc)}
+.racer.locked .face{filter:saturate(.55) brightness(.72)}
+.racer .lock{position:absolute;right:4px;top:4px;width:22px;height:22px;border-radius:50%;background:rgba(26,10,43,.82);color:var(--marigold);display:grid;place-items:center}
+.racer b{font-family:var(--font-display);font-size:13px;overflow-wrap:anywhere;line-height:1.2}
+.racer b em{font-style:normal;font-family:inherit;font-size:11px;font-weight:700;opacity:.7;margin-left:4px}
+.racer .tag{font-size:11px;font-weight:800;line-height:1.2;padding:2px 7px;border-radius:999px;background:rgba(255,242,216,.12);color:var(--rg)}
 .racer small{font-size:12px;font-weight:700;opacity:.85}
+.racer.locked small{color:var(--marigold);opacity:1}
 .pick{background:var(--plum);border-radius:12px;padding:10px 12px;display:flex;justify-content:space-between;gap:10px;align-items:center}
 .pick b{font-family:var(--font-display);font-size:15px;color:var(--marigold);display:block}
 .pick span{font-size:14px;font-weight:500}
@@ -342,12 +351,12 @@ function css(hex){return '#'+('000000'+hex.toString(16)).slice(-6);}
 
 /* ================= data ================= */
 const RACERS={
-  bunny:{name:'모찌',kind:'토끼',car:0xff5fa8,glow:0xffa8d2,perk:'약점 없이 고르게 잘 달려요',cost:0},
-  fox:{name:'불꽃',kind:'여우',car:0xff7a1f,glow:0xffc04d,perk:'드리프트가 25% 더 빨리 모여요',cost:120},
-  panda:{name:'만두',kind:'판다',car:0x2fd6a0,glow:0x9dffd8,perk:'부딪혀도 35% 더 빨리 일어나요',cost:220},
-  frog:{name:'폴짝이',kind:'개구리',car:0xa5e02b,glow:0xe3ff7a,perk:'공중 회전 티켓을 두 배로 받아요',cost:340},
-  penguin:{name:'뒤뚱이',kind:'펭귄',car:0x3f8cff,glow:0x9fd0ff,perk:'최고 속도가 더 빨라요',cost:480},
-  pig:{name:'트러플',kind:'돼지',car:0xa765ff,glow:0xdcb8ff,perk:'티켓을 더 멀리서 끌어당겨요',cost:650}
+  bunny:{name:'모찌',kind:'토끼',tag:'고른 능력',car:0xff5fa8,glow:0xffa8d2,perk:'약점 없이 고르게 잘 달려요',cost:0},
+  fox:{name:'불꽃',kind:'여우',tag:'드리프트',car:0xff7a1f,glow:0xffc04d,perk:'드리프트가 25% 더 빨리 모여요',cost:120},
+  panda:{name:'만두',kind:'판다',tag:'빠른 회복',car:0x2fd6a0,glow:0x9dffd8,perk:'부딪혀도 35% 더 빨리 일어나요',cost:220},
+  frog:{name:'폴짝이',kind:'개구리',tag:'공중 회전',car:0xa5e02b,glow:0xe3ff7a,perk:'공중 회전 티켓을 두 배로 받아요',cost:340},
+  penguin:{name:'뒤뚱이',kind:'펭귄',tag:'최고 속도',car:0x3f8cff,glow:0x9fd0ff,perk:'최고 속도가 더 빨라요',cost:480},
+  pig:{name:'트러플',kind:'돼지',tag:'티켓 자석',car:0xa765ff,glow:0xdcb8ff,perk:'티켓을 더 멀리서 끌어당겨요',cost:650}
 };
 const RIDS=Object.keys(RACERS);
 const UPG={
@@ -1107,6 +1116,38 @@ function buildCarModel(rid){
   under.rotation.x=-Math.PI/2;under.scale.set(5.2,6.6,1);under.position.y=.08;
   root.add(under);root.add(body);
   return {root:root,body:body,mFlame:flame,mShield:shield,mRing:ring,mUnder:under};
+}
+/* 레이서 얼굴 그림 — 경주에 쓰는 같은 범퍼카 모델을 작은 화면에 정면 3/4 각도로 한 번씩 그려 그림(data URL)으로 둔다. 차고 칸에 쓴다 */
+const RTHUMB={};
+function makeRacerThumbs(){
+  if(RTHUMB.done)return;RTHUMB.done=true;
+  const t0=performance.now(),N=192;
+  try{
+    const sc=new THREE.Scene();
+    sc.add(new THREE.HemisphereLight(0xfff0e0,0x6a4a8a,.95));
+    const kl=new THREE.DirectionalLight(0xffd8b0,.85);kl.position.set(2.5,4,5);sc.add(kl);
+    const rl=new THREE.DirectionalLight(0xff9fd8,.35);rl.position.set(-3,2,-2);sc.add(rl);
+    sc.add(new THREE.AmbientLight(0x8a6aaa,.25));
+    const cam=new THREE.PerspectiveCamera(30,1,.5,60);
+    cam.position.set(2.5,2.85,4.5);cam.lookAt(0,1.64,.2);
+    const rt=new THREE.WebGLRenderTarget(N,N),buf=new Uint8Array(N*N*4);
+    const cv=document.createElement('canvas');cv.width=cv.height=N;
+    const g=cv.getContext('2d'),img=g.createImageData(N,N),row=N*4;
+    const prevClear=renderer.getClearColor(new THREE.Color()).getHex(),prevA=renderer.getClearAlpha(),prevRT=renderer.getRenderTarget();
+    renderer.setClearColor(0x000000,0);
+    for(const rid of RIDS){
+      const m=buildCarModel(rid);
+      m.mUnder.visible=false;m.body.rotation.y=-.12;sc.add(m.root);
+      renderer.setRenderTarget(rt);renderer.clear();renderer.render(sc,cam);
+      renderer.readRenderTargetPixels(rt,0,0,N,N,buf);
+      for(let y=0;y<N;y++)img.data.set(buf.subarray((N-1-y)*row,(N-y)*row),y*row); // 위아래 뒤집기
+      g.clearRect(0,0,N,N);g.putImageData(img,0,0);
+      RTHUMB[rid]=cv.toDataURL('image/png');
+      sc.remove(m.root);disposeCar(m);
+    }
+    renderer.setRenderTarget(prevRT);renderer.setClearColor(prevClear,prevA);rt.dispose();
+  }catch(e){for(const k of RIDS)delete RTHUMB[k];}
+  RTHUMB.ms=Math.round(performance.now()-t0);
 }
 function disposeCar(c){
   c.root.traverse(o=>{
@@ -2649,13 +2690,20 @@ function renderHome(){
   el.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&el.scrollWidth>el.clientWidth){el.scrollLeft+=e.deltaY;e.preventDefault();}},{passive:false});
 })();
 function renderGarage(){
+  makeRacerThumbs();
   $('walletG').textContent=fmt(save.tickets);
   const sel=game.preview||save.racer,rl=$('racerList');
   rl.innerHTML='';
   RIDS.forEach(rid=>{
     const rc=RACERS[rid],own=save.owned.indexOf(rid)>=0,b=document.createElement('button');
     b.type='button';b.className='racer';b.setAttribute('aria-pressed',String(rid===sel));
-    b.innerHTML='<i class="sw" style="background:'+css(rc.car)+'"></i><b>'+rc.name+'</b><small>'+(rid===save.racer?'타는 중':own?rc.kind:fmt(rc.cost)+' 티켓')+'</small>';
+    b.style.setProperty('--rc',css(rc.car));b.style.setProperty('--rg',css(rc.glow));
+    b.setAttribute('aria-label',rc.kind+' '+rc.name+', '+rc.tag+(rid===save.racer?', 타는 중':own?'':', 잠김 '+fmt(rc.cost)+' 티켓'));
+    if(!own)b.classList.add('locked');
+    const face=RTHUMB[rid]?'<img class="face" src="'+RTHUMB[rid]+'" alt="" draggable="false">':'<i class="sw"></i>';
+    b.innerHTML='<span class="pic">'+face+(own?'':'<i class="lock" aria-hidden="true"><svg viewBox="0 0 16 16" width="14" height="14"><rect x="3" y="7" width="10" height="8" rx="2" fill="currentColor"/><path d="M5.2 7V5.2a2.8 2.8 0 0 1 5.6 0V7" fill="none" stroke="currentColor" stroke-width="1.8"/></svg></i>')+'</span>'
+      +'<b>'+rc.name+'<em>'+rc.kind+'</em></b><span class="tag">'+rc.tag+'</span>'
+      +'<small>'+(rid===save.racer?'타는 중':own?'고르기':fmt(rc.cost)+' 티켓')+'</small>';
     b.addEventListener('click',()=>{
       game.preview=rid;
       if(own){save.racer=rid;persist();}
