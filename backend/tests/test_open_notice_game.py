@@ -171,8 +171,15 @@ class OpenNoticeStampGoal(unittest.TestCase):
         body = _body(self.DAY)
         self.assertIn("<strong>🎮 아케이드 도장 안내</strong>", body)
         self.assertIn("12월 1일부터 도장 <b>15개</b>를 모으면 무적 쿠폰 1장이에요(전에는 10개).", body)
-        for words in ("15개", "전에는 10개", "그대로 이어져요", "도장 2개", "한 달 5번까지"):
+        for words in ("15개", "전에는 10개", "그대로 이어져요"):
             self.assertIn(words, body)
+        # 대전 보너스 문장은 도장 안내 칸에 없고, 본문 전체에는 「이번 주 게임」 칸에서 한 번만 나온다
+        part = teams._open_notice_stamp_goal_html()
+        self.assertIn(part, body)
+        for words in ("도장 2개", "한 달 5번까지"):
+            self.assertNotIn(words, part)
+        self.assertEqual(body.count("동료를 이기면 그날 도장 2개"), 1)
+        self.assertLess(body.index("이번 주 게임"), body.index("동료를 이기면 그날 도장 2개"))
         self.assertIn('<a href="https://hk.example.test/arcade">https://hk.example.test/arcade</a>', body)
         self.assertEqual(body.count("아케이드 도장 안내"), 1)
         # 자리 — 예약 링크 다음, 스트레칭 앞(기존 한 번짜리 칸과 같은 자리)
@@ -211,12 +218,10 @@ class OpenNoticeStampGoal(unittest.TestCase):
 
         with mock.patch.object(game_service, "STAMP_GOAL", 20), \
                 mock.patch.object(game_service, "STAMP_GOAL_OLD", 12), \
-                mock.patch.object(game_service, "STAMP_GOAL_FROM", date(2027, 1, 5)), \
-                mock.patch.object(game_service, "WIN_BONUS_MONTHLY_CAP", 7):
+                mock.patch.object(game_service, "STAMP_GOAL_FROM", date(2027, 1, 5)):
             body = _body(self.DAY)
         self.assertIn("1월 5일부터 도장 <b>20개</b>", body)
         self.assertIn("(전에는 12개)", body)
-        self.assertIn("한 달 7번까지", body.split("아케이드 도장 안내")[1].split("이번 주 게임")[0])
         self.assertNotIn("15개", body)
 
 

@@ -275,7 +275,8 @@ def _open_notice_together_html() -> str:
 
 
 # 아케이드 도장 목표 변경(10개 → 15개, game.STAMP_GOAL_FROM 부터) 안내 — 이 날짜의 예약 오픈 안내에 한 번만 덧붙인다(2026-11-18 요청)
-# 숫자는 game.py 상수(STAMP_GOAL · STAMP_GOAL_OLD · STAMP_GOAL_FROM · WIN_BONUS_MONTHLY_CAP)에서 만든다.
+# 숫자는 game.py 상수(STAMP_GOAL · STAMP_GOAL_OLD · STAMP_GOAL_FROM)에서 만든다.
+# 대전 승리 보너스 문장은 넣지 않는다 — 같은 날 「이번 주 게임」 칸(WIN_BONUS_LINE)에 이미 있어 두 번 나오지 않게(2026-11-18 요청).
 # game.py 가 함수 안에서 teams 를 불러 쓰므로 여기서도 함수 안에서 불러 순환을 피한다.
 OPEN_NOTICE_STAMP_GOAL_DATE = date(2026, 12, 2)
 
@@ -290,7 +291,6 @@ def _open_notice_stamp_goal_html() -> str:
         f"<p><strong>🎮 아케이드 도장 안내</strong><br>"
         f"{goal_from.month}월 {goal_from.day}일부터 도장 <b>{game_service.STAMP_GOAL}개</b>를 모으면 무적 쿠폰 1장이에요"
         f"(전에는 {game_service.STAMP_GOAL_OLD}개). 지금까지 모은 도장은 그대로 이어져요.<br>"
-        f"동료와의 대전에서 이기면 그날 도장 2개! (보너스는 한 달 {game_service.WIN_BONUS_MONTHLY_CAP}번까지)<br>"
         f'<a href="{arcade_url}">{arcade_url}</a></p>'
     )
 
