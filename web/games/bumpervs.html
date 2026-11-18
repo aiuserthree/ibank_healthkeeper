@@ -74,6 +74,8 @@
     .bv-rank:first-child { background: #fff7ed; }
     .bv-rank:first-child b { color: #c2410c; }
     .bv-rank.is-me { box-shadow: inset 0 0 0 2px #ea580c; }
+    .bv-rank.is-dnf em { color: #64748b; font-weight: 600; }
+    .bv-rank em small { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
     .bv-invite { margin-top: 10px; }
     .bv-invite[hidden] { display: none; }
     .bv-invite button { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; border: 0; border-radius: 12px; background: #e0e7ff; color: #4338ca; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
@@ -96,6 +98,9 @@
     .bv-grid button small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
     .bv-grid button.is-on { background: #fff; color: #0f172a; box-shadow: 0 1px 3px rgba(15, 23, 42, .14); }
     .bv-grid button:disabled { cursor: not-allowed; opacity: .42; }
+    .bv-grid.is-tracks .bv-rnd { gap: 2px; color: #9a3412; background: repeating-linear-gradient(135deg, rgba(251, 146, 60, .12) 0 8px, transparent 8px 16px); } /* 무작위 트랙(단계 1b) */
+    .bv-grid.is-tracks .bv-rnd small { color: #9a3412; }
+    .bv-grid.is-tracks .bv-rnd.is-on { background: #fff; box-shadow: inset 0 0 0 2.5px #fb923c, 0 1px 3px rgba(15, 23, 42, .14); }
     /* 트랙 칸 그림(그림을 불러온 칸만 .has-art — 못 불러오면 위 모양 그대로) */
     .bv-tart { display: none; }
     .bv-grid.is-tracks button.has-art { position: relative; isolation: isolate; overflow: hidden; color: #fff; text-shadow: 0 1px 2px rgba(15, 10, 30, .9), 0 0 5px rgba(15, 10, 30, .55); }
@@ -127,15 +132,14 @@
     .bv-who div { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; padding: 10px 6px; border-radius: 12px; background: #f1f5f9; font-size: 13px; font-weight: 700; color: #475569; }
     .bv-who div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .bv-who div.is-on { background: #dcfce7; color: #15803d; }
+    .bv-who div.is-old { background: #fef3c7; color: #b45309; }
     .bv-btnrow { display: flex; gap: 8px; margin-top: 16px; }
     .bv-btnrow .hk-btn { flex: 1; height: 46px; }
+    .bv-btnrow.is-left { margin-top: 8px; }
+    .bv-btnrow.is-left .hk-btn { flex: 0 0 auto; height: 40px; padding: 0 16px; }
     .bv-mini { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--text-muted); word-break: keep-all; }
     .bv-mini.is-ok { color: #15803d; font-weight: 700; }
     .bv-mini.is-bad { color: #b45309; font-weight: 700; }
-    .bv-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 14px; }
-    .bv-stats div { padding: 10px 4px; border-radius: 12px; background: #f8fafc; }
-    .bv-stats b { display: block; font-size: 17px; font-weight: 800; color: #0f172a; font-variant-numeric: tabular-nums; }
-    .bv-stats small { font-size: 11.5px; color: var(--text-muted); }
     .bv-again { margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: #fff7ed; font-size: 13px; font-weight: 700; color: #c2410c; word-break: keep-all; }
     .bv-again[hidden] { display: none; }
     .bv-rules { max-width: 600px; text-align: left; }
@@ -175,6 +179,7 @@
       .bv-row__k { padding-top: 12px; width: 40px; }
       .bv-grid button { font-size: 11.5px; padding: 4px 2px; }
       .bv-grid.is-tracks button small { display: none; }
+      .bv-grid.is-tracks .bv-rnd small { display: block; font-size: 11px; } /* 무작위 칸은 번호가 없어 짧은 글자를 남긴다 */
       .bv-grid.is-tracks button.has-art { align-items: flex-start; padding-left: 9px; } /* 번호는 왼쪽, 미니맵 선은 오른쪽 */
       .bv-grid.is-racers button { flex-direction: column; gap: 2px; }
       .bv-face { width: 36px; height: 36px; }
@@ -198,6 +203,7 @@
     // 시험용 — 한 브라우저 두 탭으로 온라인을 흉내 낸다(#rt-host · #rt-guest). 사용자에게는 보이지 않는다
     const DEV = HKLunch.isLocal() || /\.test$/.test(location.hostname) || (() => { try { return localStorage.getItem("hk-dev") === "1"; } catch (_) { return false; } })();
     const AUTO = DEV && (() => { try { return localStorage.getItem("hk-bumpervs-auto") === "1"; } catch (_) { return false; } })(); // 시험 — 차가 저절로 달린다
+    const DEV_MIX = DEV ? (() => { try { const n = Number(localStorage.getItem("hk-bumpervs-mix")); return Number.isInteger(n) && n > 0 && n < 100 ? n : 0; } catch (_) { return 0; } })() : 0; // 시험 — 「같이 달릴 가장 낮은 판본」을 높여 대기실 막힘을 본다
     const IS_TOUCH = matchMedia("(pointer: coarse)").matches;
     // 혼자 하기와 같은 레이서 · 트랙 (모양 · 이름만 — 대전에서는 성능이 모두 같다)
     const RACERS = [["bunny", "모찌", "토끼", "#ff5fa8"], ["fox", "불꽃", "여우", "#ff7a1f"], ["panda", "만두", "판다", "#2fd6a0"], ["frog", "폴짝이", "개구리", "#a5e02b"], ["penguin", "뒤뚱이", "펭귄", "#3f8cff"], ["pig", "트러플", "돼지", "#a765ff"]];
@@ -209,10 +215,12 @@
     const LEVEL_NAME = Object.fromEntries(LEVELS);
     const LIMIT = 300; // 경주 시간 상한(초, 3바퀴 경주는 보통 2분 남짓) — 엔진 versus_bumpervs.LIMIT_SEC 과 같다
     const PREF_KEY = "hk-bumpervs-pref";
-    const pref = { mode: "cpu", level: "normal", track: 0, rid: "bunny" };
+    const pref = { mode: "cpu", level: "normal", track: 0, rid: "bunny", rnd: false, plv: "normal", log: true };
     try { Object.assign(pref, JSON.parse(localStorage.getItem(PREF_KEY) || "{}")); } catch (_) { /* 처음 */ }
     if (!["cpu", "online", "party"].includes(pref.mode)) pref.mode = "cpu";
     if (!LEVEL_NAME[pref.level]) pref.level = "normal";
+    if (!LEVEL_NAME[pref.plv]) pref.plv = "normal"; // 여러 명 — 연 사람이 고른 컴퓨터 레벨(단계 1b)
+    pref.rnd = pref.rnd === true; pref.log = pref.log !== false;
     if (!okRid(pref.rid)) pref.rid = "bunny";
     const savePref = () => { try { localStorage.setItem(PREF_KEY, JSON.stringify(pref)); } catch (_) { /* 저장 못 해도 이번엔 그대로 */ } };
     // 대전 · 연습은 모든 트랙을 고를 수 있다(성능이 모두 같아 해금과 상관없다) — 손님이 알려 주는 연 트랙 수(un)는 예전 화면과 맞추려고 그대로 주고받는다
@@ -257,6 +265,26 @@
     // ───── 본체 창과 주고받기 (같은 주소 — 우리가 띄운 창이 보낸 vs: 신호만 받는다)
     let frameReady = false;
     const frameQ = [];
+    // 대전 판본 — 본체가 vs:ready 로 알려 준다(옛 본체는 안 보냄 = 0). 대기실에서 상대 바깥과 주고받아, 서로 「같이 달릴 가장 낮은 판본(mx)」을 넘어야 출발한다
+    const frameVer = { v: 0, mx: 0 };
+    const verOf = (m) => ({ v: Number.isInteger(m && m.v) && m.v >= 0 && m.v <= 99 ? m.v : 0, mx: Number.isInteger(m && m.mx) && m.mx >= 0 && m.mx <= 99 ? m.mx : 0 });
+    const myVer = () => ({ v: frameVer.v, mx: Math.max(frameVer.mx, DEV_MIX) });
+    // 나와 상대가 한 판에 달릴 수 있나 — 0 같이 됨 · 1 내가 새로 고침해야 함(상대가 더 새 판) · 2 상대가 새로 고침해야 함
+    const verMix = (peer) => { const a = myVer(), b = verOf(peer); return a.v < b.mx ? 1 : b.v < a.mx ? 2 : 0; };
+    const VER_TXT = { 1: "새 판이 나왔어요 · 새로 고침하면 같이 달릴 수 있어요", 2: "상대 화면이 옛 판이에요 · 상대에게 새로 고침을 부탁해 주세요(상대 화면에는 이 안내가 안 떠요)" }; // 옛 바깥 화면은 막힌 까닭을 그릴 칸이 없다 — VS_MIX 를 올리는 판본은 배포 뒤 옛 탭이 사라질 때까지 미룬다(본체 VS_MIX 주석)
+    // 손님 입력에 덧붙는 칸 — 범위 밖 · 모양이 다르면 그 칸만 버린다
+    //   v 판본 0~99 · kb 키 상태 비트 0~63(1 ↑ · 2 브레이크 — 본체 판본 6부터) · tm 손님 경주 시각 0~400초(뒤 단계) · r 제자리로 누른 누적 횟수(판본 6)
+    //   h 아이템 누르고 있음 0/1(뒤 단계) · dg 출발 대시 — 손님 화면이 판정한 대시 길이(1/100초, 0 = 없음) 0~120(판본 6)
+    const inX = (m) => {
+      const o = {}, int = (x, lo, hi) => Number.isInteger(x) && x >= lo && x <= hi;
+      if (int(m.v, 0, 99)) o.v = m.v;
+      if (int(m.kb, 0, 63)) o.kb = m.kb;
+      if (typeof m.tm === "number" && Number.isFinite(m.tm) && m.tm >= 0 && m.tm <= 400) o.tm = Math.round(m.tm * 1000) / 1000;
+      if (int(m.r, 0, 1e6)) o.r = m.r;
+      if (m.h === 0 || m.h === 1) o.h = m.h;
+      if (int(m.dg, 0, 120)) o.dg = m.dg;
+      return o;
+    };
     const toFrame = (m) => { if (!frameReady) { frameQ.push(m); return; } try { frame.contentWindow.postMessage(m, location.origin); } catch (_) { /* 창이 아직 없음 */ } };
     const frameHandlers = new Set();
     addEventListener("message", (e) => {
@@ -265,7 +293,9 @@
       if (!m || typeof m.type !== "string" || !m.type.startsWith("vs:")) return;
       if (m.type === "vs:ready") {
         frameReady = true; $("#bv-load").hidden = true;
+        Object.assign(frameVer, verOf(m));
         toFrame({ type: "vs:sound", mute: HKSound.isMuted() });
+        toFrame({ type: "vs:opt", log: pref.log }); // 맞힘 소식 켬/끔(게임 방법에서 바꿈 — 옛 본체는 모르는 신호를 무시)
         while (frameQ.length) toFrame(frameQ.shift());
         return;
       }
@@ -274,11 +304,12 @@
       frameHandlers.forEach((fn) => fn(m));
     });
     // 키보드 — 초점이 바깥 화면에 있을 때도 경주 키가 먹게 본체로 넘긴다 (본체에 초점이 있으면 본체가 직접 받는다)
-    const RACE_KEYS = { ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright", KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", Space: " ", KeyE: "e", ShiftLeft: "shift", ShiftRight: "shift", Digit1: "1", Digit2: "2", Digit3: "3", Numpad1: "1", Numpad2: "2", Numpad3: "3" }; // E · Shift = 찬 칸 가운데 가장 앞 칸, 1 · 2 · 3 = 그 칸(칸 번호는 고정)
+    const RACE_KEYS = { ArrowUp: "arrowup", ArrowDown: "arrowdown", ArrowLeft: "arrowleft", ArrowRight: "arrowright", KeyW: "w", KeyA: "a", KeyS: "s", KeyD: "d", Space: " ", KeyE: "e", ShiftLeft: "shift", ShiftRight: "shift", Digit1: "1", Digit2: "2", Digit3: "3", Numpad1: "1", Numpad2: "2", Numpad3: "3", KeyR: "r" }; // E · Shift = 찬 칸 가운데 가장 앞 칸, 1 · 2 · 3 = 그 칸(칸 번호는 고정) · ↓ · S 브레이크 · R 제자리로(옛 본체는 모르는 키를 무시)
     const racing = () => screen === "play";
     function keyFwd(e, down) {
       const k = RACE_KEYS[e.code];
       if (!k || !racing() || setOpen() || document.querySelector(".hk-dialog__overlay")) return false;
+      if (k === "r" && (e.ctrlKey || e.metaKey || e.altKey)) return false; // 새로 고침 단축키는 그대로
       const t = e.target;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return false;
       e.preventDefault();
@@ -344,7 +375,10 @@
       const later = () => setTimeout(go, 600);
       if (window.requestIdleCallback) requestIdleCallback(later, { timeout: 2000 }); else later();
     }
-    const trackGrid = (attr, cur, max, disabled) => `<div class="bv-grid is-tracks">${TRACKS.map((n, i) => `<button type="button" ${attr}="${i}" class="${[i === cur ? "is-on" : "", TART.ok.has(i) ? "has-art" : ""].join(" ").trim()}" ${disabled || i >= max ? "disabled" : ""} title="${i >= max ? "아직 안 연 트랙이에요" : esc(n)}">${tartHtml(i)}<b>${i + 1}</b><small>${i >= max ? "잠김" : esc(n)}</small></button>`).join("")}</div>`;
+    // rnd 를 주면(true/false) 끝에 「무작위」 칸 — 출발할 때 연 트랙 가운데 하나를 고른다(정한 트랙은 출발 신호 track 그대로라 서버 · 옛 화면과 상관없음, 단계 1b)
+    const trackGrid = (attr, cur, max, disabled, rnd) => `<div class="bv-grid is-tracks">${TRACKS.map((n, i) => `<button type="button" ${attr}="${i}" class="${[i === cur && !rnd ? "is-on" : "", TART.ok.has(i) ? "has-art" : ""].join(" ").trim()}" ${disabled || i >= max ? "disabled" : ""} title="${i >= max ? "아직 안 연 트랙이에요" : esc(n)}">${tartHtml(i)}<b>${i + 1}</b><small>${i >= max ? "잠김" : esc(n)}</small></button>`).join("")}${rnd === undefined ? "" : `<button type="button" ${attr}="rnd" class="bv-rnd ${rnd ? "is-on" : ""}" ${disabled ? "disabled" : ""} aria-label="무작위 트랙" title="출발할 때 트랙을 무작위로 골라요">${icon("shuffle", 16)}<small>무작위</small></button>`}</div>`;
+    const pickRnd = (max) => Math.floor(Math.random() * Math.max(1, Math.min(max, TRACKS.length)));
+    const trackTxt = (t, rnd) => (rnd ? "트랙 무작위(출발할 때 정해요)" : `트랙 ${t + 1} ${TRACKS[t] || ""}`);
     // 레이서 얼굴 그림 — 혼자 하기(embed/sundown.html) 차고 칸과 같은 3D 범퍼카 모델을 미리 그려 둔 작은 그림(80px). 고르는 칸에만 쓴다(이름표 · 준비 목록은 색 점 그대로)
     const RACER_FACE = {"bunny": "data:image/webp;base64,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", "fox": "data:image/webp;base64,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", "panda": "data:image/webp;base64,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", "frog": "data:image/webp;base64,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", "penguin": "data:image/webp;base64,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", "pig": "data:image/webp;base64,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"};
     const racerGrid = (attr, cur) => `<div class="bv-grid is-racers">${RACERS.map(([id, nm, kind, col]) => `<button type="button" ${attr}="${id}" class="${id === cur ? "is-on" : ""}" aria-label="${kind} ${nm}" style="--rc:${col}"><span class="bv-face"><img src="${RACER_FACE[id]}" alt="" draggable="false"></span><span class="bv-rname"><b>${nm}</b><small>${kind}</small></span></button>`).join("")}</div>`;
@@ -365,7 +399,7 @@
             <button type="button" class="bv-mode" data-mode="party" role="radio"><span class="bv-mode__ic">${icon("users", 18)}</span><b>여러 명</b><small>최대 6명 · 빈자리는 컴퓨터</small></button>
           </div>
           <div class="bv-row" data-row="level"><span class="bv-row__k">상대</span><div class="bv-seg">${LEVELS.map(([k, t]) => `<button type="button" data-level="${k}">${t}</button>`).join("")}</div></div>
-          <div class="bv-row" data-row="track"><span class="bv-row__k">트랙</span>${trackGrid("data-track", pref.track, unlocked(), false)}</div>
+          <div class="bv-row" data-row="track"><span class="bv-row__k">트랙</span>${trackGrid("data-track", pref.track, unlocked(), false, pref.rnd)}</div>
           <div class="bv-row"><span class="bv-row__k">레이서</span>${racerGrid("data-rid", pref.rid)}</div>
           <button type="button" class="hk-btn hk-btn--primary bv-go" id="bv-go">출발하기</button>
           <div class="bv-invite" id="bv-pinv" hidden></div>
@@ -383,14 +417,14 @@
     }
     function helpHtml() {
       const k = (t) => `<kbd>${t}</kbd>`;
-      const keys = IS_TOUCH ? "화면을 누르고 있으면 달리고, 떼면 느려져요 · 누른 채 좌우로 끌어 방향을 바꿔요"
-        : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · ${k("1")}${k("2")}${k("3")}${k("E")} 아이템 · 마우스로 눌러 끌어도 돼요`;
+      const keys = IS_TOUCH ? "화면을 누르고 있으면 달리고, 떼면 느려져요 · 누른 채 좌우로 끌어 방향을 바꿔요 · 오른쪽 「브레이크」 · 「제자리로」 단추"
+        : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · ${k("↓")}${k("S")} 브레이크 · ${k("R")} 제자리로 · ${k("1")}${k("2")}${k("3")}${k("E")} 아이템 · 마우스로 눌러 끌어도 돼요`;
       return `<div>${keys}</div><div>레이서는 모양만 달라요(성능은 모두 같아요) · 트랙은 모두 골라 달릴 수 있어요 · 3바퀴를 먼저 돌면 이겨요 · 5분 안에 아무도 못 들어오면 더 멀리 간 쪽이 이겨요</div>`;
     }
     function paintMenu() {
       over.querySelectorAll("[data-mode]").forEach((b) => { const on = b.dataset.mode === pref.mode; b.classList.toggle("is-on", on); b.setAttribute("aria-checked", on ? "true" : "false"); });
       over.querySelectorAll("[data-level]").forEach((b) => b.classList.toggle("is-on", b.dataset.level === pref.level));
-      over.querySelectorAll("[data-track]").forEach((b) => b.classList.toggle("is-on", Number(b.dataset.track) === pref.track));
+      over.querySelectorAll("[data-track]").forEach((b) => b.classList.toggle("is-on", b.dataset.track === "rnd" ? pref.rnd : !pref.rnd && Number(b.dataset.track) === pref.track));
       over.querySelectorAll("[data-rid]").forEach((b) => b.classList.toggle("is-on", b.dataset.rid === pref.rid));
       // 동료와 — 트랙은 들어간 뒤 준비 화면에서 도전한 사람이 고른다
       over.querySelector('[data-row="level"]').hidden = pref.mode !== "cpu";
@@ -403,8 +437,9 @@
     function startPractice() {
       closeLayer();
       const botRid = RID.filter((r) => r !== pref.rid)[Math.floor(Math.random() * 5)];
-      playing = { mode: "cpu", online: false, track: pref.track, level: pref.level, rival: { name: `컴퓨터(${LEVEL_NAME[pref.level]})` } };
-      toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, botRid], names: [me.name, playing.rival.name], avatars: [me.avatarUrl || null, null], level: pref.level, auto: AUTO, mute: HKSound.isMuted() });
+      const track = pref.rnd ? pickRnd(unlocked()) : pref.track; // 무작위 — 출발할 때 정한다
+      playing = { mode: "cpu", online: false, track, level: pref.level, rival: { name: `컴퓨터(${LEVEL_NAME[pref.level]})` } };
+      toFrame({ type: "vs:setup", role: "solo", track, rids: [pref.rid, botRid], names: [me.name, playing.rival.name], avatars: [me.avatarUrl || null, null], level: pref.level, auto: AUTO, mute: HKSound.isMuted() });
       toFrame({ type: "vs:go" });
       hideOver();
       screen = "play"; setPlaying(true); pauseBtn.hidden = false; pauseBtn.disabled = false;
@@ -472,6 +507,7 @@
     }
 
     // ───── 게임 방법
+    const logTxt = () => `맞힘 소식: ${pref.log ? "켬" : "끔"}`;
     function openRules() {
       const k = (t) => `<kbd>${t}</kbd>`;
       setOver.innerHTML = `<div class="bv-card bv-rules" role="dialog" aria-label="게임 방법">
@@ -479,7 +515,7 @@
           <h3>먼저 결승선을 지나면 이겨요</h3>
           <ul>
             <li>두 사람이 같은 트랙을 나란히 출발해요. 트랙마다 길 모양이 다른 고리를 3바퀴 돌아, 먼저 결승선을 지난 사람이 이겨요(한 판 보통 2분 남짓).</li>
-            <li>한 사람이 들어온 뒤 12초 안에 상대가 못 들어오면 경주가 끝나요. 5분 안에 둘 다 못 들어오면 더 멀리 간 사람이 이겨요.</li>
+            <li>한 사람이 들어오면 화면 위에 남은 초가 떠요. 10초 안에 상대가 못 들어오면 경주가 끝나고, 못 들어온 사람은 「완주 못 함」이에요. 5분 안에 둘 다 못 들어오면 더 멀리 간 사람이 이겨요.</li>
             <li>서로 부딪히면 튕겨 나가요. 드리프트 부스트, 바이킹 · 망치 · 찻잔 · 굴러오는 대형 공 · 튀어 오르는 기둥 · 회전 막대 장애물은 혼자 하기와 같아요(어느 장애물이든 피해 갈 틈이 있어요).</li>
             <li>아이템 상자를 지나면 아이템이 칸(3칸)에 담겨요. ${IS_TOUCH ? "화면 왼쪽 칸 단추" : `${k("1")}${k("2")}${k("3")}(또는 ${k("E")} = 지금 쓸 수 있는 칸 중 가장 앞 칸)`}으로 원하는 칸을 골라 써요 — 써도 다른 칸 아이템은 제 번호 그대로예요. 상자는 길 폭 가득 두 줄이라 거의 다 먹을 수 있어요.</li>
             <li>아이템은 20가지 — 앞설수록 방패 · 함정, 뒤처질수록 가속 · 1등 저격이 잘 나와요. 공격이 오면 화면 테두리 · 소리로 미리 알려 줘요.${itemsHtml()}</li>
@@ -487,23 +523,32 @@
           </ul>
           <h3>조작</h3>
           <ul>
-            <li>${IS_TOUCH ? "화면을 누르고 있으면 달리고, 떼면 느려져요. 누른 채 좌우로 끌면 방향을 바꿔요." : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · 마우스로 눌러 끌어도 돼요.`}</li>
+            <li>${IS_TOUCH ? "화면을 누르고 있으면 달리고, 떼면 느려져요. 누른 채 좌우로 끌면 방향을 바꿔요. 오른쪽 「브레이크」 단추를 누르는 동안 멈춰요." : `${k("↑")}${k("W")}${k("Space")} 달리기 · ${k("←")}${k("→")}${k("A")}${k("D")} 방향 · ${k("↓")}${k("S")} 브레이크(0 까지 서요) · 마우스로 눌러 끌어도 돼요.`}</li>
+            <li>3 · 2 · 1 뒤 「출발!」 소리에 맞춰 달리기를 누르면 출발 대시로 튀어 나가요. 미리 누르고 있거나 너무 늦으면 없어요(두 사람 모두 자기 화면의 「출발!」로 판정해요).</li>
+            <li>길 가장자리에 끼거나 꼬이면 ${IS_TOUCH ? "오른쪽 「제자리로」 단추" : k("R")} — 길 가운데로 옮겨 멈춘 채 잠깐 무적이에요. 맞고 있을 땐 자리는 그대로 무적만 생기고, 점프로 떠 있을 땐 쓸 수 없어요. 한 번 쓰면 3초 뒤에 다시 써요.</li>
             <li>굽은 길에서 안쪽으로 꺾고 버티면 드리프트 부스트가 모여요. 점프해서 공중에 떴을 때 좌우로 세게 꺾으면 빙글 돌고 착지 부스트를 받아요.</li>
           </ul>
+          <h3>경주 화면</h3>
+          <ul>
+            <li>왼쪽에 모두의 순위(내 줄은 금색), 오른쪽 아래에 속도(km/h)가 보여요. 휴대폰에서는 순위를 내 앞뒤만 보여 줘요.</li>
+            <li>누가 누구를 무엇으로 맞혔는지 오른쪽에 짧게 떠요(맞힘 소식). 내가 맞히면 「맞혔어요!」와 소리로 알려 줘요.</li>
+            <li>결승선을 지나면 화면이 내 차 옆으로 돌아 계속 달리는 모습을 보여 줘요(동작 줄이기를 켜면 돌지 않아요).</li>
+          </ul>
+          <div class="bv-btnrow is-left"><button type="button" class="hk-btn hk-btn--secondary" data-act="hlog" aria-pressed="${pref.log}">${logTxt()}</button></div>
           <h3>동료와</h3>
           <ul>
-            <li>트랙은 도전한 사람이, 레이서는 각자 골라요. 대전에서는 모든 트랙을 고를 수 있어요. 바꾸면 두 사람 준비가 풀려요.</li>
+            <li>트랙은 도전한 사람이, 레이서는 각자 골라요. 대전에서는 모든 트랙을 고를 수 있고, 「무작위」를 고르면 출발할 때 트랙이 정해져요. 바꾸면 두 사람 준비가 풀려요.</li>
             <li>두 사람 모두 준비하면 3 · 2 · 1 뒤 출발해요. 경주 중에는 멈출 수 없어요. 다른 탭 · 앱으로 가거나 연결이 끊기면 잠깐 멈췄다가, 돌아오면 3초 세고 이어 가요.</li>
             <li>두 사람이 보낸 결과가 맞으면 대전 기록에 남아요. 경주 중에 나가면 기권으로 져요.</li>
           </ul>
           <h3>여러 명</h3>
           <ul>
             <li>「여러 명」에서 동료를 최대 5명 골라 초대해요. 초대 받은 사람에게 Teams 알림이 가요.</li>
-            <li>대기실에 들어와 「준비」한 사람만 함께 출발해요. 트랙은 연 사람이 골라요. 6대 가운데 남는 자리는 컴퓨터가 달려요.</li>
-            <li>사람이 모두 들어오거나, 누가 처음 들어온 뒤 20초가 지나면 경주가 끝나요. 1등이 사람이면 그 사람만 1승이에요(컴퓨터가 1등이면 승 없음). 함께 달린 사람은 참여 도장을 받아요.</li>
+            <li>대기실에 들어와 「준비」한 사람만 함께 출발해요. 트랙(무작위도 돼요)과 컴퓨터 레벨(쉬움 · 보통 · 어려움)은 연 사람이 골라요. 6대 가운데 남는 자리는 컴퓨터가 달려요 — 쉬움은 느리고 아이템을 덜 쓰고, 어려움은 빠르고 공격에 빨리 대처해요.</li>
+            <li>사람이 모두 들어오거나, 누가 처음 들어온 뒤 10초가 지나면 경주가 끝나요. 그때 못 들어온 차는 「완주 못 함」으로, 간 거리 순서로 줄을 서요. 1등이 사람이면 그 사람만 1승이에요(컴퓨터가 1등이면 승 없음). 함께 달린 사람은 참여 도장을 받아요.</li>
           </ul>
           <h3>연습</h3>
-          <ul><li>컴퓨터 레이서 한 대와 겨뤄요. 기록은 남지 않고 아케이드 순위에도 들어가지 않아요.</li></ul>
+          <ul><li>컴퓨터 레이서 한 대와 겨뤄요(레벨 · 트랙은 첫 화면에서 골라요 — 무작위도 돼요). 기록은 남지 않고 아케이드 순위에도 들어가지 않아요.</li></ul>
           <div class="bv-btnrow"><button type="button" class="hk-btn hk-btn--primary" data-act="setclose">닫기</button></div>
         </div>`;
       setOver.hidden = false; setOver.scrollTop = 0;
@@ -511,6 +556,8 @@
     }
 
     // ───── 결과
+    // 이름 뒤 「이/가」 — 끝 괄호(「컴퓨터(보통)」)는 빼고 본다
+    const iga = (s) => { const t = String(s || "").replace(/\([^)]*\)$/, ""), ch = t.charCodeAt(t.length - 1); return ch >= 0xac00 && ch <= 0xd7a3 && (ch - 0xac00) % 28 ? "이" : "가"; };
     function showResult(r) {
       if (!playing) return;
       const P = playing;
@@ -521,17 +568,15 @@
       const tName = `트랙 ${r.track} · ${TRACKS[r.track - 1] || ""}`;
       const lead = P.online ? `${esc(P.rival.name)}님과의 경주 · ${esc(tName)}` : `${esc(P.rival.name)}와 연습 · ${esc(tName)}`;
       const anyFin = r.order[0] != null || r.order[1] != null;
-      const how = anyFin ? (won ? "먼저 결승선을 지났어요" : draw ? "" : `${esc(P.rival.name)}${P.online ? "님" : ""}이 먼저 들어왔어요`) : `5분 안에 둘 다 못 들어와 ${draw ? "간 거리가 같았어요" : "더 멀리 간 쪽이 이겼어요"}`;
-      const mine = r.order[mi], theirs = r.order[ri];
+      const how = anyFin ? (won ? "먼저 결승선을 지났어요" : draw ? "" : `${esc(P.rival.name)}${P.online ? "님이" : iga(P.rival.name)} 먼저 들어왔어요`) : `5분 안에 둘 다 못 들어와 ${draw ? "간 거리가 같았어요" : "더 멀리 간 쪽이 이겼어요"}`;
+      const names = [];
+      names[mi] = "나"; names[ri] = P.rival.name;
+      const list = rankList(r, { names, bots: P.online ? [] : [ri] }, mi);
       showOver(`<div class="bv-card is-small bv-result" role="dialog" aria-label="경주 결과">
           <span class="bv-badge ${won ? "is-win" : draw ? "" : "is-lose"}">${icon(won ? "trophy" : draw ? "handshake" : "flag", 28)}</span>
           <h2>${esc(title)}</h2>
-          <p>${lead}${how ? `<br><small>${how}</small>` : ""}</p>
-          <div class="bv-stats">
-            <div><b>${mine != null ? fmtSec(mine) : pct(r.dist && r.dist[mi])}</b><small>${mine != null ? "내 기록" : "내가 간 거리"}</small></div>
-            <div><b>${theirs != null ? fmtSec(theirs) : pct(r.dist && r.dist[ri])}</b><small>${theirs != null ? "상대 기록" : "상대가 간 거리"}</small></div>
-            <div><b>${timeText(r.sec)}</b><small>경주 시간</small></div>
-          </div>
+          <p>${lead}<br><small>${how ? `${how} · ` : ""}경주 시간 ${timeText(r.sec)}</small></p>
+          <div class="bv-ranks">${list}</div>
           <div class="bv-again" id="bv-again" hidden></div>
           <div class="bv-btnrow" id="bv-endbtns">
             <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">처음으로</button>
@@ -563,10 +608,17 @@
       if (acc) acc.dataset.id = String(id);
       else row.insertAdjacentHTML("beforeend", `<button type="button" class="hk-btn hk-btn--primary" data-act="accept" data-id="${id}">다시 경주 수락</button>`);
     }
+    // 시간이 다 돼 끝난 판(못 들어온 차가 있음)은 본체의 「경주 끝!」 · 「완주 못 함」을 잠깐 보여 준 뒤 결과를 띄운다(결과 보고도 그 뒤)
+    const END_HOLD = 1200;
+    function afterEnd(r, fn) {
+      if (!(r && Array.isArray(r.order) && r.order.some((t) => t == null) && r.order.some((t) => t != null))) { fn(); return; }
+      const P = playing;
+      setTimeout(() => { if (playing === P) fn(); }, END_HOLD);
+    }
     // 연습 결과 · 대전 결과 모두 본체가 vs:end 로 알려 준다
     frameHandlers.add((m) => {
       if (m.type !== "vs:end" || !playing) return;
-      if (!playing.online) { if (screen === "play" || screen === "pause") showResult(m.r); return; }
+      if (!playing.online) { if (screen === "play" || screen === "pause") afterEnd(m.r, () => { if (screen === "play" || screen === "pause") showResult(m.r); }); return; }
       if (playing.onEnd) playing.onEnd(m.r);
     });
 
@@ -574,8 +626,9 @@
     // connect(matchId, h) 는 HKRt.connect(/_shared/rt.js) 와 같은 약속이다 — 시험용 devConnect 도 똑같이 군다
     //   h.onHello({ role, peerHere }) · h.onPeer(here) · h.onMessage(msg) · h.onClose({ final, text }) → { send(obj) → bool, close() }
     // 주고받는 말(바깥 화면끼리)
-    //   guest → host: hi {rid, un, rd} · rd {on, rid} · in {a, s} · vis {h} · ping {c}
-    //   host → guest: lb {ph, track, max, rids, rd} · go {e, track, rids} · s {d} · end {e, r} · vis {h} · pong {c}
+    //   guest → host: hi {rid, un, rd, v, mx} · rd {on, rid, v, mx} · in {a, s, u, k, v, kb, tm, r, h} · vis {h} · ping {c}
+    //   host → guest: lb {ph, track, max, rids, rd, v, mx} · go {e, track, rids} · s {d} · end {e, r} · vis {h} · pong {c}
+    //   v · mx = 본체 판본 · 같이 달릴 가장 낮은 판본(옛 바깥은 안 보냄 = 0) — 서로 맞지 않으면 준비 · 출발을 막고 「새로 고침」 안내
     const PEER_GRACE = 20000; // 상대가 이만큼 안 돌아오면 「상대가 나갔어요」 (그동안 경주는 멈춰 있다)
     const AWAY_MAX = 20000; // 상대가 다른 탭에 가 있어도 이만큼 지나면 경주를 이어 간다
     let conn = null, sess = null;
@@ -588,12 +641,13 @@
       screen = "connect"; setPlaying(false); pauseBtn.hidden = true;
       showOver(cardHtml("wifi", "연결하는 중…", `${rival.name}님과 연결하고 있어요`, `<button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>`));
       const S = { closed: false, graceT: 0, awayT: 0, tick: 0, role: null, peerHere: false, gotLb: false, lastHi: 0, lastPing: 0, phase: "wait",
-        track: Number.isInteger(track) ? track : 0, max: 1, rids: ["bunny", "fox"], rd: [0, 0], e: 0, result: null, guestUn: 1, endSent: 0 };
+        track: Number.isInteger(track) ? track : 0, rnd: false, max: 1, rids: ["bunny", "fox"], rd: [0, 0], e: 0, result: null, guestUn: 1, endSent: 0, pv: null };
       sess = S;
       const send = (o) => !S.closed && !!conn && conn.send(o);
       const names = () => (S.role === "host" ? [me.name, rival.name] : [rival.name, me.name]);
       const faces = () => (S.role === "host" ? [me.avatarUrl || null, rival.avatarUrl || null] : [rival.avatarUrl || null, me.avatarUrl || null]);
       const mi = () => (S.role === "guest" ? 1 : 0);
+      const pmix = () => ((S.role === "host" ? S.gotHi : S.gotLb) ? verMix(S.pv) : 0); // 상대 판본을 받은 뒤에만
       const lost = async (title, sub) => {
         if (S.closed || S.phase === "end") return;
         closeConn();
@@ -613,7 +667,7 @@
         if (S.role === "host") { send({ t: "end", e: S.e, r }); S.endSent = Date.now(); }
         else toFrame({ type: "vs:end", r });
         playing.result = r;
-        showResult(r);
+        afterEnd(r, () => showResult(r));
       };
       playing = { mode: "online", online: true, role: null, rival, report, resign, matchId: typeof matchId === "number" ? matchId : null, onEnd: (r) => { if (S.role === "host") finish(r); } };
       // ── 준비 화면
@@ -623,16 +677,17 @@
         screen = "ready";
         const host = S.role === "host", i = mi();
         const who = (on, name, here, rid) => `<div class="${on ? "is-on" : ""}">${icon(on ? "check-circle-2" : here ? "circle" : "loader", 15)}${here && okRid(rid) ? `<span class="bv-dot" style="background:${RACERS.find((x) => x[0] === rid)[3]}"></span>` : ""}<span>${esc(name)} · ${on ? "준비 완료" : here ? "준비 전" : "들어오는 중…"}</span></div>`;
-        const ready = !!S.rd[i];
+        const ready = !!S.rd[i], mix = pmix();
         showOver(`<div class="bv-card" role="dialog" aria-label="경주 준비">
             <h2>경주를 준비해 주세요</h2>
-            <p>${esc(rival.name)}님과 실시간 경주 · 트랙 ${S.track + 1} ${esc(TRACKS[S.track])}</p>
-            <div class="bv-row"><span class="bv-row__k">트랙</span>${trackGrid("data-otrack", S.track, S.max, !host)}</div>
+            <p>${esc(rival.name)}님과 실시간 경주 · ${esc(trackTxt(S.track, S.rnd))}</p>
+            <div class="bv-row"><span class="bv-row__k">트랙</span>${trackGrid("data-otrack", S.track, S.max, !host, S.rnd)}</div>
             <div class="bv-row"><span class="bv-row__k">레이서</span>${racerGrid("data-orid", S.rids[i])}</div>
             <div class="bv-who">${who(S.rd[i], "나", true, S.rids[i])}${who(S.rd[1 - i], rival.name, S.peerHere && (host ? S.gotHi : S.gotLb), S.rids[1 - i])}</div>
+            ${mix ? `<div class="bv-mini is-bad" role="status">${VER_TXT[mix]}</div>` : ""}
             <div class="bv-btnrow">
               <button type="button" class="hk-btn hk-btn--secondary" data-act="menu">그만두기</button>
-              <button type="button" class="hk-btn hk-btn--primary" data-act="ready" data-on="${ready ? 0 : 1}">${ready ? "준비 취소" : "준비"}</button>
+              <button type="button" class="hk-btn hk-btn--primary" data-act="ready" data-on="${ready ? 0 : 1}" ${mix && !ready ? "disabled" : ""}>${ready ? "준비 취소" : "준비"}</button>
             </div>
             <div class="bv-mini">${host ? "트랙은 도전한 내가" : "트랙은 도전한 사람이"}, 레이서는 각자 골라요 · 모든 트랙을 고를 수 있어요 · 바꾸면 두 사람 준비가 풀려요 · 레이서는 모양만 달라요 · 두 사람 모두 준비하면 바로 출발 세기를 해요</div>
           </div>`);
@@ -647,15 +702,16 @@
         toFrame({ type: "vs:setup", role: S.role, track: S.track, rids: S.rids.slice(), names: names(), avatars: faces(), e: 0, mute: HKSound.isMuted() });
       }
       // host — 준비 상태 알리기
-      const lbMsg = () => ({ t: "lb", ph: S.phase, track: S.track, max: S.max, rids: S.rids.slice(), rd: S.rd.slice() });
+      const lbMsg = () => ({ t: "lb", ph: S.phase, track: S.track, max: S.max, rids: S.rids.slice(), rd: S.rd.slice(), ...(S.rnd ? { rnd: 1 } : {}), ...myVer() }); // rnd — 무작위(옛 손님은 모르는 칸 · track 은 앞서 고른 트랙 그대로)
       function hostChanged() {
         if (S.role !== "host") return;
         if (S.phase === "wait") { S.max = Math.min(unlocked(), S.guestUn); if (S.track >= S.max) S.track = 0; } // 경주 중에는 트랙을 바꾸지 않는다
         send(lbMsg()); frameWait(); paintLobby(); maybeGo();
       }
       function maybeGo() {
-        if (S.role !== "host" || S.phase !== "wait" || !S.rd[0] || !S.rd[1] || !S.peerHere) return;
+        if (S.role !== "host" || S.phase !== "wait" || !S.rd[0] || !S.rd[1] || !S.peerHere || verMix(S.pv)) return; // 판본이 맞지 않으면 출발하지 않는다
         S.phase = "race"; S.e = 1 + Math.floor(Math.random() * 1e9); S.result = null;
+        if (S.rnd) { S.track = pickRnd(S.max); S.rnd = false; } // 무작위 — 출발 순간 정한 트랙을 출발 신호로 보내 두 화면이 같은 트랙
         const go = { t: "go", e: S.e, track: S.track, rids: S.rids.slice() };
         toFrame({ type: "vs:setup", role: "host", track: S.track, rids: S.rids.slice(), names: names(), avatars: faces(), e: S.e, auto: AUTO, mute: HKSound.isMuted() });
         toFrame({ type: "vs:go" });
@@ -700,7 +756,7 @@
       const onFrame = (m) => {
         if (S.closed) return;
         if (m.type === "vs:snap" && S.role === "host" && S.phase !== "wait" && m.d) send({ t: "s", d: m.d });
-        else if (m.type === "vs:in" && S.role === "guest" && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0, u: Number.isInteger(m.u) ? m.u : 0, k: typeof m.k === "string" ? m.k.slice(-4) : "", ...(Number.isInteger(m.v) ? { v: m.v } : {}) });
+        else if (m.type === "vs:in" && S.role === "guest" && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0, u: Number.isInteger(m.u) ? m.u : 0, k: typeof m.k === "string" ? m.k.slice(-4) : "", ...inX(m) });
       };
       frameHandlers.add(onFrame);
       S.offFrame = () => frameHandlers.delete(onFrame);
@@ -715,7 +771,7 @@
         if (m.t === "pong") { const ms = performance.now() - Number(m.c); if (ms >= 0 && ms < 5000) toFrame({ type: "vs:rtt", ms }); return; }
         if (S.role === "host") {
           if (m.t === "hi") {
-            S.gotHi = true;
+            S.gotHi = true; S.pv = verOf(m);
             if (okRid(m.rid) && S.phase === "wait") S.rids[1] = m.rid;
             S.guestUn = Number.isInteger(m.un) && m.un >= 1 && m.un <= TRACKS.length ? m.un : TRACKS.length;
             if (S.phase === "wait") S.rd[1] = m.rd ? 1 : 0;
@@ -723,10 +779,11 @@
             else if (S.phase === "end" && S.result) send({ t: "end", e: S.e, r: S.result });
             hostChanged();
           } else if (m.t === "rd" && S.phase === "wait") {
+            if (m.v !== undefined || m.mx !== undefined) S.pv = verOf(m);
             if (okRid(m.rid) && m.rid !== S.rids[1]) { S.rids[1] = m.rid; S.rd = [0, 0]; }
             else S.rd[1] = m.on ? 1 : 0;
             hostChanged();
-          } else if (m.t === "in" && S.phase === "race") toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0, ...(Number.isInteger(m.u) ? { u: m.u } : {}), ...(typeof m.k === "string" && /^[0-2]{0,4}$/.test(m.k) ? { k: m.k } : {}), ...(Number.isInteger(m.v) ? { v: m.v } : {}) });
+          } else if (m.t === "in" && S.phase === "race") toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0, ...(Number.isInteger(m.u) ? { u: m.u } : {}), ...(typeof m.k === "string" && /^[0-2]{0,4}$/.test(m.k) ? { k: m.k } : {}), ...inX(m) });
           else if (m.t === "vis" && S.phase === "race") {
             clearTimeout(S.awayT);
             if (m.h) toFrame({ type: "vs:in", a: 0, s: 0 }); // 손님 조작은 놓은 것으로 — 돌아오면 새 입력이 온다
@@ -736,7 +793,7 @@
           }
         } else {
           if (m.t === "lb") {
-            S.gotLb = true;
+            S.gotLb = true; S.pv = verOf(m);
             if (m.ph === "wait" && S.phase !== "wait") {
               // 주인이 다시 들어왔다 — 처음부터 다시
               S.phase = "wait"; S.e = 0; S.result = null; S.rd = [0, 0];
@@ -744,7 +801,7 @@
               screen = "ready"; setPlaying(false);
             }
             if (S.phase !== "wait") return;
-            S.track = clamp(m.track | 0, 0, TRACKS.length - 1); S.max = clamp(m.max | 0, 1, 5);
+            S.track = clamp(m.track | 0, 0, TRACKS.length - 1); S.max = clamp(m.max | 0, 1, 5); S.rnd = m.rnd === 1;
             if (Array.isArray(m.rids)) { S.rids = [okRid(m.rids[0]) ? m.rids[0] : "bunny", S.rids[1]]; if (okRid(m.rids[1])) S.rids[1] = m.rids[1]; }
             if (Array.isArray(m.rd)) { S.rd = [m.rd[0] ? 1 : 0, m.rd[1] ? 1 : 0]; }
             frameWait(); paintLobby();
@@ -768,22 +825,24 @@
             if (S.phase === "wait" && S.peerHere) send(lbMsg());
             if (S.phase === "end" && S.result && Date.now() - S.endSent < 6000) send({ t: "end", e: S.e, r: S.result });
           } else if (!S.gotLb || S.phase === "wait") {
-            if (!S.gotLb || now - S.lastHi > 3000) { S.lastHi = now; send({ t: "hi", rid: S.rids[1], un: unlocked(), rd: S.rd[1] }); }
+            if (!S.gotLb || now - S.lastHi > 3000) { S.lastHi = now; send({ t: "hi", rid: S.rids[1], un: unlocked(), rd: S.rd[1], ...myVer() }); }
           }
           if (now - S.lastPing > 2000) { S.lastPing = now; send({ t: "ping", c: now }); }
         }, 500);
         paintLobby();
       }
       S.setReady = (on) => {
-        if (S.phase !== "wait") return;
+        if (S.phase !== "wait" || (on && pmix())) return;
         const i = mi();
         S.rd[i] = on ? 1 : 0;
         if (S.role === "host") hostChanged();
-        else { send({ t: "rd", on: on ? 1 : 0, rid: S.rids[1] }); paintLobby(); }
+        else { send({ t: "rd", on: on ? 1 : 0, rid: S.rids[1], ...myVer() }); paintLobby(); }
       };
       S.setTrack = (t) => {
-        if (S.role !== "host" || S.phase !== "wait" || !(t >= 0 && t < S.max) || t === S.track) return;
-        S.track = t; S.rd = [0, 0]; hostChanged();
+        if (S.role !== "host" || S.phase !== "wait") return;
+        if (t === "rnd") { if (S.rnd) return; S.rnd = true; S.rd = [0, 0]; hostChanged(); return; }
+        if (!(t >= 0 && t < S.max) || (t === S.track && !S.rnd)) return;
+        S.track = t; S.rnd = false; S.rd = [0, 0]; hostChanged();
       };
       S.setRid = (r) => {
         if (S.phase !== "wait" || !okRid(r)) return;
@@ -792,7 +851,7 @@
         S.rids[i] = r; S.rd = [0, 0];
         pref.rid = r; savePref();
         if (S.role === "host") hostChanged();
-        else { send({ t: "rd", on: 0, rid: r }); frameWait(); paintLobby(); }
+        else { send({ t: "rd", on: 0, rid: r, ...myVer() }); frameWait(); paintLobby(); }
       };
       conn = connect(matchId, {
         onHello: (h) => {
@@ -1009,8 +1068,8 @@
 
     // ───── 여러 명 경주 — 동료를 최대 5명 초대해 6대가 함께 달린다(빈자리는 컴퓨터) · 1등만 1승. 서버는 app/services/party.py
     // 실시간 통로는 /api/play/rt/party/{id} — 주인(host)의 본체가 경주를 계산하고 손님들 본체는 받아 그린다(1:1 과 같은 방식, 차만 6대)
-    // 주고받는 말: 손님 → 주인: hi {rid, rd} · rd {on, rid} · in {a, s} · vis {h}
-    //              주인 → 손님(모두): lb {ph, track, roster:[{id, here, rd, rid}]} · go {e, track, players, rids, names, bots} · s {d} · end {e, r} · again {id}
+    // 주고받는 말: 손님 → 주인: hi {rid, rd, v, mx} · rd {on, rid, v, mx} · in {a, s, u, k, v, kb, tm, r, h} · vis {h}
+    //              주인 → 손님(모두): lb {ph, track, roster:[{id, here, rd, rid, old}], v, mx} · go {e, track, players, rids, names, bots} · s {d} · end {e, r} · again {id}
     const PMAX = 6;
     const PART_REP = (id) => `hk-bumpervs-prep-${id}`;
     let pickSel = []; // 새로 열 때 고른 동료 [{id, name, department}]
@@ -1118,7 +1177,7 @@
       showOver(cardHtml("wifi", "대기실에 들어가는 중…", `${p.host.name}님의 경주`, `<button type="button" class="hk-btn hk-btn--secondary" data-act="plobby">그만두기</button>`));
       const names = Object.fromEntries(p.seats.map((s) => [s.id, s.name]));
       const S = { closed: false, graceT: 0, awayT: 0, tick: 0, party: p, id: p.id, me: p.meId, host: p.host.id, role: null, phase: p.status === "RACING" ? "race" : "wait",
-        track: clamp((p.track || 1) - 1, 0, TRACKS.length - 1), here: new Set(), hostHere: false, rd: {}, rids: {}, e: 0, go: null, result: null, endSent: 0, lastHi: 0, gotLb: false, roster: [] };
+        track: clamp((p.track || 1) - 1, 0, TRACKS.length - 1), rnd: false, lv: pref.plv, here: new Set(), hostHere: false, rd: {}, rids: {}, e: 0, go: null, result: null, endSent: 0, lastHi: 0, gotLb: false, roster: [], pv: {}, hv: null };
       sess = S;
       const send = (o) => !S.closed && !!conn && conn.send(o);
       const isHost = () => S.role === "host";
@@ -1134,28 +1193,33 @@
         if (S.closed || S.phase !== "wait" || !S.role || !["connect", "ready"].includes(screen)) return;
         screen = "ready";
         const host = isHost();
-        const roster = host ? seated().map((id) => ({ id, here: id === S.me || S.here.has(id), rd: id === S.me ? 1 : S.rd[id] ? 1 : 0, rid: S.rids[id] })) : S.roster;
+        const roster = host ? seated().map((id) => ({ id, here: id === S.me || S.here.has(id), rd: id === S.me ? 1 : S.rd[id] ? 1 : 0, rid: S.rids[id], old: id !== S.me && verMix(S.pv[id]) ? 1 : 0 })) : S.roster;
+        const mix = host || !S.gotLb ? 0 : verMix(S.hv);
         const rows = p.seats.map((s) => {
           const r = roster.find((x) => x.id === s.id);
           const col = r && okRid(r.rid) ? RACERS.find((x) => x[0] === r.rid)[3] : null;
-          const st = s.seat === "HOST" ? "연 사람" : !r ? seatLabel(s.seat) : !r.here ? "들어오는 중…" : r.rd ? "준비 완료" : "준비 전";
-          const on = !!(r && r.here && (r.rd || s.seat === "HOST"));
-          return `<div class="${on ? "is-on" : ""}">${icon(on ? "check-circle-2" : r && r.here ? "circle" : "loader", 15)}${col ? `<span class="bv-dot" style="background:${col}"></span>` : ""}<span>${esc(s.id === S.me ? "나" : s.name)} · ${st}</span></div>`;
+          const old = !!(r && r.here && r.old);
+          const st = s.seat === "HOST" ? "연 사람" : !r ? seatLabel(s.seat) : !r.here ? "들어오는 중…" : old ? "새로 고침 필요" : r.rd ? "준비 완료" : "준비 전";
+          const on = !!(r && r.here && !old && (r.rd || s.seat === "HOST"));
+          return `<div class="${on ? "is-on" : old ? "is-old" : ""}">${icon(on ? "check-circle-2" : r && r.here ? "circle" : "loader", 15)}${col ? `<span class="bv-dot" style="background:${col}"></span>` : ""}<span>${esc(s.id === S.me ? "나" : s.name)} · ${st}</span></div>`;
         }).join("");
-        const readyN = roster.filter((x) => x.id !== S.host && x.here && x.rd).length;
+        const readyN = roster.filter((x) => x.id !== S.host && x.here && x.rd && !x.old).length;
+        const oldN = roster.filter((x) => x.id !== S.host && x.here && x.old).length;
         const myRd = !!S.rd[S.me];
         showOver(`<div class="bv-card" role="dialog" aria-label="여러 명 경주 대기실">
             <h2>여러 명 경주 대기실</h2>
-            <p>${esc(p.host.name)}님의 경주 · 트랙 ${S.track + 1} ${esc(TRACKS[S.track])} · 사람 ${roster.filter((x) => x.here).length}명 + 컴퓨터 ${PMAX - Math.max(1, roster.filter((x) => x.here && (x.rd || x.id === S.host)).length)}대</p>
-            <div class="bv-row"><span class="bv-row__k">트랙</span>${trackGrid("data-ptrack", S.track, TRACKS.length, !host)}</div>
+            <p>${esc(p.host.name)}님의 경주 · ${esc(trackTxt(S.track, S.rnd))} · 컴퓨터 ${esc(LEVEL_NAME[S.lv] || "보통")} · 사람 ${roster.filter((x) => x.here).length}명 + 컴퓨터 ${PMAX - Math.max(1, roster.filter((x) => x.here && (x.rd || x.id === S.host)).length)}대</p>
+            <div class="bv-row"><span class="bv-row__k">트랙</span>${trackGrid("data-ptrack", S.track, TRACKS.length, !host, S.rnd)}</div>
+            <div class="bv-row"><span class="bv-row__k">컴퓨터</span><div class="bv-seg" role="group" aria-label="컴퓨터 레벨">${LEVELS.map(([k, t]) => `<button type="button" data-plv="${k}" class="${k === S.lv ? "is-on" : ""}" aria-pressed="${k === S.lv}" ${host ? "" : "disabled"}>${t}</button>`).join("")}</div></div>
             <div class="bv-row"><span class="bv-row__k">레이서</span>${racerGrid("data-prid", S.rids[S.me])}</div>
             <div class="bv-who is-many">${rows}</div>
+            ${mix ? `<div class="bv-mini is-bad" role="status">${VER_TXT[mix].replace(/상대/g, "연 사람")}</div>` : oldN ? `<div class="bv-mini is-bad" role="status">옛 판 화면인 동료가 있어요 · 새로 고침하면 같이 달릴 수 있어요</div>` : ""}
             <div class="bv-btnrow">
               <button type="button" class="hk-btn hk-btn--secondary" data-act="pleave">${host ? "대기실 닫기" : "나가기"}</button>
               ${host ? `<button type="button" class="hk-btn hk-btn--primary" data-act="pgo" ${readyN ? "" : "disabled"}>${readyN ? `준비한 ${readyN + 1}명 출발` : "준비한 동료를 기다려요"}</button>`
-                : `<button type="button" class="hk-btn hk-btn--primary" data-act="pready" data-on="${myRd ? 0 : 1}">${myRd ? "준비 취소" : "준비"}</button>`}
+                : `<button type="button" class="hk-btn hk-btn--primary" data-act="pready" data-on="${myRd ? 0 : 1}" ${mix && !myRd ? "disabled" : ""}>${myRd ? "준비 취소" : "준비"}</button>`}
             </div>
-            <div class="bv-mini">${host ? "트랙을 고르고, 준비한 동료가 모이면 출발을 눌러요 · 준비하지 않은 사람은 이번 경주에서 빠져요" : "트랙은 연 사람이 골라요 · 준비하면 연 사람이 출발할 때 함께 달려요"} · 빈자리는 컴퓨터가 달려요 · 1등만 1승 · 레이서는 모양만 달라요</div>
+            <div class="bv-mini">${host ? "트랙 · 컴퓨터 레벨을 고르고, 준비한 동료가 모이면 출발을 눌러요 · 준비하지 않은 사람은 이번 경주에서 빠져요" : "트랙 · 컴퓨터 레벨은 연 사람이 골라요 · 준비하면 연 사람이 출발할 때 함께 달려요"} · 빈자리는 컴퓨터가 달려요 · 1등만 1승 · 레이서는 모양만 달라요</div>
           </div>`);
       }
       let shownSetup = "";
@@ -1167,14 +1231,15 @@
         const rids = [S.rids[S.me], ...partyBotRids([S.rids[S.me]]).slice(0, PMAX - 1)];
         toFrame({ type: "vs:setup", role: "solo", track: S.track, rids, names: [me.name, ...Array(PMAX - 1).fill("컴퓨터")], avatars: [me.avatarUrl || null, ...Array(PMAX - 1).fill(null)], me: 0, e: 0, mute: HKSound.isMuted() });
       }
-      const lbMsg = () => ({ t: "lb", ph: S.phase, track: S.track, roster: seated().map((id) => ({ id, here: id === S.me || S.here.has(id), rd: id === S.me ? 1 : S.rd[id] ? 1 : 0, rid: S.rids[id] || null })) });
+      const lbMsg = () => ({ t: "lb", ph: S.phase, track: S.track, lv: S.lv, ...(S.rnd ? { rnd: 1 } : {}), roster: seated().map((id) => ({ id, here: id === S.me || S.here.has(id), rd: id === S.me ? 1 : S.rd[id] ? 1 : 0, rid: S.rids[id] || null, ...(id !== S.me && verMix(S.pv[id]) ? { old: 1 } : {}) })), ...myVer() });
       function hostChanged() { if (!isHost()) return; send(lbMsg()); frameWait(); paint(); }
       // ── 출발(주인)
       async function hostGo(btn) {
         if (!isHost() || S.phase !== "wait") return;
-        const ready = seated().filter((id) => id !== S.me && S.here.has(id) && S.rd[id]);
+        const ready = seated().filter((id) => id !== S.me && S.here.has(id) && S.rd[id] && !verMix(S.pv[id])); // 판본이 맞지 않는 사람은 이번 경주에서 빠진다
         if (!ready.length) return;
         if (btn) btn.disabled = true;
+        if (S.rnd) { S.track = pickRnd(TRACKS.length); S.rnd = false; } // 무작위 — 출발 순간 정해 서버 · 출발 신호에 같은 트랙
         let n;
         try { n = await HKApi.partyStart(p.id, ready, S.track + 1); } catch (e) { if (btn) btn.disabled = false; HKMatch.fail(e); return; }
         p = S.party = n;
@@ -1185,7 +1250,7 @@
         const botName = (rid) => { const x = RACERS.find((y) => y[0] === rid); return x ? `컴퓨터 ${x[1]}` : "컴퓨터"; };
         const nm = [...players.map((id) => names[id] || "동료"), ...rids.slice(players.length).map(botName)];
         const pic = (id) => { const x = n.seats.find((y) => y.id === id); return (x && x.avatarUrl) || null; };
-        S.go = { t: "go", e: 1 + Math.floor(Math.random() * 1e9), track: S.track, players, rids, names: nm, bots: n.bots, avatars: [...players.map(pic), ...Array(PMAX - players.length).fill(null)] };
+        S.go = { t: "go", e: 1 + Math.floor(Math.random() * 1e9), track: S.track, lv: S.lv, players, rids, names: nm, bots: n.bots, avatars: [...players.map(pic), ...Array(PMAX - players.length).fill(null)] };
         startGo(S.go);
         send(S.go);
       }
@@ -1196,7 +1261,7 @@
         const nm = g.names.map((x, k) => (k === i ? me.name : x));
         const av = Array.isArray(g.avatars) ? g.avatars.map((u) => (typeof u === "string" && /^\/(api|assets)\//.test(u) ? u : null)) : [];
         if (!av[i] && /^\/(api|assets)\//.test(me.avatarUrl)) av[i] = me.avatarUrl; // 내 자리 사진이 안 왔으면 내 것으로(내 차 위 이름표)
-        toFrame({ type: "vs:setup", role: isHost() ? "host" : "guest", track: S.track, rids: g.rids.slice(), names: nm, avatars: av, me: i, bots: g.bots.slice(), level: "normal", e: S.e, auto: AUTO, mute: HKSound.isMuted() });
+        toFrame({ type: "vs:setup", role: isHost() ? "host" : "guest", track: S.track, rids: g.rids.slice(), names: nm, avatars: av, me: i, bots: g.bots.slice(), level: LEVEL_NAME[g.lv] ? g.lv : "normal", e: S.e, auto: AUTO, mute: HKSound.isMuted() });
         toFrame({ type: "vs:go" });
         shownSetup = "";
         hideOver(); closeLayer();
@@ -1209,7 +1274,7 @@
         S.phase = "end"; S.result = r;
         if (isHost()) { send({ t: "end", e: S.e, r }); S.endSent = Date.now(); } else toFrame({ type: "vs:end", r });
         try { localStorage.setItem(PART_REP(p.id), JSON.stringify({ r, at: Date.now() })); } catch (_) { /* 저장 못 해도 보내기는 그대로 */ }
-        showPartyResult(r, S.go, S);
+        afterEnd(r, () => showPartyResult(r, S.go, S));
       };
       const lost = (title, sub) => {
         if (S.closed || S.phase === "end") return;
@@ -1222,7 +1287,7 @@
       const onFrame = (m) => {
         if (S.closed) return;
         if (m.type === "vs:snap" && isHost() && S.phase !== "wait" && m.d) send({ t: "s", d: m.d });
-        else if (m.type === "vs:in" && !isHost() && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0, u: Number.isInteger(m.u) ? m.u : 0, k: typeof m.k === "string" ? m.k.slice(-4) : "", ...(Number.isInteger(m.v) ? { v: m.v } : {}) });
+        else if (m.type === "vs:in" && !isHost() && S.phase === "race") send({ t: "in", a: m.a ? 1 : 0, s: Number(m.s) || 0, u: Number.isInteger(m.u) ? m.u : 0, k: typeof m.k === "string" ? m.k.slice(-4) : "", ...inX(m) });
       };
       frameHandlers.add(onFrame);
       S.offFrame = () => frameHandlers.delete(onFrame);
@@ -1239,18 +1304,20 @@
           if (!seated().includes(from)) { refreshSoon(); if (S.phase === "wait") return; } // 대기실에 새로 들어온 사람 — 자리 정보를 다시 받아 온다
           if (m.t === "ping") { send({ t: "pong", c: m.c, to: from }); return; }
           if (m.t === "hi") {
+            S.pv[from] = verOf(m);
             if (okRid(m.rid)) S.rids[from] = m.rid;
             if (S.phase === "wait") S.rd[from] = m.rd ? 1 : 0;
             if (S.phase === "race" && S.go) send({ ...S.go, to: from }); // 경주 중 다시 들어온 사람
             else if (S.phase === "end" && S.result) send({ t: "end", e: S.e, r: S.result, to: from });
             hostChanged();
           } else if (m.t === "rd" && S.phase === "wait") {
+            if (m.v !== undefined || m.mx !== undefined) S.pv[from] = verOf(m);
             if (okRid(m.rid)) S.rids[from] = m.rid;
             S.rd[from] = m.on ? 1 : 0;
             hostChanged();
           } else if (m.t === "in" && S.phase === "race" && S.go) {
             const i = S.go.players.indexOf(from);
-            if (i > 0) toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0, i, ...(Number.isInteger(m.u) ? { u: m.u } : {}), ...(typeof m.k === "string" && /^[0-2]{0,4}$/.test(m.k) ? { k: m.k } : {}), ...(Number.isInteger(m.v) ? { v: m.v } : {}) });
+            if (i > 0) toFrame({ type: "vs:in", a: m.a ? 1 : 0, s: Number(m.s) || 0, i, ...(Number.isInteger(m.u) ? { u: m.u } : {}), ...(typeof m.k === "string" && /^[0-2]{0,4}$/.test(m.k) ? { k: m.k } : {}), ...inX(m) });
           } else if (m.t === "vis" && S.phase === "race" && S.go) {
             const i = S.go.players.indexOf(from);
             if (i > 0 && m.h) toFrame({ type: "vs:in", a: 0, s: 0, i }); // 다른 화면에 간 사람 차는 손을 놓은 것으로 — 다른 사람들은 계속 달린다
@@ -1259,10 +1326,10 @@
           if (m.from !== "host") return;
           if (m.t === "pong") { const ms = performance.now() - Number(m.c); if (ms >= 0 && ms < 5000) toFrame({ type: "vs:rtt", ms }); return; }
           if (m.t === "lb") {
-            S.gotLb = true;
+            S.gotLb = true; S.hv = verOf(m);
             if (m.ph === "wait" && S.phase !== "wait" && S.phase !== "end") { S.phase = "wait"; screen = "ready"; setPlaying(false); }
             if (S.phase !== "wait") return;
-            S.track = clamp(m.track | 0, 0, TRACKS.length - 1);
+            S.track = clamp(m.track | 0, 0, TRACKS.length - 1); S.rnd = m.rnd === 1; S.lv = LEVEL_NAME[m.lv] ? m.lv : "normal"; // 옛 주인은 lv 를 안 보냄 = 보통
             S.roster = Array.isArray(m.roster) ? m.roster.filter((x) => x && Number.isInteger(x.id)) : [];
             const mine = S.roster.find((x) => x.id === S.me);
             if (mine) S.rd[S.me] = mine.rd ? 1 : 0;
@@ -1285,19 +1352,25 @@
             if (S.phase === "wait") send(lbMsg());
             if (S.phase === "end" && S.result && Date.now() - S.endSent < 6000) send({ t: "end", e: S.e, r: S.result });
           } else if (S.phase === "wait" || (S.phase === "race" && !S.e)) {
-            if (!S.gotLb || now - S.lastHi > 3000) { S.lastHi = now; send({ t: "hi", rid: S.rids[S.me], rd: S.rd[S.me] ? 1 : 0 }); }
+            if (!S.gotLb || now - S.lastHi > 3000) { S.lastHi = now; send({ t: "hi", rid: S.rids[S.me], rd: S.rd[S.me] ? 1 : 0, ...myVer() }); }
           }
           // 손님 — 연 사람까지 왕복 지연 재기(본체가 내 차를 그만큼 앞으로 내다본다)
           if (!isHost() && S.phase === "race" && !(now - (S.lastPing || 0) < 2000)) { S.lastPing = now; send({ t: "ping", c: now }); }
         }, 600);
         paint();
       }
-      S.setReady = (on) => { if (S.phase !== "wait" || isHost()) return; S.rd[S.me] = on ? 1 : 0; send({ t: "rd", on: on ? 1 : 0, rid: S.rids[S.me] }); paint(); };
-      S.setTrack = (t) => { if (!isHost() || S.phase !== "wait" || !(t >= 0 && t < TRACKS.length) || t === S.track) return; S.track = t; hostChanged(); };
+      S.setReady = (on) => { if (S.phase !== "wait" || isHost() || (on && S.gotLb && verMix(S.hv))) return; S.rd[S.me] = on ? 1 : 0; send({ t: "rd", on: on ? 1 : 0, rid: S.rids[S.me], ...myVer() }); paint(); };
+      S.setTrack = (t) => {
+        if (!isHost() || S.phase !== "wait") return;
+        if (t === "rnd") { if (!S.rnd) { S.rnd = true; hostChanged(); } return; }
+        if (!(t >= 0 && t < TRACKS.length) || (t === S.track && !S.rnd)) return;
+        S.track = t; S.rnd = false; hostChanged();
+      };
+      S.setLv = (k) => { if (!isHost() || S.phase !== "wait" || !LEVEL_NAME[k] || k === S.lv) return; S.lv = k; pref.plv = k; savePref(); hostChanged(); };
       S.setRid = (r) => {
         if (S.phase !== "wait" || !okRid(r) || S.rids[S.me] === r) return;
         S.rids[S.me] = r; pref.rid = r; savePref();
-        if (isHost()) hostChanged(); else { S.rd[S.me] = 0; send({ t: "rd", on: 0, rid: r }); frameWait(); paint(); }
+        if (isHost()) hostChanged(); else { S.rd[S.me] = 0; send({ t: "rd", on: 0, rid: r, ...myVer() }); frameWait(); paint(); }
       };
       S.go_ = hostGo;
       S.leave = async () => {
@@ -1340,6 +1413,10 @@
       const idx = [...Array(n).keys()].sort((a, b) => { const ta = r.order[a], tb = r.order[b]; if (ta != null && tb != null) return ta - tb; if (ta != null) return -1; if (tb != null) return 1; return (r.dist[b] || 0) - (r.dist[a] || 0); });
       return idx.map((i, k) => ({ i, place: k + 1, name: (g && g.names && g.names[i]) || (i < ((g && g.players) || []).length ? "동료" : "컴퓨터"), bot: !!(g && g.bots && g.bots.includes(i)), t: r.order[i], d: r.dist[i] }));
     }
+    // 결과 줄 — 순위 · 이름 · 기록, 못 들어온 차는 순위 자리에 「—」 + 「완주 못 함」(간 거리를 작게 — 줄은 간 거리 순, 혼자 하기 결과와 같은 표기)
+    function rankList(r, g, mi) {
+      return partyRows(r, g).map((x) => `<div class="bv-rank ${x.i === mi ? "is-me" : ""} ${x.t == null ? "is-dnf" : ""}"><b>${x.t == null ? "—" : x.place}</b><span>${esc(x.i === mi ? "나" : x.name)}</span><em>${x.t != null ? fmtSec(x.t) : `완주 못 함 <small>${pct(x.d)}</small>`}</em></div>`).join("");
+    }
     function showPartyResult(r, g, S) {
       const P = playing;
       screen = "result"; setPlaying(false); pauseBtn.hidden = true;
@@ -1348,14 +1425,14 @@
       const mine = rows.find((x) => x.i === mi);
       const top = rows[0];
       const won = r.winner != null && r.winner === mi;
-      const title = won ? "1등이에요!" : mine ? `${mine.place}등으로 들어왔어요` : "경주가 끝났어요";
+      const title = won ? "1등이에요!" : mine && mine.t != null ? `${mine.place}등으로 들어왔어요` : mine && r.winner != null && r.order.some((t) => t != null) ? "아쉽게 완주 못 했어요" : mine ? `${mine.place}등이에요` : "경주가 끝났어요";
       const sub = r.winner == null ? "아무도 못 들어와 간 거리가 같았어요" : top.bot ? "컴퓨터가 1등이라 이번 경주는 승이 없어요" : won ? "1승을 얻었어요" : `${top.name}님이 1등이에요`;
-      const list = rows.map((x) => `<div class="bv-rank ${x.i === mi ? "is-me" : ""}"><b>${x.place}</b><span>${esc(x.i === mi ? "나" : x.name)}</span><em>${x.t != null ? fmtSec(x.t) : pct(x.d)}</em></div>`).join("");
+      const list = rankList(r, g, mi);
       const host = S && S.role === "host";
       showOver(`<div class="bv-card is-small bv-result" role="dialog" aria-label="경주 결과">
           <span class="bv-badge ${won ? "is-win" : ""}">${icon(won ? "trophy" : "flag", 28)}</span>
           <h2>${esc(title)}</h2>
-          <p>트랙 ${r.track} · ${esc(TRACKS[r.track - 1] || "")} · ${esc(sub)}</p>
+          <p>트랙 ${r.track} · ${esc(TRACKS[r.track - 1] || "")}${g && g.bots && g.bots.length ? ` · 컴퓨터 ${esc(LEVEL_NAME[g.lv] || "보통")}` : ""} · ${esc(sub)}</p>
           <div class="bv-ranks">${list}</div>
           <div class="bv-again" id="bv-again" hidden></div>
           <div class="bv-btnrow" id="bv-endbtns">
@@ -1439,7 +1516,7 @@
       if (!f) return showOver(cardHtml("flag", "끝난 경주예요", `${p.host.name}님의 경주${p.reasonLabel ? ` · ${p.reasonLabel}` : ""}`, back));
       const g = { players: p.players, bots: p.bots, names: [...p.players.map((id) => { const s = p.seats.find((x) => x.id === id); return s ? s.name : "동료"; }), ...Array(PMAX).fill("컴퓨터")].slice(0, f.order.length) };
       const mi = p.players.indexOf(p.meId);
-      const list = partyRows(f, g).map((x) => `<div class="bv-rank ${x.i === mi ? "is-me" : ""}"><b>${x.place}</b><span>${esc(x.i === mi ? "나" : x.name)}</span><em>${x.t != null ? fmtSec(x.t) : pct(x.d)}</em></div>`).join("");
+      const list = rankList(f, g, mi);
       showOver(`<div class="bv-card is-small bv-result" role="dialog" aria-label="경주 결과">
           <span class="bv-badge ${p.result === "win" ? "is-win" : ""}">${icon(p.result === "win" ? "trophy" : "flag", 28)}</span>
           <h2>${p.result === "win" ? "1등 한 경주예요" : p.winner ? `${esc(p.winner.name)}님이 1등` : "끝난 경주예요"}</h2>
@@ -1476,17 +1553,21 @@
     addEventListener("beforeunload", (e) => { if (saving > 0 && !leaving) { e.preventDefault(); e.returnValue = ""; } });
 
     // ───── 버튼
+    const act0 = (b) => b.dataset.act || "";
     const overClick = (e) => {
       const b = e.target.closest("button");
       if (!b || b.disabled) return;
       if (b.dataset.mode) { pref.mode = b.dataset.mode; savePref(); HKSound.play("select"); paintMenu(); b.blur(); return; }
       if (b.dataset.level) { pref.level = b.dataset.level; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
-      if (b.dataset.track) { pref.track = Number(b.dataset.track); savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"], avatars: [me.avatarUrl || null, null] }); b.blur(); return; }
+      if (b.dataset.track === "rnd") { pref.rnd = true; savePref(); HKSound.play("tap"); paintMenu(); b.blur(); return; }
+      if (b.dataset.track) { pref.track = Number(b.dataset.track); pref.rnd = false; savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"], avatars: [me.avatarUrl || null, null] }); b.blur(); return; }
       if (b.dataset.rid) { pref.rid = b.dataset.rid; savePref(); HKSound.play("tap"); paintMenu(); toFrame({ type: "vs:setup", role: "solo", track: pref.track, rids: [pref.rid, "fox"], names: [me.name, "컴퓨터"], avatars: [me.avatarUrl || null, null] }); b.blur(); return; }
-      if (b.dataset.otrack) { if (sess && sess.setTrack) sess.setTrack(Number(b.dataset.otrack)); HKSound.play("tap"); return; }
+      if (b.dataset.otrack) { if (sess && sess.setTrack) sess.setTrack(b.dataset.otrack === "rnd" ? "rnd" : Number(b.dataset.otrack)); HKSound.play("tap"); return; }
       if (b.dataset.orid) { if (sess && sess.setRid) sess.setRid(b.dataset.orid); HKSound.play("tap"); return; }
       if (b.id === "bv-go") { if (pref.mode === "online") showOnlineLobby(); else if (pref.mode === "party") showPartyLobby(); else startPractice(); return; }
-      if (b.dataset.ptrack) { if (sess && sess.setTrack) sess.setTrack(Number(b.dataset.ptrack)); HKSound.play("tap"); return; }
+      if (b.dataset.ptrack) { if (sess && sess.setTrack) sess.setTrack(b.dataset.ptrack === "rnd" ? "rnd" : Number(b.dataset.ptrack)); HKSound.play("tap"); return; }
+      if (b.dataset.plv) { if (sess && sess.setLv) sess.setLv(b.dataset.plv); HKSound.play("tap"); b.blur(); return; }
+      if (act0(b) === "hlog") { pref.log = !pref.log; savePref(); toFrame({ type: "vs:opt", log: pref.log }); HKSound.play("tap"); b.setAttribute("aria-pressed", String(pref.log)); b.textContent = logTxt(); b.blur(); return; }
       if (b.dataset.prid) { if (sess && sess.setRid) sess.setRid(b.dataset.prid); HKSound.play("tap"); return; }
       const act = b.dataset.act;
       if (act === "setclose") { closeLayer(); return; }

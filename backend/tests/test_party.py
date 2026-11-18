@@ -170,6 +170,42 @@ class PartyFlow(unittest.TestCase):
         self.assertEqual(run(self._wins()), {})
         self.assertEqual(len(self.stamps), 2)  # 그래도 참여 도장
 
+    def test_retire_ten_sec(self):
+        """단계 1a — 첫 결승 + 10초에 끝난 판(못 들어온 차 null · 간 거리 순): 1등 사람은 1승 · 참여 도장, 1등 컴퓨터는 승 없음 · 참여 도장."""
+        pid, d = self.open_race(joins=(2, 3))
+        order = [None] * 6
+        order[1] = 140.0  # 손님 1 이 1등, 나머지(사람 둘 · 컴퓨터 셋)는 완주 못 함
+        r = {"winner": 1, "order": order, "dist": [0.97, 1.0, 0.9, 0.95, 0.94, 0.8], "track": 1, "sec": 150.0}
+        for who in (1, 2, 3):
+            out = self.call(party.report, who, pid, r)
+        self.assertEqual((out["status"], out["endReason"], out["winner"]["id"]), ("DONE", "FINISH", 2))
+        self.assertEqual(sorted(x for x, _ in self.stamps), [1, 2, 3])
+        self.assertEqual(list(run(self._wins())), [2])
+        # 컴퓨터가 1등 · 사람은 모두 완주 못 함
+        self.stamps.clear()
+        self.notices.clear()
+        pid, d = self.open_race(guests=(5, 6), joins=(5,))
+        order = [None] * 6
+        order[3] = 139.0
+        r = {"winner": 3, "order": order, "dist": [0.95, 0.9, 0.7, 1.0, 0.6, 0.5], "track": 1, "sec": 149.0}
+        self.call(party.report, 1, pid, r)
+        out = self.call(party.report, 5, pid, r)
+        self.assertEqual((out["endReason"], out["winner"]), ("BOT", None))
+        self.assertEqual(sorted(x for x, _ in self.stamps), [1, 5])
+        self.assertEqual(list(run(self._wins())), [2])  # 승은 앞 판 그대로
+
+    def test_info_1b_random_track_level(self):
+        """단계 1b — 무작위로 고른 트랙(대기실 트랙과 다름)으로 출발 · 결과에 덧붙은 칸(컴퓨터 레벨 등)은 서버가 버림, 판정 · 도장은 그대로."""
+        pid, d = self.open_race(joins=(2,), track=13)
+        order = [None] * 6
+        order[0] = 150.0
+        r = {"winner": 0, "order": order, "dist": [1.0, 0.9, 0.8, 0.7, 0.6, 0.5], "track": 13, "sec": 160.0, "lv": "hard", "bots": [2, 3, 4, 5]}
+        self.call(party.report, 1, pid, r)
+        out = self.call(party.report, 2, pid, r)
+        self.assertEqual((out["status"], out["endReason"], out["winner"]["id"]), ("DONE", "FINISH", 1))
+        self.assertEqual(sorted(x for x, _ in self.stamps), [1, 2])
+        self.assertNotIn("lv", party._clean(r, 6, 0))
+
     def test_mismatch_no_count(self):
         pid, d = self.open_race(joins=(2,))
         self.call(party.report, 1, pid, self.result({0: 140.0}, winner=0))
