@@ -11,7 +11,7 @@ def handle(route):
     if not p.exists(): return route.fulfill(status=404, body="")
     return route.fulfill(status=200, content_type=mimetypes.guess_type(str(p))[0] or "text/html", body=p.read_bytes())
 WASD = "wasd"
-REC = {"ringcatch": 10.0, "hoops": 10.0}  # 녹화 길이(초) — 없으면 7초
+REC = {"ringcatch": 10.0, "hoops": 10.0, "sundown": 10.0}  # 녹화 길이(초) — 없으면 7초
 # 옥상 링 캐치 — 가장 먼저 골대 높이에 닿을 공의 떨어질 x 를 계산해 골대를 그 밑으로(림에 안 닿게 가운데로 받아 「완벽」 연속 → 불꽃 공)
 RC_AUTO = """(()=>{const R=window.__rc;if(!R)return 'no __rc';const HH=R.W.hoop.root.position.y;
   const tick=()=>{requestAnimationFrame(tick);if(R.state!=='play')return;let best=null;
@@ -34,7 +34,8 @@ GAMES = [
   # ringcatch · hoops 는 창 밖에서 열면 생기는 확인용 손잡이(window.__rc · window.__hoops)로 공 자리를 읽어 자동 조작
   ("ringcatch", "/games/embed/ringcatch.html", {"ringcatch3d.v1": json.dumps({"seen":True,"mute":True})}, ["#btnStart"], 2500, "ringcatch"),
   ("hoops", "/games/embed/hoops.html", {"hoops3d.v1": json.dumps({"seenA":True,"mute":True})}, ["#btnStart"], 600, "hoops"),
-  ("sundown", "/games/embed/sundown.html", {"sundown-bumpers-v1": json.dumps({"unlocked":13,"track":4,"seenHelp":True,"mute":True})}, ["출발하기"], 4200, "race"),
+  # 선다운 — 그래픽 품질 「높음」 고정(sundown-gfx-v1), 트랙은 0부터(4 = 그랜드 노을 축제길 · 7 = 얼음 성 · 2 = 네온). 인자 sundown@7 처럼 주면 그 트랙을 raw/sundown@7/ 에 찍는다
+  ("sundown", "/games/embed/sundown.html", {"sundown-bumpers-v1": json.dumps({"unlocked":13,"track":4,"seenHelp":True,"mute":True}), "sundown-gfx-v1": json.dumps({"pick":"high"})}, ["출발하기"], 3300, "race"),
   ("holecity", "/games/embed/holecity.html", {}, ["시작하기"], 2500, "wasd"),
   ("jelly", "/games/embed/jelly.html", {}, ["시작"], 3000, "wasd"),
   ("nightsquad", "/games/embed/nightsquad.html", {}, ["작전 시작"], 3500, "wasd"),
@@ -45,10 +46,18 @@ GAMES = [
   ("vinyl", "/games/embed/vinyl.html", {}, ["#bPlay"], 3000, "jump"),
 ]
 only = sys.argv[1:]
+RUNS = []
+for g in GAMES:
+    if not only: RUNS.append((g[0], g)); continue
+    for a in only:
+        k, _, tr = a.partition("@")
+        if k != g[0]: continue
+        ls = dict(g[2])
+        if tr: ls["sundown-bumpers-v1"] = json.dumps({**json.loads(ls["sundown-bumpers-v1"]), "track": int(tr)})
+        RUNS.append((a, (g[0], g[1], ls) + tuple(g[3:])))
 with sync_playwright() as p:
     b = p.chromium.launch(headless=True, args=["--use-angle=metal","--enable-gpu","--ignore-gpu-blocklist","--autoplay-policy=no-user-gesture-required"])
-    for key, url, ls, clicks, warm, drive in GAMES:
-        if only and key not in only: continue
+    for name, (key, url, ls, clicks, warm, drive) in RUNS:
         ctx = b.new_context(viewport={"width":1280,"height":720}, device_scale_factor=1)
         init = "try{" + "".join(f"localStorage.setItem({json.dumps(k)},{json.dumps(v)});" for k,v in ls.items()) + "}catch(e){}"
         ctx.add_init_script(init)
@@ -89,6 +98,7 @@ with sync_playwright() as p:
             elif drive == "race":
                 st = math.sin(t * 1.6)
                 hold(["ArrowRight"] if st > .55 else ["ArrowLeft"] if st < -.55 else [])
+                if int(t * 20) % 50 == 25: pg.keyboard.press("e")  # 2.5초마다 아이템 쓰기(로켓 · 물풍선 등이 화면에 보이게)
             elif drive == "lr":
                 hold(["ArrowRight"] if math.sin(t*1.4) > 0 else ["ArrowLeft"])
             elif drive == "hoops":
@@ -106,7 +116,7 @@ with sync_playwright() as p:
             pg.wait_for_timeout(50)
         hold([])
         cdp.send("Page.stopScreencast")
-        d = OUT / key; d.mkdir(exist_ok=True)
+        d = OUT / name; d.mkdir(exist_ok=True)
         for f in d.glob("*.jpg"): f.unlink()
         lines=[]
         for i,(ts,data) in enumerate(frames):
@@ -118,6 +128,6 @@ with sync_playwright() as p:
                 fh.write(f"file '{n}'\nduration {max(0.001,dur):.4f}\n")
             if lines: fh.write(f"file '{lines[-1][0]}'\n")
         fps = len(frames)/rec
-        print(key, "frames", len(frames), f"~{fps:.1f}fps", errs[:3]); sys.stdout.flush()
+        print(name, "frames", len(frames), f"~{fps:.1f}fps", errs[:3]); sys.stdout.flush()
         ctx.close()
     b.close()

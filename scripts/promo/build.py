@@ -1,9 +1,10 @@
 """새 게임 소개 영상 만들기 — capture.py 로 찍은 raw/<게임>.mp4 를 3.2초씩 잘라 부드럽게 겹쳐 잇는다.
 쓰는 법(이 폴더에서): python3 capture.py → python3 build.py → web/assets/promo/new-games.mp4 · .jpg 를 바꾸고,
-web/arcade.html 의 REEL.ch(장면 시작 초)와 ?v= 숫자를 맞춘다(아래가 출력해 준다)."""
+web/arcade.html 의 REEL.ch(장면 시작 초)와 ?v= 숫자를 맞춘다(아래가 출력해 준다).
+선다운 장면은 capture.py sundown@4(그랜드 노을 축제길 · 품질 높음)로 찍은 raw/sundown@4.mp4 를 raw/sundown.mp4 로 복사해 쓴다(2026-11-19 v3)."""
 import subprocess, pathlib
 HERE = pathlib.Path(__file__).parent
-ORDER = [("ringcatch", 3.2), ("hoops", 6.6), ("sundown", 1.6), ("nightsquad", 0.6), ("holecity", 2.2), ("herorush", 2.6), ("kitsune", 3.0), ("vinyl", 0.8), ("jelly", 1.5), ("eggfarm", 2.2), ("frostcamp", 1.8)]  # (게임, 녹화에서 시작할 초) — 가장 새 게임이 맨 앞
+ORDER = [("sundown", 6.85), ("ringcatch", 3.2), ("hoops", 6.6), ("nightsquad", 0.6), ("holecity", 2.2), ("herorush", 2.6), ("kitsune", 3.0), ("vinyl", 0.8), ("jelly", 1.5), ("eggfarm", 2.2), ("frostcamp", 1.8)]  # (게임, 녹화에서 시작할 초) — 맨 앞은 그래픽 개편된 선다운(2026-11-19), 그 뒤는 가장 새 게임부터
 L, D = 3.2, 0.45
 inputs, parts = [], []
 for i, (g, st) in enumerate(ORDER):
