@@ -488,12 +488,15 @@ async def last_week_board(db: AsyncSession) -> dict:
     return await hall_of_fame(db, "week")
 
 
-# ── 참여 도장 — 하루에 한 판이라도 끝까지 하면 도장 1개(일반 · PLAY), 한 달에 STAMP_GOAL 개면 무적 쿠폰 1장(월 1장)
+# ── 참여 도장 — 하루에 한 판이라도 끝까지 하면 도장 1개(일반 · PLAY), 도장판 한 장(stamp_goal_for — 10 또는 15개)을 채우면 무적 쿠폰 1장(월 1장)
 # 대전 승리 보너스(WIN) — 사내 동료(사람)와의 대전에서 이기면 그날 1개 더. 하루 최대 2개(일반 1 + 보너스 1), 순서 상관없음.
 #   상대가 누구든 한 사람이 한 달(한국 달력 월)에 받는 대전 보너스는 WIN_BONUS_MONTHLY_CAP 개까지.
 #   1:1 대전은 match._stamp_both, 여러 명 대전은 party._stamp_agreed 에서 give_win_bonus 를 부른다(대전 결과 처리 공통 지점 —
 #   새 대전 게임도 따로 적지 않아도 들어간다). 이긴 판 잣대는 순위 1승보다 엄격 — match._bonus_win · party._bonus_beaten.
-STAMP_GOAL = 10
+# 도장판 한 장의 목표 — 2026-12-01(한국 날짜)부터 15개. 그 전에 10번째 도장이 찍힌 판은 10개 그대로(stamp_goal_for)
+STAMP_GOAL_OLD = 10
+STAMP_GOAL = 15
+STAMP_GOAL_FROM = date(2026, 12, 1)
 STAMP_PLAY = "PLAY"  # 일반 참여 도장
 STAMP_WIN = "WIN"  # 대전 승리 보너스
 WIN_BONUS_MONTHLY_CAP = 5  # 한 사람이 한 달에 받을 수 있는 대전 승리 보너스 도장 수
@@ -512,13 +515,49 @@ async def start_run(redis: Redis, member: Member, key: str, fresh: bool = False)
     await redis.set(_run_key(member, key), str(int(time.time() * 1000)), nx=not fresh, ex=3 * 3600)
 
 
-async def stamp_status(db: AsyncSession, member: Member, day: date | None = None) -> dict:
-    """참여 도장 — 달이 바뀌어도 이어서 모은다. 10개마다 쿠폰 1장(한 달에 1장까지).
+def stamp_goal_for(dates: list[date], start: int, day: date) -> int:
+    """dates[start:] 에서 시작하는 도장판 한 장의 목표 개수.
 
-    지금 도장판 = 전체 도장에서 쿠폰으로 바꾼 만큼(쿠폰 수 × 10)을 뺀 나머지.
-    이번 달 쿠폰을 이미 받았는데 10개가 또 차면 다음 달 1일에 쿠폰이 들어온다(pending).
-    오늘 10번째 도장을 찍어 쿠폰으로 바꾼 사람은 오늘 하루는 다 찬 판(10/10 · done)을 보여 주고, 다음 날부터 새 판(0개)을 보여 준다.
+    그 판의 STAMP_GOAL_OLD 번째(10번째) 도장이 STAMP_GOAL_FROM(2026-12-01)보다 앞 날짜에 찍혔으면 STAMP_GOAL_OLD(10),
+    아니면 STAMP_GOAL(15). 아직 그만큼 찍히지 않은 판은 기준 날(day — stamp_status 는 실제 오늘을 넘긴다)로 본다 — 12월 1일 전이면 10, 그날부터 15.
+    그래서 11월 30일까지 10개를 채운 판은 10개 기준 그대로 쿠폰이 되고(기다리던 판은 12월 1일에 받는다),
+    11월 말에 덜 찬 판은 도장이 그대로 남은 채 15개를 채워야 한다.
+    """
+    i = start + STAMP_GOAL_OLD - 1
+    ref = dates[i] if i < len(dates) else day
+    return STAMP_GOAL_OLD if ref < STAMP_GOAL_FROM else STAMP_GOAL
+
+
+def stamp_cards(dates: list[date], used: int, day: date) -> list[tuple[int, int]]:
+    """도장판을 처음부터 차례로 자른다 — [(시작 위치, 목표), ...] used + 1 장(마지막이 지금 모으는 판).
+
+    이미 받은 쿠폰 한 장마다 그 판의 목표만큼 도장을 쓴 것으로 본다(예: 10 + 10 + 15 …).
+    """
+    cards: list[tuple[int, int]] = []
+    pos = 0
+    for _ in range(used + 1):
+        goal = stamp_goal_for(dates, pos, day)
+        cards.append((pos, goal))
+        pos += goal
+    return cards
+
+
+def stamp_goal_change(day: date) -> dict | None:
+    """도장 목표가 바뀌기 전(STAMP_GOAL_FROM 전날까지)에만 미리 알림 값 — {"from": "2026-12-01", "goal": 15}."""
+    if day >= STAMP_GOAL_FROM:
+        return None
+    return {"from": STAMP_GOAL_FROM.isoformat(), "goal": STAMP_GOAL}
+
+
+async def stamp_status(db: AsyncSession, member: Member, day: date | None = None) -> dict:
+    """참여 도장 — 달이 바뀌어도 이어서 모은다. 도장판 한 장을 채울 때마다 쿠폰 1장(한 달에 1장까지).
+
+    도장판 한 장의 목표는 stamp_goal_for — 12월 1일(STAMP_GOAL_FROM) 전에 10번째가 찍힌 판은 10개, 그 밖은 15개.
+    지금 도장판 = 전체 도장을 처음부터 판마다 잘라(stamp_cards) 받은 쿠폰 수만큼 지나간 뒤의 나머지.
+    이번 달 쿠폰을 이미 받았는데 판이 또 차면 다음 달 1일에 쿠폰이 들어온다(pending).
+    오늘 판을 채워 쿠폰으로 바꾼 사람은 오늘 하루는 다 찬 판(goal/goal · done)을 보여 주고, 다음 날부터 새 판(0개)을 보여 준다.
     filled 는 보여 주는 값과 상관없이 지금 모으는 판에 실제로 찍힌 수(쿠폰 · 기다림 판정용).
+    goal 은 보여 주는 판의 목표, goalChange 는 목표가 바뀌기 전에만 미리 알림 값(아니면 None).
     """
     day = day or today_kst()
     rows = (
@@ -540,35 +579,45 @@ async def stamp_status(db: AsyncSession, member: Member, day: date | None = None
             Coupon.member_id == member.id, Coupon.source == CouponSource.ARCADE, Coupon.grant_month == month
         )
     ) or 0
-    card = list(dates[used * STAMP_GOAL :])
-    filled = min(len(card), STAMP_GOAL)
-    # 오늘 판을 다 채워 쿠폰으로 바꿨으면(새 판에 아직 하나도 없고, 바꾼 판의 10번째가 오늘) 오늘은 그 판을 그대로 보여 준다
-    done = used > 0 and not card and len(dates) >= used * STAMP_GOAL and dates[used * STAMP_GOAL - 1] == day
-    lo = (used - 1) * STAMP_GOAL if done else used * STAMP_GOAL
-    shown = list(dates[lo : lo + STAMP_GOAL])
+    # 아직 10개가 안 찬 판의 목표는 「오늘」로 정한다 — 지난 날짜(day)를 넘겨받아도(예: 11/30에 끝난 대전 보너스를 12/1에 처리)
+    # 실제 오늘보다 앞 날로 정하지 않는다. 12월 전에는 둘 다 12월 전이라 결과가 같다
+    cards = stamp_cards(dates, used, max(day, today_kst()))
+    cur, cur_goal = cards[-1]
+    card = list(dates[cur:])
+    filled = min(len(card), cur_goal)
+    # 오늘 판을 다 채워 쿠폰으로 바꿨으면(새 판에 아직 하나도 없고, 바꾼 판의 마지막 칸이 오늘) 오늘은 그 판을 그대로 보여 준다
+    done = used > 0 and not card and len(dates) >= cur and dates[cur - 1] == day
+    lo, goal = cards[-2] if done else cards[-1]
+    shown = list(dates[lo : lo + goal])
     return {
         "month": month,
         "days": [d.isoformat() for d in shown],
         "kinds": kinds[lo : lo + len(shown)],  # days 와 같은 순서 — PLAY(일반) · WIN(대전 승리 보너스)
-        "count": STAMP_GOAL if done else filled,
+        "count": goal if done else filled,
         "filled": filled,
-        "goal": STAMP_GOAL,
+        "goal": goal,  # 보여 주는 판의 목표(10 또는 15)
+        "goalChange": stamp_goal_change(day),  # 목표가 바뀌기 전(11월)에만 {"from", "goal"} — 미리 알림용
         "today": any(d == day and k == STAMP_PLAY for d, k in zip(dates, kinds)),  # 오늘 일반 도장을 받았는지
         "todayBonus": any(d == day and k == STAMP_WIN for d, k in zip(dates, kinds)),  # 오늘 대전 승리 보너스를 받았는지
         # 이번 달(한국 달력 월) 받은 대전 승리 보너스 수 · 한 달 한도
         "winMonth": sum(1 for d, k in zip(dates, kinds) if k == STAMP_WIN and (d.year, d.month) == (day.year, day.month)),
         "winMonthCap": WIN_BONUS_MONTHLY_CAP,
-        "done": done,  # 오늘 10개를 채워 쿠폰을 받았다 — 내일부터 새 판
+        "done": done,  # 오늘 판을 채워 쿠폰을 받았다 — 내일부터 새 판
         "coupon": bool(this_month),  # 이번 달 아케이드 쿠폰을 받았는지
-        "pending": filled >= STAMP_GOAL and bool(this_month),  # 10개 다 찼지만 이번 달 몫은 받아서 다음 달 1일에
+        "pending": filled >= cur_goal and bool(this_month),  # 판이 다 찼지만 이번 달 몫은 받아서 다음 달 1일에
         "minSeconds": STAMP_MIN_SEC,
     }
 
 
 async def _issue_arcade_coupon_if_due(db: AsyncSession, member: Member, day: date) -> bool:
-    """도장판이 10개 찼고 이번 달 쿠폰을 아직 안 받았으면 1장 준다 (커밋은 부르는 쪽에서)."""
+    """지금 도장판이 목표(10 또는 15개)만큼 찼고 이번 달 쿠폰을 아직 안 받았으면 1장 준다 (커밋은 부르는 쪽에서).
+
+    한 사람의 쿠폰 지급을 줄 세운다(Postgres 행 잠금 — 부르는 쪽이 커밋할 때까지) — 자정 기다림 지급 · 첫 판 · 대전 보너스가
+    거의 동시에 들어와도 이번 달 몫(this_month)을 둘 다 0으로 읽고 2장이 나가지 않게. 잠근 뒤에 도장 · 쿠폰을 다시 읽는다.
+    """
+    await db.execute(select(Member.id).where(Member.id == member.id).with_for_update())
     st = await stamp_status(db, member, day)
-    if st["filled"] < STAMP_GOAL or st["coupon"]:
+    if st["filled"] < st["goal"] or st["coupon"]:
         return False
     now = now_kst()
     # 받은 날부터 30일 (예: 10/1 받으면 10/31 23:59까지) — 언제 받든 수요일 신청이 4번 넘게 들어간다
@@ -581,7 +630,7 @@ async def _issue_arcade_coupon_if_due(db: AsyncSession, member: Member, day: dat
             grant_month=st["month"],
             issued_at=now,
             expires_at=until,
-            note="아케이드 도장 10개",
+            note=f"아케이드 도장 {st['goal']}개",
         )
     )
     await db.flush()
@@ -589,23 +638,22 @@ async def _issue_arcade_coupon_if_due(db: AsyncSession, member: Member, day: dat
 
 
 async def issue_pending_arcade_coupons(db: AsyncSession) -> int:
-    """매일 자정 — 지난달에 도장 10개를 또 채워 두고 기다리던 회원에게 이번 달 쿠폰을 준다."""
+    """매일 자정 — 지난달에 도장판을 또 채워 두고 기다리던 회원에게 이번 달 쿠폰을 준다."""
     today = today_kst()
     ids = (await db.execute(select(ArcadeStamp.member_id).distinct())).scalars().all()
     members = await _members(db, list(ids))
     issued = 0
-    for m in members.values():
-        if await _issue_arcade_coupon_if_due(db, m, today):
+    for mid in sorted(members):  # 잠그는 차례를 늘 같게(번호순) — 두 일이 겹쳐도 서로 기다리다 멈추지 않게
+        if await _issue_arcade_coupon_if_due(db, members[mid], today):
             issued += 1
-    if issued:
-        await db.commit()
+    await db.commit()  # 늘 커밋해 잠금을 푼다(_issue_arcade_coupon_if_due 가 회원마다 잠근다)
     return issued
 
 
 async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -> dict:
-    """오늘 첫 도장이면 찍고, 도장판 10개를 채우면 쿠폰을 준다 (한 달에 1장).
+    """오늘 첫 도장이면 찍고, 도장판(10 또는 15개)을 다 채우면 쿠폰을 준다 (한 달에 1장).
 
-    이번 달 쿠폰을 받은 뒤 다시 10개를 채운 판은 다음 달 1일 쿠폰으로 기다린다 — 기다리는 판은 1장까지라,
+    이번 달 쿠폰을 받은 뒤 다시 채운 판은 다음 달 1일 쿠폰으로 기다린다 — 기다리는 판은 1장까지라,
     그 판이 꽉 찬 동안 찍는 도장은 쌓지 않는다 (매일 해도 받을 수 있는 쿠폰은 한 달 1장이라 손해 없음).
     """
     # 지난달에 채워 두고 기다리던 몫부터 받는다 (달이 바뀐 첫 판)
@@ -621,8 +669,7 @@ async def _give_stamp(db: AsyncSession, member: Member, key: str, today: date) -
         await db.flush()
         new = True
         issued = await _issue_arcade_coupon_if_due(db, member, today) or issued
-    if new or issued:
-        await db.commit()
+    await db.commit()  # 늘 커밋해 잠금(_issue_arcade_coupon_if_due)을 바로 푼다 — give_win_bonus 와 같다
     st = await stamp_status(db, member, today)
     return {"new": new, "count": st["count"], "goal": st["goal"], "coupon": issued, "today": st["today"], "pending": st["pending"], "done": st["done"]}
 

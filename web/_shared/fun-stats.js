@@ -247,14 +247,25 @@ window.HKFun = (function () {
   // 이번 달 아케이드 도장 — 누르면 아케이드로
   function stampLine(st) {
     if (!st) return "";
+    // 도장판 목표가 바뀌기 전(11월)에만 서버가 내려 주는 값 — { from: "2026-12-01", goal: 15 }
+    const gc = st.goalChange && st.goalChange.from && st.goalChange.goal ? st.goalChange : null;
+    const ymd = (iso, back) => {
+      const d = new Date(Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)) - back));
+      return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일`;
+    };
     // 도장은 달이 바뀌어도 이어서 모인다 — 쿠폰만 한 달에 1장
     const parts = st.done
       ? [`아케이드 도장 ${st.goal}/${st.goal} 완성`, "이번 달 쿠폰 받음", "내일부터 새 도장판"]
       : st.pending
       ? [`아케이드 도장 ${st.goal}/${st.goal} 완성`, "쿠폰은 다음 달 1일에"]
+      : st.coupon && gc
+      // 바뀌기 전날까지 다 채우면 지금 개수 기준으로 다음 달 1일에 쿠폰, 못 채우면 새 개수까지 (휴대폰 한 줄에 들어가게 짧게)
+      ? ["이번 달 아케이드 쿠폰 받음", `${ymd(gc.from, 1)}까지 ${st.goal - st.count}개 더 모으면 쿠폰`, `못 채우면 ${gc.goal}개까지`]
       : st.coupon
       ? ["이번 달 아케이드 쿠폰 받음", `다음 쿠폰까지 ${st.goal - st.count}개`]
       : [`아케이드 도장 ${st.count}/${st.goal}`, `쿠폰까지 ${st.goal - st.count}개`, st.today ? "오늘 도장 찍음" : ""].filter(Boolean);
+    // 목표가 바뀌기 전(11월)에만 — 「12월 1일부터는 15개마다 쿠폰」 (위에서 이미 말한 쿠폰 받은 달 줄은 빼고)
+    if (gc && !(st.coupon && !st.done && !st.pending)) parts.push(`${ymd(gc.from, 0)}부터는 ${gc.goal}개마다 쿠폰`);
     // 휴대폰에서 줄이 바뀌어도 낱말이 떨어지지 않게 마디마다 묶는다
     const text = parts.map((t) => `<span style="white-space:nowrap">${t}</span>`).join(" · ");
     return `<a href="${HKRoutes.lounge}" style="display:flex;align-items:center;gap:6px;margin-top:8px;padding-top:8px;border-top:1px dashed #ddd0f7;font-size:12.5px;color:var(--color-ultraviolet);text-decoration:none">${HKUI.icon("stamp", 14, "currentColor", "flex-shrink:0")}<span>${text}</span><span style="margin-left:auto;white-space:nowrap">아케이드 →</span></a>`;
