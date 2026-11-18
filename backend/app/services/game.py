@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import secrets
 import time
 from dataclasses import dataclass
@@ -20,6 +21,8 @@ from app.services import leave as leave_service
 from app.services.avatar import member_avatar_url
 from app.services.fun_stats import DEPARTMENT_RANKING_EXCLUDED
 from app.services.korean_holidays import is_public_holiday
+
+logger = logging.getLogger(__name__)
 
 
 # 상식 퀴즈 분야 — 화면(trivia.html CATS)과 같은 키
@@ -855,11 +858,14 @@ GAME_REQUEST_PER_DAY = 5
 GAME_REQUEST_MAX_LEN = 300
 GAME_REQUEST_STATUSES = ("NEW", "PLANNED", "DONE", "HOLD")
 GAME_REQUEST_KINDS = ("GAME", "BUG", "IDEA")  # 하고 싶은 게임 · 오류 신고 · 개선 의견
+# 게임 요청이 들어오면 Teams 1:1 로 알릴 운영자 — 비우면 알림을 보내지 않는다
+GAME_REQUEST_NOTIFY_EMAILS: tuple[str, ...] = ("jhcho@3ibank.com",)  # 조준형
 
 
 async def add_game_request(
     db: AsyncSession, member: Member, body: str, kind: str | None = None, game: str | None = None, device: str | None = None
-) -> None:
+) -> list[int]:
+    """요청을 저장하고, 운영자 Teams 알림을 대기열에 넣는다 — 돌려주는 값은 응답 뒤 보낼 메시지 id."""
     text = " ".join((body or "").split())[:GAME_REQUEST_MAX_LEN]
     if len(text) < 2:
         raise_app_error("GAME_REQUEST_EMPTY", 400)
@@ -874,8 +880,35 @@ async def add_game_request(
     )
     if (sent or 0) >= GAME_REQUEST_PER_DAY:
         raise_app_error("GAME_REQUEST_LIMIT")
-    db.add(GameRequest(member_id=member.id, body=text, kind=kind, game=game, device=device))
+    row = GameRequest(member_id=member.id, body=text, kind=kind, game=game, device=device)
+    db.add(row)
     await db.commit()
+    return await _notify_game_request(db, member, row)
+
+
+async def _notify_game_request(db: AsyncSession, member: Member, row: GameRequest) -> list[int]:
+    """운영자 Teams 알림 — 요청은 이미 저장했으니 여기서 무엇이 잘못돼도 요청은 그대로 두고 넘어간다."""
+    from app.services import teams as teams_service
+
+    # 로그용 id 는 먼저 받아 둔다 — flush 가 실패하면 세션이 PendingRollback 이 되어 row 의 값을 읽을 수 없다
+    request_id = row.id
+    try:
+        ids = await teams_service.enqueue_game_request_notices(
+            db,
+            request=row,
+            member=member,
+            game_title=GAMES[row.game].title if row.game in GAMES else None,
+        )
+        if ids:
+            await db.commit()
+        return ids
+    except Exception:  # noqa: BLE001 — 알림 실패가 요청 저장을 되돌리면 안 된다
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        logger.exception("game request %s: Teams 알림을 만들지 못함", request_id)
+        return []
 
 
 async def admin_game_requests(db: AsyncSession) -> dict:

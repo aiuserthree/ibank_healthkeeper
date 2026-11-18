@@ -95,11 +95,16 @@ async def stamps(
 @router.post("/requests")
 async def request_game(
     body: GameRequestBody,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     member: Member = Depends(get_current_active_member),
 ):
-    """아케이드 의견(하고 싶은 게임 · 오류 신고 · 개선 의견) — 업무 시간에도 보낼 수 있다."""
-    await game_service.add_game_request(db, member, body.body, body.kind, body.game, body.device)
+    """아케이드 의견(하고 싶은 게임 · 오류 신고 · 개선 의견) — 업무 시간에도 보낼 수 있다.
+
+    저장한 뒤 운영자에게 Teams 알림 — 응답을 먼저 주고 뒤에서 보낸다(알림이 안 돼도 요청은 저장된다).
+    """
+    message_ids = await game_service.add_game_request(db, member, body.body, body.kind, body.game, body.device)
+    _deliver(background_tasks, message_ids)
     return {"data": {"ok": True}}
 
 

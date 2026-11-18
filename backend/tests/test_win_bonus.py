@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import os
+import re
 import unittest
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -587,8 +588,11 @@ class Migration0038(unittest.TestCase):
 
         mig = self._load("0038_arcade_stamp_kind")
         self.assertEqual((mig.revision, mig.down_revision), ("0038_arcade_stamp_kind", "0037_game_party"))
-        heads = [p.stem for p in (BACKEND / "alembic" / "versions").glob("00*.py")]
-        self.assertEqual(sorted(heads)[-1], "0038_arcade_stamp_kind")  # 마지막 번호 다음
+        files = sorted((BACKEND / "alembic" / "versions").glob("00*.py"))
+        downs = [re.search(r'^down_revision[^=]*=\s*"([^"]+)"', f.read_text(encoding="utf-8"), re.M) for f in files]
+        downs = [d.group(1) for d in downs if d]
+        self.assertEqual(len(downs), len(set(downs)))  # 갈래 없이 한 줄 — 0038 뒤에 새 판이 붙어도 그대로
+        self.assertEqual(downs.count("0037_game_party"), 1)
 
         engine = sa.create_engine("sqlite://")
         with engine.begin() as conn:

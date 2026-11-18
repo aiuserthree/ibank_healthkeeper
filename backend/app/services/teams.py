@@ -22,6 +22,7 @@ from app.models import (
     Reservation,
     ReservationCycle,
     ReservationStatus,
+    GameRequest,
     Slot,
     SwapProposal,
     TeamsMessage,
@@ -53,6 +54,7 @@ _TRANSFER_NOTIFY_TYPES = frozenset({
     TeamsMessageType.ESCAPE_DECLINED,
     TeamsMessageType.ESCAPE_CANCELLED,
     TeamsMessageType.ESCAPE_CALL,
+    TeamsMessageType.GAME_REQUEST,
 })
 
 GRAPH_BASE = "https://graph.microsoft.com/v1.0"
@@ -1544,3 +1546,86 @@ async def enqueue_escape_notice(db: AsyncSession, *, kind: TeamsMessageType, to:
         db, message_type=kind, to_member_id=to.id, to_entra_oid=to.entra_oid, body=body, dedupe_key=key,
     )
     return [msg.id] if msg else []
+
+
+# ── 아케이드 게임 요청 → 운영자 알림 ─────────────────────────────
+
+GAME_REQUEST_KIND_LABEL = {"GAME": "하고 싶은 게임", "BUG": "오류 신고", "IDEA": "개선 의견"}
+GAME_REQUEST_NOTICE_MAX_LEN = 300
+
+
+def game_requests_admin_url() -> str:
+    return f"{get_settings().app_base_url.rstrip('/')}/admin/game-requests"
+
+
+def render_game_request_admin_body(
+    *,
+    kind: str,
+    member: Member,
+    body: str,
+    game_title: Optional[str] = None,
+    device: Optional[str] = None,
+) -> str:
+    """관리자 화면 「게임 요청」에 보이는 정보 그대로 — 사용자가 넣은 글은 모두 이스케이프한다."""
+    label = GAME_REQUEST_KIND_LABEL.get(kind, GAME_REQUEST_KIND_LABEL["GAME"])
+    dept = (member.department or "").strip()
+    who = f"<b>{html.escape(member.name)}</b>" + (f" · {html.escape(dept)}" if dept else "")
+    rows = [f"종류: <b>{label}</b>", f"보낸 사람: {who}"]
+    if game_title:
+        rows.append(f"게임: {html.escape(game_title)}")
+    if kind == "BUG" and device:
+        rows.append(f"기기: {html.escape(device)}")
+    text = (body or "")[:GAME_REQUEST_NOTICE_MAX_LEN]
+    return (
+        "<p><strong>[헬스키퍼]</strong> 아케이드 게임 요청이 들어왔어요</p>"
+        f"<p>{'<br>'.join(rows)}</p>"
+        f"<p>{html.escape(text)}</p>"
+        f'<p><a href="{game_requests_admin_url()}">관리자 화면에서 보기</a></p>'
+    )
+
+
+def _graph_sender_configured() -> bool:
+    """발송에 쓰는 것과 같은 기준 — 환경 변수 토큰이 비어도 .teams-sender-refresh 파일 토큰이 있으면 준비된 것."""
+    settings = get_settings()
+    if settings.teams_graph_sender_ready():
+        return True
+    if settings.sso_provider != "entra" or not settings.sso_ready() or not settings.teams_sender_email.strip():
+        return False
+    return bool((_effective_refresh_token() or "").strip())
+
+
+def game_request_dedupe_key(request_id: int, member_id: int) -> str:
+    return f"game-request:{request_id}:{member_id}"
+
+
+async def enqueue_game_request_notices(
+    db: AsyncSession,
+    *,
+    request: GameRequest,
+    member: Member,
+    game_title: Optional[str] = None,
+) -> list[int]:
+    """GAME_REQUEST_NOTIFY_EMAILS 의 운영자에게 1:1 알림 — 본인이 보낸 요청 · Teams 미설정이면 보내지 않는다."""
+    from app.services.game import GAME_REQUEST_NOTIFY_EMAILS
+
+    if not GAME_REQUEST_NOTIFY_EMAILS or not _graph_sender_configured():
+        return []
+    admins = [a for a in await _lookup_members_by_emails(db, GAME_REQUEST_NOTIFY_EMAILS) if a.id != member.id]
+    if not admins:
+        return []
+    body = render_game_request_admin_body(
+        kind=request.kind, member=member, body=request.body, game_title=game_title, device=request.device,
+    )
+    message_ids: list[int] = []
+    for admin in admins:
+        msg = await enqueue_teams_message(
+            db,
+            message_type=TeamsMessageType.GAME_REQUEST,
+            to_member_id=admin.id,
+            to_entra_oid=admin.entra_oid,
+            body=body,
+            dedupe_key=game_request_dedupe_key(request.id, admin.id),
+        )
+        if msg:
+            message_ids.append(msg.id)
+    return message_ids

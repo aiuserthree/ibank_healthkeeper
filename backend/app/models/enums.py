@@ -77,6 +77,7 @@ class TeamsMessageType(str, enum.Enum):
     ESCAPE_DECLINED = "ESCAPE_DECLINED"
     ESCAPE_CANCELLED = "ESCAPE_CANCELLED"
     ESCAPE_CALL = "ESCAPE_CALL"
+    GAME_REQUEST = "GAME_REQUEST"
 
 
 class TransferRequestStatus(str, enum.Enum):
