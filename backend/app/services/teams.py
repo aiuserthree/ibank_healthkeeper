@@ -274,6 +274,27 @@ def _open_notice_together_html() -> str:
     )
 
 
+# 아케이드 도장 목표 변경(10개 → 15개, game.STAMP_GOAL_FROM 부터) 안내 — 이 날짜의 예약 오픈 안내에 한 번만 덧붙인다(2026-11-18 요청)
+# 숫자는 game.py 상수(STAMP_GOAL · STAMP_GOAL_OLD · STAMP_GOAL_FROM · WIN_BONUS_MONTHLY_CAP)에서 만든다.
+# game.py 가 함수 안에서 teams 를 불러 쓰므로 여기서도 함수 안에서 불러 순환을 피한다.
+OPEN_NOTICE_STAMP_GOAL_DATE = date(2026, 12, 2)
+
+
+def _open_notice_stamp_goal_html() -> str:
+    from app.services import game as game_service
+
+    arcade_url = f"{get_settings().app_base_url.rstrip('/')}/arcade"
+    goal_from = game_service.STAMP_GOAL_FROM
+    return (
+        f"<p>&nbsp;</p>"
+        f"<p><strong>🎮 아케이드 도장 안내</strong><br>"
+        f"{goal_from.month}월 {goal_from.day}일부터 도장 <b>{game_service.STAMP_GOAL}개</b>를 모으면 무적 쿠폰 1장이에요"
+        f"(전에는 {game_service.STAMP_GOAL_OLD}개). 지금까지 모은 도장은 그대로 이어져요.<br>"
+        f"동료와의 대전에서 이기면 그날 도장 2개! (보너스는 한 달 {game_service.WIN_BONUS_MONTHLY_CAP}번까지)<br>"
+        f'<a href="{arcade_url}">{arcade_url}</a></p>'
+    )
+
+
 # 「이번 주 게임」 — 수요일 오픈 안내 맨 아래에 게임 하나를 소개한다(2026-11-17 요청).
 # 목록 순서대로 한 주에 하나씩 돌아가고, 끝나면 처음부터. 몇째 주인지는 발송일(수요일)로 정한다:
 # OPEN_NOTICE_GAME_START(첫 회, 2026-11-18 수) = 0번, 그다음 수요일 = 1번 …
@@ -384,6 +405,8 @@ def render_open_notice_body(
     arcade_html = _open_notice_arcade_html() if notice_date == OPEN_NOTICE_ARCADE_DATE else ""
     if notice_date == OPEN_NOTICE_TOGETHER_DATE:
         arcade_html = _open_notice_together_html()
+    if notice_date == OPEN_NOTICE_STAMP_GOAL_DATE:
+        arcade_html = _open_notice_stamp_goal_html()
     notice_html = ""
     if notice is not None:
         notice_url = notice_page_url(notice.id)
