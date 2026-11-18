@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>가짜 부모 창(하네스)</title>
+<style>html, body { margin: 0; height: 100%; background: #0f172a; } #stage { position: fixed; inset: 0; }</style>
+</head>
+<body>
+<!-- 아케이드가 게임을 끼우는 진짜 코드(web/_shared/hk-embed.js)를 그대로 쓴다 — 창의 sandbox · allow, 받는 규칙(정해 둔 출처 + 우리가 띄운 창 · 시작한 판의
+     점수만 한 번), 보내는 규칙(멈춤 깃발 · 「다시 하기」는 판을 먼저 닫고 hk:restart)이 아케이드와 같다. 여기서 흉내 내는 것은 그 코드가 기대는 play.js 의 틀뿐이다:
+     togglePause(멈춰 있으면 이어 하기, 아니면 멈춤 — play.js 595줄) · 나가기 확인 창의 멈춤 · 결과 창의 다시 하기.
+     주소의 # 뒤: raw = hk:esc 를 받아도 적기만 한다(말 하나하나를 따로 볼 때) · origin=<주소> = 게임을 그 출처에서 불러온다(이 창이 다른 출처일 때).
+     시험은 window.__parent 의 log(끼운 창이 보낸 말 전부) · accepted(순위로 올라간 점수) · starts · toggles 를 읽고, send(날것의 말) · toggle · pause · restart 로 말을 건다. -->
+<div id="stage"></div>
+<script>
+(() => {
+  const opt = new URLSearchParams(location.hash.slice(1)), origin = opt.get('origin') || location.origin, fn = {};
+  const P = window.__parent = { log: [], dropped: 0, accepted: [], starts: 0, toggles: [], raw: opt.has('raw') };
+  let frame = null;
+  window.HKUI = { escapeHtml: (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;') };
+  window.HKPlay = { mountGame({ setup }) {
+    setup(document.getElementById('stage'), {
+      game: { title: 'fogisle' }, started: () => { P.starts += 1; }, onScore: () => 0, submit: async (v) => { P.accepted.push(v); },
+      onPause: (f) => { fn.pause = f; }, onResume: (f) => { fn.resume = f; }, onRestart: (f) => { fn.restart = f; }, togglePause: () => P.toggle(),
+    });
+    frame = document.querySelector('#stage iframe');
+  } };
+  P.toggle = () => { if (P.raw) P.toggles.push('held'); else if (fn.resume()) P.toggles.push('resume'); else { fn.pause(); P.toggles.push('pause'); } };
+  P.pause = () => fn.pause();
+  P.restart = () => fn.restart();
+  P.send = (type) => frame.contentWindow.postMessage({ type }, origin);
+  window.addEventListener('message', (e) => {
+    if (!frame || e.origin !== origin || e.source !== frame.contentWindow) { P.dropped += 1; return; }
+    const m = e.data && typeof e.data === 'object' ? e.data : {};
+    P.log.push({ type: m.type, score: m.score });
+  });
+  P.mount = () => window.HKEmbed.mount({ key: 'fogisle', src: (opt.get('origin') || '') + '/games/embed/fogisle.html' + (location.search || '?hk=1'), origin, wide: true });
+})();
+</script>
+<script src="/_shared/hk-embed.js"></script>
+<script>window.__parent.mount();</script>
+</body>
+</html>

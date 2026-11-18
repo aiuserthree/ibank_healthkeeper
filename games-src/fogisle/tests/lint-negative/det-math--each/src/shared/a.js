@@ -1,0 +1,20 @@
+// 주는 것: lint 음성 시험 판(--each) — 이 줄 뒤의 모든 줄이 저마다 폴더 이름 앞머리의 규칙에 걸려야 한다. / 받는 것: 없음
+export const f01 = (x) => Math.cos(x);
+export const f02 = (x) => Math.tan(x);
+export const f03 = (x) => Math.atan(x);
+export const f04 = (y, x) => Math.atan2(y, x);
+export const f05 = (x) => Math.asin(x);
+export const f06 = (x) => Math.acos(x);
+export const f07 = (x) => Math.exp(x);
+export const f08 = (x) => Math.log(x);
+export const f09 = (x) => Math.log2(x);
+export const f10 = (x) => Math.log10(x);
+export const f11 = (x, y) => Math.pow(x, y);
+export const f12 = (x, y) => Math.hypot(x, y);
+export const f13 = (x) => Math.cbrt(x);
+export const f14 = () => Math.random();
+export const f15 = (x) => x ** 2;
+export const f16 = (x) => Math['sin'](x);
+export const f17 = (x) => { const { cos } = Math; return cos(x); };
+export const f18 = (x) => { const M = Math; return M.sin(x); };
+export const f19 = (x) => Math?.sin(x);
