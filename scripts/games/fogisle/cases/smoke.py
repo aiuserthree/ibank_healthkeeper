@@ -183,6 +183,7 @@ def nogl(h, mode):
 
 
 def crash(h, mode):
+    T, chars = h.thresholds["harness"], h.node["tune"]["app"]["errorChars"]
     with h.open(mode, allow=["시험용 딴"]) as g:
         g.wait(h.READY)
         g.click("#fgGo")
@@ -201,6 +202,11 @@ def crash(h, mode):
         h.check("시험용 고장" in st["error"] and st["lock"] == "off" and "시험용 고장" in g.js("document.getElementById('fgErrorText').textContent"), f"[{mode}] 고리 안의 예외 → 멈추고 덮개", st)
         g.shot(f"error-{mode}.png")
         g.js("() => { delete THREE.Object3D.prototype.onBeforeRender; THREE.Object3D.prototype.onBeforeRender = function () {}; }")
+        # 끊을 자리가 없는 긴 오류 글(코드가 errorChars 로 자른 길이)도 좁은 화면 안에서 접힌다 — 좌우로 넘치지 않는다
+        g.page.set_viewport_size({"width": T["narrowW"], "height": T["narrowH"]})
+        box = g.js("(n) => { const el = document.getElementById('fgErrorText'), rg = document.createRange(); el.textContent = 'W'.repeat(n); rg.selectNodeContents(el); const xs = [...rg.getClientRects()]; return [Math.min(...xs.map((r) => r.left)), Math.max(...xs.map((r) => r.right)), innerWidth, xs.length]; }", chars)
+        h.check(box[0] >= 0 and box[1] <= box[2] and box[3] > 1, f"[{mode}] 끊을 자리 없는 오류 글 {chars}자가 폭 {T['narrowW']} 화면 안에서 접힌다(글자의 왼쪽 · 오른쪽 끝 · 화면 폭 · 줄 수)", box)
+        g.shot(f"error-long-{mode}.png")
         g.click("#fgRestart")
         g.wait("__fg_status.phase === 'title'")
         g.click("#fgGo")

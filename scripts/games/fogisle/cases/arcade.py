@@ -48,7 +48,7 @@ def promise(h, mode):
         h.check(g.status()["lock"] == "free", f"{tag}: 헤드리스는 잠금 없이 논다", g.status()["lock"])
 
         # live: sim 시간으로 2초마다. 한 번의 읽기로 단계 수와 부모가 받은 수를 같이 본다(부모 쪽 도착은 한 통 늦을 수 있다)
-        g.wait(f"__fg_status.step >= {2 * per + 4}", timeout=20000)
+        g.wait(f"__fg_status.step >= {2 * per + 4}", timeout=h.thresholds["harness"]["liveWaitMs"])
         seen = g.js("() => ({ step: __fg_status.step, lives: parent.__parent.log.filter((m) => m.type === 'hk:live').map((m) => m.score) })")
         due, n = seen["step"] // per, len(seen["lives"])
         h.check(n >= 2 and due - 1 <= n <= due, f"{tag}: hk:live 는 sim 2초({per}단계)마다 한 번", seen)
@@ -110,7 +110,7 @@ def promise(h, mode):
         g.msgs(["hk:start", "hk:paused", "hk:score", "hk:resumed", "hk:start"], f"{tag}: 셋째 판을 닫고 「다시 하기」로 넷째 판")
         p = g.parent()
         scores = [m["score"] for m in p["log"] if m["type"] == "hk:score"]
-        h.check(p["starts"] == 4 and len(scores) == 3 and p["accepted"] == scores[:2], f"{tag}: 점수는 판마다 한 번 — 부모는 제가 닫지 않은 두 판의 것만 받는다", [p["starts"], p["accepted"], scores])
+        h.check(p["starts"] == 4 and len(scores) == 3 and p["accepted"] == [scores[0], scores[2]], f"{tag}: 점수는 판마다 한 번 — 부모는 제가 닫지 않은 두 판(첫째 · 셋째)의 것만 받는다", [p["starts"], p["accepted"], scores])
         h.check(all(isinstance(v, int) and 0 <= v <= arc["scoreMax"] for v in scores) and p["dropped"] == 0, f"{tag}: 점수는 0 ~ 상한의 정수", scores)
 
 

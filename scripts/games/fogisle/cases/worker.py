@@ -12,7 +12,8 @@ BLOCKS = {
     "준비 신호가 안 옴": "window.Worker = function () { this.postMessage = () => {}; this.terminate = () => {}; }; { const st = window.setTimeout; window.setTimeout = (f, ms, ...a) => st(f, ms === %(ready)d ? %(short)d : ms, ...a); }",
 }
 NO_RAF = "window.__raf = window.requestAnimationFrame; window.requestAnimationFrame = () => 0;"
-NOPE = "__fg.worker(%d, 3, 'nope').then((r) => 'ok ' + r.where, (e) => 'rejected')"
+# 없는 함수 → 러너가 그 까닭으로 거절해야 한다(러너가 「됐다」고 답하고 창구의 뒤처리에서 터진 것과 가른다)
+NOPE, NOPE_WHY = "__fg.worker(%d, 3, 'nope').then((r) => 'ok ' + r.where, (e) => 'rejected: ' + e.message)", "is not a function"
 
 
 def run(h, opt):
@@ -40,7 +41,7 @@ def run(h, opt):
             g.js(f"__fg.tune('probe.speed', {speed})")
             h.check(g.js(f"__fg.worker({seed}, {steps})")["hash"] == n["probe"], "[dev] 되돌리면 워커의 값도 돌아온다")
             bad, after = g.js(NOPE % seed), g.js(f"__fg.worker({seed}, {steps})")
-            h.check(bad == "rejected" and g.status()["error"] == "" and g.status()["phase"] == "title", "[dev] 없는 함수를 맡기면 그 일만 거절된다(워커 길 — 게임은 그대로)", bad)
+            h.check(bad.startswith("rejected") and NOPE_WHY in bad and g.status()["error"] == "" and g.status()["phase"] == "title", "[dev] 없는 함수를 맡기면 그 일만 거절된다(워커 길 — 게임은 그대로)", bad)
             h.check(after["where"] == "worker" and after["hash"] == n["probe"], "[dev] 거절 뒤에도 워커는 살아 다음 일을 한다", [after["where"], after["hash"]])
     # 워커를 막은 흉내 → 주 스레드로. 첫 흉내는 개발판 · 배포판 둘 다, 나머지는 배포판으로
     for i, (name, script) in enumerate(BLOCKS.items()):
@@ -53,11 +54,12 @@ def run(h, opt):
                     r = g.js(f"__fg.worker({seed}, {long['steps']})")
                     h.check(r["where"] == "main" and r["hash"] == long["hash"] and r["slices"] >= 2, "[dev] 주 스레드 길은 긴 일을 조각내 돈다(같은 해시)", [r["where"], r["slices"], r["hash"]])
                     h.notes["주 스레드 조각 수(긴 탐침)"] = r["slices"]
-                    h.check(g.js(NOPE % seed) == "rejected" and g.status()["error"] == "", "[dev] 없는 함수를 맡기면 거절된다(주 스레드 길)")
+                    bad = g.js(NOPE % seed)
+                    h.check(bad.startswith("rejected") and NOPE_WHY in bad and g.status()["error"] == "", "[dev] 없는 함수를 맡기면 거절된다(주 스레드 길)", bad)
                 g.click("#fgGo")
                 g.wait("__fg_status.phase === 'play' && __fg_status.step >= 5")
     with h.open("release", parent=True, init=[h.ONLY_GAME % (BLOCKS["생성자가 던짐"] + NO_RAF)]) as g:
         g.wait(h.READY)
         h.check(g.status()["worker"] == "main" and g.status()["probe"] == n["probe"], "[release] rAF 가 멈춰 있어도 주 스레드 길이 끝난다(rAF 에 묶이지 않았다)", g.status()["probe"])
-        h.check(g.js("() => new Promise((done) => { requestAnimationFrame(() => done('rAF')); setTimeout(() => done('멈춤'), 300); })") == "멈춤", "[release] (시험의 전제) 그 창의 rAF 는 정말 멈춰 있었다")
+        h.check(g.js("() => new Promise((done) => { requestAnimationFrame(() => done('rAF')); setTimeout(() => done('멈춤'), %d); })" % T["rafProbeMs"]) == "멈춤", "[release] (시험의 전제) 그 창의 rAF 는 정말 멈춰 있었다")
         g.js("() => { window.requestAnimationFrame = window.__raf; }")

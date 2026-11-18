@@ -18,8 +18,9 @@ import { WORDS_LATIN, WORDS_HANGUL } from './lint-words.mjs';
 // 나무 밖의 자리: 자산을 찾는 web 폴더 · 브라우저 하네스 폴더 · 게시 파일
 export const ENV = { web: join(REPO, 'web'), harness: join(REPO, 'scripts', 'games', 'fogisle'), published: PUBLISHED };
 // 크기 예산(바이트 · 줄). 하네스는 게임 코드의 25% 이하 — 다만 게임 코드가 아직 작은 앞 단계에서는 바닥 값까지는 허용한다.
+// 바닥 300KB = PM 결정(2026-11-18 — F0b 까지 141KB 를 썼고 F1a · F1b 가 레시피 검사 · 생성 해시 · 굽기 하네스를 더할 자리).
 export const BUDGET = {
-  htmlWarn: 2.4e6, htmlFail: 3.0e6, missionData: 40e3, devOnly: 200e3, harnessRatio: 0.25, harnessFloor: 150e3,
+  htmlWarn: 2.4e6, htmlFail: 3.0e6, missionData: 40e3, devOnly: 200e3, harnessRatio: 0.25, harnessFloor: 300e3,
   lines: [400, 600], glslLines: [600, 900], testLines: 400, checkPyLines: 600,
 };
 // 음성 시험이 꼭 한 판 이상 있어야 하는 규칙(build-plan F0a 의 9종)
