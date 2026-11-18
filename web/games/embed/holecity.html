@@ -175,6 +175,7 @@ b{font-weight:inherit}
   #hud{padding:8px;gap:6px}
   .hud-area{min-width:0;padding:5px 10px 6px}
   .hud-area b{font-size:22px}
+  .pips i{width:12px}
   .limit{width:60px;height:60px;border-width:6px;padding-top:12px}
   .limit b{font-size:25px}
   .limit.wide{padding-top:15px}
@@ -215,7 +216,7 @@ b{font-weight:inherit}
 <div id="labels" aria-hidden="true"></div>
 
 <div id="hud" hidden>
-  <div class="hud-area sign sign-green"><span class="kicker" id="areaNo">1구역</span><b id="areaName">공원</b><span class="pips" id="pips"><i></i><i></i><i></i></span></div>
+  <div class="hud-area sign sign-green"><span class="kicker" id="areaNo">1구역</span><b id="areaName">공원</b><span class="pips" id="pips"></span></div>
   <div class="hud-mid">
     <div class="limit" id="limit"><b id="time">90</b><span>초</span></div>
     <div class="clear">
@@ -240,9 +241,9 @@ b{font-weight:inherit}
 
 <section id="title" class="screen">
   <div class="title-box">
-    <span class="sign sign-green">공원 → 주택가 → 도심</span>
+    <span class="sign sign-green">공원 → 주택가 → 도심 → 항구 → 공항</span>
     <h1 class="logo" aria-label="먹보 구멍"><span>먹보</span><span>구<span class="logo-sink"><span>멍</span></span></span></h1>
-    <p class="lead">작은 구멍으로 꽃부터 삼키고 자라서, 자동차와 집, 빌딩까지 도시를 통째로 삼켜요.</p>
+    <p class="lead">작은 구멍으로 꽃부터 삼키고 자라서, 자동차와 집, 빌딩에 배와 비행기까지 도시를 통째로 삼켜요.</p>
     <ul class="rules">
       <li><i class="dot"></i><span>구멍보다 작은 것만 빠져요. 삼킬수록 구멍이 커져요.</span></li>
       <li><i class="dot dot-prey"></i><span>초록 테 구멍은 나보다 작아요. 삼키면 그 구멍이 먹은 것까지 내 몫이에요.</span></li>
@@ -352,7 +353,12 @@ var C = SC.C = {
   dark: 0x363a42, grey: 0x9aa0a8, stone: 0xc9c4b8, white: 0xf5f2ea, cream: 0xf4e4c1,
   glass: 0x9bd3ea, glassD: 0x35536f, glassT: 0x6fb5c8,
   red: 0xe44b3c, blue: 0x3f82dc, yellow: 0xf8c630, orange: 0xf68a2b, pink: 0xf291b3, purple: 0x9b72d3, teal: 0x2fb6a6,
-  brick: 0xc46a50, roofB: 0x4f77b5, roofP: 0x8a5a9c, roofG: 0x3f8f7c, navy: 0x2e3f60, tire: 0x25272c, warm: 0xffe9a3, sage: 0xa9c9a4, sky: 0xbcdcf2
+  brick: 0xc46a50, roofB: 0x4f77b5, roofP: 0x8a5a9c, roofG: 0x3f8f7c, navy: 0x2e3f60, tire: 0x25272c, warm: 0xffe9a3, sage: 0xa9c9a4, sky: 0xbcdcf2,
+  // 4 · 5구역(항구 · 공항)
+  sea: 0x3f9fc9, seaD: 0x2c7fae, seaL: 0x7cc7e3, quay: 0xc9c2b4, quayD: 0xa9a294, rust: 0xc0563a, hullR: 0xb8433a, hullN: 0x23395d,
+  conR: 0xd2543f, conB: 0x3f6fb8, conT: 0x2a9d8f, conO: 0xef8a2f, conY: 0xf2c230, rail: 0x8e8a82,
+  apron: 0xc4c7cc, runway: 0x3d4149, taxiway: 0x555a63, field: 0x8fa874, fieldD: 0x7d966a, jetW: 0xf3f4f7, tailO: 0xf28c28, tailT: 0x23a6a0,
+  cab: 0x7fd3c4, beacon: 0xff5a4a, lightW: 0xfff1b8, lightB: 0x6fa8ff
 };
 
 // ───────── 물건 모양(부품 목록) — 화면 쪽이 이 목록으로 입체를 만든다
@@ -365,6 +371,8 @@ function sph(r, x, y, z, c, sy, det) { return { k: 'sph', r: r, x: x, y: y, z: z
 function pyr(w, h, d, x, y, z, c) { return { k: 'pyr', w: w, h: h, d: d, x: x, y: y, z: z, c: c }; }
 function prism(w, h, d, x, y, z, c, ry) { return { k: 'prism', w: w, h: h, d: d, x: x, y: y, z: z, c: c, ry: ry || 0 }; }
 function wheel(r, w, x, z) { return rod(r, w, x, r, z, C.tire, 0, PI / 2, 10); }
+function wheel6(r, w, x, z) { return rod(r, w, x, r, z, C.tire, 0, PI / 2, 6); }   // 작은 탈것용(삼각형 절약)
+function darker(hex) { var r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255; return ((r * 0.78) << 16) | ((g * 0.78) << 8) | (b * 0.78 | 0); }   // 컨테이너 테두리 색
 
 var TYPES = SC.TYPES = {}, TYPE_LIST = SC.TYPE_LIST = [];
 // id, 이름, 삼킴 반지름 r, 높이 h, 부품, 「다음 먹이」에 띄울 이름(tier), 값 배율
@@ -519,6 +527,127 @@ function def(id, name, r, h, parts, tier, vmul) {
     for (i = -1; i <= 1; i += 2) { p.push(box(0.6, 22, 12.2, i * 6, 0, 0, C.white)); p.push(box(12.2, 22, 0.6, 0, 0, i * 6, C.white)); }
     def('tower', '초고층 빌딩', 7.8, 36.9, p, '초고층 빌딩', 1.65);
   })();
+
+  // ════════ 4구역 · 항구 ════════
+  // ── 아주 작은 것(시작 먹이)
+  def('gull', '갈매기', 0.26, 0.4, [sph(0.15, 0, 0.17, 0, C.white, 0.85, 0), sph(0.09, 0, 0.32, 0.1, C.white, 1, 0), box(0.04, 0.03, 0.09, 0, 0.31, 0.2, C.yellow), box(0.52, 0.03, 0.14, 0, 0.22, -0.02, C.grey)]);
+  def('bollard', '계선주', 0.3, 0.5, [cyl(0.15, 0.17, 0.4, 0, 0, 0, C.dark, 8), cyl(0.22, 0.22, 0.08, 0, 0.4, 0, C.dark, 8)]);
+  def('fishbox', '생선 상자', 0.36, 0.36, [box(0.56, 0.26, 0.4, 0, 0, 0, C.blue), box(0.5, 0.06, 0.34, 0, 0.26, 0, C.white), sph(0.07, 0.1, 0.33, 0, C.grey, 0.5, 0), sph(0.07, -0.1, 0.33, 0.05, C.grey, 0.5, 0)]);
+  def('buoy', '부표', 0.4, 0.95, [cyl(0.28, 0.34, 0.45, 0, 0, 0, C.red, 8), cyl(0.3, 0.3, 0.12, 0, 0.45, 0, C.white, 8), cyl(0.06, 0.06, 0.3, 0, 0.57, 0, C.dark, 5), sph(0.09, 0, 0.9, 0, C.warm, 1, 0)]);
+  def('drum', '드럼통', 0.45, 0.9, [cyl(0.3, 0.3, 0.86, 0, 0, 0, C.blue, 8), cyl(0.31, 0.31, 0.06, 0, 0.3, 0, C.white, 8), cyl(0.31, 0.31, 0.06, 0, 0.6, 0, C.white, 8)]);
+  def('lifering', '구명 튜브', 0.42, 1.3, [box(0.08, 1.2, 0.08, 0, 0, -0.05, C.woodD), rod(0.32, 0.1, 0, 0.8, 0.02, C.orange, PI / 2, 0, 10), rod(0.16, 0.12, 0, 0.8, 0.02, C.white, PI / 2, 0, 8)]);
+  // ── 작은 것 · 중간 것
+  def('forklift', '지게차', 1.1, 2.2, [box(1.0, 0.7, 1.5, 0, 0.25, -0.1, C.yellow), box(0.9, 0.08, 1.0, 0, 1.9, -0.2, C.dark), cyl(0.03, 0.03, 1.0, 0.4, 0.95, -0.6, C.dark, 4), cyl(0.03, 0.03, 1.0, -0.4, 0.95, -0.6, C.dark, 4),
+    box(0.1, 2.1, 0.1, 0.3, 0, 0.75, C.dark), box(0.1, 2.1, 0.1, -0.3, 0, 0.75, C.dark), box(0.12, 0.06, 0.9, 0.25, 0.15, 1.2, C.grey), box(0.12, 0.06, 0.9, -0.25, 0.15, 1.2, C.grey),
+    wheel6(0.25, 0.2, -0.5, 0.45), wheel6(0.25, 0.2, 0.5, 0.45), wheel6(0.22, 0.2, -0.5, -0.6), wheel6(0.22, 0.2, 0.5, -0.6)], '지게차');
+  def('boat', '작은 보트', 1.4, 1.3, [box(1.2, 0.5, 2.6, 0, 0.05, 0, C.white), box(0.8, 0.5, 0.6, 0, 0.05, 1.55, C.white), box(1.24, 0.12, 3.1, 0, 0.45, 0.2, C.blue), box(0.8, 0.6, 0.9, 0, 0.55, -0.4, C.cream), box(0.82, 0.22, 0.6, 0, 0.7, -0.38, C.glassD)], '작은 보트');
+  def('tug', '예인선', 3.4, 4.2, [box(2.8, 1.3, 6.4, 0, 0, 0, C.hullR), box(2.84, 0.3, 6.44, 0, 1.3, 0, C.dark), box(1.8, 0.9, 1.4, 0, 0.3, 3.5, C.hullR), box(2.0, 1.5, 2.4, 0, 1.6, -0.4, C.white), box(2.04, 0.45, 2.44, 0, 2.45, -0.4, C.glassD),
+    box(1.6, 0.7, 1.6, 0, 3.1, -0.4, C.white), cyl(0.35, 0.4, 1.2, 0, 3.0, -2.0, C.yellow, 8), cyl(0.36, 0.36, 0.25, 0, 4.0, -2.0, C.dark, 8), rod(0.35, 0.2, 1.42, 1.0, 1.4, C.tire, 0, PI / 2, 8), rod(0.35, 0.2, -1.42, 1.0, 1.4, C.tire, 0, PI / 2, 8)], '예인선', 1.1);
+  [['a', C.conR], ['b', C.conB]].forEach(function (f) {
+    def('con_' + f[0], '컨테이너', 3.0, 2.6, [box(6.0, 2.5, 2.4, 0, 0, 0, f[1]), box(6.04, 0.12, 2.44, 0, 2.48, 0, darker(f[1])), box(0.1, 2.5, 2.46, -2.0, 0, 0, darker(f[1])), box(0.1, 2.5, 2.46, 0, 0, 0, darker(f[1])), box(0.1, 2.5, 2.46, 2.0, 0, 0, darker(f[1]))], '컨테이너', 1.05);
+  });
+  [['a', C.conT, C.conO, C.conY], ['b', C.conY, C.conB, C.conR]].forEach(function (f) {
+    def('stack_' + f[0], '컨테이너 더미', 3.5, 7.6, [box(6.0, 2.5, 2.4, 0, 0, 0, f[1]), box(6.0, 2.5, 2.4, 0, 2.52, 0, f[2]), box(6.0, 2.5, 2.4, 0, 5.04, 0, f[3]),
+      box(6.06, 0.1, 2.46, 0, 2.47, 0, C.dark), box(6.06, 0.1, 2.46, 0, 4.99, 0, C.dark), box(6.06, 0.1, 2.46, 0, 7.52, 0, C.dark)], '컨테이너 더미', 1.2);
+  });
+  def('straddle', '컨테이너 운반차', 3.3, 6.2, [box(0.5, 5.4, 0.5, 1.6, 0.4, 2.4, C.conY), box(0.5, 5.4, 0.5, -1.6, 0.4, 2.4, C.conY), box(0.5, 5.4, 0.5, 1.6, 0.4, -2.4, C.conY), box(0.5, 5.4, 0.5, -1.6, 0.4, -2.4, C.conY),
+    box(3.8, 0.6, 5.4, 0, 5.6, 0, C.conY), box(1.2, 1.0, 1.2, 1.2, 4.6, 2.6, C.glassD), box(0.7, 0.7, 5.2, 1.6, 0, 0, C.dark), box(0.7, 0.7, 5.2, -1.6, 0, 0, C.dark),
+    wheel(0.4, 0.3, 1.6, 2.2), wheel(0.4, 0.3, -1.6, 2.2), wheel(0.4, 0.3, 1.6, -2.2), wheel(0.4, 0.3, -1.6, -2.2)], '컨테이너 운반차', 1.1);
+  def('lighthouse', '등대', 4.6, 22.5, [cyl(4.2, 4.6, 1.6, 0, 0, 0, C.stone, 12), cyl(2.0, 2.7, 5, 0, 1.6, 0, C.white, 12), cyl(1.8, 2.0, 4, 0, 6.6, 0, C.red, 12), cyl(1.6, 1.8, 4, 0, 10.6, 0, C.white, 12), cyl(1.45, 1.6, 3, 0, 14.6, 0, C.red, 12),
+    cyl(2.4, 2.4, 0.4, 0, 17.6, 0, C.dark, 12), cyl(1.3, 1.3, 2.0, 0, 18.0, 0, C.warm, 10), cone(1.7, 1.9, 0, 20.0, 0, C.red, 10), sph(0.3, 0, 22.1, 0, C.dark, 1, 0), box(0.9, 1.6, 0.1, 0, 1.6, 2.55, C.woodD)], '등대', 1.5);
+  def('warehouse', '물류 창고', 6.2, 8.4, [box(13, 6, 10, 0, 0, 0, C.concrete), prism(13.6, 2.2, 10.6, 0, 6, 0, C.rust, PI / 2), box(3.4, 4.4, 0.12, -3.6, 0, 5.0, C.grey), box(3.4, 4.4, 0.12, 3.6, 0, 5.0, C.grey),
+    box(13.04, 0.5, 10.04, 0, 4.6, 0, C.conB), box(2.0, 0.5, 10.6, 0, 8.2, 0, C.white)], '물류 창고', 1.3);
+  def('fishmarket', '수산시장', 7.0, 7.4, [box(15, 4.6, 10, 0, 0, 0, C.cream), prism(15.6, 2.6, 11, 0, 4.6, 0, C.blue, PI / 2), box(15.2, 0.8, 0.3, 0, 3.5, 5.1, C.white),
+    box(4.0, 1.2, 0.3, 0, 4.7, 5.2, C.red), box(13, 2.4, 0.1, 0, 0.3, 5.02, C.glass), box(15.6, 0.15, 2.2, 0, 3.0, 6.0, C.red)], '수산시장', 1.35);
+  def('ferris', '관람차', 8.0, 21, (function () {
+    var q = [box(12, 0.8, 5, 0, 0, 0, C.white), rod(0.35, 13, 3.0, 6.2, 1.6, C.white, 0, 0.42, 6), rod(0.35, 13, -3.0, 6.2, 1.6, C.white, 0, -0.42, 6), rod(0.35, 13, 3.0, 6.2, -1.6, C.white, 0, 0.42, 6), rod(0.35, 13, -3.0, 6.2, -1.6, C.white, 0, -0.42, 6),
+      rod(0.8, 3.4, 0, 12.0, 0, C.dark, PI / 2, 0, 8)], n = 12, R = 8.2, cols = [C.red, C.yellow, C.teal, C.pink, C.blue, C.orange];
+    for (var k = 0; k < n; k++) {
+      var a = k / n * TAU, x = Math.sin(a) * R, y = 12 + Math.cos(a) * R;
+      q.push(rod(0.12, R, Math.sin(a) * R / 2, 12 + Math.cos(a) * R / 2, 0, C.white, 0, -a, 5));                    // 바퀴살
+      q.push(rod(0.18, 2 * R * Math.sin(PI / n) + 0.1, Math.sin(a + PI / n) * R * Math.cos(PI / n), 12 + Math.cos(a + PI / n) * R * Math.cos(PI / n), 0, C.white, 0, -(a + PI / n) - PI / 2, 5));   // 바퀴 테
+      q.push(box(1.3, 1.3, 1.3, x, y - 1.6, 0, cols[k % cols.length]));                                         // 칸
+    }
+    return q;
+  })(), '관람차', 1.35);
+  def('crane', '갠트리 크레인', 8.6, 26, [box(0.9, 17, 0.9, 4.2, 0, 4.0, C.red), box(0.9, 17, 0.9, -4.2, 0, 4.0, C.red), box(0.9, 17, 0.9, 4.2, 0, -4.0, C.red), box(0.9, 17, 0.9, -4.2, 0, -4.0, C.red),
+    box(9.4, 0.8, 0.9, 0, 7.0, 4.0, C.red), box(9.4, 0.8, 0.9, 0, 7.0, -4.0, C.red), box(1.2, 1.0, 9.4, 4.2, 0, 0, C.dark), box(1.2, 1.0, 9.4, -4.2, 0, 0, C.dark),
+    box(10.4, 1.6, 2.2, 0, 17, 0, C.white), box(2.2, 1.4, 26, 0, 17.6, -4.0, C.white), box(1.8, 1.6, 1.8, 0, 15.4, -10.0, C.glassD), box(0.5, 6.4, 0.5, 2.0, 18.6, 3.6, C.red), box(0.5, 6.4, 0.5, -2.0, 18.6, 3.6, C.red),
+    rod(0.1, 8.0, 0, 21.3, -0.6, C.dark, 0.95, 0, 4), box(1.6, 1.2, 1.6, 0, 12.0, -10.0, C.conO)], '갠트리 크레인', 1.35);
+  def('ferry', '여객선', 9.3, 9.2, [box(7, 2.6, 18, 0, 0, 0, C.white), box(7.04, 0.9, 18.04, 0, 0, 0, C.hullN), box(4.6, 2.6, 4.0, 0, 0, 10.6, C.white), box(6.4, 2.0, 13, 0, 2.6, -1.5, C.white),
+    box(6.44, 0.6, 13.04, 0, 3.4, -1.5, C.glassD), box(5.4, 1.8, 8, 0, 4.6, -2.5, C.white), box(5.44, 0.5, 8.04, 0, 5.3, -2.5, C.glassD), cyl(0.9, 1.1, 2.4, 0, 6.4, -5.0, C.red, 8), cyl(0.92, 0.92, 0.5, 0, 8.6, -5.0, C.dark, 8),
+    box(6.6, 0.25, 4, 0, 6.4, 1.0, C.blue)], '여객선', 1.45);
+  def('cargoship', '컨테이너선', 11.2, 12, (function () {
+    var q = [box(9, 3.2, 26, 0, 0, -1, C.hullN), box(9.04, 1.2, 26.04, 0, 0, -1, C.hullR), box(6.4, 3.2, 3.2, 0, 0, 13.4, C.hullN), box(3.6, 3.2, 1.6, 0, 0, 15.6, C.hullN), box(9.1, 0.3, 26.1, 0, 3.2, -1, C.white),
+      box(8, 6.6, 4.4, 0, 3.4, -11.6, C.white), box(8.04, 0.6, 4.44, 0, 8.2, -11.6, C.glassD), box(9.6, 0.3, 2.4, 0, 9.4, -11.2, C.white), cyl(0.9, 1.1, 2.6, 0, 9.6, -12.6, C.hullR, 8)],
+      cols = [C.conR, C.conB, C.conT, C.conO, C.conY, C.conB, C.conR, C.conT, C.conO, C.conY, C.conT, C.conR];
+    for (var r2 = 0; r2 < 4; r2++) for (var c2 = 0; c2 < 3; c2++) {
+      var hgt = (r2 + c2) % 3 === 0 ? 2 : 3;
+      q.push(box(2.5, 2.5 * hgt, 5.4, (c2 - 1) * 2.75, 3.5, 9.0 - r2 * 5.8, cols[r2 * 3 + c2]));
+    }
+    return q;
+  })(), '컨테이너선', 1.6);
+
+  // ════════ 5구역 · 공항 ════════
+  def('rlight', '활주로 등', 0.22, 0.32, [cyl(0.14, 0.17, 0.2, 0, 0, 0, C.dark, 6), sph(0.1, 0, 0.24, 0, C.lightW, 0.8, 0)]);
+  def('rlight_b', '유도로 등', 0.22, 0.32, [cyl(0.14, 0.17, 0.2, 0, 0, 0, C.dark, 6), sph(0.1, 0, 0.24, 0, C.lightB, 0.8, 0)]);
+  def('suitcase', '여행 가방', 0.3, 0.62, [box(0.36, 0.48, 0.2, 0, 0.04, 0, C.red), box(0.2, 0.12, 0.03, 0, 0.5, 0, C.dark), box(0.37, 0.05, 0.21, 0, 0.26, 0, C.white), box(0.3, 0.05, 0.06, 0, 0, 0, C.dark)]);
+  def('suitcase_b', '여행 가방', 0.32, 0.66, [box(0.4, 0.52, 0.22, 0, 0.04, 0, C.tailT), box(0.2, 0.12, 0.03, 0, 0.54, 0, C.dark), box(0.41, 0.05, 0.23, 0, 0.3, 0, C.yellow), box(0.34, 0.05, 0.06, 0, 0, 0, C.dark)]);
+  def('sign_a', '안내판', 0.45, 2.4, [cyl(0.05, 0.05, 1.8, 0, 0, 0, C.grey, 5), box(0.8, 0.55, 0.08, 0, 1.75, 0, C.yellow), box(0.5, 0.12, 0.09, -0.06, 2.0, 0, C.dark), box(0.18, 0.18, 0.09, 0.26, 1.85, 0, C.dark)]);
+  def('lcart', '수하물 카트', 0.55, 1.0, [box(0.6, 0.06, 0.95, 0, 0.18, 0, C.grey), box(0.6, 0.6, 0.05, 0, 0.18, -0.45, C.grey), box(0.6, 0.05, 0.05, 0, 0.95, -0.5, C.dark), box(0.4, 0.3, 0.55, 0, 0.24, 0.05, C.blue), box(0.34, 0.24, 0.45, 0.02, 0.54, 0.1, C.orange),
+    box(0.06, 0.16, 0.16, -0.25, 0, 0.35, C.tire), box(0.06, 0.16, 0.16, 0.25, 0, 0.35, C.tire), box(0.06, 0.16, 0.16, -0.25, 0, -0.35, C.tire), box(0.06, 0.16, 0.16, 0.25, 0, -0.35, C.tire)]);
+  def('windsock', '바람 자루', 0.5, 3.4, [cyl(0.05, 0.06, 3.0, 0, 0, 0, C.grey, 5), rod(0.26, 0.5, 0, 2.95, 0.3, C.orange, PI / 2, 0, 8), rod(0.23, 0.5, 0, 2.93, 0.8, C.white, PI / 2, 0, 8), rod(0.2, 0.5, 0, 2.91, 1.3, C.orange, PI / 2, 0, 8)]);
+  def('bagtug', '수하물 견인차', 2.1, 1.6, [box(1.3, 0.8, 1.6, 0, 0.25, 2.1, C.yellow), box(1.2, 0.6, 0.7, 0, 1.0, 1.8, C.glassD), wheel6(0.25, 0.2, -0.6, 2.5), wheel6(0.25, 0.2, 0.6, 2.5), wheel6(0.25, 0.2, -0.6, 1.7), wheel6(0.25, 0.2, 0.6, 1.7),
+    box(1.3, 0.1, 1.6, 0, 0.35, 0, C.grey), box(1.0, 0.6, 1.2, 0, 0.45, 0, C.orange), box(1.3, 0.1, 1.6, 0, 0.35, -1.9, C.grey), box(1.0, 0.5, 0.6, 0, 0.45, -1.6, C.teal), box(0.9, 0.6, 0.6, 0, 0.45, -2.2, C.red),
+    wheel6(0.15, 0.1, -0.55, 0.5), wheel6(0.15, 0.1, 0.55, 0.5), wheel6(0.15, 0.1, -0.55, -1.4), wheel6(0.15, 0.1, 0.55, -1.4)], '수하물 견인차');
+  def('radar', '레이더', 2.2, 5.6, [box(2.4, 0.5, 2.4, 0, 0, 0, C.concrete), cyl(0.35, 0.45, 3.6, 0, 0.5, 0, C.white, 8), box(3.6, 1.3, 0.25, 0, 4.2, 0, C.white), box(0.6, 0.6, 0.6, 0, 4.0, 0.3, C.grey), sph(0.15, 0, 5.6, 0, C.beacon, 1, 0)], '레이더');
+  def('stairtruck', '계단차', 2.5, 3.6, (function () {
+    var q = [box(1.7, 1.0, 4.6, 0, 0.3, 0, C.white), box(1.7, 0.8, 1.3, 0, 1.3, 1.7, C.glassD), wheel6(0.3, 0.25, -0.8, 1.6), wheel6(0.3, 0.25, 0.8, 1.6), wheel6(0.3, 0.25, -0.8, -1.6), wheel6(0.3, 0.25, 0.8, -1.6), box(1.5, 0.12, 1.4, 0, 3.4, -2.2, C.grey), box(0.06, 0.9, 4, 0.72, 2.3, -0.8, C.yellow), box(0.06, 0.9, 4, -0.72, 2.3, -0.8, C.yellow)];
+    for (var k = 0; k < 5; k++) q.push(box(1.3, 0.12, 0.5, 0, 1.4 + k * 0.42, 0.9 - k * 0.6, C.grey));
+    return q;
+  })(), '계단차');
+  def('fueltruck', '급유차', 3.0, 2.8, [box(2.1, 1.6, 1.7, 0, 0.4, 2.6, C.white), box(2.0, 0.7, 0.06, 0, 1.2, 3.46, C.glassD), rod(1.05, 4.4, 0, 1.55, -0.9, C.white, PI / 2, 0, 10), box(2.12, 0.3, 4.4, 0, 0.9, -0.9, C.red),
+    box(2.2, 0.4, 6.0, 0, 0.3, 0, C.dark), wheel6(0.42, 0.32, -1.0, 2.6), wheel6(0.42, 0.32, 1.0, 2.6), wheel6(0.42, 0.32, -1.0, -1.6), wheel6(0.42, 0.32, 1.0, -1.6), wheel6(0.42, 0.32, -1.0, -2.6), wheel6(0.42, 0.32, 1.0, -2.6)], '급유차', 1.1);
+  def('heli', '헬리콥터', 3.1, 3.0, [sph(1.2, 0, 1.4, 0.5, C.red, 0.8, 1), sph(0.9, 0, 1.55, 1.1, C.glassD, 0.75, 0), rod(0.3, 3.8, 0, 1.6, -2.4, C.red, PI / 2, 0, 6), box(0.12, 1.1, 0.8, 0, 1.5, -4.2, C.red),
+    box(5.6, 0.06, 0.3, 0, 2.55, 0.3, C.dark, 0.5), box(5.6, 0.06, 0.3, 0, 2.55, 0.3, C.dark, -1.07), cyl(0.12, 0.12, 0.35, 0, 2.2, 0.3, C.dark, 6), box(0.1, 0.1, 3.0, 0.8, 0.05, 0.4, C.dark), box(0.1, 0.1, 3.0, -0.8, 0.05, 0.4, C.dark)], '헬리콥터', 1.15);
+  def('cessna', '경비행기', 3.5, 2.6, [rod(0.55, 6.0, 0, 1.2, 0, C.white, PI / 2, 0, 8), sph(0.55, 0, 1.2, 3.0, C.white, 1, 0), box(9.0, 0.14, 1.4, 0, 2.0, 0.5, C.white), box(9.04, 0.16, 0.3, 0, 2.0, 0.0, C.blue), box(0.12, 1.4, 1.0, 0, 1.4, -2.8, C.blue),
+    box(2.8, 0.1, 0.8, 0, 1.4, -2.8, C.white), box(1.0, 0.45, 1.0, 0, 1.55, 1.2, C.glassD), box(1.8, 0.12, 0.1, 0, 1.2, 3.6, C.dark), cyl(0.04, 0.04, 0.9, 0.9, 0, 0.6, C.dark, 4), cyl(0.04, 0.04, 0.9, -0.9, 0, 0.6, C.dark, 4), wheel(0.2, 0.12, 0.9, 0.6), wheel(0.2, 0.12, -0.9, 0.6), wheel(0.18, 0.1, 0, 2.6)], '경비행기', 1.15);
+  def('jetbridge', '탑승교', 4.1, 5.0, [box(2.4, 2.6, 7.6, 0, 2.2, 0, C.grey), box(2.44, 0.5, 7.64, 0, 2.9, 0, C.white), box(3.0, 3.0, 2.4, 0, 2.0, 4.4, C.grey), box(0.7, 2.2, 0.7, 0, 0, -1.6, C.dark), wheel(0.4, 0.3, 0.4, -1.6), wheel(0.4, 0.3, -0.4, -1.6)], '탑승교', 1.15);
+  def('ctower', '관제탑', 6.0, 37, [box(10, 5, 10, 0, 0, 0, C.concrete), box(10.04, 0.6, 10.04, 0, 4.4, 0, C.dark), cyl(1.9, 2.4, 22, 0, 5, 0, C.white, 10), cyl(2.0, 2.0, 0.6, 0, 14, 0, C.grey, 10),
+    cyl(3.8, 2.4, 2.2, 0, 27, 0, C.white, 10), cyl(4.4, 3.8, 3.4, 0, 29.2, 0, C.cab, 10), cyl(4.6, 4.6, 0.6, 0, 32.6, 0, C.dark, 10), cyl(0.12, 0.16, 3.6, 1.4, 33.2, 0, C.grey, 5), sph(0.3, 1.4, 36.9, 0, C.beacon, 1, 0)], '관제탑', 1.5);
+  def('bizjet', '작은 제트기', 6.4, 4.2, [rod(0.95, 11.6, 0, 1.7, 0, C.white, PI / 2, 0, 10), sph(0.95, 0, 1.7, 5.8, C.white, 1, 1), box(12.4, 0.2, 2.4, 0, 1.3, 0.2, C.white), rod(0.45, 2.2, 1.4, 2.4, -3.8, C.grey, PI / 2, 0, 8), rod(0.45, 2.2, -1.4, 2.4, -3.8, C.grey, PI / 2, 0, 8),
+    box(0.25, 2.6, 2.2, 0, 2.0, -5.0, C.hullN), box(4.6, 0.16, 1.4, 0, 4.4, -5.4, C.white), box(1.92, 0.3, 9.0, 0, 1.85, 0.4, C.hullN), wheel(0.25, 0.2, 1.1, 0.0), wheel(0.25, 0.2, -1.1, 0.0), wheel(0.22, 0.16, 0, 4.4)], '작은 제트기', 1.35);
+  def('cargohall', '화물 터미널', 7.8, 9.0, [box(17, 7, 12, 0, 0, 0, C.concrete), box(17.2, 0.6, 12.2, 0, 7, 0, C.dark), box(4.0, 5.0, 0.12, -5, 0, 6.02, C.grey), box(4.0, 5.0, 0.12, 0, 0, 6.02, C.grey), box(4.0, 5.0, 0.12, 5, 0, 6.02, C.grey),
+    box(17.04, 0.8, 12.04, 0, 5.6, 0, C.tailO), box(3, 1.4, 3, 4, 7.6, -2, C.grey)], '화물 터미널', 1.35);
+  def('terminal', '터미널', 9.0, 10.5, (function () {
+    var q = [box(20, 7.5, 14, 0, 0, 0, C.glassT), box(20.6, 0.8, 14.6, 0, 7.5, 0, C.white), prism(20.6, 2.0, 14.6, 0, 8.3, 0, C.white, PI / 2), box(20.04, 0.4, 14.04, 0, 3.6, 0, C.white), box(21, 0.3, 4, 0, 4.0, 8.6, C.white)];
+    for (var k = -2; k <= 2; k++) q.push(box(0.5, 7.5, 14.1, k * 4.4, 0, 0, C.white));
+    for (k = -1; k <= 1; k += 2) q.push(cyl(0.2, 0.2, 4.0, k * 9.6, 0, 10.2, C.white, 6));
+    return q;
+  })(), '터미널', 1.35);
+  function jet(id, tail) {
+    def(id, '여객기', 9.8, 8.2, [rod(1.6, 22, 0, 2.6, 0, C.jetW, PI / 2, 0, 12), sph(1.6, 0, 2.6, 11, C.jetW, 1, 1), cone(1.6, 3.4, 0, 0, 0, C.jetW, 8), box(1.4, 1.3, 3.4, 0, 2.6, -12.3, C.jetW),
+      box(10.4, 0.35, 4.2, 5.6, 2.0, 0.3, C.jetW, -0.32), box(10.4, 0.35, 4.2, -5.6, 2.0, 0.3, C.jetW, 0.32), rod(0.75, 3.2, 4.4, 1.4, 2.4, C.grey, PI / 2, 0, 10), rod(0.75, 3.2, -4.4, 1.4, 2.4, C.grey, PI / 2, 0, 10),
+      box(0.35, 5.0, 4.0, 0, 3.6, -11.4, tail), box(7.4, 0.25, 2.4, 0, 3.2, -11.8, C.jetW), box(3.22, 0.3, 20, 0, 3.2, 0.6, tail), box(3.24, 0.24, 18, 0, 2.9, 0.6, C.glassD),
+      wheel(0.45, 0.4, 1.5, 0), wheel(0.45, 0.4, -1.5, 0), wheel(0.35, 0.3, 0, 8.4)], '여객기', 1.4);
+  }
+  jet('jet_a', C.tailO); jet('jet_b', C.tailT);
+  def('hangar', '격납고', 11.0, 12.5, [box(22, 6.5, 18, 0, 0, 0, C.concrete), rod(9.0, 18.2, 0, 6.5, 0, C.grey, PI / 2, 0, 14), box(22.04, 0.5, 18.04, 0, 6.0, 0, C.dark), box(15, 6.2, 0.2, 0, 0, 9.05, C.dark), box(14.6, 5.8, 0.25, 0, 0.2, 9.1, C.navy),
+    box(15.4, 1.0, 0.3, 0, 6.8, 9.1, C.tailO)], '격납고', 1.4);
+  def('jumbo', '대형 여객기', 13.0, 12.4, [rod(2.3, 30, 0, 3.6, 0, C.jetW, PI / 2, 0, 12), sph(2.3, 0, 3.6, 15, C.jetW, 1, 1), sph(1.7, 0, 5.0, 10.0, C.jetW, 1.0, 1), box(2.6, 1.4, 9, 0, 4.4, 7.0, C.jetW), cone(2.3, 4.0, 0, 1.3, -15, C.jetW, 8), box(1.9, 1.8, 4.2, 0, 3.4, -16.6, C.jetW),
+    box(14.8, 0.45, 6.0, 7.8, 2.8, -0.6, C.jetW, -0.36), box(14.8, 0.45, 6.0, -7.8, 2.8, -0.6, C.jetW, 0.36),
+    rod(0.95, 4.0, 4.6, 2.0, 2.6, C.grey, PI / 2, 0, 10), rod(0.95, 4.0, -4.6, 2.0, 2.6, C.grey, PI / 2, 0, 10), rod(0.85, 3.6, 9.6, 2.1, -0.4, C.grey, PI / 2, 0, 10), rod(0.85, 3.6, -9.6, 2.1, -0.4, C.grey, PI / 2, 0, 10),
+    box(0.45, 7.4, 5.6, 0, 5.2, -15.2, C.hullN), box(10.4, 0.3, 3.4, 0, 4.4, -15.6, C.jetW), box(4.62, 0.4, 27, 0, 4.4, 0.6, C.hullN), box(4.64, 0.3, 24, 0, 3.9, 0.6, C.glassD), box(4.64, 0.35, 27, 0, 2.2, 0.6, C.tailO),
+    wheel(0.6, 0.6, 2.0, 0), wheel(0.6, 0.6, -2.0, 0), wheel(0.6, 0.6, 2.0, -2.0), wheel(0.6, 0.6, -2.0, -2.0), wheel(0.45, 0.4, 0, 11.4)], '대형 여객기', 1.7);
+  // 중간 띠 채우기(r 1~2.5 · r 4~6) — 짐 끄는 차 · 항공 화물칸 · 공항 소방차 · 화물 창고
+  def('tractor', '짐 끄는 차', 1.15, 1.4, [box(1.0, 0.6, 1.6, 0, 0.2, 0, C.yellow), box(0.9, 0.55, 0.7, 0, 0.8, -0.3, C.glassD), box(0.95, 0.08, 0.75, 0, 1.35, -0.3, C.dark),
+    wheel6(0.24, 0.2, -0.5, 0.5), wheel6(0.24, 0.2, 0.5, 0.5), wheel6(0.24, 0.2, -0.5, -0.5), wheel6(0.24, 0.2, 0.5, -0.5)], '짐 끄는 차');
+  def('uld', '항공 화물칸', 1.6, 1.8, [box(1.9, 0.12, 1.7, 0, 0, 0, C.dark), box(1.8, 1.55, 1.6, 0, 0.12, 0, C.grey), prism(1.8, 0.4, 1.6, 0, 1.4, 0, C.grey, 0), box(1.4, 1.1, 0.04, 0, 0.3, 0.82, C.tailO)], '항공 화물칸');
+  def('firetruck', '공항 소방차', 3.6, 3.2, [box(2.6, 2.2, 7.4, 0, 0.5, 0, C.red), box(2.5, 0.9, 1.8, 0, 2.0, 2.4, C.glassD), box(2.64, 0.3, 7.44, 0, 1.4, 0, C.white), cyl(0.25, 0.3, 0.6, 0, 2.7, -1.2, C.dark, 6),
+    box(0.4, 0.3, 2.2, 0, 2.7, -0.4, C.grey), box(2.0, 0.2, 0.5, 0, 2.75, 3.1, C.beacon),
+    wheel6(0.55, 0.4, -1.2, 2.4), wheel6(0.55, 0.4, 1.2, 2.4), wheel6(0.55, 0.4, -1.2, -0.6), wheel6(0.55, 0.4, 1.2, -0.6), wheel6(0.55, 0.4, -1.2, -2.4), wheel6(0.55, 0.4, 1.2, -2.4)], '공항 소방차', 1.1);
+  def('cargoshed', '화물 창고', 5.0, 6.4, [box(10, 4.6, 7.5, 0, 0, 0, C.concrete), prism(10.4, 1.6, 7.9, 0, 4.6, 0, C.grey, PI / 2), box(3.2, 3.4, 0.12, -2.4, 0, 3.76, C.navy), box(3.2, 3.4, 0.12, 2.4, 0, 3.76, C.navy),
+    box(10.04, 0.5, 7.54, 0, 3.8, 0, C.tailT)], '화물 창고', 1.3);
 })();
 
 var FLOWERS = ['flower_pink', 'flower_yellow', 'flower_white', 'flower_purple'];
@@ -853,6 +982,148 @@ function genDowntown(G) {
   g.rivalSpots = [[-45, -45], [45, 45], [-45, 45], [45, -45], [0, -47]];
 }
 
+var CARS3 = ['car_white', 'car_dark', 'taxi'];
+var BAGS = ['suitcase', 'suitcase_b'];
+
+// ───────── 4구역 · 항구 — 해 지는 바닷가. 남쪽(화면 아래) 어시장 → 가운데 컨테이너 야적장 → 북쪽 부두 · 바다
+function genHarbor(G) {
+  var g = G.g, rnd = G.rnd, i, k, x, z, a, SZ = 52;   // SZ: 시작 자리 z — 어시장 지붕이 시작 화면 위를 가리지 않게 남쪽으로(fix2)
+  // 바다(북쪽 z < -18) · 방파제 · 부두 두 개
+  G.rect(0, -43, 128, 50, C.sea, 1); G.rect(0, -19.3, 128, 1.4, C.quayD, 2);
+  G.rect(-30, -38, 12, 40, C.quay, 2); G.rect(26, -38, 12, 40, C.quay, 2);                   // 부두 손가락 둘
+  G.rect(46, -59, 32, 4, C.quay, 2);                                                          // 방파제(등대 자리)
+  G.circ(52, -50, 6, C.quay, 2);
+  for (i = -1; i <= 1; i++) G.rect(-4 + i * 10, -55 + i * 3, 3.5, 0.6, C.seaL, 3);            // 물결 줄
+  G.rect(-50, -30, 3, 0.5, C.seaL, 3); G.rect(6, -30, 4, 0.5, C.seaL, 3); G.rect(-12, -44, 4, 0.5, C.seaL, 3);
+  // 야적장 바닥 · 크레인 레일 · 차선
+  G.rect(0, -1, 128, 34, C.concrete, 1);
+  G.rect(0, -16.5, 128, 0.35, C.rail, 3); G.rect(0, -12.5, 128, 0.35, C.rail, 3);
+  for (x = -60; x <= 60; x += 6) G.rect(x, 9, 3, 0.25, C.yline, 3);
+  // 남쪽 — 산책길 · 어시장 광장
+  G.rect(0, 22, 128, 6, C.quayD, 1); G.rect(0, 44, 128, 34, C.tile, 1);
+  G.circ(-34, 44, 9, C.plaza, 2); G.circ(0, SZ - 1, 7.5, C.sand, 2);
+  G.zoneR(-64, 64, 19, 25);                                                                   // 남쪽 길(차가 다니는 곳)
+  G.zoneR(-64, 64, -20, -11);                                                                 // 크레인 레일
+  G.zoneR(-64, 64, 7.5, 10.5);
+
+  // ── 북쪽: 부두에 댄 배 · 바다에 뜬 것
+  G.add('cargoship', -6, -37, 0, true);                                                       // 가장 큰 볼거리(맨 끝에 삼킨다)
+  G.add('ferry', 47, -36, 0, true);
+  G.add('tug', -42, -30, PI * 0.1, true); G.add('tug', 12, -54, -PI / 2, true);
+  G.add('lighthouse', 54, -52, 0, true);
+  for (i = 0; i < 6; i++) G.add('bollard', -24.5, -24 - i * 6, 0, true);
+  for (i = 0; i < 6; i++) G.add('bollard', 20.5, -24 - i * 6, 0, true);
+  G.scatter(['fishbox', 'drum', 'bollard'], 18, -35, -25, -56, -22); G.scatter(['fishbox', 'drum', 'lifering'], 16, 21, 31, -56, -22);
+  G.scatter('forklift', 3, -35, -25, -50, -24); G.scatter('forklift', 2, 21, 31, -50, -24);
+  G.scatter(['buoy'], 16, -62, 62, -62, -24, function (px) { return Math.abs(px + 30) > 8 && Math.abs(px - 26) > 8; });
+  G.scatter('gull', 16, -62, 62, -60, -20);
+  for (i = 0; i < 4; i++) G.mover('boat', { k: 'c', cx: i < 2 ? -48 : 8, cz: i < 2 ? -48 : -26 - i * 2, rad: 5 + i * 1.6, a: rnd() * TAU, sp: 2.4, dir: i % 2 ? 1 : -1 });
+  // ── 가운데: 크레인 줄 · 컨테이너 야적장 · 운반차
+  [-44, -14, 16, 46].forEach(function (cx) { G.add('crane', cx, -14.5, 0, true); });
+  var lanes = [-5, 1.5, -11.5 + 0];
+  for (x = -56; x <= 56; x += 7.0) {
+    if (Math.abs(x) < 3) continue;
+    [-5.5, 0, 5.0].forEach(function (zz, row) {
+      var roll = rnd(), id = roll < 0.3 ? 'stack_a' : roll < 0.55 ? 'stack_b' : roll < 0.78 ? 'con_a' : roll < 0.93 ? 'con_b' : null;
+      if (id) G.add(id, x, zz, 0, true);
+    });
+  }
+  for (i = 0; i < 4; i++) G.mover('straddle', { k: 'r', cx: i < 2 ? -30 : 30, cz: -1, hw: 24, hd: 8.2, s: rnd() * 60, sp: 3.2, dir: i % 2 ? 1 : -1 });
+  for (i = 0; i < 6; i++) G.mover(rnd() < 0.5 ? 'truck_a' : 'truck_b', { k: 'r', cx: 0, cz: 0, hw: 58, hd: 22, s: i * 60, sp: 6, dir: -1 });
+  G.scatter(['drum', 'tcone', 'fishbox', 'gull'], 50, -60, 60, -10, 7);
+  G.scatter('forklift', 8, -60, 60, -10, 7);
+  for (i = 0; i < 5; i++) { G.add('boat', -37.5, -26 - i * 7, PI / 2, false); G.add('boat', 33.5, -26 - i * 7, -PI / 2, false); }
+  G.add('tug', 37, -58, PI / 2, true);
+  // ── 남쪽: 어시장 · 창고 · 바닷가 공원(관람차)
+  G.add('fishmarket', 0, 34, 0, true);
+  G.add('warehouse', -42, 33, 0, true); G.add('warehouse', 42, 33, 0, true);
+  G.add('ferris', -36, 52, 0, true);
+  G.add('fishmarket', 38, 54, PI, true);
+  [-16, -10, 10, 16].forEach(function (sx, n2) { G.add(n2 % 2 ? 'stall_a' : 'stall_b', sx, 44, n2 < 2 ? PI / 2 : -PI / 2, true); });
+  for (i = 0; i < 10; i++) { a = i / 10 * TAU; G.add('bench', -34 + Math.cos(a) * 10.5, 44 + Math.sin(a) * 10.5 + 8, Math.atan2(Math.cos(a), Math.sin(a)) + PI, false); }
+  for (x = -60; x <= 60; x += 10) { G.add('lamp', x, 26.5, 0, true); if (rnd() < 0.7) G.add('bin_city', x + 3, 26.6, 0, true); }
+  G.rect(21, 52, 18, 22, C.asphalt2, 2);
+  for (z = 44; z <= 60; z += 4) { G.add(G.pick(CARS3), 16.5, z, PI / 2, true); if (rnd() < 0.8) G.add(G.pick(CARS3), 25.5, z, -PI / 2, true); }
+  [[-52, 44], [-54, 26.5 + 9], [52, 44]].forEach(function (p2) { G.add(rnd() < 0.5 ? 'truck_a' : 'truck_b', p2[0], p2[1], PI / 2, false); });
+  G.add('van', -22, 42, 0, false); G.add('van', 24, 40, PI, false); G.add('kiosk', 8, 58, PI, false); G.add('kiosk', -12, 60, 0, false);
+  G.cluster(['fishbox'], 22, 0, SZ - 1, 6); G.cluster('gull', 14, 0, SZ - 1, 7);
+  G.scatter(['fishbox', 'crate', 'drum', 'gull', 'lifering', 'buoy', 'bollard'], 120, -62, 62, 26, 63);
+  G.scatter(['boat', 'forklift', 'bench'], 14, -62, 62, 28, 63);
+  G.scatter(['planter'], 10, -62, 62, 28, 63);
+  for (i = 0; i < 3; i++) G.mover(rnd() < 0.5 ? 'taxi' : 'van', { k: 'r', cx: 0, cz: 22, hw: 62, hd: 0.01, s: i * 80, sp: 5.5, dir: 1 });
+  // 산책길 시작 자리 둘레 — 첫 먹이
+  [[-6, SZ - 2], [6, SZ - 1.5], [-4, SZ + 2], [5, SZ + 3]].forEach(function (p) { G.cluster(['gull', 'fishbox', 'bollard'], 6, p[0], p[1], 1.6); });
+  g.start = [0, SZ];
+  g.rivalSpots = [[-50, 50], [50, 46], [-52, -2], [52, 2], [0, -58]];
+}
+
+// ───────── 5구역 · 공항 — 저녁 활주로. 남쪽 터미널 · 주차장 → 가운데 계류장 비행기 → 북쪽 활주로 · 격납고
+function genAirport(G) {
+  var g = G.g, rnd = G.rnd, i, k, x, z, SZ = 54;   // SZ: 시작 자리 z — 터미널 지붕이 시작 화면 위를 가리지 않게 남쪽으로(fix2)
+  // 활주로(북) · 유도로 · 계류장 · 주차장
+  G.rect(0, -46, 136, 13, C.runway, 2); G.rect(0, -46, 136, 0.35, C.line, 3);
+  for (x = -60; x <= 60; x += 8) G.rect(x, -46, 4, 0.5, C.line, 4);
+  for (i = -3; i <= 3; i++) { G.rect(-58, -46 + i * 1.6, 3.4, 0.7, C.line, 4); G.rect(58, -46 + i * 1.6, 3.4, 0.7, C.line, 4); }
+  G.rect(0, -28, 136, 7, C.taxiway, 2); G.rect(0, -28, 136, 0.25, C.yline, 3);
+  G.rect(-30, -34, 7, 12, C.taxiway, 2); G.rect(30, -34, 7, 12, C.taxiway, 2);
+  G.rect(0, -5, 136, 38, C.apron, 1);
+  for (x = -48; x <= 48; x += 24) { G.rect(x, -5, 0.3, 30, C.yline, 3); G.circ(x, 6, 1.2, C.yline, 3); }
+  G.rect(0, 22, 136, 7, C.taxiway, 2);                                                              // 터미널 앞 도로
+  G.rect(0, 48, 136, 40, C.walk, 1);
+  G.rect(36, 52, 46, 26, C.asphalt2, 2);                                                         // 주차장
+  for (x = 16; x <= 56; x += 4) { G.rect(x, 46, 0.18, 4.6, C.line, 3); G.rect(x, 58, 0.18, 4.6, C.line, 3); }
+  G.circ(-50, -4, 6, C.apron, 2); G.ring(-50, -4, 4.4, 5.0, C.yline, 3); G.rect(-51.4, -4, 0.6, 3.6, C.yline, 4); G.rect(-48.6, -4, 0.6, 3.6, C.yline, 4); G.rect(-50, -4, 3.4, 0.6, C.yline, 4);   // 헬기장 「H」
+  G.zoneR(-68, 68, -53, -39); G.zoneR(-68, 68, -32, -24); G.zoneR(-68, 68, 18.5, 25.5);
+
+  // ── 북쪽: 활주로 등 줄 · 격납고 · 레이더 · 바람 자루
+  for (x = -64; x <= 64; x += 4) { G.add('rlight', x, -52.9, 0, true); G.add('rlight', x, -39.1, 0, true); }
+  for (x = -64; x <= 64; x += 6) { G.add('rlight_b', x + 1.5, -31.8, 0, true); G.add('rlight_b', x - 1.5, -24.2, 0, true); }
+  G.add('hangar', -46, -61, 0, true); G.add('hangar', 46, -61, 0, true);
+  G.add('radar', 0, -60, 0, true); G.add('radar', 20, -62, 0, true);
+  G.add('windsock', -12, -60, 0, true); G.add('windsock', 12, -59, 0, true);
+  G.add('cessna', -24, -60, 0.2, true); G.add('cessna', 26, -60, -0.3, true);
+  G.mover('cessna', { k: 'r', cx: 0, cz: -37, hw: 62, hd: 9, s: 30, sp: 7, dir: 1 });
+  G.mover('jet_b', { k: 'r', cx: 0, cz: -37, hw: 60, hd: 9, s: 200, sp: 4.2, dir: 1 });            // 유도로를 천천히 도는 여객기
+  // ── 가운데: 계류장 — 탑승구마다 여객기 · 탑승교 · 지상 장비
+  G.add('jumbo', 0, -4, PI, true);                                                               // 가장 큰 볼거리(맨 끝에 삼킨다)
+  [-48, -24, 24, 48].forEach(function (gx, n2) {
+    G.add(n2 % 2 ? 'jet_a' : 'jet_b', gx, -6, PI, true);
+    G.add('jetbridge', gx + 4.5, 9.5, 0, true);
+    G.add(rnd() < 0.5 ? 'fueltruck' : 'stairtruck', gx - 8.5, -1, PI / 2, true);
+    G.add('bagtug', gx + 8.5, -12, 0, false);
+    G.scatter(['lcart', 'tcone', 'suitcase', 'suitcase_b'], 7, gx - 9, gx + 9, -18, 12);
+  });
+  G.add('heli', -50, -4, 0.4, true); G.add('heli', -58, 4, 1.2, true);
+  [-6, 6].forEach(function (cx2) { G.add('cessna', cx2 * 1.0 - 56 + 56 + (cx2 < 0 ? -8 : 8), -18, PI, false); });
+  for (i = 0; i < 4; i++) G.add(i % 2 ? 'fueltruck' : 'stairtruck', -60 + i * 40 + 10, 14, 0, false);
+  G.add('bizjet', 58, 8, -PI / 2, true); G.add('bizjet', -60, 12, PI / 2, true);
+  G.add('bizjet', -36, -20, 0, true); G.add('bizjet', 36, -20, 0, true);                         // 계류장 앞줄(유도로 쪽) 작은 제트기 2 — r 6.5~9.5 띠 보강(fix1)
+  for (i = 0; i < 5; i++) G.mover('bagtug', { k: 'r', cx: 0, cz: -2, hw: 56, hd: 16, s: i * 58, sp: 4.0, dir: i % 2 ? 1 : -1 });
+  for (i = 0; i < 2; i++) G.mover('bus_blue', { k: 'r', cx: 0, cz: 3, hw: 40, hd: 12, s: i * 100, sp: 5, dir: -1 });
+  // 중간 띠(spec_extra) — 화물 터미널 옆 항공 화물칸 줄 · 소방차 · 화물 창고, 계류장 · 남쪽 광장 짐 끄는 차 · 화물칸
+  for (i = 0; i < 6; i++) G.add('uld', 40 + i * 3.6, 14.5, 0, false);
+  G.add('firetruck', -60, 58, 0, true); G.add('firetruck', -26, 61, PI / 2, true);
+  G.add('cargoshed', -42, 57, 0, true); G.add('cargoshed', 62, 12, -PI / 2, true);
+  G.scatter(['tractor', 'uld', 'uld'], 26, -64, 64, -20, 16);
+  G.scatter('tractor', 10, -64, 12, 40, 64);
+  G.scatter(['tcone', 'lcart', 'suitcase', 'suitcase_b'], 60, -64, 64, -20, 16);
+  // ── 남쪽: 터미널 · 관제탑 · 화물 터미널 · 주차장 · 정류장
+  G.add('terminal', -22, 33, 0, true); G.add('terminal', 0, 33, 0, true); G.add('terminal', 22, 33, 0, true);
+  G.add('ctower', -52, 40, 0, true);                                                             // 어디서나 보이는 랜드마크
+  G.add('cargohall', 54, 33, 0, true); G.add('cargohall', -41, 34.5, -PI / 2, true);              // 화물 터미널 2 — 동쪽 끝 · 관제탑 옆 서쪽 끝(fix1)
+  for (x = -60; x <= 60; x += 8) if (x < -48 || x > -34) G.add('lamp', x, 26.6, 0, true);       // 서쪽 화물 터미널 자리는 가로등 비움
+  [-32, 10, 30].forEach(function (bx) { G.add('busstop', bx, 27.4, PI, true); });
+  for (x = 17; x <= 55; x += 4) { if (rnd() < 0.8) G.add(G.pick(CARS3), x + 2, 52, rnd() < 0.5 ? 0 : PI, true); if (rnd() < 0.75) G.add(G.pick(CARS3), x + 2, 46, rnd() < 0.5 ? 0 : PI, true); if (rnd() < 0.75) G.add(G.pick(CARS3), x + 2, 58, rnd() < 0.5 ? 0 : PI, true); }
+  for (i = 0; i < 6; i++) G.mover(i % 3 ? 'taxi' : 'bus_blue', { k: 'r', cx: 0, cz: 22, hw: 66, hd: 0.01, s: i * 45, sp: 6, dir: 1 });
+  G.scatter(['planter', 'bench', 'sign_a', 'bin_city'], 26, -64, 12, 44, 64);
+  G.scatter(BAGS.concat(['lcart', 'pigeon', 'sign_a', 'tcone']), 120, -64, 64, 42, 66);
+  G.scatter(['bagtug', 'stairtruck', 'cessna'], 8, -64, 64, -20, 16);
+  [[-6, SZ - 2], [6, SZ - 1.5], [-2, SZ + 2], [3, SZ + 3]].forEach(function (p) { G.cluster(BAGS.concat(['pigeon']), 6, p[0], p[1], 1.8); });
+  G.scatter('windsock', 2, -64, 64, 60, 66);
+  g.start = [0, SZ];
+  g.rivalSpots = [[-56, 58], [56, 64], [-60, -16], [60, -16], [0, -36]];
+}
+
 // ───────── 구역
 var AREAS = SC.AREAS = [
   { key: 'park', name: '공원', H: 50, time: 90, goal: 0.45, gen: genPark, ground: C.grass, sky: 0xbfe8f7, sun: 0xfff3d9, hemi: 0x8aa67c, sunI: 0.67,
@@ -860,7 +1131,11 @@ var AREAS = SC.AREAS = [
   { key: 'suburbs', name: '주택가', H: 57, time: 85, goal: 0.6, gen: genSuburb, ground: C.walk, sky: 0xffe3bd, sun: 0xffe2b0, hemi: 0x9a8f86, sunI: 0.69,
     rivals: [0.5, 0.75, 1.1, 1.5], rivalSpeed: 5.2, aggro: 1.0 },
   { key: 'downtown', name: '도심', H: 60, time: 95, goal: 0.7, gen: genDowntown, ground: C.walk, sky: 0xd9c9f6, sun: 0xffd9c2, hemi: 0x8a86a6, sunI: 0.67,
-    rivals: [0.55, 0.8, 1.15, 1.6, 2.1], rivalSpeed: 5.6, aggro: 1.2 }
+    rivals: [0.55, 0.8, 1.15, 1.6, 2.1], rivalSpeed: 5.6, aggro: 1.2 },
+  { key: 'harbor', name: '항구', H: 64, time: 100, goal: 0.75, gen: genHarbor, ground: C.quay, sky: 0xffc6a5, sun: 0xffc48f, hemi: 0x9a7f86, sunI: 0.7,
+    rivals: [0.55, 0.85, 1.2, 1.7, 2.3], rivalSpeed: 6.0, aggro: 1.3 },
+  { key: 'airport', name: '공항', H: 68, time: 110, goal: 0.74, gen: genAirport, ground: C.field, sky: 0x9fb2e6, sun: 0xffd2a6, hemi: 0x6f7aa3, sunI: 0.66,
+    rivals: [0.6, 0.9, 1.3, 1.8, 2.4], rivalSpeed: 6.1, aggro: 1.3 }
 ];
 
 function newHole(g, isPlayer, r0, x, z, name) {
@@ -1446,10 +1721,10 @@ var SC = window.SC, $ = function (id) { return document.getElementById(id); };
 // ── 헬스키퍼 아케이드 연결 — 아케이드 창 안(?hk=1)에서 열렸을 때만 판 시작 · 점수를 넘긴다
 var inFrame = window.parent !== window, ARC = inFrame && /[?&]hk=1(&|$)/.test(location.search), HK = location.origin;
 function hk(msg) { if (ARC) { try { window.parent.postMessage(msg, HK); } catch (e) {} } }
-// 시험용(아케이드 창 안에서는 꺼진다): ?dbg=1 은 window.__hole 을 열고, &bot=1 자동 조종 · &area=1~2 뒤 구역부터 · &fast=N 빨리 감기 · &hq=1 화질 고정 · &nohud=1 그림만
+// 시험용(아케이드 창 안에서는 꺼진다): ?dbg=1 은 window.__hole 을 열고, &bot=1 자동 조종 · &area=1~4 뒤 구역부터 · &fast=N 빨리 감기 · &hq=1 화질 고정 · &nohud=1 그림만
 var DBG = !ARC && /[?&]dbg=1(&|$)/.test(location.search), AUTO = DBG && /[?&]bot=1(&|$)/.test(location.search);
 var FAST = DBG ? Math.max(1, +((location.search.match(/[?&]fast=(\d+)/) || [])[1] || 1)) : 1;   // 시험용: 빨리 감기
-var DBG_AREA = DBG ? Math.min(2, +((location.search.match(/[?&]area=(\d)/) || [])[1] || 0)) : 0;
+var DBG_AREA = DBG ? Math.min(SC.AREAS.length - 1, +((location.search.match(/[?&]area=(\d)/) || [])[1] || 0)) : 0;
 var reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 function fmt(n) { return Math.round(n).toLocaleString('ko-KR'); }
 // 받침에 맞춘 조사 — 공원을 · 주택가를, 주택가로 · 도심으로(ㄹ 받침은 「로」)
@@ -1521,7 +1796,7 @@ function pumpToast(dt) {
   el.classList.remove('show'); void el.offsetWidth; el.classList.add('show'); toastT = toastQ.length ? 0.75 : 1.2;
 }
 
-// ── 판 진행: 첫 화면 → (구역 안내 → 놀이 → 결과 → 상점) × 3 → 끝
+// ── 판 진행: 첫 화면 → (구역 안내 → 놀이 → 결과 → 상점) × 5 → 끝
 function toTitle() {
   mode = 'title'; paused = false; run = null; audioHold(false);
   game = SC.createGame(0, null, { demo: true }); R.load(game); R.setCam('orbit');
@@ -1543,6 +1818,7 @@ function startArea() {
   only(null); show('hud', true); show('warn', false); clearLabels();
   var no = (run.area + 1) + '구역', goal = Math.round(game.goal * 100);
   $('areaNo').textContent = no; $('areaName').textContent = A.name;
+  if (!$('pips').children.length) { for (i = 0; i < AREAS.length; i++) $('pips').appendChild(document.createElement('i')); }   // 점은 구역 수만큼(처음 한 번)
   var pips = $('pips').children; for (i = 0; i < pips.length; i++) pips[i].classList.toggle('on', i <= run.area);
   $('need').textContent = goal + '%'; $('goalMark').style.left = goal + '%';
   $('introNo').textContent = no; $('introName').textContent = A.name; $('introGoal').textContent = goal + '% 삼키기 · ' + Math.round(game.timeMax) + '초';
@@ -1578,7 +1854,7 @@ function showResult() {
     $('resTotalLabel').textContent = '번 코인'; $('resTotal').innerHTML = '<i class="coin"></i>' + fmt(e.earn);
     $('btnNext').textContent = '강화 상점 열기';
   } else {
-    if (e.won) { $('resTitle').textContent = '도시 정복'; $('resMsg').textContent = '공원부터 도심까지 통째로 삼켰어요.'; }
+    if (e.won) { $('resTitle').textContent = '도시 정복'; $('resMsg').textContent = AREAS[0].name + '부터 ' + AREAS[AREAS.length - 1].name + '까지 통째로 삼켰어요.'; }
     else { $('resTitle').textContent = '시간 끝'; $('resMsg').textContent = eul(A.name) + ' ' + pct + '% 삼켰어요. 목표 ' + goal + '%까지 ' + Math.max(1, goal - pct) + '% 모자랐어요.'; }
     rows = row('정복한 구역', run.cleared + ' / ' + AREAS.length) + row('삼킨 물건', fmt(run.eaten) + '개') + row('삼킨 구멍', run.rivals + '개');
     if (e.won) rows += row('남은 시간 보너스', '+' + fmt(e.timeScore)) + row('도시 정복 보너스', '+' + fmt(e.cityScore));
