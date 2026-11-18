@@ -331,7 +331,8 @@ const Sync={store:null,on:false,
 };
 
 // ── 효과음(WebAudio 로 직접 만든 소리) ──
-const Snd={ctx:null,out:null,nb:null,lastRim:0,
+const HIT_SND_GAP=70; // 벽 · 막대 소리 최소 간격(ms) — 공이 맞닿은 채 있으면 1초에 수백 번 울리던 것을 림 소리처럼 거른다
+const Snd={ctx:null,out:null,nb:null,lastRim:0,lastWall:0,lastBar:0,
   init(){
     if(this.ctx)return;const C=window.AudioContext||window.webkitAudioContext;if(!C)return;
     try{this.ctx=new C();}catch(e){return;}
@@ -360,9 +361,9 @@ const Snd={ctx:null,out:null,nb:null,lastRim:0,
   rim(s){const now=performance.now();if(now-this.lastRim<70)return;this.lastRim=now;s=s==null?1:s;
     this.tone(930,0.34,{type:'triangle',v:0.15*s});this.tone(1460,0.24,{v:0.07*s});this.tone(2310,0.12,{v:0.04*s});},
   swish(){this.noise(0.34,{v:0.32,f:3400,to:1300,q:0.6});this.noise(0.18,{v:0.1,f:6000,type:'highpass',at:0.04});},
-  wall(){this.tone(170,0.14,{v:0.26,to:90});this.noise(0.08,{v:0.1,f:700,type:'lowpass'});},
+  wall(){const now=performance.now();if(now-this.lastWall<HIT_SND_GAP)return;this.lastWall=now;this.tone(170,0.14,{v:0.26,to:90});this.noise(0.08,{v:0.1,f:700,type:'lowpass'});},
   thud(v){this.tone(110,0.2,{v:0.3*(v==null?1:v),to:55});this.noise(0.06,{v:0.08*(v==null?1:v),f:400,type:'lowpass'});},
-  bar(){this.tone(320,0.12,{type:'square',v:0.06,to:200});this.noise(0.06,{v:0.08,f:1500});},
+  bar(){const now=performance.now();if(now-this.lastBar<HIT_SND_GAP)return;this.lastBar=now;this.tone(320,0.12,{type:'square',v:0.06,to:200});this.noise(0.06,{v:0.08,f:1500});},
   combo(n){const st=[0,4,7,12,16,19,24,28];const k=Math.min(n,5);
     for(let i=0;i<=k;i++)this.tone(523.25*Math.pow(2,st[Math.min(i+(n>4?2:0),7)]/12),0.15,{type:'square',v:0.055,at:i*0.05});},
   fire(){this.noise(0.6,{v:0.2,f:250,to:1800,type:'lowpass'});this.tone(90,0.4,{type:'sawtooth',v:0.04,to:200});},
@@ -656,7 +657,7 @@ function addHoopA(spec){
   h.tilt.rotation.x=0.42;A.scene.add(h.root);A.hoops.push(h);syncHoopA(h);
   if(spec.move&&spec.move.posts){ // 움직이는 골대의 양 끝 기둥(튕김)
     for(const sg of [-1,1]){const px=spec.move.ax==='x'?h.cx+sg*(spec.move.amp+RR+0.42):h.cx+sg*(RR+0.42);
-      const py=spec.move.ax==='x'?h.cy:h.cy;addObs({type:'post',x:px,y:py,r:0.3});}
+      const py=spec.move.ax==='x'?h.cy:h.cy;addObs({type:'post',x:px,y:py,r:0.3,h});}
   }
   return h;
 }
@@ -672,8 +673,11 @@ function addObs(o){
     m.position.set(o.x,o.y,0);m.rotation.z=o.ang||0;s.add(m);o.mesh=m;
     if(o.type==='spin'){const hub=new THREE.Mesh(new THREE.CylinderGeometry(0.2,0.2,0.5,16),new THREE.MeshPhongMaterial({color:0x3b4452}));hub.rotation.x=Math.PI/2;m.add(hub);}
   }else if(o.type==='arc'){
-    const m=new THREE.Mesh(new THREE.TorusGeometry(o.r,0.1,8,40,o.span),new THREE.MeshPhongMaterial({color:0xff5a36,shininess:50}));
-    m.position.set(o.x,o.y,0);m.rotation.z=o.a0;s.add(m);o.mesh=m;
+    // 그림만 유리 난간 안쪽에서 끝나게 자른다(판정 o.a0 · o.span 은 그대로 — 벽 밖은 공이 못 가는 자리)
+    const c=(WX-Math.abs(o.x))/o.r;let d0=0,d1=o.span;
+    if(c<1){const ac=Math.acos(Math.max(-1,c));if(o.x>0)d0=clamp(ac-o.a0,0,o.span);else d1=clamp(Math.PI-ac-o.a0,0,o.span);}
+    const m=new THREE.Mesh(new THREE.TorusGeometry(o.r,0.1,8,40,Math.max(0.01,d1-d0)),new THREE.MeshPhongMaterial({color:0xff5a36,shininess:50}));
+    m.position.set(o.x,o.y,0);m.rotation.z=o.a0+d0;s.add(m);o.mesh=m;
   }else if(o.type==='post'){
     const g=new THREE.Group();
     const c1=new THREE.Mesh(new THREE.CylinderGeometry(o.r,o.r,0.5,24),new THREE.MeshPhongMaterial({color:0xffcf1f,shininess:40}));c1.rotation.x=Math.PI/2;g.add(c1);
@@ -702,7 +706,7 @@ function addStar(x,y,h){
 }
 function disposeObj(o){if(!o)return;A.scene.remove(o);o.traverse&&o.traverse(n=>{if(n.geometry&&n.geometry!==rimGeo&&n.geometry!==netGeo&&n.geometry!==ballGeo)n.geometry.dispose();if(n.material&&n.material!==ballMat){if(n.material.map&&n.material.map!==netTex&&n.material.map!==starTex&&n.material.map!==stripeTex&&n.material.map!==dotTex)n.material.map.dispose();n.material.dispose();}});}
 function resetA(){
-  for(const h of A.hoops)disposeObj(h.root);for(const o of A.obs)disposeObj(o.mesh);for(const st of A.stars)disposeObj(st.m);
+  for(const h of A.hoops){disposeObj(h.root);if(h.obs)for(const o of h.obs)disposeObj(o.mesh);}for(const o of A.obs)disposeObj(o.mesh);for(const st of A.stars)disposeObj(st.m);
   A.hoops=[];A.obs=[];A.stars=[];A.falling=[];
 }
 // 다음 골대 만들기 — 레벨이 오를수록 기울고 · 움직이고 · 막대가 생긴다
@@ -730,7 +734,7 @@ function genTarget(prev,L){
     }else if(kind<0.8){ // 가로 막대 — 골대 위쪽 바깥(높게 띄우면 막힘)
       addObs({type:'bar',x:clamp(x+(x>0?0.6:-0.6),-WX+1,WX-1),y:y+rand(2.6,3.3),len:rand(1.6,2.2),ang:0});
     }else{ // 반원 울타리 — 벽 쪽을 감싸 안쪽으로만 들어가게
-      const r=1.75,span=100*DEG,a0=x>0?(-10*DEG):(90*DEG);addObs({type:'arc',x,y,r,span,a0});
+      const r=1.75,span=100*DEG,a0=x>0?(-10*DEG):(90*DEG);addObs({type:'arc',x,y,r,span,a0,h});
     }
   }
   if(L>=4&&!move&&Math.random()<0.25+0.07*(L-4)){ // 도는 막대 — 두 골대 사이
@@ -770,6 +774,7 @@ function hoopColl(h){
   const q1x=bx+a.tx*0.6,q1y=by+a.ty*0.6,q2x=bx-a.tx*0.6,q2y=by-a.ty*0.6;
   hitSeg(p1x,p1y,q1x,q1y,0.04,0.25);hitSeg(p2x,p2y,q2x,q2y,0.04,0.25);hitSeg(q1x,q1y,q2x,q2y,0.04,0.2);
 }
+function obsTop(o){return o.type==='arc'?o.r+0.1:o.type==='post'?o.r:o.len/2+0.18;} // 중심에서 위쪽 끝까지(판정 두께 포함)
 function obsColl(o){
   if(o.type==='bar'||o.type==='spin'){
     const c=Math.cos(o.ang),s=Math.sin(o.ang),hl=o.len/2;
@@ -789,10 +794,41 @@ function obsColl(o){
 function shootA(ang,power){
   const sp=lerp(VMIN,VMAX,power);
   const s=seatOf(A.cur,0);A.b.x=s.x;A.b.y=s.y;A.v.x=Math.sin(ang)*sp;A.v.y=Math.cos(ang)*sp;
-  A.phase='fly';A.flyT=0;A.touched=false;A.bounced=false;hideDots();
+  A.phase='fly';A.flyT=0;A.touched=false;A.bounced=false;hideDots();stuckResetA();
   A.cur.strV-=6*power;A.cur.str=Math.max(A.cur.str,0);
   Snd.throw(power);
 }
+/* ─── 끼임 풀기 ───────────────────────────────────────────────
+   던진 공이 벽과 림 끝 · 울타리 · 기둥 사이 구석이나 가로 막대 위, 그물 안에서 멈추면
+   「날아가는 중」이 7초 동안 이어져 당기기를 못 했다. 게임 시간(멈춤 · 탭 숨김 동안은 0)으로 재서
+   멈추거나 맴돈 지 늦어도 2초(RATTLE_T + UNSTICK_MAX_T = 1.9초) 안에 푼다. 그런 공이 아니면 아무 일도 하지 않는다.
+   · 그물 안에 얹혀 멈춤 → 들어간 것(위에서 들어온 공만 그물 안에 있을 수 있다)
+   · 그 밖 → 1단계: 화면 가운데 쪽 · 위로 살짝 튕겨 뺀다. 이때부터 이번 슛은 「없던 일」 —
+     어디로 가든(다음 골대 · 화면 아래 · 다시 멈춤 · 0.9초 지남) 던지기 전 골대로 돌아간다.
+     점수 · 연속 완벽 · 2배 · 불꽃 · 미션은 그대로, 놓침 · 이어하기도 아님, 튕겨 뺀 뒤에는 별도 못 먹는다. */
+const STUCK_R=0.3;        // 이 반지름 안에서만 움직이면 「멈춤」 — 빈 공중에서는 꼭대기에서도 0.3초를 못 머문다(0.5·GA·t² 로 0.15초에 0.3)
+const STUCK_T=0.7;        // 그 안에서 STUCK_V 보다 느린 시간이 0.7초 쌓이면 끼임(0.6 은 림 위에서 천천히 구르다 들어가는 공 1개/2만 번을 건드렸다)
+const STUCK_V=0.5;        // 「거의 멈춤」 속력 — 림에서 튀며 들어가는 공은 이보다 빠르다
+const RATTLE_T=1.0;       // 빠르게라도 반지름 안에서 이만큼 맴돌면 끼임(구석에서 떨며 맴도는 공)
+const UNSTICK_VX=2.5,UNSTICK_VY=3; // 1단계에 주는 속도 — 가운데 쪽 · 위
+const UNSTICK_MAX_T=0.9;  // 1단계 뒤 이만큼 지나도 안 풀리면 2단계(던지기 전 골대로) — RATTLE_T + 이 값 = 1.9초
+const NET_IN=0.6;         // 림 면 아래 이 깊이까지가 「그물 안」(그물 바닥에 얹힌 공 중심은 약 -0.49)
+function rimSideA(){const pa=[];for(const hp of [A.cur,A.tgt]){if(!hp)continue;const a=axes(hp);pa.push((A.b.x-hp.x)*a.ux+(A.b.y-hp.y)*a.uy);}return pa;}
+function stuckResetA(){A.stk={x:A.b.x,y:A.b.y,t:0,s:0};A.unstick=0;A.unstickT=0;}
+function returnA(){catchA(A.cur);} // 던지기 전 골대로 — catchA 의 앞 골대 길(점수 없음 · 0.2초 미끄러져 앉음)
+function stuckTickA(dt){
+  const k=A.stk||(stuckResetA(),A.stk);
+  if(Math.hypot(A.b.x-k.x,A.b.y-k.y)>STUCK_R){k.x=A.b.x;k.y=A.b.y;k.t=0;k.s=0;}
+  else{k.t+=dt;if(Math.hypot(A.v.x,A.v.y)<STUCK_V)k.s+=dt;}
+  if(A.unstick){A.unstickT+=dt;if(A.unstickT>=UNSTICK_MAX_T||k.s>=STUCK_T)returnA();return;}
+  if(k.s<STUCK_T&&k.t<RATTLE_T)return;
+  for(const hp of [A.tgt,A.cur]){if(!hp)continue;const a=axes(hp);
+    const qa=(A.b.x-hp.x)*a.ux+(A.b.y-hp.y)*a.uy,ql=(A.b.x-hp.x)*a.tx+(A.b.y-hp.y)*a.ty;
+    if(qa<=0&&qa>-NET_IN&&Math.abs(ql)<RR-0.16){catchA(hp);return;}}
+  A.unstick=1;A.unstickT=0;k.x=A.b.x;k.y=A.b.y;k.t=0;k.s=0;
+  A.v.x=(A.b.x>0?-1:1)*UNSTICK_VX;A.v.y=UNSTICK_VY;
+}
+/* ─── 끼임 풀기 끝 ─── */
 function aimFromDrag(){
   const dx=drag.x0-drag.x,dy=drag.y-drag.y0,len=Math.hypot(dx,dy);
   const full=clamp(Math.min(VW,VH)*0.36,120,300);
@@ -832,6 +868,9 @@ function catchA(h){
   setComboTag();
   // 앞 골대는 떨어져 사라지고, 새 골대가 위에 생긴다
   const old=A.cur;A.falling.push(old);
+  // 딸린 울타리 · 기둥도 판정에서 빼고 골대와 함께 떨어뜨린다(흐리게 하려고 이때 투명을 켬)
+  old.obs=A.obs.filter(o=>o.h===old);A.obs=A.obs.filter(o=>o.h!==old);
+  for(const o of old.obs)o.mesh.traverse(n=>{if(n.material){n.material.transparent=true;n.material.needsUpdate=true;}});
   h.rimMat.color.setHex(RIM_COLD);A.cur=h;
   run.made++;updHud();
   const clear=run.goal&&run.made>=run.goal;
@@ -841,6 +880,7 @@ function catchA(h){
 }
 function updA(dt){
   const t=performance.now()/1000;
+  const pa0=A.phase==='fly'?rimSideA():null; // 골대가 움직이기 전 림 면 기준(위아래 골대가 공을 지나쳐 올라가도 들어감을 놓치지 않게)
   // 움직이는 골대
   for(const h of A.hoops){
     if(h.move&&!h.frozen){h.mt+=dt;const o=Math.sin(h.mt*h.move.w)*h.move.amp;if(h.move.ax==='x')h.x=h.cx+o;else h.y=h.cy+o;}
@@ -851,14 +891,16 @@ function updA(dt){
   // 떨어지는 앞 골대
   for(let i=A.falling.length-1;i>=0;i--){const h=A.falling[i];h.fv+=22*dt;h.y-=h.fv*dt;h.fall+=dt;
     h.rimMat.opacity=h.netMat.opacity=Math.max(0,1-h.fall*1.4);syncHoopA(h);
-    if(h.fall>0.9){disposeObj(h.root);A.hoops.splice(A.hoops.indexOf(h),1);A.falling.splice(i,1);}}
+    if(h.obs)for(const o of h.obs){o.mesh.position.y-=h.fv*dt;o.mesh.traverse(n=>{if(n.material)n.material.opacity=h.rimMat.opacity;});}
+    if(h.fall>0.9){disposeObj(h.root);if(h.obs)for(const o of h.obs)disposeObj(o.mesh);h.obs=null;A.hoops.splice(A.hoops.indexOf(h),1);A.falling.splice(i,1);}}
   // 장애물
   for(const o of A.obs){if(o.type==='spin'){o.ang+=o.w*dt;o.mesh.rotation.z=o.ang;}}
   for(const st of A.stars){st.t+=dt;if(!st.got){starFollow(st);st.m.rotation.z=Math.sin(st.t*2)*0.3;st.m.scale.setScalar(1+Math.sin(st.t*4)*0.08);}
     else{st.m.position.y+=dt*3;st.m.material.opacity=Math.max(0,st.m.material.opacity-dt*2.5);}}
   // 화면 아래로 지나간 것 정리
   const bottom=A.camY-A.hh-3;
-  for(let i=A.obs.length-1;i>=0;i--){const o=A.obs[i];if(o.y<bottom-2){disposeObj(o.mesh);A.obs.splice(i,1);}}
+  // 장애물은 위쪽 끝이 공이 닿을 수 있는 선(죽는 선 1.2 + 공 반지름 + 한 프레임 낙하 여유 2.5)보다 내려가면 치운다
+  for(let i=A.obs.length-1;i>=0;i--){const o=A.obs[i];if(o.y+obsTop(o)<A.camY-A.hh-1.2-BR-2.5){disposeObj(o.mesh);A.obs.splice(i,1);}}
   for(let i=A.stars.length-1;i>=0;i--){const st=A.stars[i];if(st.y<bottom||(st.got&&st.m.material.opacity<=0)){disposeObj(st.m);A.stars.splice(i,1);}}
   // 공
   if(A.phase==='rest'||A.phase==='aim'){
@@ -873,23 +915,24 @@ function updA(dt){
   }else if(A.phase==='fly'){
     const N=4,h=dt/N;A.flyT+=dt;
     for(let i=0;i<N&&A.phase==='fly';i++){
-      const pa=[];for(const hp of [A.cur,A.tgt]){if(!hp)continue;const a=axes(hp);pa.push((A.b.x-hp.x)*a.ux+(A.b.y-hp.y)*a.uy);}
+      const pa=i===0&&pa0?pa0:rimSideA();
       A.v.y-=GA*h;A.b.x+=A.v.x*h;A.b.y+=A.v.y*h;
       if(A.b.x>WX-BR){A.b.x=WX-BR;A.v.x=-Math.abs(A.v.x)*0.92;A.bounced=true;Snd.wall();}
       if(A.b.x<-WX+BR){A.b.x=-WX+BR;A.v.x=Math.abs(A.v.x)*0.92;A.bounced=true;Snd.wall();}
       let j=0;
       for(const hp of [A.cur,A.tgt]){if(!hp)continue;hoopColl(hp);
         const a=axes(hp),qa=(A.b.x-hp.x)*a.ux+(A.b.y-hp.y)*a.uy,ql=(A.b.x-hp.x)*a.tx+(A.b.y-hp.y)*a.ty,va=A.v.x*a.ux+A.v.y*a.uy;
-        if(pa[j]>0&&qa<=0&&Math.abs(ql)<RR-0.16&&va<0){catchA(hp);break;}
+        if(pa[j]>0&&qa<=0&&Math.abs(ql)<RR-0.16&&va<0){catchA(A.unstick?A.cur:hp);break;}
         j++;}
       if(A.phase!=='fly')break;
       for(const o of A.obs)if(obsColl(o)){A.touched=true;Snd.bar();}
-      for(const st of A.stars)if(!st.got&&Math.hypot(st.x-A.b.x,st.y-A.b.y)<BR+0.42)gotStar(st);
+      for(const st of A.stars)if(!st.got&&!A.unstick&&Math.hypot(st.x-A.b.x,st.y-A.b.y)<BR+0.42)gotStar(st);
     }
     if(A.phase==='fly'){
       A.ball.rotation.z-=A.v.x*dt/BR;
       const lvl=run.combo>=3?2:run.combo>=2?1:0;if(lvl)trail(A.b.x,A.b.y,-0.05,lvl,BR);
-      if(A.b.y<A.camY-A.hh-1.2||A.flyT>7)missA();
+      stuckTickA(dt);
+      if(A.phase==='fly'&&(A.b.y<A.camY-A.hh-1.2||A.flyT>7)){if(A.unstick)returnA();else missA();}
     }
   }
   A.ball.position.set(A.b.x,A.b.y,0.05);
