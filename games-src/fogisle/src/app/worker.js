@@ -1,5 +1,6 @@
-// 주는 것: 워커 러너 — runJob(mod, fn, args) → Promise<{ value, where, slices, moved }>. shared 의 함수(보통 function* — 굽기 같은 긴 일)를
+// 주는 것: 워커 러너 — runJob(mod, fn, args, onStep) → Promise<{ value, where, slices, moved }>. shared 의 함수(보통 function* — 굽기 같은 긴 일)를
 //   Blob 워커에서 끝까지 돌리고 결과 속 형식 배열의 버퍼를 transfer 로 돌려받는다. 얇은 틀이다 — 일의 내용은 모른다.
+//   진행 알림: function* 이 쉬는 자리에서 글자(단계 이름)를 내놓으면 onStep(이름)을 부른다(워커 길 · 주 스레드 길 모두 — 준비 띠가 이것으로 찬다. 값 없이 쉬는 자리는 안 알린다).
 //   워커는 답을 두 통으로 보낸다: 값(버퍼를 넘기며) → 맺음(moved = 보낸 뒤 워커 쪽에서 정말 비워진 버퍼 수 — 복사가 아니라 넘김이었다는 증거).
 // 받는 것: <script id="fg-shared"> 의 글(워커가 그 글을 그대로 실행한다 — 한 파일 배포에서도 주 창과 같은 코드) · tune(스냅숏) · tune/app.worker.
 // 워커를 못 만들거나(생성자가 없거나 막힘 · 오류 사건 · readyMs 안에 준비 신호 없음) 워커가 끊기면 주 스레드에서 MessageChannel 로
@@ -24,7 +25,11 @@ function workerMain() {
     try {
       if (!T.tuneApply(job.tune)) throw new Error('워커의 수치 표를 주 창과 맞추지 못했다');
       let r = S[job.mod][job.fn](...job.args);
-      if (r && typeof r.next === 'function') { let s = r.next(); while (!s.done) s = r.next(); r = s.value; }
+      if (r && typeof r.next === 'function') {
+        let s = r.next();
+        while (!s.done) { if (typeof s.value === 'string') self.postMessage({ id: job.id, step: s.value }); s = r.next(); }
+        r = s.value;
+      }
       const list = buffers(r, []);
       self.postMessage({ id: job.id, value: r }, list);
       self.postMessage({ id: job.id, ok: true, moved: list.filter((b) => b.byteLength === 0).length });
@@ -46,7 +51,11 @@ function runOnMain(job) {
       slices += 1;
       try {
         let s = it.next();
-        while (!s.done && performance.now() - t0 < APP.worker.sliceMs) s = it.next();
+        while (!s.done) {
+          if (typeof s.value === 'string' && job.onStep) job.onStep(s.value);
+          if (performance.now() - t0 >= APP.worker.sliceMs) break;
+          s = it.next();
+        }
         if (s.done) { ch.port1.close(); done(s.value, slices); } else ch.port2.postMessage(0);
       } catch (e) { ch.port1.close(); job.reject(e); }
     };
@@ -79,6 +88,7 @@ function onMessage(e) {
   if (m.ready) { W.ready = true; settle(); return; }
   const job = W.jobs.get(m.id);
   if (!job) return;
+  if (m.step !== undefined) { if (job.onStep) job.onStep(m.step); return; }
   if (m.ok === undefined) { job.value = m.value; return; }
   W.jobs.delete(m.id);
   if (m.ok) job.resolve({ value: job.value, where: 'worker', slices: 1, moved: m.moved }); else job.reject(new Error(m.error));
@@ -95,9 +105,9 @@ function spawn() {
   } catch (e) { W.dead = true; settle(); }
 }
 
-export function runJob(mod, fn, args) {
+export function runJob(mod, fn, args, onStep) {
   return new Promise((resolve, reject) => {
-    const job = { id: ++W.seq, mod, fn, args, resolve, reject };
+    const job = { id: ++W.seq, mod, fn, args, resolve, reject, onStep };
     if (!W.worker && !W.dead) spawn();
     if (W.dead) { runOnMain(job); return; }
     W.jobs.set(job.id, job);

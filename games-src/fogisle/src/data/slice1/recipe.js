@@ -3,6 +3,7 @@
 // 바다는 +z(남쪽). 절벽 선이 양 끝에서 바다로 나와 만을 닫는다(세계의 끝 = 물과 절벽). 동굴은 아직 입구의 우묵한 자리뿐이다(안은 F12).
 // 지형 도장 여덟을 다 쓴다: 등대 터와 동굴 어귀(평평하게) · 물속 바위섬(올리기) · 물웅덩이(깎기) · 동쪽 곶 발치의 선반(계단밭) · 부두 ~ 동굴 길 · 가로 밀기 · 틈.
 // 과녁 자리 8(등롱 3 · 병 3 · 부표 2 — target) · 책갈피 6 · 등불 7(등대 = 스위치 묶음 0 · 야영지와 부두 = 늘 켜짐 · 과녁 등롱 = 깨지는 묶음 4 ~ 6).
+// 야영지와 부두 어귀의 짐(상자 · 드럼통)은 엄폐물이다 — 길(부두 ~ 동굴)에서 비켜 둔다. 끌어 올린 고무보트는 시작 자리 곁, 말뚝과 밧줄은 동굴로 가는 길의 바다 쪽.
 export const recipe = {
   id: 'slice1', size: [128, 96], seed: 11, sea: 0, sky: 'dawn',
   terrain: [
@@ -39,13 +40,18 @@ export const recipe = {
     { piece: 'bottle', at: [10.7, 34.6], on: 'top', target: true },
     { piece: 'buoy', at: [-12, 36], lean: 7, target: true },
     { piece: 'buoy', at: [18, 39], lean: -5, target: true },
+    { piece: 'boat', at: [1.5, 26.4], rot: 200 },
+    { piece: 'crate', at: [-5, 9.3], rot: 12, size: 1.4 }, { piece: 'crate', at: [-3.6, 10], rot: -8, size: 1.1 },
+    { piece: 'drum', at: [-6.7, 9.1] }, { piece: 'drum', at: [-7.4, 9.8] },
+    { piece: 'crate', at: [12.8, 15.4], rot: 20, size: 1.4 }, { piece: 'crate', at: [14.1, 14.6], rot: -14, size: 1.3 }, { piece: 'drum', at: [12.2, 14.2] },
+    { piece: 'rope', line: [[-9.5, 13], [-14.6, 11.9], [-19.6, 10.4]] },
   ],
   lights: [],
   zones: [],
   marks: {
     spawn: [-2, 25, -32],
     stations: {
-      landing: [10, 33, 14, 6], beach: [-2, 25, -32, 20], camp: [-1, 13.5, 70, 0],
+      landing: [10, 33, 14, 6, 'top'], beach: [-2, 25, -32, 20], camp: [-1, 13.5, 70, 0],
       cave: [-13.5, 11, 30, 8], rocks: [24, 24, 115, 0], cliff: [14, 9, -20, 35],
     },
     points: { cave: [-18, 4] },

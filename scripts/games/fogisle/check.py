@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 """안개 군도 FPS(fogisle) — 브라우저 하네스. 헤드리스 크롬(Playwright)으로 묶은 파일을 열어 본다.
 
-  /usr/bin/python3 check.py gate                     lint → build → simtest gate → smoke(개발판 · 배포판) · arcade · hash · worker · world (4분 안)
+  /usr/bin/python3 check.py gate                     lint → build → simtest gate → smoke(개발판 · 배포판) · arcade · hash · worker · world · bake (4분 안)
   /usr/bin/python3 check.py full                     gate 의 것 전부 + simtest full
-  /usr/bin/python3 check.py smoke [--release] | arcade | hash | worker | world   하나씩(여럿을 이어 적어도 된다 — 먼저 묶기를 한 번 돌린다)
+  /usr/bin/python3 check.py smoke [--release] | arcade | hash | worker | world | bake   하나씩(여럿을 이어 적어도 된다 — 먼저 묶기를 한 번 돌린다)
   … --out <폴더>                                      캡처 · 기록을 둘 곳(기본: 시스템 임시 폴더의 fogisle-check — 저장소 밖)
 
 종료 코드 0 = 통과 · 1 = 실패 · 2 = 쓰는 법이 틀림. 마지막 줄은 늘 JSON 요약이다.
@@ -27,7 +27,7 @@ PARENT_PATH = "/__harness/parent.html"
 FILES = {"dev": "fogisle.dev.html", "release": "fogisle.html"}
 CHROME_ARGS = ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"]
 NODE = "/usr/local/bin/node" if pathlib.Path("/usr/local/bin/node").exists() else "node"
-BROWSER_CMDS = ("smoke", "arcade", "hash", "worker", "world")
+BROWSER_CMDS = ("smoke", "arcade", "hash", "worker", "world", "bake")
 LATER_CMDS = ("leak", "perf", "compile", "alloc", "feel", "audio", "ui", "bench")   # 그것이 처음 필요한 단계가 만든다(build-plan 부록 A)
 TYPES = {".js": "text/javascript", ".woff2": "font/woff2", ".html": "text/html; charset=utf-8", ".json": "application/json"}
 THRESHOLDS = json.loads((HARNESS / "thresholds.json").read_text(encoding="utf-8"))
@@ -73,7 +73,7 @@ class Game:
             if time.time() > deadline:
                 raise RuntimeError("가짜 부모 창이 게임 창을 띄우지 못했다")
             self.page.wait_for_timeout(10)
-        self.wait("window.__fg_status && __fg_status.phase !== 'boot'" + (" && (__fg_status.probe || __fg_status.phase !== 'title')" if settle else ""))
+        self.wait("window.__fg_status && __fg_status.phase !== 'boot'" + (" && (__fg_status.readySec !== null || __fg_status.phase !== 'title')" if settle else ""))
 
     def _route(self, route, request):
         url, path = request.url, urlsplit(request.url).path
@@ -112,7 +112,8 @@ class Game:
 
     def wait(self, expr, timeout=None):
         try:
-            self.frame.wait_for_function(expr, timeout=timeout or T["waitMs"])
+            # 조건은 정해진 틈(pollMs)마다 본다 — rAF 에 묶어 보면 rAF 를 세우거나 가짜로 바꾼 시험에서 영영 안 본다(준비가 생성 · 굽기로 길어져 처음 한 번에 참이 아니다)
+            self.frame.wait_for_function(expr, timeout=timeout or T["waitMs"], polling=T["pollMs"])
         except Exception as e:
             now = self.frame.evaluate("window.__fg_status ? JSON.stringify(window.__fg_status) : document.documentElement.outerHTML.slice(0, 200)")
             raise RuntimeError(f"기다리던 것이 오지 않았다: {expr[:120]} — 지금 {now} ({type(e).__name__})")
@@ -167,7 +168,8 @@ class Game:
 
 class Harness:
     # 시험들이 같이 쓰는 조각(게임 창에서 도는 글)
-    READY = "__fg_status.phase === 'title' && __fg_status.probe !== null"
+    # 타이틀의 준비(자가 점검 → 세계 생성 → 굽기)가 다 끝났다 = 출격이 열렸다(readySec 은 그때 적힌다)
+    READY = "__fg_status.phase === 'title' && __fg_status.probe !== null && __fg_status.readySec !== null"
     ONLY_GAME = "if (location.pathname.endsWith('/fogisle.html')) { %s }"
     BREAK_DRAW = "() => { THREE.Object3D.prototype.onBeforeRender = () => { throw new Error('시험용 고장'); }; }"
     FAKE_RAF = """(() => { const C = window.__clock = { q: [], t: 0, real: window.requestAnimationFrame };
@@ -205,7 +207,7 @@ class Harness:
             self.browser = self.pw = None
 
     def open(self, mode="dev", parent=False, query="", init=(), allow=(), viewport=(1280, 720), settle=True):
-        """settle=False = 타이틀의 준비(자가 점검)가 끝나기를 기다리지 않고 돌려준다(준비 중인 화면을 볼 때)"""
+        """settle=False = 타이틀의 준비(자가 점검 → 생성 → 굽기)가 끝나기를 기다리지 않고 돌려준다(준비 중인 화면을 볼 때)"""
         self.start()
         return Game(self, mode, parent, ("hk=1&" + query).rstrip("&") if parent and query else query, init, allow, viewport, settle)
 
@@ -259,7 +261,7 @@ def expand(cmds, release):
         if cmd in ("gate", "full"):
             steps += [("lint", "node", ["tools/lint.mjs"]), ("build", "node", ["tools/build.mjs"]), ("simtest " + cmd, "node", ["tools/simtest.mjs", cmd])]
             steps += [("smoke", "case", {"release": False}), ("smoke --release", "case", {"release": True})]
-            steps += [(name, "case", {"release": False}) for name in ("arcade", "hash", "worker", "world")]
+            steps += [(name, "case", {"release": False}) for name in ("arcade", "hash", "worker", "world", "bake")]
         else:
             steps.append((cmd + (" --release" if release and cmd == "smoke" else ""), "case", {"release": release}))
     if not any(kind == "node" and name == "build" for name, kind, _ in steps):

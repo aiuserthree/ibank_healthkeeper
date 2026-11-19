@@ -12,6 +12,8 @@ import { stageInit, stageResize, stageDraw } from './stage.js';
 import { runJob } from './worker.js';
 import { GAME } from '../shared/game.js';
 import { hashState } from '../shared/state.js';
+import { STAGES } from '../shared/bake/index.js';
+import { recipe as slice1 } from '../data/slice1/recipe.js';
 import { tuneFreeze } from '../shared/tune/index.js';
 import { APP } from '../shared/tune/app.js';
 
@@ -78,18 +80,31 @@ function publishStatus() {
   def('phase', () => CTX.phase); def('lock', () => CTX.lock.s); def('arcade', () => CTX.arcade);
   def('mission', () => CTX.mission); def('objective', () => 0); def('step', () => (CTX.state ? CTX.state.clock.step : 0)); def('hash', () => (CTX.state ? hashState(CTX.state) : null));
   def('frameMs', () => Math.round(CTX.perf.frameMs * 100) / 100); def('quality', () => null); def('readySec', () => CTX.readySec);
-  def('worker', () => CTX.worker); def('probe', () => CTX.probe); def('tainted', () => CTX.tainted); def('error', () => CTX.error); def('stray', () => CTX.stray);
+  def('worker', () => CTX.worker); def('probe', () => CTX.probe); def('prep', () => CTX.prep); def('world', () => CTX.made); def('tainted', () => CTX.tainted); def('error', () => CTX.error); def('stray', () => CTX.stray);
   Object.defineProperty(window, '__fg_status', { value: Object.freeze(st), enumerable: true });
 }
 
-// 타이틀이 떠 있는 동안: 워커 러너로 결정성 자가 점검 한 판(워커 길이 되는지 · 어느 길로 돌았는지 · 해시)을 돌리고, 끝나면 출격을 연다.
-// 뒤 단계에서는 이 자리에서 세계 생성 → 굽기 → 셰이더 예열이 돈다(tdd §3-5). 실패하면 덮개 → 「다시 시작」이 타이틀로 오며 한 번 더 돌린다.
-// 덜 된 동안은 단추가 잠기고 그 아래 「작전 지역 준비 중」 줄이 보인다(<html data-fg-ready>).
+// 준비의 진행: 단계 이름을 <html data-fg-prep> 에, 찬 정도(0 ~ 1)를 CSS 변수 --fg-prep 에 적는다(준비 띠의 그림은 셸이 정한다 — 화면 글은 셸에 있다)
+function prepStep(name) {
+  CTX.prep = name; root.dataset.fgPrep = name;
+  root.style.setProperty('--fg-prep', String(Math.max(0, STAGES.indexOf(name)) / (STAGES.length - 1)));
+}
+
+// 타이틀이 떠 있는 동안: 워커 러너로 ① 결정성 자가 점검 한 판(워커 길이 되는지 · 어느 길로 돌았는지 · 해시) ② 「바로 출격」이 갈 세계의 생성 → 굽기를 돌리고,
+// 끝나면 출격을 연다(tdd §3-5 — 셰이더 예열은 F2a ~ F2c 가 이 뒤에 잇는다). 굽는 동안 워커가 단계 이름을 알려 온다(prepStep).
+// 실패하면 덮개 → 「다시 시작」이 타이틀로 오며 한 번 더 돌린다. 덜 된 동안은 단추가 잠기고 그 아래 「작전 지역 준비 중」 줄이 보인다(<html data-fg-ready>).
+// 세계는 안 바뀌므로 다시 하기 · 타이틀로 돌아오기에서는 다시 만들지 않는다(CTX.ready 가 그대로다).
 function prepare() {
   if (CTX.ready || CTX.busy) return;
   CTX.busy = true; CTX.titleAt = performance.now();
+  prepStep('check');
   runJob('shared/probe.js', 'probeRun', [APP.selfCheck.seed, APP.selfCheck.steps]).then((r) => {
     CTX.worker = r.where; CTX.probe = r.value.hash;
+    return runJob('shared/bake/index.js', 'prepSteps', [slice1], prepStep);
+  }).then((r) => {
+    CTX.world = r.value.world; CTX.baked = r.value.baked;
+    CTX.made = Object.freeze({ id: slice1.id, hash: r.value.hash.world, bake: r.value.hash.bake, where: r.where, slices: r.slices });
+    prepStep('done');
     CTX.readySec = Math.round(performance.now() - CTX.titleAt) / 1000;
     CTX.ready = true; root.dataset.fgReady = '1';
     $('fgGo').disabled = false;

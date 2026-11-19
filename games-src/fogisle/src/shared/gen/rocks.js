@@ -42,7 +42,7 @@ export function rockProtos(salt) {
     // 밑동을 어둡게(그늘 칸) — 인스턴스는 꼭짓점마다 빛을 구울 수 없어 원형에 넣어 둔다
     const mesh = shade(soup, 35), dark = new Float32Array(mesh.pos.length / 3);
     for (let v = 0; v < dark.length; v++) dark[v] = R.baseDark + (1 - R.baseDark) * sstep(-0.55, 0.25, mesh.pos[v * 3 + 1]);
-    out.push({ name: 'rock' + kind, mesh, dark, part: makePart('rock', mesh, { tint: TINT, shade: dark }) });
+    out.push({ name: 'rock' + kind, mesh, dark, part: makePart('rock', mesh, { tint: TINT, shade: dark }, salt + kind) });
   }
   return out;
 }
@@ -117,21 +117,22 @@ function putRock(G, look, x, z, size) {
   if (y !== ground - size * R.sink) G.count.rocksMoved += 1;
   const T = xf(x, y, z, turn[0], turn[1], turn[2], turn[3], turn[4], turn[3]);
   if (size > R.staticOver) {
-    addMesh(G.B, 'rock', placeMesh(proto.mesh, T), { tint: TINT, shade: proto.dark, solid: SURF.indexOf('rock') });
+    addMesh(G.B, 'rock', placeMesh(proto.mesh, T), { tint: TINT, shade: proto.dark, solid: SURF.indexOf('rock'), owner: 1 });
     G.count.staticRocks += 1;
   } else {
     G.inst[kind].push(x, y, z, turn[0], turn[1], turn[2], turn[3], turn[4]);
-    if (size >= R.collideOver) addSolid(G.B, placeMesh(proto.mesh, T), SURF.indexOf('rock'));
+    if (size >= R.collideOver) addSolid(G.B, placeMesh(proto.mesh, T), SURF.indexOf('rock'), 1);
   }
   return true;
 }
 
-// 흩기 한 줄. nth = 같은 띠의 줄 가운데 몇 번째인가 — 난수 씨앗을 「띠의 번호(tune 의 band 표에서의 차례) + 띠 수 × nth」에서 뽑는다(레시피 안의 차례가 아니다):
-//   다른 띠의 줄을 앞에 끼워도 이 줄의 바위는 그대로고, 수(n)를 늘리면 있던 바위는 그대로 두고 뒤에 더 놓인다. band 표에 띠를 더할 때는 맨 뒤에 더한다.
+// 흩기 한 줄. nth = 같은 띠의 줄 가운데 몇 번째인가 — 난수 씨앗을 띠의 첫 줄은 「띠의 번호(tune 의 band 표에서의 차례)」, 둘째 줄부터는 「띠 이름 + nth」에서 뽑는다
+//   (레시피 안의 차례가 아니다): 다른 띠의 줄을 앞에 끼워도 이 줄의 바위는 그대로고, 수(n)를 늘리면 있던 바위는 그대로 두고 뒤에 더 놓인다. band 표에 띠를 더할 때는
+//   맨 뒤에 더한다(가운데 끼우면 뒤 띠의 첫 줄이 바뀐다 — 둘째 줄부터는 이름에서 뽑으니 표가 바뀌어도 그대로다). 같은 띠에 줄을 더할 때는 그 띠의 줄들 뒤에 적는다.
 // 난수는 바위마다 늘 같은 수만큼 쓴다(자리가 막혀 버려지는 바위 · 안 생기는 잔돌에도) — 레시피에 조각을 더해 몇 개가 비켜나도 다른 바위는 그대로다.
 export function scatterRocks(G, item, nth) {
   const R = WORLD.rock, bands = Object.keys(WORLD.band), band = WORLD.band[item.region], T = G.T, face = item.region === 'face';
-  const rng = makeRng(seedFrom(G.salt, 'scatter' + (bands.indexOf(item.region) + bands.length * nth)));
+  const rng = makeRng(seedFrom(G.salt, nth ? 'scatter:' + item.region + ':' + nth : 'scatter' + bands.indexOf(item.region)));
   if (!(item.n <= WORLD.range.count[1])) throw new Error(`흩기 ${item.region} 의 수 n = ${String(item.n)} — ${WORLD.range.count[1]} 이하의 수여야 한다`);
   for (let i = 0; i < item.n; i++) {
     const x = T.x0 + rngNext(rng) * T.w, u = lerp(band.near, band.far, rngNext(rng)), t = rngNext(rng), size = lerp(item.size[0], item.size[1], t * t), z = zAtU(T, x, u);

@@ -1,17 +1,23 @@
 // 주는 것: 세계 생성 — genSteps(레시피 → 세계. 조각내 돌릴 수 있는 function* — 굽기(F1b)가 뒤에 이어 붙는다) · generate(끝까지) · genRaw(검사 없이) · hashWorld · WORLD_VERSION.
 // 받는 것: recipe(검사) · terrain · rocks · kit · build · shapes · rng · state(해시 · 복사) · tune/world. three · DOM 을 모른다 — Node · 크롬 · 워커가 같은 비트를 낸다.
 // 세계(일반 객체 · 배열 · 형식 배열만 — 워커에서 넘겨받을 수 있고 hashState 로 해시한다):
-//   batches[]  그릴 묶음(재질 × 32m 칸): { mat, cell(칸 번호 = 세로 칸 × 가로 칸 수 + 가로 칸), pos · nor(Float32 ×3), col(Uint8 ×4: 색조 × 큰 얼룩 · 그늘),
+//   batches[]  그릴 묶음(재질 × 색조 × 32m 칸): { mat, tint([r, g, b] — 색조는 묶음의 값이다), cell(칸 번호 = 세로 칸 × 가로 칸 수 + 가로 칸), pos · nor(Float32 ×3),
+//              col(Uint8 ×4: 약한 얼룩(세 칸이 같은 값) · 그늘),
 //              axis(Uint8: 주된 입힘 축), lay(지형만 Uint8 ×4: 자갈 · 풀 · 젖음 · 예비 — 다른 재질은 null), idx(Uint32) }
-//   protos[] · instances[]  인스턴스 원형(제 좌표의 형상)과 줄(xf: Float32 ×8 — rocks.js 머리 주석) · props[]  따로 그리는 조각(과녁): { piece, at, yaw, lean, parts[](재질마다 하나) }
-//   collide    충돌 삼각형: { pos, idx, surf(삼각형마다 표면 종류 번호 — world.surf 의 이름 차례) } — 그림에서 나온다(잔 소품 · 0.8m 아래 바위는 뺀다)
+//   protos[] · instances[]  인스턴스 원형(제 좌표의 형상 + tint)과 줄(xf: Float32 ×8 — rocks.js 머리 주석) · props[]  따로 그리는 조각(과녁): { piece, at, yaw, lean, parts[](재질 · 색조마다 하나) }
+//   collide    충돌 삼각형: { pos, idx, surf(삼각형마다 표면 종류 번호 — world.surf 의 이름 차례), owner(삼각형마다 임자: 0 지형 · 1 바위 · 2 + k = kit[k]) } —
+//              그림에서 나온다(잔 소품 · 0.8m 아래 바위는 뺀다)
 //   lights[]   등불: { at, color, radius, mode: 'on' | 'switch' | 'break', group(묶음 번호 · 늘 켜짐은 −1), piece }
-//   marks      { spawn: { at, yaw }, stations[{ id, at, yaw, pitch }](책갈피 — 눈 자리 · 라디안), targets[{ kind, at, prop, light }], points{ 이름: [x, y, z] } }
+//   marks      { spawn: { at, yaw }, stations[{ id, at, yaw, pitch }](책갈피 — 눈 자리 · 라디안), targets[{ kind, at, prop, light }], points{ 이름: [x, y, z] },
+//                doors[{ id, at, yaw, width }](문 표식 — 검증이 「양쪽을 잇는 길이 이 문을 지나는가」를 보고, 걷기 격자가 그 밑의 칸에 문 번호를 적는다) }
 //   grid       가로 밀기 전의 땅 높이(1m 격자 · Float32) · zones(레시피 것의 사본) · surf(표면 종류 이름) ·
 //              stats(삼각형 · 꼭짓점 · 인스턴스 수 · rocksMoved 땅에 맞추느라 옮긴 바위 · rocksSteep 가파른 면이라 버린 바위 · rocksDropped 못 맞춰 버린 바위 ·
 //              propParts 과녁 조각의 부분 수)
-// 높이 잡기: 바위 · 조각 · 돌담의 돌 · 낱 등불 · points 는 「민 뒤의 땅」(build.js 의 landAt — 그리는 지형 · 충돌과 같은 면),
-//   시작 자리 · 책갈피 · on: 'top' 조각은 「그 자리에서 가장 높은 충돌 면」(topAt — 부두 · 돌담 위). 두 규칙을 하나로 맞추는 일은 F1b(벽 속 표식 검증)의 몫이다.
+// 높이 잡기: 바위 · 조각 · 돌담의 돌 · 낱 등불은 「민 뒤의 땅」(build.js 의 landAt — 그리는 지형 · 충돌과 같은 면), on: 'top' 조각은 「그 자리에서 가장 높은 충돌 면」(topAt).
+//   표식(시작 자리 · 책갈피 · points · 문)은 전부 「설 수 있는 가장 낮은 바닥」(floorAt — 탑 발치면 땅, 지붕 밑이면 방바닥)에 선다. 레시피의 표식 끝에 'top' 을 적으면
+//   가장 높은 바닥이다(부두 위 — 밑의 얕은 물이 아니라). 설 바닥이 없으면 민 뒤의 땅에 두고,
+//   그런 표식은 굽기 검증(shared/bake/verify.js 의 「벽 속 표식」)이 잡는다.
+// genSteps 는 높이 · 지형 · 흩기 한 줄 · 조각 하나마다 쉰다(주 스레드에서 조각내 돌릴 때 한 조각이 길지 않게).
 import { PI, dsin, dcos } from '../dmath.js';
 import { makeRng, seedFrom } from '../rng.js';
 import { hashState, clone } from '../state.js';
@@ -20,10 +26,11 @@ import { checkRecipe } from './recipe.js';
 import { makeTerrain, applyOp, meshTerrain } from './terrain.js';
 import { rockProtos, scatterRocks } from './rocks.js';
 import { PIECES, LAMP, parseLit, optOf } from './kit.js';
-import { makeBuild, addMesh, addSolid, mergeParts, topAt, landAt, SURF } from './build.js';
+import { makeBuild, addMesh, addSolid, mergeParts, topAt, landAt, floorAt, SURF } from './build.js';
 import { WORLD } from '../tune/world.js';
+import { BAKE } from '../tune/bake.js';
 
-export const WORLD_VERSION = 2;
+export const WORLD_VERSION = 3;
 const DEG = PI / 180;
 
 // 지형 삼각형의 표면 종류(발소리 · 착탄이 읽는다) — 첫 꼭짓점 k 의 가파름과 지형 겹으로: 가파르면 바위 · 자갈 겹이 짙으면 자갈(젖었으면 젖은 자갈) · 풀 겹이 짙으면 풀
@@ -38,7 +45,7 @@ function surfaceOf(tm, k) {
 function addTerrain(B, T, tm) {
   const { nx, nz } = T, cell = WORLD.cell, surf = new Uint8Array(tm.idx.length / 3);
   for (let t = 0; t < surf.length; t++) surf[t] = SURF.indexOf(surfaceOf(tm, tm.idx[t * 3]));
-  addSolid(B, tm, surf);
+  addSolid(B, tm, surf, 0);
   B.groundEnd = B.solid.idx.length;
   for (let j0 = 0; j0 < nz - 1; j0 += cell) for (let i0 = 0; i0 < nx - 1; i0 += cell) {
     const w = Math.min(cell, nx - 1 - i0) + 1, d = Math.min(cell, nz - 1 - j0) + 1, n = w * d;
@@ -60,7 +67,7 @@ function addTerrain(B, T, tm) {
 // 바위를 비워 둘 자리: [x0, z0, x1, z1, 반지름](점은 길이 0 인 선분) — 표식 · 조각(선 조각은 선분마다 · 부두처럼 뻗는 조각은 뻗는 쪽으로)
 function keepOut(recipe) {
   const out = [], m = recipe.marks, dot = (p, r) => out.push([p[0], p[1], p[0], p[1], r]);
-  for (const p of [m.spawn, ...Object.values(m.stations || {}), ...Object.values(m.points || {})]) dot(p, WORLD.kit.clear);
+  for (const p of [m.spawn, ...Object.values(m.stations || {}), ...Object.values(m.points || {}), ...Object.values(m.doors || {})]) dot(p, WORLD.kit.clear);
   for (const it of recipe.kit) {
     const def = PIECES[it.piece];
     if (def.line) for (let s = 0; s + 1 < it.line.length; s++) out.push([it.line[s][0], it.line[s][1], it.line[s + 1][0], it.line[s + 1][1], def.clear]);
@@ -73,9 +80,9 @@ function keepOut(recipe) {
 }
 
 // 조각 하나를 놓는다. 난수 · 잡음의 씨앗은 조각 이름 + 자리(선 조각은 첫 점)에서 뽑는다 — 레시피의 앞이든 뒤든 다른 조각을 끼워도 이 조각의 생김새는 그대로다.
-function placePiece(G, it) {
+function placePiece(G, it, owner) {
   const def = PIECES[it.piece], spot = def.line ? it.line[0] : it.at, seed = seedFrom(G.salt, 'kit:' + it.piece + ':' + spot[0] + ',' + spot[1]);
-  const K = { B: G.B, T: G.T, it, salt: seed, rng: makeRng(seedFrom(seed, 'rng')), lights: G.lights, lit: -1, prop: null, frame: xf(0, 0, 0) };
+  const K = { B: G.B, T: G.T, it, salt: seed, owner, rng: makeRng(seedFrom(seed, 'rng')), lights: G.lights, lit: -1, prop: null, frame: xf(0, 0, 0) };
   if (def.line) { def.make(K, it); return; }
   // 놓는 높이: 해수면(부두 · 부표) · 밑에 있는 것 위(on: 'top' — 먼저 놓인 충돌 면) · 그 밖에는 민 뒤의 땅
   const x = it.at[0], z = it.at[1], top = it.on === 'top' ? topAt(G.B, x, z) : null;
@@ -99,25 +106,27 @@ function firstBad(world) {
   world.lights.forEach((l, i) => lists.push([`lights[${i}]`, [...l.at, l.radius, l.group]]));
   const m = world.marks;
   lists.push(['marks.spawn', [...m.spawn.at, m.spawn.yaw]], ...m.stations.map((s) => ['marks.stations.' + s.id, [...s.at, s.yaw, s.pitch]]), ...m.targets.map((t, i) => [`marks.targets[${i}]`, t.at]));
-  lists.push(...Object.entries(m.points).map(([id, p]) => ['marks.points.' + id, p]));
+  lists.push(...Object.entries(m.points).map(([id, p]) => ['marks.points.' + id, p]), ...m.doors.map((d) => ['marks.doors.' + d.id, [...d.at, d.yaw, d.width]]));
   for (const [name, list] of lists) for (let i = 0; i < list.length; i++) if (list[i] - list[i] !== 0) return name;
   return '';
 }
 
 function finish(G) {
   const { recipe, T, B } = G, m = recipe.marks, count = (list, per) => list.reduce((sum, b) => sum + b.idx.length / per, 0);
-  // 책갈피 · 시작 자리의 높이: 그 자리에서 가장 높은 충돌 면(부두 위에 서면 부두 높이) — 책갈피는 거기에 눈높이를 더한다. points 는 민 뒤의 땅.
-  const stand = (p) => { const top = topAt(B, p[0], p[1]); return top !== null ? top : landAt(B, T, p[0], p[1]); };
+  // 표식의 높이: 설 수 있는 가장 낮은 바닥(부두 위에 서면 부두 높이) — 책갈피는 거기에 눈높이를 더한다. 설 바닥이 없으면 민 뒤의 땅(검증이 잡는다).
+  const stand = (p) => { const floor = floorAt(B, p[0], p[1], recipe.sea, p[p.length - 1] === 'top'); return floor !== null ? floor : landAt(B, T, p[0], p[1]); };
+  const num = (p, i, or) => (typeof p[i] === 'number' ? p[i] : or);
   const batches = B.batches.map((b) => ({
-    mat: b.mat, cell: b.cell, pos: Float32Array.from(b.pos), nor: Float32Array.from(b.nor), col: Uint8Array.from(b.col), axis: Uint8Array.from(b.axis),
+    mat: b.mat, tint: b.tint, cell: b.cell, pos: Float32Array.from(b.pos), nor: Float32Array.from(b.nor), col: Uint8Array.from(b.col), axis: Uint8Array.from(b.axis),
     lay: b.lay ? Uint8Array.from(b.lay) : null, idx: Uint32Array.from(b.idx),
   }));
   const protos = G.protos.map((p) => ({ name: p.name, ...p.part })), instances = G.inst.map((list, k) => ({ proto: k, xf: Float32Array.from(list) }));
-  const collide = { pos: Float32Array.from(B.solid.pos), idx: Uint32Array.from(B.solid.idx), surf: Uint8Array.from(B.solid.surf) };
+  const collide = { pos: Float32Array.from(B.solid.pos), idx: Uint32Array.from(B.solid.idx), surf: Uint8Array.from(B.solid.surf), owner: Uint16Array.from(B.solid.owner) };
   const marks = {
-    spawn: { at: [m.spawn[0], stand(m.spawn), m.spawn[1]], yaw: (m.spawn[2] || 0) * DEG },
-    stations: Object.entries(m.stations || {}).map(([id, p]) => ({ id, at: [p[0], stand(p) + WORLD.eye, p[1]], yaw: (p[2] || 0) * DEG, pitch: (p[3] || 0) * DEG })),
-    targets: G.targets, points: Object.fromEntries(Object.entries(m.points || {}).map(([id, p]) => [id, [p[0], landAt(B, T, p[0], p[1]), p[1]]])),
+    spawn: { at: [m.spawn[0], stand(m.spawn), m.spawn[1]], yaw: num(m.spawn, 2, 0) * DEG },
+    stations: Object.entries(m.stations || {}).map(([id, p]) => ({ id, at: [p[0], stand(p) + WORLD.eye, p[1]], yaw: num(p, 2, 0) * DEG, pitch: num(p, 3, 0) * DEG })),
+    targets: G.targets, points: Object.fromEntries(Object.entries(m.points || {}).map(([id, p]) => [id, [p[0], stand(p), p[1]]])),
+    doors: Object.entries(m.doors || {}).map(([id, p]) => ({ id, at: [p[0], stand(p), p[1]], yaw: num(p, 2, 0) * DEG, width: num(p, 3, BAKE.verify.doorWidth) })),
   };
   const instCount = instances.reduce((sum, g) => sum + g.xf.length / 8, 0), instTris = instances.reduce((sum, g) => sum + g.xf.length / 8 * protos[g.proto].idx.length / 3, 0);
   const propTris = G.props.reduce((sum, p) => sum + count(p.parts, 3), 0), tris = count(batches, 3);
@@ -154,9 +163,9 @@ export function* genRaw(recipe) {
   for (const item of recipe.scatter || []) {
     scatterRocks(G, item, regions.filter((name) => name === item.region).length);
     regions.push(item.region);
+    yield 'rocks';
   }
-  yield 'rocks';
-  for (const it of recipe.kit) placePiece(G, it);
+  for (let k = 0; k < recipe.kit.length; k++) { placePiece(G, recipe.kit[k], 2 + k); yield 'kit'; }
   for (const it of recipe.lights || []) {
     const lit = parseLit(it.lit), at = [it.at[0], landAt(B, T, it.at[0], it.at[1]) + (it.up || 0), it.at[1]];
     G.lights.push({ at, color: LAMP[it.color || 'warm'].slice(), radius: it.radius || WORLD.kit.lightRadius, mode: lit.mode, group: lit.group, piece: '' });

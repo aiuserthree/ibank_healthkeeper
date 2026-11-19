@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // 주는 것: 세계 미리보기 — 레시피를 검사하고 Node 에서 생성해 지도 그림(PNG)을 뽑는다. 에이전트는 글자 격자가 아니라 이 그림을 보고 맵을 고친다.
 //   node tools/preview.mjs <세계> [--out <png>] [--view top|south] [--scale <m 당 화소>] [--update-golden]
+//   + drawMap(world, view, scale, over) · png(w, h, rgb) 를 내보낸다 — tools/bake.mjs 가 구운 것(over = { baked, solid, problems })을 얹은 지도를 그릴 때 쓴다:
+//     걷는 칸(시작 자리의 닿는 무리 = 풀빛 · 다른 무리 = 푸른빛 · 문 밑 = 흰빛) · 자동 고리(넘기 하늘색 · 오르기 노랑 · 떨어지기 붉은 점) · 엄폐 점(낮은 = 자주 · 높은 = 보라) · 검증에 걸린 자리(붉은 고리)
 //   top = 위에서 본 지도(북쪽이 위 · 표식을 얹는다) · south = 바다 쪽에서 본 입면(실루엣 확인용). 종료 코드 0 = 통과, 마지막 줄 JSON
 //   (해시 · 생성 시간(세 번의 중앙값) · 삼각형 · 꼭짓점 · 인스턴스 수 · 기준 해시와 같은지). --update-golden 은 tests/golden/world.json 을 새로 적는다.
-// 받는 것: src/data/<세계>/recipe.js · shared/gen · tune/world(예산). Node 기본 기능만(PNG 는 zlib 으로 직접 쓴다). 굽기 · 검증 8종은 F1b 의 bake.mjs.
+// 받는 것: src/data/<세계>/recipe.js · shared/gen · tune/world(예산). Node 기본 기능만(PNG 는 zlib 으로 직접 쓴다). 굽기 · 검증 8종은 tools/bake.mjs.
 // 지도의 표식: 초록 = 시작 자리(선 = 보는 쪽) · 파랑 + 숫자 = 책갈피(차례대로 1 …) · 주황 + 숫자 = 과녁 · 노랑 고리 = 등불(스위치 묶음은 흰 테, 깨지는 등불은 붉은 테)
 //   · 자주 = 그 밖의 표식 · 옅은 줄 = 32m 칸. 땅 색: 자갈 = 회갈색 · 풀 = 풀빛 · 바위 = 회색, 물에 잠긴 곳은 깊을수록 푸르다.
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -17,11 +19,12 @@ import { WORLD } from '../src/shared/tune/world.js';
 
 const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..'), GOLDEN = join(SRC, 'tests', 'golden', 'world.json');
 const MAT = { ground: [150, 150, 146], rock: [128, 130, 132], wood: [150, 118, 84], stone: [150, 150, 150], iron: [70, 76, 80], glow: [255, 214, 130], glass: [200, 170, 110], paint: [230, 120, 50] };
+const LINK = [[90, 220, 240], [250, 220, 60], [230, 70, 50]];
 const SUN = [-0.45, 0.72, 0.53];
 // 숫자 0 ~ 9 의 3 × 5 점 글꼴(표식 옆의 번호)
 const DIGITS = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001', '111100111001111', '111100111101111', '111001001001001', '111101111101111', '111101111001111'];
 
-function png(w, h, rgb) {
+export function png(w, h, rgb) {
   const raw = Buffer.alloc((w * 3 + 1) * h), part = (type, data) => {
     const body = Buffer.concat([Buffer.from(type), data]), out = Buffer.alloc(body.length + 8);
     out.writeUInt32BE(data.length, 0); body.copy(out, 4); out.writeUInt32BE(crc32(body), body.length + 4);
@@ -65,7 +68,7 @@ function canvas(w, h, project) {
   return { rgb, height, tri, dot, digit };
 }
 
-function draw(world, view, scale) {
+export function drawMap(world, view, scale, over) {
   const [x0, z0] = world.origin, [sx, sz] = world.size, top = view === 'top';
   let yMax = 0;
   for (const b of world.batches) for (let i = 1; i < b.pos.length; i += 3) yMax = Math.max(yMax, b.pos[i]);
@@ -73,7 +76,7 @@ function draw(world, view, scale) {
   const project = top ? (x, y, z) => [(x - x0) * scale, (z - z0) * scale, y] : (x, y, z) => [(x - x0) * scale, (yMax + 4 - y) * scale, z];
   const cv = canvas(w, h, project);
   const mesh = (part, pos) => {
-    const base = MAT[part.mat] || [170, 170, 170];
+    const base = MAT[part.mat] || part.tint.map((c) => 60 + c * 180);
     for (let t = 0; t < part.idx.length; t += 3) {
       const v = part.idx[t], shade = part.col[v * 4 + 3] / 255, lay = part.lay;
       const tone = lay ? [lerp3(base[0], 142, 96, lay, v), lerp3(base[1], 132, 122, lay, v), lerp3(base[2], 116, 84, lay, v)] : base;
@@ -93,6 +96,7 @@ function draw(world, view, scale) {
     if (cv.height[k] < world.sea) for (let ch = 0; ch < 3; ch++) cv.rgb[k * 3 + ch] = cv.rgb[k * 3 + ch] * (0.75 - 0.45 * deep) + [40, 78, 96][ch] * (0.25 + 0.45 * deep);
     if (gx) for (let ch = 0; ch < 3; ch++) cv.rgb[k * 3 + ch] *= 0.8;
   }
+  if (over) overlay(cv, over, world, project, w, h);
   const at = (p) => project(p[0], p[1], p[2]), aim = (p, yaw, color) => { for (let s = 0; s < 3.5 * scale; s++) cv.dot(at(p)[0] - Math.sin(yaw) * s, at(p)[1] - Math.cos(yaw) * s, 0, color); };
   for (const l of world.lights) {
     cv.dot(...at(l.at).slice(0, 2), Math.round(Math.min(l.radius, 9) * scale), [255, 220, 90], 1);
@@ -103,6 +107,37 @@ function draw(world, view, scale) {
   for (const p of Object.values(world.marks.points)) cv.dot(...at(p).slice(0, 2), 4, [200, 40, 200]);
   aim(world.marks.spawn.at, world.marks.spawn.yaw, [20, 170, 60]); cv.dot(...at(world.marks.spawn.at).slice(0, 2), 5, [20, 170, 60]);
   return { w, h, rgb: cv.rgb };
+}
+
+// 구운 것을 지도에 얹는다: 걷는 칸은 화소를 물들이고(층이 겹치면 위층이 덮는다), 고리 · 엄폐 점 · 걸린 자리는 점과 줄로
+function overlay(cv, over, world, project, w, h) {
+  const nav = over.baked.nav, L = over.baked.links, C = over.baked.cover, px = (x, z) => project(x, 0, z), home = spanNear(nav, world.marks.spawn.at);
+  const tint = (x, y, color, k) => { if (x >= 0 && y >= 0 && x < w && y < h) for (let ch = 0; ch < 3; ch++) cv.rgb[(y * w + x) * 3 + ch] = cv.rgb[(y * w + x) * 3 + ch] * (1 - k) + color[ch] * k; };
+  const where = (s) => { const col = nav.col[s], i = col % nav.w; return [nav.x0 + (i + 0.5) * nav.cell, nav.z0 + ((col - i) / nav.w + 0.5) * nav.cell]; };
+  for (let s = 0; s < nav.y.length; s++) {
+    const [x, z] = where(s), a = px(x - nav.cell / 2, z - nav.cell / 2), b = px(x + nav.cell / 2, z + nav.cell / 2);
+    const color = nav.door[s] ? [255, 255, 255] : home >= 0 && nav.group[s] === nav.group[home] ? [60, 200, 90] : [70, 120, 230];
+    for (let y = Math.round(a[1]); y < Math.round(b[1]); y++) for (let x2 = Math.round(a[0]); x2 < Math.round(b[0]); x2++) tint(x2, y, color, nav.door[s] ? 0.8 : 0.38);
+  }
+  for (let k = 0; k < L.kind.length; k++) {
+    const a = px(...where(L.from[k])), b = px(...where(L.to[k])), n = Math.max(1, Math.round(Math.hypot(b[0] - a[0], b[1] - a[1])));
+    if (L.kind[k] === 2) cv.dot(a[0], a[1], 0, LINK[2]); else for (let i = 0; i <= n; i++) cv.dot(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n, 0, LINK[L.kind[k]]);
+  }
+  for (let k = 0; k < C.n; k++) { const a = px(C.pos[k * 3], C.pos[k * 3 + 2]); cv.dot(a[0], a[1], 2, C.high[k] ? [130, 50, 200] : [230, 60, 200]); cv.dot(a[0], a[1], 0, [255, 255, 255]); }
+  for (const p of over.problems || []) if (p.at) { const a = px(p.at[0], p.at[2]); cv.dot(a[0], a[1], 9, [255, 30, 30], 2); }
+}
+
+// 표식에 가장 가까운 걷는 칸(지도 그림용 — 무리의 색을 고를 때만 쓴다)
+function spanNear(nav, at) {
+  let best = -1, cost = Infinity;
+  const ci = Math.floor((at[0] - nav.x0) / nav.cell), cj = Math.floor((at[2] - nav.z0) / nav.cell);
+  for (let j = Math.max(0, cj - 3); j <= Math.min(nav.d - 1, cj + 3); j++) for (let i = Math.max(0, ci - 3); i <= Math.min(nav.w - 1, ci + 3); i++) {
+    for (let s = nav.start[j * nav.w + i]; s < nav.start[j * nav.w + i + 1]; s++) {
+      const c = (i - ci) * (i - ci) + (j - cj) * (j - cj) + Math.abs(nav.y0 + nav.y[s] * nav.unit - at[1]);
+      if (c < cost) { cost = c; best = s; }
+    }
+  }
+  return best;
 }
 
 // 지형 겹(자갈 · 풀)으로 바탕색을 섞는다
@@ -131,7 +166,7 @@ async function main(argv) {
     Object.assign(sum, { hash, golden: golden[name] === hash ? 'same' : golden[name] ? 'differs' : 'none', genMs, stats: world.stats });
     const out = flag('--out', null);
     if (out) {
-      const img = draw(world, view, scale);
+      const img = drawMap(world, view, scale);
       mkdirSync(dirname(resolve(out)), { recursive: true }); writeFileSync(resolve(out), png(img.w, img.h, img.rgb));
       Object.assign(sum, { out: resolve(out), view, px: [img.w, img.h] });
     }
@@ -145,4 +180,4 @@ async function main(argv) {
   process.exit(sum.ok ? 0 : sum.code || 1);
 }
 
-main(process.argv.slice(2));
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main(process.argv.slice(2));

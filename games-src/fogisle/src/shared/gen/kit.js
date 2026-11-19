@@ -1,13 +1,14 @@
 // 주는 것: 키트 — PIECES(조각 이름 → 만드는 함수와 성질) · optOf(조각의 치수 — 안 적으면 기본값) · LIT(등불 표시의 꼴) · parseLit · LAMP(등불 색).
 //   조각은 제 좌표(y = 0 이 놓인 자리)에 그리고 put 이 세계로 옮긴다.
-//   원경 등대 lighthouse · 등불 기둥 lamppost · 등롱 lantern · 돌담 wall · 판자 부두 pier · 병 bottle · 부표 buoy — F1a 의 「가장 작은 꼴」이다
-//   (말뚝과 밧줄 · 상자 · 드럼통 · 고무보트는 뒤 단계가 더한다. 바위 덩이는 rocks.js 가 흩는다).
-// 받는 것: shapes · mesh · dmath · rng · terrain · build · tune/world. 조각의 생김새(모서리 깎기 · 두께 · 반복 깨기)는 여기서 책임진다(tdd §4-2).
+//   원경 등대 lighthouse · 등불 기둥 lamppost · 등롱 lantern · 돌담 wall · 판자 부두 pier · 병 bottle · 부표 buoy · 말뚝과 밧줄 rope · 상자 crate · 드럼통 drum ·
+//   고무보트 boat(바위 덩이는 rocks.js 가 흩는다).
+// 받는 것: shapes · mesh · dmath · rng · build · tune/world. 조각의 생김새(모서리 깎기 · 두께 · 반복 깨기)는 여기서 책임진다(tdd §4-2).
 //   땅과 조각은 0.3m 넘게 겹쳐 박는다(embed). 정적 부분은 모서리 kit.maxEdge 이하로 쪼갠다(꼭짓점 빛 규칙). 과녁(target)인 조각은 정적 묶음에 넣지 않고
 //   따로 그리는 조각(prop)으로 낸다 — 깨지고 사라질 수 있게. 등불이 달린 조각(lamp)은 레시피에 lit 을 꼭 적는다:
 //   'on' 늘 켜짐 · 'switch:N' 스위치 묶음 N(대본으로 켜고 끈다) · 'break:N' 깨지는 등불(묶음 N — 깨지면 꺼진다). N 은 0 ~ tune 의 lit.groups − 1.
 //   과녁인 등불(등롱)은 'break:N' 만, 과녁이 아닌 등불은 'on' · 'switch:N' 만 된다(레시피 검사가 본다).
 // 아래 색조(C)와 옆모습(선반 깎기 단면) · 치수의 기본값과 범위(PIECES 의 opt)는 조각의 모양 자료다 — 여러 조각이 같이 쓰는 수치만 tune/world 에 있다.
+// 색조는 꼭짓점에 싣지 않는다: 부분마다의 색조가 묶음(batches[].tint) · 따로 그리는 부분(parts[].tint)의 값이 된다(색조가 다르면 다른 묶음). 밑동 색(tint2)은 그늘 칸의 어둡기로만 남긴다.
 import { PI, TAU, dsin, dcos, dpow, datan2 } from '../dmath.js';
 import { rngNext } from '../rng.js';
 import { cbox, bar, extrude, lathe, sweep, displace, ico, place, xf } from '../geom/shapes.js';
@@ -18,18 +19,22 @@ import { WORLD } from '../tune/world.js';
 const C = Object.freeze({
   plaster: [0.95, 0.95, 0.93], plasterLow: [0.7, 0.71, 0.69], concrete: [0.84, 0.86, 0.87], concreteLow: [0.46, 0.48, 0.5], iron: [0.13, 0.16, 0.17],
   copper: [0.37, 0.58, 0.53], copperLow: [0.23, 0.42, 0.38], wood: [0.5, 0.42, 0.35], woodDark: [0.37, 0.31, 0.26], pane: [0.08, 0.1, 0.12], glass: [1, 0.74, 0.42],
-  glow: [1, 0.78, 0.45], stone: [0.66, 0.67, 0.66], bottle: [0.22, 0.42, 0.32], buoy: [0.86, 0.4, 0.15], white: [0.9, 0.9, 0.87],
+  glow: [1, 0.78, 0.45], stone: [0.66, 0.67, 0.66], bottle: [0.22, 0.42, 0.32], buoy: [0.86, 0.4, 0.15], white: [0.9, 0.9, 0.87], hemp: [0.42, 0.36, 0.27], rubber: [0.1, 0.11, 0.12],
 });
 export const LAMP = Object.freeze({ warm: [1, 0.68, 0.34] });
 export const LIT = /^(on|(switch|break):\d)$/;
 
 export function parseLit(lit) { return { mode: lit.split(':')[0], group: lit.includes(':') ? Number(lit.split(':')[1]) : -1 }; }
 
-// 조각의 한 부분을 넣는다. o = { tint2: 밑동 색, solid: 표면 종류 이름(충돌에 넣는다), crease: 꺾임 각, fixed: 과녁 조각 안의 안 움직이는 부분 }
+const lum = (c) => 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+
+// 조각의 한 부분을 넣는다. o = { tint2: 밑동 색(그늘 칸의 어둡기로 남는다), tone: 이 덩이의 밝기 0 ~ 1, solid: 표면 종류 이름(충돌에 넣는다), crease: 꺾임 각,
+//   fixed: 과녁 조각 안의 안 움직이는 부분 }
 function put(K, mat, soup, tint, o = {}) {
-  if (K.prop && !o.fixed) { K.prop.parts.push(makePart(mat, shade(soup, o.crease), { tint, tint2: o.tint2 })); return; }
+  const look = { tint, low: o.tint2 ? Math.max(0, 1 - lum(o.tint2) / lum(tint)) : 0, tone: o.tone };
+  if (K.prop && !o.fixed) { K.prop.parts.push(makePart(mat, shade(soup, o.crease), look, K.salt)); return; }
   const mesh = shade(subdivide(place(soup, K.frame), WORLD.kit.maxEdge), o.crease);
-  addMesh(K.B, mat, mesh, { tint, tint2: o.tint2, solid: o.solid ? SURF.indexOf(o.solid) : null });
+  addMesh(K.B, mat, mesh, { ...look, solid: o.solid ? SURF.indexOf(o.solid) : null, owner: K.owner });
 }
 
 function light(K, p, radius) {
@@ -117,7 +122,7 @@ function wall(K, it) {
         const m = Math.min(len, Math.max(0, d + l / 2)), x = a[0] + dx * m / len, z = a[1] + dz * m / len;
         const stone = displace(cbox(l + 0.06, ch + 0.04, thick, 0.1), 0.055, 2.4, K.salt + Math.floor(d * 8) + course);
         const T = xf(x, landAt(K.B, K.T, x, z) + cy, z, jitter(K, 0.06), yaw + jitter(K, 0.1), jitter(K, 0.06));
-        put(K, 'stone', place(stone, T), C.stone.map((c) => c * tone), { solid: 'stone', crease: 50 });
+        put(K, 'stone', place(stone, T), C.stone, { solid: 'stone', crease: 50, tone: (tone - 0.78) / 0.34 });
         d += l;
       }
     }
@@ -139,7 +144,7 @@ function pier(K, it) {
   for (const e of [-1, 1]) put(K, 'wood', place(bar(L + 0.6, 0.2, 0.14), xf(e * (half - 0.35), deck - 0.3, L / 2 - 0.3, 0, turn, 0)), C.woodDark);
   for (let z = -0.5; z < L; z += 0.42) {
     const tone = 0.82 + rngNext(K.rng) * 0.3;
-    put(K, 'wood', place(bar(w + 0.3, 0.06, 0.38), xf(jitter(K, 0.03), deck + jitter(K, 0.008), z, 0, jitter(K, 0.015), 0)), C.wood.map((c) => c * tone), { solid: 'wood' });
+    put(K, 'wood', place(bar(w + 0.3, 0.06, 0.38), xf(jitter(K, 0.03), deck + jitter(K, 0.008), z, 0, jitter(K, 0.015), 0)), C.wood, { solid: 'wood', tone: (tone - 0.82) / 0.3 });
   }
 }
 
@@ -153,7 +158,48 @@ function buoy(K) {
   put(K, 'paint', lathe([[0, 1.22], [0.15, 1.4], [0, 1.58]], 8), C.white);
 }
 
+// 말뚝과 밧줄: 선을 따라 3m 쯤마다 말뚝, 말뚝 머리 사이에 처진 밧줄. 밧줄도 충돌에 넣는다(보이는 것 = 막는 것 — 밑으로는 못 지나가고 넘기 고리로 넘는다)
+function rope(K, it) {
+  let prev = null;
+  for (let s = 0; s + 1 < it.line.length; s++) {
+    const a = it.line[s], b = it.line[s + 1], len = Math.sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1])), n = Math.max(1, Math.round(len / 3));
+    if (!(len > 0 && len <= WORLD.range.size[1])) throw new Error(`밧줄의 마디 ${s} 의 길이가 틀리다(${len}) — 선의 점을 본다`);
+    for (let k = s ? 1 : 0; k <= n; k++) {
+      const x = a[0] + (b[0] - a[0]) * k / n, z = a[1] + (b[1] - a[1]) * k / n, y = landAt(K.B, K.T, x, z), head = [x, y + 0.93, z];
+      put(K, 'wood', place(lathe([[0, -WORLD.kit.embed], [0.075, -WORLD.kit.embed], [0.06, 0.97], [0, 0.99]], 6), xf(x, y, z, jitter(K, 0.08), 0, jitter(K, 0.08))), C.woodDark, { solid: 'wood' });
+      if (prev) {
+        const sag = Array.from({ length: 7 }, (v, i) => [prev[0] + (head[0] - prev[0]) * i / 6, prev[1] + (head[1] - prev[1]) * i / 6 - dsin(PI * i / 6) * 0.2, prev[2] + (head[2] - prev[2]) * i / 6]);
+        put(K, 'hemp', sweep(sag, 0.018, 4), C.hemp, { solid: 'wood' });
+      }
+      prev = head;
+    }
+  }
+}
+
+// 상자: 띠 두 줄을 두른 나무 상자(높이 = 크기 × 0.8). 땅에 얹는다(박지 않는다)
+function crate(K, it) {
+  const s = optOf(it, 'size');
+  put(K, 'wood', place(cbox(s, s * 0.8, s, 0.025), xf(0, s * 0.4 - 0.04, 0)), C.wood, { solid: 'wood' });
+  for (const e of [-1, 1]) put(K, 'wood', place(cbox(s + 0.04, 0.07, s + 0.04, 0.01), xf(0, s * 0.4 - 0.04 + e * s * 0.33, 0)), C.woodDark);
+}
+
+function drum(K) {
+  const side = [[0, -0.04], [0.29, -0.04], [0.3, 0.02], [0.3, 0.28], [0.315, 0.3], [0.3, 0.32], [0.3, 0.58], [0.315, 0.6], [0.3, 0.62], [0.3, 0.86], [0.29, 0.9], [0, 0.88]];
+  put(K, 'iron', lathe(side, 14), C.copperLow, { solid: 'iron' });
+}
+
+// 고무보트: 뱃머리가 +z. 굽은 공기 관 하나(뱃머리로 갈수록 살짝 들린다) + 바닥판 + 고물 판
+function boat(K) {
+  const tube = [], side = (t, e) => [e * 0.78 * Math.min(1, 1.65 - 1.65 * t * t), 0.3 + 0.16 * t * t * t, -1.5 + 3.3 * t];
+  for (let i = 0; i <= 8; i++) tube.push(side(i / 8, -1));
+  for (let i = 7; i >= 0; i--) tube.push(side(i / 8, 1));
+  put(K, 'rubber', sweep(tube, 0.26, 8), C.rubber, { solid: 'wood' });
+  put(K, 'rubber', place(cbox(1.5, 0.06, 2.9, 0.02), xf(0, 0.12, -0.1)), C.rubber, { solid: 'wood' });
+  put(K, 'wood', place(cbox(1.5, 0.5, 0.08, 0.02), xf(0, 0.36, -1.5)), C.woodDark);
+}
+
 // lamp = 등불이 달렸다(lit 필수) · line = 자리 대신 선(line)을 받는다 · sea = 해수면에 놓는다 · clear = 바위를 비워 둘 반지름 ·
+//   loose = 땅에 얹는 소품이다(박지 않는다 — 검증 「맞닿은 조각」은 얹는 소품이 떠 있는지만 본다) ·
 //   reach = 제 +z 쪽으로 뻗는 길이를 적는 칸 이름 · aim = 과녁의 가운데 높이(이것이 있는 조각만 과녁이 될 수 있다) ·
 //   opt = 레시피에 적을 수 있는 치수: 이름 → [기본값, 작은, 큰](m) — 기본값은 여기 한 곳에만 있다(만드는 함수 · 바위 비움 · 레시피 검사가 같이 읽는다)
 export const PIECES = Object.freeze({
@@ -161,6 +207,8 @@ export const PIECES = Object.freeze({
   lantern: { make: lantern, lamp: true, clear: 0.6, aim: 0.17, opt: {} }, wall: { make: wall, line: true, clear: 0.9, opt: { height: [1.1, 0.3, 3], width: [0.55, 0.2, 2] } },
   pier: { make: pier, sea: true, clear: 2.4, reach: 'length', opt: { length: [16, 2, 80], width: [2.6, 1, 6], deck: [1.3, 0.3, 4] } },
   bottle: { make: bottle, clear: 0.4, aim: 0.15, opt: {} }, buoy: { make: buoy, sea: true, clear: 0.9, aim: 0.5, opt: {} },
+  rope: { make: rope, line: true, clear: 0.6, opt: {} }, crate: { make: crate, loose: true, clear: 1, opt: { size: [1, 0.5, 2] } }, drum: { make: drum, loose: true, clear: 0.6, opt: {} },
+  boat: { make: boat, loose: true, clear: 2.2, opt: {} },
 });
 
 // 조각의 치수 하나: 레시피에 적혀 있으면 그 값, 아니면 PIECES 의 기본값. 범위 밖 · 수가 아닌 값은 여기서 예외다(검사를 안 거친 레시피가 길이로 도는 고리를 끝없이 돌리지 않게).

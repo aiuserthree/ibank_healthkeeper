@@ -148,6 +148,11 @@ function recipeCheck() {
     '대본 스위치 묶음이 너무 많다': [vary({ lights: Array.from({ length: L.script }, (v, i) => ({ at: [i * 2, 10], lit: 'switch:' + (i + 1) })) }), 'lit'],
     '단 높이가 0 인 계단밭': [op('terrace', { step: 0 }), 'range'], '평평하게의 높이가 글자': [op('flatten', { to: 'low' }), 'shape'], '길의 겹친 점': [op('path', { line: [[10, 17], [10, 17]] }), 'shape'],
     '조각의 돌림이 글자': [swap(pier, { ...pier, rot: 'east' }), 'shape'], '조각의 올림이 글자': [swap(lamp, { ...lamp, up: 'x' }), 'shape'],
+    '조각의 기울임이 글자': [swap(find('buoy'), { ...find('buoy'), lean: 'x' }), 'shape'], '같은 자리의 같은 조각': [vary({ kit: [...recipe.kit, { ...lamp }] }), 'overlap'],
+    '절벽 선의 좌표가 범위 밖': [op('base', { cliff: { ...recipe.terrain[0].cliff, line: [[-64, 58], [0, far * 8], [64, 58]] } }), 'range'], '길 점의 높이가 범위 밖': [op('path', { line: [[10, 17, far * 8], [-2, 12.5]] }), 'range'],
+    '영역의 좌표가 범위 밖': [op('raise', { area: ['circle', far * 8, 36, 2.2] }), 'range'], '세계 밖 문': [marks({ doors: { gate: [recipe.size[0], 0, 0] } }), 'outside'],
+    '문 폭이 범위 밖': [marks({ doors: { gate: [0, 20, 0, far] } }), 'range'], '없는 문을 출입구로 적은 구역': [vary({ zones: [{ area: ['circle', 0, 20, 3], exits: ['nowhere'] }] }), 'shape'],
+    '영역 없는 구역': [vary({ zones: [{ enclosed: true }] }), 'shape'], '표식 뒤의 모르는 글자': [marks({ points: { cave: [-18, 4, 'roof'] } }), 'shape'],
     '돌담 선의 겹친 점': [swap(wall, { ...wall, line: [wall.line[0], wall.line[0].slice()] }), 'shape'],
     '조각의 치수가 범위 밖': [swap(tower, { ...tower, height: PIECES.lighthouse.opt.height[2] * 2 }), 'range'], '세계가 너무 크다': [vary({ size: [far, recipe.size[1]] }), 'range'],
     '흩는 수가 너무 많다': [vary({ scatter: [{ what: 'rocks', region: 'foot', n: WORLD.range.count[1] + 1, size: [1, 2] }] }), 'range'],
@@ -189,12 +194,14 @@ function generation(t) {
   assert.ok(st.drawTris <= B.tris && st.verts <= B.verts && st.instances <= B.instances && st.collideTris <= B.collideTris && st.instances > 0 && st.staticRocks > 0, '예산: ' + JSON.stringify(st));
   t.note('세계 ' + recipe.id, { hash, genMs: Math.round(ms * 10) / 10, ...st });
   clone(world);       // 일반 객체 · 배열 · 형식 배열만으로 된 나무다(함수 · undefined · 같은 버퍼를 두 곳에서 가리키기가 있으면 여기서 터진다)
-  // 그릴 묶음: 번호가 꼭짓점 수 안 · NaN 없음 · 법선 길이 1 · 주된 입힘 축 = 법선의 가장 큰 축 · 지형만 겹을 가진다 · 큰 얼룩이 꼭짓점 색에 들어 있다
+  // 그릴 묶음: 번호가 꼭짓점 수 안 · NaN 없음 · 법선 길이 1 · 주된 입힘 축 = 법선의 가장 큰 축 · 지형만 겹을 가진다 · 꼭짓점 색은 약한 얼룩뿐(세 칸이 같고 1 − depth 이상 — 색조는 tint)
   let tris = 0;
   for (const part of [...world.batches, ...world.protos, ...world.props.flatMap((p) => p.parts)]) {
     const n = part.pos.length / 3;
     assert.ok(part.nor.length === n * 3 && part.col.length === n * 4 && part.axis.length === n && part.idx.every((v) => v < n) && part.pos.every((v) => v === v), part.mat + ': 배열 길이 · 번호 · NaN');
     assert.ok(part.lay == null || part.lay.length === n * 4, part.mat + ': 지형 겹의 길이');
+    assert.ok(Array.isArray(part.tint) && part.tint.length === 3 && part.tint.every((c) => c >= 0 && c <= 1), part.mat + ': 색조(tint)는 묶음 · 부분의 값이다');
+    for (let v = 0; v < n * 4; v += 4) if (part.col[v] !== part.col[v + 1] || part.col[v] !== part.col[v + 2] || part.col[v] < Math.round((1 - WORLD.blotch.depth) * 255)) assert.fail(`${part.mat}: 꼭짓점 색이 약한 얼룩이 아니다(${part.col.subarray(v, v + 3)})`);
     for (let v = 0; v < n; v++) {
       const [x, y, z] = part.nor.subarray(v * 3, v * 3 + 3);
       if (Math.abs(Math.hypot(x, y, z) - 1) > 1e-4 || part.axis[v] !== dominantAxis(x, y, z)) assert.fail(`${part.mat}: 꼭짓점 ${v} 의 법선 · 주된 축이 틀리다`);
@@ -205,13 +212,14 @@ function generation(t) {
     tris += b.idx.length / 3;
     assert.equal(b.lay !== null, b.mat === 'ground', b.mat + ': 지형만 겹을 가진다');
     assert.ok(b.cell >= 0 && b.cell < cells, b.mat + ': 칸 번호');
+    assert.equal(world.batches.filter((o) => o.mat === b.mat && o.cell === b.cell && o.tint.join() === b.tint.join()).length, 1, b.mat + ': 재질 · 색조 · 칸이 같은 묶음이 둘');
   }
   const ground = world.batches.find((b) => b.mat === 'ground'), tones = new Set();
   for (let v = 0; v < ground.col.length; v += 4) tones.add(ground.col[v]);
-  assert.ok(tones.size > 12 && tris === st.tris && world.batches.filter((b) => b.mat === 'ground').length === cells, `지형은 32m 칸마다 한 묶음(${cells}) · 큰 얼룩의 밝기 단계 ${tones.size}`);
-  // 큰 얼룩은 지형 말고도 굽는다: 바위는 색조가 하나뿐인 재질이라, 꼭짓점 색(붉은 칸)이 여럿이면 얼룩이 구워진 것이다
+  assert.ok(tones.size > 12 && tris === st.tris && world.batches.filter((b) => b.mat === 'ground').length === cells, `지형은 32m 칸마다 한 묶음(${cells}) · 얼룩의 밝기 단계 ${tones.size}`);
+  // 얼룩은 지형 말고도 굽는다(정적 바위 · 인스턴스 원형 · 과녁 조각까지 같은 규칙) — 꼭짓점 색이 여럿이면 얼룩이 구워진 것이다
   const rockTones = new Set(world.batches.filter((b) => b.mat === 'rock').flatMap((b) => Array.from({ length: b.col.length / 4 }, (v, i) => b.col[i * 4])));
-  assert.ok(rockTones.size > 1, '정적 바위의 꼭짓점 색이 한 가지다 — 큰 얼룩이 바위에 안 구워졌다');
+  assert.ok(rockTones.size > 1 && world.protos.every((q) => new Set(q.col.filter((v, i) => i % 4 === 0)).size > 1), '바위(정적 · 원형)의 꼭짓점 색이 한 가지다 — 얼룩이 안 구워졌다');
   // 바위: staticOver 를 넘는 것은 인스턴스에 없다. 충돌은 지형보다 많다(바위 · 조각이 들어 있다)
   for (const g of world.instances) for (let i = 6; i < g.xf.length; i += 8) assert.ok(g.xf[i] * WORLD.rock.unit <= WORLD.rock.staticOver + 1e-4, '2m 넘는 바위가 인스턴스에 있다');
   // 조각을 하나 더해 그 자리의 바위가 비켜나도 다른 바위는 그대로다(바위마다 난수를 같은 수만큼 쓴다)
@@ -219,13 +227,16 @@ function generation(t) {
   const first = world.instances.find((g) => g.xf.length), before = rows(world), after = rows(generate({ ...recipe, kit: [...recipe.kit, { piece: 'bottle', at: [first.xf[0], first.xf[2]] }] }));
   assert.ok(after.size < before.size && after.size >= before.size - 6 && [...after].every((row) => before.has(row)), `조각 하나를 더했더니 다른 바위가 바뀌었다(${before.size} → ${after.size})`);
   assert.ok(world.collide.surf.length === world.collide.idx.length / 3 && world.collide.surf.length > recipe.size[0] * recipe.size[1] * 2 && world.collide.surf.every((s) => s < world.surf.length));
+  // 충돌 삼각형의 임자: 맨 앞이 지형(0) · 바위(1) · 그 뒤가 조각(2 + kit 번호)
+  const C = world.collide, owners = new Set(C.owner);
+  assert.ok(C.owner.length === C.surf.length && C.owner[0] === 0 && owners.has(1) && owners.has(2) && [...owners].every((o) => o < 2 + recipe.kit.length), '충돌 삼각형의 임자: ' + [...owners]);
   // 표식과 등불: 책갈피 · 과녁의 수와 종류는 레시피대로(slice1 = 책갈피 6 · 과녁 8) · 등불마다 표시 · 과녁 등롱은 깨지는 등불 · 등대는 스위치 묶음이고 절벽 위에 선다
   const kinds = world.marks.targets.map((m) => m.kind).sort().join(' '), cliff = recipe.terrain[0].cliff.height;
   assert.equal(world.marks.stations.length, Object.keys(recipe.marks.stations).length); assert.equal(kinds, recipe.kit.filter((it) => it.target).map((it) => it.piece).sort().join(' '));
-  for (const l of world.lights) assert.ok((l.mode === 'on' && l.group === -1) || (['switch', 'break'].includes(l.mode) && l.group >= 0 && l.group < 8), '등불 표시: ' + JSON.stringify(l));
+  for (const l of world.lights) assert.ok((l.mode === 'on' && l.group === -1) || (['switch', 'break'].includes(l.mode) && l.group >= 0 && l.group < WORLD.lit.groups), '등불 표시: ' + JSON.stringify(l));
   for (const m of world.marks.targets) assert.ok(world.props[m.prop].piece === m.kind && (m.kind === 'lantern') === (m.light >= 0 && world.lights[m.light].mode === 'break'), '과녁: ' + JSON.stringify(m));
-  // 과녁 조각의 부분은 재질마다 하나다(부분 하나 = 그리기 호출 하나)
-  for (const p of world.props) assert.equal(new Set(p.parts.map((q) => q.mat)).size, p.parts.length, p.piece + ': 같은 재질의 부분이 둘');
+  // 과녁 조각의 부분은 재질 · 색조마다 하나다(부분 하나 = 그리기 호출 하나)
+  for (const p of world.props) assert.equal(new Set(p.parts.map((q) => q.mat + q.tint)).size, p.parts.length, p.piece + ': 같은 재질 · 색조의 부분이 둘');
   assert.equal(st.propParts, world.props.reduce((sum, p) => sum + p.parts.length, 0));
   const tower = world.lights.find((l) => l.piece === 'lighthouse');
   assert.ok(tower.mode === 'switch' && tower.at[1] > cliff + 10, '등대의 등은 스위치 묶음이고 절벽 위에 선다');
@@ -290,7 +301,7 @@ function rockList(world) {
     for (let v = 0; v < b.pos.length; v += 3) { const key = b.pos[v] + ',' + b.pos[v + 1] + ',' + b.pos[v + 2]; if (!id.has(key)) { id.set(key, root.length); root.push(root.length); } of.push(id.get(key)); }
     for (let t = 0; t < b.idx.length; t += 3) { const a = find(of[b.idx[t]]); root[find(of[b.idx[t + 1]])] = a; root[find(of[b.idx[t + 2]])] = a; }
     of.forEach((w, v) => { const r = find(w); if (!groups.has(r)) groups.set(r, []); groups.get(r).push([b.pos[v * 3], b.pos[v * 3 + 1], b.pos[v * 3 + 2]]); });
-    // 정적 바위는 놓은 자리가 세계에 안 남는다 — 꼭짓점의 가운데를 자리로, 가로 폭을 크기로 본다(원형이 제 가운데에서 조금 비켜나 있어 어림이다)
+    // 정적 바위는 놓은 자리가 세계에 안 남는다 — 꼭짓점의 가운데를 자리로, 가로 폭을 크기로 본다(원형이 제 가운데에서 조금 비켜나 있어 어림이다 — 가파름은 덤 ROUGH 를 두고 잰다)
     for (const pts of groups.values()) {
       const mid = [0, 1, 2].map((c) => pts.reduce((sum, q) => sum + q[c], 0) / pts.length), xs = pts.map((q) => q[0]);
       out.push({ at: mid, size: Math.max(...xs) - Math.min(...xs), pts, rough: true });
@@ -310,7 +321,7 @@ function rocksOnGround(t) {
       return { at: r.at.map((v) => Math.round(v * 10) / 10), size: Math.round(r.size * 100) / 100, n: r.pts.length, inside: ruler.inside(r.pts), flat: land ? Math.round(land[1] * 100) / 100 : 0, rough: !!r.rough };
     });
   };
-  const wrong = (rows) => rows.filter((r) => r.inside + 1 < R.biteMin * r.n || r.n - r.inside + 1 < R.showMin * r.n), steep = (rows) => rows.filter((r) => r.flat < R.restFlat);
+  const wrong = (rows) => rows.filter((r) => r.inside + 1 < R.biteMin * r.n || r.n - r.inside + 1 < R.showMin * r.n), steep = (rows) => rows.filter((r) => r.flat < R.restFlat - (r.rough ? ROUGH : 0));
   const rows = measure(world), floating = rows.filter((r) => r.inside === 0), buried = rows.filter((r) => r.inside === r.n);
   assert.equal(rows.length, world.stats.staticRocks + world.stats.instances, '바위를 다 세지 못했다(정적 바위를 덩이로 가르는 자가 틀리다)');
   assert.deepEqual([floating, buried, wrong(rows)], [[], [], []], '뜬 바위 · 통째로 묻힌 바위 · 문턱(tune 의 rock.biteMin · showMin)을 못 채운 바위가 있다');
@@ -336,23 +347,30 @@ function rocksOnGround(t) {
   });
 }
 
+// 정적 바위의 자리를 어림으로 잴 때 가파름 문턱에 두는 덤(어림한 가운데가 옆 삼각형에 떨어질 수 있다 — 놓은 자리가 정확한 인스턴스 줄에는 덤이 없다)
+const ROUGH = 0.15;
+
 // 씨앗과 차례: 바위 흩기가 세계 씨앗을 탄다 · 조각 · 흩기 줄의 생김새가 레시피 안의 차례에 묶이지 않는다 · 부두의 기본 길이 · 충돌에 들어가는 바위
 function seedsAndOrder() {
   const vary = (patch) => ({ ...recipe, ...patch }), world = generate(recipe), R = WORLD.rock;
   const rows = (w) => new Set(w.instances.flatMap((g) => Array.from({ length: g.xf.length / 8 }, (v, i) => g.proto + ':' + g.xf.subarray(i * 8, i * 8 + 8).join(','))));
   const xs = (w) => new Set(w.instances.flatMap((g) => Array.from({ length: g.xf.length / 8 }, (v, i) => g.xf[i * 8])));
-  const KIT = ['stone', 'wood', 'iron', 'plaster', 'concrete', 'copper', 'glass', 'glow'], kitHash = (w) => hashWorld(w.batches.filter((b) => KIT.includes(b.mat)).map((b) => [b.mat, b.cell, b.pos, b.col]));
+  const kitHash = (w) => hashWorld(w.batches.filter((b) => b.mat !== 'ground' && b.mat !== 'rock').map((b) => [b.mat, b.tint, b.cell, b.pos, b.col]));
   // 씨앗이 다르면 바위의 자리(난수로 뽑는 x)가 하나도 안 겹친다 — 지형만 달라져서 다른 것이 아니다
   const other = xs(generate(vary({ seed: recipe.seed + 1 })));
   assert.equal([...xs(world)].filter((x) => other.has(x)).length, 0, '씨앗이 달라도 바위의 x 가 같다 — 흩기가 세계 씨앗을 안 쓴다');
   // 조각을 목록 앞에 끼워도 뒤에 붙여도 다른 조각의 생김새는 그대로(씨앗 = 조각 이름 + 자리)
-  const extra = { piece: 'buoy', at: [recipe.size[0] / 2 - 8, recipe.size[1] / 2 - 8] };
+  const extra = { piece: 'buoy', at: [recipe.size[0] / 2 - 8, recipe.size[1] / 2 - 8], target: true };       // 과녁 = 따로 그리는 조각이라 정적 묶음을 더하지 않는다
   assert.equal(kitHash(generate(vary({ kit: [extra, ...recipe.kit] }))), kitHash(world), '조각을 앞에 끼웠더니 뒤 조각의 생김새가 바뀌었다');
   assert.equal(kitHash(generate(vary({ kit: [...recipe.kit, extra] }))), kitHash(world), '조각을 뒤에 붙였더니 앞 조각의 생김새가 바뀌었다');
   // 흩기 줄의 차례를 뒤집어도 바위는 그대로, 한 줄의 수를 늘리면 있던 바위는 그대로 두고 더 놓인다(씨앗 = 띠 이름 + 그 띠의 몇 번째 줄)
   const flipped = generate(vary({ scatter: recipe.scatter.slice().reverse() })), more = rows(generate(vary({ scatter: recipe.scatter.map((s, i) => (i === 0 ? { ...s, n: s.n + 8 } : s)) })));
   assert.deepEqual([...rows(flipped)].sort(), [...rows(world)].sort(), '흩기 줄의 차례를 바꿨더니 바위가 달라졌다');
   assert.ok(flipped.stats.staticRocks === world.stats.staticRocks && more.size > rows(world).size && [...rows(world)].every((row) => more.has(row)), '흩는 수를 늘렸더니 있던 바위가 바뀌었다');
+  // 같은 띠의 둘째 줄: 띠 표(tune 의 band) 맨 뒤에 띠를 더해도 그 줄의 바위는 그대로다(둘째 줄부터의 씨앗 = 띠 이름 + 몇 번째 줄 — 띠의 수에 안 묶인다)
+  const twice = vary({ scatter: [...recipe.scatter, { ...recipe.scatter[0], n: 12 }] }), was = rows(generate(twice));
+  try { WORLD.band.extra = { near: 0, far: 1 }; assert.deepEqual([...rows(generate(twice))].sort(), [...was].sort(), '띠를 더했더니 둘째 줄의 바위가 바뀌었다'); } finally { delete WORLD.band.extra; }
+  assert.ok(was.size > rows(world).size, '같은 띠의 둘째 줄이 바위를 더 놓지 않았다');
   // 부두의 길이를 안 적으면 기본 길이(PIECES 한 곳)만큼 뻗고, 바위도 그만큼 비운다
   const pier = recipe.kit.find((it) => it.piece === 'pier'), bare = { piece: 'pier', at: pier.at, rot: 0 }, len = PIECES.pier.opt.length[0];
   const crowded = generate(vary({ scatter: [{ what: 'rocks', region: 'shore', n: 1500, size: [0.3, 1.2] }], kit: recipe.kit.map((it) => (it === pier ? bare : it)) }));

@@ -1,13 +1,14 @@
 // 주는 것: TUNE(수치 표 전체 — 숫자의 유일한 원본) · tuneGet · tuneSet(개발판 조정 패널) · tuneSnapshot(「복사」용 사본) · tuneApply · tuneFreeze.
-// 받는 것: 주제별 표(sim · probe · app · world …). 표의 잎은 수 · 불리언 · 글자뿐이고, tuneSet 은 이미 있는 잎을 같은 형으로만 바꾼다.
+// 받는 것: 주제별 표(sim · probe · app · world · bake …). 표의 잎은 수 · 불리언 · 글자뿐이고, tuneSet 은 이미 있는 잎을 같은 형으로만 바꾼다.
 // 배포판은 시작할 때 tuneFreeze 로 얼린다. 모듈을 읽을 때 한 번 계산해 둔 값(STEP 같은)은 조정 대상이 아니다.
 import { deepFreeze } from '../freeze.js';
 import { SIM } from './sim.js';
 import { PROBE } from './probe.js';
 import { APP } from './app.js';
 import { WORLD } from './world.js';
+import { BAKE } from './bake.js';
 
-export const TUNE = { sim: SIM, probe: PROBE, app: APP, world: WORLD };
+export const TUNE = { sim: SIM, probe: PROBE, app: APP, world: WORLD, bake: BAKE };
 
 function has(node, key) { return node !== null && typeof node === 'object' && Object.prototype.hasOwnProperty.call(node, key); }
 
