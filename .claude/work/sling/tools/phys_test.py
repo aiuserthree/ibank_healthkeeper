@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 """곰돌이 새총 원정대 시험(1단계에 만들고 2단계에서 10단계로 넓힘) — 물리 안정성 · 결정성 · 무너질 때 프레임 시간 · 캡처
-쓰는 법: (워크트리 web/ 에서 python3 -m http.server 8791 를 띄운 뒤)
-  /usr/bin/python3 .claude/work/sling/tools/phys_test.py [http://127.0.0.1:8791] [캡처 폴더]
+쓰는 법: (워크트리 web/ 에서 python3 -m http.server 19131 를 띄운 뒤)
+  /usr/bin/python3 .claude/work/sling/tools/phys_test.py [http://127.0.0.1:19131] [캡처 폴더]
 """
 import sys, json, pathlib
 from playwright.sync_api import sync_playwright
-BASE=(sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:8791').rstrip('/')
+BASE=(sys.argv[1] if len(sys.argv)>1 else 'http://127.0.0.1:19131').rstrip('/')
 OUT=pathlib.Path(sys.argv[2] if len(sys.argv)>2 else pathlib.Path(__file__).resolve().parents[1]/'shots')
 OUT.mkdir(parents=True,exist_ok=True)
 URL=BASE+'/games/embed/slingfort.html?test=1'

@@ -298,6 +298,7 @@ window.HKPlay = (function () {
     ferry: ["#0b5f86", "#ffb02e"],
     ringcatch: ["#9a3412", "#f97316"],
     hoops: ["#c2410c", "#ff5a36"],
+    slingfort: ["#e8762c", "#7a4520"],
     mansion: ["#1e1b4b", "#a78bfa"],
     bumpervs: ["#7c2d12", "#fb923c"],
     jellyvs: ["#3b1d6e", "#ff7ac8"],

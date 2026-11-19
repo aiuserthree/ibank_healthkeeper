@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 """곰돌이 새총 원정대 — 자동 쏘기로 단계마다 깰 수 있는지 · 별 3 이 되는지 확인
-쓰는 법: (워크트리 web/ 에서 python3 -m http.server 8791 를 띄운 뒤)
+쓰는 법: (워크트리 web/ 에서 python3 -m http.server 19131 를 띄운 뒤)
   /usr/bin/python3 .claude/work/sling/tools/solve.py [단계들 예: 1,2,3] [--beam 3]
 - 각도(-15~15°, 2.5° 간격 13) × 힘(.35~.85, .05 간격 11) 격자, 특수 곰은 누르는 때(안 누름 · 35 · 55 · 75 · 95 걸음)까지 훑는다
 - 묶음 찾기(beam): 한 발 쏠 때마다 후보를 모두 쳐 보고(판 상태 저장 · 되살리기), 쓰러뜨린 너구리 · 두목 체력 · 부순 블록 순으로 좋은 몇 개만 이어 간다
@@ -10,7 +10,7 @@
 """
 import sys, json, asyncio, pathlib, time
 from playwright.async_api import async_playwright
-BASE='http://127.0.0.1:8791'
+BASE='http://127.0.0.1:19131'
 URL=BASE+'/games/embed/slingfort.html?test=1'
 ARGS=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']
 OUT=pathlib.Path(__file__).resolve().parent

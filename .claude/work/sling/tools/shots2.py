@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 """곰돌이 새총 원정대 2단계 캡처 — 꿀폭탄 쾅 · 방패 통 · 큰곰 돌진 · 보스 성 · 늪 · 결과 카드 둘 · 멈춤 · 지도
-쓰는 법: (web/ 에서 python3 -m http.server 8791) /usr/bin/python3 .claude/work/sling/tools/shots2.py
+쓰는 법: (web/ 에서 python3 -m http.server 19131) /usr/bin/python3 .claude/work/sling/tools/shots2.py
 쏘기 순서는 tools/solve_result.json(자동 쏘기로 찾은 것)을 쓴다 → shots/s2-*.png"""
 import json, pathlib
 from playwright.sync_api import sync_playwright
 T=pathlib.Path(__file__).resolve().parent;OUT=T.parent/'shots';OUT.mkdir(exist_ok=True)
 SOL={int(k):v for k,v in json.loads((T/'solve_result.json').read_text()).items()}
-URL='http://127.0.0.1:8791/games/embed/slingfort.html'
+URL='http://127.0.0.1:19131/games/embed/slingfort.html'
 ARGS=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']
 errs=[]
 def newpage(b,q='?test=1'):
