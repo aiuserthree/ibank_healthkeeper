@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 """안개 군도 FPS(fogisle) — 브라우저 하네스. 헤드리스 크롬(Playwright)으로 묶은 파일을 열어 본다.
 
-  /usr/bin/python3 check.py gate                     lint → build → simtest gate → smoke(개발판 · 배포판) · arcade · hash · worker (4분 안)
+  /usr/bin/python3 check.py gate                     lint → build → simtest gate → smoke(개발판 · 배포판) · arcade · hash · worker · world (4분 안)
   /usr/bin/python3 check.py full                     gate 의 것 전부 + simtest full
-  /usr/bin/python3 check.py smoke [--release] | arcade | hash | worker      하나씩(여럿을 이어 적어도 된다 — 먼저 묶기를 한 번 돌린다)
+  /usr/bin/python3 check.py smoke [--release] | arcade | hash | worker | world   하나씩(여럿을 이어 적어도 된다 — 먼저 묶기를 한 번 돌린다)
   … --out <폴더>                                      캡처 · 기록을 둘 곳(기본: 시스템 임시 폴더의 fogisle-check — 저장소 밖)
 
 종료 코드 0 = 통과 · 1 = 실패 · 2 = 쓰는 법이 틀림. 마지막 줄은 늘 JSON 요약이다.
@@ -27,7 +27,7 @@ PARENT_PATH = "/__harness/parent.html"
 FILES = {"dev": "fogisle.dev.html", "release": "fogisle.html"}
 CHROME_ARGS = ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"]
 NODE = "/usr/local/bin/node" if pathlib.Path("/usr/local/bin/node").exists() else "node"
-BROWSER_CMDS = ("smoke", "arcade", "hash", "worker")
+BROWSER_CMDS = ("smoke", "arcade", "hash", "worker", "world")
 LATER_CMDS = ("leak", "perf", "compile", "alloc", "feel", "audio", "ui", "bench")   # 그것이 처음 필요한 단계가 만든다(build-plan 부록 A)
 TYPES = {".js": "text/javascript", ".woff2": "font/woff2", ".html": "text/html; charset=utf-8", ".json": "application/json"}
 THRESHOLDS = json.loads((HARNESS / "thresholds.json").read_text(encoding="utf-8"))
@@ -209,6 +209,13 @@ class Harness:
         self.start()
         return Game(self, mode, parent, ("hk=1&" + query).rstrip("&") if parent and query else query, init, allow, viewport, settle)
 
+    def node_json(self, code, *args):
+        """Node 로 원본을 읽는 글 한 토막을 돌려 마지막 줄의 JSON 을 돌려준다(시험이 저마다 필요한 값을 읽어 올 때)"""
+        r = subprocess.run([NODE, "--input-type=module", "-e", code, *map(str, args)], cwd=SRC, capture_output=True, text=True)
+        if r.returncode != 0:
+            raise RuntimeError("Node 로 원본을 읽지 못했다: " + r.stderr.strip()[-400:])
+        return json.loads(r.stdout.strip().split("\n")[-1])
+
     def state_hash(self, seed, steps):
         r = subprocess.run([NODE, "--input-type=module", "-e", NODE_STATE, str(seed), str(steps)], cwd=SRC, capture_output=True, text=True)
         return r.stdout.strip() or "Node 실패: " + r.stderr.strip()[-200:]
@@ -252,7 +259,7 @@ def expand(cmds, release):
         if cmd in ("gate", "full"):
             steps += [("lint", "node", ["tools/lint.mjs"]), ("build", "node", ["tools/build.mjs"]), ("simtest " + cmd, "node", ["tools/simtest.mjs", cmd])]
             steps += [("smoke", "case", {"release": False}), ("smoke --release", "case", {"release": True})]
-            steps += [(name, "case", {"release": False}) for name in ("arcade", "hash", "worker")]
+            steps += [(name, "case", {"release": False}) for name in ("arcade", "hash", "worker", "world")]
         else:
             steps.append((cmd + (" --release" if release and cmd == "smoke" else ""), "case", {"release": release}))
     if not any(kind == "node" and name == "build" for name, kind, _ in steps):

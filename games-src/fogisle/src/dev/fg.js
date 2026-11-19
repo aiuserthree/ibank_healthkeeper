@@ -1,5 +1,6 @@
 // 주는 것: 개발 창구 window.__fg v0(판 번호 v) — 시험과 조정 패널이 게임 안쪽 이름에 기대지 않도록 좁은 문 하나만 둔다. 개발판에만 묶인다.
 //   읽기(판을 더럽히지 않는다): state() · events(n) · perf() · tune(path) · simHash(seed, steps) · probeHash(seed, steps) · worker(seed, steps[, fn])
+//     · gen(세계) 주 스레드 생성의 해시 · 시간 · 수 · genJob(세계) 워커 러너로 생성 · view(세계, 카메라, 색) 세계 뷰어(dev/viewer.js)
 //   손대기(그 뒤로는 「시험 판」 — 판 신호를 보내지 않는다): hold(on) · step(n) · bot(kind) · snapshot() · restore() · tune(path, value)
 // 받는 것: app(CTX · 고리 · 워커 러너) · bot · sim · shared. station · mask · gl 같은 문은 그것이 처음 필요한 단계가 더한다(build-plan 부록 A).
 // state().events 는 「지금 나무를 step() 으로 민 동안」 나온 사건의 해시다(bot/run.js 의 runHash 뒤쪽과 같은 셈법 — 나무가 바뀌면 새로 세고,
@@ -15,6 +16,7 @@ import { EVENTS, EV_NAMES, EV_FIELDS, clearEvents, hashEvents } from '../shared/
 import { hashNew, hashHex } from '../shared/hash.js';
 import { tuneGet, tuneSet } from '../shared/tune/index.js';
 import { APP } from '../shared/tune/app.js';
+import { worldInfo, worldJob, worldView } from './viewer.js';
 
 const BOTS = Object.freeze({ probe: probeBot });
 const D = { ring: [], eh: hashNew(), of: null, snap: null };
@@ -67,6 +69,7 @@ const fg = {
   perf() { return { ...CTX.perf }; },
   simHash(seed, steps) { const run = makeRun(seed, probeBot); advance(run, steps); return runHash(run); },
   probeHash(seed, steps) { return runAll(probeRun(seed, steps)).hash; },
+  gen: worldInfo, genJob: worldJob, view: worldView,
   // fn = shared/probe.js 가 내보낸 함수 이름(없는 이름을 주면 워커 러너의 거절 길을 탄다)
   worker(seed, steps, fn = 'probeRun') {
     return runJob('shared/probe.js', fn, [seed, steps]).then((r) => ({ where: r.where, slices: r.slices, moved: r.moved, hash: r.value.hash, pos: Array.from(r.value.pos), kind: r.value.pos.constructor.name }));
