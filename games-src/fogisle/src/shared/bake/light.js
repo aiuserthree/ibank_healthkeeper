@@ -1,5 +1,5 @@
 // 주는 것: 구운 빛 — lightSetup(세계 → 굽기에 쓸 등불 · 해 · 광선 방향) · vertexLightSteps(꼭짓점 빛 v1 — 묶음마다 Uint8 ×7 · function*) · probeLight(한 점의 빛 5바이트) ·
-//   lightGrid(빛 격자 2m) · pointLightSteps(인스턴스 · 과녁 조각의 빛 5바이트 · function*) · lampBytes(늘 켜진 등불의 RGB 만) · switchSums(스위치 묶음마다의 세기 —
+//   lightGrid(빛 격자 2m) · lightAt(빛 격자에서 한 자리의 5바이트 읽기 — 움직이는 것의 조명 · 은신의 밝기) · pointLightSteps(인스턴스 · 과녁 조각의 빛 5바이트 · function*) · lampBytes(늘 켜진 등불의 RGB 만) · switchSums(스위치 묶음마다의 세기 —
 //   굽기와 검증이 같이 쓴다) + 형식의 상수 VLIGHT(7) · PLIGHT(5) · NO_GROUP(255).
 // 받는 것: bvh(광선) · nav(빛 격자의 높이) · noise · dmath · tune/bake.light · tune/world.lit(스위치 묶음 수). 재질 · 하늘은 모른다(F2a) — 여기서 굽는 것은 「얼마나 가려졌는가」와 등불의 색뿐이다.
 // 꼭짓점 빛 v1(꼭짓점마다 7바이트 — 재질이 읽는 법):
@@ -148,6 +148,15 @@ export function* lightGrid(world, nav, S) {
   }
   start[nx * nz] = ys.length;
   return { cell: L.grid, nx, nz, x0: nav.x0, z0: nav.z0, start, y: Float32Array.from(ys), data: Uint8Array.from(data) };
+}
+
+// 빛 격자에서 자리 (x, y, z) 의 빛 5바이트를 out[at …] 에 옮긴다 — 그 칸에서 높이가 가장 가까운 탐침(격자 밖은 가장자리 칸). 돌려주는 값 = 그 탐침의 번호.
+export function lightAt(grid, x, y, z, out, at) {
+  const gi = Math.min(grid.nx - 1, Math.max(0, Math.floor((x - grid.x0) / grid.cell))), gj = Math.min(grid.nz - 1, Math.max(0, Math.floor((z - grid.z0) / grid.cell))), c = gj * grid.nx + gi;
+  let best = grid.start[c];
+  for (let k = best + 1; k < grid.start[c + 1]; k++) if (Math.abs(grid.y[k] - y) < Math.abs(grid.y[best] - y)) best = k;
+  for (let b = 0; b < PLIGHT; b++) out[at + b] = grid.data[best * PLIGHT + b];
+  return best;
 }
 
 // 인스턴스 줄마다(원형 좌표 높이 instUp × 크기 위의 점) · 과녁 조각마다(과녁의 가운데)의 빛 5바이트. 탐침 256개마다 쉰다.

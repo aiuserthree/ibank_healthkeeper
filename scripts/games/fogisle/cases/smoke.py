@@ -115,13 +115,14 @@ def flow(h, mode):
         g.click("#fgQuit")
         g.wait("__fg_status.phase === 'result'")
         h.check(g.status()["lock"] == "off" and g.js("document.getElementById('fgScore').textContent") == "0", f"[{mode}] 결과 화면 — 판이 닫힘")
-        # 덮개 뒤에서도 창 크기를 바꾸면 다시 그린다(크기가 바뀌면 그리기 버퍼가 지워진다 — 왼쪽 위 하늘 자리가 그대로여야 한다)
+        # 덮개 뒤에서도 창 크기를 바꾸면 다시 그린다(크기가 바뀌면 그리기 버퍼가 지워진다 — 왼쪽 위 하늘 자리가 거의 그대로여야 한다.
+        # 진짜 하늘(F2a)은 화면비가 바뀌면 그 구석의 보는 방향이 조금 달라져 화소가 1 안팎 움직인다 — 안 그렸으면(지워진 채면) 30 넘게 다르다)
         a = g.shot(f"result-{mode}.png").read_bytes()
         g.page.set_viewport_size({"width": 1100, "height": 640})
         g.frames(3)
         a, b = (Image.open(io.BytesIO(x)).crop((0, 0, 40, 40)) for x in (a, g.page.screenshot()))
         d = sum(ImageStat.Stat(ImageChops.difference(a.convert("RGB"), b.convert("RGB"))).mean) / 3
-        h.check(d < T["stillDiffMax"], f"[{mode}] 결과 덮개 뒤에서 창 크기를 바꿔도 장면이 다시 그려진다", round(d, 3))
+        h.check(d < T["resizeDiffMax"], f"[{mode}] 결과 덮개 뒤에서 창 크기를 바꿔도 장면이 다시 그려진다", round(d, 3))
         g.click("#fgMenu")
         g.wait("__fg_status.phase === 'title'")
         g.click("#fgGo")

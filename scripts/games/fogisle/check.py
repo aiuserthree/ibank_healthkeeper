@@ -1,9 +1,10 @@
 #!/usr/bin/python3
 """안개 군도 FPS(fogisle) — 브라우저 하네스. 헤드리스 크롬(Playwright)으로 묶은 파일을 열어 본다.
 
-  /usr/bin/python3 check.py gate                     lint → build → simtest gate → smoke(개발판 · 배포판) · arcade · hash · worker · world · bake (4분 안)
+  /usr/bin/python3 check.py gate                     lint → build → simtest gate → smoke(개발판 · 배포판) · arcade · hash · worker · world · bake · compile · leak (4분 안)
+  /usr/bin/python3 check.py perf | look              gate 밖의 무거운 것: 값싼 길의 화소 기울기(GPU 시간 질의) · 재질 견본 판과 책갈피 캡처(직접 열어 볼 것)
   /usr/bin/python3 check.py full                     gate 의 것 전부 + simtest full
-  /usr/bin/python3 check.py smoke [--release] | arcade | hash | worker | world | bake   하나씩(여럿을 이어 적어도 된다 — 먼저 묶기를 한 번 돌린다)
+  /usr/bin/python3 check.py smoke [--release] | arcade | hash | worker | world | bake | compile | leak   하나씩(여럿을 이어 적어도 된다 — 먼저 묶기를 한 번 돌린다)
   … --out <폴더>                                      캡처 · 기록을 둘 곳(기본: 시스템 임시 폴더의 fogisle-check — 저장소 밖)
 
 종료 코드 0 = 통과 · 1 = 실패 · 2 = 쓰는 법이 틀림. 마지막 줄은 늘 JSON 요약이다.
@@ -27,8 +28,8 @@ PARENT_PATH = "/__harness/parent.html"
 FILES = {"dev": "fogisle.dev.html", "release": "fogisle.html"}
 CHROME_ARGS = ["--use-angle=metal", "--enable-gpu", "--ignore-gpu-blocklist"]
 NODE = "/usr/local/bin/node" if pathlib.Path("/usr/local/bin/node").exists() else "node"
-BROWSER_CMDS = ("smoke", "arcade", "hash", "worker", "world", "bake")
-LATER_CMDS = ("leak", "perf", "compile", "alloc", "feel", "audio", "ui", "bench")   # 그것이 처음 필요한 단계가 만든다(build-plan 부록 A)
+BROWSER_CMDS = ("smoke", "arcade", "hash", "worker", "world", "bake", "compile", "leak", "perf", "look")
+LATER_CMDS = ("alloc", "feel", "audio", "ui", "bench")   # 그것이 처음 필요한 단계가 만든다(build-plan 부록 A)
 TYPES = {".js": "text/javascript", ".woff2": "font/woff2", ".html": "text/html; charset=utf-8", ".json": "application/json"}
 THRESHOLDS = json.loads((HARNESS / "thresholds.json").read_text(encoding="utf-8"))
 KNOWN = json.loads((HARNESS / "known-warnings.json").read_text(encoding="utf-8"))["known"]
@@ -53,9 +54,9 @@ LONG_STEPS, EXTRA_SEED = T["longSteps"], T["extraSeed"]
 class Game:
     """열린 화면 하나. frame = 게임 문서(가짜 부모 창 안이면 그 iframe). with 로 쓰고, 나갈 때 콘솔 · 요청 기록이 깨끗한지 본다."""
 
-    def __init__(self, h, mode, parent, query, init, allow, viewport, settle):
+    def __init__(self, h, mode, parent, query, init, allow, viewport, settle, deny=()):
         # parent: False = 혼자 · True = 아케이드처럼(Esc → hk:esc → 부모가 멈춤/이어 하기) · "raw" = 부모가 hk:esc 를 적기만 한다 · "other" = 다른 출처의 부모
-        self.h, self.mode, self.allow = h, mode, tuple(allow)
+        self.h, self.mode, self.allow, self.deny = h, mode, tuple(allow), tuple(deny)   # deny = 404 로 답할 경로의 앞머리(자산을 못 받는 흉내 — 「없는 파일 요청」으로 세지 않는다)
         self.errors, self.warnings, self.known, self.blocked, self.missing, self.seen = [], [], 0, [], [], 0
         self.ctx = h.browser.new_context(viewport={"width": viewport[0], "height": viewport[1]}, device_scale_factor=1)
         for script in init:
@@ -88,6 +89,8 @@ class Game:
             return route.fulfill(status=200, content_type="application/json", body='{"data":{}}')
         if path == "/favicon.ico":
             return route.fulfill(status=204, body="")
+        if any(path.startswith(d) for d in self.deny):
+            return route.fulfill(status=404, body="")
         file = (WEB / path.lstrip("/")).resolve()
         if WEB not in file.parents or not file.is_file():
             self.missing.append(path)
@@ -206,10 +209,10 @@ class Harness:
             self.pw.stop()
             self.browser = self.pw = None
 
-    def open(self, mode="dev", parent=False, query="", init=(), allow=(), viewport=(1280, 720), settle=True):
+    def open(self, mode="dev", parent=False, query="", init=(), allow=(), viewport=(1280, 720), settle=True, deny=()):
         """settle=False = 타이틀의 준비(자가 점검 → 생성 → 굽기)가 끝나기를 기다리지 않고 돌려준다(준비 중인 화면을 볼 때)"""
         self.start()
-        return Game(self, mode, parent, ("hk=1&" + query).rstrip("&") if parent and query else query, init, allow, viewport, settle)
+        return Game(self, mode, parent, ("hk=1&" + query).rstrip("&") if parent and query else query, init, allow, viewport, settle, deny)
 
     def node_json(self, code, *args):
         """Node 로 원본을 읽는 글 한 토막을 돌려 마지막 줄의 JSON 을 돌려준다(시험이 저마다 필요한 값을 읽어 올 때)"""
@@ -261,7 +264,7 @@ def expand(cmds, release):
         if cmd in ("gate", "full"):
             steps += [("lint", "node", ["tools/lint.mjs"]), ("build", "node", ["tools/build.mjs"]), ("simtest " + cmd, "node", ["tools/simtest.mjs", cmd])]
             steps += [("smoke", "case", {"release": False}), ("smoke --release", "case", {"release": True})]
-            steps += [(name, "case", {"release": False}) for name in ("arcade", "hash", "worker", "world", "bake")]
+            steps += [(name, "case", {"release": False}) for name in ("arcade", "hash", "worker", "world", "bake", "compile", "leak")]
         else:
             steps.append((cmd + (" --release" if release and cmd == "smoke" else ""), "case", {"release": release}))
     if not any(kind == "node" and name == "build" for name, kind, _ in steps):
