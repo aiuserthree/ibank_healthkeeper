@@ -58,19 +58,19 @@ function fort(){const b=[],e=[];return{b,e,
   boss(x,y,z,hp){e.push([x,y,z,0,hp])}}}
 const LEVELS=[
   {id:1,name:'숲속 연습장',sub:'뒤로 당겼다 놓아요 · 🍯 꿀폭탄곰은 날아갈 때 누르면 쾅!',tutorial:true,
-   bears:['basic','bomb','basic'],
+   bears:['basic','bomb','basic','basic','basic'],
    blocks:[
      ['wood',.5,2.4,.5,-1.6,0,0],['wood',.5,2.4,.5,1.6,0,0],['wood',4.2,.35,1.0,0,2.4,0],
-     ['wood',1.2,1.2,1.2,-3.6,0,0],['wood',1.2,1.2,1.2,-3.6,1.2,0],
+     ['wood',1.2,1.2,1.2,-2.5,0,0],['wood',1.2,1.2,1.2,-2.5,1.2,0],
      ['wood',1.0,1.0,1.0,3.3,0,-.1],['wood',1.0,1.0,1.0,4.35,0,-.1],['wood',1.0,1.0,1.0,3.8,1.0,-.1],
    ],
-   enemies:[[0,2.75,0,0],[-3.6,2.4,0,15],[0,0,1.3,-10]],
+   enemies:[[0,2.75,0,0],[-2.5,2.4,0,15],[0,0,0,-10]],
    fence:[[-6,3.2,3.2,3.2]],banners:[[-4.5,2.8],[.5,3.0],[4.5,2.6]]},
   {id:2,name:'돌담 마을',sub:'돌은 무겁고 단단해요 · 🛡️ 방패곰은 누르면 통통 튕겨요!',
-   bears:['basic','shield','bomb','basic'],
+   bears:['basic','shield','bomb','basic','bomb','basic'],
    blocks:[
      ['stone',2.8,1.2,1.2,-3,0,0],['wood',.4,1.8,.4,-4.15,1.2,0],['wood',.4,1.8,.4,-1.85,1.2,0],['wood',3.2,.3,1.0,-3,3.0,0],
-     ['stone',1.2,1.2,1.2,.2,0,0],['stone',1.2,1.2,1.2,.2,1.2,0],
+     ['wood',1.2,1.2,1.2,.2,0,0],['wood',1.2,1.2,1.2,.2,1.2,0],
      ['wood',.4,2.0,.4,2.0,0,0],['wood',.4,2.0,.4,4.4,0,0],['wood',3.0,.3,1.0,3.2,2.0,0],['wood',1.0,1.0,1.0,3.2,2.3,0],
      ['stone',1.0,1.0,1.0,5.9,0,.2],['wood',1.0,1.0,1.0,5.9,1.0,.2],
      ['wood',1.0,1.0,1.0,-5.4,0,-.2],
@@ -78,12 +78,12 @@ const LEVELS=[
    enemies:[[-3,3.3,0,0],[-3,1.2,0,10],[.2,2.4,0,-15],[3.2,0,0,5]],
    fence:[[-7,3.2,7,3.2],[7.4,-1.8,7.4,3.0]],banners:[[-5.5,2.8],[0,3.0],[5.5,2.6]]},
   (()=>{const f=fort(); // 3 얼음 곳간 — 얼음 처음, 큰곰 처음(구현 3단계에 쉽게: 오른쪽 기둥 돌 → 나무, 얼음탑 3 → 2, 끝 상자를 0.6m 안으로)
-    f.box('stone',1,1.6,1,-4.2,0);f.box('wood',1,1.6,1,-1.4,0);f.box('ice',3.8,.5,1,-2.8,1.6);f.en(-2.8,2.1);f.en(-2.8,0,0,10);
+    f.box('wood',1,1.6,1,-4.2,0);f.box('wood',1,1.6,1,-1.4,0);f.box('ice',3.8,.5,1,-2.8,1.6);f.en(-2.8,2.1);f.en(-2.8,0,0,10);
     f.stack('ice',1,1.2,0,2);f.en(1.2,2);
-    f.arch('wood','wood',4.3,0,2.2,1.8);f.box('ice',1,1,1,4.3,2.1);f.en(4.3,0,0,-10);
-    f.box('wood',1,1,1,6.0,0,.2);f.en(6.0,1,.2);
+    f.arch('wood','wood',3.9,0,2.2,1.8);f.box('ice',1,1,1,3.9,2.1);f.en(3.9,0,0,-10);
+    f.box('wood',1,1,1,5.6,0,.2);f.en(5.6,1,.2);
     f.box('stone',1.2,1.2,1.2,-6.2,0,.1);f.box('wood',1,1,1,-6.2,1.2,.1);
-    return {id:3,name:'얼음 곳간',sub:'얼음은 쨍그랑 잘 깨져요 · 💪 큰곰은 누르면 벽을 뚫고 돌진!',bears:['basic','giant','shield','bomb','basic'],
+    return {id:3,name:'얼음 곳간',sub:'얼음은 쨍그랑 잘 깨져요 · 💪 큰곰은 누르면 벽을 뚫고 돌진!',bears:['basic','giant','shield','bomb','bomb','basic'],
       blocks:f.b,enemies:f.e,fence:[[-8,3.4,8,3.4]],banners:[[-5,3.0],[1,3.2],[5.5,3.0]]}})(),
   (()=>{const f=fort(); // 4 단풍 망루 — 높은 탑
     f.box('stone',2.6,1,1.2,0,0);f.box('wood',.4,2,.4,-1,1);f.box('wood',.4,2,.4,1,1);f.box('wood',2.8,.3,1.2,0,3);
@@ -97,37 +97,37 @@ const LEVELS=[
     f.box('stone',1.2,1.2,1.2,-1.3,0);f.box('stone',1.2,1.2,1.2,1.3,0);f.box('stone',4,.4,1.4,0,1.2);f.boss(0,1.6,0,3);
     f.box('wood',.4,2.6,.4,-1.7,1.6);f.box('wood',.4,2.6,.4,1.7,1.6);f.box('wood',4,.3,1.4,0,4.2);f.en(0,4.5);
     f.stack('wood',1,-4.4,0,2);f.en(-4.4,2);f.box('ice',.5,1.6,1.6,-3,0,-.4);
-    f.box('stone',1.2,1.2,1.2,4.3,0);f.box('wood',1,1,1,4.3,1.2);f.en(4.3,2.2,0,-10);
-    f.box('ice',.5,1.4,1.4,6.2,0,-1);f.en(6.4,0,.2);
-    f.stack('wood',.8,-6.4,.3,3);f.en(-6.4,2.4,.3,20);
-    return {id:5,name:'너구리 두목 산채',sub:'두목 너구리는 여러 번 맞혀야 쓰러져요!',bears:['basic','giant','bomb','shield','bomb','basic'],boss:true,
+    f.box('stone',1.2,1.2,1.2,3.8,0);f.box('wood',1,1,1,3.8,1.2);f.en(3.8,2.2,0,-10);
+    f.box('ice',.5,1.4,1.4,5.0,0,-1);f.en(5.1,0,.2);
+    f.stack('wood',.8,-5.8,.3,3);f.en(-5.8,2.4,.3,20);
+    return {id:5,name:'너구리 두목 산채',sub:'두목 너구리는 여러 번 맞혀야 쓰러져요!',bears:['basic','giant','bomb','shield','bomb','bomb','basic'],boss:true,
       blocks:f.b,enemies:f.e,fence:[[-8.5,3.6,8.5,3.6],[8.6,-2,8.6,3.4],[-8.6,-2,-8.6,3.4]],banners:[[-5.5,3.2],[0,3.4],[5.5,3.2],[-2.6,3.4],[2.6,3.4]]}})(),
   (()=>{const f=fort(); // 6 늪 나루터 — 안개 늪 처음, 기둥집
     for(const x of [-3,-1,1,3])f.box('wood',.4,2,.4,x,0);f.box('wood',6.8,.3,1.2,0,2);
     f.box('wood',.4,1.6,.4,-2.2,2.3);f.box('wood',.4,1.6,.4,2.2,2.3);f.box('wood',5,.3,1.2,0,3.9);
     f.en(-.9,2.3);f.en(.9,2.3,0,10);f.en(0,4.2);f.en(-2,0,0,-10);f.box('ice',1,1,1,0,0);
-    f.stack('ice',1,-5.6,0,2);f.en(-5.6,2);
-    f.box('stone',1.2,1.2,1.2,5.4,0);f.en(5.4,1.2,0,-15);
+    f.stack('ice',1,-4.2,0,2);f.en(-4.2,2);
+    f.box('wood',1.2,1.2,1.2,4.2,0);f.en(4.2,1.2,0,-15);
     return {id:6,name:'늪 나루터',sub:'안개 늪에 왔어요 · 기둥을 부러뜨리면 집이 통째로 무너져요!',bears:['basic','shield','bomb','giant','basic'],region:'swamp',
       blocks:f.b,enemies:f.e,fence:[[-8,3.4,8,3.4]],banners:[[-4.5,3.0],[4.5,3.0]]}})(),
   (()=>{const f=fort(); // 7 이끼 돌탑 — 돌탑 둘과 얼음 다리
     f.stack('stone',1,-3,0,3);f.stack('stone',1,3,0,3);f.box('ice',7.2,.4,1,0,3);f.en(-1.2,3.4);f.en(1.2,3.4,0,-10);
     f.stack('wood',1,0,-1.2,2);f.en(0,0,.4);
-    f.arch('wood','wood',-6,0,1.6,1.6);f.en(-6,0,0,10);
-    f.stack('ice',1,6.2,0,3);f.en(6.2,3);
+    f.arch('wood','wood',-5.8,0,1.6,1.6);f.en(-5.8,0,0,10);
+    f.stack('ice',1,5.2,0,2);f.en(5.2,2);
     return {id:7,name:'이끼 돌탑',sub:'돌탑 사이 얼음 다리 · 다리가 깨지면 위 너구리가 떨어져요!',bears:['basic','giant','bomb','shield','basic'],region:'swamp',
       blocks:f.b,enemies:f.e,fence:[[-8.5,3.4,8.5,3.4]],banners:[[-4.5,3.2],[4.5,3.2]]}})(),
   (()=>{const f=fort(); // 8 버섯 얼음굴 — 얼음 피라미드(3단계에 쉽게: 꼭대기 하나 뺌, 끝 얼음을 0.2m 안으로)
     for(const x of [-1.5,-.5,.5,1.5])f.box('ice',1,1,1,x,0);for(const x of [-1,0,1])f.box('ice',1,1,1,x,1);for(const x of [-.5,.5])f.box('ice',1,1,1,x,2);f.en(0,3);f.en(0,0,1.4);
     f.arch('wood','wood',-4.6,0,2,2);f.en(-4.6,0);f.en(-4.6,2.3,0,10);
     f.box('stone',1.2,1.2,1.2,4,0);f.box('stone',1.2,1.2,1.2,5.4,0);f.box('wood',2.8,.3,1.2,4.7,1.2);f.en(4.7,1.5,0,-10);
-    f.box('ice',1,1,1,6.7,0);f.en(6.7,1);
+    f.box('ice',1,1,1,6.5,0);f.en(6.5,1);
     return {id:8,name:'버섯 얼음굴',sub:'얼음 피라미드 · 꿀폭탄 한 방이면 얼음이 와장창!',bears:['basic','bomb','giant','shield','bomb','basic'],region:'swamp',
       blocks:f.b,enemies:f.e,fence:[[-8.5,3.4,8.5,3.4]],banners:[[-6.5,3.0],[2.5,3.4],[7.6,3.0]]}})(),
   (()=>{const f=fort(); // 9 갈대 성문 — 앞을 막은 성벽(3단계에 쉽게: 성벽 윗줄 가운데 둘 뺌, 오른쪽 나무 더미 2 → 1)
     for(let i=0;i<6;i++){const x=-2.5+i;f.box('stone',1,1,1,x,0,-1.4);if(i!==2&&i!==3)f.box('wood',1,1,1,x,1,-1.4)}
     f.arch('wood','wood',0,.8,2,2.6);f.en(0,2.9,.8);f.en(0,0,.8);f.en(-2.2,0,.6,10);f.en(2.2,0,.6,-10);
-    f.stack('ice',1,-5.2,0,2);f.en(-5.2,2);f.stack('wood',1,5.2,0,1);f.en(5.2,1,0,-15);
+    f.stack('ice',1,-4.4,0,2);f.en(-4.4,2);f.stack('wood',1,4.4,0,1);f.en(4.4,1,0,-15);
     return {id:9,name:'갈대 성문',sub:'성벽 뒤에 숨었어요 · 큰곰 돌진으로 벽을 뚫어요!',bears:['basic','giant','bomb','shield','giant','basic'],region:'swamp',
       blocks:f.b,enemies:f.e,fence:[[-8.5,3.4,8.5,3.4]],banners:[[-3.6,2.8],[3.6,2.8],[0,3.6]]}})(),
   (()=>{const f=fort(); // 10 산적 두목 성 — 마지막 보스 요새(3단계에 쉽게: 앞 돌담 가운데 하나 뺌)
@@ -135,11 +135,11 @@ const LEVELS=[
     f.box('stone',4.2,.4,1.6,0,2.4);f.boss(0,2.8,0,5);f.en(0,0,0);
     f.box('stone',.5,2.6,.5,-1.8,2.8);f.box('stone',.5,2.6,.5,1.8,2.8);f.box('ice',4.6,.4,1.6,0,5.4);f.en(0,5.8);
     for(let i=0;i<7;i++)if(i!==3)f.box('stone',1,1,1,-3+i,0,-2.2);for(const x of [-3,-1,1,3])f.box('ice',.5,.5,.5,x,1,-2.2);
-    f.stack('stone',1,-5.6,0,3);f.box('wood',1.6,.3,1.4,-5.6,3);f.en(-5.6,3.3,0,15);
-    f.stack('ice',1,5.6,0,3);f.en(5.6,3,0,-15);
+    f.stack('wood',1,-4.3,0,2);f.box('wood',1.6,.3,1.4,-4.3,2);f.en(-4.3,2.3,0,15);
+    f.stack('ice',1,4.8,0,2);f.en(4.8,2,0,-15);
     f.arch('wood','wood',0,2.2,3.2,3);f.en(0,3.3,2.2);
     f.en(-3.4,0,0,10);f.en(3.4,0,0,-10);
-    return {id:10,name:'산적 두목 성',sub:'마지막 성 · 두목과 졸개를 모두 쓰러뜨려요!',bears:['basic','giant','bomb','shield','giant','bomb','basic'],region:'swamp',boss:true,view:1.2,
+    return {id:10,name:'산적 두목 성',sub:'마지막 성 · 두목과 졸개를 모두 쓰러뜨려요!',bears:['basic','giant','bomb','shield','giant','bomb','bomb','bomb','basic'],region:'swamp',boss:true,view:1.2,
       blocks:f.b,enemies:f.e,fence:[[-9,4,9,4],[9.2,-3,9.2,3.8],[-9.2,-3,-9.2,3.8]],banners:[[-7.4,3.2],[-2.8,3.6],[2.8,3.6],[7.4,3.2]]}})(),
 ];
 const REGIONS=[{key:'forest',name:'단풍 숲',lv:[1,2,3,4,5]},{key:'swamp',name:'안개 늪',lv:[6,7,8,9,10]}];
@@ -156,8 +156,10 @@ const MATS={
   stone:{dens:5.0,hp:26,thr:3.4,gold:5},
   ice:{dens:1.3,hp:4.5,thr:1.4,gold:2},
 };
-const ENEMY={w:.7,h:1.4,mass:1.5,dvKill:3.8,crushJ:2.4,gold:15};
-const BOSS={w:1.1,h:2.2,mass:6,gold:60,cool:24};      // 두목: 맞을 때마다 체력 1(쉬는 걸음 24 동안은 다시 안 깎임)
+const ENEMY={w:.7,h:1.4,mass:1.5,dvKill:2.0,tipCos:.7,crushJ:2.4,gold:15};
+/* 두목: 곰 몸(빠르기 bearV 이상) · 꿀폭탄 폭발 · 큰곰 돌진 · 방패 튕김에 직접 맞을 때, 또는 아주 센 충격(속도 변화 dvHit 이상 — 큰 돌이 높은 데서 떨어진 정도)에만 체력 1.
+ * 무너진 잔해에 깔리거나 스치는 것으로는 안 깎인다. 깎인 뒤 cool 걸음(0.9초, 전 24걸음) 동안은 다시 안 깎인다. 물 · 밖으로 떨어지면 바로 쓰러짐 */
+const BOSS={w:1.4,h:2.2,mass:7,gold:60,cool:54,dvHit:6.5,bearV:3,bearV2:10}; // 빠른 곰(10m/s 이상)이 바로 맞히면 2
 const BEAR_R=.6,BEAR_M=6;
 const GIANT_R=.85,GIANT_M=14;
 /* 특수 곰 — 곰 마을 강화가 이 값을 올린다(applyUp). 시험 걸이(?test=1)는 강화 없음이 기본(SF.setUp 으로 바꿈) */
@@ -181,7 +183,7 @@ const P0=new V3(-1.6,4.35,-.25);           // 새총 주머니(쏘는 자리)
 const PITCH=32*DEG;
 const BASE_YAW=Math.atan2(FX-P0.x,FZ-P0.z); // 새총 → 요새 가운데
 const YAW_RANGE=24*DEG;
-const powerToSpeed=p=>9+14*p;
+const powerToSpeed=p=>11+11*p; // 힘 → 빠르기(검증 반영: 9+14p → 11+11p, 손이 조금 흔들려도 떨어지는 자리가 덜 바뀌게)
 
 /* ───────── 2. 장면 ───────── */
 const stage=$('stage');
@@ -197,6 +199,10 @@ sun.shadow.mapSize.set(MOBILE?1024:2048,MOBILE?1024:2048);Object.assign(sun.shad
 sun.shadow.bias=-.0006;sun.shadow.camera.updateProjectionMatrix();S.add(sun);sun.target.position.set(-3,0,16);S.add(sun.target);
 let vseed=7;const vr=()=>{vseed=(vseed*16807)%2147483647;return vseed/2147483647}; // 꾸밈 배치(늘 같은 모양)
 const M=(c,o={})=>new THREE.MeshLambertMaterial(Object.assign({color:c},o));
+// 같이 쓰는 기하 · 재질(빼도 버리지 않음)과, 장면에서 빼면서 그 물체만의 기하 · 재질을 버리는 도우미(판을 거듭해도 쌓이지 않게)
+const SHARED=new WeakSet();const share=(...a)=>{a.forEach(x=>x&&SHARED.add(x));return a[0]};
+function disposeTree(o){if(!o)return;if(o.parent)o.parent.remove(o);
+  o.traverse(c=>{if(c.geometry&&!SHARED.has(c.geometry))c.geometry.dispose();const m=c.material;if(m)(Array.isArray(m)?m:[m]).forEach(x=>{if(!SHARED.has(x))x.dispose()})})}
 
 // 꾸밈은 색마다 한 덩어리로 합쳐 그리기 수를 줄인다
 function DecoBatch(){this.b=new Map()}
@@ -230,7 +236,7 @@ const BLOCKMAT={};
   for(const k of ['wood','stone','ice']){
     const cv=[];
     BLOCKMAT[k]=[0,1,2].map(lv=>{tseed=7;const t=tex((x,w,h)=>{x.scale(2,2);base[k](x,128,128);if(lv)drawCrack(x,128,128,lv,crack[k])},256,256);cv.push(t);
-      return k==='ice'?new THREE.MeshLambertMaterial({map:t,transparent:true,opacity:.86}):new THREE.MeshLambertMaterial({map:t})});
+      return share(k==='ice'?new THREE.MeshLambertMaterial({map:t,transparent:true,opacity:.86}):new THREE.MeshLambertMaterial({map:t}))});
     artWhen('tex_'+k,im=>cv.forEach((t,lv)=>{const c=t.image,x=c.getContext('2d');x.setTransform(1,0,0,1,0,0);x.clearRect(0,0,256,256);x.drawImage(im,0,0,256,256);
       if(k==='ice'){x.fillStyle='rgba(230,250,255,.18)';x.fillRect(0,0,256,256)}x.scale(2,2);if(lv)drawCrack(x,128,128,lv,crack[k]);t.needsUpdate=true}));
   }
@@ -337,7 +343,7 @@ function bearModel(s=1,col=0xa86a34,extra){const outer=new THREE.Group();const g
   add(new THREE.SphereGeometry(.26,6,5),fur,-.35,.05,-.1);add(new THREE.SphereGeometry(.26,6,5),fur,.35,.05,-.1);
   if(extra)extra(add,outer);return outer}
 // 곰 종류마다 덧붙이는 것(꿀단지 · 냄비 뚜껑 방패 · 큰곰 머리띠)
-const POT_GEO=new THREE.SphereGeometry(.38,9,7),POT_MAT=M(0xf2a81c,{emissive:0x402000}),POT_LID=M(0x8a4a1a);
+const POT_GEO=new THREE.SphereGeometry(.38,9,7),POT_MAT=M(0xf2a81c,{emissive:0x402000}),POT_LID=M(0x8a4a1a);share(POT_GEO,POT_MAT,POT_LID);
 function honeyPot(s=1){const g=new THREE.Group();const a=new THREE.Mesh(POT_GEO,POT_MAT);a.scale.set(s,s*.9,s);a.castShadow=true;g.add(a);
   const l=new THREE.Mesh(new THREE.CylinderGeometry(.22*s,.26*s,.14*s,8),POT_LID);l.position.y=.36*s;g.add(l);
   const d=new THREE.Mesh(new THREE.SphereGeometry(.12*s,6,5),POT_MAT);d.position.set(.18*s,.05*s,-.32*s);g.add(d);return g}
@@ -353,6 +359,7 @@ const bearScale=t=>t==='giant'?.62*GIANT_R/BEAR_R:.62;
 const makeBear=t=>bearModel(bearScale(t),BEARS[t].col,BEAR_EXTRA[t]);
 const COON_GEO=(()=>{const o={};o.body=new THREE.SphereGeometry(.42,8,6);o.head=new THREE.SphereGeometry(.38,9,7);o.ear=new THREE.ConeGeometry(.13,.28,4);o.muz=new THREE.SphereGeometry(.2,6,5);o.mask=new THREE.BoxGeometry(.72,.14,.2);o.eye=new THREE.SphereGeometry(.05,4,4);o.nose=new THREE.SphereGeometry(.06,4,4);o.hat=new THREE.ConeGeometry(.42,.12,10);o.tail=[0,1,2,3].map(k=>new THREE.SphereGeometry(.16-k*.01,6,5));return o})();
 const COON_MAT={fur:M(0x8d8a86),wh:M(0xf2efe8),dk:M(0x2e2a28),eye:M(0xffffff),hat:M(0x3a5a2a)};
+share(...Object.values(COON_GEO).flat(),...Object.values(COON_MAT));
 // 너구리 몸 상자 가운데가 원점(키 1.4 → 발은 -0.7)
 function coonModel(){const outer=new THREE.Group();const g=new THREE.Group();g.position.y=-.7;outer.add(g);const G_=COON_GEO,Mt=COON_MAT;
   const add=(geo,m,a,b,c)=>{const o=new THREE.Mesh(geo,m);o.position.set(a,b,c);o.castShadow=true;g.add(o);return o};
@@ -393,14 +400,17 @@ const game={level:null,phase:'intro',blocks:[],enemies:[],bear:null,queue:[],sho
 const fortG=new THREE.Group();S.add(fortG);
 let loadedBear=null; // 새총에 얹힌 곰 그림(쏘면 날아가는 곰이 된다)
 
+let shotMeshes=[]; // 이 판에 쏜 곰 · 꿀단지 그림(판을 바꿀 때 남김없이 뺀다)
 function clearLevel(){
-  while(fortG.children.length){const c=fortG.children.pop();c.traverse(o=>{if(o.geometry&&o.userData.own)o.geometry.dispose()})}
-  if(game.bear&&game.bear.mesh)S.remove(game.bear.mesh);if(game.pot)S.remove(game.pot.mesh);
-  game.blocks=[];game.enemies=[];game.bear=null;game.pot=null;
+  // 요새 꾸밈 · 블록 · 너구리(쓰러져 이미 빠진 것도) · 쏜 곰 · 꿀단지 그림을 빼고, 그것만의 기하 · 재질은 버린다
+  const objs=new Set(fortG.children);game.blocks.forEach(o=>objs.add(o.mesh));game.enemies.forEach(o=>objs.add(o.mesh));
+  if(game.bear)objs.add(game.bear.mesh);if(game.pot)objs.add(game.pot.mesh);shotMeshes.forEach(m=>objs.add(m));
+  objs.forEach(disposeTree);shotMeshes=[];
+  game.blocks=[];game.enemies=[];game.bear=null;game.pot=null;game.loadN=(game.loadN|0)+1;
   fx.clear();
 }
 const boxGeoCache=new Map();
-const boxGeo=(w,h,d)=>{const k=w+','+h+','+d;if(!boxGeoCache.has(k))boxGeoCache.set(k,new THREE.BoxGeometry(w,h,d));return boxGeoCache.get(k)};
+const boxGeo=(w,h,d)=>{const k=w+','+h+','+d;if(!boxGeoCache.has(k))boxGeoCache.set(k,share(new THREE.BoxGeometry(w,h,d)));return boxGeoCache.get(k)};
 function addBlock(spec,awake){
   const [mat,w,h,d,x,yb,z]=spec;const m=MATS[mat];
   const b=new CANNON.Body({mass:m.dens*w*h*d,material:PM[mat],allowSleep:true,sleepSpeedLimit:.2,sleepTimeLimit:.5,angularDamping:.08,linearDamping:.01,collisionFilterGroup:2});
@@ -454,7 +464,7 @@ function loadLevel(id,opts={}){
   ui.hint(false);
 }
 function loadBearIntoSling(){
-  if(loadedBear){S.remove(loadedBear);loadedBear=null}
+  if(loadedBear){disposeTree(loadedBear);loadedBear=null}
   const t=game.queue[game.shotIdx];if(!t)return;
   loadedBear=makeBear(t);loadedBear.position.copy(P0);loadedBear.scale.setScalar(.01);loadedBear.userData.pop=0;S.add(loadedBear);
 }
@@ -472,7 +482,7 @@ function shoot(yawOff,power,tapAt=null){
   const b=new CANNON.Body({mass:big?GIANT_M:BEAR_M,material:PM.bear,allowSleep:false,linearDamping:0,angularDamping:.5,collisionFilterGroup:8,collisionFilterMask:BEAR_MASK});
   b.addShape(new CANNON.Sphere(big?GIANT_R:BEAR_R));b.position.set(P0.x,P0.y,P0.z);b.velocity.set(v.x,v.y,v.z);b.angularVelocity.set(-4,0,0);
   world.addBody(b);
-  const mesh=loadedBear||makeBear(type);mesh.scale.setScalar(1);loadedBear=null;
+  const mesh=loadedBear||makeBear(type);mesh.scale.setScalar(1);loadedBear=null;if(!mesh.parent)S.add(mesh);shotMeshes.push(mesh);
   game.bear={kind:'bear',type,body:b,mesh,slow:0,gone:false,used:false,r:big?GIANT_R:BEAR_R,bounces:0,bounceN:0,cool:0,charge:0,pierced:0,dir:null};b.userData=game.bear;
   game.shotIdx++;game.phase='flight';game.shotStep=0;game.quiet=0;game.shotBroken=0;game.shotCrumble=false;game.tapReq=false;game.tapAt=tapAt;
   ui.slots();ui.hint(false);fx.twang();
@@ -489,7 +499,7 @@ function activate(){
     const pb=new CANNON.Body({mass:2,material:PM.bear,allowSleep:false,linearDamping:0,collisionFilterGroup:16,collisionFilterMask:BEAR_MASK});
     pb.addShape(new CANNON.Sphere(.38));pb.position.set(b.position.x,b.position.y-.3,b.position.z);
     pb.velocity.set(v.x+v.x/h*BOMB.throwFwd,Math.min(v.y,0)-BOMB.throwDown,v.z+v.z/h*BOMB.throwFwd);world.addBody(pb);
-    const pm=honeyPot(1.1);S.add(pm);game.pot={kind:'pot',body:pb,mesh:pm,t:0};pb.userData=game.pot;
+    const pm=honeyPot(1.1);S.add(pm);shotMeshes.push(pm);game.pot={kind:'pot',body:pb,mesh:pm,t:0};pb.userData=game.pot;
     if(br.mesh.userData.pot)br.mesh.userData.pot.visible=false;fx.say('던져라!',b.position,'sp-b');
   }else if(br.type==='shield'){ // 냄비 방패: 닿을 때마다 튕김
     br.bounces=UP.shieldN;br.cool=0;if(br.mesh.userData.shield)br.mesh.userData.shield.visible=true;fx.say('방패!',b.position,'sp-s');
@@ -515,7 +525,7 @@ function explode(p,toBreak,hitE){
     const dv=BOMB.push*k/(1+.04*b.mass);b.velocity.x+=dir.x*dv;b.velocity.y+=dir.y*dv;b.velocity.z+=dir.z*dv;
     b.angularVelocity.x+=dir.z*3*k;b.angularVelocity.z-=dir.x*3*k;
     if(o.kind==='block'){o.hp-=BOMB.dmg*k*BOMB.fac[o.mat];if(o.hp<=0)toBreak.push(o)}
-    else if(k>BOMB.killK)hitE.push([o,'boom',k>.6?2:1]);
+    else if(k>BOMB.killK)hitE.push([o,'boom',k>(o.boss?.3:.45)?2:1]);
   }
   for(const o of world.bodies)if(o.type===CANNON.Body.DYNAMIC&&o.sleepState===CANNON.Body.SLEEPING&&o.position.distanceTo(new CANNON.Vec3(p.x,p.y,p.z))<Rb+1.2)o.wakeUp();
   game.ev.push(['boom',game.shotStep,+p.y.toFixed(2),toBreak.length-n0,hitE.length-e0]);fx.boom(p,Rb);
@@ -551,7 +561,7 @@ function gameStep(){
     if(b.sleepState===CANNON.Body.SLEEPING)continue;
     const v=b.velocity;const dx=v.x-_pre[i*3],dy=v.y-_pre[i*3+1]-G*DT,dz=v.z-_pre[i*3+2];const dv=Math.sqrt(dx*dx+dy*dy+dz*dz);
     if(u.kind==='block'&&u.alive){const m=MATS[u.mat];if(dv>m.thr){u.hp-=(dv-m.thr);if(u.hp<=0)toBreak.push(u);else if(dv>m.thr*1.4)Snd.hit(u.mat,dv)}}
-    else if(u.kind==='enemy'&&u.alive){if(dv>ENEMY.dvKill)hitE.push([u,'hit',1])}
+    else if(u.kind==='enemy'&&u.alive){if(dv>(u.boss?BOSS.dvHit:ENEMY.dvKill))hitE.push([u,'hit',1])}
   }
   // 2) 너구리를 누르는 힘(깔림) · 곰과 닿은 것
   const cs=world.contacts;const br=game.bear&&!game.bear.gone?game.bear:null;const bearHits=[];let potHit=false;
@@ -560,7 +570,9 @@ function gameStep(){
     if(game.pot&&(c.bi===game.pot.body||c.bj===game.pot.body))potHit=true;
     const en=a&&a.kind==='enemy'?a:b&&b.kind==='enemy'?b:null;if(!en||!en.alive)continue;
     const other=en===a?c.bj:c.bi;if(other.type!==CANNON.Body.DYNAMIC)continue;
-    if(c.multiplier*DT>ENEMY.crushJ*(en.boss?1.6:1))hitE.push([en,'crush',1])}
+    if(!en.boss&&c.multiplier*DT>ENEMY.crushJ)hitE.push([en,'crush',1])}
+  // 곰 몸이 두목에 직접 닿음(빠를 때만)
+  if(br&&bearPre&&bearPre.length()>=BOSS.bearV)for(const [o] of bearHits){const u=o.userData;if(u&&u.kind==='enemy'&&u.boss&&u.alive)hitE.push([u,'bear',bearPre.length()>=BOSS.bearV2?2:1])}
   // 3) 특수 곰
   if(br){
     if(br.type==='bomb'&&!br.used&&bearHits.length&&game.shotStep>2){br.used=true;if(br.mesh.userData.pot)br.mesh.userData.pot.visible=false;explode(br.body.position,toBreak,hitE);ui.slots()} // 안 누르면 닿은 자리에서 쾅
@@ -580,9 +592,11 @@ function gameStep(){
       if(br.charge===1)endCharge(br,.7);
     }
   }
-  if(game.pot){const P=game.pot;P.t++;if(potHit||P.t>180||P.body.position.y<-2){explode(P.body.position,toBreak,hitE);world.removeBody(P.body);S.remove(P.mesh);game.pot=null}}
+  if(game.pot){const P=game.pot;P.t++;if(potHit||P.t>180||P.body.position.y<-2){explode(P.body.position,toBreak,hitE);world.removeBody(P.body);disposeTree(P.mesh);game.pot=null}}
   // 4) 떨어짐 · 물에 빠짐
   for(const en of game.enemies){if(!en.alive)continue;const p=en.body.position;
+    // 졸개는 넘어지면(위 방향이 tipCos 아래로 기울면 — 약 57°) 쓰러짐
+    if(!en.boss&&en.body.sleepState!==CANNON.Body.SLEEPING){const q=en.body.quaternion;const upY=1-2*(q.x*q.x+q.z*q.z);if(upY<ENEMY.tipCos){hitE.push([en,'tip',1]);continue}}
     if(p.y<-1.5||p.z>43||p.z<-14||p.x<-40||p.x>32)hitE.push([en,'out',99])}
   for(const blk of game.blocks){if(blk.alive&&blk.body.position.y<-3)toBreak.push(blk)}
   // 5) 부서짐 · 쓰러짐(두목은 체력)
@@ -591,7 +605,7 @@ function gameStep(){
   for(const en of game.enemies)if(en.cool>0)en.cool--;
   const done=new Set();
   for(const [en,why,dmg] of hitE){if(!en.alive||done.has(en))continue;done.add(en);
-    if(en.boss&&why!=='out'){if(en.cool>0)continue;en.hp-=dmg;en.cool=BOSS.cool;ui.boss();if(en.hp>0){fx.bossHit(en);continue}}
+    if(en.boss&&why!=='out'){if(en.cool>0)continue;en.hp-=dmg;en.cool=BOSS.cool;game.ev.push(['bossHit',why,Math.max(0,en.hp),game.shotIdx,game.shotStep]);ui.boss();if(en.hp>0){fx.bossHit(en);continue}}
     en.alive=false;removeObj(en);wakeAround(en.body);
     game.enemiesLeft--;game.gold+=en.boss?BOSS.gold:ENEMY.gold;fx.enemyDown(en,why);ui.boss()}
   // 금 단계 갱신
@@ -601,7 +615,7 @@ function gameStep(){
     game.shotStep++;
     const br=game.bear;
     if(br&&!br.gone){const b=br.body;const sp=b.velocity.length();br.slow=sp<1.2?br.slow+1:0;
-      if(br.slow>30||game.shotStep>5*60||b.position.y<-3||b.position.z>48){br.gone=true;world.removeBody(b);wakeAround(b,.2);fx.poof(b.position,1.2)}
+      if(br.slow>30||game.shotStep>5*60||b.position.y<-3||b.position.z>48){br.gone=true;world.removeBody(b);wakeAround(b,.2);fx.poof(b.position,1.2);disposeTree(br.mesh)} // 그림도 바로 뺀다(같은 걸음에 차례가 끝나도 남지 않게)
       else if(game.phase==='flight'&&(b.position.z>FZ-6||game.shotStep>150))game.phase='settle'}
     // 크게 무너짐
     if(!game.shotCrumble){let fast=0;for(const blk of game.blocks)if(blk.alive&&blk.body.sleepState!==CANNON.Body.SLEEPING&&blk.body.velocity.lengthSquared()>6.25)fast++;
@@ -624,7 +638,7 @@ function endShot(){
 /* ───────── 5. 효과(보기만 — 물리와 무관) ───────── */
 const fxR=(()=>{
   const debris=[],dust=[],coins=[],texts=[],flashes=[];
-  const dustGeo=new THREE.IcosahedronGeometry(.6,0),coinGeo=new THREE.CylinderGeometry(.22,.22,.06,12),coinMat=M(0xf5c022,{emissive:0x553300});
+  const dustGeo=new THREE.IcosahedronGeometry(.6,0),coinGeo=new THREE.CylinderGeometry(.22,.22,.06,12),coinMat=M(0xf5c022,{emissive:0x553300}),boomGeo=new THREE.SphereGeometry(1,14,10);
   const debMat={wood:M(0xc98a45),stone:M(0xa3a7ab),ice:new THREE.MeshLambertMaterial({color:0xcfeffa,transparent:true,opacity:.85})};
   const debGeo=new THREE.BoxGeometry(1,1,1);
   const fxL=$('fx');
@@ -632,7 +646,7 @@ const fxR=(()=>{
     const m=new THREE.Mesh(debGeo,debMat[mat]);const s=size*(.25+Math.random()*.35);m.scale.set(s,s*(.6+Math.random()*.8),s);m.position.set(p.x+(Math.random()-.5)*size,p.y+(Math.random()-.5)*size,p.z+(Math.random()-.5)*size);
     m.rotation.set(Math.random()*3,Math.random()*3,Math.random()*3);m.castShadow=!MOBILE;S.add(m);
     debris.push({m,v:new V3((Math.random()-.5)*7,2+Math.random()*5,(Math.random()-.5)*7),w:new V3(Math.random()*8,Math.random()*8,Math.random()*8),t:0,life:1.6+Math.random()*.6})}}
-  function spawnDust(p,n,sz=1){for(let i=0;i<n;i++){if(dust.length>40){const o=dust.shift();S.remove(o.m)}
+  function spawnDust(p,n,sz=1){for(let i=0;i<n;i++){if(dust.length>40){const o=dust.shift();S.remove(o.m);o.m.material.dispose()}
     const m=new THREE.Mesh(dustGeo,new THREE.MeshLambertMaterial({color:0xe9e2d2,transparent:true,opacity:.6,depthWrite:false}));
     m.position.set(p.x+(Math.random()-.5)*1.4*sz,p.y+(Math.random()-.3)*sz,p.z+(Math.random()-.5)*1.4*sz);m.scale.setScalar(.4*sz);S.add(m);
     dust.push({m,v:new V3((Math.random()-.5)*1.2,.6+Math.random()*.8,(Math.random()-.5)*1.2),t:0,life:.9+Math.random()*.5,s0:(.5+Math.random()*.7)*sz})}}
@@ -655,12 +669,12 @@ const fxR=(()=>{
       en.dieT=.001;en.dieV=new V3((Math.random()-.5)*3,6,2+Math.random()*2);ui.enemies(game.enemiesLeft,true);ui.gold(game.gold);snd('enemy')},
     poof(p,sz){spawnDust(p,4,sz)},
     say(str,p,cls,size){text(str,new V3(p.x,p.y+1.4,p.z),cls,1.1,size||44,!size)},
-    boom(p,r){const c=new V3(p.x,p.y,p.z);const m=new THREE.Mesh(new THREE.SphereGeometry(1,14,10),new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:.85,depthWrite:false}));
+    boom(p,r){const c=new V3(p.x,p.y,p.z);const m=new THREE.Mesh(boomGeo,new THREE.MeshBasicMaterial({color:0xffb030,transparent:true,opacity:.85,depthWrite:false}));
       m.position.copy(c);S.add(m);flashes.push({m,t:0,r});spawnDust(c,10,r*.6);spawnDebris(c,'wood',4,.6);text('쾅!',new V3(c.x,c.y+3.4,c.z),'sp-b',1.3,110,true);snd('boom')},
     bossHit(en){const p=en.body.position;spawnDust(p,3,1);text('아야! ♥'+en.hp,new V3(p.x,p.y+1.6,p.z),'sp-b',1.1,38,true);snd('enemy',1)},
     crumble(){ui.crumble();snd('crumble')},
     twang(){snd('twang')},
-    clear(){debris.forEach(o=>S.remove(o.m));dust.forEach(o=>S.remove(o.m));coins.forEach(o=>S.remove(o.m));flashes.forEach(o=>S.remove(o.m));texts.forEach(o=>o.el.remove());pend.g=pend.n=pend.x=pend.y=pend.z=pend.t=0;debris.length=dust.length=coins.length=texts.length=flashes.length=0},
+    clear(){debris.forEach(o=>S.remove(o.m));dust.forEach(o=>{S.remove(o.m);o.m.material.dispose()});coins.forEach(o=>S.remove(o.m));flashes.forEach(o=>{S.remove(o.m);o.m.material.dispose()});texts.forEach(o=>o.el.remove());pend.g=pend.n=pend.x=pend.y=pend.z=pend.t=0;debris.length=dust.length=coins.length=texts.length=flashes.length=0},
     update(dt){
       if(pend.t){pend.t+=dt;if(pend.t>GOLD_GAP)flushGold()}
       for(let i=flashes.length-1;i>=0;i--){const o=flashes[i];o.t+=dt;const k=o.t/.45;o.m.scale.setScalar(.4+o.r*smooth(k));o.m.material.opacity=.85*(1-k);if(k>=1){S.remove(o.m);o.m.material.dispose();flashes.splice(i,1)}}
@@ -799,6 +813,7 @@ function afterSync(){Snd.applyVol();if(ui.cur==='title')ui.title();else if(ui.cu
 const firstBonus=id=>50+id*5;
 function onResult(){
   const r=game.result,L=game.level,d=SAVE.get();
+  hkRun=false; // 결과 뒤에는 다음 단계 시작(hk:start) 전까지 지금 점수(hk:live)를 보내지 않는다
   if(typeof L.id==='number'){
     if(r.win){r.first=d.cleared[L.id]?0:firstBonus(L.id);r.leftGold=r.left*100;r.total=r.gold+r.leftGold+r.first;
       d.cleared[L.id]=true;d.stars[L.id]=Math.max(d.stars[L.id]||0,r.stars);d.best[L.id]=Math.max(d.best[L.id]||0,r.total);
@@ -830,7 +845,8 @@ const ui={
   slots(){const el=$('slots');const q=game.queue;let x=0,h='';
     const fly=(game.phase==='flight'||game.phase==='settle')&&game.bear,cur=fly?game.shotIdx-1:game.shotIdx;
     q.forEach((t,i)=>{const B=BEARS[t];const on=i===cur&&game.phase!=='win'&&game.phase!=='lose';const used=i<cur||(fly&&i===cur&&game.bear.used);
-      h+=`<div class="slot ${on?'on':''} ${used?'used':''}" style="left:${x}px">${aimg(B.art,B.icon,'sl')}${B.tag?`<span class="tag" style="background:${B.tagc}">${B.tag}</span>`:''}</div>`;x+=on?108:84});
+      // 둥글게 자르기는 안쪽 칸(.slin)만 — 특수 딱지(.tag)는 그 바깥 형제라 위로 삐져나와도 안 잘린다
+      h+=`<div class="slot ${on?'on':''} ${used?'used':''}" style="left:${x}px"><span class="slin">${aimg(B.art,B.icon,'sl')}</span>${B.tag?`<span class="tag" style="background:${B.tagc}">${B.tag}</span>`:''}</div>`;x+=on?108:84});
     el.innerHTML=h},
   // 단계 시작 띠: 두목 단계는 두목을 가리지 않게 아래 오른쪽에
   banner(show,L){const b=$('banner');if(show){$('bn1').textContent=(isNum(L)?L.id+'단계 · ':'')+L.name;$('bn2').textContent=L.sub;b.classList.toggle('low',!!L.boss);b.style.opacity=1;b.hidden=false}else{b.style.opacity=0;setTimeout(()=>{if(b.style.opacity==='0')b.hidden=true},450)}},
@@ -841,24 +857,24 @@ const ui={
     const r=game.result,L=game.level,num=isNum(L);const hasNext=num&&L.id<LEVELS.length;
     const row=(ic,label,val,cls='')=>`<div class="row"><span class="ic">${ic}</span><span class="lb">${label}</span><span class="vl ${cls}">${val}</span></div>`;
     if(r.win){const n=game.enemies.length;
-      ui.overlay(`<div class="dim"><div class="card res"><div class="ttl teal">요새 함락!</div><div class="body">
+      ui.overlay(`<div class="dim"><div class="card res"><div class="ttl teal">요새 함락!</div><div class="body"><div class="rinfo">
         <div class="lvname">${num?L.id+'단계 · ':''}${L.name}</div>
         <div class="stars">${STAR(r.stars>=1)}${STAR(r.stars>=2).replace('star','star mid')}${STAR(r.stars>=3)}</div>
         <div class="s3tip ${r.stars>=3?'ok':''}">${r.stars>=3?`곰을 ${r.left}마리 남겨서 별 3개!`:'곰을 2마리 남기면 별 3개!'}</div>
         ${row(aimg('coon','🦝'),'너구리',n+'/'+n,'pur')}${row(COIN,'약탈 금화','+'+r.gold,'grn')}
         ${row(aimg('bear','🐻'),'남은 곰',r.left+' × 100','grn')}${r.first?row('🚩','첫 함락 보너스','+'+r.first,'grn'):''}
-        ${num?`<div class="sc">단계 점수 <b>${nf(r.total)}</b> · 원정 점수 <b>${nf(SAVE.score())}</b></div>`:''}
+        ${num?`<div class="sc">단계 점수 <b>${nf(r.total)}</b> · 원정 점수 <b>${nf(SAVE.score())}</b></div>`:''}</div><div class="ract">
         <div class="btns"><button class="btn b sm" data-a="map">🗺️ 지도</button><button class="btn b sm" data-a="village">${aimg('up_horn','🏡','bi')} 곰 마을</button></div>
         ${hasNext?`<button class="btn g wide" data-a="next">▶ 다음</button>`:`<button class="btn g wide" data-a="retry">↻ 다시</button>`}
-      </div></div></div>`,'result')}
+      </div></div></div></div>`,'result')}
     else{
-      ui.overlay(`<div class="dim"><div class="card res"><div class="ttl">산적들이 버텼다!</div><div class="body">
+      ui.overlay(`<div class="dim"><div class="card res"><div class="ttl">산적들이 버텼다!</div><div class="body"><div class="rinfo">
         <div class="bigic">${aimg('coon','🦝','big')}</div><div class="left">너구리 ${r.enemies}마리 남음</div>
         <div class="row tip"><span class="ic">${aimg('up_horn','📯')}</span><span class="lb">곰 마을에서 출정 나팔을 사면 곰이 한 마리 더!</span></div>
-        ${row(COIN,'얻은 금화는 가져요','+'+r.gold,'grn')}
+        ${row(COIN,'얻은 금화는 가져요','+'+r.gold,'grn')}</div><div class="ract">
         <div class="btns"><button class="btn b sm" data-a="map">🗺️ 지도</button><button class="btn b sm" data-a="village">${aimg('up_horn','🏡','bi')} 곰 마을</button></div>
         <button class="btn g wide" data-a="retry">↻ 다시</button>
-      </div></div></div>`,'result')}
+      </div></div></div></div>`,'result')}
   },
   pause(){const d=SAVE.get();ui.overlay(`<div class="dim"><div class="card pz"><div class="ttl teal">잠깐 멈춤</div><div class="body">
     <button class="btn g wide" data-a="resume">▶ 이어 하기</button>
@@ -876,13 +892,13 @@ const ui={
     const path=[1,2,3,4,5,6,7,8,9,10].map(i=>POS[i]).map(([x,y])=>`${x},${y}`).join(' ');
     const L=levelById(sel),img=ART.ok.map;
     ui.overlay(`<div class="dim map"><div class="card mapc"><div class="ttl teal">원정 지도<span class="mgold">${COIN}${nf(d.gold)}</span><span class="mstar">★ ${SAVE.totalStars()}/${LEVELS.length*3}</span></div>
-      <div class="mapbody ${img?'img':''}">${img?`<div class="mapimg" style="background-image:url(${artUrl('map')})"></div>`:''}
+      <div class="mapmain"><div class="mapwrap"><div class="mapbody ${img?'img':''}">${img?`<div class="mapimg" style="background-image:url(${artUrl('map')})"></div>`:''}
         <div class="region f"><span class="rtag">🍁 단풍 숲</span></div><div class="region s"><span class="rtag">🍄 안개 늪</span></div>
         <svg class="mpath" viewBox="0 0 1120 470" width="1120" height="470"><polyline points="${path}" fill="none" stroke="${img?'#fff6dc':'#a07848'}" stroke-width="${img?7:5}" stroke-dasharray="4 12" stroke-linecap="round"/></svg>
         ${nodes}
-      </div>
-      <div class="mapfoot"><button class="rbtn" data-a="home" aria-label="첫 화면">🏠</button><div class="mname">${L.id}단계 · ${L.name}</div><button class="btn g" data-a="play">▶ ${sel}단계</button><button class="btn b sm" data-a="village">${aimg('up_horn','🏡','bi')} 곰 마을</button></div>
-    </div></div>`,'map')},
+      </div></div>
+      <div class="mapfoot"><button class="rbtn" data-a="home" aria-label="첫 화면">🏠</button><div class="mname">${L.id}단계 · ${L.name}</div><button class="btn g mplay" data-a="play">▶ ${sel}단계</button><button class="btn b sm" data-a="village">${aimg('up_horn','🏡','bi')} 곰 마을</button></div>
+    </div></div></div>`,'map')},
   // 곰 마을(강화): 레퍼런스 LONGHOUSE 처럼 칸 넷을 가로로. 금화가 모자라면 회색, 다 올리면 「최고」
   village(back){if(back)ui._vback=back;const d=SAVE.get(),u=upLv();
     const it=k=>{const G=UPG[k],lv=u[k],n=G.cost.length,max=lv>=n,cost=max?0:G.cost[lv],can=!max&&d.gold>=cost;
@@ -895,8 +911,9 @@ const ui={
       <div class="ups">${it('bomb')}${it('shield')}${it('giant')}${it('horn')}</div>
       <div class="btns"><button class="btn b sm" data-a="map">🗺️ 지도</button><button class="btn g" data-a="vback">▶ 계속</button></div></div></div></div>`,'village')},
   // 첫 화면: 대표 그림(왼쪽 새총곰 · 오른쪽 요새) 위 가운데에 제목 · 원정 시작 · 금화 · 별 · 곰 마을 · 원정 점수, 오른쪽 아래 음악 · 소리
+  // 그림이 아직 · 못 오면 noimg 바탕(불투명 하늘 · 풀밭)이 보이고, 오면 그 위에 그림이 덮인다(뒤 게임 화면이 비치지 않게)
   title(){const d=SAVE.get(),img=ART.ok.title!==false;
-    ui.overlay(`<div class="tscr ${img?'':'noimg'}" ${img?`style="background-image:url(${artUrl('title')})"`:''}><div class="tcol">
+    ui.overlay(`<div class="tscr ${img?'':'noimg'}" ${img?`style="background-image:url(${artUrl('title')}),var(--tbg)"`:''}><div class="tcol">
       <div class="tsm">곰돌이</div><div class="tbig">새총 원정대</div>
       <button class="btn g tstart" data-a="start">▶ 원정 시작</button>
       <div class="tpills"><span class="pillg">${COIN}${nf(d.gold)}</span><span class="pillg st">★ ${SAVE.totalStars()} / ${LEVELS.length*3}</span></div>
@@ -920,7 +937,7 @@ $('ov').addEventListener('click',e=>{const a=e.target.closest('[data-a]');if(!a|
   else if(k==='retry')startLevel(game.level.id);
   else if(k==='next')startLevel(game.level.id+1);
   else if(k==='map'){paused=true;ui.map(isNum(game.level)&&game.phase!=='win'?game.level.id:d.last)}
-  else if(k==='pick')ui.map(+a.dataset.l);
+  else if(k==='pick'){const l=+a.dataset.l;if(l===ui._sel)startLevel(l);else ui.map(l)} // 고른 단계를 한 번 더 누르면 바로 시작
   else if(k==='play')startLevel(ui._sel);
   else if(k==='start'){paused=true;ui.map(d.last)}
   else if(k==='home')goTitle();
@@ -947,10 +964,13 @@ const SP_HINT={bomb:'눌러서 꿀폭탄!',shield:'눌러서 방패!',giant:'눌
 function placeSpHint(){const el=$('sp');const br=game.bear;
   if(!canTap()||paused||game.shotStep<8){el.hidden=true;return}
   const v=new V3().copy(br.body.position);v.y+=1.6;v.project(cam);if(v.z>1){el.hidden=true;return}
-  el.hidden=false;el.textContent=SP_HINT[br.type];el.className='p sp-'+br.type[0];el.style.left=clamp((v.x+1)/2*view.w,120,view.w-120)+'px';el.style.top=clamp((1-v.y)/2*view.h,Math.min(view.w/1280,view.h/720)*120,view.h-160)+'px'}
+  el.hidden=false;el.textContent=SP_HINT[br.type];el.className='p sp-'+br.type[0];el.style.left=clamp((v.x+1)/2*view.w,120,view.w-120)+'px';el.style.top=clamp((1-v.y)/2*view.h,view.u*120,view.h-view.sb-view.u*160)+'px'}
 
 /* ───────── 7. 화면 크기(16:9 기준) ───────── */
-const view={w:1280,h:720};
+const view={w:1280,h:720,sb:0,u:1};
+/* 낮은 창(무대 높이 400px 이하 — 가로 휴대폰 · 아케이드 창 안 휴대폰): 아래 SAFE_B px 에는 중요한 단추를 두지 않는다
+ * (아케이드 틀이 휴대폰 가로에서 창 아래를 화면 밖으로 밀어낸다). 이때 화면 위 글씨 · 단추는 조금 크게(--u), 카드는 낮은 모양으로(--uc) */
+const SHORT_H=400,SAFE_B=60;
 const BASE_VFOV=42,BASE_HT=Math.tan(BASE_VFOV/2*DEG)*16/9;
 function resize(){
   const W=window.innerWidth,H=window.innerHeight;let w=W,h=H;
@@ -958,9 +978,12 @@ function resize(){
   if(portrait){h=Math.round(W*9/16)} // 세로 화면: 16:9 로 줄여 가운데
   stage.style.width=w+'px';stage.style.height=h+'px';stage.style.top=Math.round((H-h)/2)+'px';
   view.w=w;view.h=h;R.setSize(w,h,false);
+  const short=h<=SHORT_H,sb=short?SAFE_B:0,u=short?Math.min(w/1024,h/533):Math.min(w/1280,h/720),uc=short?Math.min(w/1240,(h-sb-10)/480):u;
+  view.sb=sb;view.u=u;document.documentElement.classList.toggle('short',short);
+  document.documentElement.style.setProperty('--sb',sb+'px');document.documentElement.style.setProperty('--uc',uc.toFixed(4));
   const a=w/h;cam.aspect=a;cam.fov=a<16/9?2*Math.atan(BASE_HT/a)/DEG:Math.max(34,2*Math.atan(BASE_HT/a)/DEG); // 넓은 화면은 가로 폭을 16:9 와 같게(위아래를 조금 자름)
   cam.updateProjectionMatrix();
-  document.documentElement.style.setProperty('--u',Math.min(w/1280,h/720).toFixed(4));
+  document.documentElement.style.setProperty('--u',u.toFixed(4));
   $('rot').hidden=!portrait;
 }
 window.addEventListener('resize',resize);resize();
@@ -995,7 +1018,7 @@ function updateCamera(dt){
 
 /* ───────── 9. 조준 입력 ───────── */
 const aim={on:false,id:null,x0:0,y0:0,yaw:0,pow:0,pull:0};
-const PULL_UNIT=()=>Math.min(view.w,view.h)*.36;
+const PULL_UNIT=()=>Math.min(view.w,view.h-view.sb)*.36; // 낮은 창은 아래 가려진 몫을 빼고(끝까지 당길 수 있게)
 function aimFromDrag(dx,dy){const u=PULL_UNIT();const L=Math.hypot(dx,dy);
   aim.pull=clamp(L/u,0,1);aim.pow=aim.pull;if(dy<-.5*L)aim.pow=aim.pull=0; // 위로 밀면 안 쏨
   aim.yaw=clamp(dx/u,-1,1)*YAW_RANGE}
@@ -1040,7 +1063,7 @@ function syncAll(dt){
   for(const en of game.enemies){if(en.alive){syncMesh(en);continue}
     if(en.dieT>0){en.dieT+=dt;en.dieV.y+=G*dt;en.mesh.position.addScaledVector(en.dieV,dt);en.mesh.rotation.x+=9*dt;en.mesh.rotation.z+=6*dt;
       en.mesh.scale.setScalar(Math.max(.01,1-en.dieT/.9));if(en.dieT>.9){en.dieT=0;if(en.mesh.parent)en.mesh.parent.remove(en.mesh)}}}
-  if(game.bear){if(!game.bear.gone)syncMesh(game.bear);else if(game.bear.mesh.parent)S.remove(game.bear.mesh)}
+  if(game.bear){if(!game.bear.gone)syncMesh(game.bear);else if(game.bear.mesh.parent)disposeTree(game.bear.mesh)}
   if(game.pot)syncMesh(game.pot);
 }
 function frame(now){
@@ -1069,7 +1092,7 @@ if(TEST){
     blocks:game.blocks.length,broken:game.broken,gold:game.gold,shotIdx:game.shotIdx,bearsLeft:game.queue.length-game.shotIdx,hash:hashOf(snapshot())});
   const SN=new Map();
   const statics=()=>world.bodies.filter(b=>b.type!==CANNON.Body.DYNAMIC);
-  let ALL=null;const allBodies=()=>{if(!ALL||ALL.lv!==game.level){ALL=[...statics(),...game.blocks.map(o=>o.body),...game.enemies.map(o=>o.body)];ALL.lv=game.level}return ALL};
+  let ALL=null;const allBodies=()=>{if(!ALL||ALL.lv!==game.loadN){ALL=[...statics(),...game.blocks.map(o=>o.body),...game.enemies.map(o=>o.body)];ALL.lv=game.loadN}return ALL}; // 단계를 다시 부를 때마다(같은 단계여도) 새로
   const objs=()=>[...game.blocks,...game.enemies];
   function takeSnap(){const A=allBodies(),ix=b=>A.indexOf(b);
     return {t:world.time,sn:world.stepnumber,steps:game.steps,g:{enemiesLeft:game.enemiesLeft,broken:game.broken,gold:game.gold,shotIdx:game.shotIdx},
@@ -1077,9 +1100,10 @@ if(TEST){
       o:objs().map(o=>{const b=o.body;return {alive:o.alive,inW:o.inWorld,hp:o.hp,crack:o.crack||0,cool:o.cool||0,p:[b.position.x,b.position.y,b.position.z],q:[b.quaternion.x,b.quaternion.y,b.quaternion.z,b.quaternion.w],
         v:[b.velocity.x,b.velocity.y,b.velocity.z],w:[b.angularVelocity.x,b.angularVelocity.y,b.angularVelocity.z],ss:b.sleepState,tls:b.timeLastSleepy,wa:b.wakeUpAfterNarrowphase}})}}
   function putSnap(s){const A=allBodies();
-    if(game.bear){if(!game.bear.gone)world.removeBody(game.bear.body);S.remove(game.bear.mesh);game.bear=null}
-    if(game.pot){world.removeBody(game.pot.body);S.remove(game.pot.mesh);game.pot=null}
-    if(loadedBear){S.remove(loadedBear);loadedBear=null}
+    if(game.bear){if(!game.bear.gone)world.removeBody(game.bear.body);disposeTree(game.bear.mesh);game.bear=null}
+    if(game.pot){world.removeBody(game.pot.body);disposeTree(game.pot.mesh);game.pot=null}
+    if(loadedBear){disposeTree(loadedBear);loadedBear=null}
+    shotMeshes=[];
     world.time=s.t;world.stepnumber=s.sn;game.steps=s.steps;Object.assign(game,s.g);
     objs().forEach((o,i)=>{const r=s.o[i],b=o.body;o.alive=r.alive;o.hp=r.hp;o.cool=r.cool;
       if(r.inW&&!o.inWorld){world.addBody(b);o.inWorld=true}if(!r.inW&&o.inWorld){world.removeBody(b);o.inWorld=false}
