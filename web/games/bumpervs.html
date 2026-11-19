@@ -76,6 +76,33 @@
     .bv-rank.is-me { box-shadow: inset 0 0 0 2px #ea580c; }
     .bv-rank.is-dnf em { color: #64748b; font-weight: 600; }
     .bv-rank em small { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+    /* 최근 경주 — 줄을 누르면 그 경주의 1등 ~ 꼴찌 순위 */
+    .bv-prec { border-radius: 12px; background: #f8fafc; }
+    .bv-prec + .bv-prec, .bv-prow + .bv-prec, .bv-prec + .bv-prow { margin-top: 6px; }
+    .bv-prec > summary { list-style: none; cursor: pointer; }
+    .bv-prec > summary::-webkit-details-marker { display: none; }
+    .bv-prec > summary:focus-visible { outline: 2px solid #ea580c; outline-offset: 2px; border-radius: 12px; }
+    .bv-prec__more { display: inline-flex; align-items: center; gap: 2px; font-size: 12.5px; font-weight: 700; color: #64748b; }
+    .bv-prec__more svg { transition: transform .15s; }
+    .bv-prec[open] .bv-prec__more svg { transform: rotate(180deg); }
+    .bv-prec__body { padding: 0 10px 10px; }
+    .bv-prec__body .bv-ranks { margin-top: 0; }
+    .bv-prec__body .bv-rank { background: #fff; }
+    .bv-prec__body .bv-rank:first-child { background: #fff7ed; }
+    .bv-prec__body .bv-mini { margin: 0; padding: 0 2px 2px; }
+    /* 대기실 채팅 — 참가자 목록 아래 */
+    .bv-chat { margin-top: 12px; border-radius: 12px; background: #f8fafc; padding: 8px; text-align: left; }
+    .bv-chat__list { display: flex; flex-direction: column; gap: 4px; min-height: 44px; max-height: 132px; overflow-y: auto; overscroll-behavior: contain; padding: 2px 2px 4px; }
+    .bv-chat__list:focus-visible { outline: 2px solid #ea580c; outline-offset: 1px; border-radius: 8px; }
+    .bv-chat__m { max-width: 86%; align-self: flex-start; padding: 6px 10px; border-radius: 10px; background: #fff; box-shadow: 0 0 0 1px #e2e8f0; font-size: 13.5px; line-height: 1.4; color: #0f172a; overflow-wrap: anywhere; word-break: keep-all; }
+    .bv-chat__m b { display: block; font-size: 11.5px; font-weight: 800; color: #64748b; }
+    .bv-chat__m.is-me { align-self: flex-end; background: #fff7ed; box-shadow: 0 0 0 1px #fed7aa; }
+    .bv-chat__m.is-me b { color: #c2410c; }
+    .bv-chat__empty { margin: auto 0; font-size: 12.5px; color: var(--text-muted); text-align: center; }
+    .bv-chat__form { display: flex; gap: 6px; margin-top: 6px; }
+    .bv-chat__in { flex: 1; min-width: 0; box-sizing: border-box; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; font: inherit; font-size: 14px; color: #0f172a; }
+    .bv-chat__in:focus { outline: none; border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234, 88, 12, .14); }
+    .bv-chat__form .hk-btn { flex-shrink: 0; height: 40px; padding: 0 14px; }
     .bv-invite { margin-top: 10px; }
     .bv-invite[hidden] { display: none; }
     .bv-invite button { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; border: 0; border-radius: 12px; background: #e0e7ff; color: #4338ca; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
@@ -173,6 +200,7 @@
       .bv-prow { flex-wrap: wrap; }
       .bv-prow__b { width: 100%; }
       .bv-prow__b .hk-btn { flex: 1; }
+      .bv-prec .bv-prow__b { justify-content: space-between; align-items: center; }
       .bv-mode b { font-size: 14px; }
       .bv-logo { width: 42px; height: 42px; }
       .bv-row { align-items: flex-start; }
@@ -632,8 +660,9 @@
     const PEER_GRACE = 20000; // 상대가 이만큼 안 돌아오면 「상대가 나갔어요」 (그동안 경주는 멈춰 있다)
     const AWAY_MAX = 20000; // 상대가 다른 탭에 가 있어도 이만큼 지나면 경주를 이어 간다
     let conn = null, sess = null;
+    if (window.visualViewport) visualViewport.addEventListener("resize", () => { if (sess && sess.chatKeep) sess.chatKeep(); }); // 휴대폰 키보드가 올라오면 대기실 채팅 입력 칸 · 단추를 보이게
     function closeConn() {
-      if (sess) { sess.closed = true; clearTimeout(sess.graceT); clearTimeout(sess.awayT); clearInterval(sess.tick); sess = null; }
+      if (sess) { sess.closed = true; clearTimeout(sess.graceT); clearTimeout(sess.awayT); clearInterval(sess.tick); clearInterval(sess.chatT); sess = null; }
       if (conn) { try { conn.close(); } catch (_) { /* 이미 닫힘 */ } conn = null; }
     }
     function playOnline({ matchId, rival, track, connect, report, resign, check, fallbackRole }) {
@@ -1086,7 +1115,17 @@
       const row = (x, btns, note) => `<div class="bv-prow"><div class="bv-prow__t"><b>${esc(x.host.name)}님의 경주</b><small>${note || who(x)}</small></div><div class="bv-prow__b">${btns}</div></div>`;
       const inv = (d.invites || []).map((x) => row(x, `<button type="button" class="hk-btn hk-btn--secondary" data-act="pdecline" data-id="${x.id}">거절</button><button type="button" class="hk-btn hk-btn--primary" data-act="pjoin" data-id="${x.id}">들어가기</button>`)).join("");
       const mine = (d.open || []).map((x) => row(x, `<button type="button" class="hk-btn hk-btn--primary" data-act="penter" data-id="${x.id}">${x.status === "RACING" ? "경주로" : "대기실로"}</button>`, `${x.status === "RACING" ? "달리는 중 · " : ""}${who(x)}`)).join("");
-      const rec = (d.recent || []).map((x) => { const w = x.result === "win" ? "1등!" : x.winner ? `1등 ${esc(x.winner.name)}` : x.reasonLabel ? esc(x.reasonLabel) : "끝"; return row(x, `<span class="bv-prow__tag ${x.result === "win" ? "is-win" : ""}">${w}</span>`, `트랙 ${x.track} · ${who(x)}`); }).join("");
+      // 최근 경주 — 줄을 누르면 그 경주의 1등 ~ 꼴찌(서버가 끝난 판에 남긴 final 그대로 · 결과 화면과 같은 줄 모양)
+      const recRanks = (x) => {
+        const f = doneFinal(x);
+        if (!f) return `<div class="bv-mini">순위 기록이 없어요${x.reasonLabel ? ` · ${esc(x.reasonLabel)}` : ""}</div>`;
+        return `<div class="bv-ranks">${rankList(f, doneNames(x, f), x.players.indexOf(x.meId))}</div>`;
+      };
+      const rec = (d.recent || []).map((x) => {
+        const w = x.result === "win" ? "1등!" : x.winner ? `1등 ${esc(x.winner.name)}` : x.reasonLabel ? esc(x.reasonLabel) : "끝";
+        const f = doneFinal(x);
+        return `<details class="bv-prec"><summary class="bv-prow" aria-label="${esc(x.host.name)}님의 경주 순위 보기"><div class="bv-prow__t"><b>${esc(x.host.name)}님의 경주</b><small>트랙 ${f ? f.track : x.track} · ${who(x)}</small></div><div class="bv-prow__b"><span class="bv-prow__tag ${x.result === "win" ? "is-win" : ""}">${w}</span><span class="bv-prec__more">순위${icon("chevron-down", 15)}</span></div></summary><div class="bv-prec__body">${recRanks(x)}</div></details>`;
+      }).join("");
       pickSel = [];
       showOver(`<div class="bv-card" role="dialog" aria-label="여러 명 경주">
           <div class="bv-head"><span class="bv-logo">${icon("users", 24, "#fff")}</span><div><h2>여러 명 경주</h2><p>동료를 최대 5명 초대해 6대가 함께 달려요 · 빈자리는 컴퓨터가 달려요 · 1등만 1승</p></div></div>
@@ -1206,21 +1245,129 @@
         const readyN = roster.filter((x) => x.id !== S.host && x.here && x.rd && !x.old).length;
         const oldN = roster.filter((x) => x.id !== S.host && x.here && x.old).length;
         const myRd = !!S.rd[S.me];
-        showOver(`<div class="bv-card" role="dialog" aria-label="여러 명 경주 대기실">
-            <h2>여러 명 경주 대기실</h2>
+        paintCard(`<h2>여러 명 경주 대기실</h2>
             <p>${esc(p.host.name)}님의 경주 · ${esc(trackTxt(S.track, S.rnd))} · 컴퓨터 ${esc(LEVEL_NAME[S.lv] || "보통")} · 사람 ${roster.filter((x) => x.here).length}명 + 컴퓨터 ${PMAX - Math.max(1, roster.filter((x) => x.here && (x.rd || x.id === S.host)).length)}대</p>
             <div class="bv-row"><span class="bv-row__k">트랙</span>${trackGrid("data-ptrack", S.track, TRACKS.length, !host, S.rnd)}</div>
             <div class="bv-row"><span class="bv-row__k">컴퓨터</span><div class="bv-seg" role="group" aria-label="컴퓨터 레벨">${LEVELS.map(([k, t]) => `<button type="button" data-plv="${k}" class="${k === S.lv ? "is-on" : ""}" aria-pressed="${k === S.lv}" ${host ? "" : "disabled"}>${t}</button>`).join("")}</div></div>
             <div class="bv-row"><span class="bv-row__k">레이서</span>${racerGrid("data-prid", S.rids[S.me])}</div>
             <div class="bv-who is-many">${rows}</div>
-            ${mix ? `<div class="bv-mini is-bad" role="status">${VER_TXT[mix].replace(/상대/g, "연 사람")}</div>` : oldN ? `<div class="bv-mini is-bad" role="status">옛 판 화면인 동료가 있어요 · 새로 고침하면 같이 달릴 수 있어요</div>` : ""}
-            <div class="bv-btnrow">
+            ${mix ? `<div class="bv-mini is-bad" role="status">${VER_TXT[mix].replace(/상대/g, "연 사람")}</div>` : oldN ? `<div class="bv-mini is-bad" role="status">옛 판 화면인 동료가 있어요 · 새로 고침하면 같이 달릴 수 있어요</div>` : ""}`,
+            `<div class="bv-btnrow">
               <button type="button" class="hk-btn hk-btn--secondary" data-act="pleave">${host ? "대기실 닫기" : "나가기"}</button>
               ${host ? `<button type="button" class="hk-btn hk-btn--primary" data-act="pgo" ${readyN ? "" : "disabled"}>${readyN ? `준비한 ${readyN + 1}명 출발` : "준비한 동료를 기다려요"}</button>`
                 : `<button type="button" class="hk-btn hk-btn--primary" data-act="pready" data-on="${myRd ? 0 : 1}" ${mix && !myRd ? "disabled" : ""}>${myRd ? "준비 취소" : "준비"}</button>`}
             </div>
-            <div class="bv-mini">${host ? "트랙 · 컴퓨터 레벨을 고르고, 준비한 동료가 모이면 출발을 눌러요 · 준비하지 않은 사람은 이번 경주에서 빠져요" : "트랙 · 컴퓨터 레벨은 연 사람이 골라요 · 준비하면 연 사람이 출발할 때 함께 달려요"} · 빈자리는 컴퓨터가 달려요 · 1등만 1승 · 레이서는 모양만 달라요</div>
-          </div>`);
+            <div class="bv-mini">${host ? "트랙 · 컴퓨터 레벨을 고르고, 준비한 동료가 모이면 출발을 눌러요 · 준비하지 않은 사람은 이번 경주에서 빠져요" : "트랙 · 컴퓨터 레벨은 연 사람이 골라요 · 준비하면 연 사람이 출발할 때 함께 달려요"} · 빈자리는 컴퓨터가 달려요 · 1등만 1승 · 레이서는 모양만 달라요</div>`);
+      }
+      // 대기실 카드 — 위(설정 · 참가자) · 채팅 · 아래(단추)로 나눠, 바뀐 쪽만 다시 그린다(채팅 입력 칸 · 글 목록 · 초점은 그대로 둔다)
+      let shownA = "", shownB = "";
+      function paintCard(a, b) {
+        const card = over.querySelector(".bv-card[data-plobby]");
+        if (!over.hidden && card && card.dataset.plobby === String(p.id) && CH.node && card.contains(CH.node)) {
+          const A = card.querySelector(".bv-pl-a"), B = card.querySelector(".bv-pl-b");
+          if (a !== shownA) { A.innerHTML = a; HKUI.refreshIcons(A); shownA = a; }
+          if (b !== shownB) { B.innerHTML = b; HKUI.refreshIcons(B); shownB = b; }
+          return;
+        }
+        showOver(`<div class="bv-card" role="dialog" aria-label="여러 명 경주 대기실" data-plobby="${p.id}"><div class="bv-pl-a">${a}</div><div class="bv-pl-chat"></div><div class="bv-pl-b">${b}</div></div>`);
+        shownA = a; shownB = b;
+        over.querySelector(".bv-pl-chat").replaceWith(chatNode());
+        chatPaint(true);
+      }
+      // ── 대기실 채팅 — 보내기 · 처음 목록은 서버(/play/party/{id}/chat), 새 글은 실시간 통로로 바로(서버가 "from" 없이 보냄) · 8초마다 한 번 다시 읽어 빠진 글을 채운다
+      const CH = { items: [], node: null, list: null, input: null, btn: null, sending: false, composing: false, lastSend: 0 };
+      const chatOk = (c) => c && typeof c === "object" && Number.isInteger(c.n) && typeof c.text === "string" && typeof c.name === "string";
+      function chatNode() {
+        if (CH.node) return CH.node;
+        const box = document.createElement("div");
+        box.className = "bv-chat";
+        box.innerHTML = `<div class="bv-chat__list" role="log" aria-label="대기실 대화" aria-live="polite" tabindex="0"></div>
+          <div class="bv-chat__form"><input type="text" class="bv-chat__in" maxlength="80" placeholder="대기실 사람들에게 한마디" aria-label="대기실 대화 입력" autocomplete="off" enterkeyhint="send"><button type="button" class="hk-btn hk-btn--secondary bv-chat__send">보내기</button></div>`;
+        CH.node = box; CH.list = box.querySelector(".bv-chat__list"); CH.input = box.querySelector(".bv-chat__in"); CH.btn = box.querySelector(".bv-chat__send");
+        CH.input.addEventListener("compositionstart", () => { CH.composing = true; });
+        CH.input.addEventListener("compositionend", () => { CH.composing = false; });
+        CH.input.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter" || e.shiftKey) return;
+          if (e.isComposing || CH.composing) return; // 한글 조합 중 Enter 는 글자 확정만(두 번 보내지 않게)
+          e.preventDefault();
+          chatSend();
+        });
+        CH.btn.addEventListener("click", (e) => { e.stopPropagation(); chatSend(); CH.input.focus(); });
+        CH.input.addEventListener("focus", () => { setTimeout(chatKeep, 350); });
+        return box;
+      }
+      // 휴대폰 — 키보드가 올라와도 입력 칸과 아래 단추(출발 · 준비)가 함께 보이게 카드를 올린다
+      function chatKeep() {
+        if (S.closed || !CH.input || document.activeElement !== CH.input) return;
+        const row = over.querySelector(".bv-pl-b .bv-btnrow");
+        const vv = window.visualViewport;
+        const top = vv ? vv.offsetTop : 0, bottom = vv ? vv.offsetTop + vv.height : innerHeight;
+        const low = (row || CH.input).getBoundingClientRect().bottom;
+        if (low > bottom - 6) over.scrollTop += low - bottom + 10;
+        const it = CH.input.getBoundingClientRect().top;
+        if (it < top + 6) over.scrollTop -= top + 6 - it;
+      }
+      S.chatKeep = chatKeep;
+      function chatPaint(force) {
+        const list = CH.list;
+        if (!list) return;
+        const atEnd = force || list.scrollHeight - list.scrollTop - list.clientHeight < 28;
+        const keep = list.scrollTop;
+        list.textContent = "";
+        if (!CH.items.length) {
+          const e = document.createElement("div");
+          e.className = "bv-chat__empty";
+          e.textContent = "아직 나눈 말이 없어요";
+          list.appendChild(e);
+        }
+        for (const c of CH.items) {
+          const mine = c.id === S.me;
+          const row = document.createElement("div");
+          row.className = `bv-chat__m${mine ? " is-me" : ""}`;
+          const b = document.createElement("b");
+          b.textContent = mine ? "나" : c.name || "동료";
+          const t = document.createElement("span");
+          t.textContent = c.text; // 글자 그대로 — HTML 로 해석하지 않는다
+          row.append(b, t);
+          list.appendChild(row);
+        }
+        list.scrollTop = atEnd ? list.scrollHeight : keep; // 위로 올려 읽는 중이면 끌어내리지 않는다
+      }
+      function chatAdd(items, toEnd) {
+        let changed = false;
+        for (const c of items) {
+          if (!chatOk(c) || CH.items.some((x) => x.n === c.n)) continue;
+          CH.items.push({ n: c.n, id: c.id, name: c.name, text: c.text.slice(0, 80) });
+          changed = true;
+        }
+        if (!changed) return;
+        CH.items.sort((x, y) => x.n - y.n);
+        if (CH.items.length > 50) CH.items.splice(0, CH.items.length - 50);
+        chatPaint(!!toEnd);
+      }
+      async function chatLoad() {
+        if (S.closed || S.phase !== "wait" || !HKApi.partyChat) return;
+        const d = await HKApi.partyChat(p.id).catch(() => null);
+        if (!d || S.closed || S.phase !== "wait") return;
+        if (d.open === false) { if (CH.items.length) { CH.items = []; chatPaint(true); } return; }
+        chatAdd(Array.isArray(d.items) ? d.items : [], false);
+      }
+      async function chatSend() {
+        if (!CH.input || CH.sending || S.closed || S.phase !== "wait") return;
+        const text = CH.input.value.replace(/\s+/g, " ").trim();
+        if (!text) return;
+        if (Date.now() - CH.lastSend < 2000) { HKUI.toast("조금 천천히 보내 주세요"); return; }
+        CH.sending = true; CH.btn.disabled = true; CH.lastSend = Date.now();
+        CH.input.value = "";
+        try {
+          const d = await HKApi.partyChatSend(p.id, text);
+          if (d && d.item) chatAdd([d.item], true);
+        } catch (e) {
+          if (!CH.input.value) CH.input.value = text; // 못 보냈으면 적은 글을 되돌린다
+          HKUI.toast((e && e.message) || "보내지 못했어요", "error");
+        } finally {
+          CH.sending = false; if (CH.btn) CH.btn.disabled = false;
+        }
       }
       let shownSetup = "";
       function frameWait() {
@@ -1297,6 +1444,7 @@
       };
       function onMsg(m) {
         if (!m || typeof m.t !== "string") return;
+        if (m.t === "chat") { if (m.from === undefined && S.phase === "wait") chatAdd([m.c], false); return; } // 서버가 보낸 대기실 채팅 — 사람이 통로로 보낸 것(from 있음)은 버린다
         if (m.t === "again" && Number.isInteger(m.id) && m.id > 0) { playing.againId = m.id; showPartyAgain(m.id); return; }
         if (isHost()) {
           const from = Number(m.from);
@@ -1357,6 +1505,7 @@
           // 손님 — 연 사람까지 왕복 지연 재기(본체가 내 차를 그만큼 앞으로 내다본다)
           if (!isHost() && S.phase === "race" && !(now - (S.lastPing || 0) < 2000)) { S.lastPing = now; send({ t: "ping", c: now }); }
         }, 600);
+        S.chatT = setInterval(() => { if (!document.hidden) chatLoad(); }, 8000);
         paint();
       }
       S.setReady = (on) => { if (S.phase !== "wait" || isHost() || (on && S.gotLb && verMix(S.hv))) return; S.rd[S.me] = on ? 1 : 0; send({ t: "rd", on: on ? 1 : 0, rid: S.rids[S.me], ...myVer() }); paint(); };
@@ -1385,6 +1534,7 @@
         onHello: (h) => {
           if (S.closed) return;
           if (!S.role) begin(h && h.role === "guest" ? "guest" : "host");
+          chatLoad();
           if (isHost()) { S.here = new Set(Array.isArray(h.here) ? h.here : []); hostChanged(); }
           else { S.hostHere = !!h.peerHere; S.gotLb = false; if (!S.hostHere && S.phase === "race") note("연 사람 연결을 기다리는 중이에요"); }
         },
@@ -1509,12 +1659,20 @@
         }, 5000);
       })();
     }
+    // 끝난 판의 순위 — final(서버가 정한 결과: order · dist · track · winner · sec)이 순위를 그릴 만큼 있으면 그것, 아니면 null
+    function doneFinal(p) {
+      const f = p && p.final;
+      if (!f || !Array.isArray(f.order) || !f.order.length) return null;
+      return { ...f, dist: Array.isArray(f.dist) && f.dist.length === f.order.length ? f.dist : f.order.map(() => 0) };
+    }
+    // 자리 이름 — 사람은 자리 이름(없으면 「동료」), 컴퓨터 자리는 「컴퓨터」(끝난 판에는 컴퓨터 레이서 모양이 남지 않는다)
+    const doneNames = (p, f) => ({ players: p.players, bots: p.bots, names: [...p.players.map((id) => { const s = p.seats.find((x) => x.id === id); return s ? s.name : "동료"; }), ...Array(PMAX).fill("컴퓨터")].slice(0, f.order.length) });
     function showPartyDone(p) {
       screen = "lost"; setPlaying(false); pauseBtn.hidden = true;
-      const f = p.final;
+      const f = doneFinal(p);
       const back = `<button type="button" class="hk-btn hk-btn--secondary" data-act="menu">처음으로</button><button type="button" class="hk-btn hk-btn--primary" data-act="plobby">여러 명 경주 목록</button>`;
       if (!f) return showOver(cardHtml("flag", "끝난 경주예요", `${p.host.name}님의 경주${p.reasonLabel ? ` · ${p.reasonLabel}` : ""}`, back));
-      const g = { players: p.players, bots: p.bots, names: [...p.players.map((id) => { const s = p.seats.find((x) => x.id === id); return s ? s.name : "동료"; }), ...Array(PMAX).fill("컴퓨터")].slice(0, f.order.length) };
+      const g = doneNames(p, f);
       const mi = p.players.indexOf(p.meId);
       const list = rankList(f, g, mi);
       showOver(`<div class="bv-card is-small bv-result" role="dialog" aria-label="경주 결과">

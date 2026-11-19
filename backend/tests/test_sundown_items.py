@@ -182,7 +182,7 @@ class SundownItems(unittest.TestCase):
         # 손님 — 끝 소식(vs:end r)으로 「경주 끝!」 · 「완주 못 함」
         self.assertIn("if(d.r&&Array.isArray(d.r.order)&&d.r.order.some(x=>x!=null))vsEndNote(d.r);", BODY)
         # 바깥 — 결과 전원 줄, 못 들어온 차는 「완주 못 함」(간 거리는 작게), 1:1 · 연습 · 여러 명 · 지난 판 모두 같은 줄
-        self.assertEqual(OUTER.count("rankList("), 4)  # 정의 1 + 1:1 · 여러 명 · 지난 판
+        self.assertEqual(OUTER.count("rankList("), 5)  # 정의 1 + 1:1 · 여러 명 · 지난 판 · 최근 경주 펼쳐 보기
         self.assertIn("`완주 못 함 <small>${pct(x.d)}</small>`", OUTER)
         self.assertNotIn("bv-stats", OUTER)
         self.assertIn("const END_HOLD = 1200;", OUTER)

@@ -437,6 +437,163 @@ class PartyFlow(unittest.TestCase):
         self.assertIsNone(run(seat(5)))
 
 
+class PartyChat(unittest.TestCase):
+    """대기실 채팅 — 자리 있는 사람만 · 80자 · 2초에 한 번 · 최근 50개 · 끝나면 지움. Redis 는 fakeredis."""
+
+    setUp = PartyFlow.setUp
+    tearDown = PartyFlow.tearDown
+    _schema = PartyFlow._schema
+    _people = PartyFlow._people
+    _stamp = PartyFlow._stamp
+    _notice = PartyFlow._notice
+    call = PartyFlow.call
+
+    def redis(self):
+        import fakeredis
+
+        if not hasattr(self, "_redis"):
+            self._redis = fakeredis.aioredis.FakeRedis(decode_responses=True)
+        return self._redis
+
+    def room(self):
+        """주인 1 · 들어온 2 · 3 · 초대만 받은 4 · 거절한 5(초대 받음), 6 은 남."""
+        data, _ = self.call(party.create, 1, "bumpervs", [2, 3, 4, 5])
+        pid = data["id"]
+        self.call(party.accept, 2, pid)
+        self.call(party.accept, 3, pid)
+        self.call(party.decline, 5, pid)
+        return pid
+
+    def say(self, who, pid, text, wait=True):
+        if wait:  # 2초 간격 — 시험에서는 앞 글의 간격 키를 지워 기다린 것으로 한다
+            run(self.redis().delete(party._chat_gap_key(pid, who)))
+        return self.chat(party.chat_send, who, pid, text)
+
+    def read(self, who, pid):
+        return self.chat(party.chat_list, who, pid)
+
+    def chat(self, fn, who, *args):
+        async def go():
+            async with self.Session() as db:
+                m = await db.get(Member, who)
+                return await fn(db, self.redis(), m, *args)
+        return run(go())
+
+    def err(self, fn):
+        with self.assertRaises(AppError) as cm:
+            fn()
+        return cm.exception.status_code, cm.exception.detail["error"]["code"]
+
+    def test_only_seated_read_write(self):
+        pid = self.room()
+        self.assertEqual(self.say(1, pid, "안녕하세요")["item"]["text"], "안녕하세요")
+        self.say(2, pid, "반가워요")
+        got = self.read(3, pid)
+        self.assertTrue(got["open"])
+        self.assertEqual([(x["id"], x["name"], x["text"], x["mine"]) for x in got["items"]], [(1, "주인", "안녕하세요", False), (2, "가", "반가워요", False)])
+        self.assertEqual([x["mine"] for x in self.read(2, pid)["items"]], [False, True])
+        # 초대만 받은 사람 · 거절한 사람 — 못 읽고 못 씀(403), 남 — 판이 없는 것처럼(404)
+        for who, want in ((4, (403, "PARTY_CHAT_SEAT")), (5, (403, "PARTY_CHAT_SEAT")), (6, (404, "PARTY_NOT_FOUND"))):
+            self.assertEqual(self.err(lambda: self.read(who, pid)), want)
+            self.assertEqual(self.err(lambda: self.say(who, pid, "몰래")), want)
+        # 들어왔다 나간 사람도 더는 못 읽음
+        self.call(party.decline, 3, pid)
+        self.assertEqual(self.err(lambda: self.read(3, pid)), (403, "PARTY_CHAT_SEAT"))
+        self.assertEqual(len(self.read(1, pid)["items"]), 2)
+
+    def test_cut_and_empty(self):
+        pid = self.room()
+        long = "가" * 120
+        self.assertEqual(self.say(1, pid, long)["item"]["text"], "가" * 80)
+        self.assertEqual(self.say(1, pid, "  줄\n바꿈\t\u202e뒤집기  ")["item"]["text"], "줄 바꿈 뒤집기")
+        for bad in ("", "   ", "\n\t", "\u202e", None, 5):
+            self.assertEqual(self.err(lambda: self.say(1, pid, bad)), (400, "PARTY_CHAT_EMPTY"))
+        self.assertEqual(len(self.read(1, pid)["items"]), 2)
+
+    def test_too_fast(self):
+        pid = self.room()
+        self.say(2, pid, "하나")
+        self.assertEqual(self.err(lambda: self.say(2, pid, "둘", wait=False)), (429, "PARTY_CHAT_FAST"))
+        self.say(1, pid, "주인은 따로", wait=False)  # 간격은 사람마다
+        ttl = run(self.redis().pttl(party._chat_gap_key(pid, 2)))
+        self.assertTrue(0 < ttl <= party.CHAT_GAP_MS)
+        self.say(2, pid, "셋")  # 2초 지난 뒤
+        self.assertEqual([x["text"] for x in self.read(1, pid)["items"]], ["하나", "주인은 따로", "셋"])
+
+    def test_keep_last_50(self):
+        pid = self.room()
+        for i in range(55):
+            self.say(1 if i % 2 else 2, pid, f"글 {i}")
+        items = self.read(1, pid)["items"]
+        self.assertEqual(len(items), party.CHAT_KEEP)
+        self.assertEqual((items[0]["text"], items[-1]["text"]), ("글 5", "글 54"))
+        self.assertEqual([x["n"] for x in items], list(range(6, 56)))  # 차례 번호는 이어진다
+        ttl = run(self.redis().ttl(party._chat_key(pid)))
+        self.assertTrue(0 < ttl <= party.CHAT_TTL_SEC)
+
+    def test_html_kept_as_text(self):
+        pid = self.room()
+        raw = '<b>굵게</b> <img src=x onerror="alert(1)"> & "따옴표"'
+        self.assertEqual(self.say(1, pid, raw)["item"]["text"], raw)  # 서버는 바꾸지 않는다 — 화면이 글자 그대로 그린다
+        self.assertEqual(self.read(2, pid)["items"][0]["text"], raw)
+
+    def test_after_start_and_close(self):
+        pid = self.room()
+        self.say(1, pid, "곧 출발해요")
+        self.call(party.start, 1, pid, [2], 1)
+        self.assertEqual(self.read(2, pid), {"open": False, "items": []})
+        self.assertEqual(run(self.redis().exists(party._chat_key(pid))), 0)  # 읽을 때 지운다
+        self.assertEqual(self.err(lambda: self.say(1, pid, "달리는 중")), (400, "PARTY_NOT_OPEN"))
+        # 닫힌 대기실도
+        pid2 = self.room()
+        self.say(2, pid2, "안녕")
+        self.call(party.decline, 1, pid2)
+        self.assertEqual(self.read(2, pid2), {"open": False, "items": []})
+        self.assertEqual(self.err(lambda: self.say(2, pid2, "남아 있나요")), (400, "PARTY_NOT_OPEN"))
+
+    def test_push_on_rt_channels(self):
+        """새 글은 실시간 통로의 주인 · 손님 채널로 — "from" 없이(사람이 통로로 보낸 것과 구별)."""
+        import json
+
+        pid = self.room()
+        r = self.redis()
+
+        async def listen():
+            ps = r.pubsub()
+            await ps.subscribe(party.rt_channel(r, pid, "host"), party.rt_channel(r, pid, "all"))
+            for _ in range(2):
+                await ps.get_message(timeout=1.0)
+            async with self.Session() as db:
+                m = await db.get(Member, 2)
+                await party.chat_send(db, r, m, pid, "<i>안녕</i>")
+            got = []
+            for _ in range(20):
+                msg = await ps.get_message(timeout=0.2)
+                if msg and msg.get("type") == "message":
+                    got.append((msg["channel"], msg["data"]))
+                if len(got) == 2:
+                    break
+            await ps.aclose()
+            return got
+        got = run(listen())
+        self.assertEqual(sorted(c.rsplit(":", 1)[1] for c, _ in got), ["all", "host"])
+        for _, data in got:
+            self.assertEqual(data[0], "m")
+            body = json.loads(data[1:])
+            self.assertEqual(body["t"], "chat")
+            self.assertNotIn("from", body)
+            self.assertEqual((body["c"]["id"], body["c"]["name"], body["c"]["text"]), (2, "가", "<i>안녕</i>"))
+        from app.routers import realtime_party
+        self.assertEqual(realtime_party._ch(r, pid, "all"), party.rt_channel(r, pid, "all"))  # 통로와 같은 채널
+
+    def test_no_text_in_logs(self):
+        pid = self.room()
+        with self.assertLogs("app.services.party", level="DEBUG") as cm:
+            party.logger.debug("시험 표시")
+            self.say(1, pid, "비밀스러운 글")
+        self.assertFalse(any("비밀스러운" in line for line in cm.output))
+
+
 class PartyRealtime(unittest.TestCase):
     """실시간 통로 — 주인 ↔ 손님 둘. fakeredis 로 pub/sub · Lua 를 대신한다."""
 

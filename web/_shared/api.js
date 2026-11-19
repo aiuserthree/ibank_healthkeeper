@@ -105,6 +105,9 @@ window.HKApi = (function () {
     partyDecline: (id) => request(`/play/party/${id}/decline`, { method: "POST" }),
     partyStart: (id, playerIds, track) => request(`/play/party/${id}/start`, { method: "POST", body: JSON.stringify({ playerIds, track }) }),
     partyReport: (id, data) => request(`/play/party/${id}/report`, { method: "POST", body: JSON.stringify({ data }) }),
+    // 대기실 채팅 — 자리 있는 사람만 · 80자 · 2초에 한 번 · 최근 50개(남기지 않음)
+    partyChat: (id) => request(`/play/party/${id}/chat`),
+    partyChatSend: (id, text) => request(`/play/party/${id}/chat`, { method: "POST", body: JSON.stringify({ text }) }),
     // 상대 수를 기다린다 — 판이 바뀌면 바로, 아니면 20초 뒤 돌아온다
     matchWait: (id, seq, status, signal) =>
       request(`/play/match/${id}/wait?seq=${seq}&status=${encodeURIComponent(status)}`, { signal }),

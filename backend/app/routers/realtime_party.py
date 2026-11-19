@@ -65,12 +65,8 @@ async def admit(redis: Redis, session_id: Optional[str], party_id: int):
     return None, who, seat
 
 
-def _db(redis: Redis) -> int:
-    return redis.connection_pool.connection_kwargs.get("db", 0)
-
-
 def _ch(redis: Redis, party_id: int, name: str) -> str:
-    return f"hk:{_db(redis)}:prt:{party_id}:{name}"  # name: host · all · g{id}
+    return party_service.rt_channel(redis, party_id, name)  # name: host · all · g{id} — 대기실 채팅(party.chat_send)도 같은 채널로 보낸다
 
 
 def _here(party_id: int, name: str) -> str:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional, Union
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -205,6 +205,33 @@ async def party_start(party_id: int, body: PartyStart, db: AsyncSession = Depend
 @router.post("/party/{party_id}/report")
 async def party_report(party_id: int, body: PartyReport, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
     return {"data": await party_service.report(db, member, party_id, body.data)}
+
+
+class PartyChat(BaseModel):
+    text: str = Field(max_length=2000)  # 서버가 80자로 자른다 — 이건 너무 큰 요청만 막는다
+
+
+@router.get("/party/{party_id}/chat")
+async def party_chat_list(
+    party_id: int,
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis_client),
+    member: Member = Depends(get_current_active_member),
+):
+    """대기실 채팅 — 최근 글(자리 있는 사람만)."""
+    return {"data": await party_service.chat_list(db, redis, member, party_id)}
+
+
+@router.post("/party/{party_id}/chat")
+async def party_chat_send(
+    party_id: int,
+    body: PartyChat,
+    db: AsyncSession = Depends(get_db),
+    redis: Redis = Depends(get_redis_client),
+    member: Member = Depends(get_current_active_member),
+):
+    """대기실 채팅 — 글 하나 보내기(80자 · 2초에 한 번)."""
+    return {"data": await party_service.chat_send(db, redis, member, party_id, body.text)}
 
 
 @router.get("/match/members")

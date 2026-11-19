@@ -23,6 +23,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from collections import Counter
@@ -695,6 +696,125 @@ async def ranking(db: AsyncSession, member: Member, game: str) -> dict:
             rank, prev = n, row["wins"]
         row["rank"] = rank
     return {"top": table[:20], "me": next((r for r in table if r["id"] == member.id), None)}
+
+
+# ── 대기실 채팅 ───────────────────────────────────────────────────────
+# 대기실(OPEN)에 자리가 있는 사람(주인 · 들어온 사람)끼리 짧은 글을 주고받는다. 남기지 않는다 — DB 가 아니라 Redis 의
+# 기한 있는 목록(prt:chat:{판 id})에 최근 CHAT_KEEP 개만 두고, 출발 · 닫힘 · 기한이 지나면 읽을 때 지운다(늦어도 CHAT_TTL_SEC 뒤 사라짐).
+# 새 글은 실시간 통로(realtime_party)의 같은 채널로 {"t": "chat", "c": 글} 을 보내 대기실 화면들이 바로 받는다("from" 이 없다 —
+# 사람이 통로로 보낸 것은 서버가 늘 "from" 을 붙이니 화면은 "from" 없는 chat 만 믿는다). 채팅을 모르는 예전 화면은 이 소식을 그냥 버린다.
+# 글 내용은 로그에 남기지 않는다. 화면은 글자 그대로(HTML 로 해석하지 않게) 그린다.
+
+CHAT_MAX = 80  # 한 글 최대 글자 수 — 넘으면 서버가 자른다
+CHAT_KEEP = 50  # 판마다 최근 글 수
+CHAT_GAP_MS = 2000  # 한 사람이 이 간격 안에 또 보내면 거절
+CHAT_TTL_SEC = OPEN_HOURS * 3600 + 600  # 대기실이 열려 있는 시간 + 10분 — 그 뒤엔 Redis 가 지운다
+
+register_messages({
+    "PARTY_CHAT_SEAT": "대기실에 들어온 사람만 채팅할 수 있어요.",
+    "PARTY_CHAT_EMPTY": "보낼 글을 적어 주세요.",
+    "PARTY_CHAT_FAST": "조금 천천히 보내 주세요.",
+})
+
+_BIDI = {0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x206A)}  # 글자 방향을 뒤집는 보이지 않는 글자
+
+
+def rt_channel(redis, party_id: int, name: str) -> str:
+    """실시간 통로 채널 이름(realtime_party 와 같은 값) — name: host · all · g{id}."""
+    db = redis.connection_pool.connection_kwargs.get("db", 0)
+    return f"hk:{db}:prt:{party_id}:{name}"
+
+
+def _chat_key(party_id: int) -> str:
+    return f"prt:chat:{party_id}"
+
+
+def _chat_seq_key(party_id: int) -> str:
+    return f"prt:chat:{party_id}:n"
+
+
+def _chat_gap_key(party_id: int, member_id: int) -> str:
+    return f"prt:chat:{party_id}:gap:{member_id}"
+
+
+def clean_chat(text) -> str:
+    """보이지 않는 조절 글자를 빼고 공백을 하나로, CHAT_MAX 자까지 — 빈 글이면 PARTY_CHAT_EMPTY. HTML 은 바꾸지 않는다(화면이 글자로 그린다)."""
+    if not isinstance(text, str):
+        raise_app_error("PARTY_CHAT_EMPTY")
+    s = "".join(" " if (ord(c) < 32 or 127 <= ord(c) < 160 or c in "  ") else c for c in text if ord(c) not in _BIDI)
+    s = " ".join(s.split())[:CHAT_MAX].strip()
+    if not s:
+        raise_app_error("PARTY_CHAT_EMPTY")
+    return s
+
+
+async def _chat_room(db: AsyncSession, member: Member, party_id: int) -> GameParty:
+    """채팅할 수 있는 사람인지 — 자리가 없으면 404(남의 판), 초대만 받았거나 거절 · 나간 사람은 403."""
+    p = await _get(db, party_id)
+    if p.game not in PARTY_GAMES:
+        raise_app_error("PARTY_NOT_FOUND", 404)
+    s = _seat_of((await _seats(db, [p.id]))[p.id], member.id)
+    if s is None:
+        raise_app_error("PARTY_NOT_FOUND", 404)
+    if s.status not in IN_SEAT:
+        raise_app_error("PARTY_CHAT_SEAT", 403)
+    return p
+
+
+def _chat_live(p: GameParty) -> bool:
+    return p.status == "OPEN" and (p.deadline_at is None or _aware(p.deadline_at) > now_kst())
+
+
+def _chat_out(item: dict, member_id: int) -> dict:
+    return {"n": int(item.get("n") or 0), "id": item.get("id"), "name": str(item.get("name") or ""), "text": str(item.get("text") or ""),
+            "mine": item.get("id") == member_id}
+
+
+async def chat_list(db: AsyncSession, redis, member: Member, party_id: int) -> dict:
+    """대기실 글 목록(오래된 것부터) — {"open": 대기실이 열려 있나, "items": [{n, id, name, text, mine}]}. 대기실이 끝났으면 지우고 빈 목록."""
+    p = await _chat_room(db, member, party_id)
+    if not _chat_live(p):
+        try:
+            await redis.delete(_chat_key(p.id), _chat_seq_key(p.id))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("party chat %s: clear failed (%s)", p.id, type(exc).__name__)
+        return {"open": False, "items": []}
+    items = []
+    for raw in await redis.lrange(_chat_key(p.id), 0, -1):
+        try:
+            x = json.loads(raw)
+        except (TypeError, ValueError):
+            continue
+        if isinstance(x, dict):
+            items.append(_chat_out(x, member.id))
+    return {"open": True, "items": items}
+
+
+async def chat_send(db: AsyncSession, redis, member: Member, party_id: int, text) -> dict:
+    """대기실에 글 하나 — 자리 있는 사람만 · 대기실(OPEN)일 때만 · CHAT_MAX 자로 자름 · 한 사람 CHAT_GAP_MS 에 한 번 · 최근 CHAT_KEEP 개만."""
+    ensure_open(grace=True, member=member)
+    p = await _chat_room(db, member, party_id)
+    if not _chat_live(p):
+        raise_app_error("PARTY_NOT_OPEN")
+    body = clean_chat(text)
+    if not await redis.set(_chat_gap_key(p.id, member.id), "1", px=CHAT_GAP_MS, nx=True):
+        raise_app_error("PARTY_CHAT_FAST", 429)
+    n = int(await redis.incr(_chat_seq_key(p.id)))
+    item = {"n": n, "id": member.id, "name": member.name or "", "text": body}
+    raw = json.dumps(item, ensure_ascii=False, separators=(",", ":"))
+    async with redis.pipeline(transaction=True) as pipe:
+        pipe.rpush(_chat_key(p.id), raw)
+        pipe.ltrim(_chat_key(p.id), -CHAT_KEEP, -1)
+        pipe.expire(_chat_key(p.id), CHAT_TTL_SEC)
+        pipe.expire(_chat_seq_key(p.id), CHAT_TTL_SEC)
+        await pipe.execute()
+    note = "m" + json.dumps({"t": "chat", "c": item}, ensure_ascii=False, separators=(",", ":"))
+    try:  # 대기실 화면들에 바로 — 못 보내도 글은 남아 있어 화면이 다시 읽을 때 나온다
+        await redis.publish(rt_channel(redis, p.id, "host"), note)
+        await redis.publish(rt_channel(redis, p.id, "all"), note)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("party chat %s: publish failed (%s)", p.id, type(exc).__name__)
+    return {"item": _chat_out(item, member.id)}
 
 
 async def seat_for_rt(db: AsyncSession, party_id: int, member_id: int) -> Optional[tuple]:
