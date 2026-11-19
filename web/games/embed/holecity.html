@@ -648,6 +648,8 @@ function def(id, name, r, h, parts, tier, vmul) {
     wheel6(0.55, 0.4, -1.2, 2.4), wheel6(0.55, 0.4, 1.2, 2.4), wheel6(0.55, 0.4, -1.2, -0.6), wheel6(0.55, 0.4, 1.2, -0.6), wheel6(0.55, 0.4, -1.2, -2.4), wheel6(0.55, 0.4, 1.2, -2.4)], '공항 소방차', 1.1);
   def('cargoshed', '화물 창고', 5.0, 6.4, [box(10, 4.6, 7.5, 0, 0, 0, C.concrete), prism(10.4, 1.6, 7.9, 0, 4.6, 0, C.grey, PI / 2), box(3.2, 3.4, 0.12, -2.4, 0, 3.76, C.navy), box(3.2, 3.4, 0.12, 2.4, 0, 3.76, C.navy),
     box(10.04, 0.5, 7.54, 0, 3.8, 0, C.tailT)], '화물 창고', 1.3);
+  // 구멍이 밑으로 들어갈 수 있는 넓은 건물(4 · 5구역에만 있다) — [발자국 x 반폭, z 반폭](지붕 · 차양 포함, 돌리기 전). 렌더러가 구멍이 그 밑에 있을 때도 눌러 준다(fix3)
+  [['fishmarket', 7.8, 5.5], ['warehouse', 6.8, 5.3], ['terminal', 10.5, 10.6], ['cargohall', 8.6, 6.1], ['cargoshed', 5.2, 4.0], ['hangar', 11.0, 9.1]].forEach(function (c) { TYPES[c[0]].cov = [c[1], c[2]]; });
 })();
 
 var FLOWERS = ['flower_pink', 'flower_yellow', 'flower_white', 'flower_purple'];
@@ -1048,8 +1050,9 @@ function genHarbor(G) {
   G.add('van', -22, 42, 0, false); G.add('van', 24, 40, PI, false); G.add('kiosk', 8, 58, PI, false); G.add('kiosk', -12, 60, 0, false);
   G.cluster(['fishbox'], 22, 0, SZ - 1, 6); G.cluster('gull', 14, 0, SZ - 1, 7);
   G.scatter(['fishbox', 'crate', 'drum', 'gull', 'lifering', 'buoy', 'bollard'], 120, -62, 62, 26, 63);
-  G.scatter(['boat', 'forklift', 'bench'], 14, -62, 62, 28, 63);
-  G.scatter(['planter'], 10, -62, 62, 28, 63);
+  var far = function (px, pz) { return Math.hypot(px, pz - SZ) > 4; };   // 시작 자리에 못 먹는 물건이 겹치지 않게(fix3)
+  G.scatter(['boat', 'forklift', 'bench'], 14, -62, 62, 28, 63, far);
+  G.scatter(['planter'], 10, -62, 62, 28, 63, far);
   for (i = 0; i < 3; i++) G.mover(rnd() < 0.5 ? 'taxi' : 'van', { k: 'r', cx: 0, cz: 22, hw: 62, hd: 0.01, s: i * 80, sp: 5.5, dir: 1 });
   // 산책길 시작 자리 둘레 — 첫 먹이
   [[-6, SZ - 2], [6, SZ - 1.5], [-4, SZ + 2], [5, SZ + 3]].forEach(function (p) { G.cluster(['gull', 'fishbox', 'bollard'], 6, p[0], p[1], 1.6); });
@@ -1067,12 +1070,12 @@ function genAirport(G) {
   G.rect(0, -28, 136, 7, C.taxiway, 2); G.rect(0, -28, 136, 0.25, C.yline, 3);
   G.rect(-30, -34, 7, 12, C.taxiway, 2); G.rect(30, -34, 7, 12, C.taxiway, 2);
   G.rect(0, -5, 136, 38, C.apron, 1);
-  for (x = -48; x <= 48; x += 24) { G.rect(x, -5, 0.3, 30, C.yline, 3); G.circ(x, 6, 1.2, C.yline, 3); }
+  [-52, -27.5, 0, 27.5, 52].forEach(function (lx) { G.rect(lx, -5, 0.3, 30, C.yline, 3); G.circ(lx, lx ? 9 : 6, 1.2, C.yline, 3); });   // 탑승구 유도선 — 여객기 줄을 벌린 자리(fix3)
   G.rect(0, 22, 136, 7, C.taxiway, 2);                                                              // 터미널 앞 도로
   G.rect(0, 48, 136, 40, C.walk, 1);
   G.rect(36, 52, 46, 26, C.asphalt2, 2);                                                         // 주차장
   for (x = 16; x <= 56; x += 4) { G.rect(x, 46, 0.18, 4.6, C.line, 3); G.rect(x, 58, 0.18, 4.6, C.line, 3); }
-  G.circ(-50, -4, 6, C.apron, 2); G.ring(-50, -4, 4.4, 5.0, C.yline, 3); G.rect(-51.4, -4, 0.6, 3.6, C.yline, 4); G.rect(-48.6, -4, 0.6, 3.6, C.yline, 4); G.rect(-50, -4, 3.4, 0.6, C.yline, 4);   // 헬기장 「H」
+  G.circ(-61, -9, 6, C.apron, 2); G.ring(-61, -9, 4.4, 5.0, C.yline, 3); G.rect(-62.4, -9, 0.6, 3.6, C.yline, 4); G.rect(-59.6, -9, 0.6, 3.6, C.yline, 4); G.rect(-61, -9, 3.4, 0.6, C.yline, 4);   // 헬기장 「H」 — 서쪽 여객기 · 유도로를 도는 여객기 길과 겹치지 않게 서쪽 끝으로(fix3)
   G.zoneR(-68, 68, -53, -39); G.zoneR(-68, 68, -32, -24); G.zoneR(-68, 68, 18.5, 25.5);
 
   // ── 북쪽: 활주로 등 줄 · 격납고 · 레이더 · 바람 자루
@@ -1086,18 +1089,18 @@ function genAirport(G) {
   G.mover('jet_b', { k: 'r', cx: 0, cz: -37, hw: 60, hd: 9, s: 200, sp: 4.2, dir: 1 });            // 유도로를 천천히 도는 여객기
   // ── 가운데: 계류장 — 탑승구마다 여객기 · 탑승교 · 지상 장비
   G.add('jumbo', 0, -4, PI, true);                                                               // 가장 큰 볼거리(맨 끝에 삼킨다)
-  [-48, -24, 24, 48].forEach(function (gx, n2) {
-    G.add(n2 % 2 ? 'jet_a' : 'jet_b', gx, -6, PI, true);
-    G.add('jetbridge', gx + 4.5, 9.5, 0, true);
-    G.add(rnd() < 0.5 ? 'fueltruck' : 'stairtruck', gx - 8.5, -1, PI / 2, true);
+  [-52, -27.5, 27.5, 52].forEach(function (gx, n2) {   // 기수가 터미널(남)을 보고, 탑승교가 기수 왼쪽 문에 닿는다 · 날개가 이웃과 포개지지 않게 줄을 벌림(fix3)
+    G.add(n2 % 2 ? 'jet_a' : 'jet_b', gx, -3, 0, true);                                        // z -3: 유도로를 도는 여객기 날개가 꼬리에 닿지 않게(fix3)
+    G.add('jetbridge', gx + 3.2, 8.6, 0, true);
+    G.add(rnd() < 0.5 ? 'fueltruck' : 'stairtruck', gx - 8.5, 4.5, PI / 2, true);
     G.add('bagtug', gx + 8.5, -12, 0, false);
     G.scatter(['lcart', 'tcone', 'suitcase', 'suitcase_b'], 7, gx - 9, gx + 9, -18, 12);
   });
-  G.add('heli', -50, -4, 0.4, true); G.add('heli', -58, 4, 1.2, true);
+  G.add('heli', -61, -9, 0.4, true); G.add('heli', -40, 13, 1.2, true);
   [-6, 6].forEach(function (cx2) { G.add('cessna', cx2 * 1.0 - 56 + 56 + (cx2 < 0 ? -8 : 8), -18, PI, false); });
-  for (i = 0; i < 4; i++) G.add(i % 2 ? 'fueltruck' : 'stairtruck', -60 + i * 40 + 10, 14, 0, false);
-  G.add('bizjet', 58, 8, -PI / 2, true); G.add('bizjet', -60, 12, PI / 2, true);
-  G.add('bizjet', -36, -20, 0, true); G.add('bizjet', 36, -20, 0, true);                         // 계류장 앞줄(유도로 쪽) 작은 제트기 2 — r 6.5~9.5 띠 보강(fix1)
+  [-34, -10, 40].forEach(function (tx, n2) { G.add(n2 % 2 ? 'fueltruck' : 'stairtruck', tx, 16, 0, false); });   // 탑승교 사이 빈자리(fix3)
+  G.add('bizjet', 12, 12, PI / 2, true); G.add('bizjet', -60, 12, PI / 2, true);   // 동쪽 작은 제트기는 탑승교 · 화물 창고 · 유도로 여객기 길과 겹치지 않게 대형 여객기 꼬리 동쪽으로(fix3)
+  G.add('bizjet', -39, -20, 0, true); G.add('bizjet', 39, -20, 0, true);                         // 계류장 앞줄(유도로 쪽) 작은 제트기 2 — r 6.5~9.5 띠 보강(fix1)
   for (i = 0; i < 5; i++) G.mover('bagtug', { k: 'r', cx: 0, cz: -2, hw: 56, hd: 16, s: i * 58, sp: 4.0, dir: i % 2 ? 1 : -1 });
   for (i = 0; i < 2; i++) G.mover('bus_blue', { k: 'r', cx: 0, cz: 3, hw: 40, hd: 12, s: i * 100, sp: 5, dir: -1 });
   // 중간 띠(spec_extra) — 화물 터미널 옆 항공 화물칸 줄 · 소방차 · 화물 창고, 계류장 · 남쪽 광장 짐 끄는 차 · 화물칸
@@ -1105,19 +1108,22 @@ function genAirport(G) {
   G.add('firetruck', -60, 58, 0, true); G.add('firetruck', -26, 61, PI / 2, true);
   G.add('cargoshed', -42, 57, 0, true); G.add('cargoshed', 62, 12, -PI / 2, true);
   G.scatter(['tractor', 'uld', 'uld'], 26, -64, 64, -20, 16);
-  G.scatter('tractor', 10, -64, 12, 40, 64);
+  var far = function (px, pz) { return Math.hypot(px, pz - SZ) > 4; };   // 시작 자리에 못 먹는 물건이 겹치지 않게(fix3)
+  G.scatter('tractor', 10, -64, 12, 40, 64, far);
   G.scatter(['tcone', 'lcart', 'suitcase', 'suitcase_b'], 60, -64, 64, -20, 16);
   // ── 남쪽: 터미널 · 관제탑 · 화물 터미널 · 주차장 · 정류장
   G.add('terminal', -22, 33, 0, true); G.add('terminal', 0, 33, 0, true); G.add('terminal', 22, 33, 0, true);
   G.add('ctower', -52, 40, 0, true);                                                             // 어디서나 보이는 랜드마크
-  G.add('cargohall', 54, 33, 0, true); G.add('cargohall', -41, 34.5, -PI / 2, true);              // 화물 터미널 2 — 동쪽 끝 · 관제탑 옆 서쪽 끝(fix1)
-  for (x = -60; x <= 60; x += 8) if (x < -48 || x > -34) G.add('lamp', x, 26.6, 0, true);       // 서쪽 화물 터미널 자리는 가로등 비움
+  G.add('cargohall', 54, 33, 0, true); G.add('cargohall', -39.5, 34.5, -PI / 2, true);            // 화물 터미널 2 — 동쪽 끝 · 서쪽 끝(관제탑 받침과 틈을 두게 fix3)
+  for (x = -60; x <= 60; x += 8) if (x < -46 || x > -33) G.add('lamp', x, 26.6, 0, true);       // 서쪽 화물 터미널 자리(x -45.6~-33.4)는 가로등 비움
   [-32, 10, 30].forEach(function (bx) { G.add('busstop', bx, 27.4, PI, true); });
   for (x = 17; x <= 55; x += 4) { if (rnd() < 0.8) G.add(G.pick(CARS3), x + 2, 52, rnd() < 0.5 ? 0 : PI, true); if (rnd() < 0.75) G.add(G.pick(CARS3), x + 2, 46, rnd() < 0.5 ? 0 : PI, true); if (rnd() < 0.75) G.add(G.pick(CARS3), x + 2, 58, rnd() < 0.5 ? 0 : PI, true); }
   for (i = 0; i < 6; i++) G.mover(i % 3 ? 'taxi' : 'bus_blue', { k: 'r', cx: 0, cz: 22, hw: 66, hd: 0.01, s: i * 45, sp: 6, dir: 1 });
-  G.scatter(['planter', 'bench', 'sign_a', 'bin_city'], 26, -64, 12, 44, 64);
+  G.scatter(['planter', 'bench', 'sign_a', 'bin_city'], 26, -64, 12, 44, 64, far);
   G.scatter(BAGS.concat(['lcart', 'pigeon', 'sign_a', 'tcone']), 120, -64, 64, 42, 66);
-  G.scatter(['bagtug', 'stairtruck', 'cessna'], 8, -64, 64, -20, 16);
+  G.scatter(['bagtug', 'stairtruck', 'cessna'], 8, -64, 64, -20, 16, function (px, pz) {   // 여객기 꼬리 · 대형 여객기 꼬리 위에 놓이지 않게(fix3)
+    return !(pz < -8 && [-52, -27.5, 27.5, 52].some(function (gx) { return Math.abs(px - gx) < 7; })) && !(Math.abs(px) < 8 && pz > 7) && !(Math.abs(px - 12) < 9 && pz > 4);
+  });
   [[-6, SZ - 2], [6, SZ - 1.5], [-2, SZ + 2], [3, SZ + 3]].forEach(function (p) { G.cluster(BAGS.concat(['pigeon']), 6, p[0], p[1], 1.8); });
   G.scatter('windsock', 2, -64, 64, 60, 66);
   g.start = [0, SZ];
@@ -1568,6 +1574,8 @@ SC.Renderer = function (canvas) {
     for (k in holeVis) { scene.remove(holeVis[k].grp); holeVis[k].rim.material.dispose(); holeVis[k].pulse.material.dispose(); }
     holeVis = {}; meshes = []; clouds = []; game = g;
     tall = g.objs.filter(function (o) { return !o.mv && o.t.h > 6; }); tall.forEach(function (o) { o.sq = 1; });
+    // 넓은 건물(cov) — 돌린 발자국 반폭. 다른 물건은 0 이라 아래 계산이 예전과 같다
+    tall.forEach(function (o) { var c = o.t.cov, sw = c && Math.abs(Math.sin(o.rot)) > 0.5; o.cx = c ? (sw ? c[1] : c[0]) : 0; o.cz = c ? (sw ? c[0] : c[1]) : 0; });
     level = new T.Group(); scene.add(level);
     scene.background = new T.Color(A.sky);
     sun.color.setHex(A.sun); sun.intensity = A.sunI; hemi.groundColor.setHex(A.hemi);
@@ -1652,11 +1660,13 @@ SC.Renderer = function (canvas) {
       _p.set(x, y, z); _s.set(sc, sc * (o.sq || 1), sc); _m.compose(_p, _q, _s); o.mesh.setMatrixAt(o.inst, _m); o.mesh.userData.dirty = true;
     }
     // 내 구멍을 가리는 높은 건물(카메라 쪽에 선 것)은 납작하게 낮춰 구멍이 보이게 한다
-    var pl = g.player, see = camMode !== 'orbit' && pl.alive;
+    //  넓은 건물(cz > 0)은 구멍이 그 발자국 밑(남쪽 절반 포함)에 있어도 누르고, 그때는 내 구멍 테를 건물 위로 그려 자리를 보인다(fix3)
+    var pl = g.player, see = camMode !== 'orbit' && pl.alive, under = false;
     for (i = 0; i < tall.length; i++) {
       o = tall[i]; if (o.st !== 0) continue;
       var want = 1, oz = o.z - pl.z;
-      if (see && oz > 0 && oz < o.t.h * 0.62 + o.r + pl.r * 1.3 && Math.abs(o.x - pl.x) < o.r + pl.r * 1.4 + 1 + oz * 0.22) want = Math.max(0.1, Math.min(1, 2.2 / o.t.h + (oz - o.r) / (o.t.h * 1.4)));
+      if (see && oz > -o.cz && oz < o.t.h * 0.62 + o.r + pl.r * 1.3 && Math.abs(o.x - pl.x) < o.r + pl.r * 1.4 + 1 + Math.max(0, oz) * 0.22) want = Math.max(0.1, Math.min(1, 2.2 / o.t.h + (oz - o.r) / (o.t.h * 1.4)));
+      if (see && o.cz && Math.abs(oz) < o.cz + pl.r * 0.3 && Math.abs(o.x - pl.x) < o.cx + pl.r * 0.3) under = true;
       if (Math.abs(want - o.sq) > 0.004) { o.sq += (want - o.sq) * Math.min(1, dt * 9); put(o, o.x, 0, o.z, o.rot, 1, o.sq); }
     }
     while (g.doneQ.length) { o = g.doneQ.pop(); if (o.mesh) { o.mesh.setMatrixAt(o.inst, ZERO); o.mesh.userData.dirty = true; } }
@@ -1670,6 +1680,7 @@ SC.Renderer = function (canvas) {
       v.grp.position.set(h.x, 0, h.z);
       v.disc.scale.set(r, 1, r); v.rim.scale.set(r, 1, r); v.wall.scale.set(r, depth, r); v.bottom.scale.set(r, 1, r); v.bottom.position.y = -depth;
       var th = self.threat(g, h); v.rim.material.color.setHex(RIM[th]);
+      if (h === pl) v.rim.material.depthTest = !under;
       v.rim.visible = !(h.shield > 0) || Math.sin(time * 22) > -0.2;
       if (v.pulse.visible) {
         v.pt += dt * 1.6; if (v.pt >= 1) v.pulse.visible = false;
