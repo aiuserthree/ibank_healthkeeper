@@ -1,11 +1,11 @@
 // 주는 것: 높이 지형 — makeTerrain(1m 격자) · applyOp(도장 하나 찍기) · heightAt(땅 높이) · coastU(절벽 발치에서 바다 쪽으로 잰 거리) ·
 //   zAtU(그 거리의 z) · pathDist(가장 가까운 길까지) · meshTerrain(격자 → 꼭짓점: 가로 밀기 · 접힘 풀기 · 법선 · 지형 겹 · 틈 그늘) · OPS(도장 이름).
+//   heightAt 은 가로로 밀기 전의 격자 높이다 — 그리는 지형 · 충돌과 같은 「민 뒤의 땅 높이」는 build.js 의 landAt 이 준다.
 // 받는 것: dmath · noise · tune/world. 도장: base 바탕(해변 → 절벽 → 고원 단면을 절벽 선 따라 휨 + 지층) · flatten 평평하게 · path 길 다지기 ·
 //   raise 올리기 · carve 깎기 · terrace 계단밭(높이 도장 — 적힌 순서대로) / push 가파른 면 가로 밀기 · crack 틈 어둡게(꼭짓점 도장 — 높이가 다 끝난 뒤 한 번).
 // 영역(area) = ['circle', x, z, 반지름] 또는 ['box', x0, z0, x1, z1]. 가장자리 밖 blend m 에 걸쳐 부드럽게 사라진다. 바다는 +z 쪽(coast: 'south').
 import { dpow } from '../dmath.js';
 import { clamp, lerp, sstep, fbm2, ridge3, worley3 } from '../geom/noise.js';
-import { dominantAxis } from '../geom/mesh.js';
 import { WORLD } from '../tune/world.js';
 
 export const OPS = Object.freeze(['base', 'flatten', 'path', 'raise', 'carve', 'terrace', 'push', 'crack']);
@@ -112,15 +112,15 @@ const HEIGHT = {
 };
 
 export function applyOp(T, op) {
-  if (op.op === 'push' || op.op === 'crack') T[op.op] = op; else HEIGHT[op.op](T, op);
+  if (op.op === 'push' || op.op === 'crack') { T[op.op] = op; return; }
+  HEIGHT[op.op](T, op);
+  // 틀린 수(0 으로 나누기 · 수가 아닌 값)는 높이를 NaN 으로 만든다 — 뒤에서 형상을 끝없이 쪼개기 전에 여기서 그 도장을 가리키며 멈춘다
+  for (let k = 0; k < T.h.length; k++) if (T.h[k] - T.h[k] !== 0) throw new Error('지형 도장 ' + op.op + ' 뒤에 땅 높이가 유한한 수가 아니다(' + T.h[k] + ') — 도장의 수 칸을 본다');
 }
 
-// 격자 → 꼭짓점. 돌려주는 것: pos · nor(Float32 ×3) · lay(Uint8 ×4: 자갈 · 풀 · 젖음 · 예비) · shade(틈 그늘 0 ~ 1) · axis · idx(삼각형) ·
-//   steep(가파름 0 ~ 1 — 삼각형의 표면 종류를 정할 때 쓴다).
-export function meshTerrain(T) {
-  const { nx, nz, h, salt } = T, n = nx * nz, P = WORLD.push, L = WORLD.layer, wv = [0, 0], wf = [0, 0];
-  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), lay = new Uint8Array(n * 4), shade = new Float32Array(n).fill(1);
-  const axis = new Uint8Array(n), steep = new Float32Array(n), off = new Float64Array(n * 3), flat = new Float32Array(n);
+// 가파른 꼭짓점마다 가로로 밀 양(off: x · y · z)과 틈 그늘(shade)을 정한다. flat = 밀기 전 법선의 위쪽 성분(1 = 평지) · steep = 가파름 0 ~ 1.
+function pushAndCrack(T, flat, steep, off, shade) {
+  const { nx, nz, h, salt } = T, P = WORLD.push, cellBig = [0, 0], cellFine = [0, 0];
   const at = (i, j) => h[clamp(j, 0, nz - 1) * nx + clamp(i, 0, nx - 1)];
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
     const k = j * nx + i, x = T.x0 + i, z = T.z0 + j, y = h[k], gx = (at(i + 1, j) - at(i - 1, j)) / 2, gz = (at(i, j + 1) - at(i, j - 1)) / 2;
@@ -128,57 +128,91 @@ export function meshTerrain(T) {
     const st = sstep(P.steepFrom, P.steepFull, flat[k]);
     steep[k] = st;
     if (!(st > 0) || (!T.push && !T.crack)) continue;
-    const cell = (T.push && T.push.cell) || P.cell, layer = (T.cliff && T.cliff.strata) || cell / 2;
     // 덩이의 세로 크기는 지층 한 켜(strata)에 맞춘다 — 같은 켜의 바위가 한 덩이로 밀려 턱과 선반이 가로로 이어진다
-    worley3(x / cell + 3.3, y / layer + 0.37, z / cell + 1.7, salt + 41, wv); worley3(x * P.chipFreq, y * 1.5 + 9, z * P.chipFreq, salt + 43, wf);
+    const cell = (T.push && T.push.cell) || P.cell, layer = (T.cliff && T.cliff.strata) || cell / 2;
+    worley3(x / cell + 3.3, y / layer + 0.37, z / cell + 1.7, salt + 41, cellBig);
+    worley3(x * P.chipFreq, y * 1.5 + 9, z * P.chipFreq, salt + 43, cellFine);
     if (T.push) {
       // 큰 굴곡(능선 잡음) + 깨진 바위 덩이(보로노이 칸마다 들쭉날쭉) — 높이 지형의 「늘어난 벽」을 턱 · 판 · 처마로 바꾼다
       const gl = Math.sqrt(gx * gx + gz * gz) || 1, amt = T.push.amount * st;
-      const dsp = (ridge3(x * P.bigFreq, y * 0.2, z * P.bigFreq, 3, salt + 47) - P.bigBias) * P.big + (wv[0] - P.slabBias) * P.slab + (wf[0] - 0.5) * P.chip;
-      off[k * 3] = -gx / gl * dsp * amt; off[k * 3 + 1] = (wv[0] - 0.5) * P.lift * amt; off[k * 3 + 2] = -gz / gl * dsp * amt;
+      const dsp = (ridge3(x * P.bigFreq, y * 0.2, z * P.bigFreq, 3, salt + 47) - P.bigBias) * P.big + (cellBig[0] - P.slabBias) * P.slab + (cellFine[0] - 0.5) * P.chip;
+      off[k * 3] = -gx / gl * dsp * amt; off[k * 3 + 1] = (cellBig[0] - 0.5) * P.lift * amt; off[k * 3 + 2] = -gz / gl * dsp * amt;
     }
-    if (T.crack) shade[k] = lerp(1, T.crack.dark + (1 - T.crack.dark) * sstep(0, P.crackWide, wv[1]) * (0.7 + 0.3 * sstep(0, P.crackFine, wf[1])), st);
+    if (T.crack) shade[k] = lerp(1, T.crack.dark + (1 - T.crack.dark) * sstep(0, P.crackWide, cellBig[1]) * (0.7 + 0.3 * sstep(0, P.crackFine, cellFine[1])), st);
   }
-  // 삼각형(칸마다 대각선을 번갈아) — 민 뒤에 뒤집히거나 접힌 것은 그 꼭짓점의 밀기를 반씩 줄이고, passes 번을 넘기면 0 으로(접힌 것이 없을 때까지)
+}
+
+// 격자 삼각형 — 칸마다 대각선을 번갈아 둔다(한쪽으로만 두면 결이 생긴다)
+function gridTris(nx, nz) {
   const idx = new Uint32Array((nx - 1) * (nz - 1) * 6);
   for (let j = 0, o = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
-    const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
-    if ((i + j) & 1) { idx[o++] = a; idx[o++] = c; idx[o++] = b; idx[o++] = b; idx[o++] = c; idx[o++] = d; } else { idx[o++] = a; idx[o++] = c; idx[o++] = d; idx[o++] = a; idx[o++] = d; idx[o++] = b; }
+    const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1, order = (i + j) & 1 ? [a, c, b, b, c, d] : [a, c, d, a, d, b];
+    for (let e = 0; e < 6; e++) idx[o++] = order[e];
   }
-  const px = (k, m) => T.x0 + k % nx + off[k * 3] * m, py = (k, m) => h[k] + off[k * 3 + 1] * m, pz = (k, m) => T.z0 + Math.floor(k / nx) + off[k * 3 + 2] * m;
+  return idx;
+}
+
+// 접힘 풀기: 민 뒤에 뒤집히거나 접힌 삼각형이 있으면 그 꼭짓점의 밀기를 반으로 줄인다 — 접힌 것이 없을 때까지. passes 번을 넘기면 0 으로 되돌린다.
+//   at(k, m, c) = 꼭짓점 k 를 밀기의 m 배만큼 민 자리의 좌표 c(0 x · 1 y · 2 z). 삼각형의 법선이 밀기 전(m = 0)과 minDot 보다 더 어긋나면 접힌 것으로 본다.
+function unfold(T, idx, off, at) {
+  const P = WORLD.push, n = T.nx * T.nz, before = [0, 0, 0], after = [0, 0, 0];
   const normal = (a, b, c, m, out) => {
-    const ux = px(b, m) - px(a, m), uy = py(b, m) - py(a, m), uz = pz(b, m) - pz(a, m), vx = px(c, m) - px(a, m), vy = py(c, m) - py(a, m), vz = pz(c, m) - pz(a, m);
+    const ux = at(b, m, 0) - at(a, m, 0), uy = at(b, m, 1) - at(a, m, 1), uz = at(b, m, 2) - at(a, m, 2), vx = at(c, m, 0) - at(a, m, 0), vy = at(c, m, 1) - at(a, m, 1), vz = at(c, m, 2) - at(a, m, 2);
     out[0] = uy * vz - uz * vy; out[1] = uz * vx - ux * vz; out[2] = ux * vy - uy * vx;
     return out;
   };
-  const moved = (k) => off[k * 3] !== 0 || off[k * 3 + 1] !== 0 || off[k * 3 + 2] !== 0, n0 = [0, 0, 0], n1 = [0, 0, 0];
-  for (let pass = 0, found = 1; T.push && found > 0; pass++) {
-    const bad = new Uint8Array(n);
+  const moved = (k) => off[k * 3] !== 0 || off[k * 3 + 1] !== 0 || off[k * 3 + 2] !== 0;
+  for (let pass = 0, found = 1; found > 0; pass++) {
+    const bad = new Uint8Array(n), keep = pass < P.passes ? 0.5 : 0;
     found = 0;
     for (let t = 0; t < idx.length; t += 3) {
       const a = idx[t], b = idx[t + 1], c = idx[t + 2];
       if (!moved(a) && !moved(b) && !moved(c)) continue;
-      normal(a, b, c, 0, n0); normal(a, b, c, 1, n1);
-      const dot = n0[0] * n1[0] + n0[1] * n1[1] + n0[2] * n1[2], l2 = (n0[0] * n0[0] + n0[1] * n0[1] + n0[2] * n0[2]) * (n1[0] * n1[0] + n1[1] * n1[1] + n1[2] * n1[2]);
+      normal(a, b, c, 0, before); normal(a, b, c, 1, after);
+      const dot = before[0] * after[0] + before[1] * after[1] + before[2] * after[2];
+      const l2 = (before[0] * before[0] + before[1] * before[1] + before[2] * before[2]) * (after[0] * after[0] + after[1] * after[1] + after[2] * after[2]);
       if (dot <= P.minDot * Math.sqrt(l2)) { bad[a] = bad[b] = bad[c] = 1; found++; }
     }
-    const keep = pass < P.passes ? 0.5 : 0;
     for (let k = 0; k < n; k++) if (bad[k]) { off[k * 3] *= keep; off[k * 3 + 1] *= keep; off[k * 3 + 2] *= keep; }
   }
-  for (let k = 0; k < n; k++) { pos[k * 3] = px(k, 1); pos[k * 3 + 1] = py(k, 1); pos[k * 3 + 2] = pz(k, 1); }
+}
+
+// 꼭짓점 법선: 민 뒤의 동서 · 남북 이웃을 이은 두 벡터의 가위곱(가장자리에서는 제 자리를 이웃 삼아)
+function gridNormals(T, pos, nor) {
+  const { nx, nz } = T;
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
-    const k = j * nx + i, x = T.x0 + i, z = T.z0 + j, y = h[k];
-    const e = (clamp(j, 0, nz - 1) * nx + clamp(i + 1, 0, nx - 1)) * 3, w = (j * nx + clamp(i - 1, 0, nx - 1)) * 3, s = (clamp(j + 1, 0, nz - 1) * nx + i) * 3, q = (clamp(j - 1, 0, nz - 1) * nx + i) * 3;
-    const ax = pos[e] - pos[w], ay = pos[e + 1] - pos[w + 1], az = pos[e + 2] - pos[w + 2], bx = pos[s] - pos[q], by = pos[s + 1] - pos[q + 1], bz = pos[s + 2] - pos[q + 2];
+    const k = j * nx + i, east = (j * nx + Math.min(i + 1, nx - 1)) * 3, west = (j * nx + Math.max(i - 1, 0)) * 3, south = (Math.min(j + 1, nz - 1) * nx + i) * 3, north = (Math.max(j - 1, 0) * nx + i) * 3;
+    const ax = pos[east] - pos[west], ay = pos[east + 1] - pos[west + 1], az = pos[east + 2] - pos[west + 2];
+    const bx = pos[south] - pos[north], by = pos[south + 1] - pos[north + 1], bz = pos[south + 2] - pos[north + 2];
     const cx = by * az - bz * ay, cy = bz * ax - bx * az, cz = bx * ay - by * ax, cl = Math.sqrt(cx * cx + cy * cy + cz * cz) || 1;
     nor[k * 3] = cx / cl; nor[k * 3 + 1] = cy / cl; nor[k * 3 + 2] = cz / cl;
-    axis[k] = dominantAxis(cx, cy, cz);
-    // 지형 겹: 자갈(낮은 곳 · 길) · 풀(평평하고 높은 곳) · 젖음(물가 · 가파른 면)
-    const pd = pathDist(T, x, z);
-    const pebble = Math.max(sstep(L.pebbleTop, L.pebbleFull, y + (fbm2(x * 0.2, z * 0.2, 2, salt + 53) - 0.5) * L.pebbleNoise), sstep(2.6, 1.2, pd) * L.pathPebble);
-    const turf = sstep(L.turfFlat, L.turfFull, flat[k]) * sstep(L.turfFrom, L.turfTo, y) * (0.55 + 0.9 * fbm2(x * 0.06 + 5, z * 0.06, 3, salt + 59)) * sstep(1.4, 3, pd);
-    const wet = sstep(L.wetTop, L.wetFull, y) * 0.95 + L.wetNoise * fbm2(x * 0.09 + 20, z * 0.09, 2, salt + 61) + (1 - flat[k]) * L.wetSteep;
+  }
+}
+
+// 지형 겹(꼭짓점마다 0 ~ 255): 자갈(낮은 곳 · 길가) · 풀(평평하고 높은 곳 — 길에서는 물러난다) · 젖음(물가 · 가파른 면). 넷째 칸은 예비.
+function layers(T, flat, lay) {
+  const { nx, nz, h, salt } = T, L = WORLD.layer;
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i, x = T.x0 + i, z = T.z0 + j, y = h[k], road = pathDist(T, x, z);
+    const low = sstep(L.pebbleTop, L.pebbleFull, y + (fbm2(x * 0.2, z * 0.2, 2, salt + 53) - 0.5) * L.pebbleNoise);
+    const pebble = Math.max(low, sstep(L.pathPebbleFar, L.pathPebbleNear, road) * L.pathPebble);
+    const turf = sstep(L.turfFlat, L.turfFull, flat[k]) * sstep(L.turfFrom, L.turfTo, y) * (0.55 + 0.9 * fbm2(x * 0.06 + 5, z * 0.06, 3, salt + 59)) * sstep(L.pathTurfFrom, L.pathTurfTo, road);
+    const wet = sstep(L.wetTop, L.wetFull, y) * L.wetFlat + L.wetNoise * fbm2(x * 0.09 + 20, z * 0.09, 2, salt + 61) + (1 - flat[k]) * L.wetSteep;
     lay[k * 4] = Math.round(clamp(pebble, 0, 1) * 255); lay[k * 4 + 1] = Math.round(clamp(turf, 0, 1) * 255); lay[k * 4 + 2] = Math.round(clamp(wet, 0, 1) * 255);
   }
-  return { pos, nor, lay, shade, axis, idx, steep };
+}
+
+// 격자 → 꼭짓점. 돌려주는 것: pos · nor(Float32 ×3) · lay(Uint8 ×4: 자갈 · 풀 · 젖음 · 예비) · shade(틈 그늘 0 ~ 1) · idx(삼각형) ·
+//   steep(가파름 0 ~ 1 — 삼각형의 표면 종류를 정할 때 쓴다). 차례: 밀 양과 틈 그늘 → 접힘 풀기 → 민 자리 → 법선 → 지형 겹.
+export function meshTerrain(T) {
+  const { nx, nz, h } = T, n = nx * nz, idx = gridTris(nx, nz);
+  const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), lay = new Uint8Array(n * 4), shade = new Float32Array(n).fill(1);
+  const steep = new Float32Array(n), flat = new Float32Array(n), off = new Float64Array(n * 3);
+  const at = (k, m, c) => (c === 0 ? T.x0 + k % nx : c === 1 ? h[k] : T.z0 + Math.floor(k / nx)) + off[k * 3 + c] * m;
+  pushAndCrack(T, flat, steep, off, shade);
+  if (T.push) unfold(T, idx, off, at);
+  for (let k = 0; k < n; k++) for (let c = 0; c < 3; c++) pos[k * 3 + c] = at(k, 1, c);
+  gridNormals(T, pos, nor);
+  layers(T, flat, lay);
+  return { pos, nor, lay, shade, idx, steep };
 }

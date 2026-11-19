@@ -5,18 +5,30 @@
 import { PI, dcos } from '../dmath.js';
 
 const QUANT = 4096;
+// 쪼개기의 울타리(틀린 수가 들어와도 끝없이 돌지 않게): 깊이 — 한 번 쪼갤 때마다 가장 긴 모서리가 반이 되니 이만큼 쪼개고도 남으면 수가 틀린 것이다 ·
+//   나온 삼각형 수 — 조각 하나의 한 부분은 많아야 몇천 개다(등대 탑이 3천쯤). 이 수를 넘으면 치수가 틀린 것이다(100km 짜리 말뚝 같은).
+const SPLIT_MAX = 48;
+const TRIS_MAX = 500000;
 
 // 모서리가 maxEdge 를 넘는 삼각형을 가장 긴 모서리의 가운데에서 둘로 — 다 될 때까지. 맞닿은 삼각형은 같은 가운데 점을 쓴다(틈 없음).
+// 좌표나 maxEdge 가 유한한 수가 아니면 예외를 낸다(NaN 은 어떤 길이와 견줘도 거짓이라, 그대로 두면 끝없이 쪼갠다).
+// 쌓아 두는 삼각형은 수 10개다: 꼭짓점 셋(9칸) + 쪼갠 깊이(1칸).
 export function subdivide(soup, maxEdge) {
   const out = [], m2 = maxEdge * maxEdge, st = [];
   const d2 = (p, i, j) => (p[i] - p[j]) * (p[i] - p[j]) + (p[i + 1] - p[j + 1]) * (p[i + 1] - p[j + 1]) + (p[i + 2] - p[j + 2]) * (p[i + 2] - p[j + 2]);
+  if (!(m2 > 0)) throw new Error('subdivide: maxEdge 는 0 보다 큰 수여야 한다 — ' + maxEdge);
   for (let t = 0; t < soup.length; t += 9) {
-    st.push(soup.slice(t, t + 9));
+    const first = soup.slice(t, t + 9);
+    first.push(0);
+    st.push(first);
     while (st.length) {
-      const p = st.pop(), l0 = d2(p, 0, 3), l1 = d2(p, 3, 6), l2 = d2(p, 6, 0), e = l0 >= l1 && l0 >= l2 ? 0 : l1 >= l2 ? 1 : 2;
-      if (Math.max(l0, l1, l2) <= m2) { for (let k = 0; k < 9; k++) out.push(p[k]); continue; }
+      const p = st.pop(), l0 = d2(p, 0, 3), l1 = d2(p, 3, 6), l2 = d2(p, 6, 0), longest = Math.max(l0, l1, l2), e = l0 >= l1 && l0 >= l2 ? 0 : l1 >= l2 ? 1 : 2;
+      if (longest <= m2) { for (let k = 0; k < 9; k++) out.push(p[k]); continue; }
+      if (out.length > TRIS_MAX * 9) throw new Error('subdivide: 삼각형이 ' + TRIS_MAX + '개를 넘는다 — 형상이 너무 크다(치수를 본다)');
+      if (longest - longest !== 0) throw new Error('subdivide: 삼각형 ' + t / 9 + ' 의 좌표가 유한한 수가 아니다 — [' + p.slice(0, 9).join(', ') + ']');
+      if (p[9] >= SPLIT_MAX) throw new Error('subdivide: 삼각형 ' + t / 9 + ' 을(를) ' + SPLIT_MAX + '번 쪼개도 모서리가 ' + maxEdge + ' 아래로 안 내려간다');
       const i = e * 3, j = ((e + 1) % 3) * 3, k = ((e + 2) % 3) * 3, mx = (p[i] + p[j]) / 2, my = (p[i + 1] + p[j + 1]) / 2, mz = (p[i + 2] + p[j + 2]) / 2;
-      st.push([p[i], p[i + 1], p[i + 2], mx, my, mz, p[k], p[k + 1], p[k + 2]], [mx, my, mz, p[j], p[j + 1], p[j + 2], p[k], p[k + 1], p[k + 2]]);
+      st.push([p[i], p[i + 1], p[i + 2], mx, my, mz, p[k], p[k + 1], p[k + 2], p[9] + 1], [mx, my, mz, p[j], p[j + 1], p[j + 2], p[k], p[k + 1], p[k + 2], p[9] + 1]);
     }
   }
   return out;
