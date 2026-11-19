@@ -40,6 +40,8 @@ MGMT_GAMES: dict[str, MgmtGame] = {
         MgmtGame("farm", "옥상 텃밭", "출근 전에 심고 점심 · 퇴근 후에 거둬 텃밭을 넓혀요", "sprout"),
         # 아케이드 「햇살 농장 3D」의 이야기 모드 진행 — 매니지먼트 목록에는 안 보인다
         MgmtGame("eggfarm", "햇살 농장 이야기", "햇살 농장 3D 이야기 모드 진행", "egg", listed=False),
+        # 아케이드 「문구 팡팡」의 단계 · 별 · 꾸미기 · 코인 · 아이템 진행 — 매니지먼트 목록에는 안 보인다
+        MgmtGame("deskpop", "문구 팡팡 진행", "문구 팡팡 단계 · 별 · 꾸미기", "pencil", listed=False),
         # 아케이드 「옥상 덩크슛」의 별 · 가진 공 · 고른 공 · 미션 진행 — 매니지먼트 목록에는 안 보인다
         MgmtGame("hoops", "옥상 덩크슛 공 상점", "옥상 덩크슛 별 · 공 모으기", "dribbble", listed=False),
     )
@@ -89,6 +91,80 @@ def check_hoops_state(state: dict) -> bool:
 
 
 STATE_CHECKS = {"hoops": check_hoops_state}
+
+
+# 문구 팡팡 진행 저장 — 값 검사(타입 · 범위 · 길이 · 서로 맞물린 값까지. 점수와 엮어 검증하지는 않는다)
+# 과제 별 값: 구역 10 × 과제 5(차례대로) — 화면(web/games/embed/deskpop.html 의 TASK_STARS)과 같아야 한다(시험이 비교)
+DESKPOP_TASK_STARS = (
+    (1, 1, 2, 3, 3),  # 빈 사무실 1~10단계
+    (3, 4, 4, 4, 5),  # 탕비실 11~30
+    (3, 4, 4, 4, 5),  # 회의실 31~50
+    (3, 4, 4, 4, 5),  # 휴게 라운지 51~70
+    (3, 4, 4, 4, 5),  # 체력단련실 71~90
+    (5, 6, 6, 6, 7),  # 옥상 정원 91~120
+    (5, 6, 6, 6, 7),  # 도서 코너 121~150
+    (7, 8, 8, 8, 9),  # 사내 카페 151~190
+    (9, 10, 10, 10, 11),  # 로비 191~240
+    (11, 12, 12, 12, 13),  # 대표실 241~300
+)
+DESKPOP_AREA_LEVELS = (10, 20, 20, 20, 20, 30, 30, 40, 50, 60)  # 구역마다 단계 수(= 그 구역 과제 별 합)
+DESKPOP_BOOST_KEYS = ("line", "stamp", "globe", "hammer", "rowRuler", "colTape", "fan")
+DESKPOP_KEYS = {"level", "stars", "starsTotal", "tasks", "styles", "chest", "coins", "boost", "streak", "bestRun", "seen"}
+DESKPOP_MAX_LEVEL = 100_000
+DESKPOP_MAX_STARS = 100_000
+DESKPOP_MAX_COINS = 9_999_999
+DESKPOP_MAX_BOOST = 999
+DESKPOP_MAX_RUN = 1_000_000  # game.py 상한과 같게
+DESKPOP_MAX_SEEN = 64
+
+
+def check_deskpop_state(state: dict) -> bool:
+    """단계 · 별 · 과제 · 구역 상자 · 코인 · 아이템이 말이 되는지. 모르는 칸은 받지 않는다. 빈 상태({})는 처음."""
+    if not isinstance(state, dict) or set(state) - DESKPOP_KEYS:
+        return False
+    level, stars, total = state.get("level", 1), state.get("stars", 0), state.get("starsTotal", 0)
+    if not (
+        _int_in(level, 1, DESKPOP_MAX_LEVEL)
+        and _int_in(stars, 0, DESKPOP_MAX_STARS)
+        and _int_in(total, 0, DESKPOP_MAX_STARS)
+    ):
+        return False
+    if not stars <= total <= level - 1:  # 별은 처음 깬 단계마다 1개
+        return False
+    tasks = state.get("tasks", [0] * 10)
+    if not isinstance(tasks, list) or len(tasks) != 10 or not all(_int_in(t, 0, 5) for t in tasks):
+        return False
+    if any(tasks[i] > 0 and tasks[i - 1] != 5 for i in range(1, 10)):  # 앞 구역을 다 꾸며야 뒤 구역
+        return False
+    spent = sum(sum(DESKPOP_TASK_STARS[i][:t]) for i, t in enumerate(tasks))
+    if spent + stars > total:
+        return False
+    styles = state.get("styles", [[0] * 5] * 10)
+    if not isinstance(styles, list) or len(styles) != 10:
+        return False
+    if not all(isinstance(r, list) and len(r) == 5 and all(_int_in(v, 0, 2) for v in r) for r in styles):
+        return False
+    chest = state.get("chest", 0)
+    if not _int_in(chest, 0, 10) or chest > sum(1 for t in tasks if t == 5):
+        return False
+    if not _int_in(state.get("coins", 200), 0, DESKPOP_MAX_COINS):
+        return False
+    boost = state.get("boost", {})
+    if not isinstance(boost, dict) or set(boost) - set(DESKPOP_BOOST_KEYS):
+        return False
+    if not all(_int_in(v, 0, DESKPOP_MAX_BOOST) for v in boost.values()):
+        return False
+    if not _int_in(state.get("streak", 0), 0, DESKPOP_MAX_STARS) or not _int_in(state.get("bestRun", 0), 0, DESKPOP_MAX_RUN):
+        return False
+    seen = state.get("seen", [])
+    return (
+        isinstance(seen, list)
+        and len(seen) <= DESKPOP_MAX_SEEN
+        and all(isinstance(x, str) and 0 < len(x) <= 32 for x in seen)
+    )
+
+
+STATE_CHECKS["deskpop"] = check_deskpop_state
 
 
 def _game(key: str) -> MgmtGame:

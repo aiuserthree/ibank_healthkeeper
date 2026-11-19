@@ -43,8 +43,11 @@ def jpeg_size(path: pathlib.Path) -> tuple[int, int]:
 
 
 class FerryStaticTest(unittest.TestCase):
-    def test_games_first_entry(self):
-        first = next(iter(game.GAMES.values()))
+    def test_games_entry(self):
+        # 목록 맨 위는 그 뒤에 나온 더 새 게임이 차지한다 — 등록돼 있고 먼저 나온 게임(옥상 링 캐치)보다 위에 있는지만 본다
+        keys = list(game.GAMES)
+        self.assertLess(keys.index("ferry"), keys.index("ringcatch"))
+        first = game.GAMES["ferry"]
         self.assertEqual(first.key, "ferry")
         self.assertEqual(first.title, "통통배 선착장")
         self.assertEqual(first.category, "MINI")
