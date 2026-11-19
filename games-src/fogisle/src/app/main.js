@@ -12,7 +12,7 @@ import { stageInit, stageResize, stageDraw } from './stage.js';
 import { runJob } from './worker.js';
 import { GAME } from '../shared/game.js';
 import { hashState } from '../shared/state.js';
-import { STAGES } from '../shared/bake/index.js';
+import { stageAt } from '../shared/bake/index.js';
 import { recipe as slice1 } from '../data/slice1/recipe.js';
 import { tuneFreeze } from '../shared/tune/index.js';
 import { APP } from '../shared/tune/app.js';
@@ -84,11 +84,16 @@ function publishStatus() {
   Object.defineProperty(window, '__fg_status', { value: Object.freeze(st), enumerable: true });
 }
 
-// 준비의 진행: 단계 이름을 <html data-fg-prep> 에, 찬 정도(0 ~ 1)를 CSS 변수 --fg-prep 에 적는다(준비 띠의 그림은 셸이 정한다 — 화면 글은 셸에 있다)
+// 준비의 진행: 단계 이름을 <html data-fg-prep> 에, 찬 정도(0 ~ 1)를 CSS 변수 --fg-prep 에 적는다(준비 띠의 그림은 셸이 정한다 — 화면 글은 셸에 있다).
+// 찬 정도는 단계 수가 아니라 단계마다의 무게(걸리는 시간의 어림 — tune 의 bake.progress)로 센다: 가장 긴 「구운 빛」에서 띠가 멈춘 듯 보이지 않게.
 function prepStep(name) {
   CTX.prep = name; root.dataset.fgPrep = name;
-  root.style.setProperty('--fg-prep', String(Math.max(0, STAGES.indexOf(name)) / (STAGES.length - 1)));
+  root.style.setProperty('--fg-prep', String(stageAt(name)));
 }
+
+// 개발판에서 주소에 ?bakehash=1 을 붙이면 준비 길에서 세계 · 구운 것의 해시를 센다(워커가 센 값 → __fg_status.world.hash · bake). 배포판 · 보통의 준비는 세지 않는다 —
+// 구운 것을 통째로 훑는 일이라 임무 크기에서 「생성 + 굽기」의 9% 다. 하네스는 받은 배열을 주 창에서 다시 세어 견준다(__fg.prepHash · 묶인 shared 의 hashState).
+function wantBakeHash() { return root.dataset.fgMode === 'dev' && /[?&]bakehash=1(&|$)/.test(location.search); }
 
 // 타이틀이 떠 있는 동안: 워커 러너로 ① 결정성 자가 점검 한 판(워커 길이 되는지 · 어느 길로 돌았는지 · 해시) ② 「바로 출격」이 갈 세계의 생성 → 굽기를 돌리고,
 // 끝나면 출격을 연다(tdd §3-5 — 셰이더 예열은 F2a ~ F2c 가 이 뒤에 잇는다). 굽는 동안 워커가 단계 이름을 알려 온다(prepStep).
@@ -100,10 +105,11 @@ function prepare() {
   prepStep('check');
   runJob('shared/probe.js', 'probeRun', [APP.selfCheck.seed, APP.selfCheck.steps]).then((r) => {
     CTX.worker = r.where; CTX.probe = r.value.hash;
-    return runJob('shared/bake/index.js', 'prepSteps', [slice1], prepStep);
+    return runJob('shared/bake/index.js', 'prepSteps', [slice1, wantBakeHash()], prepStep);
   }).then((r) => {
+    const hash = r.value.hash || { world: null, bake: null };
     CTX.world = r.value.world; CTX.baked = r.value.baked;
-    CTX.made = Object.freeze({ id: slice1.id, hash: r.value.hash.world, bake: r.value.hash.bake, where: r.where, slices: r.slices });
+    CTX.made = Object.freeze({ id: slice1.id, hash: hash.world, bake: hash.bake, where: r.where, slices: r.slices });
     prepStep('done');
     CTX.readySec = Math.round(performance.now() - CTX.titleAt) / 1000;
     CTX.ready = true; root.dataset.fgReady = '1';

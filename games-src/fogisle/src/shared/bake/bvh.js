@@ -1,5 +1,6 @@
 // 주는 것: 삼각형 BVH — bvhSteps(pos, idx → BVH. 조각내 돌릴 수 있는 function*) + 질의: rayAny(가리는 것이 있는가) · rayHit(가장 가까운 맞은 곳) ·
-//   column((x, z) 수직선이 만나는 면 전부) · sphereAny(공에 닿는 삼각형이 있는가). 광선(탄 · 시야 · 빛) · 지면 붙기 · 캡슐 끼임이 다 이것을 쓴다.
+//   column((x, z) 수직선이 만나는 면 전부) · sphereAny(공에 닿는 삼각형이 있는가) · pillarAny(세로 기둥에 닿는 삼각형이 있는가 — 가로 거리).
+//   광선(탄 · 시야 · 빛) · 지면 붙기 · 캡슐 끼임 · 걷기 격자의 가장자리 깎기가 다 이것을 쓴다. 삼각형이 하나도 없는 BVH 에서는 질의가 「없다」로 바로 돌아간다.
 // 받는 것: tune/bake(잎 크기 · 한 번에 훑는 삼각형 수). 사칙 연산과 Math.sqrt 뿐이라 Node · 크롬 · 워커가 같은 비트를 낸다.
 // BVH(형식 배열만 — 워커에서 넘겨받고 해시한다):
 //   nodes  Float32 ×6: 마디의 상자 [x0, y0, z0, x1, y1, z1]. 마디 0 이 뿌리, 왼쪽 자식은 늘 「제 번호 + 1」이다.
@@ -8,11 +9,11 @@
 //   order  Uint32: 칸 → 원래 삼각형 번호(world.collide 의 surf · owner 를 읽을 때) · count = 마디 수
 // 나누기: 삼각형 가운데들이 가장 길게 퍼진 축을 12칸으로 나눠 「겉넓이 × 삼각형 수」가 가장 작은 금에서(못 가르면 가운데의 중앙값 — 동률은 삼각형 번호로 깬다).
 //   어디서 돌려도 같은 나무가 나온다.
-// 질의의 쌓는 통(STACK)은 부를 때마다 처음부터 다시 쓴다 — 부름 사이에 남는 뜻이 없다. 나무의 깊이는 DEEP + log₂(삼각형 수)를 넘지 않는다
+// 질의의 쌓는 통(STACK)과 자른 다각형을 두는 통(CLIP)은 부를 때마다 처음부터 다시 쓴다 — 부름 사이에 남는 뜻이 없다. 나무의 깊이는 DEEP + log₂(삼각형 수)를 넘지 않는다
 //   (깊이 DEEP 부터는 늘 중앙값으로 반씩 가른다 — 한쪽으로 쏠린 금이 이어져도 통이 넘치지 않는다).
 import { BAKE } from '../tune/bake.js';
 
-const STACK = new Int32Array(256), BINS = 12, DEEP = 40;
+const STACK = new Int32Array(256), CLIP = new Float64Array(36), BINS = 12, DEEP = 40;
 // 광선이 삼각형의 면과 나란한지 보는 틈 · 맞은 곳이 출발점에 붙었는지 보는 거리
 const FLAT = 1e-12, NEAR = 1e-4;
 
@@ -32,8 +33,9 @@ function select(order, cen, axis, s, e, m) {
 }
 
 export function* bvhSteps(pos, idx) {
-  const nt = idx.length / 3, leaf = BAKE.bvh.leaf, order = new Uint32Array(nt), box = new Float32Array(nt * 6), cen = new Float32Array(nt * 3);
+  const nt = idx.length / 3, leaf = BAKE.bvh.leaf, chunk = BAKE.bvh.chunk, order = new Uint32Array(nt), box = new Float32Array(nt * 6), cen = new Float32Array(nt * 3);
   for (let t = 0; t < nt; t++) {
+    if (t % chunk === chunk - 1) yield;
     const a = idx[t * 3] * 3, b = idx[t * 3 + 1] * 3, c = idx[t * 3 + 2] * 3;
     order[t] = t;
     for (let k = 0; k < 3; k++) {
@@ -44,6 +46,7 @@ export function* bvhSteps(pos, idx) {
   const cap = Math.max(1, 2 * nt), nodes = new Float32Array(cap * 6), meta = new Int32Array(cap * 2), todo = [0, nt, -1, 0];
   const binN = new Int32Array(BINS), binB = new Float64Array(BINS * 6), right = new Float64Array(BINS);
   let count = 0, work = 0;
+  // 쉬는 자리는 훑은 삼각형 수로 정한다(큰 마디는 한 마디 안에서도 상자 · 칸 나누기 · 가르기 사이에 쉰다 — 주 스레드 길의 한 조각이 길지 않게)
   while (todo.length) {
     const depth = todo.pop(), parent = todo.pop(), e = todo.pop(), s = todo.pop(), id = count++, o = id * 6;
     if (parent >= 0) meta[parent * 2] = id;
@@ -55,6 +58,8 @@ export function* bvhSteps(pos, idx) {
     }
     nodes[o] = x0; nodes[o + 1] = y0; nodes[o + 2] = z0; nodes[o + 3] = x1; nodes[o + 4] = y1; nodes[o + 5] = z1;
     if (e - s <= leaf) { meta[id * 2] = s; meta[id * 2 + 1] = e - s; continue; }
+    work += e - s;
+    if (work > chunk) { work = 0; yield; }
     // 삼각형 가운데들의 상자에서 가장 긴 축을 BINS 칸으로 나눠, 「겉넓이 × 삼각형 수」가 가장 작게 갈리는 금을 고른다(광선이 덜 헤맨다). 못 가르면 중앙값으로.
     let c0x = Infinity, c0y = Infinity, c0z = Infinity, c1x = -Infinity, c1y = -Infinity, c1z = -Infinity;
     for (let i = s; i < e; i++) {
@@ -63,6 +68,8 @@ export function* bvhSteps(pos, idx) {
     }
     const dx = c1x - c0x, dy = c1y - c0y, dz = c1z - c0z, axis = dx >= dy && dx >= dz ? 0 : dy >= dz ? 1 : 2, from = axis === 0 ? c0x : axis === 1 ? c0y : c0z, span = Math.max(dx, dy, dz);
     let m = (s + e) >> 1, cut = -1;
+    work += e - s;
+    if (work > chunk) { work = 0; yield; }
     if (span > 0 && depth < DEEP) {
       const scale = BINS / span;
       binN.fill(0); binB.fill(Infinity, 0, BINS * 3); binB.fill(-Infinity, BINS * 3);
@@ -71,6 +78,8 @@ export function* bvhSteps(pos, idx) {
         binN[b]++;
         for (let k = 0; k < 3; k++) { if (box[t * 6 + k] < binB[b * 3 + k]) binB[b * 3 + k] = box[t * 6 + k]; if (box[t * 6 + 3 + k] > binB[(BINS + b) * 3 + k]) binB[(BINS + b) * 3 + k] = box[t * 6 + 3 + k]; }
       }
+      work += e - s;
+      if (work > chunk) { work = 0; yield; }
       // 오른쪽부터 쌓은 겉넓이 × 수를 적어 두고, 왼쪽부터 쌓으며 더한다
       let ax = Infinity, ay = Infinity, az = Infinity, bx = -Infinity, by = -Infinity, bz = -Infinity, n = 0, best = Infinity;
       for (let b = BINS - 1; b > 0; b--) {
@@ -100,10 +109,13 @@ export function* bvhSteps(pos, idx) {
     if (cut < 0) select(order, cen, axis, s, e, m);
     todo.push(m, e, id, depth + 1, s, m, -1, depth + 1);
     work += e - s;
-    if (work > BAKE.bvh.chunk) { work = 0; yield; }
+    if (work > chunk) { work = 0; yield; }
   }
   const tri = new Float32Array(nt * 9);
-  for (let i = 0; i < nt; i++) for (let k = 0; k < 3; k++) { const v = idx[order[i] * 3 + k] * 3; tri[i * 9 + k * 3] = pos[v]; tri[i * 9 + k * 3 + 1] = pos[v + 1]; tri[i * 9 + k * 3 + 2] = pos[v + 2]; }
+  for (let i = 0; i < nt; i++) {
+    if (i % chunk === chunk - 1) yield;
+    for (let k = 0; k < 3; k++) { const v = idx[order[i] * 3 + k] * 3; tri[i * 9 + k * 3] = pos[v]; tri[i * 9 + k * 3 + 1] = pos[v + 1]; tri[i * 9 + k * 3 + 2] = pos[v + 2]; }
+  }
   return { nodes: nodes.slice(0, count * 6), meta: meta.slice(0, count * 2), tri, order, count };
 }
 
@@ -139,7 +151,7 @@ const inverse = (d) => 1 / (d === 0 ? 1e-30 : d);
 export function rayAny(bvh, ox, oy, oz, dx, dy, dz, far) {
   const N = bvh.nodes, M = bvh.meta, T = bvh.tri, ix = inverse(dx), iy = inverse(dy), iz = inverse(dz);
   let top = 0;
-  STACK[top++] = 0;
+  if (T.length) STACK[top++] = 0;
   while (top) {
     const n = STACK[--top];
     if (!slab(N, n * 6, ox, oy, oz, ix, iy, iz, far)) continue;
@@ -154,7 +166,7 @@ export function rayAny(bvh, ox, oy, oz, dx, dy, dz, far) {
 export function rayHit(bvh, ox, oy, oz, dx, dy, dz, far, hit) {
   const N = bvh.nodes, M = bvh.meta, T = bvh.tri, ix = inverse(dx), iy = inverse(dy), iz = inverse(dz);
   let top = 0, best = far, slot = -1;
-  STACK[top++] = 0;
+  if (T.length) STACK[top++] = 0;
   while (top) {
     const n = STACK[--top];
     if (!slab(N, n * 6, ox, oy, oz, ix, iy, iz, best)) continue;
@@ -176,7 +188,7 @@ export function rayHit(bvh, ox, oy, oz, dx, dy, dz, far, hit) {
 export function column(bvh, x, z, out) {
   const N = bvh.nodes, M = bvh.meta, T = bvh.tri;
   let top = 0, n = 0;
-  STACK[top++] = 0;
+  if (T.length) STACK[top++] = 0;
   while (top) {
     const id = STACK[--top], o = id * 6;
     if (x < N[o] || x > N[o + 3] || z < N[o + 2] || z > N[o + 5]) continue;
@@ -218,13 +230,55 @@ function triDist2(T, i, px, py, pz) {
 export function sphereAny(bvh, cx, cy, cz, r) {
   const N = bvh.nodes, M = bvh.meta, T = bvh.tri, r2 = r * r;
   let top = 0;
-  STACK[top++] = 0;
+  if (T.length) STACK[top++] = 0;
   while (top) {
     const n = STACK[--top], o = n * 6;
     if (cx + r < N[o] || cx - r > N[o + 3] || cy + r < N[o + 1] || cy - r > N[o + 4] || cz + r < N[o + 2] || cz - r > N[o + 5]) continue;
     const count = M[n * 2 + 1];
     if (!count) { STACK[top++] = M[n * 2]; STACK[top++] = n + 1; continue; }
     for (let i = M[n * 2] * 9, e = i + count * 9; i < e; i += 9) if (triDist2(T, i, cx, cy, cz) < r2) return true;
+  }
+  return false;
+}
+
+// 다각형(src 의 so 부터 n 꼭짓점 × 3)을 높이 y 의 평면으로 자른다 — up 이면 그 위쪽을, 아니면 아래쪽을 남긴다. CLIP 의 to 부터 적고 남은 꼭짓점 수를 돌려준다.
+function clipY(src, so, n, to, y, up) {
+  let m = 0;
+  for (let i = 0; i < n; i++) {
+    const a = so + i * 3, b = so + ((i + 1) % n) * 3, da = up ? src[a + 1] - y : y - src[a + 1], db = up ? src[b + 1] - y : y - src[b + 1];
+    if (da >= 0) { CLIP[to + m * 3] = src[a]; CLIP[to + m * 3 + 1] = src[a + 1]; CLIP[to + m * 3 + 2] = src[a + 2]; m++; }
+    if ((da > 0 && db < 0) || (da < 0 && db > 0)) {
+      const t = da / (da - db);
+      CLIP[to + m * 3] = src[a] + (src[b] - src[a]) * t; CLIP[to + m * 3 + 1] = y; CLIP[to + m * 3 + 2] = src[a + 2] + (src[b + 2] - src[a + 2]) * t; m++;
+    }
+  }
+  return m;
+}
+
+// 가운데 (x, z) · 반지름 r 인 세로 기둥의 높이 y0 ~ y1 에 닿는 삼각형이 있는가(= 그 높이 띠 안의 것 가운데 가운데 줄에서 가로로 r 보다 가까운 것이 있는가).
+//   삼각형을 높이 띠로 자른 다각형(꼭짓점 다섯까지 — 위에서 보면 볼록하다)과 점 (x, z) 의 가로 거리를 잰다: 변까지의 거리가 r 보다 작거나 점이 다각형 안이면 닿은 것.
+//   걷기 격자가 「칸 가운데에서 장애물까지의 거리 ≥ 몸 반지름」을 이것으로 본다(nav.js).
+export function pillarAny(bvh, x, z, y0, y1, r) {
+  const N = bvh.nodes, M = bvh.meta, T = bvh.tri, r2 = r * r;
+  let top = 0;
+  if (T.length) STACK[top++] = 0;
+  while (top) {
+    const id = STACK[--top], o = id * 6;
+    if (x + r < N[o] || x - r > N[o + 3] || y1 < N[o + 1] || y0 > N[o + 4] || z + r < N[o + 2] || z - r > N[o + 5]) continue;
+    const count = M[id * 2 + 1];
+    if (!count) { STACK[top++] = M[id * 2]; STACK[top++] = id + 1; continue; }
+    for (let i = M[id * 2] * 9, e = i + count * 9; i < e; i += 9) {
+      if (Math.max(T[i + 1], T[i + 4], T[i + 7]) < y0 || Math.min(T[i + 1], T[i + 4], T[i + 7]) > y1) continue;
+      const n = clipY(CLIP, 0, clipY(T, i, 3, 0, y0, true), 18, y1, false);
+      let sign = 0, inside = n >= 3;
+      for (let k = 0; k < n; k++) {
+        const a = 18 + k * 3, b = 18 + ((k + 1) % n) * 3, ex = CLIP[b] - CLIP[a], ez = CLIP[b + 2] - CLIP[a + 2], px = x - CLIP[a], pz = z - CLIP[a + 2];
+        const len2 = ex * ex + ez * ez, t = len2 > 0 ? Math.min(1, Math.max(0, (px * ex + pz * ez) / len2)) : 0, dx = px - ex * t, dz = pz - ez * t, turn = ex * pz - ez * px;
+        if (dx * dx + dz * dz < r2) return true;
+        if (turn > 0) { if (sign < 0) inside = false; sign = 1; } else if (turn < 0) { if (sign > 0) inside = false; sign = -1; }
+      }
+      if (inside && sign !== 0) return true;
+    }
   }
   return false;
 }

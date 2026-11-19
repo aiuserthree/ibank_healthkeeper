@@ -1,23 +1,27 @@
 // 굽기(F1b): 결정성(두 번 · 번갈아 · 조각내 · 기준 해시 tests/golden/bake.json) · 시간과 예산(tune 의 bake.budget) · 구운 것의 형식 ·
-// 걷기 격자(해변 · 부두 · 길을 덮고 절벽 면 · 덩이 속 · 깊은 물에는 없다) · 자동 고리 · 닿는 무리 · 엄폐 점 · 구운 빛(처마 밑 · 등불 둘레 · 이음매 · 깨지는 등불) ·
-// 검증 8종(slice1 통과 · 깨진 레시피 8종이 저마다 그 검증에 걸린다 · 문 1.0m 와 계단 1.2m 는 이어진다) · 표식의 높이 규칙. 값을 못 박지 않고 표 · 기준 파일과 견준다.
+// 걷기 격자(해변 · 부두 · 길을 덮고 절벽 면 · 덩이 속 · 깊은 물에는 없다 · 걷는 칸에 몸이 선다) · 자동 고리(층이 둘인 칸에서 바닥을 안 뚫는다) · 닿는 무리 ·
+// 엄폐 점(몸 폭까지 가려진다) · 구운 빛(처마 밑 · 등불 둘레 · 이음매 · 깨지는 등불) · BVH 질의(빈 나무 · 세로 기둥) ·
+// 검증 8종(slice1 통과 · 깨진 레시피 8종이 저마다 그 검증에 걸린다 · 문 1.0m 는 어느 방향으로 돌려도 · 격자에 나란한 0.9m 문 · 계단 1.2m 는 이어진다 · 0.5m 틈은 끊긴다 ·
+// 교전 구역의 엄폐 · 섞여 구워진 등불 · 한쪽이 뜬 소품) · 표식의 높이 규칙. 값을 못 박지 않고 표 · 기준 파일과 견준다.
 // 기준 해시가 바뀌는 것이 맞으면: node tools/bake.mjs <세계> --update-golden (넘겨주기에 까닭을 적는다).
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { generate, genRaw, hashWorld } from '../../src/shared/gen/world.js';
-import { bake, bakeSteps, prepSteps, hashBake, STAGES } from '../../src/shared/bake/index.js';
+import { bake, bakeSteps, prepSteps, hashBake, stageAt, STAGES } from '../../src/shared/bake/index.js';
 import { verify } from '../../src/shared/bake/verify.js';
-import { column, rayHit } from '../../src/shared/bake/bvh.js';
-import { spanAt, spanPos } from '../../src/shared/bake/nav.js';
+import { bvhSteps, column, rayHit, rayAny, sphereAny, pillarAny } from '../../src/shared/bake/bvh.js';
+import { spanAt, spanPos, DX, DZ } from '../../src/shared/bake/nav.js';
 import { VLIGHT, PLIGHT, NO_GROUP } from '../../src/shared/bake/light.js';
 import { PIECES } from '../../src/shared/gen/kit.js';
 import { clone } from '../../src/shared/state.js';
 import { WORLD } from '../../src/shared/tune/world.js';
 import { BAKE } from '../../src/shared/tune/bake.js';
 import { recipe } from '../../src/data/slice1/recipe.js';
+import { cbox, place, xf } from '../../src/shared/geom/shapes.js';
 import { doorWorld } from '../worlds/door.mjs';
+import { shelfWorld } from '../worlds/shelf.mjs';
 
 const TESTS = resolve(dirname(fileURLToPath(import.meta.url)), '..'), GOLDEN = join(TESTS, 'golden', 'bake.json');
 const finish = (it) => { let s = it.next(); while (!s.done) s = it.next(); return s.value; };
@@ -50,11 +54,17 @@ function determinism(t) {
     if (!rb.done) rb = b.next();
   }
   assert.equal(hashBake(strip(ra.value)), hash, '번갈아 구운 것이 혼자 구운 것과 다르다');
-  assert.equal(hashBake(strip(rb.value)), hashBake(bake(other).baked)); assert.notEqual(hashBake(strip(rb.value)), hash, '씨앗이 다른 세계의 굽기 해시가 같다');
+  const otherHash = hashBake(bake(other).baked);
+  assert.equal(hashBake(strip(rb.value)), otherHash); assert.notEqual(otherHash, hash, '씨앗이 다른 세계의 굽기 해시가 같다');
   assert.ok(yields > 40 && stages.every((s) => STAGES.includes(s)) && stages.join() === STAGES.slice(STAGES.indexOf('bvh')).join(), '굽기의 쉬는 자리: ' + yields + ' · ' + stages);
-  // 「생성 → 굽기」 한 번에(워커 러너가 돌리는 것): 같은 세계 · 같은 구운 것 · 해시 둘
-  const prep = finish(prepSteps(recipe));
+  // 「생성 → 굽기」 한 번에(워커 러너가 돌리는 것): 같은 세계 · 같은 구운 것. 해시는 달라고 할 때만 센다(놀이의 준비 길은 세지 않는다 — hash 가 null)
+  const prep = finish(prepSteps(recipe, true)), quiet = finish(prepSteps({ ...recipe, seed: recipe.seed + 1 }));
   assert.deepEqual([prep.hash.world, prep.hash.bake, hashBake(prep.baked)], [before, hash, hash]);
+  assert.equal(quiet.hash, null, '달라고 하지 않았는데 준비 길이 해시를 셌다'); assert.equal(hashBake(quiet.baked), otherHash);
+  // 준비 띠의 진행: 단계마다의 무게(tune 의 bake.progress)가 단계 이름과 짝이 맞고, 찬 정도는 0 에서 1 까지 줄지 않는다
+  const at = STAGES.map((name) => stageAt(name));
+  assert.deepEqual(Object.keys(BAKE.progress), [...STAGES]); assert.deepEqual([at[0], at[at.length - 1], stageAt('없는 단계')], [0, 1, 0]);
+  assert.ok(at.every((v, i) => i === 0 || v >= at[i - 1]) && new Set(at).size >= STAGES.length - 1, '준비 띠의 진행: ' + at);
   const golden = JSON.parse(readFileSync(GOLDEN, 'utf8')), ms = times.sort((x, y) => x - y)[1];
   assert.equal(hash, golden[recipe.id], `굽기 기준 해시와 다르다 — ${recipe.id}: 기준 ${golden[recipe.id]} · 지금 ${hash}. 바뀌는 것이 맞으면 node tools/bake.mjs ${recipe.id} --update-golden`);
   assert.ok(ms <= BAKE.budget.bakeMs, `굽기 ${ms.toFixed(0)}ms — ${BAKE.budget.bakeMs}ms 안이어야 한다`);
@@ -91,10 +101,24 @@ function format() {
     if (!ok || links.from[k] >= ns || links.to[k] >= ns || (kind !== 2 && nav.group[links.from[k]] !== nav.group[links.to[k]])) assert.fail(`고리 ${k}(종류 ${kind} · 높이 ${rise})가 틀리다`);
   }
   assert.ok(baked.stats.vaults > 0 && baked.stats.climbs > 0 && baked.stats.drops > 0 && baked.stats.groups > 1 && baked.stats.links === links.kind.length);
-  // 엄폐 점: 걷는 칸 위 · 막힌 쪽이 있다 · 높은 엄폐는 낮은 엄폐의 부분 · gap 보다 가까운 짝이 없다
-  assert.ok(cover.n >= BAKE.budget.coverMin && cover.pos.length === cover.n * 3, `엄폐 점 ${cover.n}곳 — ${BAKE.budget.coverMin}곳 이상`);
+  // 고리는 몸이 실제로 닿는 층으로만: 떨어지기는 내려설 칸의 머리 위가 떠나는 높이의 머리까지 비었고(사이에 다른 층이 없다), 오르기는 떠나는 칸의 머리 위가 올라설 높이의 머리까지 비었다
+  const tall = Math.ceil(BAKE.nav.height / nav.unit - 1e-4);
+  for (let k = 0; k < links.kind.length; k++) {
+    const a = links.from[k], b = links.to[k];
+    if (links.kind[k] === 2 && nav.ceil[b] < nav.y[a] + tall) assert.fail(`떨어지기 고리 ${k} 이 다른 층을 뚫는다`);
+    if (links.kind[k] === 1 && nav.ceil[a] < nav.y[b] + tall) assert.fail(`오르기 고리 ${k} 의 떠나는 칸 머리 위가 막혔다`);
+  }
+  // 엄폐 점: 걷는 칸 위 · 막힌 쪽이 있다 · 높은 엄폐는 낮은 엄폐의 부분 · gap 보다 가까운 짝이 없다 · 닿는 무리 번호가 실려 있다 · 시작 자리의 닿는 무리 안에 예산만큼 있다
+  const home = spanAt(nav, ...world.marks.spawn.at, 0, BAKE.nav.climb), C = BAKE.cover, p = [0, 0, 0];
+  assert.ok(home >= 0 && baked.stats.home === nav.group[home] && baked.stats.coverHome === cover.group.filter((g) => g === nav.group[home]).length && baked.stats.cover === cover.n);
+  assert.ok(baked.stats.coverHome >= BAKE.budget.coverMin && cover.pos.length === cover.n * 3, `엄폐 점(시작 자리의 닿는 무리 안) ${baked.stats.coverHome}곳 — ${BAKE.budget.coverMin}곳 이상`);
   for (let k = 0; k < cover.n; k++) {
-    assert.ok(cover.span[k] < ns && cover.low[k] > 0 && cover.low[k] < 16 && (cover.high[k] & ~cover.low[k]) === 0, '엄폐 점 ' + k);
+    assert.ok(cover.span[k] < ns && cover.group[k] === nav.group[cover.span[k]] && cover.low[k] > 0 && cover.low[k] < 16 && (cover.high[k] & ~cover.low[k]) === 0, '엄폐 점 ' + k);
+    // 몸 폭까지 가려진다: 막혔다고 적힌 쪽은 옆으로 ±side 비킨 광선도 낮은 · 가운데 높이에서 막힌다(가는 말뚝 · 덩이의 모서리는 엄폐가 아니다)
+    spanPos(nav, cover.span[k], p);
+    for (let d = 0; d < 4; d++) if (cover.low[k] & (1 << d)) for (const o of [-C.side, C.side]) for (const h of [C.low, C.mid]) {
+      if (!rayAny(bvh, p[0] + DZ[d] * o, p[1] + h, p[2] - DX[d] * o, DX[d], 0, DZ[d], C.reach)) assert.fail(`엄폐 점 ${k} 의 ${d} 쪽이 몸 폭까지 가려지지 않는다`);
+    }
     for (let j = 0; j < k; j++) if (Math.hypot(cover.pos[k * 3] - cover.pos[j * 3], cover.pos[k * 3 + 2] - cover.pos[j * 3 + 2]) < BAKE.cover.gap - 1e-6 && Math.abs(cover.pos[k * 3 + 1] - cover.pos[j * 3 + 1]) < BAKE.nav.height) assert.fail(`엄폐 점 ${j} · ${k} 이 너무 가깝다`);
   }
   assert.ok(cover.high.some((h) => h > 0) && cover.high.some((h) => h === 0), '낮은 엄폐 · 높은 엄폐가 다 있어야 한다');
@@ -126,10 +150,26 @@ function walkGrid() {
     if (nav.y[s] < wet) assert.fail('깊은 물속에 걷는 칸이 있다: ' + spanPos(nav, s, p));
     if (s % 23) continue;
     spanPos(nav, s, p);
+    // 같은 높이 · 같은 쪽의 면은 하나로 센다(칸 가운데가 두 삼각형이 같이 쓰는 모서리에 걸치면 수직선이 둘 다 만난다) — 위를 보는 면이 하나라도 더 많으면 덩이 속이다
     let ups = 0, downs = 0;
-    for (let n = column(bvh, p[0], p[2], H), i = 0; i < n; i++) if (H[i * 3] > p[1] + 0.03) { if (H[i * 3 + 1]) ups++; else downs++; }
-    if (ups > downs + 1) assert.fail('덩이 속에 걷는 칸이 있다: ' + p);
+    for (let n = column(bvh, p[0], p[2], H), i = 0; i < n; i++) {
+      if (H[i * 3] <= p[1] + nav.unit / 2) continue;
+      let twin = false;
+      for (let j = 0; j < i && !twin; j++) twin = H[j * 3 + 1] === H[i * 3 + 1] && Math.abs(H[j * 3] - H[i * 3]) < 1e-4;
+      if (!twin) { if (H[i * 3 + 1]) ups++; else downs++; }
+    }
+    if (ups > downs) assert.fail('덩이 속에 걷는 칸이 있다: ' + p);
   }
+  // 걷는 칸에 몸이 선다(가장자리 깎기 = 칸 가운데에서 장애물까지 몸 반지름): 시작 자리의 닿는 무리의 칸 가운데에서 높이 셋 × 여덟 쪽으로 반지름만큼의 광선이 아무것에도 안 맞는다
+  let stood = 0;
+  for (let s = 0; s < nav.y.length; s += 5) {
+    if (nav.group[s] !== nav.group[home]) continue;
+    spanPos(nav, s, p); stood++;
+    for (const h of [N.climb + 0.15, N.height / 2, N.height - 0.15]) for (let d = 0; d < 8; d++) {
+      if (rayAny(bvh, p[0], p[1] + h, p[2], Math.cos(d * Math.PI / 4), 0, Math.sin(d * Math.PI / 4), N.radius)) assert.fail(`걷는 칸 [${p}] 에서 몸(반지름 ${N.radius})이 높이 ${h} 에서 걸린다`);
+    }
+  }
+  assert.ok(stood > 2000, '(시험의 전제) 몸을 세워 본 칸: ' + stood);
   const C = world.collide;
   let steep = 0;
   for (let t = 0; t < C.owner.length && C.owner[t] === 0; t++) {
@@ -178,7 +218,7 @@ function light() {
   const dark = groundVerts(world, (x, y, z) => lamps.every((l) => Math.hypot(x - l.at[0], y - l.at[1], z - l.at[2]) > l.radius + 0.5));
   assert.ok(dark.length > 1000 && lampSum(dark) === 0, '늘 켜진 등불의 반지름 밖에 등불 빛이 구워졌다');
   // 깨지는 등롱은 「늘 켜진 빛」에 없고 제 스위치 묶음으로만 구워진다(늘 켜진 등불에서 먼 등롱으로 본다). 등대(대본 스위치)의 묶음도 어딘가에는 구워진다
-  //   (등대의 등은 난간 바닥에 가려 발치의 땅에는 안 닿는다 — 제 지붕 · 난간에 닿는다).
+  //   (등대의 등은 제 지붕 · 난간에 세게 닿고, 먼 땅에도 아주 약하게 닿는다 — 반지름이 조각 세계를 다 덮는다).
   const breakable = world.lights.filter((x) => x.mode === 'break' && lamps.every((o) => Math.hypot(x.at[0] - o.at[0], x.at[2] - o.at[2]) > o.radius + 3));
   assert.ok(breakable.length > 0, '(시험의 전제) 늘 켜진 등불에서 먼 깨지는 등롱이 있어야 한다');
   for (const l of breakable) {
@@ -215,18 +255,55 @@ async function checks(t) {
   }
   assert.deepEqual(seen.sort(), [1, 2, 3, 4, 5, 6, 7, 8], '깨진 레시피가 검증 여덟을 하나씩 맡아야 한다');
   t.note('깨진 레시피 8종', notes);
-  // 문 1.0m · 폭 1.2m 계단: 마당 · 방 · 지붕이 한 무리로 이어지고 검증 8종을 통과한다. 좁히면 끊기고 그 검증이 잡는다.
+  // 교전 구역의 엄폐(검증 8): 엄폐물이 있는 야영지는 통과하고, 트인 물가의 구역은 걸린다(시작 자리의 닿는 무리 안의 점만 센다 — 구운 것은 그대로 두고 구역만 바꿔 본다)
+  const zoned = (area) => verify({ ...world, zones: [{ area, fight: true }] }, baked, recipe), camp = recipe.kit.find((it) => it.piece === 'crate').at, sp = world.marks.spawn.at;
+  assert.deepEqual(zoned(['circle', camp[0], camp[1], 9]).problems, [], '엄폐물이 있는 교전 구역(야영지)이 걸린다');
+  const bare = zoned(['circle', sp[0], sp[2] + 2, 2.5]);
+  assert.ok(failed(bare).join() === '8' && bare.problems.every((q) => q.code === 'cover'), '엄폐 없는 교전 구역을 못 잡았다: ' + JSON.stringify(bare.counts));
+  // 책갈피도 닿는 무리 안이어야 한다(검증 1): 책갈피 하나를 절벽 위 고원(「떨어진 섬」 레시피가 표식을 두는 자리)에 세우면 걸린다 — 지형은 그대로라 구운 것을 그대로 쓴다
+  const island = await import(pathToFileURL(join(TESTS, 'broken-recipes', 'island.mjs')).href), up = raw(island.recipe).marks.points.supply;
+  const strayed = verify({ ...world, marks: { ...world.marks, stations: [...world.marks.stations, { id: 'far', at: [up[0], up[1] + WORLD.eye, up[2]], yaw: 0, pitch: 0 }] } }, baked, recipe);
+  assert.ok(failed(strayed).join() === '1' && strayed.problems.some((q) => /책갈피 far/.test(q.msg)), '닿지 않는 책갈피를 못 잡았다: ' + JSON.stringify(strayed.problems));
+  // 섞여 구워진 등불(검증 7): 구운 「늘 켜진 빛」의 값 하나를 바꾸면(굽기가 다른 등불을 섞은 꼴) 다시 잰 값과 달라 걸린다
+  const k0 = world.batches.findIndex((b) => b.mat === 'ground'), mixed = { ...baked, vlight: baked.vlight.map((d, k) => (k === k0 ? d.slice() : d)) };
+  mixed.vlight[k0][BAKE.verify.lampCheck * 3 * VLIGHT + 1] ^= 64;
+  const lit = verify(world, mixed, recipe);
+  assert.ok(failed(lit).join() === '7' && lit.problems.some((q) => q.code === 'light' && /섞여/.test(q.msg)), '섞여 구워진 등불을 못 잡았다: ' + JSON.stringify(lit.counts));
+  assert.ok(clean.notes.switchChecked > 1000 && clean.notes.switchOverlap >= 0 && clean.notes.edgeSamples > 100, '검증의 알림: ' + JSON.stringify(clean.notes));
+  // 문과 계단: 마당 · 방 · 지붕이 한 무리로 이어지고 검증 8종을 통과한다. 좁히면 끊기고 그 검증이 잡는다.
   const tryDoor = (...args) => { const w = doorWorld(...args), b = bake(w).baked, g = (p2) => { const k = spanAt(b.nav, p2[0], p2[1], p2[2], 0, BAKE.nav.climb); return k < 0 ? -1 : b.nav.group[k]; }; return { w, b, r: verify(w, b, null), groups: [g(w.marks.spawn.at), g(w.marks.points.room), g(w.marks.points.roof)] }; };
-  const good = tryDoor(1, 1.2), yard = good.groups[0];
-  assert.ok(yard >= 0 && good.groups.every((g) => g === yard), '문 1.0m · 계단 1.2m 세계에서 길이 끊겼다: ' + good.groups);
-  // 문 밑의 걷는 칸: 폭 1.0m 에서 양쪽을 한 칸씩 깎고 남는 칸(둘)이 문턱의 줄마다 있다 — 문이 한쪽으로 치우쳐 좁아지지 않는다
-  const doorCells = good.b.nav.door.filter((d) => d === 1).length, across = Math.round(1 / BAKE.nav.cell) - 2 * BAKE.nav.erode;
-  assert.ok(across >= 2 && doorCells >= 2 * across, `문 밑의 걷는 칸 ${doorCells} — 줄마다 ${across}칸씩 두 줄은 있어야 한다`);
+  const joined = (t) => t.groups[0] >= 0 && t.groups.every((g) => g === t.groups[0]), good = tryDoor(1, 1.2);
+  assert.ok(joined(good), '문 1.0m · 계단 1.2m 세계에서 길이 끊겼다: ' + good.groups);
+  // 문 밑의 걷는 칸: 가운데가 양쪽 문틀에서 몸 반지름 넘게 떨어진 칸(폭 − 2 × 반지름의 띠)이 문턱의 줄마다 있다
+  const doorCells = good.b.nav.door.filter((d) => d === 1).length, across = Math.floor((1 - 2 * BAKE.nav.radius) / BAKE.nav.cell);
+  assert.ok(across >= 1 && doorCells >= 2 * across, `문 밑의 걷는 칸 ${doorCells} — 줄마다 ${across}칸씩 두 줄은 있어야 한다`);
   assert.deepEqual(good.r.problems, [], '문 · 계단 세계가 검증에 걸린다');
-  const narrow = tryDoor(0.6, 1.2), thin = tryDoor(1, 0.5), leaky = tryDoor(1, 1.2, true);
-  assert.ok(narrow.groups[1] !== narrow.groups[0] && failed(narrow.r).join() === '1,2', '0.6m 문: ' + JSON.stringify(narrow.r.counts));
-  assert.ok(thin.groups[2] !== thin.groups[0] && failed(thin.r).join() === '1', '0.5m 계단: ' + JSON.stringify(thin.r.counts));
+  // 1.0m 문은 건물을 어느 방향으로 돌려도 · 격자에서 비낀 자리에서도 이어진다(가장자리 깎기가 칸 수가 아니라 장애물까지의 거리다 — 문틀이 한 칸씩 부풀지 않는다)
+  const SHIFTS = [[0, 0], [0.07, 0.11], [0.125, 0.125], [0.2, 0.06]];
+  for (const turn of [22.5, 30, 45, 60]) for (const [ox, oz] of SHIFTS) {
+    const t = tryDoor(1, 1.2, false, turn, ox, oz);
+    assert.ok(joined(t) && t.r.problems.length === 0, `1.0m 문을 ${turn}° 돌린 건물(옮김 ${ox}, ${oz})에서 길이 끊겼다: ${t.groups} · ${JSON.stringify(t.r.counts)}`);
+  }
+  // 격자에 나란한 0.9m 문(tdd §4-3 의 가장 좁은 문)도 어느 자리에서나 이어진다
+  for (const [ox, oz] of SHIFTS) { const t = tryDoor(0.9, 1.2, false, 0, ox, oz); assert.ok(joined(t) && t.r.problems.length === 0, `0.9m 문(옮김 ${ox}, ${oz})에서 길이 끊겼다: ${t.groups}`); }
+  // 몸(지름 0.6m)이 못 지나가는 0.5m 틈은 어떻게 놓아도 끊기고 검증 1 · 2 가 잡는다. 0.3m 계단도 끊긴다.
+  for (const [turn, ox, oz] of [[0, 0, 0], [0, 0.125, 0.125], [30, 0.07, 0.11], [45, 0, 0]]) {
+    const t = tryDoor(0.5, 1.2, false, turn, ox, oz);
+    assert.ok(t.groups[1] !== t.groups[0] && failed(t.r).join() === '1,2', `0.5m 틈(${turn}° · 옮김 ${ox}, ${oz})이 이어졌다: ` + JSON.stringify(t.r.counts));
+  }
+  const thin = tryDoor(1, 0.3), leaky = tryDoor(1, 1.2, true);
+  assert.ok(thin.groups[2] !== thin.groups[0] && failed(thin.r).join() === '1', '0.3m 계단: ' + JSON.stringify(thin.r.counts));
   assert.equal(failed(leaky.r).join(), '4', '벽이 뚫린 닫힌 구역: ' + JSON.stringify(leaky.r.counts));
+  // 얹는 소품(검증 6): 반듯이 놓인 상자는 통과하고, 한쪽 모서리만 땅에 닿게 기운 상자는 「한쪽이 떴다」로 걸린다(세계의 kit 이름으로 소품을 안다 — 레시피 없이)
+  const withCrate = (soup) => {
+    const w = doorWorld(), old = w.collide.owner.length, pos = Float32Array.from([...w.collide.pos, ...soup]), n = pos.length / 9;
+    w.collide = { pos, idx: Uint32Array.from({ length: n * 3 }, (v, i) => i), surf: new Uint8Array(n), owner: Uint16Array.from({ length: n }, (v, t) => (t < old ? w.collide.owner[t] : 4)) };
+    w.kit = ['wall', 'wall', 'crate'];
+    return verify(w, bake(w).baked, null);
+  };
+  assert.deepEqual(withCrate(place(cbox(1.4, 1.1, 1.4), xf(7, 0.51, 6))).problems, [], '반듯이 놓인 상자가 걸린다');
+  const tipped = withCrate(place(cbox(1.4, 1.1, 1.4), xf(7, 0.7, 6, 0, 0, 0.3)));
+  assert.ok(failed(tipped).join() === '6' && tipped.problems.some((q) => /한쪽/.test(q.msg)), '한쪽이 뜬 상자를 못 잡았다: ' + JSON.stringify(tipped.problems));
   // 뒷면이 보이는 구멍: 방의 북쪽 벽을 뒤집으면(면이 안쪽을 본다) 방 안의 눈높이 광선이 뒷면에 맞는다
   const flipped = doorWorld(1, 1.2), P = flipped.collide.pos;
   for (let v = 0; v < P.length; v += 9) if (Math.max(P[v + 2], P[v + 5], P[v + 8]) <= -2.5 && Math.min(P[v + 2], P[v + 5], P[v + 8]) >= -2.8 && Math.min(P[v + 1], P[v + 4], P[v + 7]) < 2.8) for (let c = 0; c < 3; c++) { const keep = P[v + 3 + c]; P[v + 3 + c] = P[v + 6 + c]; P[v + 6 + c] = keep; }
@@ -234,6 +311,35 @@ async function checks(t) {
   assert.ok(hole.problems.some((p) => p.check === 4 && /뒷/.test(p.msg)), '뒤집힌 벽의 뒷면을 못 봤다: ' + JSON.stringify(hole.counts));
   // (자가 눈이 멀지 않았는가) 광선이 벽을 정말 맞힌다
   assert.ok(rayHit(good.b.bvh, 0, 1.7, 0, 0, 0, -1, 50, { slot: -1, back: false }) < 3);
+}
+
+// 층이 둘인 칸의 자동 고리(단 + 선반): 단에서 선반 쪽으로 난 떨어지기는 전부 선반 위로 간다 — 선반 밑의 땅(바닥을 뚫는 길)으로는 하나도 안 간다.
+//   선반에서는 땅으로 내려갈 수 있다(한 번에 한 층씩).
+function layers() {
+  const w = shelfWorld(), b = bake(w).baked, nav = b.nav, L = b.links, p = [0, 0, 0], q = [0, 0, 0], high = 2.5, shelf = 1.95, near = (y, to) => Math.abs(y - to) < nav.unit * 1.5;
+  assert.ok(high <= BAKE.link.drop, '(시험의 전제) 단의 높이가 떨어지기 한도 안이어야 한다');
+  assert.ok(spanAt(nav, -2, high, 0, 0, 0.2) >= 0 && spanAt(nav, 1.5, shelf, 0, 0, 0.2) >= 0 && spanAt(nav, 1.5, 0, 0, 0, 0.2) >= 0, '(시험의 전제) 단 위 · 선반 위 · 선반 밑 땅에 걷는 칸이 있어야 한다');
+  let toShelf = 0, through = 0, down = 0;
+  for (let k = 0; k < L.kind.length; k++) {
+    if (L.kind[k] !== 2) continue;
+    spanPos(nav, L.from[k], p); spanPos(nav, L.to[k], q);
+    if (near(p[1], high) && q[0] > 0 && q[0] < 3 && Math.abs(q[2]) < 3) { if (near(q[1], shelf)) toShelf++; else through++; }
+    if (near(p[1], shelf) && near(q[1], 0)) down++;
+  }
+  assert.ok(toShelf >= 10 && through === 0 && down >= 10, `단 → 선반 위 ${toShelf} · 단 → 선반 밑 땅(뚫는 고리) ${through} · 선반 → 땅 ${down}`);
+  assert.deepEqual(verify(w, b, null).problems, [], '단 · 선반 세계가 검증에 걸린다');
+}
+
+// BVH 질의의 가장자리: 삼각형이 없는 나무에서 질의가 끝나고 「없다」고 답한다 · 세로 기둥 질의(가로 거리 · 높이 띠 · 점이 면 안)
+function queries() {
+  const hit = { slot: 0, back: true }, out = [], empty = finish(bvhSteps(new Float32Array(0), new Uint32Array(0)));
+  assert.deepEqual([rayAny(empty, 0, 0, 0, 0, 1, 0, 9), rayHit(empty, 0, 0, 0, 0, 1, 0, 9, hit), hit.slot, column(empty, 0, 0, out), sphereAny(empty, 0, 0, 0, 1), pillarAny(empty, 0, 0, 0, 2, 1)], [false, 9, -1, 0, false, false]);
+  // x = 1 에 선 벽(높이 0 ~ 2 · z −1 ~ 1) + 높이 1 의 누운 판(x 3 ~ 5 · z −1 ~ 1)
+  const pos = Float32Array.from([1, 0, -1, 1, 2, -1, 1, 2, 1, 1, 0, -1, 1, 2, 1, 1, 0, 1, 3, 1, -1, 3, 1, 1, 5, 1, 1, 3, 1, -1, 5, 1, 1, 5, 1, -1]);
+  const bvh = finish(bvhSteps(pos, Uint32Array.from({ length: 12 }, (v, i) => i))), r = BAKE.nav.radius, far = (x, z, y0, y1) => pillarAny(bvh, x, z, y0, y1, r);
+  assert.deepEqual([far(1 - r - 0.02, 0, 0.5, 1.5), far(1 - r + 0.02, 0, 0.5, 1.5), far(1 + r - 0.02, 0, 0.5, 1.5), far(1 + r + 0.02, 0, 0.5, 1.5)], [false, true, true, false], '벽까지의 가로 거리');
+  assert.deepEqual([far(0.9, 0, 2.1, 3), far(0.9, 0, -1, -0.1), far(0.9, 0, 1.9, 3), far(0.9, 1 + r + 0.05, 0.5, 1.5), far(0.9, 1 + r - 0.05, 0.5, 1.5)], [false, false, true, false, true], '높이 띠 · 벽의 끝');
+  assert.deepEqual([far(4, 0, 0.5, 1.5), far(4, 0, 1.1, 1.5), far(4, 0, 0.2, 0.9), far(5 + r + 0.02, 0, 0.5, 1.5), far(5 + r - 0.02, 0, 0.5, 1.5)], [true, false, false, false, true], '누운 판(점이 면 안 · 띠 밖 · 가장자리)');
 }
 
 // 표식의 높이 규칙 하나: 설 수 있는 가장 낮은 바닥(끝에 'top' 이면 가장 높은 바닥) — 설 바닥이 없으면 민 뒤의 땅에 두고 검증이 잡는다
@@ -249,9 +355,11 @@ function markHeights() {
 
 export const tests = [
   { name: '굽기: 결정성(두 번 · 번갈아 · 생성 → 굽기 한 번에) · 기준 해시 · 시간 · 해시가 덮는 범위', tags: ['gate', 'bake', 'determinism'], run: determinism },
-  { name: '구운 것의 꼴: BVH · 걷기 격자의 이웃 · 자동 고리 · 닿는 무리 · 엄폐 점 25곳 이상 · 빛의 길이', tags: ['gate', 'bake'], run: format },
-  { name: '걷기 격자: 해변 · 부두 · 길을 덮고 깊은 물 · 덩이 속 · 절벽 면에는 없다 · 돌려 넣은 키트까지 덮는다', tags: ['gate', 'bake'], run: walkGrid },
+  { name: '구운 것의 꼴: BVH · 걷기 격자의 이웃 · 자동 고리(다른 층을 안 뚫는다) · 닿는 무리 · 엄폐 점(닿는 무리 안 25곳 이상 · 몸 폭까지 가려진다) · 빛의 길이', tags: ['gate', 'bake'], run: format },
+  { name: '걷기 격자: 해변 · 부두 · 길을 덮고 깊은 물 · 덩이 속 · 절벽 면에는 없다 · 걷는 칸에 몸이 선다 · 돌려 넣은 키트까지 덮는다', tags: ['gate', 'bake'], run: walkGrid },
   { name: '구운 빛: 처마 밑이 어둡다 · 등불 둘레가 밝다 · 깨지는 등불은 스위치 묶음으로만 · 이음매 · 인스턴스와 빛 격자', tags: ['gate', 'bake'], run: light },
-  { name: '검증 8종: slice1 통과 · 깨진 레시피 8종이 저마다 걸린다 · 문 1.0m 와 계단 1.2m 는 이어진다 · 뒷면이 보이는 구멍', tags: ['gate', 'bake'], run: checks },
+  { name: '검증 8종: slice1 통과 · 깨진 레시피 8종이 저마다 걸린다 · 교전 구역의 엄폐 · 섞인 등불 · 문 1.0m(돌려도) · 0.9m · 계단 1.2m 는 이어지고 0.5m 틈은 끊긴다 · 뜬 소품 · 뒷면', tags: ['gate', 'bake'], run: checks },
+  { name: '자동 고리: 층이 둘인 칸(단 + 선반)에서 떨어지기가 바닥을 뚫지 않는다', tags: ['gate', 'bake'], run: layers },
+  { name: 'BVH 질의: 삼각형이 없는 나무에서 끝난다 · 세로 기둥(가로 거리 · 높이 띠)', tags: ['gate', 'bake'], run: queries },
   { name: '표식의 높이: 설 수 있는 가장 낮은 바닥 · top · 문 표식', tags: ['gate', 'bake', 'world'], run: markHeights },
 ];

@@ -1,5 +1,6 @@
 // 주는 것: 구운 빛 — lightSetup(세계 → 굽기에 쓸 등불 · 해 · 광선 방향) · vertexLightSteps(꼭짓점 빛 v1 — 묶음마다 Uint8 ×7 · function*) · probeLight(한 점의 빛 5바이트) ·
-//   lightGrid(빛 격자 2m) · pointLights(인스턴스 · 과녁 조각의 빛 5바이트) · lampBytes(늘 켜진 등불의 RGB 만) + 형식의 상수 VLIGHT(7) · PLIGHT(5) · NO_GROUP(255).
+//   lightGrid(빛 격자 2m) · pointLightSteps(인스턴스 · 과녁 조각의 빛 5바이트 · function*) · lampBytes(늘 켜진 등불의 RGB 만) · switchSums(스위치 묶음마다의 세기 —
+//   굽기와 검증이 같이 쓴다) + 형식의 상수 VLIGHT(7) · PLIGHT(5) · NO_GROUP(255).
 // 받는 것: bvh(광선) · nav(빛 격자의 높이) · noise · dmath · tune/bake.light · tune/world.lit(스위치 묶음 수). 재질 · 하늘은 모른다(F2a) — 여기서 굽는 것은 「얼마나 가려졌는가」와 등불의 색뿐이다.
 // 꼭짓점 빛 v1(꼭짓점마다 7바이트 — 재질이 읽는 법):
 //   [0] 하늘 열림: 법선 둘레 반구 광선(rays 개 · 코사인 분포) 가운데 하늘로 빠져나간 비율 × 255(바닥 값 floor). 하늘빛 × 이 값.
@@ -76,6 +77,15 @@ function skyOpen(S, ox, oy, oz, nx, ny, nz) {
   return open / (D.length / 3);
 }
 
+// 스위치 묶음(늘 켜진 것이 아닌 등불): 묶음마다 세기를 더해 S.sum 에 두고, 가장 큰 묶음의 번호를 돌려준다(동률이면 번호가 작은 쪽 · 닿는 것이 없으면 −1)
+export function switchSums(S, ox, oy, oz, nx, ny, nz) {
+  let best = -1;
+  S.sum.fill(0);
+  for (const l of S.other) S.sum[l.group] += lamp(S, l, ox, oy, oz, nx, ny, nz, 0);
+  for (let g = 0; g < S.sum.length; g++) if (S.sum[g] > 0 && (best < 0 || S.sum[g] > S.sum[best])) best = g;
+  return best;
+}
+
 export function* vertexLightSteps(world, S) {
   const L = BAKE.light, out = [], floor = Math.round(L.floor * 255);
   let work = 0;
@@ -86,13 +96,9 @@ export function* vertexLightSteps(world, S) {
       data[at] = Math.max(floor, Math.round(skyOpen(S, ox, oy, oz, nx, ny, nz) * 255));
       lampBytes(S, data, at, ox, oy, oz, nx, ny, nz, 0);
       data[at + 4] = rayAny(S.bvh, ox, oy, oz, S.sun[0], S.sun[1], S.sun[2], S.far) ? 0 : 255;
-      // 스위치 묶음: 묶음마다 세기를 더해 가장 큰 묶음 하나(동률이면 번호가 작은 쪽)
-      let best = -1;
-      S.sum.fill(0);
-      for (const l of S.other) S.sum[l.group] += lamp(S, l, ox, oy, oz, nx, ny, nz, 0);
-      for (let g = 0; g < S.sum.length; g++) if (S.sum[g] > 0 && (best < 0 || S.sum[g] > S.sum[best])) best = g;
+      const best = switchSums(S, ox, oy, oz, nx, ny, nz);
       data[at + 5] = best < 0 ? NO_GROUP : best; data[at + 6] = best < 0 ? 0 : Math.max(1, pack(S.sum[best] * L.lampGain));
-      if (++work === 512) { work = 0; yield; }
+      if (++work === 256) { work = 0; yield; }
     }
     out.push(data);
   }
@@ -144,14 +150,18 @@ export function* lightGrid(world, nav, S) {
   return { cell: L.grid, nx, nz, x0: nav.x0, z0: nav.z0, start, y: Float32Array.from(ys), data: Uint8Array.from(data) };
 }
 
-// 인스턴스 줄마다(원형 좌표 높이 instUp × 크기 위의 점) · 과녁 조각마다(과녁의 가운데)의 빛 5바이트
-export function pointLights(world, S) {
-  const up = BAKE.light.instUp, inst = world.instances.map((g) => {
+// 인스턴스 줄마다(원형 좌표 높이 instUp × 크기 위의 점) · 과녁 조각마다(과녁의 가운데)의 빛 5바이트. 탐침 256개마다 쉰다.
+export function* pointLightSteps(world, S) {
+  const up = BAKE.light.instUp, inst = [], props = new Uint8Array(world.props.length * PLIGHT);
+  let work = 0;
+  for (const g of world.instances) {
     const n = g.xf.length / 8, data = new Uint8Array(n * PLIGHT);
-    for (let i = 0; i < n; i++) probeLight(S, g.xf[i * 8], g.xf[i * 8 + 1] + up * g.xf[i * 8 + 7] + BAKE.light.bias, g.xf[i * 8 + 2], data, i * PLIGHT);
-    return data;
-  });
-  const props = new Uint8Array(world.props.length * PLIGHT);
-  world.marks.targets.forEach((t) => probeLight(S, t.at[0], t.at[1], t.at[2], props, t.prop * PLIGHT));
+    for (let i = 0; i < n; i++) {
+      probeLight(S, g.xf[i * 8], g.xf[i * 8 + 1] + up * g.xf[i * 8 + 7] + BAKE.light.bias, g.xf[i * 8 + 2], data, i * PLIGHT);
+      if (++work === 256) { work = 0; yield; }
+    }
+    inst.push(data);
+  }
+  for (const t of world.marks.targets) probeLight(S, t.at[0], t.at[1], t.at[2], props, t.prop * PLIGHT);
   return { inst, props };
 }

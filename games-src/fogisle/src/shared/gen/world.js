@@ -7,6 +7,7 @@
 //   protos[] · instances[]  인스턴스 원형(제 좌표의 형상 + tint)과 줄(xf: Float32 ×8 — rocks.js 머리 주석) · props[]  따로 그리는 조각(과녁): { piece, at, yaw, lean, parts[](재질 · 색조마다 하나) }
 //   collide    충돌 삼각형: { pos, idx, surf(삼각형마다 표면 종류 번호 — world.surf 의 이름 차례), owner(삼각형마다 임자: 0 지형 · 1 바위 · 2 + k = kit[k]) } —
 //              그림에서 나온다(잔 소품 · 0.8m 아래 바위는 뺀다)
+//   kit[]      조각 이름(레시피의 kit 차례 — collide.owner 의 2 + k 가 가리키는 조각이 무엇인지: 검증이 「얹는 소품」을 가를 때 읽는다)
 //   lights[]   등불: { at, color, radius, mode: 'on' | 'switch' | 'break', group(묶음 번호 · 늘 켜짐은 −1), piece }
 //   marks      { spawn: { at, yaw }, stations[{ id, at, yaw, pitch }](책갈피 — 눈 자리 · 라디안), targets[{ kind, at, prop, light }], points{ 이름: [x, y, z] },
 //                doors[{ id, at, yaw, width }](문 표식 — 검증이 「양쪽을 잇는 길이 이 문을 지나는가」를 보고, 걷기 격자가 그 밑의 칸에 문 번호를 적는다) }
@@ -14,6 +15,7 @@
 //              stats(삼각형 · 꼭짓점 · 인스턴스 수 · rocksMoved 땅에 맞추느라 옮긴 바위 · rocksSteep 가파른 면이라 버린 바위 · rocksDropped 못 맞춰 버린 바위 ·
 //              propParts 과녁 조각의 부분 수)
 // 높이 잡기: 바위 · 조각 · 돌담의 돌 · 낱 등불은 「민 뒤의 땅」(build.js 의 landAt — 그리는 지형 · 충돌과 같은 면), on: 'top' 조각은 「그 자리에서 가장 높은 충돌 면」(topAt).
+//   땅에 얹는 소품(상자 · 드럼통 · 고무보트)은 발자국 끝 넷과 가운데의 땅 높이로 땅의 기울기대로 기울여, 밑바닥이 어디서도 뜨지 않게 앉힌다(restFrame).
 //   표식(시작 자리 · 책갈피 · points · 문)은 전부 「설 수 있는 가장 낮은 바닥」(floorAt — 탑 발치면 땅, 지붕 밑이면 방바닥)에 선다. 레시피의 표식 끝에 'top' 을 적으면
 //   가장 높은 바닥이다(부두 위 — 밑의 얕은 물이 아니라). 설 바닥이 없으면 민 뒤의 땅에 두고,
 //   그런 표식은 굽기 검증(shared/bake/verify.js 의 「벽 속 표식」)이 잡는다.
@@ -22,6 +24,7 @@ import { PI, dsin, dcos } from '../dmath.js';
 import { makeRng, seedFrom } from '../rng.js';
 import { hashState, clone } from '../state.js';
 import { xf } from '../geom/shapes.js';
+import { clamp } from '../geom/noise.js';
 import { checkRecipe } from './recipe.js';
 import { makeTerrain, applyOp, meshTerrain } from './terrain.js';
 import { rockProtos, scatterRocks } from './rocks.js';
@@ -30,7 +33,7 @@ import { makeBuild, addMesh, addSolid, mergeParts, topAt, landAt, floorAt, SURF 
 import { WORLD } from '../tune/world.js';
 import { BAKE } from '../tune/bake.js';
 
-export const WORLD_VERSION = 3;
+export const WORLD_VERSION = 4;
 const DEG = PI / 180;
 
 // 지형 삼각형의 표면 종류(발소리 · 착탄이 읽는다) — 첫 꼭짓점 k 의 가파름과 지형 겹으로: 가파르면 바위 · 자갈 겹이 짙으면 자갈(젖었으면 젖은 자갈) · 풀 겹이 짙으면 풀
@@ -79,6 +82,20 @@ function keepOut(recipe) {
   return out;
 }
 
+// 땅에 얹는 소품의 틀(3 × 4): 발자국(제 좌표의 ±hx · ±hz)의 앞뒤 · 좌우 끝에서 민 뒤의 땅 높이를 재어 땅의 기울기대로 기울이고(kit.looseSlope 까지),
+//   그 넷과 가운데 어디에서도 밑바닥이 땅 위로 뜨지 않는 높이에 둔다(뜨는 쪽이 아니라 조금 묻히는 쪽으로 — 비탈에 수평으로 떠 있지 않게).
+//   축: Z = 앞(제 +z — 기울기 gz) · X = 옆(기울기 gx) · Y = Z × X(위). X 는 Y × Z 로 다시 잡아 셋이 서로 수직이다.
+function restFrame(G, x, z, yaw, foot, up) {
+  const s = dsin(yaw), c = dcos(yaw), hx = foot[0], hz = foot[1], max = WORLD.kit.looseSlope, land = (dx, dz) => landAt(G.B, G.T, x + dx, z + dz);
+  const hF = land(s * hz, c * hz), hB = land(-s * hz, -c * hz), hR = land(c * hx, -s * hx), hL = land(-c * hx, s * hx);
+  const gz = clamp((hF - hB) / (2 * hz), -max, max), gx = clamp((hR - hL) / (2 * hx), -max, max);
+  const y = Math.min(hF - gz * hz, hB + gz * hz, hR - gx * hx, hL + gx * hx, land(0, 0)) + up, zl = Math.sqrt(1 + gz * gz), zx = s / zl, zy = gz / zl, zz = c / zl;
+  let yx = zy * -s - zz * gx, yy = zz * c - zx * -s, yz = zx * gx - zy * c;
+  const yl = Math.sqrt(yx * yx + yy * yy + yz * yz);
+  yx /= yl; yy /= yl; yz /= yl;
+  return [yy * zz - yz * zy, yx, zx, x, yz * zx - yx * zz, yy, zy, y, yx * zy - yy * zx, yz, zz, z];
+}
+
 // 조각 하나를 놓는다. 난수 · 잡음의 씨앗은 조각 이름 + 자리(선 조각은 첫 점)에서 뽑는다 — 레시피의 앞이든 뒤든 다른 조각을 끼워도 이 조각의 생김새는 그대로다.
 function placePiece(G, it, owner) {
   const def = PIECES[it.piece], spot = def.line ? it.line[0] : it.at, seed = seedFrom(G.salt, 'kit:' + it.piece + ':' + spot[0] + ',' + spot[1]);
@@ -87,7 +104,7 @@ function placePiece(G, it, owner) {
   // 놓는 높이: 해수면(부두 · 부표) · 밑에 있는 것 위(on: 'top' — 먼저 놓인 충돌 면) · 그 밖에는 민 뒤의 땅
   const x = it.at[0], z = it.at[1], top = it.on === 'top' ? topAt(G.B, x, z) : null;
   const y = (def.sea ? G.recipe.sea : top !== null ? top : landAt(G.B, G.T, x, z)) + (it.up || 0), yaw = (it.rot || 0) * DEG, lean = (it.lean || 0) * DEG;
-  K.frame = xf(x, y, z, 0, yaw, lean);
+  K.frame = def.loose && top === null ? restFrame(G, x, z, yaw, def.foot(it), it.up || 0) : xf(x, y, z, 0, yaw, lean);
   if (it.target) K.prop = { piece: it.piece, at: [x, y, z], yaw, lean, parts: [] };
   def.make(K, it);
   if (!K.prop) return;
@@ -136,7 +153,7 @@ function finish(G) {
   };
   const world = {
     v: WORLD_VERSION, id: recipe.id, seed: recipe.seed, size: recipe.size.slice(), origin: [T.x0, T.z0], sea: recipe.sea, sky: recipe.sky || '', cell: WORLD.cell,
-    grid: { nx: T.nx, nz: T.nz, h: Float32Array.from(T.h) }, surf: SURF.slice(), batches, protos, instances, props: G.props, collide, lights: G.lights,
+    grid: { nx: T.nx, nz: T.nz, h: Float32Array.from(T.h) }, surf: SURF.slice(), batches, protos, instances, props: G.props, collide, kit: recipe.kit.map((it) => it.piece), lights: G.lights,
     marks, zones: clone(recipe.zones || []), stats,
   };
   const broken = firstBad(world);

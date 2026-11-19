@@ -15,7 +15,7 @@ import { heightAt } from './terrain.js';
 import { WORLD } from '../tune/world.js';
 import { BAKE } from '../tune/bake.js';
 
-export const SURF = Object.freeze(['rock', 'gravel', 'wet', 'turf', 'wood', 'iron', 'stone', 'glass']);
+export const SURF = Object.freeze(['rock', 'gravel', 'wet', 'turf', 'wood', 'iron', 'stone', 'glass', 'rubber', 'rope']);
 // 삼각형의 모서리에 꼭 걸친 자리를 놓치지 않게 두는 틈(무게 중심 좌표)
 const EDGE = 1e-9;
 

@@ -3,6 +3,7 @@
 //     · gen(세계) · genJob(세계) 주 스레드 · 워커 러너로 생성 · bake(세계) · bakeJob(세계) 주 스레드 · 워커 러너로 「생성 → 굽기」 · view(세계, 카메라, 색, 얹을 것) 세계 뷰어(dev/viewer.js)
 //   손대기(그 뒤로는 「시험 판」 — 판 신호를 보내지 않는다): hold(on) · step(n) · bot(kind) · snapshot() · restore() · tune(path, value)
 // 받는 것: app(CTX · 고리 · 워커 러너) · bot · sim · shared. station · mask · gl 같은 문은 그것이 처음 필요한 단계가 더한다(build-plan 부록 A).
+// 읽기에 더: prepHash() = 타이틀의 준비가 만든 세계 · 구운 것을 주 창에서 다시 센 해시(주소 ?bakehash=1 이면 워커가 센 값도 __fg_status.world.hash · bake 에 있다).
 // state().events 는 「지금 나무를 step() 으로 민 동안」 나온 사건의 해시다(bot/run.js 의 runHash 뒤쪽과 같은 셈법 — 나무가 바뀌면 새로 세고,
 //   밀기 전에 통에 있던 사건(복원의 restored 따위)은 기록에만 남기고 해시에는 넣지 않는다).
 import { CTX } from '../app/ctx.js';
@@ -16,7 +17,7 @@ import { EVENTS, EV_NAMES, EV_FIELDS, clearEvents, hashEvents } from '../shared/
 import { hashNew, hashHex } from '../shared/hash.js';
 import { tuneGet, tuneSet } from '../shared/tune/index.js';
 import { APP } from '../shared/tune/app.js';
-import { worldInfo, worldJob, worldView, bakeInfo, bakeJob } from './viewer.js';
+import { worldInfo, worldJob, worldView, bakeInfo, bakeJob, prepHash } from './viewer.js';
 
 const BOTS = Object.freeze({ probe: probeBot });
 const D = { ring: [], eh: hashNew(), of: null, snap: null };
@@ -69,7 +70,7 @@ const fg = {
   perf() { return { ...CTX.perf }; },
   simHash(seed, steps) { const run = makeRun(seed, probeBot); advance(run, steps); return runHash(run); },
   probeHash(seed, steps) { return runAll(probeRun(seed, steps)).hash; },
-  gen: worldInfo, genJob: worldJob, bake: bakeInfo, bakeJob, view: worldView,
+  gen: worldInfo, genJob: worldJob, bake: bakeInfo, bakeJob, prepHash, view: worldView,
   // fn = shared/probe.js 가 내보낸 함수 이름(없는 이름을 주면 워커 러너의 거절 길을 탄다)
   worker(seed, steps, fn = 'probeRun') {
     return runJob('shared/probe.js', fn, [seed, steps]).then((r) => ({ where: r.where, slices: r.slices, moved: r.moved, hash: r.value.hash, pos: Array.from(r.value.pos), kind: r.value.pos.constructor.name }));

@@ -34,8 +34,8 @@ export const WORLD = {
     kidChance: 0.55, kids: 3, kidSpread: 1.1, kidLo: 0.35, kidHi: 1.3, biteMin: 0.08, showMin: 0.1, settleMax: 0.5, settlePad: 0.02, settleTries: 2,
   },
   band: { foot: { near: -1.5, far: 7 }, shore: { near: 14, far: 27 }, surf: { near: 25, far: 38 }, face: { near: -11, far: -1.5 }, top: { near: -30, far: -14 } },
-  // beaconRadius = 등대의 빛 반지름 · lanternLight = 등롱의 빛 반지름(× lightRadius)
-  kit: { maxEdge: 1.25, embed: 0.35, clear: 1.2, lightRadius: 12, beaconRadius: 80, lanternLight: 0.6 },
+  // beaconRadius = 등대의 빛 반지름 · lanternLight = 등롱의 빛 반지름(× lightRadius) · looseSlope = 얹는 소품을 땅의 기울기대로 기울이는 끝(기울기 = 높이 / 거리 — 더 가파르면 여기까지만 기울이고 낮은 쪽에 맞춰 묻는다)
+  kit: { maxEdge: 1.25, embed: 0.35, clear: 1.2, lightRadius: 12, beaconRadius: 80, lanternLight: 0.6, looseSlope: 0.3 },
   // 등불의 스위치 묶음(tdd §4-5): 번호는 0 ~ groups − 1, 대본 스위치는 script 묶음까지 · 깨지는 등불은 breakable 묶음까지
   lit: { groups: 8, script: 4, breakable: 4 },
   // 레시피의 수 칸이 들 수 있는 범위 [작은, 큰](검사 code 'range') — 생성이 끝나지 않거나 터지는 값을 막는 울타리다. 조각마다의 치수는 kit.js 의 PIECES.opt.

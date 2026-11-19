@@ -169,7 +169,7 @@ function rope(K, it) {
       put(K, 'wood', place(lathe([[0, -WORLD.kit.embed], [0.075, -WORLD.kit.embed], [0.06, 0.97], [0, 0.99]], 6), xf(x, y, z, jitter(K, 0.08), 0, jitter(K, 0.08))), C.woodDark, { solid: 'wood' });
       if (prev) {
         const sag = Array.from({ length: 7 }, (v, i) => [prev[0] + (head[0] - prev[0]) * i / 6, prev[1] + (head[1] - prev[1]) * i / 6 - dsin(PI * i / 6) * 0.2, prev[2] + (head[2] - prev[2]) * i / 6]);
-        put(K, 'hemp', sweep(sag, 0.018, 4), C.hemp, { solid: 'wood' });
+        put(K, 'hemp', sweep(sag, 0.018, 4), C.hemp, { solid: 'rope' });
       }
       prev = head;
     }
@@ -188,18 +188,19 @@ function drum(K) {
   put(K, 'iron', lathe(side, 14), C.copperLow, { solid: 'iron' });
 }
 
-// 고무보트: 뱃머리가 +z. 굽은 공기 관 하나(뱃머리로 갈수록 살짝 들린다) + 바닥판 + 고물 판
+// 고무보트: 뱃머리가 +z. 굽은 공기 관 하나(뱃머리로 갈수록 살짝 들린다) + 바닥판 + 고물 판. 관의 밑이 놓인 자리보다 4cm 아래다(상자 · 드럼통처럼 땅에 살짝 앉는다).
 function boat(K) {
-  const tube = [], side = (t, e) => [e * 0.78 * Math.min(1, 1.65 - 1.65 * t * t), 0.3 + 0.16 * t * t * t, -1.5 + 3.3 * t];
+  const tube = [], side = (t, e) => [e * 0.78 * Math.min(1, 1.65 - 1.65 * t * t), 0.22 + 0.16 * t * t * t, -1.5 + 3.3 * t];
   for (let i = 0; i <= 8; i++) tube.push(side(i / 8, -1));
   for (let i = 7; i >= 0; i--) tube.push(side(i / 8, 1));
-  put(K, 'rubber', sweep(tube, 0.26, 8), C.rubber, { solid: 'wood' });
-  put(K, 'rubber', place(cbox(1.5, 0.06, 2.9, 0.02), xf(0, 0.12, -0.1)), C.rubber, { solid: 'wood' });
-  put(K, 'wood', place(cbox(1.5, 0.5, 0.08, 0.02), xf(0, 0.36, -1.5)), C.woodDark);
+  put(K, 'rubber', sweep(tube, 0.26, 8), C.rubber, { solid: 'rubber' });
+  put(K, 'rubber', place(cbox(1.5, 0.06, 2.9, 0.02), xf(0, 0.04, -0.1)), C.rubber, { solid: 'rubber' });
+  put(K, 'wood', place(cbox(1.5, 0.5, 0.08, 0.02), xf(0, 0.28, -1.5)), C.woodDark, { solid: 'wood' });
 }
 
 // lamp = 등불이 달렸다(lit 필수) · line = 자리 대신 선(line)을 받는다 · sea = 해수면에 놓는다 · clear = 바위를 비워 둘 반지름 ·
-//   loose = 땅에 얹는 소품이다(박지 않는다 — 검증 「맞닿은 조각」은 얹는 소품이 떠 있는지만 본다) ·
+//   loose = 땅에 얹는 소품이다(박지 않는다 — 땅의 기울기대로 기울여 앉힌다(world.js 의 restFrame). 검증 「맞닿은 조각」은 얹는 소품이 떠 있는지 · 한쪽이 떴는지를 본다) ·
+//   foot = 얹는 소품의 발자국(제 좌표의 반 폭 [x, z] — 그 끝에서 땅 높이를 재어 앉힌다) ·
 //   reach = 제 +z 쪽으로 뻗는 길이를 적는 칸 이름 · aim = 과녁의 가운데 높이(이것이 있는 조각만 과녁이 될 수 있다) ·
 //   opt = 레시피에 적을 수 있는 치수: 이름 → [기본값, 작은, 큰](m) — 기본값은 여기 한 곳에만 있다(만드는 함수 · 바위 비움 · 레시피 검사가 같이 읽는다)
 export const PIECES = Object.freeze({
@@ -207,8 +208,9 @@ export const PIECES = Object.freeze({
   lantern: { make: lantern, lamp: true, clear: 0.6, aim: 0.17, opt: {} }, wall: { make: wall, line: true, clear: 0.9, opt: { height: [1.1, 0.3, 3], width: [0.55, 0.2, 2] } },
   pier: { make: pier, sea: true, clear: 2.4, reach: 'length', opt: { length: [16, 2, 80], width: [2.6, 1, 6], deck: [1.3, 0.3, 4] } },
   bottle: { make: bottle, clear: 0.4, aim: 0.15, opt: {} }, buoy: { make: buoy, sea: true, clear: 0.9, aim: 0.5, opt: {} },
-  rope: { make: rope, line: true, clear: 0.6, opt: {} }, crate: { make: crate, loose: true, clear: 1, opt: { size: [1, 0.5, 2] } }, drum: { make: drum, loose: true, clear: 0.6, opt: {} },
-  boat: { make: boat, loose: true, clear: 2.2, opt: {} },
+  rope: { make: rope, line: true, clear: 0.6, opt: {} },
+  crate: { make: crate, loose: true, foot: (it) => [optOf(it, 'size') / 2, optOf(it, 'size') / 2], clear: 1, opt: { size: [1, 0.5, 2] } },
+  drum: { make: drum, loose: true, foot: () => [0.3, 0.3], clear: 0.6, opt: {} }, boat: { make: boat, loose: true, foot: () => [0.78, 1.5], clear: 2.2, opt: {} },
 });
 
 // 조각의 치수 하나: 레시피에 적혀 있으면 그 값, 아니면 PIECES 의 기본값. 범위 밖 · 수가 아닌 값은 여기서 예외다(검사를 안 거친 레시피가 길이로 도는 고리를 끝없이 돌리지 않게).

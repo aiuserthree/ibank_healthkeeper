@@ -1,7 +1,9 @@
 // 주는 것: 세계 뷰어(개발판 전용) — worldInfo(주 스레드에서 생성: 해시 · 시간 · 수) · worldJob(워커 러너로 생성) · bakeInfo(주 스레드에서 「생성 → 굽기」: 해시 둘 ·
-//   시간 · 수) · bakeJob(워커 러너로 「생성 → 굽기」: 해시 · 벽시계 · 받은 단계 이름) · worldView(이름, 카메라, 색, 얹을 것) → 제 캔버스에 그리고 { tris, calls … } 를 돌려준다.
+//   시간 · 수) · bakeJob(워커 러너로 「생성 → 굽기」: 해시 · 벽시계 · 받은 단계 이름) · prepHash(타이틀의 준비가 만든 것의 해시) ·
+//   worldView(이름, 카메라, 색, 얹을 것) → 제 캔버스에 그리고 { tris, calls … } 를 돌려준다.
 //   주소 ?show=world[&world=slice1][&view=…][&tint=…][&over=nav] 로도 연다. 세계는 이름(개발판에 묶인 레시피) 또는 레시피 객체(하네스가 시험 레시피를 넘길 때).
-// 받는 것: shared/gen(생성) · shared/bake(굽기) · data(레시피) · app/worker(runJob) · tune · 전역 THREE. 게임의 캔버스(app/stage)는 건드리지 않고 그 위에 제 캔버스를 덮는다.
+// 받는 것: shared/gen(생성) · shared/bake(굽기) · data(레시피) · app/worker(runJob) · app/ctx · tune · 전역 THREE. 게임의 캔버스(app/stage)는 건드리지 않고 그 위에 제 캔버스를 덮는다.
+//   해시는 전부 **주 창에서 받은 배열을 다시 센 값**이다(워커가 세어 보낸 값이 아니다 — 워커가 보내는 길에서 값이 바뀌어도 잡힌다). 시간(ms)에는 해시 셈이 안 든다.
 //   카메라: 'top'(위 — 북쪽이 위) · 'side'(바다 쪽 비스듬한 위) · 'eye'(시작 자리의 눈높이) · 책갈피 이름 · 'at:x,y,z,요(도),피치(도)'
 //   색: 'gray'(회색 음영 = 색조의 밝기 × 얼룩 × 틈 그늘) · 'axis'(주된 입힘 축: x 빨강 · y 초록 · z 파랑) · 'color'(색조 × 얼룩)
 //       'baked'(구운 빛만 입힌 회색 — 하늘 열림 + 해 가림 + 늘 켜진 등불. 조명 · 그림자 없이 구운 값만 본다) · 'lamps'(하늘빛을 낮추고 등불과 스위치 묶음을 다 켠 것)
@@ -9,9 +11,10 @@
 //       엄폐 점(낮은 엄폐 자주 · 높은 엄폐 보라 — 막대 끝의 가지가 막힌 쪽) · 표식(시작 자리 풀빛 · 책갈피 파랑 · 그 밖 흰빛 막대)
 // 재질 · 하늘은 여기 없다(F2a). 'gray' 계열은 형상을 읽으려고 해 하나 · 하늘빛 · 그림자 · 옅은 거리 안개 · 납작한 물을 두고, 구운 빛 계열은 꼭짓점 색만 그린다.
 import { generate, hashWorld } from '../shared/gen/world.js';
-import { bake, prepSteps } from '../shared/bake/index.js';
+import { bake, prepSteps, hashBake } from '../shared/bake/index.js';
 import { spanAt, spanPos, DX, DZ } from '../shared/bake/nav.js';
 import { runJob } from '../app/worker.js';
+import { CTX } from '../app/ctx.js';
 import { recipe as slice1 } from '../data/slice1/recipe.js';
 import { WORLD } from '../shared/tune/world.js';
 import { BAKE } from '../shared/tune/bake.js';
@@ -35,20 +38,28 @@ export function worldJob(name) {
   return runJob('shared/gen/world.js', 'genSteps', [recipeOf(name)]).then((r) => ({ where: r.where, moved: r.moved, hash: hashWorld(r.value), stats: r.value.stats }));
 }
 
-// 주 스레드에서 한 번에 「생성 → 굽기」(해시까지) — ms = 전부 · genMs = 굽기가 시작되기 전까지
+const hashes = (v) => ({ world: hashWorld(v.world), bake: hashBake(v.baked) });
+
+// 주 스레드에서 한 번에 「생성 → 굽기」 — ms = 전부(해시 셈은 빼고) · genMs = 굽기가 시작되기 전까지
 export function bakeInfo(name) {
   const t0 = performance.now(), it = prepSteps(recipeOf(name));
   let s = it.next(), genMs = 0;
   while (!s.done) { if (s.value === 'bvh') genMs = performance.now() - t0; s = it.next(); }
-  return { hash: s.value.hash, ms: performance.now() - t0, genMs, stats: s.value.baked.stats };
+  const ms = performance.now() - t0;
+  return { hash: hashes(s.value), ms, genMs, stats: s.value.baked.stats };
 }
 
-// 워커 러너로 「생성 → 굽기」 — ms = 맡긴 때부터 답을 받을 때까지의 벽시계 · steps = 알려 온 단계 이름
+// 워커 러너로 「생성 → 굽기」 — ms = 맡긴 때부터 답을 받을 때까지의 벽시계 · steps = 알려 온 단계 이름 · hash = 받은 것을 주 창에서 센 값
 export function bakeJob(name) {
   const t0 = performance.now(), steps = [];
-  return runJob('shared/bake/index.js', 'prepSteps', [recipeOf(name)], (step) => steps.push(step)).then((r) => (
-    { where: r.where, moved: r.moved, slices: r.slices, hash: r.value.hash, ms: performance.now() - t0, steps, stats: r.value.baked.stats }));
+  return runJob('shared/bake/index.js', 'prepSteps', [recipeOf(name)], (step) => steps.push(step)).then((r) => {
+    const ms = performance.now() - t0;
+    return { where: r.where, moved: r.moved, slices: r.slices, hash: hashes(r.value), ms, steps, stats: r.value.baked.stats };
+  });
 }
+
+// 타이틀의 준비가 만든 세계 · 구운 것(CTX.world · CTX.baked — 워커가 넘겨준 배열 그대로)을 주 창에서 센 해시. 준비가 덜 됐으면 null.
+export function prepHash() { return CTX.world && CTX.baked ? { ...hashes({ world: CTX.world, baked: CTX.baked }), where: CTX.made.where } : null; }
 
 // 구운 빛 한 줄(꼭짓점 7바이트 · 점 5바이트)을 색으로: 하늘 열림 × 하늘빛 + 해(가림 × 법선·해) + 늘 켜진 등불(+ lamps 에서는 스위치 묶음도 켠다)
 function lit(L, at, tint, facing, out, o) {
