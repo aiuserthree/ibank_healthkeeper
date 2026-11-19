@@ -179,6 +179,7 @@ ART_JS = (ROOT / "web/assets/games/deskpop/deskpop-art.js").read_text(encoding="
 class DeskpopArcadeTest(unittest.TestCase):
     """아케이드에 붙인 것 — 자리(GAMES 맨 위)는 합칠 때 다른 새 게임이 위에 올 수 있어 보지 않는다"""
 
+    @unittest.skip("문구 팡팡은 2026-11-19 운영자 말로 아케이드 목록에서 숨김 — game.py 의 주석을 풀면 이 줄도 지운다")
     def test_registered_in_games(self):
         from app.services import game as game_svc
 
@@ -189,6 +190,7 @@ class DeskpopArcadeTest(unittest.TestCase):
         self.assertEqual(g.max_score, 1_000_000)
         self.assertRegex(g.added, r"^\d{4}-\d{2}-\d{2}$")
 
+    @unittest.skip("문구 팡팡은 2026-11-19 운영자 말로 아케이드 목록에서 숨김 — game.py 의 주석을 풀면 이 줄도 지운다")
     def test_score_max_equals_server(self):
         from app.services import game as game_svc
 
