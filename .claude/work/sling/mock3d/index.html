@@ -1,0 +1,180 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>시안</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1280px;height:720px;overflow:hidden;background:#87c9f0;font-family:"Apple SD Gothic Neo","Pretendard",sans-serif}
+canvas{display:block}
+#ui{position:absolute;inset:0;pointer-events:none}
+.p{position:absolute;color:#fff;font-weight:900;text-shadow:0 2px 0 rgba(0,0,0,.35)}
+.pill{border-radius:999px;border:4px solid #2a1a0e;box-shadow:0 4px 0 #2a1a0e;padding:6px 18px;font-size:22px;display:flex;align-items:center;gap:8px}
+.sq{width:58px;height:58px;border-radius:16px;background:#8a5a2e;border:4px solid #2a1a0e;box-shadow:0 4px 0 #2a1a0e;display:flex;align-items:center;justify-content:center;font-size:24px}
+.coin{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffe680,#f0b000 60%,#b07800);border:2px solid #7a5000;display:inline-flex;align-items:center;justify-content:center;font-size:14px;color:#7a5000}
+.slot{position:absolute;bottom:22px;width:72px;height:72px;border-radius:50%;background:#fff3dc;border:4px solid #2a1a0e;box-shadow:0 4px 0 #2a1a0e;display:flex;align-items:center;justify-content:center;font-size:34px}
+.slot.on{width:96px;height:96px;bottom:14px;background:#ffd23a;border-width:5px}
+.slot.used{opacity:.45;filter:grayscale(1)}
+.tag{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;color:#fff;border-radius:8px;padding:2px 8px;border:2px solid #2a1a0e;white-space:nowrap}
+.big{position:absolute;font-weight:900;color:#ffe14a;-webkit-text-stroke:4px #6a2a00;text-shadow:0 6px 0 #6a2a00;letter-spacing:2px}
+.card{position:absolute;background:#fff4de;border:6px solid #4a2a12;border-radius:26px;box-shadow:0 10px 0 #2a1a0e;overflow:hidden}
+.ttl{background:#c8352e;border-bottom:6px solid #4a2a12;color:#fff;text-align:center;font-weight:900;font-size:32px;padding:10px;text-shadow:0 3px 0 #6a1010}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;font-weight:900;color:#fff;border-radius:22px;border:4px solid #2a1a0e;box-shadow:0 6px 0 #2a1a0e;text-shadow:0 2px 0 rgba(0,0,0,.3)}
+.g{background:linear-gradient(#5be36a,#28b33a)}.b{background:linear-gradient(#a8703c,#7a4a22)}
+.dim{position:absolute;inset:0;background:rgba(20,40,60,.35);backdrop-filter:blur(3px)}
+</style></head><body>
+<script src="three.js"></script>
+<div id="ui"></div>
+<script>
+const VIEW=(location.hash||'#aim').slice(1);
+const W=1280,H=720;
+const R=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+R.setSize(W,H);R.shadowMap.enabled=true;R.shadowMap.type=THREE.PCFSoftShadowMap;
+document.body.prepend(R.domElement);
+const S=new THREE.Scene();S.background=new THREE.Color(0x8fd0f5);S.fog=new THREE.Fog(0xbfe4f7,60,170);
+const cam=new THREE.PerspectiveCamera(42,W/H,.1,400);
+S.add(new THREE.HemisphereLight(0xdff2ff,0x4a7a2a,.62));
+const sun=new THREE.DirectionalLight(0xfff1d6,1.05);sun.position.set(-30,50,-20);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-40,right:40,top:40,bottom:-40,far:150});S.add(sun);sun.target.position.set(0,0,20);S.add(sun.target);
+let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+const M=(c,o={})=>new THREE.MeshLambertMaterial(Object.assign({color:c,flatShading:true},o));
+function mesh(g,m,x,y,z,sh=true){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=sh;o.receiveShadow=true;S.add(o);return o}
+// 캔버스 결
+function tex(draw,w=128,h=128){const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');draw(x,w,h);const t=new THREE.CanvasTexture(c);return t}
+const woodT=tex((x,w,h)=>{x.fillStyle='#c98a45';x.fillRect(0,0,w,h);for(let i=0;i<4;i++){x.fillStyle=i%2?'#bd7d3a':'#d39552';x.fillRect(0,i*32,w,30);x.fillStyle='#7a4a1e';x.fillRect(0,i*32+30,w,2)}x.strokeStyle='#5a3412';x.lineWidth=6;x.strokeRect(3,3,w-6,h-6);x.fillStyle='#4a2a10';[[12,12],[w-12,12],[12,h-12],[w-12,h-12]].forEach(([a,b])=>{x.beginPath();x.arc(a,b,4,0,7);x.fill()})});
+const stoneT=tex((x,w,h)=>{x.fillStyle='#a3a7ab';x.fillRect(0,0,w,h);for(let i=0;i<260;i++){x.fillStyle=`rgba(${rnd()>.5?255:40},${rnd()>.5?255:40},${rnd()>.5?255:40},.06)`;x.fillRect(rnd()*w,rnd()*h,6,6)}x.strokeStyle='#6d7378';x.lineWidth=3;x.strokeRect(2,2,w-4,h-4);x.beginPath();x.moveTo(0,h/2);x.lineTo(w,h/2);x.moveTo(w/2,0);x.lineTo(w/2,h/2);x.moveTo(w/4,h/2);x.lineTo(w/4,h);x.stroke()});
+const iceT=tex((x,w,h)=>{const g=x.createLinearGradient(0,0,w,h);g.addColorStop(0,'#e8fbff');g.addColorStop(1,'#a6e0f5');x.fillStyle=g;x.fillRect(0,0,w,h);x.strokeStyle='rgba(255,255,255,.9)';x.lineWidth=4;x.beginPath();x.moveTo(20,10);x.lineTo(50,60);x.lineTo(40,110);x.moveTo(90,20);x.lineTo(110,70);x.stroke();x.strokeStyle='#7cc4df';x.lineWidth=4;x.strokeRect(2,2,w-4,h-4)});
+const mWood=new THREE.MeshLambertMaterial({map:woodT}),mStone=new THREE.MeshLambertMaterial({map:stoneT}),mIce=new THREE.MeshLambertMaterial({map:iceT,transparent:true,opacity:.86});
+// 땅 · 강 · 산
+const groundG=new THREE.PlaneGeometry(400,400,80,80);groundG.rotateX(-Math.PI/2);
+{const p=groundG.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i),z=p.getZ(i);let y=Math.sin(x*.05)*.6+Math.cos(z*.07)*.5;if(z<-5||z>40)y+=Math.max(0,(Math.abs(x)-60)*.05);p.setY(i,y-0.6+ (z>44? -1.2:0))}groundG.computeVertexNormals()}
+mesh(groundG,M(0x5fb043),0,0,0,false).castShadow=false;
+const river=new THREE.Mesh(new THREE.PlaneGeometry(400,18),new THREE.MeshLambertMaterial({color:0x3aa7e0,transparent:true,opacity:.95}));river.rotation.x=-Math.PI/2;river.rotation.z=-.18;river.position.set(0,-.55,52);S.add(river);
+for(let i=0;i<40;i++){const fo=mesh(new THREE.CircleGeometry(.5+rnd()*.6,6),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.5}),-80+rnd()*160,-.5,46+rnd()*12,false);fo.rotation.x=-Math.PI/2;fo.scale.y=.25}
+const far=mesh(new THREE.PlaneGeometry(400,30),M(0xa8d07a),0,-.4,70,false);far.rotation.x=-Math.PI/2;
+for(let i=0;i<9;i++){const h=18+rnd()*22;const m=mesh(new THREE.ConeGeometry(14+rnd()*12,h,5),M(i%2?0x7fa6b8:0x92b6c4),-110+i*28,h/2-2,120+rnd()*20,false)}
+// 꽃
+for(let i=0;i<300;i++){const c=[0xffffff,0xfff07a,0xffb3d1,0xc9b3ff][i%4];mesh(new THREE.SphereGeometry(.09,5,4),new THREE.MeshBasicMaterial({color:c}),-30+rnd()*60,-.35,-6+rnd()*42,false)}
+// 나무
+function pine(x,z,s=1){mesh(new THREE.CylinderGeometry(.25*s,.35*s,1.6*s,6),M(0x7a4a26),x,.6*s,z);for(let k=0;k<3;k++)mesh(new THREE.ConeGeometry((1.9-k*.45)*s,(2.1-k*.3)*s,7),M(k%2?0x2f9a3e:0x37ab48),x,(1.9+k*1.15)*s,z)}
+function round(x,z,s=1){mesh(new THREE.CylinderGeometry(.18*s,.24*s,2.4*s,6),M(0xefe8da),x,1.1*s,z);mesh(new THREE.IcosahedronGeometry(1.4*s,0),M(0x9ad24a),x,2.9*s,z)}
+function maple(x,z,s=1){mesh(new THREE.CylinderGeometry(.22*s,.3*s,2*s,6),M(0x6a3c1e),x,.9*s,z);mesh(new THREE.DodecahedronGeometry(1.5*s,0),M(0xe8762c),x,2.8*s,z);mesh(new THREE.DodecahedronGeometry(1.0*s,0),M(0xf0a23a),x+.8*s,3.4*s,z-.3)}
+[[-9,10],[-6,18],[-12,26],[-4,34],[12,36],[18,30],[24,40],[-16,40],[6,44],[30,34],[-22,30],[16,46],[8,20],[-24,18],[-20,40]].filter(([x,z])=>!(x>-19&&x<6&&z>4&&z<38)).forEach(([x,z],i)=>(i%3==0?maple:i%3==1?pine:round)(x,z,1+rnd()*.5));
+for(let i=0;i<14;i++)pine(-40+i*7+rnd()*3,62+rnd()*6,1.3+rnd()*.5);
+for(let i=0;i<10;i++)maple(-38+i*8,58+rnd()*3,1.2);
+// 돌덩이
+for(let i=0;i<8;i++){const r=mesh(new THREE.DodecahedronGeometry(.4+rnd()*.5,0),M(0x9b9a92),-14+rnd()*28,-.2,4+rnd()*30);r.scale.y=.6}
+// 새총
+const SL=new THREE.Group();S.add(SL);SL.position.set(-1.6,0,0);
+function slPart(g,m,x,y,z,rz=0){const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.rotation.z=rz;o.castShadow=true;SL.add(o);return o}
+const bark=M(0x8a5428),rope=M(0xd9b27a);
+slPart(new THREE.CylinderGeometry(.42,.55,3.4,7),bark,0,1.5,0);
+for(let k=0;k<6;k++)slPart(new THREE.TorusGeometry(.47,.07,4,10),rope,0,.6+k*.35,0).rotation.x=Math.PI/2;
+slPart(new THREE.CylinderGeometry(.25,.36,2,6),bark,-.6,3.9,0,.45);slPart(new THREE.CylinderGeometry(.25,.36,2,6),bark,.6,3.9,0,-.45);
+slPart(new THREE.SphereGeometry(.38,7,6),M(0xf0c04a),-1.05,4.85,0);slPart(new THREE.SphereGeometry(.38,7,6),M(0xf0c04a),1.05,4.85,0);
+// 곰
+function bear(x,y,z,s=1,col=0xa86a34,extra){const g=new THREE.Group();g.position.set(x,y,z);g.scale.setScalar(s);S.add(g);
+ const add=(geo,m,a,b,c)=>{const o=new THREE.Mesh(geo,m);o.position.set(a,b,c);o.castShadow=true;g.add(o);return o};
+ const fur=M(col),light=M(0xe8c48e),dark=M(0x2a1a0e);
+ add(new THREE.SphereGeometry(.75,10,8),fur,0,.75,0).scale.set(1,.95,.9);
+ add(new THREE.SphereGeometry(.5,8,6),light,0,.65,-.4).scale.set(1,1,.5);
+ add(new THREE.SphereGeometry(.55,10,8),fur,0,1.75,0);
+ add(new THREE.SphereGeometry(.2,6,5),fur,-.4,2.2,0);add(new THREE.SphereGeometry(.2,6,5),fur,.4,2.2,0);
+ add(new THREE.SphereGeometry(.24,7,6),light,0,1.62,-.45).scale.z=.7;
+ add(new THREE.SphereGeometry(.08,5,4),dark,0,1.7,-.62);add(new THREE.SphereGeometry(.06,5,4),dark,-.2,1.88,-.48);add(new THREE.SphereGeometry(.06,5,4),dark,.2,1.88,-.48);
+ add(new THREE.TorusGeometry(.48,.11,5,12),M(0xd83a2e),0,1.3,0).rotation.x=Math.PI/2;
+ add(new THREE.SphereGeometry(.22,6,5),fur,-.75,.9,-.1);add(new THREE.SphereGeometry(.22,6,5),fur,.75,.9,-.1);
+ add(new THREE.SphereGeometry(.26,6,5),fur,-.35,.05,-.1);add(new THREE.SphereGeometry(.26,6,5),fur,.35,.05,-.1);
+ if(extra)extra(add);return g}
+// 너구리 산적
+function coon(x,y,z,s=1,rot=0){const g=new THREE.Group();g.position.set(x,y,z);g.scale.setScalar(s);g.rotation.y=rot;S.add(g);
+ const add=(geo,m,a,b,c)=>{const o=new THREE.Mesh(geo,m);o.position.set(a,b,c);o.castShadow=true;g.add(o);return o};
+ const fur=M(0x8d8a86),wh=M(0xf2efe8),dk=M(0x2e2a28);
+ add(new THREE.SphereGeometry(.42,8,6),fur,0,.45,0);
+ add(new THREE.SphereGeometry(.38,9,7),fur,0,1.05,0);
+ add(new THREE.ConeGeometry(.13,.28,4),dk,-.25,1.42,0);add(new THREE.ConeGeometry(.13,.28,4),dk,.25,1.42,0);
+ add(new THREE.SphereGeometry(.2,6,5),wh,0,.98,-.3).scale.z=.7;
+ add(new THREE.BoxGeometry(.72,.14,.2),dk,0,1.1,-.28);
+ add(new THREE.SphereGeometry(.05,4,4),M(0xffffff),-.14,1.11,-.39);add(new THREE.SphereGeometry(.05,4,4),M(0xffffff),.14,1.11,-.39);
+ add(new THREE.SphereGeometry(.06,4,4),dk,0,.95,-.46);
+ add(new THREE.ConeGeometry(.42,.12,10),M(0x3a5a2a),0,1.38,0); // 산적 두건
+ for(let k=0;k<4;k++)add(new THREE.SphereGeometry(.16-k*.01,6,5),k%2?dk:fur,0,.35+k*.12,.45+k*.12);
+ return g}
+// 나무 울타리 · 깃발
+function stake(x,z,h=2.2){mesh(new THREE.CylinderGeometry(.22,.24,h,6),M(0xc07a3c),x,h/2-.3,z);mesh(new THREE.ConeGeometry(.22,.5,6),M(0xc88a4a),x,h-.05,z)}
+function banner(x,z){mesh(new THREE.CylinderGeometry(.06,.06,6,5),M(0x4a3020),x,2.7,z);mesh(new THREE.SphereGeometry(.14,6,5),M(0xf0c04a),x,5.75,z);
+ const f=mesh(new THREE.PlaneGeometry(1.1,1.9),new THREE.MeshLambertMaterial({color:0xe0682a,side:THREE.DoubleSide}),x+.6,4.6,z);
+ const em=mesh(new THREE.CircleGeometry(.3,10),new THREE.MeshBasicMaterial({color:0xfff2cf,side:THREE.DoubleSide}),x+.6,4.75,z-.01,false)}
+// 요새
+const FX=-6,FZ=26;
+function blk(m,w,h,d,x,y,z,rx=0,rz=0){const o=mesh(new THREE.BoxGeometry(w,h,d),m,FX+x,y,FZ+z);o.rotation.set(rx,0,rz);return o}
+for(let i=0;i<18;i++)stake(FX-6+i*.48,FZ+3.2,2+(i%3)*.25);
+for(let i=0;i<12;i++)stake(FX+3+ i*.1,FZ-2.5+i*.48,2+(i%2)*.3);
+banner(FX-4.5,FZ+2.6);banner(FX+.5,FZ+3);banner(FX+4.5,FZ+2);
+const impact=VIEW==='impact';
+// 아래층: 돌 받침 + 나무 판
+blk(mStone,3.2,1.4,1.4,-3,.4,0);
+blk(mStone,1.4,2.6,1.4,1.6,1,0);
+blk(mWood,1.2,1.2,1.2,-1.1,.3,0, 0, impact?.5:0);
+blk(mWood,5.6,.35,1.2,-1.2,impact?1.5:1.35,0,0,impact?.28:0);
+blk(mWood,.4,2,.4,-3.6,2.4,0);blk(mWood,.4,2,.4,-.2,impact?2.2:2.4,0,0,impact?.6:0);
+blk(mWood,4,.35,1,-1.9,impact?3.1:3.55,0,0,impact?-.35:0);
+blk(mIce,.6,2.2,.6,2.6,impact?2.8:3.4,.2,0,impact?-.9:0);
+blk(mIce,1.4,1.4,1.4,4,.4,.3);
+blk(mWood,1.2,1.2,1.2,4.6,1.7,.4);
+blk(mWood,1.4,1.4,1.4,6.6,.4,-.4);
+blk(mStone,1.4,1.4,1.4,6.6,1.8,-.4,0,impact?.2:0);
+coon(FX-2.2,1.95,FZ,1);coon(FX-1.2,.0,FZ-1.1,.95,.3);coon(FX+3.9,1.1,FZ+.3,.9);coon(FX+1.6,2.3,FZ,1);coon(FX+6.6,2.5,FZ-.4,.9,-.3);
+if(impact){
+ // 날아간 파편 · 먼지 · 금화
+ for(let i=0;i<16;i++){const m=[mWood,mStone,mIce][i%3];const o=blk(m,.3+rnd()*.5,.3+rnd()*.4,.3+rnd()*.4,-3+rnd()*7,1+rnd()*4,-1+rnd()*2);o.rotation.set(rnd()*3,rnd()*3,rnd()*3)}
+ for(let i=0;i<14;i++){const p=mesh(new THREE.IcosahedronGeometry(.5+rnd()*.9,0),new THREE.MeshLambertMaterial({color:0xe9e2d2,transparent:true,opacity:.55}),FX-2+rnd()*5,.5+rnd()*2.5,FZ-1.5+rnd()*2,false)}
+ for(let i=0;i<10;i++){const c=mesh(new THREE.CylinderGeometry(.22,.22,.06,12),M(0xf5c022,{emissive:0x553300}),FX-1+rnd()*3,2+rnd()*3,FZ-1.2,false);c.rotation.set(Math.PI/2*rnd(),0,rnd()*3)}
+ bear(FX+.4,1.6,FZ-.4,.9,0xa86a34).rotation.set(.4,2.6,.8);
+}
+// 쏠 곰(새총 위) + 기다리는 곰들
+if(!impact){bear(-1.6,3.6,-.3,.62);
+ bear(1.8,0,-1.6,.75,0x8a5226,add=>{add(new THREE.SphereGeometry(.5,8,6),M(0xf0b030),.0,.6,.7)}).rotation.y=.4; // 꿀단지
+ bear(3.4,0,-.6,.75,0xb07a44,add=>{const s=add(new THREE.CylinderGeometry(.6,.6,.12,12),M(0x9aa3ab),.8,1,-.2);s.rotation.z=Math.PI/2}).rotation.y=.6; // 냄비 방패
+ bear(5.6,0,.8,1.15,0x7a4520).rotation.y=.7; // 큰곰
+}
+// 궤적
+if(!impact){const pts=[];for(let t=0;t<=1;t+=.04){pts.push(new THREE.Vector3(-1.6+(FX-1.6+1.6)*t*.95,4+15*t-14.5*t*t,0+FZ*t*.95))}
+ pts.forEach((p,i)=>{if(i>0&&i<pts.length-2)mesh(new THREE.SphereGeometry(.13-i*.002,6,5),new THREE.MeshBasicMaterial({color:0xffffff}),p.x,p.y,p.z,false)});
+ // 고무줄
+ const band=new THREE.MeshLambertMaterial({color:0x4a2a12});[[-1.05],[1.05]].forEach(([dx])=>{const a=new THREE.Vector3(-1.6+dx,4.85,0),b=new THREE.Vector3(-1.6,4.1,-.7);const L=a.distanceTo(b);const o=new THREE.Mesh(new THREE.CylinderGeometry(.06,.06,L,5),band);o.position.copy(a.clone().add(b).multiplyScalar(.5));o.lookAt(b);o.rotateX(Math.PI/2);S.add(o)})}
+// 카메라
+if(VIEW==='aim'){cam.position.set(-6.5,5.2,-8.5);cam.lookAt(-3.2,2.8,16)}
+else if(VIEW==='impact'){cam.position.set(FX-2.5,4.8,FZ-11.5);cam.lookAt(FX+.6,1.8,FZ)}
+else {cam.position.set(5,8,-12);cam.lookAt(-4,2.5,18)}
+R.render(S,cam);
+// ── 화면 표시(HTML)
+const ui=document.getElementById('ui');const h=s=>ui.insertAdjacentHTML('beforeend',s);
+function hud(n,coins,lvl){h(`<div class="p sq" style="left:22px;top:18px">❚❚</div>
+<div class="p pill" style="left:94px;top:24px;background:#2c96b0;font-size:19px">🏕️ ${lvl}</div>
+<div class="p pill" style="left:50%;transform:translateX(-50%);top:14px;background:#7d45c9;font-size:38px;padding:4px 26px">🦝 × ${n}</div>
+<div class="p pill" style="right:22px;top:20px;background:#3a332e"><span class="coin">₩</span>${coins}</div>`)}
+function slots(){const L=[['🐻','',''],['🍯','꿀폭탄','#d8452e'],['🛡️','방패','#2f7fd8'],['💪','큰곰','#e0862a'],['🐻','','']];let x=22;
+ L.forEach((s,i)=>{const on=i==0;h(`<div class="p slot ${on?'on':''}" style="left:${x}px">${s[0]}${s[1]?`<span class="tag" style="background:${s[2]}">${s[1]}</span>`:''}</div>`);x+=on?108:84})}
+if(VIEW==='aim'){hud(5,128,'단계 3');slots();
+ h(`<div class="p pill" style="left:50%;transform:translateX(-50%);top:130px;background:#2c96b0;border-radius:22px;flex-direction:column;gap:2px;padding:10px 34px"><div style="font-size:30px">3단계 · 얼음 곳간</div><div style="font-size:17px;font-weight:700">얼음은 잘 깨지고 · 큰곰은 벽을 뚫어요!</div></div>`)}
+if(VIEW==='impact'){hud(2,163,'단계 3');h(`<div class="big" style="left:50%;transform:translateX(-50%) rotate(-4deg);top:150px;font-size:86px">와르르!</div><div class="big" style="left:560px;top:300px;font-size:44px;color:#fff">+15</div><div class="big" style="left:690px;top:250px;font-size:38px;color:#fff">+15</div><div class="p" style="left:730px;top:20px;font-size:34px;color:#ff5a4a;-webkit-text-stroke:2px #5a0000">−1</div>`);
+ [['🐻',1],['🍯',1],['🛡️',0],['💪',0],['🐻',0]].forEach((s,i)=>h(`<div class="p slot ${s[1]?'used':''} ${i==2?'on':''}" style="left:${22+i*84+(i>2?24:0)}px">${s[0]}</div>`))}
+if(VIEW==='title'){h(`<div class="dim" style="background:rgba(30,60,90,.18);backdrop-filter:none"></div>
+<div class="p" style="left:0;right:0;top:70px;text-align:center"><div style="font-size:30px;color:#ffe9b0;-webkit-text-stroke:2px #4a2a12;letter-spacing:6px">곰돌이</div><div class="big" style="position:static;font-size:104px;line-height:1">새총 원정대</div></div>
+<div class="p btn g" style="left:50%;transform:translateX(-50%);top:330px;width:330px;height:92px;font-size:44px">▶ 원정 시작</div>
+<div class="p pill" style="left:450px;top:460px;background:#3a332e"><span class="coin">₩</span>0</div><div class="p pill" style="left:640px;top:460px;background:#3a332e">⭐ 0 / 30</div>
+<div class="p btn b" style="left:50%;transform:translateX(-50%);top:540px;width:300px;height:66px;font-size:26px">🏡 곰 마을 강화</div>
+<div class="p sq" style="right:96px;bottom:22px">♪</div><div class="p sq" style="right:22px;bottom:22px">🔊</div>`)}
+if(VIEW==='map'){h(`<div class="dim"></div>
+<div class="card" style="left:60px;top:40px;width:700px;height:640px"><div class="ttl" style="background:#2c96b0;text-shadow:0 3px 0 #0e4a5a">원정 지도</div>
+<div style="position:absolute;left:24px;top:84px;width:310px;height:520px;border-radius:50%;background:#bfe6a0;border:4px dashed #5a9a40"></div>
+<div style="position:absolute;left:366px;top:84px;width:310px;height:520px;border-radius:50%;background:#ccb8e6;border:4px dashed #6a4a9a"></div>
+${[[70,430,1,3],[150,300,2,2],[230,430,3,-1],[220,170,0],[285,300,0,0,1],[400,390,0],[460,200,0],[520,420,0],[580,200,0],[590,330,0,0,2]].map(([x,y,n,st,boss])=>{const sz=boss?92:72;const lock=!n;return `<div style="position:absolute;left:${x}px;top:${y}px;width:${sz}px;height:${sz}px;border-radius:50%;border:5px solid #4a2a12;box-shadow:0 5px 0 #2a1a0e${st===-1?',0 0 0 8px #ffe14a':''};background:${lock?'#bdb6ab':'#f6d9a6'};display:flex;align-items:center;justify-content:center;font-size:${lock?28:34}px;font-weight:900;color:#4a2a12">${lock?(boss==1?'🦝':boss==2?'🏰':'🔒'):n}</div>${st>0?`<div style="position:absolute;left:${x+4}px;top:${y+76}px;font-size:20px;color:#e6a400">${'★'.repeat(st)}${'☆'.repeat(3-st)}</div>`:''}`}).join('')}
+<div class="pill" style="position:absolute;left:70px;top:96px;background:#2c96b0;color:#fff;font-weight:900;font-size:18px">단풍 숲</div>
+<div class="pill" style="position:absolute;left:430px;top:96px;background:#7d45c9;color:#fff;font-weight:900;font-size:18px">안개 늪</div>
+<div class="btn g" style="position:absolute;left:250px;bottom:22px;width:200px;height:62px;font-size:28px">▶ 3단계</div></div>
+<div class="card" style="left:790px;top:40px;width:430px;height:640px"><div class="ttl" style="background:#8a5a2e;text-shadow:0 3px 0 #3a2010">곰 마을</div>
+<div style="text-align:center;margin:14px 0"><span class="pill" style="display:inline-flex;background:#3a332e;color:#fff;font-weight:900"><span class="coin">₩</span>163</span></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 16px">
+${[['🍯','꿀폭탄','폭발 3.2m → 3.6m',1,3,320],['🛡️','냄비 방패','튕김 3 → 4번',0,3,120],['💪','큰곰 돌진','블록 4 → 5개',1,3,380],['📯','출정 나팔','곰 +1 → +2',1,2,900]].map(([i,n,d,l,m,c])=>`<div style="background:#fff;border:4px solid #e2c48e;border-radius:18px;padding:10px 6px;text-align:center;font-weight:900;color:#4a2a12"><div style="width:58px;height:58px;margin:0 auto;border-radius:14px;border:3px solid #4a2a12;background:#fff4de;font-size:32px;display:flex;align-items:center;justify-content:center">${i}</div><div style="font-size:19px;margin-top:6px">${n}</div><div style="display:flex;gap:4px;justify-content:center;margin:4px 0">${Array.from({length:m},(_,k)=>`<span style="width:22px;height:9px;border-radius:5px;background:${k<l?'#3cc24a':'#e3d6bf'};border:2px solid #b8a688"></span>`).join('')}</div><div style="font-size:13px;font-weight:700;color:#7a5a3a">${d}</div><div class="btn" style="margin-top:8px;background:${c<=163?'linear-gradient(#5be36a,#28b33a)':'linear-gradient(#c9c2b6,#a39a8c)'};height:42px;width:118px;font-size:18px;border-radius:14px"><span class="coin" style="width:22px;height:22px;font-size:11px">₩</span>${c}</div></div>`).join('')}
+</div>
+<div class="btn g" style="position:absolute;left:115px;bottom:22px;width:200px;height:62px;font-size:28px">▶ 계속</div></div>`)}
+document.title='ready';
+</script></body></html>
