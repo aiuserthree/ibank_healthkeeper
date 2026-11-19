@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""곰돌이 새총 원정대 1단계 시험 — 물리 안정성 · 결정성 · 무너질 때 프레임 시간 · 캡처
+"""곰돌이 새총 원정대 시험(1단계에 만들고 2단계에서 10단계로 넓힘) — 물리 안정성 · 결정성 · 무너질 때 프레임 시간 · 캡처
 쓰는 법: (워크트리 web/ 에서 python3 -m http.server 8791 를 띄운 뒤)
   /usr/bin/python3 .claude/work/sling/tools/phys_test.py [http://127.0.0.1:8791] [캡처 폴더]
 """
@@ -10,9 +10,12 @@ OUT=pathlib.Path(sys.argv[2] if len(sys.argv)>2 else pathlib.Path(__file__).reso
 OUT.mkdir(parents=True,exist_ok=True)
 URL=BASE+'/games/embed/slingfort.html?test=1'
 ARGS=['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']
-LEVELS=[1,2,'stress']
+LEVELS=list(range(1,11))+['stress']
 # 시험 쏘기(기준 방향에서 돌린 각(도) · 힘 0~1)
-SHOTS={1:[(0,.62),(-6,.6),(5,.66)],2:[(0,.6),(-8,.58),(6,.64),(0,.7)],'stress':[(0,.64)]}
+# 단계마다: 자동 쏘기로 찾은 이기는 순서(tools/solve_result.json) — 특수 곰 누르는 걸음까지 그대로
+_SOL=json.loads((pathlib.Path(__file__).resolve().parent/'solve_result.json').read_text())
+SHOTS={int(k):[tuple(x) for x in v['seq']] for k,v in _SOL.items() if v.get('win')}
+SHOTS['stress']=[(0,.64,None)]
 res={}
 def page(b,vp=(1280,720)):
     pg=b.new_page(viewport={'width':vp[0],'height':vp[1]})
@@ -31,10 +34,10 @@ with sync_playwright() as p:
     # (b) 결정성: 같은 쏘기를 두 번(같은 쪽 안에서 다시 불러) + 새로 연 쪽에서 한 번
     def play(pgx,L):
         pgx.evaluate(f'SF.load({json.dumps(L)},{{hold:true}})');out=[]
-        for yaw,pw in SHOTS[L]:
+        for yaw,pw,tap in SHOTS[L]:
             st=pgx.evaluate('SF.state()')
             if st['phase']!='aim':break
-            pgx.evaluate(f'SF.shoot({yaw},{pw})');r=pgx.evaluate('SF.runShot(14)')
+            pgx.evaluate(f'SF.shoot({yaw},{pw},{json.dumps(tap)})');r=pgx.evaluate('SF.runShot(14)')
             out.append({k:r[k] for k in ('phase','enemiesDown','broken','gold','hash','stepsRun')}|{'msMaxStep':round(r['msMaxStep'],2),'msPerStep':round(r['msTotal']/max(1,r['stepsRun']),3)})
         return out
     res['b']={}
@@ -46,9 +49,9 @@ with sync_playwright() as p:
     pg2.close()
     # (c) 무너질 때 프레임 시간(실시간으로 돌림 — 큰 벽 100개 쏘고 5초)
     res['c']={}
-    for L in ['stress',2]:
+    for L in ['stress',10,2]:
         pg.evaluate(f'SF.load({json.dumps(L)},{{hold:false}})');pg.wait_for_timeout(800)
-        pg.evaluate('SF.resetPerf()');pg.evaluate(f'SF.shoot({SHOTS[L][0][0]},{SHOTS[L][0][1]})');pg.wait_for_timeout(5000)
+        pg.evaluate('SF.resetPerf()');pg.evaluate(f'SF.shoot({SHOTS[L][0][0]},{SHOTS[L][0][1]},{json.dumps(SHOTS[L][0][2])})');pg.wait_for_timeout(5000)
         pf=pg.evaluate('SF.perf()');fr=sorted(pf['frames'][2:]);st=sorted(pf['steps'])
         q=lambda a,x:round(a[min(len(a)-1,int(len(a)*x))],2) if a else None
         res['c'][str(L)]={'frames':len(fr),'frame_ms_p50':q(fr,.5),'frame_ms_p95':q(fr,.95),'frame_ms_max':q(fr,1),'step_ms_p50':q(st,.5),'step_ms_p95':q(st,.95),'step_ms_max':q(st,1),'state':pg.evaluate('SF.state()')}
@@ -56,6 +59,10 @@ with sync_playwright() as p:
     cdp=pg.context.new_cdp_session(pg);cdp.send('Emulation.setCPUThrottlingRate',{'rate':4})
     pg.evaluate("SF.load('stress',{hold:true})");pg.evaluate('SF.shoot(0,.64)');r=pg.evaluate('SF.runShot(6)')
     res['c']['stress_cpu4x']={'msPerStep':round(r['msTotal']/max(1,r['stepsRun']),3),'msMaxStep':round(r['msMaxStep'],2),'stepsRun':r['stepsRun']}
+    pg.evaluate("SF.load(10,{hold:true})");mx=0;tot=0;n=0
+    for yaw,pw,tap in SHOTS[10]:
+        pg.evaluate(f'SF.shoot({yaw},{pw},{json.dumps(tap)})');r=pg.evaluate('SF.runShot(14)');mx=max(mx,r['msMaxStep']);tot+=r['msTotal'];n+=r['stepsRun']
+    res['c']['boss10_cpu4x']={'msPerStep':round(tot/max(1,n),3),'msMaxStep':round(mx,2),'stepsRun':n}
     cdp.send('Emulation.setCPUThrottlingRate',{'rate':1})
     res['errors']=errs+errs2
     pg.close()
@@ -64,8 +71,8 @@ with sync_playwright() as p:
         bg=p.chromium.launch(args=['--use-angle=metal','--enable-gpu','--ignore-gpu-blocklist'])
         pgg=bg.new_page(viewport={'width':1280,'height':720});pgg.goto(URL);pgg.wait_for_function('window.SF',timeout=60000)
         gpu=pgg.evaluate("(()=>{const c=document.createElement('canvas').getContext('webgl');const d=c&&c.getExtension('WEBGL_debug_renderer_info');return d?c.getParameter(d.UNMASKED_RENDERER_WEBGL):'?'})()")
-        for L in ['stress',2]:
-            pgg.evaluate(f'SF.load({json.dumps(L)},{{hold:false}})');pgg.wait_for_timeout(800);pgg.evaluate('SF.resetPerf()');pgg.evaluate(f'SF.shoot({SHOTS[L][0][0]},{SHOTS[L][0][1]})');pgg.wait_for_timeout(5000)
+        for L in ['stress',10]:
+            pgg.evaluate(f'SF.load({json.dumps(L)},{{hold:false}})');pgg.wait_for_timeout(800);pgg.evaluate('SF.resetPerf()');pgg.evaluate(f'SF.shoot({SHOTS[L][0][0]},{SHOTS[L][0][1]},{json.dumps(SHOTS[L][0][2])})');pgg.wait_for_timeout(5000)
             fr=sorted(pgg.evaluate('SF.perf()')['frames'][2:]);q=lambda a,x:round(a[min(len(a)-1,int(len(a)*x))],2) if a else None
             res['c']['gpu_'+str(L)]={'renderer':gpu,'frames':len(fr),'frame_ms_p50':q(fr,.5),'frame_ms_p95':q(fr,.95),'frame_ms_max':q(fr,1)}
         bg.close()
