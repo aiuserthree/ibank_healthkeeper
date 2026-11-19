@@ -45,8 +45,10 @@ def jpeg_size(path: pathlib.Path) -> tuple[int, int]:
 
 
 class MoonshotStaticTest(unittest.TestCase):
-    def test_games_first_entry(self):
-        first = next(iter(game.GAMES.values()))
+    def test_games_entry(self):
+        # Newer releases may precede this game; it must remain ahead of older ones.
+        self.assertLess(list(game.GAMES).index("moonshot"), list(game.GAMES).index("ferry"))
+        first = game.GAMES["moonshot"]
         self.assertEqual(first.key, "moonshot")
         self.assertEqual(first.title, "뿅뿅 달나라 대포")
         self.assertEqual(first.category, "MINI")

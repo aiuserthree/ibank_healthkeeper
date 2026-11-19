@@ -295,6 +295,7 @@ window.HKPlay = (function () {
     alkkagi: ["#1f2937", "#a16207"],
     watersort: ["#0e7490", "#a855f7"],
     deskpop: ["#5b21b6", "#facc15"],
+    acornshot: ["#315d49", "#d9a263"],
     moonshot: ["#1b1f4b", "#ffcf4a"],
     ferry: ["#0b5f86", "#ffb02e"],
     ringcatch: ["#9a3412", "#f97316"],
