@@ -54,6 +54,7 @@ def good_state() -> dict:
 
 
 class SlingfortStaticTest(unittest.TestCase):
+    @unittest.skip("곰돌이 새총 원정대는 2026-11-20 운영자 말로 아케이드 목록에서 숨김 — game.py 의 주석을 풀면 이 줄도 지운다")
     def test_games_entry_on_top(self):
         # 새 게임은 목록 맨 위(숨긴 문구 팡팡 주석 줄보다도 위) — 그 뒤 더 새 게임이 오면 이 줄만 고친다
         keys = list(game.GAMES)
@@ -69,12 +70,14 @@ class SlingfortStaticTest(unittest.TestCase):
         src = (ROOT / "backend/app/services/game.py").read_text(encoding="utf-8")
         self.assertLess(src.index('Game("slingfort"'), src.index('# Game("deskpop"'))
 
+    @unittest.skip("곰돌이 새총 원정대는 2026-11-20 운영자 말로 아케이드 목록에서 숨김 — game.py 의 주석을 풀면 이 줄도 지운다")
     def test_frame_page_wide(self):
         self.assertIn('HKEmbed.mount({ key: "slingfort"', FRAME)
         self.assertIn('src: "/games/embed/slingfort.html?hk=1"', FRAME)
         self.assertIn("wide: true", FRAME)
         self.assertIn(f"<title>{game.GAMES['slingfort'].title} — 아케이드</title>", FRAME)
 
+    @unittest.skip("곰돌이 새총 원정대는 2026-11-20 운영자 말로 아케이드 목록에서 숨김 — game.py 의 주석을 풀면 이 줄도 지운다")
     def test_body_signals_and_score_max(self):
         m = re.search(r"const SCORE_MAX=(\d+);", BODY)
         self.assertIsNotNone(m)
