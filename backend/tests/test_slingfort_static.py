@@ -57,7 +57,7 @@ class SlingfortStaticTest(unittest.TestCase):
     def test_games_entry_on_top(self):
         # 새 게임은 목록 맨 위(숨긴 문구 팡팡 주석 줄보다도 위) — 그 뒤 더 새 게임이 오면 이 줄만 고친다
         keys = list(game.GAMES)
-        self.assertEqual(keys[0], "slingfort")
+        self.assertLess(keys.index("slingfort"), keys.index("ferry"))  # 더 새 게임(달나라 대포)이 위에 왔다 — 먼저 나온 게임보다 위인지만 본다
         self.assertLess(keys.index("slingfort"), keys.index("ferry"))
         g = game.GAMES["slingfort"]
         self.assertEqual(g.title, "곰돌이 새총 원정대")
