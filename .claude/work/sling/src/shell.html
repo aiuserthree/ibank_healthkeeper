@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <script src="/_shared/no-zoom.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>곰돌이 새총 원정대</title>
+<style>
+@font-face{font-family:'Pretendard';src:url('/assets/fonts/PretendardVariable.woff2') format('woff2');font-weight:100 900;font-display:swap}
+:root{--u:1;--font:'Pretendard','Apple SD Gothic Neo','Malgun Gothic','Noto Sans KR',system-ui,sans-serif;color-scheme:light}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#1d3a52;font-family:var(--font);-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;touch-action:none}
+[hidden]{display:none!important}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
+#stage{position:absolute;left:0;top:0;overflow:hidden;background:#8fd0f5}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none}
+.layer{position:absolute;inset:0;pointer-events:none}
+.corner{position:absolute;transform:scale(var(--u))}
+#tl{left:0;top:0;transform-origin:0 0}
+#tc{left:50%;top:0;transform:translateX(-50%) scale(var(--u));transform-origin:50% 0}
+#tr{right:0;top:0;transform-origin:100% 0}
+#bl{left:0;bottom:0;transform-origin:0 100%}
+#cc{left:50%;top:0;transform:translateX(-50%) scale(var(--u));transform-origin:50% 0}
+.p{position:absolute;color:#fff;font-weight:900;text-shadow:0 2px 0 rgba(0,0,0,.35);white-space:nowrap}
+.pill{border-radius:999px;border:4px solid #2a1a0e;box-shadow:0 4px 0 #2a1a0e;padding:6px 18px;font-size:22px;display:flex;align-items:center;gap:8px}
+.sq{width:58px;height:58px;border-radius:16px;background:#8a5a2e;border:4px solid #2a1a0e;box-shadow:0 4px 0 #2a1a0e;display:flex;align-items:center;justify-content:center;font-size:22px;pointer-events:auto;cursor:pointer}
+.sq:active{transform:translateY(3px);box-shadow:0 1px 0 #2a1a0e}
+.coin{width:28px;height:28px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffe680,#f0b000 60%,#b07800);border:2px solid #7a5000;display:inline-flex;align-items:center;justify-content:center;font-size:14px;color:#7a5000}
+#slots{position:absolute;left:22px;bottom:14px;height:110px;width:700px}
+.slot{position:absolute;bottom:8px;width:72px;height:72px;border-radius:50%;background:#fff3dc;border:4px solid #2a1a0e;box-shadow:0 4px 0 #2a1a0e;display:flex;align-items:center;justify-content:center;font-size:34px;transition:all .25s}
+.slot.on{width:96px;height:96px;bottom:0;background:#ffd23a;border-width:5px;font-size:44px}
+.slot.used{opacity:.45;filter:grayscale(1)}
+.tag{position:absolute;top:-14px;left:50%;transform:translateX(-50%);font-size:12px;font-weight:900;color:#fff;border-radius:8px;padding:2px 8px;border:2px solid #2a1a0e;white-space:nowrap}
+.big{position:absolute;font-weight:900;color:#ffe14a;-webkit-text-stroke:4px #6a2a00;text-shadow:0 6px 0 #6a2a00;letter-spacing:2px;white-space:nowrap}
+#enemy{left:50%;transform:translateX(-50%);top:14px;background:#7d45c9;font-size:38px;padding:4px 26px}
+#enemy .ok{display:none;width:40px;height:40px;border-radius:50%;background:#3cc24a;border:3px solid #1d5a20;font-size:26px;align-items:center;justify-content:center}
+#enemy.zero .ok{display:inline-flex}#enemy.zero .n{display:none}
+#minus{left:calc(50% + 112px);top:20px;font-size:34px;color:#ff5a4a;-webkit-text-stroke:2px #5a0000;opacity:0;transition:opacity .2s}
+#banner{left:50%;transform:translateX(-50%);top:130px;background:#2c96b0;border-radius:22px;flex-direction:column;gap:2px;padding:10px 34px;transition:opacity .4s}
+#banner .t1{font-size:30px}#banner .t2{font-size:17px;font-weight:700}
+#crumble{left:50%;top:150px;font-size:86px;transform:translateX(-50%) rotate(-4deg) scale(.4);opacity:0;transition:transform .25s cubic-bezier(.3,1.6,.5,1),opacity .25s}
+#crumble.show{opacity:1;transform:translateX(-50%) rotate(-4deg) scale(1)}
+#hint{left:50%;transform:translateX(-50%);top:520px;font-size:34px;color:#fff;-webkit-text-stroke:2px #3a2410;text-shadow:0 4px 0 #3a2410;animation:hb 1.2s ease-in-out infinite}
+@keyframes hb{50%{transform:translateX(-50%) translateY(-6px)}}
+#hand{position:absolute;font-size:56px;pointer-events:none;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35));animation:hp 1.6s ease-in-out infinite}
+@keyframes hp{0%{transform:translate(0,0)}60%{transform:translate(-26px,70px)}100%{transform:translate(-26px,70px);opacity:0}}
+.fl{position:absolute;font-weight:900;color:#fff;-webkit-text-stroke:3px #6a2a00;text-shadow:0 4px 0 #6a2a00;font-size:40px;transform:translate(-50%,-50%) scale(var(--u));pointer-events:none;white-space:nowrap}
+.dim{position:absolute;inset:0;background:rgba(20,40,60,.45);pointer-events:auto;display:flex;align-items:center;justify-content:center}
+.card{background:#fff4de;border:6px solid #4a2a12;border-radius:26px;box-shadow:0 10px 0 #2a1a0e;overflow:hidden;width:520px;text-align:center;transform:scale(var(--u));font-weight:900;color:#4a2a12}
+.ttl{background:#c8352e;border-bottom:6px solid #4a2a12;color:#fff;font-size:34px;padding:12px;text-shadow:0 3px 0 #6a1010}
+.card .body{padding:22px 24px 26px;font-size:22px;display:flex;flex-direction:column;gap:14px;align-items:center}
+.btns{display:flex;gap:14px;justify-content:center;margin-top:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;font-weight:900;color:#fff;border-radius:22px;border:4px solid #2a1a0e;box-shadow:0 6px 0 #2a1a0e;text-shadow:0 2px 0 rgba(0,0,0,.3);height:62px;min-width:170px;padding:0 20px;font-size:26px}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 #2a1a0e}
+.g{background:linear-gradient(#5be36a,#28b33a)}.b{background:linear-gradient(#a8703c,#7a4a22)}
+#rot{position:fixed;left:0;right:0;bottom:12px;text-align:center;color:#fff;font-weight:800;font-size:15px;pointer-events:none}
+#rot span{background:rgba(0,0,0,.45);border-radius:999px;padding:8px 16px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div class="layer" id="fx"></div>
+  <div class="layer" id="hud">
+    <div class="corner" id="tl">
+      <button class="p sq" id="pauseBtn" style="left:22px;top:18px" aria-label="멈춤">❚❚</button>
+      <div class="p pill" id="lvl" style="left:94px;top:24px;background:#2c96b0;font-size:19px">🏕️ 단계 1</div>
+    </div>
+    <div class="corner" id="tc" style="width:600px">
+      <div class="p pill" id="enemy"><span>🦝</span><span class="n">× <b id="enemyN">3</b></span><span class="ok">✓</span></div>
+      <div class="p" id="minus">−1</div>
+    </div>
+    <div class="corner" id="tr">
+      <div class="p pill" style="right:22px;top:20px;background:#3a332e"><span class="coin">₩</span><span id="gold">0</span></div>
+    </div>
+    <div class="corner" id="cc" style="width:1000px">
+      <div class="p pill" id="banner"><div class="t1" id="bn1"></div><div class="t2" id="bn2"></div></div>
+      <div class="big" id="crumble">와르르!</div>
+      <div class="p" id="hint" hidden>뒤로 당겼다 놓아요!</div>
+    </div>
+    <div class="corner" id="bl"><div id="slots"></div></div>
+    <div id="hand" hidden>👆</div>
+  </div>
+  <div class="layer" id="ov"></div>
+</div>
+<div id="rot" hidden><span>📱 가로로 돌리면 더 크게 볼 수 있어요</span></div>
+<script>
+/*__THREE__*/
+</script>
+<script>
+/*__CANNON__*/
+</script>
+<script>
+/*__GAME__*/
+</script>
+</body>
+</html>
