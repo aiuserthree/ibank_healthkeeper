@@ -3,8 +3,11 @@
 판은 모두 「끝까지 한 판」만 센다.
   혼자 하는 게임  game_play(점수를 남긴 판 — 오늘의 도전 게임은 그날 첫 판만 남는다)
   대전           game_match 가 끝났고(DONE) 도장 · 순위에 드는 판(바로 기권 · 받기 전 만료 빼고) — 한 판 = 1, 두 사람 모두 참여
+  여러 명 대전    game_party(선다운 범퍼스 대전 · 꿀꺽 젤리 숲 대전 · 한밤의 두뇌 저택)가 끝났고(DONE) 도장이 찍히는 판
+                 (party._stamp_agreed 와 같은 끝 — 결과가 서로 달라 무효(MISMATCH) · 결과 없음(NO_REPORT) · 닫힘 · 만료 빼고)
+                 — 한 판 = 1, 출발 때 달린 사람(state.players, 자리가 주인 · 들어옴) 모두 참여. 컴퓨터 · 초대만 받은 사람 · 거절 · 나간 사람은 빼고
   협동           escape_room 이 끝난 판(탈출 · 시간 끝) — 중간에 나가거나 포기한 판은 뺀다. 한 판 = 1, 두 사람 모두 참여
-날짜 · 시각은 한국 시각. 대전 · 협동은 끝난 시각으로 센다.
+날짜 · 시각은 한국 시각. 대전(1:1 · 여러 명) · 협동은 끝난 시각으로 센다. 여러 명 대전도 화면 · 집계에서는 「대전」(versus)으로 묶는다.
 참여 인원 · 한 날은 위 판에 더해 그날 도장을 받은 사람도 센다 — 오늘의 도전 게임의 두 번째 판부터(연습)는 점수가 남지 않지만 끝까지 하면 도장은 찍힌다.
 """
 from __future__ import annotations
@@ -16,23 +19,26 @@ from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.time import KST, today_kst
-from app.models import ArcadeStamp, Coupon, CouponSource, EscapeRoom, GameMatch, GamePlay, Member
+from app.models import ArcadeStamp, Coupon, CouponSource, EscapeRoom, GameMatch, GameParty, GamePartySeat, GamePlay, Member
 from app.models.coupon import CouponStatus
 from app.models.enums import MemberStatus
 from app.services import match as match_service
+from app.services import party as party_service
 from app.services.escape import ALL_ROOMS
 from app.services.game import GAMES
 
 MAX_DAYS = 400  # 한 번에 볼 수 있는 기간
 COOP_SKIP_ENDS = ("GIVEUP", "LEFT")  # 중간에 그만둔 협동 판
+# 여러 명 대전 가운데 세는 판 — party._stamp_agreed 가 도장을 주는 끝과 같다(MISMATCH · NO_REPORT 는 무효라 뺀다)
+PARTY_COUNT_ENDS = ("FINISH", "FARTHER", "WIN", "BIGGEST", "BOT", "DRAW")
 
 
 def _kst(dt: datetime) -> datetime:
-    return dt.astimezone(KST)
+    return dt.astimezone(KST) if dt.tzinfo else dt.replace(tzinfo=KST)
 
 
 def _kind(key: str) -> str:
-    if key in match_service.MATCH_GAMES:
+    if key in match_service.MATCH_GAMES or key in party_service.PARTY_GAMES:
         return "versus"
     if key in COOP_KEYS:
         return "coop"
@@ -76,6 +82,40 @@ async def admin_arcade_stats(db: AsyncSession, start: date | None, end: date | N
         who = tuple(x for x in (m.challenger_id, None if m.bot else m.opponent_id) if x)
         at = _kst(m.finished_at)
         plays.append((m.game, at.date(), at.hour, who))
+
+    parties = (
+        await db.execute(
+            select(GameParty).where(
+                GameParty.status == "DONE",
+                GameParty.end_reason.in_(PARTY_COUNT_ENDS),
+                GameParty.finished_at >= t0,
+                GameParty.finished_at < t1,
+            )
+        )
+    ).scalars().all()
+    if parties:
+        seated: dict[int, set[int]] = defaultdict(set)  # 판마다 자리가 주인 · 들어옴인 사람
+        for pid, mid in (
+            await db.execute(
+                select(GamePartySeat.party_id, GamePartySeat.member_id).where(
+                    GamePartySeat.party_id.in_([p.id for p in parties]), GamePartySeat.status.in_(party_service.IN_SEAT)
+                )
+            )
+        ).all():
+            seated[pid].add(mid)
+        for p in parties:
+            who: list[int] = []
+            for x in (p.state or {}).get("players") or []:  # 출발 때 달린 사람(컴퓨터는 bots 라 여기 없다)
+                try:
+                    x = int(x)
+                except (TypeError, ValueError):
+                    continue
+                if x in seated[p.id] and x not in who:
+                    who.append(x)
+            if not who:
+                continue
+            at = _kst(p.finished_at)
+            plays.append((p.game, at.date(), at.hour, tuple(who)))
 
     rooms = (
         await db.execute(
