@@ -44,6 +44,8 @@ MGMT_GAMES: dict[str, MgmtGame] = {
         MgmtGame("deskpop", "문구 팡팡 진행", "문구 팡팡 단계 · 별 · 꾸미기", "pencil", listed=False),
         # 아케이드 「옥상 덩크슛」의 별 · 가진 공 · 고른 공 · 미션 진행 — 매니지먼트 목록에는 안 보인다
         MgmtGame("hoops", "옥상 덩크슛 공 상점", "옥상 덩크슛 별 · 공 모으기", "dribbble", listed=False),
+        # 아케이드 「곰돌이 새총 원정대」의 단계 · 별 · 금화 · 곰 마을 강화 · 소리 설정 — 매니지먼트 목록에는 안 보인다
+        MgmtGame("slingfort", "곰돌이 새총 원정대 진행", "단계 · 별 · 금화 · 곰 마을", "castle", listed=False),
     )
 }
 
@@ -165,6 +167,56 @@ def check_deskpop_state(state: dict) -> bool:
 
 
 STATE_CHECKS["deskpop"] = check_deskpop_state
+
+
+# 곰돌이 새총 원정대 진행 저장 — 값 검사(칸 · 타입 · 범위 · 크기. 화면 web/games/embed/slingfort.html 의 cleanSave 와 같은 칸)
+# 점수(단계 최고)는 원정 점수(game.py 상한 100,000)의 재료라 단계 하나 상한을 넉넉히 둔다(실제 한 판은 2,000 안팎)
+SLINGFORT_LEVELS = 10
+SLINGFORT_MAX_GOLD = 9_999_999
+SLINGFORT_MAX_LEVEL_SCORE = 20_000
+SLINGFORT_UP_MAX = {"bomb": 3, "shield": 3, "giant": 3, "horn": 2}  # 곰 마을 칸 수
+SLINGFORT_KEYS = {"v", "gold", "unlocked", "last", "stars", "best", "cleared", "up", "music", "sfx", "summary"}
+SLINGFORT_LEVEL_KEYS = {str(i) for i in range(1, SLINGFORT_LEVELS + 1)}
+
+
+def check_slingfort_state(state: dict) -> bool:
+    """금화 · 열린 단계 · 단계별 별 · 최고 점수 · 깬 단계 · 강화 단계 · 소리 설정이 말이 되는지. 모르는 칸은 받지 않는다. 빈 상태({})는 처음."""
+    if not isinstance(state, dict) or set(state) - SLINGFORT_KEYS:
+        return False
+    if state.get("v", 1) != 1 or state.get("summary") is not None:
+        return False
+    unlocked, last = state.get("unlocked", 1), state.get("last", 1)
+    if not (
+        _int_in(state.get("gold", 0), 0, SLINGFORT_MAX_GOLD)
+        and _int_in(unlocked, 1, SLINGFORT_LEVELS)
+        and _int_in(last, 1, SLINGFORT_LEVELS)
+        and last <= unlocked
+    ):
+        return False
+    cleared = state.get("cleared", {})
+    if not isinstance(cleared, dict) or set(cleared) - SLINGFORT_LEVEL_KEYS or any(v is not True for v in cleared.values()):
+        return False
+    if any(int(k) > unlocked for k in cleared):  # 깬 단계는 열린 단계 안
+        return False
+    stars = state.get("stars", {})
+    if not isinstance(stars, dict) or set(stars) - set(cleared):  # 별은 깬 단계에만
+        return False
+    if not all(_int_in(v, 1, 3) for v in stars.values()):
+        return False
+    best = state.get("best", {})
+    if not isinstance(best, dict) or set(best) - SLINGFORT_LEVEL_KEYS:
+        return False
+    if not all(_int_in(v, 0, SLINGFORT_MAX_LEVEL_SCORE) for v in best.values()):
+        return False
+    up = state.get("up", {})
+    if not isinstance(up, dict) or set(up) - set(SLINGFORT_UP_MAX):
+        return False
+    if not all(_int_in(v, 0, SLINGFORT_UP_MAX[k]) for k, v in up.items()):
+        return False
+    return all(isinstance(state.get(k, True), bool) for k in ("music", "sfx"))
+
+
+STATE_CHECKS["slingfort"] = check_slingfort_state
 
 
 def _game(key: str) -> MgmtGame:

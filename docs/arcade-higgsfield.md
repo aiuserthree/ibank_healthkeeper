@@ -56,6 +56,7 @@ window.addEventListener("keydown", (e) => { if (e.key === "Escape" && !e.repeat)
 
 | 아케이드 이름 | 키 | 바탕이 된 힉스필드 예시 | 장르 | 아케이드 점수 |
 |---|---|---|---|---|
+| 곰돌이 새총 원정대 | `slingfort` | Sling Raiders — https://higgsfield.ai/ko/playable?preset=1b4973cd-b1a7-4b40-9cd4-c278277b807d (직접 해 보고 기능을 똑같이, 3D 로우폴리 · 그림은 힉스필드 GPT 이미지 20장) | 액션 | 원정 점수 = 10단계 각각의 최고 단계 점수 합(단계 점수 = 약탈 금화 + 남은 곰×100 + 첫 함락 보너스 50+5×단계), 상한 100,000 |
 | 차 빼기 대작전 3D | `traffic` | Gridlock Out — https://higgsfield.ai/ko/playable?preset=446f4a39-15b7-4798-acb6-97e5bd47823f | 퍼즐 | 3분 동안 번 코인(매 판 1단계부터) |
 | 영웅 돌격 다리 3D | `herorush` | Crowd Surge — https://higgsfield.ai/ko/playable?preset=2b20c165-397b-4663-aeef-14afaa2db089 | 액션 | 단계 하나: 이기면 단계×500 + 별×300 + 영웅×10, 지면 진행%×단계×250÷100 |
 | 눈꽃 야영지 3D | `frostcamp` | 확인 안 됨(프롬프트 글만 받음 — 겨울 숲 야영지 방치형 경영) | 캐주얼 | 한 판 8분: 건물에 쓴 통나무×20 + 건물 완성(500·1,000·1,500·2,000) + 나무꾼×300 + 장비 단계×200 + 눈보라 버티기×800(2번까지) − 얼어붙음×200, 얼음 문을 열면 +3,000 + 남은 초×10 |
