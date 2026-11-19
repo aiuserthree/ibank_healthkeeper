@@ -401,7 +401,7 @@ const MATS={
 const ENEMY={w:.7,h:1.4,mass:1.5,dvKill:2.0,tipCos:.7,crushJ:2.4,gold:15};
 /* 두목: 곰 몸(빠르기 bearV 이상) · 꿀폭탄 폭발 · 큰곰 돌진 · 방패 튕김에 직접 맞을 때, 또는 아주 센 충격(속도 변화 dvHit 이상 — 큰 돌이 높은 데서 떨어진 정도)에만 체력 1.
  * 무너진 잔해에 깔리거나 스치는 것으로는 안 깎인다. 깎인 뒤 cool 걸음(0.9초, 전 24걸음) 동안은 다시 안 깎인다. 물 · 밖으로 떨어지면 바로 쓰러짐 */
-const BOSS={w:1.4,h:2.2,mass:7,gold:60,cool:54,dvHit:6.5,bearV:3,bearV2:10}; // 빠른 곰(10m/s 이상)이 바로 맞히면 2
+const BOSS={w:1.4,h:2.2,mass:7,gold:60,cool:54,dvHit:6.5,bearV:3,bearV2:10,perShot:2}; // perShot: 한 발(쏜 곰 하나)이 두목에게 깎는 체력 합 상한 — 물/밖 떨어짐은 따로(바로 쓰러짐) // 빠른 곰(10m/s 이상)이 바로 맞히면 2
 const BEAR_R=.6,BEAR_M=6;
 const GIANT_R=.85,GIANT_M=14;
 /* 특수 곰 — 곰 마을 강화가 이 값을 올린다(applyUp). 시험 걸이(?test=1)는 강화 없음이 기본(SF.setUp 으로 바꿈) */
@@ -726,7 +726,7 @@ function shoot(yawOff,power,tapAt=null){
   world.addBody(b);
   const mesh=loadedBear||makeBear(type);mesh.scale.setScalar(1);loadedBear=null;if(!mesh.parent)S.add(mesh);shotMeshes.push(mesh);
   game.bear={kind:'bear',type,body:b,mesh,slow:0,gone:false,used:false,r:big?GIANT_R:BEAR_R,bounces:0,bounceN:0,cool:0,charge:0,pierced:0,dir:null};b.userData=game.bear;
-  game.shotIdx++;game.phase='flight';game.shotStep=0;game.quiet=0;game.shotBroken=0;game.shotCrumble=false;game.tapReq=false;game.tapAt=tapAt;
+  game.shotIdx++;for(const en of game.enemies)en.shotDmg=0;game.phase='flight';game.shotStep=0;game.quiet=0;game.shotBroken=0;game.shotCrumble=false;game.tapReq=false;game.tapAt=tapAt;
   ui.slots();ui.hint(false);fx.twang();
   return true;
 }
@@ -847,7 +847,7 @@ function gameStep(){
   for(const en of game.enemies)if(en.cool>0)en.cool--;
   const done=new Set();
   for(const [en,why,dmg] of hitE){if(!en.alive||done.has(en))continue;done.add(en);
-    if(en.boss&&why!=='out'){if(en.cool>0)continue;en.hp-=dmg;en.cool=BOSS.cool;game.ev.push(['bossHit',why,Math.max(0,en.hp),game.shotIdx,game.shotStep]);ui.boss();if(en.hp>0){fx.bossHit(en);continue}}
+    if(en.boss&&why!=='out'){if(en.cool>0)continue;const d=Math.min(dmg,BOSS.perShot-(en.shotDmg||0));en.cool=BOSS.cool;if(d<=0){fx.bossHit(en);continue}en.shotDmg=(en.shotDmg||0)+d;en.hp-=d;en.cool=BOSS.cool;game.ev.push(['bossHit',why,Math.max(0,en.hp),game.shotIdx,game.shotStep]);ui.boss();if(en.hp>0){fx.bossHit(en);continue}}
     en.alive=false;removeObj(en);wakeAround(en.body);
     game.enemiesLeft--;game.gold+=en.boss?BOSS.gold:ENEMY.gold;fx.enemyDown(en,why);ui.boss()}
   // 금 단계 갱신

@@ -1,7 +1,7 @@
 # 어디까지 — 2026-11-20 (곰돌이 새총 원정대 · key `slingfort`)
 - 레퍼런스 직접 해 봄 · spec.md · 3D 시안(mock3d/) → 운영자 「A안 3D로 시작해」, 이어 「확인받지 말고 추천안으로 진행」
 - 구현 1단계(물리 · 새총 · 무너짐) 8301edf · 그림 20장 ed672fa · 2단계(특수 곰 · 10단계 · 결과 · 멈춤 · 지도 · 저장) b5d7741
-- 구현 3단계 끝(4fcd458) → 검증 ㉮(verify-a) · ㉯(verify-b) → **검증 반영 끝(2026-11-20, fix/ — 브랜치 커밋만, 푸시 · 배포 안 함)**
+- 구현 3단계 끝(4fcd458) → 검증 ㉮(verify-a) · ㉯(verify-b) → 검증 반영(1878834) → 재검증 ㉰(verify-c) → **두목 한 발 체력 최대 2(BOSS.perShot, 물/밖은 바로 쓰러짐) — verify-d, 브랜치 커밋만, 푸시 · 배포 안 함**
 
 ## 만드는 법(그대로)
 - 소스는 `src/`(shell.html · game.js · cannon.min.js · vendor/three-r128.min.js), `python3 .claude/work/sling/tools/build.py` 로 묶음 → `web/games/embed/slingfort.html`. **본체를 직접 고치지 말고 src 를 고친 뒤 build**
