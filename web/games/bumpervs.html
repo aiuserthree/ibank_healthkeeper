@@ -103,6 +103,18 @@
     .bv-chat__in { flex: 1; min-width: 0; box-sizing: border-box; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid #cbd5e1; background: #fff; font: inherit; font-size: 14px; color: #0f172a; }
     .bv-chat__in:focus { outline: none; border-color: #ea580c; box-shadow: 0 0 0 3px rgba(234, 88, 12, .14); }
     .bv-chat__form .hk-btn { flex-shrink: 0; height: 40px; padding: 0 14px; }
+    /* 빠른 이모지 · 빠른 말 — 누르면 바로 보냄(입력 칸 글은 그대로) · 보낸 뒤 2초는 흐리게 · 키보드가 올라오면 접음 */
+    .bv-chat__quick { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+    .bv-chat__row { display: flex; gap: 5px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; padding: 1px; }
+    .bv-chat__row::-webkit-scrollbar { display: none; }
+    .bv-chat__row.is-say { flex-wrap: wrap; }
+    .bv-chat__q { flex: 0 0 auto; box-sizing: border-box; min-height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: #fff; box-shadow: 0 0 0 1px #e2e8f0; font: inherit; font-size: 13px; font-weight: 700; color: #334155; white-space: nowrap; cursor: pointer; transition: opacity .15s, box-shadow .15s; }
+    .bv-chat__q.is-emo { min-width: 40px; padding: 0 8px; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; font-size: 19px; line-height: 1; }
+    .bv-chat__q:hover { box-shadow: 0 0 0 1px #fdba74; background: #fff7ed; color: #c2410c; }
+    .bv-chat__q:focus-visible { outline: 2px solid #ea580c; outline-offset: 1px; }
+    .bv-chat.is-wait .bv-chat__q, .bv-chat.is-wait .bv-chat__send { opacity: .45; cursor: default; }
+    .bv-chat.is-wait .bv-chat__q:hover { box-shadow: 0 0 0 1px #e2e8f0; background: #fff; color: #334155; }
+    .bv-chat.is-kb .bv-chat__quick { display: none; }
     .bv-invite { margin-top: 10px; }
     .bv-invite[hidden] { display: none; }
     .bv-invite button { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; height: 40px; border: 0; border-radius: 12px; background: #e0e7ff; color: #4338ca; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
@@ -240,6 +252,9 @@
     const racerName = (r) => { const x = RACERS.find((y) => y[0] === r); return x ? `${x[2]} ${x[1]}` : ""; };
     const TRACKS = ["팝콘 퍼레이드", "솜사탕 찻잔 회오리", "네온 등불 루프", "사막 망치 협곡", "그랜드 노을 축제길", "밀림 유적 언덕길", "빗방울 물놀이장", "얼음 성 놀이공원", "별빛 우주 정거장", "바닷속 유리 터널", "장난감 공장 벨트길", "용암 화산 동굴", "구름 위 무지개길"];
     const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    // 여러 명 경주 대기실 채팅의 빠른 단추 — 바꿀 때는 여기만. [이모지, 읽어 주는 이름]
+    const CHAT_EMOJI = [["👍", "엄지척"], ["😂", "웃음"], ["🔥", "불꽃"], ["👏", "박수"], ["😭", "울음"], ["🙏", "부탁해요"], ["😎", "선글라스"], ["🏁", "결승 깃발"]];
+    const CHAT_SAY = ["준비 완료!", "잠깐만요", "출발해요!", "한 판 더?", "살살 해 주세요", "트랙 바꿔요"];
     const LEVEL_NAME = Object.fromEntries(LEVELS);
     const LIMIT = 300; // 경주 시간 상한(초, 3바퀴 경주는 보통 2분 남짓) — 엔진 versus_bumpervs.LIMIT_SEC 과 같다
     const PREF_KEY = "hk-bumpervs-pref";
@@ -1275,14 +1290,19 @@
         chatPaint(true);
       }
       // ── 대기실 채팅 — 보내기 · 처음 목록은 서버(/play/party/{id}/chat), 새 글은 실시간 통로로 바로(서버가 "from" 없이 보냄) · 8초마다 한 번 다시 읽어 빠진 글을 채운다
-      const CH = { items: [], node: null, list: null, input: null, btn: null, sending: false, composing: false, lastSend: 0 };
+      const CH = { items: [], node: null, list: null, input: null, btn: null, sending: false, composing: false, lastSend: 0, warned: 0, lockT: 0, kbT: 0 };
       const chatOk = (c) => c && typeof c === "object" && Number.isInteger(c.n) && typeof c.text === "string" && typeof c.name === "string";
+      const qBtn = (kind, i, label, aria) => `<button type="button" class="bv-chat__q${kind === "emo" ? " is-emo" : ""}" data-chatq="${kind}:${i}" aria-label="${aria} 보내기" aria-disabled="false">${label}</button>`;
       function chatNode() {
         if (CH.node) return CH.node;
         const box = document.createElement("div");
         box.className = "bv-chat";
         box.innerHTML = `<div class="bv-chat__list" role="log" aria-label="대기실 대화" aria-live="polite" tabindex="0"></div>
-          <div class="bv-chat__form"><input type="text" class="bv-chat__in" maxlength="80" placeholder="대기실 사람들에게 한마디" aria-label="대기실 대화 입력" autocomplete="off" enterkeyhint="send"><button type="button" class="hk-btn hk-btn--secondary bv-chat__send">보내기</button></div>`;
+          <div class="bv-chat__quick">
+            <div class="bv-chat__row" role="group" aria-label="빠른 이모지">${CHAT_EMOJI.map(([e, a], i) => qBtn("emo", i, e, a)).join("")}</div>
+            <div class="bv-chat__row is-say" role="group" aria-label="빠른 말">${CHAT_SAY.map((t, i) => qBtn("say", i, t, t)).join("")}</div>
+          </div>
+          <div class="bv-chat__form"><input type="text" class="bv-chat__in" maxlength="80" placeholder="대기실 사람들에게 한마디" aria-label="대기실 대화 입력" autocomplete="off" enterkeyhint="send"><button type="button" class="hk-btn hk-btn--secondary bv-chat__send" aria-disabled="false">보내기</button></div>`;
         CH.node = box; CH.list = box.querySelector(".bv-chat__list"); CH.input = box.querySelector(".bv-chat__in"); CH.btn = box.querySelector(".bv-chat__send");
         CH.input.addEventListener("compositionstart", () => { CH.composing = true; });
         CH.input.addEventListener("compositionend", () => { CH.composing = false; });
@@ -1293,11 +1313,40 @@
           chatSend();
         });
         CH.btn.addEventListener("click", (e) => { e.stopPropagation(); chatSend(); CH.input.focus(); });
-        CH.input.addEventListener("focus", () => { setTimeout(chatKeep, 350); });
+        // 빠른 이모지 · 빠른 말 — 그 글 하나를 바로 보낸다(입력 칸은 건드리지 않음) · 흐린 동안 누르면 조용히 무시
+        box.querySelector(".bv-chat__quick").addEventListener("click", (e) => {
+          const q = e.target.closest("[data-chatq]");
+          if (!q) return;
+          e.stopPropagation();
+          if (CH.node.classList.contains("is-wait")) return;
+          const [kind, i] = q.dataset.chatq.split(":");
+          const t = kind === "emo" ? (CHAT_EMOJI[+i] || [])[0] : CHAT_SAY[+i];
+          if (t) chatSend(t);
+        });
+        CH.input.addEventListener("focus", () => { chatKb(); setTimeout(chatKeep, 350); });
+        CH.input.addEventListener("blur", () => { clearTimeout(CH.kbT); CH.kbT = setTimeout(chatKb, 250); }); // 바로 펼치면 누르던 자리가 밀려 엉뚱한 단추가 눌릴 수 있어 조금 뒤에
         return box;
+      }
+      // 보낸 뒤 2초(서버 간격과 같음)는 빠른 단추 · 보내기를 흐리게 — 연타 도배를 막는다
+      function chatLock() {
+        if (!CH.node) return;
+        const left = CH.lastSend + 2000 - Date.now();
+        const wait = CH.sending || left > 0;
+        CH.node.classList.toggle("is-wait", wait);
+        CH.node.querySelectorAll(".bv-chat__q, .bv-chat__send").forEach((b) => b.setAttribute("aria-disabled", String(wait)));
+        clearTimeout(CH.lockT);
+        if (wait && !CH.sending) CH.lockT = setTimeout(chatLock, left + 20);
+      }
+      // 휴대폰 키보드가 올라와 보이는 높이가 낮으면 빠른 단추를 접어 입력 칸 · 출발 단추가 보이게
+      function chatKb() {
+        if (!CH.node || !CH.input) return;
+        const vv = window.visualViewport;
+        const h = vv ? vv.height : innerHeight;
+        CH.node.classList.toggle("is-kb", document.activeElement === CH.input && h < 560);
       }
       // 휴대폰 — 키보드가 올라와도 입력 칸과 아래 단추(출발 · 준비)가 함께 보이게 카드를 올린다
       function chatKeep() {
+        chatKb();
         if (S.closed || !CH.input || document.activeElement !== CH.input) return;
         const row = over.querySelector(".bv-pl-b .bv-btnrow");
         const vv = window.visualViewport;
@@ -1352,21 +1401,23 @@
         if (d.open === false) { if (CH.items.length) { CH.items = []; chatPaint(true); } return; }
         chatAdd(Array.isArray(d.items) ? d.items : [], false);
       }
-      async function chatSend() {
+      // quick — 빠른 이모지 · 빠른 말 글(없으면 입력 칸 글). 보내는 길은 같다
+      async function chatSend(quick) {
         if (!CH.input || CH.sending || S.closed || S.phase !== "wait") return;
-        const text = CH.input.value.replace(/\s+/g, " ").trim();
+        const typed = typeof quick !== "string";
+        const text = (typed ? CH.input.value : quick).replace(/\s+/g, " ").trim();
         if (!text) return;
-        if (Date.now() - CH.lastSend < 2000) { HKUI.toast("조금 천천히 보내 주세요"); return; }
-        CH.sending = true; CH.btn.disabled = true; CH.lastSend = Date.now();
-        CH.input.value = "";
+        if (Date.now() - CH.lastSend < 2000) { if (CH.warned !== CH.lastSend) { CH.warned = CH.lastSend; HKUI.toast("조금 천천히 보내 주세요"); } return; }
+        CH.sending = true; CH.lastSend = Date.now(); chatLock();
+        if (typed) CH.input.value = "";
         try {
           const d = await HKApi.partyChatSend(p.id, text);
           if (d && d.item) chatAdd([d.item], true);
         } catch (e) {
-          if (!CH.input.value) CH.input.value = text; // 못 보냈으면 적은 글을 되돌린다
+          if (typed && !CH.input.value) CH.input.value = text; // 못 보냈으면 적은 글을 되돌린다(빠른 글은 입력 칸에 넣지 않음)
           HKUI.toast((e && e.message) || "보내지 못했어요", "error");
         } finally {
-          CH.sending = false; if (CH.btn) CH.btn.disabled = false;
+          CH.sending = false; chatLock();
         }
       }
       let shownSetup = "";
