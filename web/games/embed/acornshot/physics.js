@@ -7,7 +7,7 @@
     const { Engine, Bodies, Body, Composite, Events, Vector } = M;
   const STEP = 1000 / 120, FLOOR = 574, SLING = { x: 205, y: 432 }, MAX_PULL = 86, SCORE_MAX = 20000;
   // The rotating sprite extends beyond its 22px collider (ears reach 38px).
-  const TARGET_MARGIN = 38, TARGET_BOUNCE = .25;
+  const TARGET_MARGIN = 38, TARGET_BOUNCE = .25, TARGET_DAMAGE = 1.75;
   const MATERIAL = {
     wood: { hp: 15, density: .0024, color: '#c58a4d', edge: '#754828', points: 120 },
     ice: { hp: 7, density: .0015, color: '#a2e5e6', edge: '#4a969e', points: 150 },
@@ -16,20 +16,20 @@
   // Original stage maps. `ground` is a [x, y] polyline (y is clamped to the base floor);
   // every tower gets a flat pad so it always starts stable on the terrain.
   const LEVELS = [
-    { name: '숲 입구', theme: 'meadow', tip: '평평한 풀밭. 아래쪽 나무 기둥을 노려 보세요.', ammo: ['seed', 'seed', 'bomb'], towers: [[800, 1, 'wood']], enemyHp: 12, blockHp: 1.2 },
-    { name: '반짝이는 온실', theme: 'meadow', tip: '완만한 언덕 위의 얼음탑이에요.', ammo: ['seed', 'split', 'seed'], towers: [[790, 2, 'ice']], enemyHp: 30, blockHp: 2,
+    { name: '숲 입구', theme: 'meadow', tip: '평평한 풀밭. 아래쪽 나무 기둥을 노려 보세요.', ammo: ['seed', 'seed', 'bomb'], towers: [[800, 1, 'wood']], enemyHp: 7, blockHp: 1.2 },
+    { name: '반짝이는 온실', theme: 'meadow', tip: '완만한 언덕 위의 얼음탑이에요.', ammo: ['seed', 'split', 'seed'], towers: [[790, 2, 'ice']], enemyHp: 17, blockHp: 2,
       ground: [[0, 574], [520, 574], [700, 536], [1280, 536]] },
-    { name: '쌍둥이 망루', theme: 'cliff', tip: '높은 언덕 위 망루와 낮은 평지의 망루, 두 높이를 모두 노려요.', ammo: ['split', 'seed', 'seed', 'bomb'], towers: [[700, 2, 'wood'], [1040, 2, 'ice']], enemyHp: 23, blockHp: 1.7,
+    { name: '쌍둥이 망루', theme: 'cliff', tip: '높은 언덕 위 망루와 낮은 평지의 망루, 두 높이를 모두 노려요.', ammo: ['split', 'seed', 'seed', 'bomb'], towers: [[700, 2, 'wood'], [1040, 2, 'ice']], enemyHp: 14, blockHp: 1.7,
       ground: [[0, 574], [440, 574], [600, 510], [830, 510], [920, 574], [1280, 574]] },
-    { name: '오래된 돌문', theme: 'stone', tip: '계단처럼 높아지는 지형. 위쪽 망루가 아래쪽을 짓눌러요.', ammo: ['bomb', 'seed', 'seed', 'split'], towers: [[740, 2, 'stone'], [1040, 2, 'wood']], enemyHp: 23, blockHp: 1.6,
+    { name: '오래된 돌문', theme: 'stone', tip: '계단처럼 높아지는 지형. 위쪽 망루가 아래쪽을 짓눌러요.', ammo: ['bomb', 'seed', 'seed', 'split'], towers: [[740, 2, 'stone'], [1040, 2, 'wood']], enemyHp: 14, blockHp: 1.6,
       ground: [[0, 574], [560, 574], [620, 546], [860, 546], [920, 510], [1280, 510]] },
-    { name: '바람 언덕', theme: 'cliff', tip: '앞 망루를 무너뜨린 뒤, 높게 쏴서 절벽 위 망루를 노려요.', ammo: ['seed', 'split', 'bomb', 'seed', 'seed', 'seed'], towers: [[690, 3, 'wood'], [1040, 2, 'stone']], enemyHp: 20, blockHp: 1.5,
+    { name: '바람 언덕', theme: 'cliff', tip: '앞 망루를 무너뜨린 뒤, 높게 쏴서 절벽 위 망루를 노려요.', ammo: ['seed', 'split', 'bomb', 'seed', 'seed', 'seed'], towers: [[690, 3, 'wood'], [1040, 2, 'stone']], enemyHp: 12, blockHp: 1.5,
       ground: [[0, 574], [880, 574], [950, 470], [1280, 470]] },
-    { name: '유리 숲', theme: 'ice', tip: '두 언덕 사이의 골짜기. 얼음탑이 무너지면 골짜기로 쏟아져요.', ammo: ['split', 'seed', 'bomb', 'seed', 'bomb', 'seed'], towers: [[670, 3, 'ice'], [1040, 3, 'wood']], enemyHp: 28, blockHp: 1.9,
+    { name: '유리 숲', theme: 'ice', tip: '두 언덕 사이의 골짜기. 얼음탑이 무너지면 골짜기로 쏟아져요.', ammo: ['split', 'seed', 'bomb', 'seed', 'bomb', 'seed'], towers: [[670, 3, 'ice'], [1040, 3, 'wood']], enemyHp: 16, blockHp: 1.9,
       ground: [[0, 574], [520, 574], [580, 508], [780, 508], [850, 574], [930, 574], [990, 504], [1280, 504]] },
-    { name: '돌담 너머', theme: 'stone', tip: '돌담 위로 높이 쏘고, 폭탄은 망루 가까이에서 터뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'seed', 'seed'], towers: [[650, 3, 'stone'], [1040, 3, 'wood']], enemyHp: 42, blockHp: 2.5,
+    { name: '돌담 너머', theme: 'stone', tip: '돌담 위로 높이 쏘고, 폭탄은 망루 가까이에서 터뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'seed', 'seed'], towers: [[650, 3, 'stone'], [1040, 3, 'wood']], enemyHp: 26, blockHp: 2.5,
       ground: [[0, 574], [380, 574], [440, 466], [520, 466], [580, 574], [1280, 574]] },
-    { name: '도토리 성채', theme: 'castle', tip: '계단식 절벽 위의 거대한 성채. 아래 받침부터 무너뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'bomb'], towers: [[700, 3, 'wood'], [1040, 3, 'stone']], enemyHp: 27, blockHp: 1.7,
+    { name: '도토리 성채', theme: 'castle', tip: '계단식 절벽 위의 거대한 성채. 아래 받침부터 무너뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'bomb'], towers: [[700, 3, 'wood'], [1040, 3, 'stone']], enemyHp: 15, blockHp: 1.7,
       ground: [[0, 574], [500, 574], [560, 528], [800, 528], [860, 474], [1280, 474]] },
   ];
   function pull(x, y) {
@@ -95,6 +95,7 @@
     const state = { engine, levelIndex, phase: 'aim', blocks: [], targets: [], shots: [], spent: 0, score: 0, time: 0, shotTime: 0, active: null, abilityUsed: false, destroyed: 0 };
     const removed = new Set();
     const pendingSupports = [];
+    const scheduledSupports = new WeakMap();
     const pendingImpacts = [];
     let firstHit = null, hitShown = false;
     let settling = true, quiet = 0, winWait = 0, winQuiet = 0;
@@ -145,7 +146,7 @@
     }
     function damage(b, value) {
       if (!b.game || removed.has(b) || (b.game.kind !== 'block' && b.game.kind !== 'target')) return;
-      b.game.hp -= value;
+      b.game.hp -= value * (b.game.kind === 'target' ? TARGET_DAMAGE : 1);
       if (b.game.hp <= 0) removed.add(b);
     }
     Events.on(engine, 'collisionStart', event => {
@@ -188,9 +189,17 @@
           if (!removed.has(piece) && (state.blocks.includes(piece) || state.targets.includes(piece))) {
             if (piece.game.kind === 'block') piece.game.dropTop ??= piece.position.y;
             M.Sleeping.set(piece, false);
+            Body.setVelocity(piece, { x: piece.velocity.x, y: Math.max(piece.velocity.y, .45) });
           }
         }
       }
+    }
+    function scheduleCollapse(tower, floor, delay) {
+      let floors = scheduledSupports.get(tower);
+      if (!floors) { floors = new Set(); scheduledSupports.set(tower, floors); }
+      if (floors.has(floor)) return;
+      floors.add(floor);
+      pendingSupports.push({ tower, floor, at: state.time + delay });
     }
     function flush() {
       for (const b of removed) {
@@ -200,8 +209,13 @@
         if (targetHit) {
           // The bottom guard of a floor braces its posts. Releasing them is
           // delayed briefly so impacts and each collapse read as separate beats.
-          if (floor + 1 < tower.length) pendingSupports.push({ tower, floor, at: state.time + 140 });
-        } else wakeStack(tower, floor);
+          if (floor + 1 < tower.length) scheduleCollapse(tower, floor, 140);
+        } else {
+          // A missing post or deck means this floor no longer braces the stack.
+          // Tip any remaining support away so a single sleeping post cannot leave
+          // the deck and enemies suspended in mid-air.
+          scheduleCollapse(tower, floor, 60);
+        }
         state.score = Math.min(SCORE_MAX, state.score + (targetHit ? 1000 : MATERIAL[b.game.material].points));
         state.destroyed += targetHit ? 1 : 0;
         state.targets = state.targets.filter(v => v !== b);
@@ -232,6 +246,7 @@
     function releaseSupports() {
       while (pendingSupports.length && pendingSupports[0].at <= state.time) {
         const { tower, floor } = pendingSupports.shift();
+        scheduledSupports.get(tower)?.delete(floor);
         const { posts, deck } = tower[floor];
         if (state.blocks.includes(deck)) notify({ type: 'buckling', ...deck.position });
         // Tip the posts outwards; the deck and enemies above move under normal
@@ -248,10 +263,16 @@
     }
     function shot(x, y, kind, velocity, radius = 20) {
       const b = add(Bodies.circle(x, y, radius, { density: .012, friction: .5, restitution: .3, frictionAir: .0003 }));
-      b.game = { kind: 'shot', ammo: kind, radius };
+      b.game = { kind: 'shot', ammo: kind, radius, turn: state.spent };
       Body.setVelocity(b, velocity);
       state.shots.push(b);
       return b;
+    }
+    function retireCurrentShots() {
+      for (const b of state.shots) {
+        if (b.game.kind === 'shot' && b.game.turn === state.spent) b.game.kind = 'spentShot';
+      }
+      state.active = null;
     }
     function launch(x, y) {
       if (state.phase !== 'aim' || state.spent >= level.ammo.length) return false;
@@ -278,7 +299,8 @@
           M.Sleeping.set(other, false);
         }
         notify({ type: 'blast', ...center });
-        Composite.remove(engine.world, b); state.shots = state.shots.filter(s => s !== b); state.active = null;
+        b.game.kind = 'spentShot'; state.active = null;
+        Body.setVelocity(b, { x: b.velocity.x * .15, y: Math.min(0, b.velocity.y * .15) });
         flush();
       } else {
         const v = b.velocity;
@@ -348,8 +370,7 @@
       const moving = [...state.shots, ...state.blocks, ...state.targets].some(b => b.position.x > -60 && b.position.x < 1340 && b.position.y < 650 && !b.isSleeping && (b.speed > .65 || b.angularSpeed > .04));
       quiet = moving ? 0 : quiet + STEP;
       if (!pendingSupports.length && ((state.shotTime > 1800 && quiet > 650) || state.shotTime > 11000)) {
-        for (const b of state.shots) Composite.remove(engine.world, b);
-        state.shots = []; state.active = null;
+        retireCurrentShots();
         if (state.spent >= level.ammo.length) finish(false);
         else { state.phase = 'aim'; notify({ type: 'reload' }); }
       }

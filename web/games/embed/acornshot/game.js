@@ -17,8 +17,21 @@
   let lastCrashSound = -Infinity;
   let hitStop = 0, chain = 0, chainLabel = null;
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  let audio, sound = false, lastLive = -1, submitted = false, keyAim = false;
+  let audio, sound = false, keyAim = false;
+  let runOpen = false, runBest = 0, lastLive = -1;
   const send = (type, extras = {}) => { if (EMBED) parent.postMessage({ type, ...extras }, location.origin); };
+  function publishLiveScore() {
+    const score = Math.max(runBest, sim.state.score);
+    if (runOpen && score !== lastLive) {
+      lastLive = score;
+      send('hk:live', { score });
+    }
+  }
+  function submitRun() {
+    if (!runOpen) return;
+    runOpen = false;
+    send('hk:score', { score: Math.max(runBest, sim.state.score) });
+  }
   function tone(freq, duration = .12, type = 'sine', volume = .045) {
     if (!sound || paused) return;
     try {
@@ -113,23 +126,29 @@
   }
   function cancelDrag() { dragging = false; pointer = null; aim = { ...P.SLING }; keyAim = false; }
   function start(index) {
-    sim?.dispose(); levelIndex = index; submitted = false; lastLive = -1;
+    sim?.dispose(); levelIndex = index;
     sim = P.create(index, onEvent); screen = 'play'; paused = false; cancelDrag();
     particles = []; rings = []; texts = []; trail = []; accumulator = 0; angle = 27; power = 78;
     lastCrashSound = -Infinity; shake = 0; hitStop = 0; chain = 0; chainLabel = null;
     $('menu').hidden = $('result').hidden = $('paused').hidden = true;
     $('chapter').textContent = `FOREST ${String(index + 1).padStart(2, '0')} / 08`;
     $('level-name').textContent = P.LEVELS[index].name;
-    send('hk:resumed'); send('hk:start'); send('hk:live', { score: 0 });
+    send('hk:resumed');
+    if (!runOpen) {
+      runOpen = true; runBest = 0; lastLive = -1;
+      send('hk:start');
+    }
     canvas.focus({ preventScroll: true }); updateHUD();
   }
   function finish(e) {
-    submitted = true; send('hk:score', { score: e.score });
     screen = 'result'; cancelDrag();
     if (e.won) {
+      runBest = Math.max(runBest, e.score);
       record.best[levelIndex] = Math.max(record.best[levelIndex], e.score);
       record.stars[levelIndex] = Math.max(record.stars[levelIndex], e.stars); save();
     }
+    if (!e.won || levelIndex === P.LEVELS.length - 1) submitRun();
+    else publishLiveScore();
     $('result-label').textContent = e.won ? (levelIndex === 7 ? 'FOREST SAVED' : 'STAGE CLEAR') : 'ONE MORE SHOT';
     $('result-title').textContent = e.won ? (levelIndex === 7 ? '숲을 되찾았어요!' : '멋진 한 방이었어요!') : '조금만 더 정확하게!';
     $('stars').innerHTML = e.won ? '★'.repeat(e.stars) + `<span class="empty">${'★'.repeat(3 - e.stars)}</span>` : '↻';
@@ -140,7 +159,7 @@
     tone(e.won ? 880 : 220, .3);
   }
   function home() {
-    if (sim && !submitted && screen === 'play') { submitted = true; send('hk:score', { score: sim.state.score }); }
+    submitRun();
     screen = 'menu'; paused = false; cancelDrag();
     $('menu').hidden = false; $('result').hidden = $('paused').hidden = true; $('flight-hint').hidden = true;
     $('chapter').textContent = 'ACORN RANGERS'; $('level-name').textContent = '도토리 새총단';
@@ -160,7 +179,7 @@
     const ability = screen === 'play' && s.phase === 'flight' && !s.abilityUsed && s.active && s.active.game.ammo !== 'seed';
     $('ability').disabled = !ability; $('flight-hint').hidden = !ability || paused;
     $('hint').textContent = s.phase === 'aim' ? (keyAim ? `각도 ${angle}° · 힘 ${power}% · SPACE 발사` : level.tip) : `남은 밤도깨비 ${s.targets.length}마리 · 무너지는 중…`;
-    if (!submitted && s.score !== lastLive) { lastLive = s.score; send('hk:live', { score: s.score }); }
+    publishLiveScore();
   }
   const point = e => {
     const rect = canvas.getBoundingClientRect(), scale = Math.min(rect.width / 1280, rect.height / 720);

@@ -57,19 +57,37 @@ collapse.launch(135, 450);
 Body.setPosition(collapse.state.active, { x: lower.position.x, y: lower.position.y });
 assert.equal(collapse.ability(), true);
 assert.ok(!collapse.state.targets.includes(lower), 'A direct bomb defeats the armored foundation guard');
-assert.ok(collapse.state.targets.includes(middle) && collapse.state.targets.includes(upper), 'The blast leaves the upper armored guards standing');
+assert.ok(collapse.state.targets.includes(upper), 'The blast does not instantly clear the entire upper tower');
 for (let i = 0; i < 12; i++) collapse.step();
 assert.ok(upper.position.y - upperStart[1] < 3, 'Upper floor does not drop at the moment of defeat');
 for (let i = 0; i < 360; i++) collapse.step();
 assert.ok(!collapse.state.blocks.includes(lowerDeck) || lowerDeck.position.y - deckStart > 40, 'The unsupported deck falls or breaks');
 assert.ok(!collapse.state.blocks.includes(upperDeck) || upperDeck.position.y - upperDeckStart > 50, 'Top roof falls or breaks rather than staying at its original height');
-assert.ok(middle.position.y - upperStart[0] > 50 && upper.position.y - upperStart[1] > 50, 'Both higher guards actually fall');
+assert.ok((!collapse.state.targets.includes(middle) || middle.position.y - upperStart[0] > 50)
+  && (!collapse.state.targets.includes(upper) || upper.position.y - upperStart[1] > 50),
+  'Both higher guards fall or are defeated during the collapse');
 assert.ok(Math.abs(otherTower.position.y - otherStart) < 3, 'A nearby independent tower does not collapse');
 const crashes = collapseEvents.filter(event => event.type === 'crash');
 assert.ok(crashes.length >= 1, 'Falling floors produce landing impacts');
 assert.ok(collapseEvents.filter(event => event.type === 'break' && !event.target).length >= 3, 'The collapse shatters several structural pieces');
 collapse.dispose();
 console.log('PASS foundation loss releases the floor, roof and upper guards fall, neighboring tower stays standing.');
+// Destroying a bottom structural piece must also release the stack. This covers
+// the player-visible case where the support is gone but sleeping bodies float.
+const brokenSupport = P.create(3);
+const firstTower = brokenSupport.state.blocks.filter(b => b.position.x < 900);
+const bottomPost = firstTower.find(b => b.game.h > b.game.w && b.position.y > 450);
+const topDeck = firstTower.filter(b => b.game.w > b.game.h).at(-1);
+const topDeckY = topDeck.position.y;
+brokenSupport.launch(135, 450);
+Body.setPosition(brokenSupport.state.active, { x: bottomPost.position.x, y: bottomPost.position.y });
+assert.equal(brokenSupport.ability(), true);
+assert.ok(!brokenSupport.state.blocks.includes(bottomPost), 'The lower support is destroyed');
+for (let i = 0; i < 360; i++) brokenSupport.step();
+assert.ok(!brokenSupport.state.blocks.includes(topDeck) || topDeck.position.y - topDeckY > 45,
+  'Destroying a lower structural piece makes the upper deck fall or break');
+brokenSupport.dispose();
+console.log('PASS broken lower structure cannot leave the upper tower floating.');
 // A well-placed blast should defeat even the toughest guard without requiring
 // the projectile to overlap its body at the moment of activation.
 const nearBlast = P.create(6);
@@ -78,7 +96,8 @@ nearBlast.launch(135, 450);
 Body.setPosition(nearBlast.state.active, { x: toughestGuard.position.x - 35, y: toughestGuard.position.y });
 assert.equal(nearBlast.ability(), true);
 assert.ok(!nearBlast.state.targets.includes(toughestGuard), 'A close, off-center blast defeats the stage 7 guard');
-assert.equal(nearBlast.state.destroyed, 1, 'The close blast does not wipe out the tower');
+assert.ok(nearBlast.state.destroyed >= 1 && nearBlast.state.targets.length > 0,
+  'The close blast defeats nearby guards without clearing the whole stage');
 nearBlast.dispose();
 function fire(sim, angle, power, activation = 650) {
   const a = angle * Math.PI / 180, length = power * P.MAX_PULL / 100;
@@ -101,6 +120,8 @@ for (let l = 0; l < P.LEVELS.length; l++) {
 const miss = P.create(0);
 for (let i = 0; i < P.LEVELS[0].ammo.length; i++) fire(miss, 75, 15);
 assert.equal(miss.state.phase, 'lost');
+assert.equal(miss.state.shots.length, P.LEVELS[0].ammo.length, 'Every thrown ally remains on the field after defeat');
+assert.ok(miss.state.shots.every(b => b.game.kind === 'spentShot'), 'Finished shots become harmless resting allies');
 assert.equal(miss.launch(120, 432), false, 'Cannot launch after result');
 miss.dispose();
 // Stage 2 now needs several shots; keep shooting until it is won, then confirm the
@@ -116,13 +137,10 @@ if (roofCheck.state.phase === 'won') {
 }
 roofCheck.dispose();
 // Replay all earlier chosen shots for each candidate: no state teleport or target deletion.
-// Keep the precise stage 7 route: the coarse greedy search clears it, but spends the reserve.
-const stageSevenPath = [[16, 88, 800], [36, 88, 650], [36, 88, 0], [12, 88, 800], [8, 100, 0], [28, 94, 0]];
 for (let l = 0; l < P.LEVELS.length; l++) {
-  const knownPath = P.LEVELS[l].name === '돌담 너머' ? stageSevenPath : null;
-  const path = knownPath ?? [];
+  const path = [];
   let won = false;
-  for (let shot = 0; !knownPath && shot < P.LEVELS[l].ammo.length && !won; shot++) {
+  for (let shot = 0; shot < P.LEVELS[l].ammo.length && !won; shot++) {
     let best;
     for (const angle of [8, 12, 16, 20, 28, 36, 44]) {
       for (const power of [58, 64, 76, 88, 100]) {
@@ -158,8 +176,11 @@ for (let l = 0; l < P.LEVELS.length; l++) {
 }
 const bomb = P.create(3);
 bomb.launch(122, 450);
+const bombBody = bomb.state.active;
 assert.equal(bomb.ability(), true);
 assert.equal(bomb.ability(), false, 'One ability per shot');
+assert.ok(bomb.state.shots.includes(bombBody), 'The bomb ally remains after using its ability');
+assert.equal(bombBody.game.kind, 'spentShot', 'The used bomb cannot deal repeated shot damage');
 bomb.dispose();
 const split = P.create(2);
 split.launch(122, 450); split.ability();
