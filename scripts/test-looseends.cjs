@@ -31,8 +31,8 @@ console.log('PASS rules: cross / cover / settle');
   assert.ok(mvAll.some(x => x.rope === 0), '덮인 줄도 옮길 수 있다(모든 수)');
   assert.ok(!mvClean.some(x => x.rope === 0), '깔끔한 수에는 덮인 줄이 없다(옛 규칙과 같음)');
   const one = R.applyMove(ropes, 0, 'a', 3, holes, {});
-  assert.equal(Math.abs(R.twOf(one.tw, 0, 1)), 1, '덮인 줄을 빼면 감긴 수 1');
-  assert.equal(one.ropes[one.ropes.length - 1].id, 0, '옮긴 줄은 맨 위로');
+  assert.equal(Math.abs(R.twOf(one.tw, 0, 1)), 1, '위 줄 밑으로 지나가면 걸린다(감긴 수 1)');
+  assert.equal(one.ropes[one.ropes.length - 1].id, 1, '걸린 줄은 위 줄 밑에 남는다');
   // 3-4 와 2-6 은 엇갈리지 않지만 감겨 있으니 빠지지 않는다
   assert.equal(R.freed(holes, one.ropes).length, 2, '엇갈림은 없다');
   assert.equal(R.settle(holes, one.ropes, one.tw).gone.length, 0, '감긴 채로는 빠지지 않는다');
@@ -41,14 +41,30 @@ console.log('PASS rules: cross / cover / settle');
   assert.equal(R.twCount(back.tw), 0, '반대로 지나가면 감김이 풀린다');
   const s1 = R.sigma(holes, ropes[1], 0, 3), s2 = R.sigma(holes, ropes[1], 3, 0);
   assert.equal(s1, -s2, '길을 거꾸로 하면 방향도 반대');
-  // 감긴 쌍을 다른 줄(위 줄)로 풀 수도 있다: 위 줄 1 의 핀을 옮겨 반대 방향으로 돌리면 0
+  // 다른 줄(위 줄)을 옮겨서는 걸림이 풀리지 않는다
   const i1 = one.ropes.findIndex(r => r.id === 1), w = R.twOf(one.tw, 0, 1);
-  const unw = R.moves(holes, one.ropes, undefined, one.tw).filter(x => x.rope === i1 && x.delta.some(d => d.w1 === 0));
-  assert.ok(unw.length > 0, '위 줄을 돌려서도 감김을 풀 수 있다');
+  for (const mv of R.moves(holes, one.ropes, undefined, one.tw, { all: true }).filter(x => x.rope === i1))
+    assert.equal(R.twOf(R.applyMove(one.ropes, i1, mv.end, mv.to, holes, one.tw).tw, 0, 1), w, '위 줄을 옮겨도 걸림은 그대로');
   assert.ok(R.solve(holes, one.ropes, { tw: one.tw, nodes: 50000, depth: 6 }), '꼬인 상태에서도 깔끔한 풀이가 나온다');
   void w;
 }
 console.log('PASS twist: wind / unwind / no release while wound');
+
+// 덮이지 않은 밑 줄도 위 줄 밑으로 지나가면 걸린다(운영자 2026-11-21 「밑 줄을 옮길 때 위 줄 때문에 꼬여야」)
+{
+  const holes = R.layout(8, 0);
+  const ropes = [{ a: 0, b: 1, id: 0 }, { a: 3, b: 7, id: 1 }]; // 0 은 아래, 1 은 위 — 엇갈리지 않음
+  assert.equal(R.freed(holes, ropes).length, 2, '시작은 엇갈림 없음');
+  const one = R.applyMove(ropes, 0, 'b', 5, holes, {}); // 0-1 의 핀 1 → 5: 줄 1(3-7) 밑을 지나간다
+  assert.equal(Math.abs(R.twOf(one.tw, 0, 1)), 1, '밑 줄 핀이 위 줄 밑을 지나가면 걸린다');
+  assert.equal(R.settle(holes, one.ropes, one.tw).gone.length, 0, '걸린 채로는 빠지지 않는다');
+  const back = R.applyMove(one.ropes, one.ropes.findIndex(r => r.id === 0), 'b', 1, holes, one.tw);
+  assert.equal(R.twCount(back.tw), 0, '같은 길로 되돌리면 풀린다');
+  const over = R.applyMove(ropes, 1, 'a', 2, holes, {}); // 위 줄 3-7 의 핀 3 → 2: 아래 줄 0-1 위로 지나감
+  assert.equal(R.twCount(over.tw), 0, '위 줄이 아래 줄 위로 지나가는 것은 걸리지 않는다');
+}
+console.log('PASS hook: lower rope passing under an upper rope gets caught');
+
 
 
 // 본편 40판: 시작부터 풀린 줄 없음 · 풀이기가 목표 수와 같은 풀이를 찾는다 · 구멍 번호가 겹치지 않는다
@@ -70,30 +86,37 @@ LV.forEach((d, i) => {
 console.log('PASS 40 levels solvable, targets match, total target moves', totalTarget);
 
 
-// 꼬인 상태에서 힌트(깔끔한 풀이기)를 따라가면 끝까지 풀린다 · 막히면 되돌리기로 늘 시작으로 돌아간다
+// 꼬인 상태에서 힌트(suggest)만 따라가도 끝까지 풀린다 — 막다른 상태가 없다
 {
-  const rand = R.rng(11); let solvedByHint = 0, tried = 0;
-  for (let t = 0; t < 24; t++) {
+  const rand = R.rng(11); let tried = 0, cleared = 0, maxSteps = 0;
+  for (let t = 0; t < 30; t++) {
     const d = LV[(t * 7) % 40], holes = R.layout(d.ring, d.inner);
-    let ropes = d.ropes.map(([a, b], k) => ({ a, b, id: k })), tw = {};
-    for (let k = 0; k < 3; k++) {
+    let ropes = d.ropes.map(([a, b], k) => ({ a, b, id: k })), tw = {}; const hist = [];
+    for (let k = 0; k < 3 + (t % 4); k++) {
       const ms = R.moves(holes, ropes, undefined, tw, { all: true }).filter(x => x.delta.length);
       if (!ms.length) break;
-      const mv = ms[Math.floor(rand() * ms.length)], nx = R.applyMove(ropes, mv.rope, mv.end, mv.to, holes, tw);
+      const mv = ms[Math.floor(rand() * ms.length)], r = ropes[mv.rope], nx = R.applyMove(ropes, mv.rope, mv.end, mv.to, holes, tw);
       if (R.settle(holes, nx.ropes, nx.tw).gone.length) break;
-      ropes = nx.ropes; tw = nx.tw;
+      hist.push({ id: r.id, end: mv.end, from: r[mv.end], to: mv.to }); ropes = nx.ropes; tw = nx.tw;
     }
     if (!R.twCount(tw)) continue;
     tried++;
-    const sol = R.solve(holes, ropes, { tw, nodes: 150000, depth: 14 });
-    if (!sol) continue;
-    let cur = ropes, ctw = tw;
-    for (const mv of sol) { const ri = cur.findIndex(r => r.id === mv.id); const nx = R.applyMove(cur, ri, mv.end, mv.to, holes, ctw); cur = nx.ropes; ctw = nx.tw; }
-    assert.equal(R.settle(holes, cur, ctw).gone.length, cur.length, 'hint path from twisted state clears');
-    solvedByHint++;
+    // 게임처럼: 힌트가 있으면 두고, 없으면 되돌리기(상태를 그대로 되살림)
+    let steps = 0; const snaps = hist.map(() => null); // 무작위 수의 되돌리기 상태는 아래서 다시 만든다
+    { let rp = d.ropes.map(([a, b], k) => ({ a, b, id: k })), tp = {}; for (let k = 0; k < hist.length; k++) { snaps[k] = { ropes: rp, tw: tp }; const h = hist[k], i = rp.findIndex(r => r.id === h.id); const nx = R.applyMove(rp, i, h.end, h.to, holes, tp); rp = nx.ropes; tp = nx.tw; } }
+    while (steps < 80) {
+      const s = R.suggest(holes, ropes, tw, hist); steps++;
+      if (!s) { assert.ok(snaps.length, 'undo available when no hint'); do { const b = snaps.pop(); hist.pop(); ropes = b.ropes; tw = b.tw; } while (snaps.length && R.twCount(tw)); continue; }
+      const i = ropes.findIndex(r => r.id === s.id); snaps.push({ ropes, tw }); hist.push({ id: s.id, end: s.end, from: ropes[i][s.end], to: s.to });
+      const nx = R.applyMove(ropes, i, s.end, s.to, holes, tw);
+      if (R.settle(holes, nx.ropes, nx.tw).gone.length) { cleared++; break; }
+      ropes = nx.ropes; tw = nx.tw;
+    }
+    maxSteps = Math.max(maxSteps, steps);
   }
-  assert.ok(tried >= 10 && solvedByHint / tried >= 0.7, `twisted states mostly solvable by hint (${solvedByHint}/${tried})`);
-  console.log('PASS hint from twisted states', solvedByHint + '/' + tried);
+  assert.ok(tried >= 12, 'enough twisted samples');
+  assert.equal(cleared, tried, 'following hints always clears');
+  console.log('PASS hints clear every twisted state', cleared + '/' + tried, 'max steps', maxSteps);
 }
 
 // 처음부터 꼬인 판(끝없는 실 · 오늘): 결정적 · 풀이가 목표 수와 같다 · 풀이 재생으로 빠진다

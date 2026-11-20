@@ -27,7 +27,7 @@ class LooseendsIntegrationTest(unittest.TestCase):
         page = ROOT / 'web/games/embed/looseends.html'
         for src in re.findall(r'(?:src|href)="([^"]+)"', page.read_text()):
             self.assertNotIn('://', src)
-            self.assertTrue((page.parent / src).is_file(), src)
+            self.assertTrue((page.parent / src.split('?')[0]).is_file(), src)
 
     def test_embed_messages_and_gallery(self):
         js = (ROOT / 'web/games/embed/looseends/game.js').read_text()

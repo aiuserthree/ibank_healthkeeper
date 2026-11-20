@@ -89,8 +89,10 @@
     return set;
   }
   const TW_MAX = 3;
-  const pairKey = (x, y) => (x < y ? x + '-' + y : y + '-' + x);
-  const twOf = (tw, x, y) => (tw && tw[pairKey(x, y)]) || 0;
+  // 걸림(꼬임) 키: '아래줄id-위줄id' — 아래 줄(옮긴 줄)이 위 줄에 걸렸다. 순서가 있다.
+  const pairKey = (low, host) => low + '-' + host;
+  const twOf = (tw, low, host) => (tw && tw[pairKey(low, host)]) || 0;
+  const twAny = (tw, x, y) => twOf(tw, x, y) || twOf(tw, y, x);
   const twCount = tw => { let n = 0; for (const k in tw || {}) if (tw[k]) n += Math.abs(tw[k]); return n; };
   const twPairs = tw => Object.keys(tw || {}).filter(k => tw[k]).map(k => { const [x, y] = k.split('-').map(Number); return { x, y, w: tw[k] }; });
   // 핀이 h1 → h2 로 갈 때 줄 s 를 기준으로 돈 방향(+1 / -1)
@@ -100,36 +102,51 @@
     if (Math.abs(c) < 1e-9) return h2 > h1 ? 1 : -1;
     return c > 0 ? 1 : -1;
   }
-  // 줄 i 와 얽힌 줄 번호들: 위에서 덮고 있거나 이미 감긴 줄
+  // 핀이 h1 → h2 로 가는 동안 줄 s 를 「지나갔나」: 길이 s 를 가로지르거나, 옮기기 전후로 s 와의 엇갈림이 바뀌었다(s 의 핀을 돌아감)
+  function passes(holes, r, end, h1, h2, s) {
+    if (segCross(holes[h1], holes[h2], holes[s.a], holes[s.b])) return true;
+    const after = { ...r, [end]: h2 };
+    return crosses(holes, r, s) !== crosses(holes, after, s);
+  }
+  // 줄 i 를 end 핀으로 hole 까지 옮길 때 걸림 변화: [{ id(위 줄), w0, w1, over? }]
+  //  - 이미 걸린 위 줄: 그 줄을 다시 지나가면 방향대로 ±1(반대로 지나가면 풀림)
+  //  - 아직 안 걸린, 나보다 위에 있는 줄: 그 줄 밑을 지나가면 걸린다
+  //  - 다른 줄을 옮겨서는 걸림이 바뀌지 않는다
+  function twistDelta(holes, ropes, ri, end, hole, m, tw) {
+    const r = ropes[ri], h1 = r[end], out = [];
+    for (let j = 0; j < ropes.length; j++) {
+      if (j === ri) continue;
+      const s = ropes[j], w0 = twOf(tw, r.id, s.id);
+      if (!w0 && j < ri) continue;
+      if (!passes(holes, r, end, h1, hole, s)) continue;
+      const raw = w0 + sigma(holes, s, h1, hole), w1 = Math.max(-TW_MAX, Math.min(TW_MAX, raw));
+      if (w1 !== w0) out.push({ id: s.id, w0, w1 });
+      else out.push({ id: s.id, w0, w1, over: true });
+    }
+    return out;
+  }
+  // 줄 i 와 얽힌 줄(안내용): 위에서 덮고 있거나 i 가 걸려 있는 줄
   function entangled(holes, ropes, i, m, tw) {
     m = m || crossMatrix(holes, ropes);
     const out = [], id = ropes[i].id;
     for (let j = 0; j < ropes.length; j++) if (j !== i && ((j > i && m[i][j]) || twOf(tw, id, ropes[j].id))) out.push(j);
     return out;
   }
-  // 한 수가 꼬임에 주는 변화: [{ id, w0, w1 }] (상대 줄 id, 전 · 뒤 감긴 수)
-  function twistDelta(holes, ropes, ri, end, hole, m, tw) {
-    const r = ropes[ri], h1 = r[end], out = [];
-    for (const j of entangled(holes, ropes, ri, m, tw)) {
-      const s = ropes[j], w0 = twOf(tw, r.id, s.id), raw = w0 + sigma(holes, s, h1, hole), w1 = Math.max(-TW_MAX, Math.min(TW_MAX, raw));
-      if (w1 !== w0) out.push({ id: s.id, w0, w1 });
-      else if (raw !== w0) out.push({ id: s.id, w0, w1, over: true }); // 상한에 막혀 그대로지만 더 꼬려는 수
-    }
-    return out;
-  }
   const isClean = delta => delta.every(d => !d.over && Math.abs(d.w1) <= Math.abs(d.w0));
-  // 한 수 적용: 옮긴 줄을 맨 위로 올린 새 상태 반환. tw 를 주면 { ropes, tw } 를 돌려준다.
+  // 한 수 적용. holes 를 주면 { ropes, tw } — 옮긴 줄은 맨 위로 가되, 옮긴 뒤에도 엇갈리거나 걸려 있는 위 줄보다는 아래에 남는다.
+  // holes 없이 부르면 옛 방식(맨 위로) 배열만 돌려준다.
   function applyMove(ropes, ri, end, hole, holes, tw) {
     const next = ropes.map(r => ({ ...r }));
+    if (!holes) { const [r] = next.splice(ri, 1); r[end] = hole; next.push(r); return next; }
+    const ntw = { ...(tw || {}) }, rid = ropes[ri].id;
+    for (const d of twistDelta(holes, ropes, ri, end, hole, null, tw)) { const k = pairKey(rid, d.id); if (d.w1) ntw[k] = d.w1; else delete ntw[k]; }
     const [r] = next.splice(ri, 1);
-    let ntw = null;
-    if (holes) {
-      ntw = { ...(tw || {}) };
-      for (const d of twistDelta(holes, ropes, ri, end, hole, null, tw)) { const k = pairKey(r.id, d.id); if (d.w1) ntw[k] = d.w1; else delete ntw[k]; }
-    }
     r[end] = hole;
-    next.push(r); // 맨 위로
-    return holes ? { ropes: next, tw: ntw } : next;
+    // 위에 있던 줄 가운데 아직 나를 덮고 있거나 내가 걸려 있는 줄 — 그 가운데 가장 아래 줄 바로 밑에 놓는다
+    let at = next.length;
+    for (let j = ri; j < next.length; j++) if (crosses(holes, r, next[j]) || ntw[pairKey(rid, next[j].id)]) { at = j; break; }
+    next.splice(at, 0, r);
+    return { ropes: next, tw: ntw };
   }
   function settle(holes, ropes, tw) {
     return freed(holes, ropes).length === ropes.length && !twCount(tw)
@@ -144,11 +161,12 @@
     const empties = [];
     for (let h = 0; h < holes.length; h++) if (!occ.has(h)) empties.push(h);
     for (let i = 0; i < ropes.length; i++) {
-      const ent = entangled(holes, ropes, i, m, tw);
-      if (!ent.length) { for (const end of ['a', 'b']) for (const h of empties) out.push({ rope: i, end, to: h, delta: [] }); continue; }
+      // 위에서 덮인 줄은 깔끔하게 옮길 수 없다(옛 규칙) — 모든 수(all)일 때만
+      const covered = !movable(holes, ropes, i, m);
+      if (covered && !all && !Object.keys(tw || {}).some(k => tw[k] && k.startsWith(ropes[i].id + '-'))) continue;
       for (const end of ['a', 'b']) for (const h of empties) {
         const delta = twistDelta(holes, ropes, i, end, h, m, tw);
-        if (all || isClean(delta)) out.push({ rope: i, end, to: h, delta });
+        if (all || (isClean(delta) && !covered) || (covered && delta.length && delta.every(d => Math.abs(d.w1) < Math.abs(d.w0)))) out.push({ rope: i, end, to: h, delta });
       }
     }
     return out;
@@ -157,7 +175,7 @@
   // 엇갈리거나 감긴 쌍 하나마다 둘 중 하나는 최소 한 번 옮겨야 한다(겹치지 않는 쌍 수 = 하한).
   function moveLowerBound(matrix, ropes, tw) {
     const matched = new Set(), n = matrix.length;
-    const bad = (i, j) => matrix[i][j] || (tw && ropes && twOf(tw, ropes[i].id, ropes[j].id));
+    const bad = (i, j) => matrix[i][j] || (tw && ropes && twAny(tw, ropes[i].id, ropes[j].id));
     for (let i = 0; i < n; i++) {
       if (matched.has(i)) continue;
       for (let j = i + 1; j < n; j++) {
@@ -223,6 +241,41 @@
     return null;
   }
 
+  // 힌트 한 수: ① 꼬임을 늘리지 않는 최소 풀이의 첫 수 ② 걸림을 만든 최근 수를 거꾸로(history: [{id,end,from,to}])
+  // ③ 걸림 합을 가장 줄이는 수. 없으면 null(되돌리기 · 다시 하기 안내).
+  function suggest(holes, ropes, tw, history, opts) {
+    const n = twCount(tw);
+    const path = solve(holes, ropes, { tw, nodes: (opts && opts.nodes) || (n ? 60000 : 150000), depth: 14 });
+    if (path && path.length) return { ...path[0], how: 'solve' };
+    if (!n) {
+      const deep = solve(holes, ropes, { tw, nodes: 900000, depth: 12 });
+      return deep && deep.length ? { ...deep[0], how: 'solve' } : null;
+    }
+    const occ = occupied(ropes), idx = id => ropes.findIndex(r => r.id === id);
+    const after = m => twCount(applyMove(ropes, idx(m.id), m.end, m.to, holes, tw).tw);
+    for (let k = (history || []).length - 1; k >= 0; k--) {
+      const h = history[k]; if (!h) continue;
+      const i = idx(h.id); if (i < 0 || occ.has(h.from) || ropes[i][h.end] !== h.to) continue;
+      const m = { id: h.id, end: h.end, to: h.from }; if (after(m) < n) return { ...m, how: 'reverse' };
+    }
+    let best = n, mv = null;
+    for (const m of moves(holes, ropes, undefined, tw, { all: true })) {
+      if (!m.delta.length) continue;
+      const c = { id: ropes[m.rope].id, end: m.end, to: m.to }, v = after(c); if (v < best) { best = v; mv = c; }
+    }
+    if (mv) return { ...mv, how: 'greedy' };
+    // ④ 두 수 앞: 먼저 둔 한 수 뒤에 걸림을 줄이는 수가 생기면 그 첫 수(막힌 구멍 비우기)
+    for (const m1 of moves(holes, ropes, undefined, tw, { all: true })) {
+      if (m1.delta.some(d => Math.abs(d.w1) > Math.abs(d.w0) || d.over)) continue;
+      const nx = applyMove(ropes, m1.rope, m1.end, m1.to, holes, tw);
+      for (const m2 of moves(holes, nx.ropes, undefined, nx.tw, { all: true })) {
+        if (!m2.delta.length) continue;
+        if (twCount(applyMove(nx.ropes, m2.rope, m2.end, m2.to, holes, nx.tw).tw) < n) return { id: ropes[m1.rope].id, end: m1.end, to: m1.to, how: 'clear' };
+      }
+    }
+    return null; // 되돌리기 안내
+  }
+
   // 처음부터 꼬인 판: 깔끔한 판에서 덮인 줄 하나를 억지로 뺀 상태로 시작. 깔끔한 풀이 최소 수가 목표.
   function twist(p, seed, opts) {
     const rand = rng(seed * 40503 + 977), holes = p.holes, cap = (opts && opts.nodes) || 90000, maxMoves = (opts && opts.maxMoves) || 8;
@@ -238,5 +291,5 @@
     return null;
   }
 
-  return { rng, layout, crosses, crossMatrix, movable, coveredBy, freed, occupied, applyMove, settle, moves, solve, generate, twist, keyOf, NEAR, pairKey, twOf, twCount, twPairs, sigma, entangled, twistDelta, isClean, TW_MAX };
+  return { rng, layout, crosses, crossMatrix, movable, coveredBy, freed, occupied, applyMove, settle, moves, solve, generate, twist, keyOf, NEAR, pairKey, twOf, twCount, twPairs, sigma, entangled, twistDelta, isClean, TW_MAX, twAny, passes, suggest };
 });
