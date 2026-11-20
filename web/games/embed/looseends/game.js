@@ -97,7 +97,7 @@
 
   function begin(level) {
     closeModal(true);
-    S = { ...level, ropes: level.ropes.map(r => ({ ...r })), tw: { ...(level.tw || {}) }, hookT: {}, wob: {}, preview: null, moves: 0, hist: [], held: null, sel: null, cursor: 0, kb: false, hint: null, anim: [], busy: false, won: false, shake: null, flash: null, mv: new Set(), tip: '' };
+    S = { ...level, ropes: level.ropes.map(r => ({ ...r })), tw: { ...(level.tw || {}) }, hookT: {}, hookEnd: {}, wob: {}, preview: null, moves: 0, hist: [], held: null, sel: null, cursor: 0, kb: false, hint: null, anim: [], busy: false, won: false, shake: null, flash: null, mv: new Set(), tip: '' };
     S.tip = level.kind === 'map' ? (TIPS[level.idx] || '흰 테 두른 핀을 빈 구멍으로 옮기세요.') : Rules.twCount(level.tw) ? '처음부터 꼬여 있어요. 꼬인 줄을 반대쪽으로 돌려 풀어요 — 막히면 힌트!' : level.kind === 'daily' ? '오늘의 퍼즐이에요. 차분히 풀어 보세요.' : '끝없이 이어지는 퍼즐이에요.';
     S.cursor = S.ropes.length ? S.ropes[S.ropes.length - 1].a : 0;
     particles = []; recalc(); setCoach(S.tip); hud();
@@ -365,7 +365,7 @@
   function ropeGeom(rope) {
     if (S.held && S.held.id === rope.id) return null;
     const A0 = endPos(rope, 'a'), B0 = endPos(rope, 'b');
-    const hooks = Rules.twPairs(S.tw).filter(p => p.x === rope.id).map(p => ({ host: S.ropes[ropeIdx(p.y)], turns: Math.min(2, Math.abs(p.w)), sign: Math.sign(p.w) })).filter(h => h.host);
+    const hooks = Rules.twPairs(S.tw).filter(p => p.x === rope.id).map(p => ({ host: S.ropes[ropeIdx(p.y)], turns: Math.min(2, Math.abs(p.w)), sign: Math.sign(p.w), end: S.hookEnd[p.x + '-' + p.y] || 'b' })).filter(h => h.host);
     if (!hooks.length) return null;
     const w = ropeW(), dx0 = B0.x - A0.x, dy0 = B0.y - A0.y, len0 = Math.hypot(dx0, dy0) || 1;
     hooks.forEach(h => {
@@ -395,12 +395,15 @@
     // 덮던 줄을 건너는 자리를 찾아 위 · 아래 번갈아(감긴 방향에 따라 첫 자리가 바뀜)
     hooks.forEach(hk => {
       const ex = hk.D.x - hk.C.x, ey = hk.D.y - hk.C.y, sideOf = P => Math.sign((P.x - hk.C.x) * ey - (P.y - hk.C.y) * ex) || 1;
-      let c = 0;
+      // 덮던 줄을 건너는 자리들을 모은 뒤, 옮긴 핀 쪽 자리는 위(넘어감), 거기서 멀어질수록 아래 · 위 번갈아
+      const xs = [];
       for (let i = 1; i < pts.length; i++) if (sideOf(pts[i]) !== sideOf(pts[i - 1])) {
-        const t = ((pts[i].x - hk.C.x) * ex + (pts[i].y - hk.C.y) * ey) / (ex * ex + ey * ey); if (t < 0 || t > 1) continue;
-        if ((c + (hk.sign > 0 ? 1 : 0)) % 2 === 1) { let a = i, b = i; let acc = 0; while (a > 1 && acc < w * 1.3) { acc += Math.hypot(pts[a].x - pts[a - 1].x, pts[a].y - pts[a - 1].y); a--; } acc = 0; while (b < pts.length - 2 && acc < w * 1.3) { acc += Math.hypot(pts[b + 1].x - pts[b].x, pts[b + 1].y - pts[b].y); b++; } fronts.push([a, b]); }
-        c++;
+        const t = ((pts[i].x - hk.C.x) * ex + (pts[i].y - hk.C.y) * ey) / (ex * ex + ey * ey); if (t >= 0 && t <= 1) xs.push(i);
       }
+      xs.forEach((i, c) => {
+        const fromMoved = hk.end === 'b' ? xs.length - 1 - c : c;
+        if (fromMoved % 2 === 0) { let a = i, b = i; let acc = 0; while (a > 1 && acc < w * 1.3) { acc += Math.hypot(pts[a].x - pts[a - 1].x, pts[a].y - pts[a - 1].y); a--; } acc = 0; while (b < pts.length - 2 && acc < w * 1.3) { acc += Math.hypot(pts[b + 1].x - pts[b].x, pts[b + 1].y - pts[b].y); b++; } fronts.push([a, b]); }
+      });
     });
     return { pts, fronts };
   }
@@ -576,6 +579,7 @@
     S.hist.push({ ropes: S.ropes.map(r => ({ ...r })), tw: { ...S.tw }, moves: S.moves, mv: { id, end, from: S.ropes[i][end], to: hole } });
     const delta = Rules.twistDelta(S.holes, S.ropes, i, end, hole, S.cm, S.tw);
     const tw0 = Rules.twCount(S.tw), h1 = S.ropes[i][end], nx = Rules.applyMove(S.ropes, i, end, hole, S.holes, S.tw);
+    for (const d of delta) if (!d.w0 && d.w1) S.hookEnd[id + '-' + d.id] = end; // 넘어간 쪽 핀(그쪽이 위로 보인다)
     for (const d of delta) if (!d.w0 && d.w1) { // 새로 걸린 자리: 핀이 지난 길과 위 줄이 만나는 점
       const s2 = S.ropes[ropeIdx(d.id)], P = S.holes[h1], Q = S.holes[hole], C = S.holes[s2.a], D = S.holes[s2.b];
       const den = (Q.x - P.x) * (D.y - C.y) - (Q.y - P.y) * (D.x - C.x);
