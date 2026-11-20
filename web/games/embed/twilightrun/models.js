@@ -14,8 +14,14 @@ const profiles = {
 const liveries = {
   coupe: { index: 0, stripe: '#202827', accent: '#d4af5e', rim: '#b59d68' },
   sport: { index: 1, stripe: '#142e48', accent: '#b9f5fb', rim: '#a8c4dd' },
-  gt: { index: 2, stripe: '#f3e6cc', accent: '#fff0cc', rim: '#b9b9b5' },
-  hyper: { index: 3, stripe: '#151b32', accent: '#e8a171', rim: '#a47d71' },
+  gt: { index: 2, stripe: '#f3e6cc', accent: '#fff0cc', rim: '#525761' },
+  hyper: { index: 3, stripe: '#29223e', accent: '#a789dc', rim: '#b4888c' },
+};
+const rearStyles = {
+  coupe: { wingHeight: .062, exhaust: .64, diffuser: .66 },
+  sport: { wingHeight: .044, exhaust: 0, diffuser: .83 },
+  gt: { wingHeight: .405, exhaust: .18, diffuser: .80 },
+  hyper: { wingHeight: .183, exhaust: 0, diffuser: .89 },
 };
 
 export function createCarModels(T, glowTexture) {
@@ -174,6 +180,7 @@ export function createCarModels(T, glowTexture) {
 
   function aero(group, shape, data, paint) {
     const { w, l, deck, roof, front, rear } = data;
+    const { wingHeight, exhaust, diffuser } = rearStyles[shape];
     const boot = l - .21;
     const rearDeck = deck - .021;
     const floor = .23;
@@ -182,21 +189,40 @@ export function createCarModels(T, glowTexture) {
     const bumper = new T.Group();
     const frontPanel = new T.Group();
     const sides = {};
+    const diffuserWidth = w * diffuser;
+    panel(bumper, trim, [
+      [-diffuserWidth, floor - .048, l + .057], [diffuserWidth, floor - .048, l + .057],
+      [diffuserWidth * 1.08, floor - .044, l - .31], [-diffuserWidth * 1.08, floor - .044, l - .31],
+    ]);
     panel(bumper, grille, [
-      [-w * .77, floor, l + .018], [w * .77, floor, l + .018],
-      [w * .70, .386, l + .020], [w * .53, .43, l + .021],
-      [-w * .53, .43, l + .021], [-w * .70, .386, l + .020],
+      [-diffuserWidth, floor - .044, l + .056], [diffuserWidth, floor - .044, l + .056],
+      [diffuserWidth * .91, .386, l + .034], [diffuserWidth * .70, .43, l + .025],
+      [-diffuserWidth * .70, .43, l + .025], [-diffuserWidth * .91, .386, l + .034],
     ]);
     for (const side of [-1, 1]) {
       const bodySide = new T.Group();
       sides[side < 0 ? 'left' : 'right'] = bodySide;
-      const fin = box(bumper, trim, side * w * .49, .296, l + .039, .056, .135, .151);
-      fin.rotation.z = side * -.15;
-      box(bumper, accent, side * w * .657, .269, l + .041, w * .22, .026, .062);
-      const exhaust = piece(bumper, tube, alloy, side * (shape === 'gt' ? .39 : .62), .34, l + .034, .084, .108, .044);
-      exhaust.rotation.x = Math.PI / 2;
-      const opening = piece(bumper, tube, grille, exhaust.position.x, .34, l + .094, .059, .016, .030);
-      opening.rotation.x = Math.PI / 2;
+      for (const offset of [.41, .73]) {
+        const fin = box(bumper, trim, side * diffuserWidth * offset, .246, l + .027, .035, .115, .18);
+        fin.rotation.z = side * -.18;
+      }
+      box(bumper, accent, side * diffuserWidth * .87, .223, l + .063, w * .14, .019, .041);
+      if (exhaust) {
+        const pipe = piece(bumper, tube, alloy, side * exhaust, .337, l + .036, .075, .093, .047);
+        pipe.rotation.x = Math.PI / 2;
+        const opening = piece(bumper, tube, grille, pipe.position.x, .337, l + .086, .054, .012, .031);
+        opening.rotation.x = Math.PI / 2;
+      }
+      if (shape === 'hyper') {
+        panel(bumper, accent, [
+          [side * w * .17, .24, l + .063], [side * w * .31, .414, l + .045],
+          [side * w * .64, .447, l + .045], [side * w * .80, .27, l + .063],
+        ]);
+        panel(bumper, grille, [
+          [side * w * .20, .24, l + .069], [side * w * .335, .392, l + .051],
+          [side * w * .624, .422, l + .051], [side * w * .77, .27, l + .069],
+        ]);
+      }
       const mirror = box(group, paint, side * w * .814, roof - .266, front - .075, .25, .084, .165);
       mirror.rotation.y = side * .18;
       box(group, blackGlass, side * w * .84, roof - .26, front + .011, .18, .063, .022);
@@ -239,22 +265,20 @@ export function createCarModels(T, glowTexture) {
     ]);
     box(frontPanel, accent, 0, .198, -l - .112, w * 1.48, .019, .038);
     const wing = new T.Group();
-    const wingHeight = { coupe: .095, sport: .056, gt: .405, hyper: .183 }[shape];
+    const raisedWing = shape === 'gt' || shape === 'hyper';
     for (const side of [-1, 1]) {
-      if (wingHeight > .06) {
+      if (raisedWing) {
         const pylon = box(wing, trim, side * w * .52, rearDeck + wingHeight * .43, boot - .047, .058, wingHeight, .132);
         pylon.rotation.x = -.18;
-      }
-      if (shape === 'gt' || shape === 'hyper') {
         const endplate = box(wing, shape === 'gt' ? paint : trim, side * w * .92, rearDeck + wingHeight,
           boot + .014, .045, .116, .36);
         endplate.rotation.x = -.09;
       }
     }
-    const spoiler = box(wing, shape === 'sport' ? paint : trim, 0, rearDeck + wingHeight, boot,
-      w * (shape === 'gt' ? 1.87 : 1.70), shape === 'sport' ? .055 : .041, shape === 'gt' ? .30 : .195);
+    const spoiler = box(wing, raisedWing ? trim : paint, 0, rearDeck + wingHeight, boot,
+      w * (shape === 'gt' ? 1.87 : 1.70), raisedWing ? .043 : .061, shape === 'gt' ? .30 : .195);
     spoiler.rotation.x = -.115;
-    box(wing, accent, 0, rearDeck + wingHeight + .022, boot + .091, w * 1.53, .018, .034);
+    if (raisedWing) box(wing, accent, 0, rearDeck + wingHeight + .022, boot + .091, w * 1.53, .018, .034);
     function mount(part, x, y, z) {
       const pivot = new T.Group();
       pivot.position.set(x, y, z);

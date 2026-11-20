@@ -381,11 +381,26 @@ export function createFallback(canvas) {
     const paintEnd = (left, right, lo, hi, tint, z0 = end) =>
       polygon([at(left, lo, z0), at(left, hi, z0), at(right, hi, z0), at(right, lo, z0)], tint);
     paintEnd(-half * .9, half * .9, faceY - .06, faceY + .14, '#22232c');
+    if (vehicle.player && shape === 'sport') {
+      paintEnd(-half * .86, half * .86, faceY + .068, faceY + .103, lamp);
+    }
     for (const sign of [-1, 1]) {
-      const l = Math.min(sign * half * .86, sign * half * .28);
-      const r = Math.max(sign * half * .86, sign * half * .28);
-      paintEnd(l, r, faceY, faceY + .045, lamp);
-      paintEnd(l, r, faceY + .078, faceY + .12, lamp);
+      const inside = sign * half * .32;
+      const outside = sign * half * .86;
+      if (vehicle.player && shape === 'gt') {
+        for (const offset of [.42, .60, .78]) {
+          const center = sign * half * offset;
+          paintEnd(center - .026, center + .026, faceY + .009, faceY + .118, lamp);
+        }
+      } else if (vehicle.player && shape === 'hyper') {
+        polygon([at(inside, faceY + .034, end), at(inside, faceY + .076, end),
+          at(outside, faceY + .134, end), at(outside, faceY + .093, end)], lamp);
+      } else if (!vehicle.player || shape !== 'sport') {
+        const l = Math.min(inside, outside);
+        const r = Math.max(inside, outside);
+        paintEnd(l, r, faceY, faceY + .045, lamp);
+        paintEnd(l, r, faceY + .078, faceY + .12, lamp);
+      }
       if (!oncoming && vehicle.turnSignal === sign && Math.floor(state.elapsed * 5) % 2 === 0) {
         const edge = sign * half * .83;
         paintEnd(edge - .095, edge + .095, faceY + .14, faceY + .178, '#ffc345');
@@ -394,6 +409,18 @@ export function createFallback(canvas) {
     if (!oncoming) {
       paintEnd(-.17, .17, faceY + .005, faceY + .105, '#acb1b7');
       paintEnd(-half * .70, half * .70, .27, .34, '#26282e');
+    }
+    if (vehicle.player && (shape === 'gt' || shape === 'hyper')) {
+      const wing = boot + (shape === 'gt' ? .38 : .17);
+      const edge = half * .87;
+      const rear = end + .20;
+      for (const sign of [-1, 1]) {
+        const center = sign * half * .54;
+        paintEnd(center - .025, center + .025, boot - .04, wing, '#1c1e29', rear);
+      }
+      polygon([at(-edge, wing, rear), at(-edge, wing + .045, rear + .19),
+        at(edge, wing + .045, rear + .19), at(edge, wing, rear)], '#242733');
+      paintEnd(-edge, edge, wing - .025, wing, shape === 'gt' ? '#e7dabc' : '#a789dc', rear);
     }
     if (vehicle.rival) {
       const marker = at(0, roof + .62, 0);

@@ -63,10 +63,10 @@ export function trackLook(course, distance, repeat) {
   return { current, next, mix: t * t * (3 - 2 * t) };
 }
 export const cars = [
-  { name: '솔라 S', color: '#d1e84e', price: 0, top: 224, power: 7.8, grip: 5.7, wheelbase: 3.36, shape: 'coupe' },
-  { name: '이온 RS', color: '#58c9f9', price: 430, top: 248, power: 9.2, grip: 6.2, wheelbase: 3.08, shape: 'sport' },
-  { name: '앰버 GT', color: '#ff8251', price: 900, top: 270, power: 10.6, grip: 6.7, wheelbase: 3.50, shape: 'gt' },
-  { name: '펄스 X', color: '#e8e1fa', price: 1650, top: 296, power: 12.3, grip: 7.3, wheelbase: 3.26, shape: 'hyper' },
+  { name: '솔라 S', color: '#c6d642', top: 224, power: 7.8, grip: 5.7, wheelbase: 3.36, shape: 'coupe' },
+  { name: '이온 RS', color: '#34bce9', top: 248, power: 9.2, grip: 6.2, wheelbase: 3.08, shape: 'sport' },
+  { name: '앰버 GT', color: '#ee763b', top: 270, power: 10.6, grip: 6.7, wheelbase: 3.50, shape: 'gt' },
+  { name: '펄스 X', color: '#cab9ed', top: 296, power: 12.3, grip: 7.3, wheelbase: 3.26, shape: 'hyper' },
 ];
 export const modes = [
   { id: 'sprint', name: '스프린트' },

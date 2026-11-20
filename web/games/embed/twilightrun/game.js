@@ -32,17 +32,15 @@ const titles = { win: '완주 성공!', wreck: '차량 파손', timeout: '시간
 function load() {
   let data;
   try { data = JSON.parse(localStorage.getItem(storageKey)); } catch { data = null; }
-  const owned = cars.map((_, i) => i === 0 || data?.owned?.[i] === true);
-  const upgrades = cars.map((_, i) => owned[i] && Number.isInteger(data?.upgrades?.[i])
+  const upgrades = cars.map((_, i) => Number.isInteger(data?.upgrades?.[i])
     ? clamp(data.upgrades[i], 0, maxUpgrade) : 0);
   return {
     balance: Number.isSafeInteger(data?.balance) ? Math.max(0, data.balance) : 0,
     best: Number.isSafeInteger(data?.best) ? clamp(data.best, 0, SCORE_LIMIT) : 0,
-    car: Number.isInteger(data?.car) && owned[data.car] ? data.car : 0,
+    car: Number.isInteger(data?.car) && cars[data.car] ? data.car : 0,
     course: Number.isInteger(data?.course) && courses[data.course] ? data.course : 0,
     mode: Number.isInteger(data?.mode) && modes[data.mode] ? data.mode : 0,
     sound: data?.sound === true,
-    owned,
     upgrades,
   };
 }
@@ -166,8 +164,6 @@ function playImpact({ force, stage = 1, detached = false, side }, distance = 0) 
 function homeInfo() {
   $('balance').textContent = number(profile.balance);
   $('best').textContent = number(profile.best);
-  $('selected-car').textContent = cars[profile.car].name;
-  $('paint-dot').style.background = cars[profile.car].color;
   const course = courses[profile.course];
   const length = (course.length / 1000).toFixed(1);
   $('course-detail').textContent = `${length} km · ${course.sections.map(part => part.name).join(' → ')}`;
@@ -191,25 +187,45 @@ function setOptions(id, items) {
 setOptions('course', courses);
 setOptions('mode', modes);
 
+const carOptions = $('car-options');
+const carPortrait = car => `${assetRoot}garage/${car.shape}.webp?v=3`;
+carOptions.innerHTML = cars.map((car, i) => `
+  <div>
+    <input id="car-${i}" type="radio" name="car" value="${i}">
+    <label class="car-option" for="car-${i}">
+      <img src="${carPortrait(car)}" width="600" height="260" alt="">
+      <span>${car.name}</span>
+    </label>
+  </div>`).join('');
+const carInputs = [...carOptions.querySelectorAll('input')];
+function paintCarSelection() {
+  carInputs[profile.car].checked = true;
+  const car = carStats(profile.car, profile.upgrades[profile.car]);
+  $('car-spec').textContent = `최고 ${car.top} km/h · 가속 ${car.power.toFixed(1)}`;
+}
+carOptions.addEventListener('change', event => {
+  profile.car = Number(event.target.value);
+  save();
+  paintCarSelection();
+});
+
 const upgradeCost = (i, level) => 220 + i * 85 + level * 155;
 function garageInfo(focus) {
   $('garage-balance').textContent = number(profile.balance);
   $('car-list').innerHTML = cars.map((car, i) => {
     const equipped = profile.car === i;
-    const owned = profile.owned[i];
     const level = profile.upgrades[i];
     const stats = carStats(i, level);
     const price = upgradeCost(i, level);
     const selectButton = equipped ? '선택됨' : '선택';
-    const purchase = owned
-      ? `<button type="button" class="button quiet" data-car="${i}" data-action="equip" ${equipped ? 'disabled' : ''}>${selectButton}</button>
-         <button type="button" class="button quiet" data-car="${i}" data-action="upgrade" ${level >= maxUpgrade || profile.balance < price ? 'disabled' : ''}>${level >= maxUpgrade ? '강화 완료' : '강화 · ' + number(price)}</button>`
-      : `<button type="button" class="button quiet" data-car="${i}" data-action="buy" ${profile.balance < car.price ? 'disabled' : ''}>해금 · ${number(car.price)}</button>`;
     return `<article class="car-card ${equipped ? 'current' : ''}">
-      <img class="car-portrait" src="${assetRoot}garage/${car.shape}.webp?v=2" width="600" height="260" alt="">
+      <img class="car-portrait" src="${carPortrait(car)}" width="600" height="260" alt="">
       <h3>${car.name}</h3>
       <p class="car-stats"><span>${stats.top} km/h</span><span>가속 ${stats.power.toFixed(1)}</span><span>강화 ${level}/${maxUpgrade}</span></p>
-      <div class="car-actions">${purchase}</div>
+      <div class="car-actions">
+        <button type="button" class="button quiet" data-car="${i}" data-action="equip" ${equipped ? 'disabled' : ''}>${selectButton}</button>
+        <button type="button" class="button quiet" data-car="${i}" data-action="upgrade" ${level >= maxUpgrade || profile.balance < price ? 'disabled' : ''}>${level >= maxUpgrade ? '강화 완료' : '강화 · ' + number(price)}</button>
+      </div>
     </article>`;
   }).join('');
   if (focus) {
@@ -231,15 +247,10 @@ $('car-list').addEventListener('click', event => {
   const i = Number(button.dataset.car);
   const { action } = button.dataset;
   const car = cars[i];
-  if (action === 'equip' && profile.owned[i]) {
+  if (action === 'equip') {
     profile.car = i;
-    $('garage-status').textContent = `${car.name} 장착 완료`;
-  } else if (action === 'buy' && !profile.owned[i] && profile.balance >= car.price) {
-    profile.balance -= car.price;
-    profile.owned[i] = true;
-    profile.car = i;
-    $('garage-status').textContent = `${car.name} 해금 및 장착 완료`;
-  } else if (action === 'upgrade' && profile.owned[i] && profile.upgrades[i] < maxUpgrade) {
+    $('garage-status').textContent = `${car.name} 선택 완료`;
+  } else if (action === 'upgrade' && profile.upgrades[i] < maxUpgrade) {
     const price = upgradeCost(i, profile.upgrades[i]);
     if (profile.balance < price) return;
     profile.balance -= price;
@@ -248,7 +259,8 @@ $('car-list').addEventListener('click', event => {
   } else return;
   save();
   garageInfo({ i, action });
-  homeInfo();
+  paintCarSelection();
+  $('balance').textContent = number(profile.balance);
 });
 
 $('sound').addEventListener('click', () => {
@@ -555,5 +567,6 @@ addEventListener('storage', event => {
 });
 
 $('camera').setAttribute('aria-label', `시점 변경 · 현재 ${viewNames[view]}`);
+paintCarSelection();
 homeInfo();
 send('hk:ready');
