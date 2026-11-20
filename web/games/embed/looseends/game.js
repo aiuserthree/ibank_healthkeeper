@@ -780,6 +780,7 @@
       <div class="tiles">${LOOMS.map(l => `<button class="tile" data-loom="${l.id}" aria-pressed="${rec.settings.loom === l.id}" ${loomOk(l) ? '' : 'disabled'}><div class="sw" style="background:${l.id === 'garden' ? 'linear-gradient(135deg,#eceadf,#cfd3c2)' : 'linear-gradient(135deg,#e6b97f,#cf9559)'}"></div><span>${l.name}</span>${loomOk(l) ? '' : `<small>별 ${l.need}개로 열림</small>`}</button>`).join('')}</div>
       <button class="btn teal" id="s-back" data-focus>퍼즐로 돌아가기</button>
       <button class="btn" id="s-help">게임 방법</button>
+      <button class="btn danger" id="s-reset">기록 지우고 처음부터</button>
       <p class="note">${saveOk ? '진행은 이 기기에 저장돼요.' : '저장소를 쓸 수 없어 이번 창에서만 기록해요.'}</p>`;
     const wire = el => {
       on(el, '#t-sound', () => { rec.settings.sound = !rec.settings.sound; save(); re(); });
@@ -787,9 +788,22 @@
       el.querySelectorAll('[data-thread]').forEach(b => b.addEventListener('click', () => { rec.settings.thread = b.dataset.thread; save(); sfx.click(); re(); }));
       el.querySelectorAll('[data-loom]').forEach(b => b.addEventListener('click', () => { rec.settings.loom = b.dataset.loom; save(); bgCache = null; sfx.click(); re(); }));
       on(el, '#s-back', () => closeModal()); on(el, '#s-help', () => openHelp(() => openSettings(back)));
+      on(el, '#s-reset', () => openReset(() => openSettings(back)));
     };
     const re = () => { const st = modal.el.querySelector('.body').scrollTop, el = openModal('settings', '설정', body(), { onClose: back }); wire(el); el.querySelector('.body').scrollTop = st; };
     wire(openModal('settings', '설정', body(), { onClose: back }));
+  }
+  // 기록 지우고 1단계부터: 별 · 단계 · 오늘의 퍼즐 · 끝없는 실 기록을 지운다(소리 · 잔잔한 움직임 설정은 남김)
+  function openReset(back) {
+    const el = openModal('reset', '처음부터 다시 할까요?', `
+      <p class="praise">이 기기에 저장된 별 ${starTotal()}개 · 단계 기록 · 오늘의 퍼즐 · 끝없는 실 기록이 모두 지워지고 1단계부터 시작해요.<br>아케이드 순위에 이미 남은 점수는 그대로예요.</p>
+      <div class="row"><button class="btn" id="r-cancel" data-focus>그대로 두기</button><button class="btn danger" id="r-ok">지우고 1단계부터</button></div>`, { onClose: back });
+    on(el, '#r-cancel', () => closeModal());
+    on(el, '#r-ok', () => {
+      const keep = { sound: rec.settings.sound, gentle: rec.settings.gentle };
+      const f = fresh(); Object.keys(f).forEach(k => { rec[k] = f[k]; }); rec.settings.sound = keep.sound; rec.settings.gentle = keep.gentle;
+      save(); bgCache = null; closeModal(true); begin(mapLevel(0)); setCoach('기록을 지웠어요. 1단계부터 시작해요!', 3000);
+    });
   }
   function openPause() {
     if (!S) return;
