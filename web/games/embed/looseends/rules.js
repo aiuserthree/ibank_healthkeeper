@@ -103,10 +103,9 @@
     return c > 0 ? 1 : -1;
   }
   // 핀이 h1 → h2 로 가는 동안 줄 s 를 「지나갔나」: 길이 s 를 가로지르거나, 옮기기 전후로 s 와의 엇갈림이 바뀌었다(s 의 핀을 돌아감)
+  // 꼬이는 기준은 하나: 핀이 옛 구멍 → 새 구멍으로 곧게 가는 길이 그 줄을 가로지른다(그 줄 밑으로 지나간다).
   function passes(holes, r, end, h1, h2, s) {
-    if (segCross(holes[h1], holes[h2], holes[s.a], holes[s.b])) return true;
-    const after = { ...r, [end]: h2 };
-    return crosses(holes, r, s) !== crosses(holes, after, s);
+    return segCross(holes[h1], holes[h2], holes[s.a], holes[s.b]);
   }
   // 줄 i 를 end 핀으로 hole 까지 옮길 때 걸림 변화: [{ id(위 줄), w0, w1, over? }]
   //  - 이미 걸린 위 줄: 그 줄을 다시 지나가면 방향대로 ±1(반대로 지나가면 풀림)
@@ -119,6 +118,7 @@
       const s = ropes[j], w0 = twOf(tw, r.id, s.id);
       if (!w0 && j < ri) continue;
       if (!passes(holes, r, end, h1, hole, s)) continue;
+      // 방향: 위 줄의 어느 쪽에서 어느 쪽으로 건너갔나(반대로 건너가면 풀림)
       const raw = w0 + sigma(holes, s, h1, hole), w1 = Math.max(-TW_MAX, Math.min(TW_MAX, raw));
       if (w1 !== w0) out.push({ id: s.id, w0, w1 });
       else out.push({ id: s.id, w0, w1, over: true });
@@ -140,11 +140,12 @@
     if (!holes) { const [r] = next.splice(ri, 1); r[end] = hole; next.push(r); return next; }
     const ntw = { ...(tw || {}) }, rid = ropes[ri].id;
     for (const d of twistDelta(holes, ropes, ri, end, hole, null, tw)) { const k = pairKey(rid, d.id); if (d.w1) ntw[k] = d.w1; else delete ntw[k]; }
+    const before = { ...ropes[ri] };
     const [r] = next.splice(ri, 1);
     r[end] = hole;
-    // 위에 있던 줄 가운데 아직 나를 덮고 있거나 내가 걸려 있는 줄 — 그 가운데 가장 아래 줄 바로 밑에 놓는다
+    // 맨 위로 가되, 내가 걸린 위 줄과 원래 나를 덮고 있었고 옮긴 뒤에도 덮고 있는 위 줄보다는 아래에 남는다
     let at = next.length;
-    for (let j = ri; j < next.length; j++) if (crosses(holes, r, next[j]) || ntw[pairKey(rid, next[j].id)]) { at = j; break; }
+    for (let j = ri; j < next.length; j++) if (ntw[pairKey(rid, next[j].id)] || (crosses(holes, before, next[j]) && crosses(holes, r, next[j]))) { at = j; break; }
     next.splice(at, 0, r);
     return { ropes: next, tw: ntw };
   }

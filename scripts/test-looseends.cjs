@@ -65,6 +65,24 @@ console.log('PASS twist: wind / unwind / no release while wound');
 }
 console.log('PASS hook: lower rope passing under an upper rope gets caught');
 
+// 꼬이는 기준: 핀 길이 위 줄을 가로지를 때만. 같은 쪽으로 또 건너가면 두 번, 반대로 건너가면 풀림, 끝을 돌아가는 것은 안 셈
+{
+  const holes = R.layout(12, 0);
+  const ropes = [{ a: 0, b: 1, id: 0 }, { a: 3, b: 9, id: 1 }]; // 아래 줄 0-1, 위 줄 3-9(세로 가운데)
+  const one = R.applyMove(ropes, 0, 'b', 5, holes, {}); // 1 → 5: 위 줄을 가로지름(오른쪽 → 왼쪽 쪽)
+  assert.equal(Math.abs(R.twOf(one.tw, 0, 1)), 1, '한 번 건너가면 한 번 꼬임');
+  let i0 = one.ropes.findIndex(r => r.id === 0);
+  const around = R.applyMove(one.ropes, i0, 'b', 7, holes, one.tw); // 5 → 7: 같은 쪽 안에서 움직임(가로지르지 않음)
+  assert.equal(R.twOf(around.tw, 0, 1), R.twOf(one.tw, 0, 1), '가로지르지 않으면 그대로');
+  i0 = one.ropes.findIndex(r => r.id === 0);
+  const back = R.applyMove(one.ropes, i0, 'b', 1, holes, one.tw); // 5 → 1: 반대로 건너감
+  assert.equal(R.twCount(back.tw), 0, '반대로 건너가면 풀림');
+  const i1 = one.ropes.findIndex(r => r.id === 0), other = R.applyMove(one.ropes, i1, 'a', 2, holes, one.tw); // 0 → 2: 위 줄 안 건넘
+  assert.equal(Math.abs(R.twOf(other.tw, 0, 1)), 1, '다른 핀을 위 줄 안 건너게 옮기면 그대로');
+}
+console.log('PASS twist rule: only crossing the upper rope counts, direction = side to side');
+
+
 
 
 // 본편 40판: 시작부터 풀린 줄 없음 · 풀이기가 목표 수와 같은 풀이를 찾는다 · 구멍 번호가 겹치지 않는다

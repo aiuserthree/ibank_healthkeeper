@@ -354,7 +354,7 @@
     const A0 = endPos(rope, 'a'), B0 = endPos(rope, 'b');
     const hooks = Rules.twPairs(S.tw).filter(p => p.x === rope.id).map(p => ({ host: S.ropes[ropeIdx(p.y)], turns: Math.abs(p.w) })).filter(h => h.host);
     if (!hooks.length) return null;
-    const w = ropeW(), amp = w * 1.1, dx0 = B0.x - A0.x, dy0 = B0.y - A0.y;
+    const w = ropeW(), amp = w * .72, dx0 = B0.x - A0.x, dy0 = B0.y - A0.y;
     hooks.forEach(h => { h.X = hookPoint(rope, h.host); h.k = (h.X.x - A0.x) * dx0 + (h.X.y - A0.y) * dy0; });
     hooks.sort((p, q) => p.k - q.k);
     const pts = [A0], fronts = [];
@@ -366,7 +366,7 @@
       // 들어오는 쪽(cur)에서 가까운 끝부터 감기 시작하게 방향을 맞춘다
       if (((cur.x - hk.X.x) * ex + (cur.y - hk.X.y) * ey) > ((next.x - hk.X.x) * ex + (next.y - hk.X.y) * ey)) { ex = -ex; ey = -ey; }
       const nx = -ey, ny = ex;
-      const L = Math.min(hl * .75, w * (1.8 + 3.4 * hk.turns));
+      const L = Math.min(hl * .5, w * (1.2 + 1.9 * hk.turns));
       const tX = (hk.X.x - C.x) * (ex > 0 || ey > 0 ? 1 : 1) * 0; void tX;
       const half = L / 2, X = hk.X;
       const S1 = { x: X.x - ex * half, y: X.y - ey * half };
@@ -374,12 +374,12 @@
       let h = hk.turns * 2; if ((h % 2 === 1) !== (sd1 !== sd2)) h += 1; // 위 줄을 넘는 횟수: 한 번 꼬임 = 밑으로 한 번 + 위로 한 번
       const at = (u, y) => ({ x: S1.x + ex * L * u + nx * y, y: S1.y + ey * L * u + ny * y });
       const steps = Math.max(16, h * 12), endY = sd1 * amp * (h % 2 ? -1 : 1);
-      pts.push(...quad(cur, at(-.3, sd1 * amp * 1.4), at(0, sd1 * amp), 12).slice(1));
+      pts.push(...quad(cur, at(-.15, sd1 * amp), at(0, sd1 * amp), 12).slice(1));
       const base = pts.length - 1;
       for (let i = 1; i <= steps; i++) { const u = i / steps; pts.push(at(u, sd1 * amp * Math.cos(Math.PI * h * u))); }
       for (let c = 1; c < h; c += 2) { const uc = (c + .5) / h, hw = .5 / h * .8; fronts.push([base + Math.max(0, Math.floor((uc - hw) * steps)), base + Math.min(steps, Math.ceil((uc + hw) * steps))]); }
       cur = at(1, endY);
-      if (idx + 1 === hooks.length) pts.push(...quad(cur, at(1.3, endY * 1.4), B0, 12).slice(1));
+      if (idx + 1 === hooks.length) pts.push(...quad(cur, at(1.15, endY), B0, 12).slice(1));
       else { const nxt = hooks[idx + 1].X; pts.push({ x: (cur.x + nxt.x) / 2, y: (cur.y + nxt.y) / 2 }); cur = pts[pts.length - 1]; }
     });
     return { pts, fronts };
