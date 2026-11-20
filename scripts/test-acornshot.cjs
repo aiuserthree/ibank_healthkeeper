@@ -70,6 +70,16 @@ assert.ok(crashes.length >= 1, 'Falling floors produce landing impacts');
 assert.ok(collapseEvents.filter(event => event.type === 'break' && !event.target).length >= 3, 'The collapse shatters several structural pieces');
 collapse.dispose();
 console.log('PASS foundation loss releases the floor, roof and upper guards fall, neighboring tower stays standing.');
+// A well-placed blast should defeat even the toughest guard without requiring
+// the projectile to overlap its body at the moment of activation.
+const nearBlast = P.create(6);
+const toughestGuard = nearBlast.state.targets[0];
+nearBlast.launch(135, 450);
+Body.setPosition(nearBlast.state.active, { x: toughestGuard.position.x - 35, y: toughestGuard.position.y });
+assert.equal(nearBlast.ability(), true);
+assert.ok(!nearBlast.state.targets.includes(toughestGuard), 'A close, off-center blast defeats the stage 7 guard');
+assert.equal(nearBlast.state.destroyed, 1, 'The close blast does not wipe out the tower');
+nearBlast.dispose();
 function fire(sim, angle, power, activation = 650) {
   const a = angle * Math.PI / 180, length = power * P.MAX_PULL / 100;
   assert.equal(sim.launch(P.SLING.x - Math.cos(a) * length, P.SLING.y + Math.sin(a) * length), true);
@@ -106,10 +116,13 @@ if (roofCheck.state.phase === 'won') {
 }
 roofCheck.dispose();
 // Replay all earlier chosen shots for each candidate: no state teleport or target deletion.
+// Keep the precise stage 7 route: the coarse greedy search clears it, but spends the reserve.
+const stageSevenPath = [[16, 88, 800], [36, 88, 650], [36, 88, 0], [12, 88, 800], [8, 100, 0], [28, 94, 0]];
 for (let l = 0; l < P.LEVELS.length; l++) {
-  const path = [];
+  const knownPath = P.LEVELS[l].name === '돌담 너머' ? stageSevenPath : null;
+  const path = knownPath ?? [];
   let won = false;
-  for (let shot = 0; shot < P.LEVELS[l].ammo.length && !won; shot++) {
+  for (let shot = 0; !knownPath && shot < P.LEVELS[l].ammo.length && !won; shot++) {
     let best;
     for (const angle of [8, 12, 16, 20, 28, 36, 44]) {
       for (const power of [58, 64, 76, 88, 100]) {
@@ -128,18 +141,20 @@ for (let l = 0; l < P.LEVELS.length; l++) {
     }
     assert.ok(best, `Stage ${l + 1} has a playable next shot`);
     path.push(best.choice); won = best.won;
-    if (won) {
-      const events = [], replay = P.create(l, e => events.push(e));
-      for (const shot of path) fire(replay, ...shot);
-      for (let i = 0; i < 300; i++) replay.step();
-      assert.equal(events.filter(e => e.type === 'finish').length, 1, 'Exactly one result');
-      assert.ok(replay.state.score > 0 && replay.state.score <= P.SCORE_MAX);
-      assert.ok(replay.state.stars >= 1 && replay.state.stars <= 3);
-      console.log(`PASS stage ${l + 1}: ${path.length} shots, ${replay.state.score} points, solution ${JSON.stringify(path)}`);
-      replay.dispose();
-    }
   }
-  assert.ok(won, `Stage ${l + 1} must be solvable within its ammo budget; best sequence ${JSON.stringify(path)}`);
+  const events = [], replay = P.create(l, e => events.push(e));
+  for (const shot of path) {
+    if (replay.state.phase !== 'aim') break;
+    fire(replay, ...shot);
+  }
+  for (let i = 0; i < 300; i++) replay.step();
+  assert.equal(replay.state.phase, 'won', `Stage ${l + 1} must be solvable; sequence ${JSON.stringify(path)}`);
+  assert.equal(events.filter(e => e.type === 'finish').length, 1, 'Exactly one result');
+  assert.ok(replay.state.score > 0 && replay.state.score <= P.SCORE_MAX);
+  assert.ok(replay.state.stars >= 2 && replay.state.stars <= 3,
+    `Stage ${l + 1} has a verified clear with at least one spare acorn`);
+  console.log(`PASS stage ${l + 1}: ${replay.state.spent} shots, ${replay.state.score} points, solution ${JSON.stringify(path)}`);
+  replay.dispose();
 }
 const bomb = P.create(3);
 bomb.launch(122, 450);

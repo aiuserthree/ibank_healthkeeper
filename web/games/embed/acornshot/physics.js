@@ -16,20 +16,20 @@
   // Original stage maps. `ground` is a [x, y] polyline (y is clamped to the base floor);
   // every tower gets a flat pad so it always starts stable on the terrain.
   const LEVELS = [
-    { name: '숲 입구', theme: 'meadow', tip: '평평한 풀밭. 아래쪽 나무 기둥을 노려 보세요.', ammo: ['seed', 'seed', 'bomb'], towers: [[800, 1, 'wood']], enemyHp: 14, blockHp: 1.2 },
-    { name: '반짝이는 온실', theme: 'meadow', tip: '완만한 언덕 위의 얼음탑이에요.', ammo: ['seed', 'split', 'seed'], towers: [[790, 2, 'ice']], enemyHp: 38, blockHp: 2,
+    { name: '숲 입구', theme: 'meadow', tip: '평평한 풀밭. 아래쪽 나무 기둥을 노려 보세요.', ammo: ['seed', 'seed', 'bomb'], towers: [[800, 1, 'wood']], enemyHp: 12, blockHp: 1.2 },
+    { name: '반짝이는 온실', theme: 'meadow', tip: '완만한 언덕 위의 얼음탑이에요.', ammo: ['seed', 'split', 'seed'], towers: [[790, 2, 'ice']], enemyHp: 30, blockHp: 2,
       ground: [[0, 574], [520, 574], [700, 536], [1280, 536]] },
-    { name: '쌍둥이 망루', theme: 'cliff', tip: '높은 언덕 위 망루와 낮은 평지의 망루, 두 높이를 모두 노려요.', ammo: ['split', 'seed', 'seed', 'bomb'], towers: [[700, 2, 'wood'], [1040, 2, 'ice']], enemyHp: 28, blockHp: 1.7,
+    { name: '쌍둥이 망루', theme: 'cliff', tip: '높은 언덕 위 망루와 낮은 평지의 망루, 두 높이를 모두 노려요.', ammo: ['split', 'seed', 'seed', 'bomb'], towers: [[700, 2, 'wood'], [1040, 2, 'ice']], enemyHp: 23, blockHp: 1.7,
       ground: [[0, 574], [440, 574], [600, 510], [830, 510], [920, 574], [1280, 574]] },
-    { name: '오래된 돌문', theme: 'stone', tip: '계단처럼 높아지는 지형. 위쪽 망루가 아래쪽을 짓눌러요.', ammo: ['bomb', 'seed', 'seed', 'split'], towers: [[740, 2, 'stone'], [1040, 2, 'wood']], enemyHp: 28, blockHp: 1.6,
+    { name: '오래된 돌문', theme: 'stone', tip: '계단처럼 높아지는 지형. 위쪽 망루가 아래쪽을 짓눌러요.', ammo: ['bomb', 'seed', 'seed', 'split'], towers: [[740, 2, 'stone'], [1040, 2, 'wood']], enemyHp: 23, blockHp: 1.6,
       ground: [[0, 574], [560, 574], [620, 546], [860, 546], [920, 510], [1280, 510]] },
-    { name: '바람 언덕', theme: 'cliff', tip: '낮은 골짜기의 높은 망루, 그리고 절벽 위의 망루예요.', ammo: ['seed', 'split', 'bomb', 'seed', 'seed'], towers: [[690, 3, 'wood'], [1040, 2, 'stone']], enemyHp: 24, blockHp: 1.5,
+    { name: '바람 언덕', theme: 'cliff', tip: '앞 망루를 무너뜨린 뒤, 높게 쏴서 절벽 위 망루를 노려요.', ammo: ['seed', 'split', 'bomb', 'seed', 'seed', 'seed'], towers: [[690, 3, 'wood'], [1040, 2, 'stone']], enemyHp: 20, blockHp: 1.5,
       ground: [[0, 574], [880, 574], [950, 470], [1280, 470]] },
-    { name: '유리 숲', theme: 'ice', tip: '두 언덕 사이의 골짜기. 얼음탑이 무너지면 골짜기로 쏟아져요.', ammo: ['split', 'seed', 'bomb', 'seed', 'bomb', 'seed'], towers: [[670, 3, 'ice'], [1040, 3, 'wood']], enemyHp: 34, blockHp: 1.9,
+    { name: '유리 숲', theme: 'ice', tip: '두 언덕 사이의 골짜기. 얼음탑이 무너지면 골짜기로 쏟아져요.', ammo: ['split', 'seed', 'bomb', 'seed', 'bomb', 'seed'], towers: [[670, 3, 'ice'], [1040, 3, 'wood']], enemyHp: 28, blockHp: 1.9,
       ground: [[0, 574], [520, 574], [580, 508], [780, 508], [850, 574], [930, 574], [990, 504], [1280, 504]] },
-    { name: '돌담 너머', theme: 'stone', tip: '앞의 큰 바위 언덕이 직선 사격을 막아요. 위로 높이 쏘세요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'seed'], towers: [[650, 3, 'stone'], [1040, 3, 'wood']], enemyHp: 52, blockHp: 2.5,
+    { name: '돌담 너머', theme: 'stone', tip: '돌담 위로 높이 쏘고, 폭탄은 망루 가까이에서 터뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'seed', 'seed'], towers: [[650, 3, 'stone'], [1040, 3, 'wood']], enemyHp: 42, blockHp: 2.5,
       ground: [[0, 574], [380, 574], [440, 466], [520, 466], [580, 574], [1280, 574]] },
-    { name: '도토리 성채', theme: 'castle', tip: '계단식 절벽 위의 거대한 성채. 아래 받침부터 무너뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'bomb'], towers: [[700, 3, 'wood'], [1040, 3, 'stone']], enemyHp: 32, blockHp: 1.7,
+    { name: '도토리 성채', theme: 'castle', tip: '계단식 절벽 위의 거대한 성채. 아래 받침부터 무너뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'bomb'], towers: [[700, 3, 'wood'], [1040, 3, 'stone']], enemyHp: 27, blockHp: 1.7,
       ground: [[0, 574], [500, 574], [560, 528], [800, 528], [860, 474], [1280, 474]] },
   ];
   function pull(x, y) {
