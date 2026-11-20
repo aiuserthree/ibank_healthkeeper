@@ -45,9 +45,9 @@ def jpeg_size(path: pathlib.Path) -> tuple[int, int]:
 
 
 class MoonshotStaticTest(unittest.TestCase):
-    def test_games_entry(self):
-        # Newer releases may precede this game; it must remain ahead of older ones.
-        self.assertLess(list(game.GAMES).index("moonshot"), list(game.GAMES).index("ferry"))
+    def test_games_first_entry(self):
+        # 달나라 대포 계열이 맨 위 — 대전(moonshotvs) 바로 아래가 혼자 하기(moonshot). 혼자 하기 · 대전 짝은 대전이 위(범퍼스 · 젤리 숲과 같은 꼴)
+        self.assertEqual(list(game.GAMES)[:2], ["moonshotvs", "moonshot"])
         first = game.GAMES["moonshot"]
         self.assertEqual(first.key, "moonshot")
         self.assertEqual(first.title, "뿅뿅 달나라 대포")

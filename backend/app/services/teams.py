@@ -1380,6 +1380,7 @@ async def send_test_chat_to_member(
 # ── 대전 게임(오목 · 체스) ─────────────────────────────────────────
 
 MATCH_GAME_NAME = {"gomoku": "오목", "chess": "체스", "baseball": "숫자 야구", "boxes": "칸 따먹기", "quizduel": "1:1 퀴즈", "gostop": "고스톱", "memory": "도형 짝맞추기", "soccer": "헤딩 축구", "volley": "배구", "rummy": "타일 러미", "alkkagi": "알까기", "bumpervs": "범퍼카 대전", "jellyvs": "젤리 숲 대전", "mansion": "두뇌 저택"}
+MATCH_GAME_NAME["moonshotvs"] = "달나라 대포"  # 뿅뿅 달나라 대포 대전 — 「달나라 대포 대전 신청」(이름 뒤에 「대전」이 붙으므로 이름엔 「대전」을 안 넣음)
 
 
 def match_page_url(game: str, match_id: Optional[int] = None) -> str:
@@ -1422,6 +1423,8 @@ def _match_first_line(game: str, turn: str) -> str:
     """수락 알림의 「누가 먼저」 한 줄 — 게임마다 말이 다르다(둘이 따로 하는 게임은 차례가 없다)."""
     if game == "quizduel":
         return "이제 24시간 안에 각자 10문제를 풀어요."
+    if game == "moonshotvs":
+        return "둘 다 대전 화면에 들어와 탈것을 고르면 시작돼요. 첫 차례는 시작할 때 정해져요."
     if game in ("soccer", "volley", "bumpervs", "jellyvs"):
         return "둘 다 대전 화면에 들어오면 바로 경기가 시작돼요."
     if game == "baseball":
@@ -1486,6 +1489,7 @@ def party_page_url(game: str, party_id: int) -> str:
 PARTY_INVITE_WORDS = {
     "mansion": ("두뇌 저택", "게임", "하는 두뇌 저택"),
     "jellyvs": ("젤리 숲", "대전", "하는 젤리 숲 대전"),
+    "moonshotvs": ("달나라 대포", "팀전", "하는 달나라 대포 팀전"),
 }
 
 

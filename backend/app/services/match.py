@@ -89,6 +89,7 @@ GOMOKU = "gomoku"
 CHESS = "chess"
 CLASSIC_GAMES = (GOMOKU, CHESS)  # 이 파일이 직접 두는 게임
 ENGINE_GAMES = ("baseball", "boxes", "quizduel", "gostop", "memory", "soccer", "volley", "rummy", "alkkagi", "bumpervs", "jellyvs")  # 대전 엔진 — app/services/versus_<키>.py
+ENGINE_GAMES = (*ENGINE_GAMES, "moonshotvs")  # 뿅뿅 달나라 대포 대전(1:1 — 팀전은 party.py)
 MATCH_GAMES = (*CLASSIC_GAMES, *ENGINE_GAMES)
 BOARD = 15
 ACCEPT_HOURS = 24  # 받은 도전을 기다리는 시간

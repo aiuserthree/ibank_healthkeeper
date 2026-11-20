@@ -11,7 +11,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 class LooseendsIntegrationTest(unittest.TestCase):
     def test_registration_and_frame(self):
         entry = game.GAMES['looseends']
-        self.assertEqual(next(iter(game.GAMES)), 'looseends')
+        # 목록 맨 위는 그 뒤에 나온 더 새 게임이 차지한다 — 먼저 나온 게임(통통배 선착장)보다 위에 있는지만 본다
+        self.assertLess(list(game.GAMES).index('looseends'), list(game.GAMES).index('ferry'))
         self.assertEqual(entry.category, 'MINI')
         self.assertFalse(entry.lower_better)
         frame = (ROOT / 'web/games/looseends.html').read_text()

@@ -140,6 +140,9 @@ class PartyInvite(BaseModel):
 class PartyStart(BaseModel):
     playerIds: list[int]
     track: int = 1
+    teamSize: Optional[int] = None  # 팀 게임(party.TEAM_GAMES)만 — 2 · 3
+    botLevel: Optional[str] = None  # 팀 게임 컴퓨터 자리 난이도(easy · normal · hard)
+    lineup: Optional[list[Optional[int]]] = None  # 팀 게임 자리마다 회원 id | null(컴퓨터) — 짝 자리 A 팀 · 홀 자리 B 팀
 
 
 class PartyReport(BaseModel):
@@ -199,7 +202,7 @@ async def party_decline(party_id: int, db: AsyncSession = Depends(get_db), membe
 
 @router.post("/party/{party_id}/start")
 async def party_start(party_id: int, body: PartyStart, db: AsyncSession = Depends(get_db), member: Member = Depends(get_current_active_member)):
-    return {"data": await party_service.start(db, member, party_id, body.playerIds, body.track)}
+    return {"data": await party_service.start(db, member, party_id, body.playerIds, body.track, body.teamSize, body.botLevel, body.lineup)}
 
 
 @router.post("/party/{party_id}/report")

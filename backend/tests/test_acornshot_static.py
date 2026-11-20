@@ -11,7 +11,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 class AcornshotIntegrationTest(unittest.TestCase):
     def test_registration_and_frame(self):
         entry = game.GAMES['acornshot']
-        self.assertLess(list(game.GAMES).index('acornshot'), list(game.GAMES).index('moonshot'))
+        self.assertLess(list(game.GAMES).index('acornshot'), list(game.GAMES).index('ferry'))  # 달나라 대포는 대전과 짝으로 맨 위 — 먼저 나온 통통배보다 위인지만 본다
         self.assertEqual(entry.category, 'MINI')
         self.assertFalse(entry.lower_better)
         frame = (ROOT / 'web/games/acornshot.html').read_text()

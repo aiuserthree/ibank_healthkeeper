@@ -14,6 +14,8 @@
   두뇌 저택은 1:1 이 없어 overview 의 ranking 으로 따로 보여 준다.
   젤리 숲 — 6마리가 2분 동안 먹고 자란다. 삼켜진 젤리는 3초 뒤 처음 크기로 다시 태어난다. 끝났을 때 가장 큰 젤리 1등만 1승
   (1 · 2등 크기 차가 1.02배 미만이면 승자 없음). 판 화면은 web/games/jellyvs.html · 엔진 web/_shared/jellyvs-vs.js.
+  팀 게임(TEAM_GAMES — 뿅뿅 달나라 대포 대전 moonshotvs 의 2:2 · 3:3 팀전)은 이 파일 끝 「팀 게임」 절의 옵트인 갈래로만 돈다.
+  다른 게임은 그 갈래를 지나지 않는다(팀 갈래는 모두 `if p.game in TEAM_GAMES` 안 · 기본값 None 인 새 인자).
 
 판(state)
   track: 대기실 트랙(1 ~ 13) — 젤리 숲은 숲(맵) 번호(1 ~ 6) · players: [달리는 사람 id …](주인이 0번) · bots: [컴퓨터 차 번호 …] · at: 출발 시각(epoch ms)
@@ -25,6 +27,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re as _re
+import secrets as _secrets
 import time
 from collections import Counter
 from datetime import datetime, timedelta
@@ -39,10 +43,13 @@ from app.models import GameParty, GamePartySeat, Member, MemberStatus
 from app.services import teams as teams_service
 from app.services.avatar import member_avatar_url
 from app.services.game import _give_stamp, ensure_open, game_visible, give_win_bonus, win_bonus_state
+from app.services.versus_moonshotvs import clean_line as _moon_line  # 팀 게임(달나라 대포) 행동 줄 검사 — 1:1 과 같은 잣대
 
 logger = logging.getLogger(__name__)
 
 PARTY_GAMES = ("bumpervs", "mansion", "jellyvs")  # 선다운 범퍼스 대전 · 한밤의 두뇌 저택 · 꿀꺽 젤리 숲 대전
+PARTY_GAMES = (*PARTY_GAMES, "moonshotvs")  # 뿅뿅 달나라 대포 대전 — 팀전(2:2 · 3:3)만 여기로(1:1 은 match.py)
+TEAM_GAMES = ("moonshotvs",)  # 팀 게임 — 자리 번호 짝/홀 = 팀, 이긴 팀 사람마다 1승(이 파일 끝 「팀 게임」 절)
 MAX_SEATS = 6  # 트랙에 설 수 있는 차 — 사람(주인 포함) 최대 6명, 남는 자리는 컴퓨터
 OPEN_HOURS = 2  # 대기실이 열려 있는 시간 — 그 안에 출발하지 않으면 EXPIRED
 RACE_HOURS = 1  # 출발 뒤 결과를 기다리는 최대 시간
@@ -122,6 +129,8 @@ def _track(game: str, track) -> int:
         n = int(track or 1)
     except (TypeError, ValueError):
         n = 1
+    if game in TEAM_GAMES:
+        return max(1, min(MOON_MAPS, n))  # 달나라 대포 — 맵 번호(1 ~ 6)
     return max(1, min(JELLY_MAPS if game == "jellyvs" else TRACKS, n))
 
 
@@ -182,6 +191,8 @@ def _set_state(p: GameParty, **kw) -> None:
 
 def _judge(p: GameParty) -> None:
     """받은 결과로 판을 끝낸다 — 과반이 같은 (1등 차, 트랙)이면 그 결과, 아니면 무효."""
+    if p.game in TEAM_GAMES:
+        return _judge_team(p)
     st = dict(p.state or {})
     players = [int(x) for x in st.get("players") or []]
     rep = st.get("rep") or {}
@@ -241,6 +252,8 @@ WIN_REASONS = ("FINISH", "FARTHER", "WIN", "BIGGEST")  # 사람이 1등으로 �
 
 def _beaten(p: GameParty) -> tuple:
     """1등이 이긴 사람들(함께 한 사람, 컴퓨터 제외) — 순위 1승과 같은 잣대. 사람을 이긴 판이 아니면 빈 튜플."""
+    if p.game in TEAM_GAMES:
+        return _team_beaten(p)
     if p.status != "DONE" or p.winner_id is None or p.end_reason not in WIN_REASONS:
         return ()
     return tuple(sorted(int(x) for x in (p.state or {}).get("players") or [] if int(x) != p.winner_id))
@@ -255,6 +268,8 @@ def _bonus_beaten(p: GameParty) -> tuple:
     beaten = _beaten(p)
     if not beaten:
         return ()
+    if p.game in TEAM_GAMES:
+        return _team_bonus_beaten(p, beaten)
     st = p.state or {}
     players = [int(x) for x in st.get("players") or []]
     agreed = {int(x) for x in st.get("agreed") or []}
@@ -277,9 +292,10 @@ async def _stamp_agreed(db: AsyncSession, p: GameParty) -> None:
     # 여러 명 대전 게임 전부가 여기를 지난다. 보너스 날짜는 판이 끝난 시각(한국 날짜)
     others = _bonus_beaten(p)
     if others:
-        w = await db.get(Member, int(p.winner_id))
-        if w is not None and w.status == MemberStatus.ACTIVE:
-            await give_win_bonus(db, w, p.game, _kst_day(p.finished_at) or today, f"party:{p.id}", others)
+        for wid in _winner_ids(p):  # 팀 게임은 이긴 팀 사람마다 · 그 밖은 1등 한 명(winner_id)
+            w = await db.get(Member, int(wid))
+            if w is not None and w.status == MemberStatus.ACTIVE:
+                await give_win_bonus(db, w, p.game, _kst_day(p.finished_at) or today, f"party:{p.id}", others)
     for mid in (p.state or {}).get("agreed") or []:
         m = await db.get(Member, int(mid))
         if m is not None and m.status == MemberStatus.ACTIVE:
@@ -315,6 +331,8 @@ def _payload(p: GameParty, seats: list, people: dict, member_id: int) -> dict:
     if p.status == "DONE":
         out["final"] = st.get("final")
         out["result"] = "win" if p.winner_id == member_id else ("none" if p.end_reason in ("MISMATCH", "NO_REPORT") else "lose")
+    if p.game in TEAM_GAMES:
+        _team_payload(p, out, people, member_id)
     return out
 
 
@@ -328,7 +346,7 @@ async def _with_bonus(db: AsyncSession, member: Member, p: GameParty, out: dict)
     """결과 화면용 대전 승리 보너스 표시 — winBonus(got · already · full · None) · winBonusMonth (match._view 와 같은 값)."""
     out.update(
         await win_bonus_state(
-            db, member.id, f"party:{p.id}", bool(_bonus_beaten(p)) and p.winner_id == member.id, p.finished_at
+            db, member.id, f"party:{p.id}", bool(_bonus_beaten(p)) and member.id in _winner_ids(p), p.finished_at
         )
     )
     return out
@@ -456,8 +474,10 @@ async def decline(db: AsyncSession, member: Member, party_id: int) -> dict:
     return await _view(db, member, p)
 
 
-async def start(db: AsyncSession, member: Member, party_id: int, player_ids: list, track: int) -> dict:
-    """주인이 출발 — 대기실에 와 있는 사람들(player_ids, 주인 빼고)로 달릴 사람을 정한다."""
+async def start(db: AsyncSession, member: Member, party_id: int, player_ids: list, track: int,
+                team_size: Optional[int] = None, bot_level: Optional[str] = None, lineup: Optional[list] = None) -> dict:
+    """주인이 출발 — 대기실에 와 있는 사람들(player_ids, 주인 빼고)로 달릴 사람을 정한다.
+    team_size · bot_level · lineup 은 팀 게임만 본다(_start_team) — 다른 게임은 세 인자를 보지 않는다."""
     ensure_open(member=member)
     p = await _get(db, party_id, lock=True)
     if p.host_id != member.id:
@@ -466,6 +486,10 @@ async def start(db: AsyncSession, member: Member, party_id: int, player_ids: lis
         raise_app_error("PARTY_NOT_OPEN")
     seats = (await _seats(db, [p.id]))[p.id]
     joined = {s.member_id for s in seats if s.status == "JOINED"}
+    if p.game in TEAM_GAMES:
+        _start_team(p, member, joined, player_ids, track, team_size, bot_level, lineup)
+        await db.commit()
+        return await _view(db, member, p)
     players = [member.id]
     for i in player_ids or []:
         try:
@@ -582,6 +606,7 @@ def _clean_jelly(data: dict, seats: int, start_ms: int) -> dict:
 
 
 CLEANERS = {"mansion": _clean_mansion, "jellyvs": _clean_jelly}
+CLEANERS["moonshotvs"] = lambda data, cars, start_ms: _clean_moon(data, cars, start_ms)  # 팀 게임 — 이 파일 끝 「팀 게임」 절
 
 
 async def report(db: AsyncSession, member: Member, party_id: int, data: dict) -> dict:
@@ -597,7 +622,10 @@ async def report(db: AsyncSession, member: Member, party_id: int, data: dict) ->
     if str(member.id) not in rep:
         cars = len(players) + len(st.get("bots") or [])  # 늘 6대(사람 + 컴퓨터)
         clean = CLEANERS.get(p.game, _clean)
-        rep[str(member.id)] = clean(data, cars, int(st.get("at") or 0))
+        got = clean(data, cars, int(st.get("at") or 0))
+        if p.game in TEAM_GAMES:
+            got = _team_report(st, p, member, got)
+        rep[str(member.id)] = got
         st["rep"] = rep
         p.state = st
         if len(rep) == 1:
@@ -680,7 +708,8 @@ async def ranking_wins(db: AsyncSession, game: str) -> dict:
         if not others:
             continue
         day = p.finished_at.astimezone(KST).date()
-        wins.setdefault(p.winner_id, set()).add(("party", others, day))
+        for wid in _winner_ids(p):  # 팀 게임은 이긴 팀 사람마다 · 그 밖은 1등 한 명
+            wins.setdefault(wid, set()).add(("party", others, day))
     return wins
 
 
@@ -835,3 +864,245 @@ async def seat_for_rt(db: AsyncSession, party_id: int, member_id: int) -> Option
     if member_id not in seated:
         return None
     return ("host" if member_id == p[0] else "guest", status, seated)
+
+
+# ── 팀 게임(옵트인 갈래) ─────────────────────────────────────────────
+# 뿅뿅 달나라 대포 대전(moonshotvs)의 2:2 · 3:3 팀전. 위의 공통 흐름(만들기 · 초대 · 대기실 · 통로 · 채팅 · 기한)은 그대로 쓰고,
+# 아래 일곱 자리만 팀 게임일 때 이 절의 함수로 간다(모두 `if p.game in TEAM_GAMES` 안 — 다른 게임은 지나지 않는다):
+#   _track(맵 1~6) · start(_start_team) · report(_clean_moon · _team_report) · _judge(_judge_team) · _beaten(_team_beaten)
+#   · _bonus_beaten(_team_bonus_beaten) · _payload(_team_payload). 보너스 · 순위는 _winner_ids 로 이긴 팀 사람마다.
+#
+# 판(state) — 팀 게임만 더 있는 칸
+#   lineup: [자리마다 회원 id | None(컴퓨터)] — 자리 번호 k 의 팀 = k & 1(짝 A · 홀 B), 차례 A1 B1 A2 B2 …(엔진이 정함)
+#   teamSize: 2 | 3 · teams: [k & 1 …] · botLevel: 컴퓨터 자리 난이도 · seed: 씨앗(서버 난수 32비트 — 주인이 맵을 고르려고 씨앗을 돌리지 못하게)
+#   players: lineup 의 사람(자리 순서) · bots: 컴퓨터 자리 번호 · track: 맵 번호(1~6, 출발 때 정함)
+#   rep: {str(id): {"winner": 팀 0|1|None, "how", "hash", "turns", "sec", "map", "ver", "at"} | {"void": 1, "at"}}
+#   log: 주인이 보낸 행동 줄(다툰 판을 다시 돌려 보려고 — 손님 것은 남기지 않음)
+#   final(서로 맞은 결과) · winners: 이긴 팀 사람 id(자리 순서) · losers: 진 팀 사람 id
+# 판정: 사람 결과의 과반이 (winner, how, hash, turns, map, ver) 모두 같아야 그 결과(둘이면 둘 다). 「무효」(void)는 어느 결과와도 다른 한 표.
+#   이긴 팀에 사람이 있으면 WIN(winner_id = 그중 자리 번호가 가장 낮은 사람 — 목록 표시용), 모두 컴퓨터면 BOT, 비기면 DRAW, 과반이 없으면 MISMATCH.
+# 순위: 이긴 팀 사람마다 「진 팀 사람들」을 상대로 1승(같은 사람들과 하루에 여러 번 이겨도 1승). 진 팀이 모두 컴퓨터면 승 없음. 패는 세지 않음.
+#   진 팀 사람 가운데 한 명 이상이 같은 결과를 냈을 때만 1승(같은 팀끼리 짜고 거짓 결과로 과반을 만드는 것 막기 — 진 팀 사람이
+#   안 보내고 나가면 그 판은 승 없이 끝, 1:1 의 「한쪽만 보냄」과 같은 뜻). 판 기한은 팀전만 MOON_RACE_SEC(차례 상한 × 차례 시간 + 여유).
+# 보너스: 이긴 팀 사람마다, 사람 전원이 같은 결과를 보냈을 때만(지금 잣대 그대로).
+
+TEAM_SIZES = (2, 3)  # 2:2(4자리) · 3:3(6자리)
+MOON_MAPS = 6  # 엔진 MAP_KEYS(calm · canyon · ice · mushroom · ring · valley) 순서로 1~6
+MOON_MIN_SEC = 45  # 출발 뒤 이만큼 지나야 결과를 받는다(1:1 과 같은 값 — 결과만 주고받아 승을 쌓지 못하게, 화면은 받아 줄 때까지 다시 보냄)
+MOON_CAP_ROUNDS = 30  # 엔진 TEAM_CAP_ROUNDS — 차례 상한 = 30 × 자리 수
+MOON_TURN_SEC = 45  # 한 차례 가장 긴 시간(조준 20초 + 「한 번 더」 12초 + 날기 · 내려앉음 · 주인 벽시계 여유) — 판 기한 셈
+MOON_MAX_SEC = MOON_CAP_ROUNDS * 6 * MOON_TURN_SEC  # 결과 sec 상한 8,100초(3:3 상한 180차례 × 45초 = 2시간 15분)
+MOON_RACE_SEC = MOON_MAX_SEC + 15 * 60  # 팀전 판 기한(출발 뒤) — sec 상한보다 넉넉히(다른 게임은 RACE_HOURS 1시간 그대로)
+MOON_LOG_MAX = 420  # 행동 줄 수 상한(3:3 상한 180차례 + 「한 번 더」 둘째 발 · 이동 중 빠짐 넘김)
+MOON_LOG_CHARS = 120_000
+MOON_HOW = ("hp", "sea", "more", "both", "cap")
+MOON_WIN_HOW = ("hp", "sea", "more")  # 이긴 팀이 있어야 하는 끝(both 는 비김, cap 은 남은 체력 합으로 — 어느 쪽이든)
+MOON_KEYS = ("winner", "how", "hash", "turns", "map", "ver")  # 결과가 같아야 하는 칸
+BOT_LEVELS = ("easy", "normal", "hard")
+_MOON_HASH = _re.compile(r"[0-9a-f]{8}")
+_MOON_VER = _re.compile(r"m1-[0-9a-f]{8}")
+
+GAME_REASONS["moonshotvs"] = {
+    "WIN": "상대 팀을 모두 쓰러뜨림",
+    "BOT": "컴퓨터만 있는 팀이 이김",
+    "DRAW": "두 팀이 비김",
+    "MISMATCH": "화면끼리 결과가 서로 달라 무효",
+}
+
+register_messages({
+    "PARTY_BAD_TEAM": "팀을 다시 짜 주세요(2:2 · 3:3 · 대기실에 들어온 사람만 · 사람 2명 이상).",
+})
+
+
+def _is_int(x) -> bool:
+    return isinstance(x, int) and not isinstance(x, bool)
+
+
+def _start_team(p: GameParty, member: Member, joined: set, player_ids, track, team_size, bot_level, lineup) -> None:
+    """팀 게임 출발 — lineup(자리마다 회원 id | None) 그대로 자리를 정한다. lineup 이 없으면 들어온 순서대로 A B A B …(빈자리는 컴퓨터)."""
+    if not _is_int(team_size) or team_size not in TEAM_SIZES:
+        raise_app_error("PARTY_BAD_TEAM")
+    n = 2 * team_size
+    if lineup is None:
+        humans = [member.id]
+        for i in player_ids or []:
+            try:
+                i = int(i)
+            except (TypeError, ValueError):
+                continue
+            if i in joined and i not in humans:
+                humans.append(i)
+        if len(humans) > n:
+            raise_app_error("PARTY_BAD_TEAM")
+        seats = humans + [None] * (n - len(humans))
+    else:
+        if not isinstance(lineup, list) or len(lineup) != n:
+            raise_app_error("PARTY_BAD_TEAM")
+        seats = []
+        for x in lineup:
+            if x is None or x == 0:
+                seats.append(None)
+                continue
+            if not _is_int(x) or (x != member.id and x not in joined) or x in seats:
+                raise_app_error("PARTY_BAD_TEAM")
+            seats.append(x)
+        if member.id not in seats:
+            raise_app_error("PARTY_BAD_TEAM")
+    humans = [x for x in seats if x]
+    if len(humans) < 2:
+        raise_app_error("PARTY_FEW")
+    now = now_kst()
+    p.status = "RACING"
+    p.started_at = now
+    p.deadline_at = now + timedelta(seconds=MOON_RACE_SEC)
+    _set_state(p, players=humans, bots=[k for k, x in enumerate(seats) if x is None], lineup=seats, teamSize=team_size,
+               teams=[k & 1 for k in range(n)], botLevel=bot_level if bot_level in BOT_LEVELS else "normal",
+               seed=_secrets.randbits(32), at=_ms(now), track=_track(p.game, track), rep={})
+
+
+def _clean_moon(data: dict, cars: int, start_ms: int) -> dict:
+    """달나라 대포 팀전 결과 — {"winner": 팀 0|1|None, "how", "hash", "turns", "sec", "map", "ver", "log": [행동 한 줄 …]} 또는 {"op": "void"}.
+    행동 줄은 엔진 encodeAct 글자 그대로(versus_moonshotvs.clean_line — 1:1 과 같은 잣대)."""
+    if not isinstance(data, dict) or cars not in (4, 6):
+        raise_app_error("PARTY_BAD_RESULT")
+    if data.get("op") == "void":  # 화면끼리 판이 어긋남 — 어느 결과와도 다른 한 표(과반으로 정함)
+        return {"void": 1, "at": _now_ms()}
+    if data.get("op", "result") != "result":
+        raise_app_error("PARTY_BAD_RESULT")
+    winner, how = data.get("winner"), data.get("how")
+    if winner is not None and (not _is_int(winner) or winner not in (0, 1)):
+        raise_app_error("PARTY_BAD_RESULT")
+    if how not in MOON_HOW or (how in MOON_WIN_HOW and winner is None) or (how == "both" and winner is not None):
+        raise_app_error("PARTY_BAD_RESULT")
+    h, ver = data.get("hash"), data.get("ver")
+    if not isinstance(h, str) or not _MOON_HASH.fullmatch(h) or not isinstance(ver, str) or not _MOON_VER.fullmatch(ver):
+        raise_app_error("PARTY_BAD_RESULT")
+    turns, mp, sec = data.get("turns"), data.get("map"), data.get("sec")
+    if not _is_int(turns) or not 1 <= turns <= MOON_CAP_ROUNDS * cars or not _is_int(mp) or not 1 <= mp <= MOON_MAPS:
+        raise_app_error("PARTY_BAD_RESULT")
+    if isinstance(sec, bool) or not isinstance(sec, (int, float)) or sec != sec or not 0 <= sec <= MOON_MAX_SEC:
+        raise_app_error("PARTY_BAD_RESULT")
+    log = data.get("log")
+    if not isinstance(log, list) or len(log) > MOON_LOG_MAX or not turns - cars - 2 <= len(log) <= turns + 2 * cars + 4:
+        raise_app_error("PARTY_BAD_RESULT")
+    if sum(len(x) if isinstance(x, str) else MOON_LOG_CHARS + 1 for x in log) > MOON_LOG_CHARS or any(_moon_line(x) is None for x in log):
+        raise_app_error("PARTY_BAD_RESULT")
+    if _now_ms() - start_ms < MOON_MIN_SEC * 1000:
+        raise_app_error("PARTY_TOO_SOON")
+    return {"winner": winner, "how": how, "hash": h, "turns": turns, "sec": round(float(sec), 1), "map": mp, "ver": ver,
+            "log": list(log), "at": _now_ms()}
+
+
+def _team_report(st: dict, p: GameParty, member: Member, got: dict) -> dict:
+    """맵이 출발 때와 같은지 보고, 행동 줄은 주인 것만 판에 남긴다(rep 에는 넣지 않음)."""
+    log = got.pop("log", None)
+    if got.get("void"):
+        return got
+    if got.get("map") != int(st.get("track") or 0):
+        raise_app_error("PARTY_BAD_RESULT")
+    if member.id == p.host_id and log is not None:
+        st["log"] = log
+    return got
+
+
+def _moon_key(r: dict) -> tuple:
+    return ("void",) if r.get("void") else tuple(r.get(k) for k in MOON_KEYS)
+
+
+def _judge_team(p: GameParty) -> None:
+    st = dict(p.state or {})
+    players = [int(x) for x in st.get("players") or []]
+    rep = st.get("rep") or {}
+    reps = [rep[str(i)] for i in players if str(i) in rep]
+    p.status = "DONE"
+    p.finished_at = now_kst()
+    p.deadline_at = None
+    if not reps:
+        p.end_reason = "NO_REPORT"
+        return
+    top, n = Counter(_moon_key(r) for r in reps).most_common(1)[0]
+    need = len(players) // 2 + 1 if len(players) > 2 else 2  # 둘이면 둘 다 같아야
+    if n < need or top == ("void",):
+        p.end_reason = "MISMATCH"
+        return
+    base = next(r for r in reps if _moon_key(r) == top)
+    final = {k: base.get(k) for k in MOON_KEYS}
+    final["sec"] = base.get("sec")
+    final["log"] = list(st.get("log") or [])
+    lineup = list(st.get("lineup") or [])
+    winner = base.get("winner")
+    winners = [int(x) for k, x in enumerate(lineup) if x and winner is not None and (k & 1) == winner]
+    losers = [int(x) for k, x in enumerate(lineup) if x and winner is not None and (k & 1) != winner]
+    st["final"] = final
+    st["agreed"] = [i for i in players if str(i) in rep and _moon_key(rep[str(i)]) == top]
+    st["winners"], st["losers"] = winners, losers
+    p.state = st
+    if winner is None:
+        p.end_reason = "DRAW"
+    elif winners:
+        p.winner_id = winners[0]
+        p.end_reason = "WIN"
+    else:
+        p.end_reason = "BOT"
+
+
+def _team_beaten(p: GameParty) -> tuple:
+    """이긴 팀 사람들이 이긴 「진 팀 사람들」 — 진 팀이 모두 컴퓨터거나 사람이 이긴 판이 아니면 빈 튜플.
+
+    짜고 치기 막기: 진 팀 사람 가운데 한 명 이상이 같은 결과(agreed)를 냈을 때만 1승. 같은 팀 둘이 같은 거짓 결과로
+    과반을 만들어도, 진 팀 누구도 그 결과를 내지 않았으면(다른 결과 · 무효 · 안 보내고 나감) 승은 없다(판정 · 도장은 그대로).
+    """
+    if p.status != "DONE" or p.end_reason != "WIN":
+        return ()
+    st = p.state or {}
+    win = {int(x) for x in st.get("winners") or []}
+    losers = tuple(sorted(int(x) for x in st.get("losers") or [] if int(x) not in win))
+    agreed = {int(x) for x in st.get("agreed") or []}
+    if not any(x in agreed for x in losers):
+        return ()
+    return losers
+
+
+def _team_bonus_beaten(p: GameParty, beaten: tuple) -> tuple:
+    st = p.state or {}
+    players = [int(x) for x in st.get("players") or []]
+    agreed = {int(x) for x in st.get("agreed") or []}
+    if len(set(players)) != len(players) or set(players) != agreed:
+        return ()
+    return beaten
+
+
+def _winner_ids(p: GameParty) -> list:
+    """순위 · 보너스를 받을 사람 — 팀 게임은 이긴 팀 사람 모두, 그 밖은 1등 한 명(winner_id)."""
+    if p.game in TEAM_GAMES:
+        return [int(x) for x in (p.state or {}).get("winners") or []] if p.end_reason == "WIN" else []
+    return [p.winner_id] if p.winner_id else []
+
+
+def _team_payload(p: GameParty, out: dict, people: dict, member_id: int) -> None:
+    st = p.state or {}
+    lineup = list(st.get("lineup") or [])
+    out["teamGame"] = True
+    out["teamSize"] = st.get("teamSize")
+    out["botLevel"] = st.get("botLevel")
+    out["lineup"] = [
+        {**_person(people.get(x)), "seat": k, "team": k & 1, "bot": False} if x else
+        {"id": None, "name": "컴퓨터", "department": "", "avatarUrl": None, "seat": k, "team": k & 1, "bot": True}
+        for k, x in enumerate(lineup)
+    ]
+    out["mySeatNo"] = lineup.index(member_id) if member_id in lineup else None
+    if out["mySeatNo"] is not None and p.status in ("RACING", "DONE"):
+        out["seed"] = st.get("seed")  # 판에 선 사람만 — 모든 화면이 같은 판을 차린다
+    if p.status == "DONE":
+        final = st.get("final")
+        out["final"] = {k: v for k, v in final.items() if k != "log"} if isinstance(final, dict) else None
+        out["winners"] = [int(x) for x in st.get("winners") or []]
+        out["losers"] = [int(x) for x in st.get("losers") or []]
+        out["winTeam"] = final.get("winner") if isinstance(final, dict) else None
+        if p.end_reason in ("MISMATCH", "NO_REPORT"):
+            out["result"] = "none"
+        elif p.end_reason == "DRAW":
+            out["result"] = "draw"
+        else:
+            out["result"] = "win" if member_id in out["winners"] else "lose"
+        out["countsWin"] = bool(_team_beaten(p))  # 이긴 팀 사람에게 1승이 생긴 판인지(진 팀에 사람이 있었나)

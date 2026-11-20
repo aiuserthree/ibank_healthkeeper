@@ -54,6 +54,7 @@ router = APIRouter(prefix="/play", tags=["play-rt"])
 
 # 실시간 연결을 여는 게임 (game_match.game 키). 새 실시간 게임을 대전에 올리면 여기에 키를 더한다
 REALTIME_GAMES = ("soccer", "volley", "bumpervs", "jellyvs")
+REALTIME_GAMES = (*REALTIME_GAMES, "moonshotvs")  # 뿅뿅 달나라 대포 대전 — 두 화면이 행동 한 줄 · 해시를 주고받는다
 
 # 정해 둔 값 — 시험에서 줄여 쓸 수 있게 모듈 값으로 둔다 (실행 중에 읽는다)
 MAX_BYTES = 4096          # 메시지 하나의 최대 크기 (UTF-8 바이트)

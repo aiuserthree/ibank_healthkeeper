@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <script src="/_shared/no-zoom.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <link rel="icon" href="/assets/logo-mark.svg" type="image/svg+xml">
+  <title>뿅뿅 달나라 대포 대전 — 아케이드</title>
+  <link rel="stylesheet" href="/_ds/healthkeeper-ds-31e44bd2-68dd-4c55-91c3-7ca10811b6be/styles.css">
+  <link rel="stylesheet" href="/_shared/responsive.css">
+  <link rel="stylesheet" href="/_shared/app.css">
+  <script src="/_shared/ui.js"></script>
+  <script src="/_shared/api.js"></script>
+  <script src="/_shared/member-shell.js"></script>
+  <script src="/_shared/play.js"></script>
+  <script src="/_shared/match-lobby.js"></script>
+  <style>
+    /* 뿅뿅 달나라 대포 대전 — 전장 본체(창, /games/embed/moonshot.html?vs=1) 위에 덮는 카드 · 연결 띠 */
+    .mv-main { align-items: stretch !important; padding: 10px !important; }
+    .mv { position: relative; flex: 1; min-width: 0; min-height: 300px; border-radius: 16px; overflow: hidden; background: #1b1f4b; box-shadow: 0 10px 30px rgba(15, 23, 42, .16); }
+    .mv iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+    .mv-load { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; color: #e6e1ff; font-size: 14px; }
+    .mv-load[hidden] { display: none; }
+    .mv-over { position: absolute; inset: 0; z-index: 5; display: flex; padding: 14px; overflow-y: auto; background: rgba(20, 16, 60, .5); box-sizing: border-box; }
+    .mv-over[hidden] { display: none; }
+    .mv-card { margin: auto; width: 100%; max-width: 520px; box-sizing: border-box; padding: 20px; border-radius: 18px; background: #fff; box-shadow: 0 18px 44px rgba(15, 23, 42, .32); color: var(--color-midnight-navy, #0b3558); text-align: center; }
+    .mv-card h2 { margin: 0; font-size: 22px; font-weight: 800; color: #0f172a; word-break: keep-all; }
+    .mv-card p { margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary); word-break: keep-all; }
+    .mv-card.is-wide { max-width: 760px; padding: 0; overflow: hidden; text-align: left; }
+    .mv-card.is-wide .gk { padding: 18px 18px 24px; }
+    .mv-badge { display: inline-flex; width: 56px; height: 56px; border-radius: 16px; align-items: center; justify-content: center; margin-bottom: 8px; background: #e2e8f0; color: #475569; }
+    .mv-badge.is-win { background: linear-gradient(135deg, #ffe36b, #ff9f43); color: #fff; }
+    .mv-badge.is-lose { background: #ede9fe; color: #6d28d9; }
+    .mv-badge.is-bad { background: #fef3c7; color: #b45309; }
+    .mv-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 12px; text-align: left; }
+    .mv-stats div { display: flex; justify-content: space-between; gap: 8px; padding: 9px 12px; border-radius: 12px; background: #f8fafc; font-size: 13.5px; color: #475569; min-width: 0; }
+    .mv-stats div b { color: #0f172a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mv-stats div span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mv-btnrow { display: flex; gap: 8px; margin-top: 16px; }
+    .mv-btnrow .hk-btn { flex: 1; min-height: 46px; }
+    .mv-mini { margin-top: 10px; font-size: 12.5px; line-height: 1.5; color: var(--text-muted); word-break: keep-all; }
+    .mv-mini.is-ok { color: #15803d; font-weight: 700; }
+    .mv-mini.is-bad { color: #b45309; font-weight: 700; }
+    .mv-practice { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 4px; padding: 12px 14px; border-radius: 14px; background: #eef0ff; color: #3730a3; font-size: 14px; font-weight: 700; text-decoration: none; }
+    .mv-practice small { display: block; font-size: 12.5px; font-weight: 600; color: #4f46e5; }
+    .mv-practice:hover { background: #e0e7ff; }
+    .mv-net { position: absolute; z-index: 4; left: 50%; top: 8px; transform: translateX(-50%); max-width: calc(100% - 24px); box-sizing: border-box; padding: 8px 14px; border-radius: 999px; background: rgba(32, 24, 92, .9); color: #fff; font-size: 13px; font-weight: 700; line-height: 1.35; text-align: center; box-shadow: 0 6px 18px rgba(0, 0, 0, .25); pointer-events: none; word-break: keep-all; }
+    .mv-net[hidden] { display: none; }
+    .mv-net.is-bad { background: rgba(180, 83, 9, .94); }
+    .mv-rules { text-align: left; }
+    .mv-rules ul { margin: 6px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.6; color: var(--text-secondary); word-break: keep-all; }
+    .mv-rules li + li { margin-top: 3px; }
+    @media (max-width: 640px) {
+      .hk-pf__bar .hk-pf__icon { display: none; }
+      .mv-main { padding: 4px !important; }
+      .mv { border-radius: 12px; }
+      .mv-over { padding: 8px; }
+      .mv-card { padding: 16px 14px; border-radius: 16px; }
+      .mv-card h2 { font-size: 19px; }
+    }
+    /* 가로로 든 휴대폰(높이가 낮음) — 대전 목록 말고는 머리 막대를 숨겨 판 · 카드를 크게(나가기는 판 안 멈춤 단추 · 고르기 ◀ · 카드 단추) */
+    @media (max-height: 520px) {
+      .mv-pf:not(.is-lobby) .hk-pf__bar { display: none; }
+      .mv-pf:not(.is-lobby) .mv-main { padding: 0 !important; }
+      .mv-pf:not(.is-lobby) .mv { border-radius: 0; }
+      .mv-card { padding: 12px 14px; }
+      .mv-card h2 { font-size: 19px; }
+      .mv-card p { margin-top: 2px; font-size: 13px; line-height: 1.4; }
+      .mv-badge { width: 40px; height: 40px; margin-bottom: 2px; }
+      .mv-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 8px; }
+      .mv-stats div { flex-direction: column; align-items: center; gap: 0; padding: 6px 4px; font-size: 12px; }
+      .mv-btnrow { margin-top: 10px; }
+      .mv-btnrow .hk-btn { min-height: 44px; }
+      .mv-mini { margin-top: 6px; }
+    }
+    /* 팀전(2:2 · 3:3) — 목록 · 대기실(팀 짜기) · 결과 */
+    .mv-tabs { display: flex; gap: 6px; padding: 14px 18px 0; }
+    .mv-tabs button { flex: 1; min-height: 44px; border-radius: 12px; border: 2px solid #e2e8f0; background: #f8fafc; color: #475569; font-size: 14.5px; font-weight: 800; cursor: pointer; }
+    .mv-tabs button.is-on { border-color: #4f46e5; background: #eef0ff; color: #3730a3; }
+    .mv-tl { padding: 12px 18px 22px; }
+    .mv-lead { margin: 4px 0 0; font-size: 14px; line-height: 1.55; color: var(--text-secondary); word-break: keep-all; }
+    .mv-sec { margin: 16px 0 6px; font-size: 15px; font-weight: 800; color: #0f172a; }
+    .mv-sec small { display: block; margin-top: 2px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+    .mv-prow { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #f8fafc; margin-top: 6px; }
+    .mv-prow__t { flex: 1; min-width: 0; }
+    .mv-prow__t b { display: block; font-size: 14px; color: #0f172a; }
+    .mv-prow__t small { display: block; font-size: 12.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mv-prow__b { display: flex; gap: 6px; flex: none; }
+    .mv-prow__b .hk-btn { min-height: 44px; }
+    .mv-prow__tag { font-size: 13px; font-weight: 800; color: #64748b; }
+    .mv-prow__tag.is-win { color: #b45309; }
+    .mv-search { width: 100%; box-sizing: border-box; min-height: 44px; padding: 8px 12px; border-radius: 12px; border: 1.5px solid #cbd5e1; font-size: 15px; }
+    .mv-picked { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .mv-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 4px 10px; border-radius: 99px; border: 0; background: #eef0ff; color: #3730a3; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+    .mv-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; margin-top: 8px; max-height: 220px; overflow-y: auto; }
+    .mv-pick button { text-align: left; min-height: 48px; padding: 6px 10px; border-radius: 12px; border: 1.5px solid #e2e8f0; background: #fff; cursor: pointer; }
+    .mv-pick button b { display: block; font-size: 14px; color: #0f172a; }
+    .mv-pick button small { display: block; font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mv-pick button.is-on { border-color: #4f46e5; background: #eef0ff; }
+    .mv-card.is-room, .mv-card.is-team { max-width: 680px; }
+    .mv-opts { display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: center; margin-top: 12px; }
+    .mv-opts label { display: flex; align-items: center; gap: 6px; font-size: 13.5px; font-weight: 700; color: #475569; }
+    /* 셀렉트 — 화살표는 오른쪽 테두리에서 12px 안쪽, 글과 겹치지 않게 padding-right 36px(공통 규칙) */
+    .mv-sel { appearance: none; -webkit-appearance: none; min-height: 44px; padding: 8px 36px 8px 12px; border-radius: 10px; border: 1.5px solid #cbd5e1; font-size: 14px; font-weight: 700; color: #0f172a; cursor: pointer;
+      background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23777' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center / 10px 6px; }
+    .mv-sel:disabled { cursor: default; opacity: .75; }
+    .mv-teams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; text-align: left; }
+    .mv-team { border-radius: 14px; padding: 8px; background: #f1f6ff; border: 2px solid #9cc8ff; }
+    .mv-team.t1 { background: #fff5ec; border-color: #ffc290; }
+    .mv-team h3 { margin: 0 0 6px; font-size: 14.5px; font-weight: 900; color: #1d4ed8; }
+    .mv-team.t1 h3 { color: #c2410c; }
+    .mv-team h3 small { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+    .mv-seat { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; margin-top: 6px; padding: 6px 10px; border-radius: 12px; border: 2px solid transparent; background: #fff; text-align: left; cursor: pointer; }
+    .mv-seat:disabled { cursor: default; }
+    .mv-seat b { display: block; font-size: 14px; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mv-seat small { display: block; font-size: 12px; color: var(--text-muted); }
+    .mv-seat > span:not(.mv-seat__no) { min-width: 0; }
+    .mv-seat__no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: #e2e8f0; color: #334155; font-size: 12.5px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+    .mv-seat.is-bot { background: rgba(255, 255, 255, .55); }
+    .mv-seat.is-away b { color: #94a3b8; }
+    .mv-seat.is-sel { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, .2); }
+    .mv-tn.t0, .mv-dot.t0 { color: #2563eb; }
+    .mv-tn.t1, .mv-dot.t1 { color: #ea580c; }
+    .mv-trs { margin-top: 12px; text-align: left; }
+    .mv-tr { display: grid; grid-template-columns: 10px minmax(0, 1fr) repeat(4, 64px); gap: 6px; align-items: center; padding: 6px 8px; border-radius: 10px; font-size: 13.5px; color: #475569; }
+    .mv-tr + .mv-tr { margin-top: 3px; }
+    .mv-tr:not(.is-head) { background: #f8fafc; }
+    .mv-tr.is-me { background: #fff7d6; }
+    .mv-tr.is-out { opacity: .7; }
+    .mv-tr.is-head { font-size: 12px; font-weight: 700; color: var(--text-muted); }
+    .mv-tr b { text-align: right; color: #0f172a; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mv-tr.is-head b { color: var(--text-muted); font-weight: 700; }
+    .mv-dot { display: block; width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+    .mv-tr__n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; color: #0f172a; }
+    .mv-tr__n small { margin-left: 6px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+    .mv-card p small { font-size: 12px; }
+    .mv-foot .mv-btnrow { margin-top: 12px; }
+    @media (max-width: 640px) { .mv-tr { grid-template-columns: 10px minmax(0, 1fr) repeat(4, 48px); font-size: 12.5px; } .mv-tr.is-head { font-size: 12px; } .mv-teams { grid-template-columns: 1fr; }
+      .mv-tr__n small { display: block; margin-left: 0; overflow: hidden; text-overflow: ellipsis; } }
+    @media (max-height: 520px) {
+      .mv-card.is-room h2 { font-size: 18px; } .mv-opts { margin-top: 6px; } .mv-teams { margin-top: 6px; gap: 6px; }
+      .mv-seat { min-height: 44px; margin-top: 4px; padding: 4px 8px; }
+      .mv-trs { margin-top: 6px; } .mv-tr { padding: 3px 8px; } .mv-tr + .mv-tr { margin-top: 2px; }
+      /* 가로 휴대폰 팀 결과(3:3 이면 일곱 줄) — 한 화면에 들어가게: 메달 숨김 · 이유 줄을 한 줄로 · 단추와 기록 글을 한 줄에 */
+      .mv-card.is-team { padding: 10px 12px; }
+      .mv-card.is-team .mv-badge { display: none; }
+      .mv-card.is-team p br { display: none; }
+      .mv-card.is-team p small:not(:empty)::before { content: " · "; }
+      .mv-card.is-team .mv-tr { padding: 2px 8px; font-size: 12.5px; }
+      .mv-foot { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+      .mv-foot .mv-btnrow { margin-top: 0; flex: none; order: 2; }
+      .mv-foot .mv-mini { flex: 1; margin-top: 0; text-align: left; order: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+  (async function () {
+    // 뿅뿅 달나라 대포 대전 — 동료와 실시간 1:1 · 팀전 2:2 · 3:3(아케이드 목록 · 함께하기 · 대전 알림에 올림 — 4단계). 서버는 1:1 app/services/versus_moonshotvs.py · 팀전 app/services/party.py(팀 게임 갈래)
+    // 전장은 혼자 하기 본체(/games/embed/moonshot.html?vs=1)를 창으로 — 두 화면이 같은 엔진을 돌리고 행동 한 줄만 주고받는다(잠금 걸음 · 본체 「동료 대전」 절)
+    // 이 화면 몫: 대전 목록(HKMatch) · 실시간 통로(HKRt) · 본체 ↔ 통로 다리 · 끊김 기다림 · 그만두기(기권) · 결과 보내기(두 사람 다) · 결과 카드
+    const esc = HKUI.escapeHtml;
+    const KEY = "moonshotvs";
+    const TINT = "linear-gradient(135deg, #1b1f4b, #ffcf4a)";
+    const HOST_WAIT = 40, GUEST_WAIT = 60; // 끊긴 상대를 기다리는 초 — 손님이 기다리는 연 사람 40초 · 연 사람이 기다리는 손님 60초(명세 2.3)
+    const HOW = { hp: "체력을 다 깎았어요", sea: "별바다에 빠뜨렸어요", more: "같이 쓰러졌지만 남은 체력이 더 많았어요", both: "같이 쓰러졌고 남은 체력도 같아요", cap: "너무 오래 걸려 비겼어요" };
+    const HOW_LOSE = { hp: "내 체력이 다 떨어졌어요", sea: "별바다에 빠졌어요", more: "같이 쓰러졌지만 상대 체력이 더 많았어요" };
+    const LOCAL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+    const QS = new URLSearchParams(location.search);
+    const FAKEVER = LOCAL && /^m1-[0-9a-f]{8}$/.test(QS.get("fakever") || "") ? QS.get("fakever") : ""; // 시험 — 본체 판본을 바꿔 「판본이 달라요」를 본다
+
+    await HKUI.loadLucide();
+    const profile = await HKMember.requireAuth(location.pathname + location.search + location.hash);
+    if (!profile) return;
+    const icon = (n, s = 18, c = "currentColor") => HKUI.icon(n, s, c);
+    document.body.classList.add("hk-pf-body");
+    const frameSrc = "/games/embed/moonshot.html?vs=1" + (FAKEVER ? `&fakever=${FAKEVER}` : "") + (LOCAL && QS.get("dev") === "1" ? "&dev=1" : "") + (QS.get("noart") === "1" ? "&noart=1" : "");
+    document.getElementById("app").innerHTML = `<div class="hk-pf mv-pf" id="mv-pf">
+        <header class="hk-pf__bar">
+          <a class="hk-pf__back" href="${HKRoutes.lounge}" id="mv-back">${icon("chevron-left", 20)}<span>아케이드</span></a>
+          <span class="hk-pf__icon" style="background:${TINT}">${icon("rocket", 18, "#fff")}</span>
+          <div class="hk-pf__title"><b>뿅뿅 달나라 대포 대전</b><small>동료와 실시간 1:1 · 2:2 · 3:3 팀전 · 번갈아 쏘는 달나라 포격</small></div>
+          <div class="hk-pf__tools">
+            <button type="button" class="hk-play-sound" id="mv-rules" aria-label="게임 방법">${icon("book-open")}<span>게임 방법</span></button>
+          </div>
+        </header>
+        <div class="hk-pf__body">
+          <main class="hk-pf__main mv-main">
+            <div class="mv" id="mv">
+              <iframe id="mv-frame" title="뿅뿅 달나라 대포 대전 전장" src="${frameSrc}" allow="autoplay; fullscreen"
+                sandbox="allow-scripts allow-same-origin" referrerpolicy="no-referrer"></iframe>
+              <div class="mv-load" id="mv-load"><span class="hk-spin"></span> 달나라 전장을 불러오는 중이에요</div>
+              <div class="mv-net" id="mv-net" role="status" hidden></div>
+              <div class="mv-over" id="mv-over" hidden></div>
+            </div>
+          </main>
+        </div>
+      </div>`;
+    HKUI.refreshIcons();
+    const $ = (s) => document.querySelector(s);
+    const over = $("#mv-over"), frame = $("#mv-frame"), netEl = $("#mv-net");
+    const me = { name: profile.name || "나" };
+    let screen = "menu"; // menu · lobby · connect · pick · battle · result · lost · sent · menuCard
+    const setPlaying = (on) => $("#mv-pf").classList.toggle("is-playing", on);
+    function showOver(html) { over.innerHTML = html; over.hidden = false; HKUI.refreshIcons(over); }
+    function hideOver() { over.hidden = true; over.innerHTML = ""; }
+    function card(ic, title, sub, buttons, cls) {
+      return `<div class="mv-card" role="dialog" aria-label="${esc(title)}"><span class="mv-badge ${cls || ""}">${icon(ic, 28)}</span><h2>${esc(title)}</h2>${sub ? `<p>${sub}</p>` : ""}${buttons ? `<div class="mv-btnrow">${buttons}</div>` : ""}</div>`;
+    }
+    const BTN_LOBBY = `<button type="button" class="hk-btn hk-btn--primary" data-act="lobby">대전 목록</button>`;
+    function netMsg(text, bad) { if (!text) { netEl.hidden = true; return; } netEl.textContent = text; netEl.classList.toggle("is-bad", !!bad); netEl.hidden = false; }
+
+    // ───── 본체 창과 주고받기 (같은 주소 — 우리가 띄운 창이 보낸 vs: 신호만)
+    let frameReady = false;
+    const frameQ = [];
+    const toFrame = (m) => { if (!frameReady) { frameQ.push(m); return; } try { frame.contentWindow.postMessage(m, location.origin); } catch (_) { /* 창이 아직 없음 */ } };
+    addEventListener("message", (e) => {
+      if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
+      const m = e.data && typeof e.data === "object" ? e.data : null;
+      if (!m || typeof m.type !== "string" || !m.type.startsWith("vs:")) return;
+      if (m.type === "vs:ready") { frameReady = true; $("#mv-load").hidden = true; while (frameQ.length) toFrame(frameQ.shift()); return; }
+      if (TS && TS.onFrame) return TS.onFrame(m);   // 팀전
+      if (!S) return;
+      if (m.type === "vs:send") { if (m.o && typeof m.o === "object" && conn) conn.send(m.o); return; }
+      if (m.type === "vs:state") { if (m.ph === "battle") { S.phase = "battle"; screen = "battle"; } return; }
+      if (m.type === "vs:end") return onEnd(m.r, m.ui);
+      if (m.type === "vs:void") return onVoid(m.peer);
+      if (m.type === "vs:lost") return lost("판이 끊겼어요", "연 사람 화면이 이 판을 잃어 이어 갈 수 없어요 · 이 판은 기록에 남지 않아요");
+      if (m.type === "vs:quit") return askLeave();
+      if (m.type === "vs:menu") return askMenu();
+    });
+
+    // ───── 실시간 1:1 — 통로는 HKRt(/_shared/rt.js). 메시지는 본체가 만든 것을 그대로 넘긴다(bye 만 이 화면 몫)
+    let conn = null, S = null;
+    function closeConn() {
+      closeTeam();
+      if (S) { S.closed = true; clearInterval(S.awayT); clearInterval(S.poll); S = null; }
+      if (conn) { try { conn.close(); } catch (_) { /* 이미 닫힘 */ } conn = null; }
+      netMsg("");
+    }
+    function playOnline(m) {
+      closeConn();
+      const rival = { id: (m.opponent && m.opponent.id) || null, name: (m.opponent && m.opponent.name) || "상대" };
+      S = { id: m.id, rival, role: m.role === "guest" ? "guest" : "host", seed: m.seed, phase: "connect", peer: false, awayAt: 0, awayT: 0, setup: false, ended: false, closed: false };
+      const my = S;
+      screen = "connect"; setPlaying(false);
+      showOver(card("wifi", "연결하는 중…", `${esc(rival.name)}님과 연결하고 있어요`, `<button type="button" class="hk-btn hk-btn--secondary" data-act="lobby">대전 목록</button>`));
+      conn = window.HKRt.connect(m.id, {
+        onHello({ role, peerHere }) {
+          if (my.closed) return;
+          if (role === "host" || role === "guest") my.role = role;
+          my.peer = !!peerHere;
+          if (!my.setup) {
+            my.setup = true; my.phase = "pick"; screen = "pick"; setPlaying(true); hideOver();
+            toFrame({ type: "vs:setup", role: my.role, seed: my.seed, mid: String(my.id), me: me.name, rival: rival.name });
+            try { frame.focus(); } catch (_) { /* 초점을 못 옮겨도 그대로 */ }
+          } else toFrame({ type: "vs:setup", role: my.role, seed: my.seed, mid: String(my.id), me: me.name, rival: rival.name }); // 다시 붙음 — 본체는 같은 판이면 상태만 다시 보낸다
+          toFrame({ type: "vs:peer", here: my.peer });
+          peerPaint();
+        },
+        onPeer(here) { if (my.closed) return; my.peer = !!here; toFrame({ type: "vs:peer", here: my.peer }); peerPaint(); },
+        onMessage(msg) {
+          if (my.closed || !msg || typeof msg !== "object") return;
+          if (msg.t === "bye") return onRivalBye(msg);
+          const o = { ...msg }; delete o.from;
+          toFrame({ type: "vs:net", o });
+        },
+        onClose({ final, text }) {
+          if (my.closed) return;
+          if (final) return lost("연결이 닫혔어요", esc(text || "이 판에 다시 들어갈 수 없어요"));
+          netMsg("연결이 끊겼어요 · 다시 연결하는 중…", true);
+        },
+        onStatus(st) { if (my.closed) return; if (st === "open") peerPaint(); },
+      });
+    }
+    // 상대가 들어와 있는지 — 판 중 끊기면 기다리는 초를 세고, 넘으면 판을 끝냄(기록 없음 · 서버 기한에 무승부)
+    function peerPaint() {
+      if (!S || S.ended) return;
+      if (S.peer) { clearInterval(S.awayT); S.awayT = 0; S.awayAt = 0; netMsg(""); return; }
+      if (S.phase !== "battle") { netMsg(""); return; }   // 고르기 화면은 본체가 「○○님을 기다려요」를 보여 줌
+      if (!S.awayAt) S.awayAt = Date.now();
+      const limit = S.role === "host" ? GUEST_WAIT : HOST_WAIT, my = S;
+      const tick = () => {
+        if (my.closed || my !== S || S.peer || S.ended) return;
+        const left = Math.max(0, Math.ceil(limit - (Date.now() - S.awayAt) / 1000));
+        netMsg(`${S.rival.name}님 연결이 끊겼어요 · ${left}초 기다려요`, true);
+        if (left <= 0) {
+          clearInterval(S.awayT);
+          toFrame({ type: "vs:freeze" });
+          if (S.role === "host") lost("상대가 나갔어요", `${esc(S.rival.name)}님이 ${GUEST_WAIT}초 넘게 돌아오지 않았어요 · 이 판은 기록에 남지 않아요`);
+          else lost("판이 끊겼어요", `연 사람(${esc(S.rival.name)}님) 화면과 ${HOST_WAIT}초 넘게 연결되지 않았어요 · 이 판은 기록에 남지 않아요`);
+        }
+      };
+      clearInterval(S.awayT); S.awayT = setInterval(tick, 1000); tick();
+    }
+    async function lost(title, sub) {
+      if (!S || S.ended) return;
+      const id = S.id; S.ended = true;
+      toFrame({ type: "vs:freeze" });
+      closeConn();
+      screen = "lost"; setPlaying(false);
+      showOver(card("wifi-off", title, sub, BTN_LOBBY, "is-bad"));
+      const d = await HKApi.matchDetail(id).catch(() => null);
+      if (d && d.status === "DONE" && screen === "lost") showServerResult(d);
+    }
+
+    // ───── 그만두기 · 나가기
+    async function askLeave() {
+      if (!S) return;
+      const ok = await HKUI.confirmDialog("대기실에서 나갈까요?", "아직 시작 전이에요. 나중에 대전 목록에서 다시 들어올 수 있어요.", { confirmLabel: "나가기", cancelLabel: "계속 고르기" });
+      if (ok && S && S.phase !== "battle") { closeConn(); goLobby(); }
+    }
+    async function askMenu() {
+      if (!S || S.phase !== "battle" || S.ended) return;
+      const ok = await HKUI.confirmDialog("그만할까요?", "그만하면 이 판은 기권으로 져요(순위에는 넣지 않아요).", { confirmLabel: "기권하기", cancelLabel: "계속하기" });
+      if (!ok || !S || S.ended) return;
+      await resign();
+    }
+    async function resign() {
+      const my = S; if (!my || my.ended) return;
+      my.ended = true;
+      try { if (conn) conn.send({ t: "bye", resign: 1 }); } catch (_) { /* 상대 화면은 서버 결과로 안다 */ }
+      toFrame({ type: "vs:freeze" });
+      const d = await HKApi.matchResign(my.id).catch((e) => { HKMatch.fail(e); return null; });
+      closeConn();
+      if (d) showServerResult(d); else goLobby();
+    }
+    async function onRivalBye(msg) {
+      const my = S; if (!my || my.ended) return;
+      my.ended = true;
+      toFrame({ type: "vs:freeze" });
+      closeConn();
+      screen = "lost"; setPlaying(false);
+      showOver(card("flag", msg.resign ? "상대가 기권했어요" : "상대가 나갔어요", "이긴 판으로 남지만 기권 판은 순위에는 넣지 않아요", BTN_LOBBY));
+      for (let i = 0; i < 4; i++) {
+        const d = await HKApi.matchDetail(my.id).catch(() => null);
+        if (d && d.status === "DONE") { if (screen === "lost") showServerResult(d); return; }
+        await sleep(1500);
+      }
+    }
+
+    // ───── 결과 — 두 사람이 각자 보낸다(서버가 둘을 맞춰 보고 같으면 승패를 적는다)
+    const sleep = (ms) => new Promise((f) => setTimeout(f, ms));
+    const repKey = (id) => `hk-moonshotvs-rep-${id}`;
+    const loadRep = (id) => { try { const v = JSON.parse(localStorage.getItem(repKey(id)) || "null"); return v && v.r && Date.now() - v.at < 3 * 3600e3 ? v : null; } catch (_) { return null; } };
+    const putRep = (id, r, ui, role) => { try { localStorage.setItem(repKey(id), JSON.stringify({ r, ui, role, at: Date.now() })); } catch (_) { /* 저장 못 해도 보내기는 그대로 */ } };
+    const dropRep = (id) => { try { localStorage.removeItem(repKey(id)); } catch (_) { /* 없음 */ } };
+    let saving = 0;
+    async function reportResult(id, data) {
+      const earlyUntil = Date.now() + 120000; // 서버는 수락 뒤 45초가 지나야 받는다 — 아주 빨리 끝난 판은 받아 줄 때까지 다시 보낸다
+      let fails = 0;
+      while (fails < 3) {
+        try {
+          const d = await HKApi.matchDetail(id);
+          if (d.status !== "ACTIVE") return d;
+          if (d.reported && d.reported.me) return d;
+          return await HKApi.matchMove(id, { data }, d.seq);
+        } catch (e) {
+          if (e && e.code === "MOONSHOTVS_TOO_EARLY" && Date.now() < earlyUntil) { await sleep(3000); continue; }
+          if (e && e.code === "MOONSHOTVS_BAD") return null;
+          if (++fails < 3) await sleep(800 * fails);
+        }
+      }
+      return null;
+    }
+    async function sendResult(id, data) {
+      saving++;
+      try { const d = await reportResult(id, data); if (d) dropRep(id); return d; } finally { saving--; }
+    }
+    function onEnd(r, ui) {
+      const my = S; if (!my || my.ended || !r) return;
+      my.ended = true; clearInterval(my.awayT); netMsg("");
+      putRep(my.id, r, ui, my.role);
+      showResult(my.id, my.role, my.rival, r, ui);
+      const id = my.id;
+      sendResult(id, r).then((d) => afterSent(id, d));
+    }
+    function resultHtml(role, rival, r, ui) {
+      const mine = role === "guest" ? "guest" : "host", mi = mine === "host" ? 0 : 1, ri = 1 - mi;
+      const win = r.winner === mine, draw = r.winner === "draw";
+      const title = draw ? "비겼어요" : win ? "이겼어요!" : "아쉽게 졌어요";
+      const why = draw ? HOW[r.how] : win ? HOW[r.how] : HOW_LOSE[r.how] || "";
+      const u = ui || {};
+      const stat = (k, v) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`;
+      const nums = Array.isArray(u.dealt) ? [
+        stat("준 피해", `${u.dealt[mi]} : ${u.dealt[ri]}`), stat("맞힌 발", `${u.hits[mi]}/${u.shots[mi]}`),
+        stat("남은 체력", `${u.hp[mi]} : ${u.hp[ri]}`), stat("차례", `${r.turns}번`),
+      ].join("") : stat("차례", `${r.turns}번`);
+      return `<div class="mv-card" role="dialog" aria-label="대전 결과">
+          <span class="mv-badge ${win ? "is-win" : draw ? "" : "is-lose"}">${icon(win ? "trophy" : draw ? "handshake" : "flag", 28)}</span>
+          <h2>${esc(title)}</h2>
+          <p>${esc(rival.name)}님과 1:1${u.map ? ` · ${esc(u.map)}` : ""}<br><small>${esc(why)}${u.rv ? ` · ${esc(u.rv[mi])} 대 ${esc(u.rv[ri])}` : ""}</small></p>
+          <div class="mv-stats">${nums}</div>
+          <div class="mv-btnrow">
+            ${BTN_LOBBY.replace("hk-btn--primary", "hk-btn--secondary")}
+            ${rival.id ? `<button type="button" class="hk-btn hk-btn--primary" data-act="rematch" data-rid="${Number(rival.id)}">다시 도전</button>` : ""}
+          </div>
+          <div class="mv-mini" id="mv-mini">대전 기록에 남기는 중…</div>
+        </div>`;
+    }
+    function showResult(id, role, rival, r, ui) {
+      screen = "result"; setPlaying(false); S && (S.resultId = id);
+      showOver(resultHtml(role, rival, r, ui));
+      resultFor = id; resultRival = rival.name || "상대";
+    }
+    let resultFor = 0, resultRival = "상대";
+    const rivalName = () => resultRival;
+    function miniText(text, cls) { const el = $("#mv-mini"); if (!el || screen !== "result") return; el.textContent = text; el.className = "mv-mini" + (cls ? " " + cls : ""); }
+    async function afterSent(id, d) {
+      if (resultFor !== id) return;
+      if (!d) { miniText("결과를 아직 보내지 못했어요 · 대전 목록에서 이 판에 다시 들어오면 다시 보내요", "is-bad"); return; }
+      for (let i = 0; i < 90 && resultFor === id; i++) {
+        if (d && d.status === "DONE") {
+          if (["HP", "SEA", "MORE", "DRAW"].includes(d.endReason)) miniText(`대전 기록에 남겼어요 · ${d.result === "win" ? "승" : d.result === "lose" ? "패" : "무"}`, "is-ok");
+          else miniText(`${d.reasonLabel || "기록에 남지 않았어요"} · 순위에는 넣지 않아요`, "is-bad");
+          return;
+        }
+        miniText(`결과를 보냈어요 · ${esc(rivalName(id))}님 결과가 오면 기록에 남아요`);
+        await sleep(4000);
+        d = await HKApi.matchDetail(id).catch(() => d);
+      }
+    }
+    async function onVoid(fromPeer) {
+      const my = S; if (!my || my.ended) return;
+      my.ended = true;
+      toFrame({ type: "vs:freeze" });
+      const id = my.id;
+      closeConn();
+      screen = "lost"; setPlaying(false);
+      showOver(card("triangle-alert", "이 판은 무효예요", `두 화면의 판이 서로 어긋나 이어 갈 수 없어요${fromPeer ? "(상대 화면에서 알림)" : ""} · 기록에 남지 않아요<br><small>게임 화면을 새로 고침한 뒤 다시 도전해 주세요</small>`, BTN_LOBBY, "is-bad"));
+      try { const d = await HKApi.matchDetail(id); if (d.status === "ACTIVE") await HKApi.matchMove(id, { data: { op: "void" } }, d.seq); } catch (_) { /* 이미 끝났거나 기한에 무승부 */ }
+    }
+    function showServerResult(m) {
+      screen = "lost"; setPlaying(false);
+      const t = m.result === "win" ? "이긴 판이에요" : m.result === "lose" ? "진 판이에요" : "비긴 판이에요";
+      const extra = [m.turns ? `${m.turns}차례` : "", m.reasonLabel].filter(Boolean).join(" · ");
+      showOver(card(m.result === "win" ? "trophy" : "flag", t, `${esc((m.opponent && m.opponent.name) || "상대")}님과의 판${extra ? ` · ${esc(extra)}` : ""}`, BTN_LOBBY, m.result === "win" ? "is-win" : ""));
+    }
+    let sentPoll = 0;
+    function showSent(id, m) {
+      clearInterval(sentPoll);
+      screen = "sent"; setPlaying(false);
+      showOver(card("send", "결과를 보냈어요", `${esc((m.opponent && m.opponent.name) || "상대")}님 결과가 오면 대전 기록에 남아요`, BTN_LOBBY));
+      sentPoll = setInterval(async () => {
+        if (screen !== "sent" || location.hash !== `#m${id}`) { clearInterval(sentPoll); return; }
+        const d = await HKApi.matchDetail(id).catch(() => null);
+        if (d && d.status === "DONE") { clearInterval(sentPoll); showServerResult(d); }
+      }, 5000);
+    }
+
+    // ───── 대전 목록 — 도전 · 수락은 공용 HKMatch. 수락하면 #m{id} 로 들어온다
+    let lobbyPoll = 0;
+    function goLobby() { if (location.hash) history.replaceState(null, "", location.pathname + location.search); showLobby(); }
+    async function showLobby() {
+      closeConn(); clearInterval(lobbyPoll); clearInterval(sentPoll); resultFor = 0;
+      screen = "lobby"; setPlaying(false); $("#mv-pf").classList.add("is-lobby");
+      const tab = tabOf();
+      showOver(`<div class="mv-card is-wide"><div class="mv-tabs" role="tablist" aria-label="대전 방식">
+          <button type="button" role="tab" data-act="tab" data-tab="duel" class="${tab === "duel" ? "is-on" : ""}" aria-selected="${tab === "duel"}">1:1 대전</button>
+          <button type="button" role="tab" data-act="tab" data-tab="team" class="${tab === "team" ? "is-on" : ""}" aria-selected="${tab === "team"}">팀전 2:2 · 3:3</button>
+        </div><div id="mv-lobby" class="${tab === "team" ? "mv-tl" : ""}"></div></div>`);
+      const box = $("#mv-lobby");
+      if (tab === "team") return renderTeamLobby(box);
+      await HKMatch.lobby(box, KEY, {
+        title: "뿅뿅 달나라 대포 대전", lead: "동료에게 도전장을 보내요. 상대가 수락하면 둘 다 들어와 실시간으로 번갈아 쏴요(차례 20초).",
+        intro: `<a class="mv-practice" href="/games/moonshot"><span>컴퓨터와 연습하기<small>혼자 하기 · 대전 기록과 상관없어요</small></span>${icon("chevron-right", 18)}</a>`,
+        bot: false, rankNote: "1:1 · 팀전 승을 함께 세요(팀전은 이긴 팀 사람마다 1승 · 진 팀이 모두 컴퓨터면 승 없음) · 같은 상대에게 하루에 거둔 승은 1승 · 기권 판은 세지 않아요", rankEmpty: "아직 끝난 대전이 없어요",
+        labels: { myTurn: "들어갈 판", waiting: "들어갈 판", turnTag: "들어가기", waitTag: "들어가기", recent: "최근 대전" },
+        rowNote: (m) => ["실시간 1:1", HKMatch.due(m.deadlineAt)].filter(Boolean).join(" · "),
+        resultNote: (m) => [m.turns ? `${m.turns}차례` : "", HKMatch.reason(m)].filter(Boolean).join(" · ") || "대전 끝",
+      });
+      if (screen !== "lobby" || !box.isConnected) return;
+      HKUI.refreshIcons(box);
+      box.onclick = async (e) => { const t = e.target.closest("button"); if (!t) return; await HKMatch.act(t, KEY, showLobby); };
+      const sent = new Set([...box.querySelectorAll("[data-decline]")].filter((b) => !b.closest(".gk__row").querySelector("[data-accept]")).map((b) => Number(b.dataset.decline)));
+      if (!sent.size) return;
+      lobbyPoll = setInterval(async () => {
+        if (screen !== "lobby") { clearInterval(lobbyPoll); return; }
+        const d = await HKApi.matchOverview(KEY).catch(() => null);
+        if (!d || screen !== "lobby") return;
+        const m = [...(d.myTurn || []), ...(d.waiting || [])].find((x) => sent.has(x.id) && x.status === "ACTIVE");
+        if (!m) return;
+        clearInterval(lobbyPoll);
+        HKUI.toast(`${m.opponent ? m.opponent.name : "상대"}님이 도전을 받았어요`);
+        location.hash = `m${m.id}`;
+      }, 4000);
+    }
+    async function openMatch(id) {
+      closeConn(); clearInterval(lobbyPoll); clearInterval(sentPoll);
+      screen = "connect"; setPlaying(false); $("#mv-pf").classList.remove("is-lobby");
+      showOver(card("wifi", "판을 불러오는 중…", ""));
+      let m;
+      try { m = await HKApi.matchDetail(id); } catch (e) { HKMatch.fail(e); return goLobby(); }
+      if (m.game !== KEY) { location.href = `/games/${m.game}#m${id}`; return; }
+      if (m.status === "DONE") { dropRep(id); return showServerResult(m); }
+      if (m.status !== "ACTIVE") { dropRep(id); HKUI.toast(m.status === "PENDING" ? "상대가 아직 도전을 받지 않았어요" : "이미 끝난 도전이에요"); return goLobby(); }
+      if (m.reported && m.reported.me) { dropRep(id); return showSent(id, m); }
+      const saved = loadRep(id);
+      if (saved) {
+        const rival = { id: (m.opponent && m.opponent.id) || null, name: (m.opponent && m.opponent.name) || "상대" };
+        showResult(id, saved.role, rival, saved.r, saved.ui);
+        return sendResult(id, saved.r).then((d) => afterSent(id, d));
+      }
+      if (!Number.isInteger(m.seed)) { HKUI.toast("판 정보를 받지 못했어요", "error"); return goLobby(); }
+      if (!window.HKRt) { try { await loadScript("/_shared/rt.js"); } catch (_) { HKUI.toast("실시간 연결을 열지 못했어요", "error"); return goLobby(); } }
+      playOnline(m);
+    }
+    function loadScript(src) { return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); }); }
+
+    function openRules() {
+      showRulesBack = { html: over.hidden ? null : over.innerHTML };
+      showOver(`<div class="mv-card mv-rules" role="dialog" aria-label="게임 방법"><h2>게임 방법</h2>
+          <ul>
+            <li>둘이 번갈아 쏴요. 내 차례는 20초 — 이동 · 각도 · 힘을 맞추고 놓으면 쏴요(조작은 혼자 하기와 같아요).</li>
+            <li>상대 차례에는 상대 포신과 힘이 미리 보이고, 쏜 뒤 내 화면에서도 똑같이 날아가요.</li>
+            <li>상대 체력을 다 깎거나 별바다에 빠뜨리면 이겨요. 같이 쓰러지면 남은 체력이 많은 쪽, 오래 끌면 밀물이 차올라요.</li>
+            <li>탈것 · 아이템 3개는 각자 고르고, 맵은 도전한 사람이 골라요. 둘 다 「준비」를 누르면 3초 뒤 시작해요.</li>
+            <li>끝나면 두 화면이 결과를 보내 서로 맞아야 기록돼요. 그만두면 기권(순위에는 안 셈) · 연결이 오래 끊기면 기록 없이 끝나요.</li>
+            <li>팀전(2:2 · 3:3): 파랑 팀과 주황 팀이 한 대씩 번갈아 쏴요(파랑 1 → 주황 1 → 파랑 2 …). 같은 팀이 맞으면 피해는 절반. 상대 팀을 모두 쓰러뜨리면 이겨요 · 빈자리는 컴퓨터.</li>
+            <li>팀전에서 연결이 끊기면 그 자리는 컴퓨터가 대신하고, 다시 들어오면 이어서 해요. 이긴 팀 사람마다 1승(진 팀이 모두 컴퓨터면 승 없음).</li>
+          </ul>
+          <div class="mv-btnrow"><button type="button" class="hk-btn hk-btn--primary" data-act="rules-close">알겠어요</button></div></div>`);
+    }
+    let showRulesBack = null;
+
+    // ═════ 팀전(2:2 · 3:3) — 여러 명 대전(party.py 팀 게임 갈래). 대기실 · 팀 짜기는 이 화면, 고르기 · 전장은 본체(?vs=1 · vs:setup 의 team)
+    //   통로 /api/play/rt/party/{id} — 주인 가운데 별 모양(손님 말은 주인에게만 · from = 회원 id, 주인 말은 모두에게 · to = 한 사람)
+    //   대기실 말(이 화면 몫): room {size, map, level, lineup}(주인 → 모두) · rhi(손님 → 주인, 대기실 다시 보내 달라) · start(주인 → 모두, 출발함)
+    //   그 밖의 말은 본체가 만든 것 그대로 넘긴다(vs:net {o, from} · vs:send {o, to})
+    const MAPS = [["calm", "고요한 달 바다", "처음 하기 좋아요"], ["canyon", "큰 구덩이 협곡", "넘겨 치기"], ["ice", "얼음 혜성 동굴", "천장이 있어요"], ["mushroom", "버섯 행성", "무거운 중력"], ["ring", "고리 행성 섬", "가벼운 중력"], ["valley", "달빛 협곡 마을", "계곡에 떨어뜨리기"]];
+    const LEVELS = [["easy", "쉬움"], ["normal", "보통"], ["hard", "어려움"]];
+    const TEAMN = ["파랑", "주황"];
+    const TEAM_HOW = { hp: "상대 팀 체력을 다 깎았어요", sea: "상대 팀을 별바다에 빠뜨렸어요", more: "같이 쓰러졌지만 남은 체력 합이 더 많았어요", both: "같이 쓰러졌고 남은 체력 합도 같아요", cap: "너무 오래 걸려 남은 체력 합으로 정했어요" };
+    const TEAM_HOW_LOSE = { hp: "우리 팀 체력이 다 떨어졌어요", sea: "우리 팀이 별바다에 빠졌어요", more: "같이 쓰러졌지만 상대 팀 체력 합이 더 많았어요", cap: "너무 오래 걸려 남은 체력 합으로 정했어요" };
+    const prefT = (() => { try { const v = JSON.parse(localStorage.getItem("hk-moonshotvs-team") || "null"); return v && typeof v === "object" ? v : {}; } catch (_) { return {}; } })();
+    const savePrefT = () => { try { localStorage.setItem("hk-moonshotvs-team", JSON.stringify(prefT)); } catch (_) { /* 저장 못 해도 그대로 */ } };
+    const tabOf = () => (prefT.tab === "team" ? "team" : "duel");
+    const mapIdx = (n) => Math.max(1, Math.min(MAPS.length, Number(n) || 1));
+    const repKeyT = (id) => `hk-moonshotvs-prep-${id}`;
+    let TS = null, tconn = null, tpoll = 0;
+    function closeTeam() {
+      if (TS) { TS.closed = true; clearInterval(TS.tick); clearInterval(TS.awayT); clearTimeout(TS.refreshT); TS = null; }
+      if (tconn) { try { tconn.close(); } catch (_) { /* 이미 닫힘 */ } tconn = null; }
+      clearInterval(tpoll);
+    }
+    const tsel = (id, opts, val, dis) => `<select class="mv-sel" id="${id}" ${dis ? "disabled" : ""}>${opts.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(val) ? "selected" : ""}>${esc(t)}</option>`).join("")}</select>`;
+
+    // ── 팀전 목록(받은 초대 · 내 대기실 · 최근 · 새로 열기)
+    let pickSel = [];
+    async function renderTeamLobby(box) {
+      clearInterval(tpoll);
+      box.innerHTML = `<div class="mv-mini">팀전 목록을 불러오는 중…</div>`;
+      let d;
+      try { d = await HKApi.partyOverview(KEY); } catch (e) { box.innerHTML = `<div class="mv-mini is-bad">${esc((e && e.message) || "불러오지 못했어요")}</div>`; return; }
+      if (screen !== "lobby" || !box.isConnected) return;
+      const who = (x) => x.seats.filter((s) => s.seat === "HOST" || s.seat === "JOINED" || s.seat === "INVITED").map((s) => esc(s.name)).join(" · ");
+      const row = (x, btns, note) => `<div class="mv-prow"><div class="mv-prow__t"><b>${esc(x.host.name)}님의 팀전</b><small>${note || who(x)}</small></div><div class="mv-prow__b">${btns}</div></div>`;
+      const inv = (d.invites || []).map((x) => row(x, `<button type="button" class="hk-btn hk-btn--secondary" data-act="tdecline" data-id="${x.id}">거절</button><button type="button" class="hk-btn hk-btn--primary" data-act="tjoin" data-id="${x.id}">들어가기</button>`)).join("");
+      const mine = (d.open || []).map((x) => row(x, `<button type="button" class="hk-btn hk-btn--primary" data-act="tenter" data-id="${x.id}">${x.status === "RACING" ? "판으로" : "대기실로"}</button>`, `${x.status === "RACING" ? "하는 중 · " : ""}${esc(MAPS[mapIdx(x.track) - 1][1])} · ${who(x)}`)).join("");
+      const rec = (d.recent || []).map((x) => {
+        const t = x.result === "win" ? "🏆 이김" : x.result === "lose" ? "짐" : x.result === "draw" ? "비김" : esc(x.reasonLabel || "끝");
+        return row(x, `<span class="mv-prow__tag ${x.result === "win" ? "is-win" : ""}">${t}</span>`, `${x.teamSize ? `${x.teamSize}:${x.teamSize} · ` : ""}${esc(MAPS[mapIdx(x.track) - 1][1])} · ${who(x)}`);
+      }).join("");
+      pickSel = [];
+      box.innerHTML = `
+          <p class="mv-lead">동료를 1 ~ 5명 초대해 2:2 · 3:3 팀전을 해요. 빈자리는 컴퓨터가 채워요 · 파랑 팀과 주황 팀이 번갈아 한 대씩 쏴요(같은 팀 피해는 절반).</p>
+          ${inv ? `<h3 class="mv-sec">받은 초대</h3>${inv}` : ""}
+          ${mine ? `<h3 class="mv-sec">내 대기실</h3>${mine}` : ""}
+          <h3 class="mv-sec">새로 열기 <small>함께할 동료를 1 ~ 5명 골라요 · 팀 · 맵은 대기실에서 정해요</small></h3>
+          <input type="search" class="mv-search" id="mv-psearch" placeholder="이름이나 부서로 찾기" autocomplete="off" maxlength="30">
+          <div class="mv-picked" id="mv-picked"></div>
+          <div class="mv-pick" id="mv-pick"><div class="mv-mini">불러오는 중…</div></div>
+          <div class="mv-btnrow"><button type="button" class="hk-btn hk-btn--primary" data-act="tcreate" id="mv-tcreate" disabled>초대하고 대기실 열기</button></div>
+          ${rec ? `<h3 class="mv-sec">최근 팀전</h3>${rec}` : ""}
+          <div class="mv-mini">초대 받은 사람에게 Teams 로 알려요 · 대기실은 2시간 동안 열려 있어요 · 이긴 팀 사람마다 1승(진 팀이 모두 컴퓨터면 승 없음)</div>`;
+      const input = box.querySelector("#mv-psearch");
+      let q = "", timer = 0, seq = 0;
+      const paintPicked = () => {
+        const pk = box.querySelector("#mv-picked"); if (!pk) return;
+        pk.innerHTML = pickSel.map((x) => `<button type="button" class="mv-chip" data-unpick="${x.id}">${esc(x.name)} ${icon("x", 13)}</button>`).join("");
+        HKUI.refreshIcons(pk);
+        const b = box.querySelector("#mv-tcreate");
+        if (b) { b.disabled = !pickSel.length; b.textContent = pickSel.length ? `${pickSel.length}명 초대하고 ${pickSel.length > 3 ? "3:3" : "팀전"} 대기실 열기` : "초대하고 대기실 열기"; }
+        box.querySelectorAll("[data-pick]").forEach((x) => x.classList.toggle("is-on", pickSel.some((y) => y.id === Number(x.dataset.pick))));
+      };
+      const search = async () => {
+        const my = ++seq;
+        const list = await HKApi.matchMembers(q).catch(() => []);
+        if (my !== seq || screen !== "lobby") return;
+        const pb = box.querySelector("#mv-pick"); if (!pb) return;
+        pb.innerHTML = list.length ? list.map((x) => `<button type="button" data-pick="${x.id}" data-name="${esc(x.name)}"><b>${esc(x.name)}</b><small>${esc(x.department || "")}</small></button>`).join("") : `<div class="mv-mini">찾는 동료가 없어요</div>`;
+        paintPicked();
+      };
+      input.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { q = input.value.trim(); search(); }, 250); });
+      box.addEventListener("click", (e) => {
+        const b = e.target.closest("[data-pick],[data-unpick]");
+        if (!b) return;
+        const id = Number(b.dataset.pick || b.dataset.unpick), at = pickSel.findIndex((x) => x.id === id);
+        if (at >= 0) pickSel.splice(at, 1);
+        else if (b.dataset.pick) { if (pickSel.length >= 5) { HKUI.toast("최대 5명까지 초대할 수 있어요"); return; } pickSel.push({ id, name: b.dataset.name }); }
+        paintPicked();
+      });
+      search();
+      const sig = JSON.stringify([(d.invites || []).map((x) => x.id), (d.open || []).map((x) => [x.id, x.status])]);
+      tpoll = setInterval(async () => {
+        if (screen !== "lobby" || tabOf() !== "team") { clearInterval(tpoll); return; }
+        if (document.activeElement === input || pickSel.length) return;
+        const n = await HKApi.partyOverview(KEY).catch(() => null);
+        if (n && screen === "lobby" && JSON.stringify([(n.invites || []).map((x) => x.id), (n.open || []).map((x) => [x.id, x.status])]) !== sig) renderTeamLobby(box);
+      }, 10000);
+    }
+    async function teamCreate(btn) {
+      if (!pickSel.length) return;
+      btn.disabled = true;
+      try {
+        const d = await HKApi.partyCreate(KEY, pickSel.map((x) => x.id), mapIdx(prefT.map));
+        prefT.size = pickSel.length > 3 ? 3 : prefT.size || 2; savePrefT();
+        HKUI.toast(`${pickSel.length}명에게 초대를 보냈어요`);
+        location.hash = `p${d.id}`;
+      } catch (e) { btn.disabled = false; HKMatch.fail(e); }
+    }
+
+    // ── 대기실 · 판 열기
+    async function openParty(id) {
+      closeConn(); clearInterval(lobbyPoll); clearInterval(sentPoll);
+      screen = "connect"; setPlaying(false); $("#mv-pf").classList.remove("is-lobby");
+      showOver(card("users", "팀전을 불러오는 중…", ""));
+      let p;
+      try { p = await HKApi.partyDetail(id); } catch (e) { HKMatch.fail(e); return goLobby(); }
+      if (location.hash !== `#p${id}`) return;
+      if (p.game !== KEY) { location.href = `/games/${p.game}#p${id}`; return; }
+      const back = `<button type="button" class="hk-btn hk-btn--primary" data-act="lobby">팀전 목록</button>`;
+      if (p.status === "DONE") { dropRepT(id); return showTeamDone(p); }
+      if (p.status === "CANCELLED" || p.status === "EXPIRED") { screen = "lost"; return showOver(card("flag", p.status === "CANCELLED" ? "닫힌 대기실이에요" : "시간이 지나 닫힌 대기실이에요", `${esc(p.host.name)}님의 팀전`, back)); }
+      if (p.mySeat === "INVITED") {
+        screen = "lost";
+        const ppl = p.seats.filter((s) => s.seat !== "DECLINED" && s.seat !== "LEFT").map((s) => esc(s.name)).join(" · ");
+        return showOver(card("users", `${esc(p.host.name)}님이 팀전에 초대했어요`, `${ppl} · 빈자리는 컴퓨터 · 이긴 팀 사람마다 1승`,
+          `<button type="button" class="hk-btn hk-btn--secondary" data-act="tdecline" data-id="${id}">거절</button><button type="button" class="hk-btn hk-btn--primary" data-act="tjoin" data-id="${id}">들어가기</button>`));
+      }
+      if (p.mySeat !== "HOST" && p.mySeat !== "JOINED") { screen = "lost"; return showOver(card("flag", "들어갈 수 없는 판이에요", "", back)); }
+      if (p.status === "RACING" && p.mySeatNo == null) { screen = "lost"; return showOver(card("flag", "이미 시작한 판이에요", "대기실에 없을 때 시작해서 이번 판에는 함께하지 못했어요", back)); }
+      const saved = loadRepT(id);
+      if (p.status === "RACING" && (p.reported || saved)) return teamSent(id, saved && !p.reported ? saved.r : null, saved);
+      if (!window.HKRt) { try { await loadScript("/_shared/rt.js"); } catch (_) { HKUI.toast("실시간 연결을 열지 못했어요", "error"); return goLobby(); } }
+      playParty(p);
+    }
+    function lineupOf(p) { return (p.lineup || []).map((x) => (x && x.id ? x.id : null)); }
+    function playParty(p) {
+      closeConn();
+      screen = "connect"; setPlaying(false);
+      showOver(card("wifi", p.status === "RACING" ? "판에 들어가는 중…" : "대기실에 들어가는 중…", `${esc(p.host.name)}님의 팀전`, `<button type="button" class="hk-btn hk-btn--secondary" data-act="lobby">그만두기</button>`));
+      const T = { p, id: p.id, me: p.meId, host: p.host.id, role: null, phase: p.status === "RACING" ? "battle" : "wait", closed: false, here: new Set(), hostHere: false,
+        size: p.teamSize || Math.max(2, Math.min(3, prefT.size || 2)), map: mapIdx(p.track), level: p.botLevel || prefT.level || "normal", lineup: p.status === "RACING" ? lineupOf(p) : [],
+        pickA: -1, setup: false, ended: false, awayAt: 0, awayT: 0, tick: 0, gotRoom: false, starting: false, absent: {} };
+      TS = T;
+      const isHost = () => T.role === "host";
+      const send = (o) => !T.closed && !!tconn && tconn.send(o);
+      const names = () => Object.fromEntries(T.p.seats.map((s) => [s.id, s.name]));
+      const seated = () => T.p.seats.filter((s) => s.seat === "HOST" || s.seat === "JOINED").map((s) => s.id);
+      async function refresh() { const n = await HKApi.partyDetail(T.id).catch(() => null); if (!n || T.closed) return; T.p = n; if (n.status === "RACING" && T.phase === "wait") return enterBattle(n); if (n.status === "CANCELLED" || n.status === "EXPIRED") return lostT("대기실이 닫혔어요", "연 사람이 대기실을 닫았거나 시간이 지났어요"); if (isHost()) hostFix(); paintRoom(); }
+      const refreshSoon = () => { if (T.refreshT) return; T.refreshT = setTimeout(() => { T.refreshT = 0; refresh(); }, 300); };
+      // 주인 — 자리 표를 지금 대기실 사람에 맞춤(나간 사람 빼고 · 새로 온 사람은 사람이 적은 팀의 빈자리로)
+      function hostFix() {
+        const n = 2 * T.size, ppl = seated();
+        let L = (T.lineup || []).slice(0, n); while (L.length < n) L.push(null);
+        L = L.map((x) => (x && ppl.includes(x) ? x : null));
+        for (const id of ppl) {
+          if (L.includes(id)) continue;
+          const cnt = [0, 1].map((t) => L.filter((x, k) => x && (k & 1) === t).length);
+          const order = cnt[0] <= cnt[1] ? [0, 1] : [1, 0];
+          let at = -1;
+          for (const t of order) { for (let k = t; k < n; k += 2) if (!L[k]) { at = k; break; } if (at >= 0) break; }
+          if (at < 0 && T.size === 2) { T.size = 3; return hostFix(); }
+          if (at >= 0) L[at] = id;
+        }
+        if (!L.includes(T.me)) { const k = L.indexOf(null); if (k >= 0) L[k] = T.me; }
+        T.lineup = L;
+        send(roomMsg());
+      }
+      const roomMsg = () => ({ t: "room", size: T.size, map: T.map, level: T.level, lineup: T.lineup });
+      function paintRoom() {
+        if (T.closed || T.phase !== "wait" || !T.role || !["connect", "room"].includes(screen)) return;
+        screen = "room";
+        const host = isHost(), nm = names(), n = 2 * T.size, here = (id) => id === T.me || (host ? T.here.has(id) : T.roster ? T.roster.includes(id) : true);
+        const humans = T.lineup.filter(Boolean), allHere = humans.every(here);
+        const seat = (k) => {
+          const id = T.lineup[k], sel = T.pickA === k;
+          const body = id ? `<b>${esc(id === T.me ? `${nm[id] || "나"} (나)` : nm[id] || "동료")}</b><small>${id === T.host ? "연 사람" : here(id) ? "와 있어요" : "들어오는 중…"}</small>`
+            : `<b>컴퓨터</b><small>${esc((LEVELS.find((x) => x[0] === T.level) || LEVELS[1])[1])}</small>`;
+          return `<button type="button" class="mv-seat ${id ? "" : "is-bot"} ${sel ? "is-sel" : ""} ${id && !here(id) ? "is-away" : ""}" data-act="tseat" data-k="${k}" ${host ? "" : "disabled"}><span class="mv-seat__no">${(k >> 1) + 1}</span>${body}</button>`;
+        };
+        const col = (t) => { let h = ""; for (let k = t; k < n; k += 2) h += seat(k); return `<div class="mv-team t${t}"><h3>${TEAMN[t]} 팀 <small>${t === 0 ? "왼쪽" : "오른쪽"}</small></h3>${h}</div>`; };
+        const waiting = T.p.seats.filter((s) => s.seat === "INVITED").map((s) => esc(s.name));
+        showOver(`<div class="mv-card is-room" role="dialog" aria-label="팀전 대기실">
+            <h2>팀전 대기실</h2>
+            <p>${esc(T.p.host.name)}님의 팀전 · 차례는 파랑 1 → 주황 1 → 파랑 2 → 주황 2${T.size === 3 ? " → 파랑 3 → 주황 3" : ""} → 다시 처음(쓰러진 탈것은 건너뜀)</p>
+            <div class="mv-opts">
+              <label>크기 ${tsel("mv-tsize", [[2, "2:2"], [3, "3:3"]], T.size, !host || seated().length > 4)}</label>
+              <label>맵 ${tsel("mv-tmap", MAPS.map((m, i) => [i + 1, m[1]]), T.map, !host)}</label>
+              <label>컴퓨터 ${tsel("mv-tlevel", LEVELS, T.level, !host)}</label>
+            </div>
+            <div class="mv-teams">${col(0)}${col(1)}</div>
+            ${waiting.length ? `<div class="mv-mini">초대 받고 아직 안 들어온 사람: ${waiting.join(" · ")}</div>` : ""}
+            <div class="mv-btnrow">
+              <button type="button" class="hk-btn hk-btn--secondary" data-act="tleave">${host ? "대기실 닫기" : "나가기"}</button>
+              ${host ? `<button type="button" class="hk-btn hk-btn--primary" data-act="tgo" ${humans.length >= 2 && allHere && !T.starting ? "" : "disabled"}>${humans.length < 2 ? "동료가 들어오길 기다려요" : !allHere ? "모두 들어오길 기다려요" : `${T.size}:${T.size} 출발`}</button>` : ""}
+            </div>
+            <div class="mv-mini">${host ? "자리 두 칸을 차례로 누르면 서로 바꿔요(사람 · 컴퓨터 모두) · 출발하면 각자 탈것 · 아이템을 골라요" : "팀 · 맵은 연 사람이 정해요 · 연 사람이 출발하면 탈것 · 아이템을 골라요"} · 같은 팀 피해는 절반</div>
+          </div>`);
+        if (host) {
+          const on = (id, f) => { const el = $(id); if (el) el.onchange = () => f(el.value); };
+          on("#mv-tsize", (v) => { const s = Number(v) === 3 ? 3 : 2; if (s === T.size) return; if (s === 2 && seated().length > 4) return; T.size = s; prefT.size = s; savePrefT(); T.lineup = T.lineup.filter(Boolean); hostFix(); T.pickA = -1; paintRoom(); });
+          on("#mv-tmap", (v) => { T.map = mapIdx(v); prefT.map = T.map; savePrefT(); send(roomMsg()); paintRoom(); });
+          on("#mv-tlevel", (v) => { T.level = LEVELS.some((x) => x[0] === v) ? v : "normal"; prefT.level = T.level; savePrefT(); send(roomMsg()); paintRoom(); });
+        }
+      }
+      T.seatClick = (k) => {
+        if (!isHost() || T.phase !== "wait") return;
+        if (T.pickA < 0) { T.pickA = k; return paintRoom(); }
+        if (T.pickA !== k) { const L = T.lineup, a = T.pickA; [L[a], L[k]] = [L[k], L[a]]; send(roomMsg()); }
+        T.pickA = -1; paintRoom();
+      };
+      T.go = async (btn) => {
+        if (!isHost() || T.phase !== "wait" || T.starting) return;
+        T.starting = true; if (btn) btn.disabled = true;
+        let n;
+        try { n = await HKApi.partyStartTeam(T.id, { playerIds: T.lineup.filter((x) => x && x !== T.me), track: T.map, teamSize: T.size, botLevel: T.level, lineup: T.lineup }); }
+        catch (e) { T.starting = false; if (btn) btn.disabled = false; HKMatch.fail(e); refreshSoon(); return; }
+        if (T.closed) return;
+        send({ t: "start" });
+        enterBattle(n);
+      };
+      // 서버 확정을 받은 창이 한 번 — 「fin」(주인은 모두에게 · 손님은 주인에게 → 주인이 모두에게). 받은 창은 바로 다시 묻는다
+      T.fin = () => { if (T.finSent || T.closed) return; T.finSent = true; send({ t: "fin" }); };
+      T.leave = async () => {
+        const host = isHost();
+        const ok = await HKUI.confirmDialog(host ? "대기실을 닫을까요?" : "대기실에서 나갈까요?", host ? "초대한 사람들도 더는 들어올 수 없어요." : "다시 들어오려면 초대를 다시 받아야 해요.", { confirmLabel: host ? "닫기" : "나가기", cancelLabel: "계속 있기" });
+        if (!ok || T.closed) return;
+        await HKApi.partyDecline(T.id).catch(() => null);
+        closeTeam(); goLobby();
+      };
+      // ── 판 — 본체 창에 판을 차려 줌
+      function enterBattle(n) {
+        if (T.closed || T.setup) return;
+        T.p = n; T.phase = "battle"; T.lineup = lineupOf(n);
+        if (n.mySeatNo == null || !Number.isInteger(n.seed)) return lostT("이번 판에는 빠졌어요", "대기실에 없을 때 시작했어요");
+        T.setup = true; screen = "pick"; setPlaying(true); hideOver(); netMsg("");
+        const nm = names();
+        T.team = { n: T.lineup.length, seat: n.mySeatNo, ids: T.lineup, names: T.lineup.map((id) => (id ? nm[id] || "동료" : "컴퓨터")), map: MAPS[mapIdx(n.track) - 1][0], level: n.botLevel || "normal" };
+        toFrame({ type: "vs:setup", role: T.role || (n.host.id === T.me ? "host" : "guest"), seed: n.seed, mid: `p${n.id}`, me: me.name, rival: "", team: T.team });
+        presence();
+        try { frame.focus(); } catch (_) { /* 그대로 */ }
+      }
+      function presence() {
+        if (!T.setup) return;
+        if (isHost()) T.lineup.forEach((id) => { if (id && id !== T.me) toFrame({ type: "vs:peer", here: T.here.has(id), id }); });
+        else toFrame({ type: "vs:peer", here: T.hostHere });
+        peerPaintT();
+      }
+      // 끊김 — 손님: 연 사람이 40초 넘게 없으면 끝(기록 없음) · 연 사람: 끊긴 손님 자리는 본체가 컴퓨터로 대신(띠만 보임)
+      function peerPaintT() {
+        if (T.closed || T.ended || T.phase !== "battle") return;
+        if (isHost()) {
+          const gone = T.lineup.filter((id) => id && id !== T.me && !T.here.has(id)).map((id) => names()[id] || "동료");
+          netMsg(gone.length && screen === "battle" ? `${gone.join(" · ")}님 연결이 끊겨 컴퓨터가 대신해요` : "", false);
+          return;
+        }
+        if (T.hostHere) { clearInterval(T.awayT); T.awayT = 0; T.awayAt = 0; netMsg(""); return; }
+        if (screen !== "battle" && screen !== "pick") { netMsg(""); return; }
+        if (!T.awayAt) T.awayAt = Date.now();
+        const tick = () => {
+          if (T.closed || T.hostHere || T.ended) return;
+          const left = Math.max(0, Math.ceil(HOST_WAIT - (Date.now() - T.awayAt) / 1000));
+          netMsg(`연 사람(${T.p.host.name}님) 연결이 끊겼어요 · ${left}초 기다려요`, true);
+          if (left <= 0) { clearInterval(T.awayT); lostT("판이 끊겼어요", `연 사람(${esc(T.p.host.name)}님) 화면과 ${HOST_WAIT}초 넘게 연결되지 않았어요 · 이 판은 기록에 남지 않아요`); }
+        };
+        clearInterval(T.awayT); T.awayT = setInterval(tick, 1000); tick();
+      }
+      T.onFrame = (m) => {
+        if (m.type === "vs:send") { if (m.o && typeof m.o === "object") send(Number.isInteger(m.to) ? { ...m.o, to: m.to } : m.o); return; }
+        if (m.type === "vs:state") { if (m.ph === "battle") { screen = "battle"; peerPaintT(); } return; }
+        if (m.type === "vs:end") return onEndT(m.r, m.ui);
+        if (m.type === "vs:void") return onVoidT();
+        if (m.type === "vs:lost") return lostT("판이 끊겼어요", "연 사람 화면이 이 판을 잃어 이어 갈 수 없어요 · 이 판은 기록에 남지 않아요");
+        if (m.type === "vs:quit" || m.type === "vs:menu") return askLeaveT();
+      };
+      async function askLeaveT() {
+        if (T.closed || T.ended) return;
+        const host = isHost();
+        const ok = await HKUI.confirmDialog("판에서 나갈까요?", host ? "연 사람 화면이 판을 이끌어요 · 나가면 모두의 판이 멈추고 기록에 남지 않아요." : "나가면 내 자리는 컴퓨터가 대신해요 · 다시 들어오면 이어서 할 수 있어요.", { confirmLabel: "나가기", cancelLabel: "계속하기" });
+        if (!ok || T.closed || T.ended) return;
+        toFrame({ type: "vs:freeze" }); closeTeam(); goLobby();
+      }
+      function lostT(title, sub) {
+        if (T.closed || T.ended) return;
+        T.ended = true; toFrame({ type: "vs:freeze" }); const id = T.id; closeTeam();
+        screen = "lost"; setPlaying(false);
+        showOver(card("wifi-off", title, sub || "", `<button type="button" class="hk-btn hk-btn--primary" data-act="lobby">팀전 목록</button>`, "is-bad"));
+        HKApi.partyDetail(id).then((d) => { if (d && d.status === "DONE" && screen === "lost") showTeamDone(d); }).catch(() => {});
+      }
+      function onEndT(r, ui) {
+        if (T.ended || !r) return;
+        T.ended = true; clearInterval(T.awayT); netMsg("");
+        putRepT(T.id, r, ui);
+        const id = T.id, P = T.p;
+        showTeamResult(id, r, ui, P);
+        teamReport(id, r).then((d) => afterTeamSent(id, d));
+      }
+      async function onVoidT() {
+        if (T.ended) return;
+        T.ended = true; toFrame({ type: "vs:freeze" }); const id = T.id; closeTeam();
+        screen = "lost"; setPlaying(false);
+        showOver(card("triangle-alert", "이 판은 무효예요", "이 화면의 판이 다른 화면과 어긋나 이어 갈 수 없어요 · 다른 사람 결과로 판이 정해져요<br><small>게임 화면을 새로 고침해 주세요</small>", `<button type="button" class="hk-btn hk-btn--primary" data-act="lobby">팀전 목록</button>`, "is-bad"));
+        await teamReport(id, { op: "void" });
+      }
+      function onMsg(m) {
+        if (!m || typeof m.t !== "string") return;
+        if (isHost()) {
+          const from = Number(m.from); if (!(from > 0)) return;
+          T.here.add(from);
+          if (!seated().includes(from)) refreshSoon();
+          if (m.t === "rhi") { if (T.phase === "wait") { hostFix(); paintRoom(); } else send({ t: "start", to: from }); return; }
+          if (m.t === "fin") { if (T.ended) { T.fin(); wakeTeam(); } return; }
+          if (T.phase === "battle") { const o = { ...m }; delete o.from; toFrame({ type: "vs:net", o, from }); }
+          return;
+        }
+        if (m.from !== "host") return;
+        if (m.t === "room") {
+          T.gotRoom = true;
+          if (T.phase !== "wait") return;
+          T.size = m.size === 3 ? 3 : 2; T.map = mapIdx(m.map); T.level = LEVELS.some((x) => x[0] === m.level) ? m.level : "normal";
+          T.lineup = Array.isArray(m.lineup) ? m.lineup.slice(0, 2 * T.size).map((x) => (Number.isInteger(x) && x > 0 ? x : null)) : [];
+          if (T.lineup.some((x) => x && !T.p.seats.some((s) => s.id === x))) refreshSoon();
+          paintRoom(); return;
+        }
+        if (m.t === "start") { if (T.phase === "wait") refresh(); return; }
+        if (m.t === "fin") { if (T.ended) wakeTeam(); return; }
+        if (T.phase === "battle" && T.setup) { const o = { ...m }; delete o.from; toFrame({ type: "vs:net", o, from: "host" }); }
+      }
+      function begin(role) {
+        T.role = role;
+        T.tick = setInterval(() => {
+          if (T.closed) return;
+          if (T.phase === "wait") { if (isHost()) send(roomMsg()); else if (!T.gotRoom) send({ t: "rhi" }); }
+        }, 2500);
+        T.poll = setInterval(() => { if (T.closed) { clearInterval(T.poll); return; } if (T.phase === "wait") refresh(); }, 5000);
+        if (T.phase === "battle") enterBattle(T.p);
+        else { if (isHost()) hostFix(); else send({ t: "rhi" }); paintRoom(); }
+      }
+      tconn = window.HKRt.connect(p.id, {
+        url: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/play/rt/party/" + encodeURIComponent(p.id),
+        onHello: (h) => {
+          if (T.closed) return;
+          const first = !T.role;
+          if (first) T.role = h && h.role === "guest" ? "guest" : "host";
+          if (isHost()) T.here = new Set(Array.isArray(h.here) ? h.here : []);
+          else { T.hostHere = !!h.peerHere; T.gotRoom = false; if (T.phase === "wait") send({ t: "rhi" }); }
+          if (first) begin(T.role);
+          else if (T.setup) { toFrame({ type: "vs:setup", role: T.role, seed: T.p.seed, mid: `p${T.p.id}`, me: me.name, rival: "", team: T.team }); presence(); }
+          else paintRoom();
+        },
+        onPeer: (here, id) => {
+          if (T.closed || !T.role) return;
+          if (isHost()) {
+            if (!(id > 0)) return;
+            if (here) T.here.add(id); else T.here.delete(id);
+            if (!seated().includes(id)) refreshSoon();
+            if (T.phase === "wait") { send(roomMsg()); paintRoom(); }
+            else if (T.setup) { toFrame({ type: "vs:peer", here, id }); peerPaintT(); }
+          } else {
+            T.hostHere = !!here;
+            if (here && T.phase === "wait") send({ t: "rhi" });
+            if (T.setup) { toFrame({ type: "vs:peer", here: T.hostHere }); peerPaintT(); }
+          }
+        },
+        onMessage: (m) => { if (!T.closed) onMsg(m); },
+        onClose: ({ final, text }) => { if (T.closed) return; if (final) lostT("연결이 닫혔어요", esc(text || "이 판에 다시 들어갈 수 없어요")); else netMsg("연결이 끊겼어요 · 다시 연결하는 중…", true); },
+        onStatus: (st) => { if (!T.closed && st === "open") netMsg(""); },
+      });
+    }
+
+    // ── 결과 — 사람 모두 각자 보낸다(서버가 과반으로 정함)
+    const loadRepT = (id) => { try { const v = JSON.parse(localStorage.getItem(repKeyT(id)) || "null"); return v && v.r && Date.now() - v.at < 3 * 3600e3 ? v : null; } catch (_) { return null; } };
+    const putRepT = (id, r, ui) => { try { localStorage.setItem(repKeyT(id), JSON.stringify({ r, ui, at: Date.now() })); } catch (_) { /* 저장 못 해도 그대로 */ } };
+    const dropRepT = (id) => { try { localStorage.removeItem(repKeyT(id)); } catch (_) { /* 없음 */ } };
+    async function teamReport(id, data) {
+      const earlyUntil = Date.now() + 120000; // 서버는 출발 뒤 45초가 지나야 받는다 — 빨리 끝난 판은 받아 줄 때까지 다시
+      let fails = 0;
+      saving++;
+      try {
+        while (fails < 3) {
+          try { const d = await HKApi.partyReport(id, data); dropRepT(id); return d; }
+          catch (e) {
+            if (e && e.code === "PARTY_TOO_SOON" && Date.now() < earlyUntil) { await sleep(3000); continue; }
+            if (e && (e.code === "PARTY_NOT_RACING" || e.code === "PARTY_BAD_RESULT")) { dropRepT(id); return null; }
+            if (++fails < 3) await sleep(800 * fails);
+          }
+        }
+        return null;
+      } finally { saving--; }
+    }
+    function teamRows(ui) {
+      const S = (ui && ui.seats) || [];
+      const one = (x, k) => `<div class="mv-tr ${k === ui.me ? "is-me" : ""} ${x.out ? "is-out" : ""}"><i class="mv-dot t${x.team}"></i><span class="mv-tr__n">${esc(k === ui.me ? `${x.name} (나)` : x.name)}<small>${esc(x.rv)}</small></span><b>${Number(x.dealt || 0)}</b><b>${Number(x.hits || 0)}/${Number(x.shots || 0)}</b><b>${Number(x.ff || 0)}</b><b>${x.out ? "쓰러짐" : Number(x.hp || 0)}</b></div>`;
+      const head = `<div class="mv-tr is-head"><i></i><span class="mv-tr__n">탈것</span><b>준 피해</b><b>맞힌 발</b><b>같은 편</b><b>체력</b></div>`;
+      return head + [0, 1].map((t) => S.map((x, k) => (x.team === t ? one(x, k) : "")).join("")).join("");
+    }
+    function showTeamResult(id, r, ui, p) {
+      screen = "result"; setPlaying(false);
+      const my = ui ? ui.myTeam : 0, win = r.winner === my, draw = r.winner == null;
+      const title = draw ? "비겼어요" : win ? "우리 팀이 이겼어요!" : "아쉽게 졌어요";
+      const why = draw ? TEAM_HOW[r.how] || "" : win ? TEAM_HOW[r.how] || "" : TEAM_HOW_LOSE[r.how] || "";
+      const foesBot = ui && ui.seats ? ui.seats.every((x) => x.team === my || x.bot) : false;
+      showOver(`<div class="mv-card is-team" role="dialog" aria-label="팀전 결과">
+          <span class="mv-badge ${win ? "is-win" : draw ? "" : "is-lose"}">${icon(win ? "trophy" : draw ? "handshake" : "flag", 28)}</span>
+          <h2>${esc(title)}</h2>
+          <p>${draw ? "" : `<b class="mv-tn t${r.winner}">${TEAMN[r.winner]} 팀</b> 승리 · `}${esc((ui && ui.map) || "")} · ${r.turns}차례<br><small>${esc(why)}${win && foesBot ? " · 컴퓨터 팀을 이겨 승은 없어요" : ""}</small></p>
+          <div class="mv-trs">${teamRows(ui || {})}</div>
+          <div class="mv-foot"><div class="mv-btnrow">${BTN_LOBBY.replace("hk-btn--primary", "hk-btn--secondary").replace("대전 목록", "팀전 목록")}</div>
+          <div class="mv-mini" id="mv-mini">대전 기록에 남기는 중…</div></div>
+        </div>`);
+      resultFor = id;
+    }
+    // 서버 확정을 기다리는 동안 — 3초마다 다시 묻고, 확정을 먼저 받은 창이 통로로 「fin」을 보내면 바로 다시 묻는다.
+    // 한 번 묻기가 8초 넘게 안 오면(망 · 서버가 잠깐 막힘) 그 물음은 버리고 다음 물음으로(갱신 고리가 멈추지 않게).
+    let teamWake = null;
+    const wakeTeam = () => { const f = teamWake; teamWake = null; if (f) f(); };
+    const nap = (ms) => new Promise((f) => { const t = setTimeout(() => { teamWake = null; f(); }, ms); teamWake = () => { clearTimeout(t); f(); }; });
+    const detailSoon = (id) => Promise.race([HKApi.partyDetail(id), sleep(8000).then(() => null)]).catch(() => null);
+    async function afterTeamSent(id, d) {
+      if (resultFor !== id) return;
+      if (!d) { miniText("결과를 아직 보내지 못했어요 · 팀전 목록에서 이 판에 다시 들어오면 다시 보내요", "is-bad"); return; }
+      for (let i = 0; i < 150 && resultFor === id; i++) {
+        if (d && d.status === "DONE") { miniText(teamDoneText(d), ["WIN", "BOT", "DRAW"].includes(d.endReason) ? "is-ok" : "is-bad"); if (TS && TS.id === id) TS.fin(); return; }
+        miniText("결과를 보냈어요 · 다른 사람 결과가 오면 기록에 남아요");
+        await nap(3000);
+        d = (await detailSoon(id)) || d;
+      }
+    }
+    function teamDoneText(d) {
+      if (d.endReason === "MISMATCH" || d.endReason === "NO_REPORT") return `${d.reasonLabel || "기록에 남지 않았어요"} · 순위에는 넣지 않아요`;
+      if (d.result === "win") return d.countsWin ? "대전 기록에 1승을 남겼어요" : "이겼지만 컴퓨터 팀이라 승은 없어요";
+      return `대전 기록에 남겼어요 · ${d.result === "draw" ? "비김" : "짐"}`;
+    }
+    function teamSent(id, resend, saved) {
+      screen = "sent"; setPlaying(false);
+      if (saved && saved.ui) { showTeamResult(id, saved.r, saved.ui); if (resend) teamReport(id, resend).then((d) => afterTeamSent(id, d)); else HKApi.partyDetail(id).then((d) => afterTeamSent(id, d)).catch(() => {}); return; }
+      showOver(card("send", "결과를 보냈어요", "다른 사람 결과가 오면 대전 기록에 남아요", `<button type="button" class="hk-btn hk-btn--primary" data-act="lobby">팀전 목록</button>`));
+      clearInterval(sentPoll);
+      sentPoll = setInterval(async () => {
+        if (screen !== "sent" || location.hash !== `#p${id}`) { clearInterval(sentPoll); return; }
+        const d = await detailSoon(id);
+        if (d && d.status === "DONE") { clearInterval(sentPoll); showTeamDone(d); }
+      }, 3000);
+    }
+    function showTeamDone(p) {
+      screen = "lost"; setPlaying(false);
+      const f = p.final || {}, myT = p.mySeatNo != null ? p.mySeatNo & 1 : null;
+      const t = p.result === "win" ? "이긴 팀전이에요" : p.result === "lose" ? "진 팀전이에요" : p.result === "draw" ? "비긴 팀전이에요" : "끝난 팀전이에요";
+      const side = (tm) => (p.lineup || []).filter((x) => x.team === tm).map((x) => esc(x.bot ? "컴퓨터" : x.name)).join(" · ");
+      showOver(card(p.result === "win" ? "trophy" : "flag", t, `${esc(p.host.name)}님의 팀전${f.turns ? ` · ${f.turns}차례` : ""}${p.reasonLabel ? ` · ${esc(p.reasonLabel)}` : ""}<br><small>파랑: ${side(0)}<br>주황: ${side(1)}${myT != null ? ` · 나는 ${TEAMN[myT]} 팀` : ""}</small><br><small>${esc(teamDoneText(p))}</small>`,
+        `<button type="button" class="hk-btn hk-btn--primary" data-act="lobby">팀전 목록</button>`, p.result === "win" ? "is-win" : ""));
+    }
+
+    function closeRules() { const b = showRulesBack; showRulesBack = null; if (b && b.html) { over.innerHTML = b.html; HKUI.refreshIcons(over); } else hideOver(); }
+
+    // ───── 업무 시간이면 게임 대신 안내
+    const status = await HKApi.playStatus().catch(() => ({ open: true }));
+    function route() {
+      const mm = /^#m(\d+)$/.exec(location.hash);
+      if (mm) return openMatch(Number(mm[1]));
+      const pm = /^#p(\d+)$/.exec(location.hash);
+      if (pm) return openParty(Number(pm[1]));
+      showLobby();
+    }
+    if (!status.open) {
+      showOver(`<div class="mv-card">${HKPlay.closedHtml(status.opensAt)}</div>`);
+      setInterval(async () => { const st = await HKApi.playStatus().catch(() => null); if (st && st.open) location.reload(); }, 60000);
+      return;
+    }
+    route();
+    addEventListener("hashchange", () => { closeConn(); route(); });
+    addEventListener("pagehide", () => { if (conn) { try { conn.close(); } catch (_) { /* 닫는 중 */ } } });
+    addEventListener("beforeunload", (e) => { if (saving > 0 || (S && S.phase === "battle" && !S.ended) || (TS && TS.phase === "battle" && !TS.ended)) { e.preventDefault(); e.returnValue = ""; } });
+
+    // ───── 카드 단추
+    over.addEventListener("click", (e) => {
+      const b = e.target.closest("button");
+      if (!b || b.disabled) return;
+      const act = b.dataset.act;
+      if (act === "rules-close") return closeRules();
+      if (act === "lobby") { closeConn(); return goLobby(); }
+      if (act === "tab") { prefT.tab = b.dataset.tab === "team" ? "team" : "duel"; savePrefT(); return showLobby(); }
+      if (act === "tcreate") return teamCreate(b);
+      if (act === "tenter") { location.hash = `p${Number(b.dataset.id)}`; return; }
+      if (act === "tjoin" || act === "tdecline") {
+        const id = Number(b.dataset.id); b.disabled = true;
+        (act === "tjoin" ? HKApi.partyAccept(id) : HKApi.partyDecline(id)).then(() => { if (act === "tjoin") { if (location.hash === `#p${id}`) openParty(id); else location.hash = `p${id}`; } else goLobby(); })
+          .catch((err) => { b.disabled = false; HKMatch.fail(err); });
+        return;
+      }
+      if (act === "tseat" && TS) return TS.seatClick(Number(b.dataset.k));
+      if (act === "tgo" && TS) return TS.go(b);
+      if (act === "tleave" && TS) return TS.leave();
+      if (act === "rematch") {
+        const rid = Number(b.dataset.rid);
+        if (!(rid > 0)) return;
+        b.disabled = true;
+        HKApi.matchCreate(rid, KEY).then(() => { HKUI.toast("다시 도전장을 보냈어요 · 상대가 받으면 들어가요"); goLobby(); })
+          .catch((err) => { b.disabled = false; HKMatch.fail(err); });
+      }
+    });
+    $("#mv-rules").onclick = (e) => { e.currentTarget.blur(); if (showRulesBack) closeRules(); else openRules(); };
+    // 「‹ 아케이드」 — 판 중이면 확인(기권) · 결과 보내는 중이면 기다리기
+    $("#mv-back").addEventListener("click", async (e) => {
+      if (saving > 0) {
+        e.preventDefault();
+        if (await HKUI.confirmDialog("결과를 남기는 중이에요", "지금 나가면 이 판이 기록되지 않을 수 있어요.", { confirmLabel: "나가기", cancelLabel: "기다리기" })) location.href = HKRoutes.lounge;
+        return;
+      }
+      if (TS && !TS.ended && TS.phase === "battle") { e.preventDefault(); if (await HKUI.confirmDialog("판에서 나갈까요?", "팀전 판은 연 사람 화면이 이끌어요 · 손님이 나가면 그 자리는 컴퓨터가 대신해요.", { confirmLabel: "나가기", cancelLabel: "계속하기" })) { closeConn(); location.href = HKRoutes.lounge; } return; }
+      if (!S || S.ended) return;
+      e.preventDefault();
+      if (S.phase === "battle") { if (await HKUI.confirmDialog("판에서 나갈까요?", "나가면 이 판은 기권으로 져요(순위에는 넣지 않아요).", { confirmLabel: "기권하고 나가기", cancelLabel: "계속하기" })) { await resign(); location.href = HKRoutes.lounge; } return; }
+      if (await HKUI.confirmDialog("대기실에서 나갈까요?", "나중에 대전 목록에서 다시 들어올 수 있어요.", { confirmLabel: "나가기", cancelLabel: "계속 고르기" })) { closeConn(); location.href = HKRoutes.lounge; }
+    });
+    addEventListener("keydown", (e) => {
+      if (document.querySelector(".hk-dialog__overlay")) return;
+      if (e.code === "Escape" && showRulesBack) { e.preventDefault(); closeRules(); }
+    });
+    if (LOCAL && QS.get("dev") === "1") window.MV_DEV = { get S() { return S; }, get TS() { return TS; }, get screen() { return screen; } };
+  })();
+  </script>
+</body>
+</html>
