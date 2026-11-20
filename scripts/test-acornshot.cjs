@@ -22,6 +22,54 @@ for (const flight of [false, true]) {
   }
 }
 console.log('PASS enemy bounds: aim/flight, all edges, corner, high-speed overshoot, no free score.');
+// Every simulated body (blocks, shots and enemies) must stay in the 1280x720 view.
+for (const [level, forceX, forceY] of [[7, 120, -60], [7, -120, -60], [1, 160, -160], [3, 220, 40]]) {
+  const sim = P.create(level);
+  sim.launch(125, 470);
+  for (const b of [...sim.state.blocks, ...sim.state.targets, ...sim.state.shots]) {
+    Sleeping.set(b, false);
+    Body.setVelocity(b, { x: forceX * (Math.random() * .6 + .4), y: forceY * Math.random() });
+    Body.setAngularVelocity(b, 1.5);
+  }
+  for (let i = 0; i < 900 && ['aim', 'flight'].includes(sim.state.phase); i++) {
+    sim.step();
+    for (const b of [...sim.state.blocks, ...sim.state.targets, ...sim.state.shots]) {
+      const box = P.shapeBox(b);
+      assert.ok(box.min.x >= -2 && box.max.x <= 1282 && box.min.y >= -2 && box.max.y <= 720, `Stage ${level + 1} body stayed in view`);
+    }
+  }
+  sim.dispose();
+}
+console.log('PASS all blocks, shots and enemies stay inside the visible playfield under extreme force.');
+// Armored guards: a direct bomb defeats the foundation guard, which must release its
+// floor and bring the roof and upper guards down.
+const collapseEvents = [];
+const collapse = P.create(7, event => collapseEvents.push({ ...event, time: collapse.state.time }));
+const towerGuards = collapse.state.targets.filter(t => t.position.x < 900);
+const [lower, middle, upper] = towerGuards;
+const otherTower = collapse.state.targets.find(t => t.position.x > 900);
+const upperStart = [middle.position.y, upper.position.y];
+const otherStart = otherTower.position.y;
+const lowerDeck = collapse.state.blocks.find(b => b.position.x < 900 && b.game.w > 100);
+const upperDeck = collapse.state.blocks.filter(b => b.position.x < 900 && b.game.w > 100).at(-1);
+const deckStart = lowerDeck.position.y, upperDeckStart = upperDeck.position.y;
+collapse.launch(135, 450);
+Body.setPosition(collapse.state.active, { x: lower.position.x, y: lower.position.y });
+assert.equal(collapse.ability(), true);
+assert.ok(!collapse.state.targets.includes(lower), 'A direct bomb defeats the armored foundation guard');
+assert.ok(collapse.state.targets.includes(middle) && collapse.state.targets.includes(upper), 'The blast leaves the upper armored guards standing');
+for (let i = 0; i < 12; i++) collapse.step();
+assert.ok(upper.position.y - upperStart[1] < 3, 'Upper floor does not drop at the moment of defeat');
+for (let i = 0; i < 360; i++) collapse.step();
+assert.ok(!collapse.state.blocks.includes(lowerDeck) || lowerDeck.position.y - deckStart > 40, 'The unsupported deck falls or breaks');
+assert.ok(!collapse.state.blocks.includes(upperDeck) || upperDeck.position.y - upperDeckStart > 50, 'Top roof falls or breaks rather than staying at its original height');
+assert.ok(middle.position.y - upperStart[0] > 50 && upper.position.y - upperStart[1] > 50, 'Both higher guards actually fall');
+assert.ok(Math.abs(otherTower.position.y - otherStart) < 3, 'A nearby independent tower does not collapse');
+const crashes = collapseEvents.filter(event => event.type === 'crash');
+assert.ok(crashes.length >= 1, 'Falling floors produce landing impacts');
+assert.ok(collapseEvents.filter(event => event.type === 'break' && !event.target).length >= 3, 'The collapse shatters several structural pieces');
+collapse.dispose();
+console.log('PASS foundation loss releases the floor, roof and upper guards fall, neighboring tower stays standing.');
 function fire(sim, angle, power, activation = 650) {
   const a = angle * Math.PI / 180, length = power * P.MAX_PULL / 100;
   assert.equal(sim.launch(P.SLING.x - Math.cos(a) * length, P.SLING.y + Math.sin(a) * length), true);
@@ -45,18 +93,30 @@ for (let i = 0; i < P.LEVELS[0].ammo.length; i++) fire(miss, 75, 15);
 assert.equal(miss.state.phase, 'lost');
 assert.equal(miss.launch(120, 432), false, 'Cannot launch after result');
 miss.dispose();
+// Stage 2 now needs several shots; keep shooting until it is won, then confirm the
+// finish waits for the settling roof instead of freezing it in mid-air.
+const roofCheck = P.create(1);
+const roof = roofCheck.state.blocks.at(-1), roofY = roof.position.y;
+for (const [angle, power] of [[8, 76], [12, 88], [16, 100], [12, 100], [20, 88]]) {
+  if (roofCheck.state.phase !== 'aim') break;
+  fire(roofCheck, angle, power);
+}
+if (roofCheck.state.phase === 'won') {
+  assert.ok(!roofCheck.state.blocks.includes(roof) || (roof.position.y > roofY + 50 && roof.speed <= .5), 'Finishing the stage does not freeze the falling top roof');
+}
+roofCheck.dispose();
 // Replay all earlier chosen shots for each candidate: no state teleport or target deletion.
 for (let l = 0; l < P.LEVELS.length; l++) {
   const path = [];
   let won = false;
   for (let shot = 0; shot < P.LEVELS[l].ammo.length && !won; shot++) {
     let best;
-    for (const angle of [12, 20, 28, 36, 44, 52]) {
-      for (const power of [64, 76, 88, 100]) {
+    for (const angle of [8, 12, 16, 20, 28, 36, 44]) {
+      for (const power of [58, 64, 76, 88, 100]) {
         const sim = P.create(l);
         for (const prev of path) fire(sim, ...prev);
         if (sim.state.phase !== 'aim') { sim.dispose(); continue; }
-        const choice = [angle, power, P.LEVELS[l].ammo[shot] === 'bomb' ? 800 : 550];
+        const choice = [angle, power, P.LEVELS[l].ammo[shot] === 'bomb' ? 800 : P.LEVELS[l].ammo[shot] === 'split' ? 650 : 0];
         fire(sim, ...choice);
         const s = sim.state;
         const value = (s.phase === 'won' ? 100000 : 0) + s.destroyed * 5000 + s.score + s.blocks.reduce((n, b) => n + (b.game.maxHp - b.game.hp), 0);

@@ -14,6 +14,9 @@
   let sim, levelIndex = 0, screen = 'menu', paused = false, dragging = false, pointer = null;
   let aim = { x: P.SLING.x, y: P.SLING.y }, angle = 27, power = 78;
   let particles = [], texts = [], rings = [], trail = [], shake = 0, last = 0, accumulator = 0, renderTime = 0;
+  let lastCrashSound = -Infinity;
+  let hitStop = 0, chain = 0, chainLabel = null;
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let audio, sound = false, lastLive = -1, submitted = false, keyAim = false;
   const send = (type, extras = {}) => { if (EMBED) parent.postMessage({ type, ...extras }, location.origin); };
   function tone(freq, duration = .12, type = 'sine', volume = .045) {
@@ -30,13 +33,65 @@
   function burst(x, y, color, count = 12) {
     for (let i = 0; i < count; i++) particles.push({ x, y, vx: (Math.random() - .5) * 7, vy: -Math.random() * 7, life: .7 + Math.random() * .4, max: 1.1, color, size: 3 + Math.random() * 6, rotation: Math.random() * 6 });
   }
+  function shock(x, y, radius, color, duration = .36, flat = 1) {
+    if (rings.length >= 24) rings.shift();
+    rings.push({ x, y, radius, color, duration, life: duration, flat });
+  }
+  function debris(e, count, force) {
+    const amount = reducedMotion.matches ? Math.ceil(count / 3) : count;
+    if (particles.length + amount > 280) particles.splice(0, particles.length + amount - 280);
+    for (let i = 0; i < amount; i++) {
+      const rand = Math.random, large = i < 4;
+      particles.push({ x: e.x + (rand() - .5) * Math.min(e.w || 20, 70), y: e.y + (rand() - .5) * Math.min(e.h || 20, 60),
+        vx: (rand() - .5) * force + Math.max(-4, Math.min(4, (e.vx || 0) * .35)), vy: -1.5 - rand() * force * .65,
+        size: large ? 10 + rand() * 10 : 3 + rand() * 6, life: .55 + rand() * .65, color: e.color,
+        material: e.material, rotation: rand() * 6, spin: (rand() - .5) * 15, fragment: true });
+    }
+  }
+  function dust(x, y, count, spread) {
+    for (let i = 0; i < (reducedMotion.matches ? Math.ceil(count / 3) : count); i++) {
+      const side = i % 2 ? 1 : -1;
+      particles.push({ x: x + side * Math.random() * 18, y, vx: side * (1 + Math.random() * spread), vy: -Math.random() * 2,
+        life: .35 + Math.random() * .45, color: i % 3 ? '#e5c797' : '#fff2cf', size: 7 + Math.random() * 14, dust: true });
+    }
+  }
   function onEvent(e) {
+    if (e.type === 'hit') {
+      shock(e.x, e.y, 68 + e.energy * 2, '#fff6c7', .25);
+      debris({ ...e, color: '#fff1bc' }, 12, 9);
+      shake = Math.max(shake, Math.min(15, e.energy));
+      if (!reducedMotion.matches) hitStop = .046;
+      tone(145, .14, 'triangle', .07);
+    }
+    if (e.type === 'buckling') {
+      dust(e.x - 53, e.y + 9, 6, 3); dust(e.x + 53, e.y + 9, 6, 3);
+      tone(225, .12, 'triangle', .025);
+    }
     if (e.type === 'break') {
-      burst(e.x, e.y, e.color, e.target ? 20 : 10); shake = Math.max(shake, e.target ? 5 : 2);
-      texts.push({ x: e.x, y: e.y, text: e.target ? '+1,000' : '와르르!', life: 1 });
+      if (e.target) {
+        burst(e.x, e.y, e.color, 15); shock(e.x, e.y, 43, '#eed4fc', .26);
+        texts.push({ x: e.x, y: e.y - 10, text: '+1,000', life: .95 });
+      } else {
+        debris(e, 15, 13); dust(e.x, e.y, 5, 4);
+        if (++chain >= 3) chainLabel = { text: `연쇄 붕괴 ×${chain}`, life: 1.05 };
+      }
+      shake = Math.max(shake, e.target ? 7 : 4);
       tone(e.target ? 700 : 180, .1, e.target ? 'sine' : 'triangle');
     }
-    if (e.type === 'blast') { rings.push({ x: e.x, y: e.y, life: .6 }); burst(e.x, e.y, '#f7bb4a', 35); shake = 12; tone(90, .4, 'sawtooth'); }
+    if (e.type === 'blast') {
+      shock(e.x, e.y, 165, '#ffdb79', .46); shock(e.x, e.y, 96, '#fff3bb', .27);
+      dust(e.x, e.y, 16, 8); debris({ ...e, color: '#f7bb4a' }, 26, 16); shake = 17;
+      if (!reducedMotion.matches) hitStop = .055;
+      tone(90, .4, 'sawtooth');
+    }
+    if (e.type === 'crash') {
+      const big = e.energy >= 18;
+      debris(e, big ? 12 : 6, e.energy * .54); dust(e.x, e.y + 8, big ? 14 : 6, e.energy * .27);
+      if (big) shock(e.x, e.y + 8, 40 + e.energy * 2.1, '#fff1cf', .32, .36);
+      shake = Math.max(shake, Math.min(17, e.energy * .48));
+      if (sim.state.time - lastCrashSound > 85) { lastCrashSound = sim.state.time; tone(big ? 90 : 135, .18, 'triangle', big ? .08 : .04); }
+    }
+    if (e.type === 'launch') { chain = 0; chainLabel = null; }
     if (e.type === 'launch' || e.type === 'split') tone(460, .18, 'triangle');
     if (e.type === 'reload') { aim = { ...P.SLING }; trail = []; keyAim = false; }
     if (e.type === 'finish') finish(e);
@@ -61,6 +116,7 @@
     sim?.dispose(); levelIndex = index; submitted = false; lastLive = -1;
     sim = P.create(index, onEvent); screen = 'play'; paused = false; cancelDrag();
     particles = []; rings = []; texts = []; trail = []; accumulator = 0; angle = 27; power = 78;
+    lastCrashSound = -Infinity; shake = 0; hitStop = 0; chain = 0; chainLabel = null;
     $('menu').hidden = $('result').hidden = $('paused').hidden = true;
     $('chapter').textContent = `FOREST ${String(index + 1).padStart(2, '0')} / 08`;
     $('level-name').textContent = P.LEVELS[index].name;
@@ -171,6 +227,43 @@
     ellipse(x + size * .18, y - size * .48, size * .22, size * .27, color);
     line([[x, y - size * .15], [x - size * .12, y - size * .45]], '#78916b', size * .018);
   }
+  // Per-theme ground palette: soil, grass edge, highlight and pebble colours.
+  const THEMES = {
+    meadow: { soil: '#c6a878', grass: '#607b49', light: '#9bab62', pebble: '#b4986a', tuft: '#668750' },
+    cliff: { soil: '#b79a70', grass: '#6c8450', light: '#a1ae65', pebble: '#a58660', tuft: '#6f8a55' },
+    stone: { soil: '#a8a398', grass: '#7a8b72', light: '#a9b79b', pebble: '#8d887e', tuft: '#7e9071' },
+    ice: { soil: '#b6cdd2', grass: '#e6f4f4', light: '#ffffff', pebble: '#9bbcc4', tuft: '#c8e6ea' },
+    castle: { soil: '#9d9087', grass: '#6f7c66', light: '#97a58c', pebble: '#85786f', tuft: '#74826b' },
+  };
+  function terrain() {
+    const ys = P.groundProfile(levelIndex), step = P.GROUND_STEP;
+    const theme = THEMES[P.LEVELS[levelIndex].theme] || THEMES.meadow;
+    ctx.fillStyle = theme.soil; ctx.beginPath(); ctx.moveTo(0, 730);
+    ys.forEach((y, i) => ctx.lineTo(i * step, y)); ctx.lineTo(1280, ys.at(-1)); ctx.lineTo(1280, 730); ctx.closePath(); ctx.fill();
+    // Layered edge: dark grass line with a lighter band underneath follows every slope.
+    line(ys.map((y, i) => [i * step, y + 6]), theme.light, 11);
+    line(ys.map((y, i) => [i * step, y + 1]), theme.grass, 9);
+    for (let i = 0; i < 70; i++) {
+      const x = (i * 173) % 1280, top = P.groundAt(levelIndex, x), y = top + 22 + (i * 47) % Math.max(24, 740 - top - 24);
+      ellipse(x, y, 3 + i % 4, 2, theme.pebble);
+    }
+    for (let i = 0; i < 52; i++) {
+      const x = (i * 79) % 1280, y = P.groundAt(levelIndex, x);
+      line([[x, y], [x + 4, y - 10], [x + 8, y]], theme.tuft, 2);
+    }
+    // Rock faces make steep steps and cliffs read as solid stone.
+    if (['cliff', 'stone', 'castle'].includes(P.LEVELS[levelIndex].theme)) {
+      for (let i = 1; i < ys.length; i++) {
+        if (Math.abs(ys[i] - ys[i - 1]) < 14) continue;
+        const x = i * step, top = Math.min(ys[i], ys[i - 1]), bottom = Math.max(ys[i], ys[i - 1]);
+        for (let y = top + 14; y < bottom; y += 22) line([[x - 16, y], [x + 4, y + 3]], theme.pebble, 3);
+      }
+    }
+    for (const [x, y] of [[350, 568], [1140, 568], [420, 571]]) {
+      const gy = P.groundAt(levelIndex, x) - 6;
+      line([[x, gy], [x, gy - 14]], '#65834f', 2); ellipse(x, gy - 18, 5, 5, '#fff0b8'); ellipse(x + 4, gy - 15, 4, 4, '#e6b36a');
+    }
+  }
   function background() {
     const sky = ctx.createLinearGradient(0, 0, 0, 640); sky.addColorStop(0, '#c5e2df'); sky.addColorStop(.65, '#eef0cf'); sky.addColorStop(1, '#f5e8be'); ctx.fillStyle = sky; ctx.fillRect(0, 0, 1280, 720);
     ellipse(1010, 148, 72, 72, '#fff9d280'); ellipse(1010, 148, 48, 48, '#fff6cb');
@@ -178,11 +271,9 @@
     hill(344, '#b9d2b7', 55, .2); hill(415, '#9bbfa0', 40, 2.5);
     for (let i = 0; i < 11; i++) tree(i * 140 - 30, 520, 110 + (i % 3) * 40, '#87ad8d');
     hill(512, '#7ca47c', 24, 1.2); hill(556, '#9ab47a', 12, 4);
-    rounded(0, P.FLOOR, 1280, 146, 0, '#c6a878'); rounded(0, P.FLOOR, 1280, 12, 0, '#607b49'); rounded(0, P.FLOOR + 11, 1280, 12, 0, '#9bab62');
-    for (let i = 0; i < 55; i++) { const x = (i * 173) % 1280, y = 612 + (i * 47) % 100; ellipse(x, y, 3 + i % 4, 2, '#b4986a'); }
-    for (let i = 0; i < 35; i++) { const x = (i * 79) % 1280; line([[x, 573], [x + 4, 563], [x + 8, 573]], '#668750', 2); }
-    tree(40, 570, 240, '#537c59'); tree(1245, 575, 205, '#63875d');
-    for (const [x, y] of [[350, 568], [1140, 568], [420, 571]]) { line([[x, y], [x, y - 14]], '#65834f', 2); ellipse(x, y - 18, 5, 5, '#fff0b8'); ellipse(x + 4, y - 15, 4, 4, '#e6b36a'); }
+    terrain();
+    tree(40, 570, 240, '#537c59');
+    if (P.groundAt(levelIndex, 1245) >= P.FLOOR - 1) tree(1245, 575, 205, '#63875d');
     // The team's little supply cart.
     rounded(55, 523, 88, 40, 6, '#a37949'); line([[60, 538], [138, 538]], '#795936', 3);
     ellipse(74, 564, 10, 10, '#52654b'); ellipse(124, 564, 10, 10, '#52654b');
@@ -237,9 +328,45 @@
     for (let i = 0; i < 130; i++) {
       vx *= 1 - .0003 * .5; vy = vy * (1 - .0003 * .5) + .1388889;
       x += vx * .5; y += vy * .5;
-      if (y > P.FLOOR - 15) break;
+      if (y > P.groundAt(levelIndex, x) - 15) break;
       if (i % 8 === 0) ellipse(x, y, Math.max(2, 4 - i / 65), Math.max(2, 4 - i / 65), `rgba(255,253,230,${.9 - i / 170})`);
     }
+  }
+  function drawParticle(p, dt) {
+    if (p.life <= 0) return;
+    if (!paused) {
+      p.x += p.vx * dt * 60; p.y += p.vy * dt * 60;
+      p.vy += dt * (p.dust ? 2 : 20); p.life -= dt;
+      const groundY = P.groundAt(levelIndex, p.x);
+      if (p.fragment && p.y > groundY - p.size * .25) {
+        p.y = groundY - p.size * .25;
+        p.vy = p.vy > 1.4 ? p.vy * -.32 : 0;
+        p.vx *= Math.exp(-dt * 9); p.spin *= Math.exp(-dt * 8);
+      }
+      if (p.fragment) p.rotation += p.spin * dt;
+      // Particles are visual only, but must still never leave the playfield.
+      const edge = p.dust ? p.size * 1.6 : p.size;
+      if (p.x < edge) { p.x = edge; p.vx = Math.abs(p.vx) * .35; }
+      else if (p.x > 1280 - edge) { p.x = 1280 - edge; p.vx = -Math.abs(p.vx) * .35; }
+      if (p.y < edge) { p.y = edge; p.vy = Math.abs(p.vy) * .2; }
+    }
+    ctx.globalAlpha = Math.max(0, Math.min(1, p.life / .32));
+    if (p.dust) {
+      const size = p.size * (1.65 - Math.min(.8, p.life));
+      ctx.globalAlpha *= .45; ellipse(p.x, p.y, size, size * .63, p.color);
+      return;
+    }
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation);
+    const s = p.size;
+    if (p.material === 'wood') {
+      rounded(-s, -s * .25, s * 2, s * .5, 1, '#855539');
+      line([[-s * .85, -s * .1], [s * .84, 0]], '#e8b779', Math.max(1, s * .12));
+    } else if (p.material === 'ice' || p.material === 'stone') {
+      ctx.fillStyle = p.color; ctx.beginPath(); ctx.moveTo(-s * .6, s * .33); ctx.lineTo(-s * .22, -s * .63);
+      ctx.lineTo(s * .58, -s * .23); ctx.lineTo(s * .34, s * .62); ctx.closePath(); ctx.fill();
+      line([[-s * .57, s * .31], [-s * .22, -s * .59], [s * .55, -s * .22]], p.material === 'ice' ? '#f2fff8' : '#d4dcd0', 1.4);
+    } else rounded(-s / 2, -s / 2, s, s, 2, p.color);
+    ctx.restore();
   }
   function draw(dt) {
     const dpr = Math.min(devicePixelRatio || 1, 2), width = Math.round(canvas.clientWidth * dpr), height = Math.round(canvas.clientHeight * dpr);
@@ -248,7 +375,7 @@
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#d6e7cf'; ctx.fillRect(0, 0, width, height);
     ctx.setTransform(scale, 0, 0, scale, (width - 1280 * scale) / 2, (height - 720 * scale) / 2);
     ctx.save(); ctx.beginPath(); ctx.rect(0, 0, 1280, 720); ctx.clip();
-    if (shake > .1 && !paused) { ctx.translate(Math.sin(renderTime * 81) * shake, Math.cos(renderTime * 95) * shake * .5); shake *= Math.exp(-dt * 8); }
+    if (shake > .1 && !paused) { if (!reducedMotion.matches) ctx.translate(Math.sin(renderTime * 81) * shake, Math.cos(renderTime * 95) * shake * .5); shake *= Math.exp(-dt * 8); }
     background();
     if (sim) {
       sim.state.blocks.forEach(drawBlock); sim.state.targets.forEach(creature);
@@ -265,26 +392,43 @@
     if (screen === 'play' && ready && !dragging && !keyAim) {
       ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#44644e'; ctx.fillText('← 뒤로 당겨요', 195, 373 + Math.sin(renderTime * 3) * 4);
     }
-    for (const p of particles) {
-      if (!paused) { p.x += p.vx * dt * 60; p.y += p.vy * dt * 60; p.vy += dt * 15; p.life -= dt; }
-      ctx.globalAlpha = Math.max(0, Math.min(1, p.life / .4)); ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rotation + p.life * 4); rounded(-p.size / 2, -p.size / 2, p.size, p.size, 1, p.color); ctx.restore();
-    }
+    if (particles.length > 280) particles.splice(0, particles.length - 280);
+    for (const p of particles) drawParticle(p, dt);
     ctx.globalAlpha = 1; particles = particles.filter(p => p.life > 0);
     for (const r of rings) {
       if (!paused) r.life -= dt;
-      ctx.strokeStyle = `rgba(255,224,145,${Math.max(0, r.life)})`; ctx.lineWidth = 8; ctx.beginPath(); ctx.arc(r.x, r.y, (1 - r.life / .6) * 170 + 8, 0, Math.PI * 2); ctx.stroke();
+      if (r.life <= 0) continue;
+      const t = r.life / r.duration, radius = 7 + (1 - t * t) * r.radius;
+      ctx.globalAlpha = t * .8; ctx.strokeStyle = r.color; ctx.lineWidth = 1 + t * 5;
+      ctx.beginPath(); ctx.ellipse(r.x, r.y, radius, radius * r.flat, 0, 0, Math.PI * 2); ctx.stroke();
     }
+    ctx.globalAlpha = 1;
     rings = rings.filter(r => r.life > 0);
-    for (const t of texts) { if (!paused) { t.y -= dt * 32; t.life -= dt; } ctx.globalAlpha = Math.max(0, t.life); ctx.fillStyle = '#fff8dd'; ctx.strokeStyle = '#496547'; ctx.lineWidth = 4; ctx.font = '900 22px sans-serif'; ctx.textAlign = 'center'; ctx.strokeText(t.text, t.x, t.y); ctx.fillText(t.text, t.x, t.y); }
+    for (const t of texts) { if (!paused) { t.y -= dt * 32; t.life -= dt; } ctx.globalAlpha = Math.max(0, t.life); ctx.fillStyle = '#fff8dd'; ctx.strokeStyle = '#496547'; ctx.lineWidth = 4; ctx.font = '900 22px sans-serif'; ctx.textAlign = 'center'; const tx = Math.max(58, Math.min(1222, t.x)), ty = Math.max(34, Math.min(P.FLOOR - 12, t.y)); ctx.strokeText(t.text, tx, ty); ctx.fillText(t.text, tx, ty); }
     ctx.globalAlpha = 1; texts = texts.filter(t => t.life > 0); ctx.restore();
+    if (chainLabel && screen === 'play') {
+      if (!paused) chainLabel.life -= dt;
+      if (chainLabel.life <= 0) chainLabel = null;
+      else {
+        ctx.globalAlpha = Math.min(1, chainLabel.life * 4);
+        rounded(523, 108, 234, 46, 20, '#274539');
+        ctx.fillStyle = '#fff0aa'; ctx.font = '900 25px Pretendard, sans-serif'; ctx.textAlign = 'center';
+        ctx.fillText(chainLabel.text, 640, 140); ctx.globalAlpha = 1;
+      }
+    }
   }
   let hudElapsed = 0, trailElapsed = 0;
   function frame(now) {
     const dt = Math.min(.05, (now - (last || now)) / 1000); last = now;
     if (!paused) renderTime += dt;
     if (screen === 'play' && !paused) {
-      accumulator += dt * 1000;
-      while (accumulator >= P.STEP) { sim.step(); accumulator -= P.STEP; }
+      const frozen = reducedMotion.matches ? 0 : Math.min(dt, hitStop);
+      hitStop = reducedMotion.matches ? 0 : hitStop - frozen;
+      accumulator += (dt - frozen) * 1000;
+      while (accumulator >= P.STEP && hitStop <= 0 && screen === 'play') {
+        sim.step(); accumulator -= P.STEP;
+        if (hitStop > 0) accumulator %= P.STEP;
+      }
       trailElapsed += dt;
       if (sim.state.active && trailElapsed > .07) { trail.push({ ...sim.state.active.position }); if (trail.length > 60) trail.shift(); trailElapsed = 0; }
     }
@@ -292,6 +436,6 @@
     draw(dt); requestAnimationFrame(frame);
   }
   // Read-only diagnostics for browser smoke tests, without gameplay mutation hooks.
-  window.AcornGame = { snapshot: () => ({ screen, paused, level: levelIndex, phase: sim?.state.phase, score: sim?.state.score, remaining: sim?.state.targets.length, spent: sim?.state.spent, shot: sim?.state.active ? { ...sim.state.active.position } : null, dragging }) };
+  window.AcornGame = { snapshot: () => ({ screen, paused, level: levelIndex, phase: sim?.state.phase, score: sim?.state.score, remaining: sim?.state.targets.length, spent: sim?.state.spent, shot: sim?.state.active ? { ...sim.state.active.position } : null, dragging, effects: { chain, particles: particles.length, shockwaves: rings.length } }) };
   sim = P.create(0); updateLevels(); send('hk:ready'); requestAnimationFrame(frame);
 })();
