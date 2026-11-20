@@ -14,7 +14,14 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html,body{width:100%;height:100%;overflow:hidden;background:var(--night)}
+html,body{width:100%;height:100%;height:100dvh;overflow:hidden;background:var(--night)}
+/* 판 전체 — 세로로 든 휴대폰이면 game.js 가 폭 · 높이를 바꿔 시계 방향 90° 돌림(안의 position:fixed 는 이 판 기준) */
+#rot{position:fixed;left:0;top:0;width:100%;height:100%;overflow:hidden;transform-origin:0 0}
+#safeP{position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px)}
+/* 돌린 화면 안내(처음 한 번 · 3.5초 · 누르기를 막지 않음) */
+#rotHint{position:fixed;right:calc(var(--vr,0px) + 14px);top:calc(var(--vt,0px) + 50%);transform:translateY(-50%);z-index:12;pointer-events:none;display:flex;align-items:center;gap:10px;padding:10px 16px 10px 12px;border-radius:20px;background:rgba(40,30,110,.95);border:2px solid var(--moon);box-shadow:0 10px 30px rgba(0,0,0,.35);animation:hintIn .35s ease-out}
+#rotHint b{display:block;font-size:15px;font-weight:900;white-space:nowrap}#rotHint small{display:block;font-size:12px;font-weight:700;opacity:.85;white-space:nowrap;margin-top:2px}
+@keyframes hintIn{from{opacity:0;transform:translateY(-50%) scale(.9)}to{opacity:1;transform:translateY(-50%)}}
 body{font-family:var(--font);color:#fff;word-break:keep-all;-webkit-font-smoothing:antialiased;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none;touch-action:none}
 [hidden]{display:none!important}
 button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-action:manipulation}
@@ -305,8 +312,75 @@ button:disabled{cursor:default}
 #pickS.P[data-step="1"] #iBox,#pickS.P[data-step="1"] #mBox,#pickS.P[data-step="1"] #pGo,#pickS.P[data-step="1"] .backP{display:none!important}
 #pickS.P[data-step="2"] .cards,#pickS.P[data-step="2"] .detail,#pickS.P[data-step="2"] .nextP{display:none!important}
 
+/* ── 휴대폰 판이 1배보다 작을 때(.z · --u = 1 ÷ 줄임 배율 — 작은 휴대폰 · 아케이드 창): 실제 글 12px · 터치 단추 44px 이상, 보조 글은 숨김 ── */
+/* 첫 화면 */
+.P.z #tPanel{height:auto;max-height:calc(390px - 24px);padding:calc(10px*var(--u,1)) calc(14px*var(--u,1))}
+.P.z #tPanel h1{font-size:calc(24px*var(--u,1));letter-spacing:0}.P.z #tPanel h1 b{font-size:calc(17px*var(--u,1))}
+.P.z .tsub,.P.z .tl{display:none}
+.P.z .lvs{gap:calc(6px*var(--u,1));margin-top:calc(8px*var(--u,1))}.P.z .lv{height:calc(44px*var(--u,1));font-size:calc(14px*var(--u,1));border-radius:calc(10px*var(--u,1))}.P.z .lv small{font-size:calc(12px*var(--u,1))}
+.P.z #tStart{height:calc(44px*var(--u,1));font-size:calc(18px*var(--u,1));margin:calc(6px*var(--u,1)) 0;border-radius:calc(12px*var(--u,1));box-shadow:0 calc(3px*var(--u,1)) 0 #c93a6a}
+.P.z .row2{gap:calc(6px*var(--u,1))}.P.z .sub2{height:calc(44px*var(--u,1));font-size:calc(13px*var(--u,1));border-radius:calc(10px*var(--u,1));gap:calc(4px*var(--u,1))}.P.z .sub2 small{font-size:calc(12px*var(--u,1))}
+.P.z .best{height:calc(28px*var(--u,1));margin-top:calc(6px*var(--u,1));padding:0 calc(10px*var(--u,1));gap:calc(6px*var(--u,1));font-size:calc(12px*var(--u,1));border-radius:calc(9px*var(--u,1))}.P.z .best b{font-size:calc(15px*var(--u,1))}
+.P.z .snd{width:calc(44px*var(--u,1));height:calc(44px*var(--u,1));border-radius:calc(10px*var(--u,1))}
+/* 고르기 머리 */
+.P.z .ph{top:2px;height:calc(44px*var(--u,1));gap:calc(6px*var(--u,1))}.P.z .back{width:calc(44px*var(--u,1));height:calc(44px*var(--u,1));font-size:calc(15px*var(--u,1));border-radius:calc(10px*var(--u,1))}
+.P.z .ph h2{font-size:calc(16px*var(--u,1))}.P.z .chip{font-size:calc(12px*var(--u,1));padding:calc(1px*var(--u,1)) calc(6px*var(--u,1))}.P.z .plv{font-size:calc(12px*var(--u,1));top:calc(14px*var(--u,1))}
+/* 고르기 ① 탈것: 카드(그림 + 이름) 왼쪽 반, 자세히 오른쪽 반(그림 · 막대 · 태그 숨기고 숫자만) */
+.P.z .cards{top:calc(50px*var(--u,1));width:414px;height:calc(390px - 8px - calc(50px*var(--u,1)));gap:calc(5px*var(--u,1))}
+.P.z .rcard{border-radius:calc(10px*var(--u,1))}.P.z .rcard .pic{flex:1;height:auto;min-height:0}.P.z .rcard .pic img{width:auto;height:100%;max-width:92%;object-fit:contain}
+.P.z .rcard .tx{flex:none;padding:0 calc(5px*var(--u,1)) calc(3px*var(--u,1))}.P.z .rcard h3{font-size:calc(13px*var(--u,1));text-align:center}.P.z .rcard h3 small,.P.z .tags{display:none}
+.P.z .rcard .pickd{font-size:calc(12px*var(--u,1));top:calc(3px*var(--u,1));right:calc(3px*var(--u,1));padding:0 calc(5px*var(--u,1))}
+.P.z .detail{left:430px;top:calc(50px*var(--u,1));width:406px;height:calc(390px - 8px - calc(50px*var(--u,1)) - calc(50px*var(--u,1)));padding:calc(6px*var(--u,1)) calc(9px*var(--u,1));border-radius:calc(12px*var(--u,1));overflow:hidden}
+.P.z .dpic{display:none}
+.P.z .dinfo{display:flex;flex-wrap:wrap;column-gap:calc(10px*var(--u,1));align-items:baseline}
+.P.z .dinfo h3{font-size:calc(15px*var(--u,1));width:100%}.P.z .dinfo h3 small{font-size:calc(12px*var(--u,1));margin-left:calc(4px*var(--u,1))}
+.P.z .trait{font-size:calc(12px*var(--u,1));width:100%;margin:0 0 calc(2px*var(--u,1));line-height:1.25}
+.P.z .st{font-size:calc(12px*var(--u,1));margin:0;gap:calc(4px*var(--u,1));justify-content:flex-start}.P.z .sbar{display:none}
+.P.z .wbox{gap:calc(6px*var(--u,1));padding:calc(3px*var(--u,1)) calc(6px*var(--u,1));margin-top:calc(4px*var(--u,1));border-radius:calc(8px*var(--u,1))}.P.z .wbox .ic{width:calc(24px*var(--u,1));height:calc(24px*var(--u,1))}
+.P.z .wbox b{font-size:calc(12px*var(--u,1))}.P.z .wbox em{font-size:calc(12px*var(--u,1));padding:0 calc(4px*var(--u,1));margin-left:calc(4px*var(--u,1))}.P.z .wbox p{font-size:calc(12px*var(--u,1));line-height:1.2;margin-top:0}
+.P.z .nextP{right:8px;bottom:6px;width:406px;height:calc(44px*var(--u,1));font-size:calc(16px*var(--u,1));border-radius:calc(12px*var(--u,1))}
+/* 고르기 ② 아이템 · 맵 */
+.P.z #iBox{top:calc(50px*var(--u,1));width:456px;height:calc(390px - 8px - calc(50px*var(--u,1)) - calc(50px*var(--u,1)));padding:calc(6px*var(--u,1)) calc(8px*var(--u,1));border-radius:calc(12px*var(--u,1))}
+.P.z #mBox{left:472px;top:calc(50px*var(--u,1));width:364px;height:calc(390px - 8px - calc(50px*var(--u,1)) - calc(50px*var(--u,1)));padding:calc(6px*var(--u,1)) calc(8px*var(--u,1));border-radius:calc(12px*var(--u,1))}
+.P.z .bt{font-size:calc(13px*var(--u,1))}.P.z .bt small{display:none}
+.P.z .slots{gap:calc(5px*var(--u,1));margin:calc(4px*var(--u,1)) 0}.P.z .slot{height:calc(44px*var(--u,1));gap:calc(4px*var(--u,1));padding:0 calc(4px*var(--u,1));border-radius:calc(9px*var(--u,1))}.P.z .slot .ic{width:calc(24px*var(--u,1));height:calc(24px*var(--u,1))}
+.P.z .slot b{font-size:calc(12px*var(--u,1));white-space:nowrap;letter-spacing:-.04em}.P.z .slot small{display:none}.P.z .slot.empty{font-size:calc(12px*var(--u,1))}
+.P.z .slot .x{width:calc(18px*var(--u,1));height:calc(18px*var(--u,1));font-size:calc(12px*var(--u,1));right:calc(-6px*var(--u,1));top:calc(-6px*var(--u,1))}
+.P.z .pool{gap:calc(4px*var(--u,1))}.P.z .pi{width:calc((100% - calc(12px*var(--u,1))) / 4);height:calc(44px*var(--u,1));flex-direction:column;justify-content:center;gap:0;padding:0;font-size:calc(12px*var(--u,1));border-radius:calc(9px*var(--u,1));text-align:center}
+.P.z .pi .ic{width:calc(22px*var(--u,1));height:calc(22px*var(--u,1))}.P.z .pi .in2{font-size:calc(11px*var(--u,1));top:calc(-5px*var(--u,1));right:calc(-3px*var(--u,1));padding:0 calc(3px*var(--u,1))}
+.P.z .idesc{display:none}
+.P.z .maps{gap:calc(4px*var(--u,1));margin-top:calc(4px*var(--u,1))}.P.z .mp{height:calc(44px*var(--u,1));font-size:calc(12px*var(--u,1));border-radius:calc(8px*var(--u,1))}.P.z .mp canvas,.P.z .mp .rnd{height:calc(18px*var(--u,1))}.P.z .mp .rnd{font-size:calc(14px*var(--u,1))}
+.P.z .mp span{padding:calc(2px*var(--u,1)) calc(1px*var(--u,1));letter-spacing:-.05em}
+.P.z .mdesc{font-size:calc(12px*var(--u,1));margin-top:calc(4px*var(--u,1));padding:calc(2px*var(--u,1)) calc(5px*var(--u,1));line-height:1.25}.P.z .mdesc .md2,.P.z .mdesc br{display:none}
+.P.z #pGo{left:472px;top:auto;bottom:6px;width:364px;height:calc(44px*var(--u,1));font-size:calc(18px*var(--u,1));border-radius:calc(12px*var(--u,1));gap:calc(8px*var(--u,1))}.P.z #pGo small{font-size:calc(12px*var(--u,1))}
+.P.z .backP{left:8px;bottom:6px;width:456px;height:calc(44px*var(--u,1));font-size:calc(14px*var(--u,1));border-radius:calc(10px*var(--u,1))}
+/* 전장 단추판 */
+#hudM.z{--P:max(56px,calc(44px*var(--u,1)));--Q:max(56px,calc(44px*var(--u,1)));--F:max(88px,calc(66px*var(--u,1)))}
+#hudM.z .tb{top:4px;height:calc(34px*var(--u,1));border-radius:calc(10px*var(--u,1));gap:calc(5px*var(--u,1));padding:0 calc(7px*var(--u,1));font-size:calc(13px*var(--u,1))}
+#hudM.z .tb .bar{width:auto;flex:1;height:calc(9px*var(--u,1))}#hudM.z .tb .n{font-size:calc(14px*var(--u,1));min-width:calc(24px*var(--u,1))}#hudM.z .who{font-size:calc(12px*var(--u,1));padding:calc(1px*var(--u,1)) calc(5px*var(--u,1))}
+#hudM.z #mMeName,#hudM.z #mOpName,#hudM.z .wl2{display:none}
+#hudM.z #mMe{width:calc(140px*var(--u,1))}#hudM.z #mOp{left:calc(844px - 10px - calc(44px*var(--u,1)) - calc(150px*var(--u,1)));width:calc(150px*var(--u,1))}
+#hudM.z #mWind{left:calc(422px - calc(81px*var(--u,1)));width:calc(124px*var(--u,1));height:calc(28px*var(--u,1))!important;top:calc(4px + calc(3px*var(--u,1)))!important;padding:0 calc(6px*var(--u,1));gap:calc(4px*var(--u,1))!important}
+#hudM.z #mWind .arrow{width:calc(18px*var(--u,1));height:calc(12px*var(--u,1))}#hudM.z #mWind .cells{gap:calc(2px*var(--u,1))}#hudM.z #mWind .cells i{width:calc(3px*var(--u,1));height:calc(10px*var(--u,1))}#hudM.z #mWind .cells .mid{width:calc(2px*var(--u,1))}#hudM.z #mWind b{font-size:calc(15px*var(--u,1));min-width:calc(16px*var(--u,1))}
+#hudM.z #mClock{left:calc(422px + calc(47px*var(--u,1)));width:calc(34px*var(--u,1));height:calc(34px*var(--u,1))}#hudM.z #mClock svg{width:100%;height:100%}#hudM.z #mClock .n{font-size:calc(14px*var(--u,1))}
+#hudM.z #mTurn{left:calc(422px - calc(55px*var(--u,1)));top:calc(8px + calc(34px*var(--u,1)));width:calc(110px*var(--u,1));height:calc(22px*var(--u,1));font-size:calc(12px*var(--u,1))}
+#hudM.z #mPause{left:calc(844px - 4px - calc(44px*var(--u,1)));top:2px;width:calc(44px*var(--u,1));height:calc(44px*var(--u,1));border-radius:calc(10px*var(--u,1))}
+#hudM.z .pad{width:var(--P);height:var(--P);font-size:max(22px,calc(18px*var(--u,1)));padding-bottom:calc(11px*var(--u,1))}#hudM.z .pad small{font-size:calc(12px*var(--u,1))}
+#hudM.z .pad[data-hold=left]{left:12px!important;top:calc(390px - 6px - var(--P))!important}
+#hudM.z .pad[data-hold=right]{left:calc(18px + var(--P))!important;top:calc(390px - 6px - var(--P))!important}
+#hudM.z #mFuel{top:calc(390px - 6px - var(--P) - 9px)!important;width:calc(var(--P) * 2 + 6px)!important}
+#hudM.z .pad[data-hold=down]{left:12px!important;top:calc(390px - 19px - var(--P) * 2)!important}
+#hudM.z .pad[data-hold=up]{left:12px!important;top:calc(390px - 23px - var(--P) * 3)!important}
+#hudM.z #mFire{left:calc(844px - 8px - var(--F));top:calc(390px - 6px - var(--F));width:var(--F);height:var(--F)}
+#hudM.z #mFire svg{width:100%;height:100%}#hudM.z #mFire .in{inset:10%;font-size:calc(13px*var(--u,1))}
+#hudM.z .mi{top:calc(390px - 6px - var(--Q));width:var(--Q);height:var(--Q)}#hudM.z .mi .ic{width:calc(28px*var(--u,1));height:calc(28px*var(--u,1))}
+#hudM.z #mI2{left:calc(844px - 14px - var(--F) - var(--Q))}#hudM.z #mI1{left:calc(844px - 20px - var(--F) - var(--Q) * 2)}#hudM.z #mI0{left:calc(844px - 26px - var(--F) - var(--Q) * 3)}
+#hudM.z #mAp{left:calc(844px - 4px - calc(130px*var(--u,1)));width:calc(130px*var(--u,1));top:calc(390px - 10px - var(--F) - calc(16px*var(--u,1)));font-size:calc(12px*var(--u,1))}
+#hudM.z .mw{top:calc(390px - 14px - var(--F) - calc(16px*var(--u,1)) - var(--Q));width:var(--Q);height:var(--Q)}#hudM.z .mw .ic{width:calc(24px*var(--u,1));height:calc(24px*var(--u,1))}#hudM.z .mw>span:last-child{font-size:calc(12px*var(--u,1));line-height:1.1}
+#hudM.z #mW1{left:calc(844px - 8px - var(--Q))}#hudM.z #mW0{left:calc(844px - 14px - var(--Q) * 2)}
+
 /* ── 덮개 카드 ── */
-.modal{position:fixed;left:0;right:0;top:var(--vt,0px);bottom:var(--vb,0px);display:flex;align-items:center;justify-content:center;background:rgba(20,14,60,.55);z-index:10;padding:16px}
+.modal{position:fixed;left:var(--vl,0px);right:var(--vr,0px);top:var(--vt,0px);bottom:var(--vb,0px);display:flex;align-items:center;justify-content:center;background:rgba(20,14,60,.55);z-index:10;padding:16px}
 .mcard{width:min(460px,100%);max-height:100%;overflow:auto;border-radius:28px;padding:24px 24px 20px;text-align:center;background:rgba(40,30,110,.94);border:2px solid var(--line);box-shadow:0 20px 60px rgba(0,0,0,.35)}
 .mcard h2{font-size:30px;font-weight:900;margin-bottom:6px}
 .mcard p{font-size:16px;opacity:.9;line-height:1.5}
@@ -327,14 +401,17 @@ button:disabled{cursor:default}
 .hows div{border-radius:18px;background:rgba(255,255,255,.08);padding:12px 10px;text-align:left}
 .hows b{display:block;color:var(--moon);font-size:17px;margin-bottom:6px}
 .hows p{font-size:14px;line-height:1.45}
-@media (max-height:500px){.mcard{padding:12px 16px 10px;border-radius:20px}.mcard h2{font-size:21px}.mcard p{font-size:13px}.sc{margin:6px 0;padding:3px 10px}.sc div{font-size:12px;padding:1px 0}.sc .tot{font-size:15px}.big{height:44px;min-width:110px;font-size:14px;margin:3px}.hows{grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}.hows div{padding:6px}.hows b{font-size:12px;margin-bottom:2px}.hows p{font-size:12px;line-height:1.32}.ostat{margin-top:4px;gap:5px}.ostat span{font-size:12px;padding:1px 8px}.howc .hint{font-size:12px!important}}
+/* 낮은 판(판 높이 500 이하 — game.js 가 .sh, 돌린 판도 판 기준) */
+.sh .mcard{padding:12px 16px 10px;border-radius:20px}.sh .mcard h2{font-size:21px}.sh .mcard p{font-size:13px}.sh .sc{margin:6px 0;padding:3px 10px}.sh .sc div{font-size:12px;padding:1px 0}.sh .sc .tot{font-size:15px}.sh .big{height:44px;min-width:110px;font-size:14px;margin:3px}.sh .hows{grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0}.sh .hows div{padding:6px}.sh .hows b{font-size:12px;margin-bottom:2px}.sh .hows p{font-size:12px;line-height:1.32}.sh .ostat{margin-top:4px;gap:5px}.sh .ostat span{font-size:12px;padding:1px 8px}.sh .howc .hint{font-size:12px!important}
 /* 놀이 방법 카드: 뒤 첫 화면 글이 비치지 않게 덮개를 진하게 */
 #howM{background:rgba(20,14,60,.9)}
 #howM .mcard{background:rgba(40,30,110,.98)}
-@media (max-width:600px){.hows{grid-template-columns:1fr 1fr}}
+.nw .hows{grid-template-columns:1fr 1fr}
 </style>
 </head>
 <body>
+<div id="safeP" aria-hidden="true"></div>
+<div id="rot">
 <canvas id="bg" aria-hidden="true"></canvas>
 <canvas id="cv" aria-label="달나라 전장"></canvas>
 
@@ -411,7 +488,7 @@ button:disabled{cursor:default}
 
 <div class="hud" id="hudM" hidden>
   <div class="tb glass" id="mMe"><span class="who">나</span><span id="mMeName">방아</span><div class="bar" id="mMeBar"><i></i></div><span class="n" id="mMeHp">100</span></div>
-  <div class="tb glass" id="mWind" data-g="c">별바람 <svg class="arrow" id="mArrow" width="18" height="12" viewBox="0 0 18 12"><path d="M17,6 H4 M8,1 L2,6 L8,11" stroke="#8fe0ff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="cells" id="mCells"></span><b id="mWindN">0</b></div>
+  <div class="tb glass" id="mWind" data-g="c"><span class="wl2">별바람</span> <svg class="arrow" id="mArrow" width="18" height="12" viewBox="0 0 18 12"><path d="M17,6 H4 M8,1 L2,6 L8,11" stroke="#8fe0ff" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="cells" id="mCells"></span><b id="mWindN">0</b></div>
   <div id="mClock" data-g="c" class="clock"><svg width="34" height="34" viewBox="0 0 34 34"><circle cx="17" cy="17" r="14" fill="rgba(32,24,92,.8)" stroke="rgba(255,255,255,.25)" stroke-width="3.5"/><circle id="mRing" cx="17" cy="17" r="14" fill="none" stroke="#8fe0ff" stroke-width="3.5" stroke-linecap="round" transform="rotate(-90 17 17)"/></svg><div class="n" id="mClockN">20</div></div>
   <div class="turn" id="mTurn" data-g="c">내 차례</div>
   <div class="tb glass" id="mOp" data-g="r"><span class="who cpu">컴퓨터</span><span id="mOpName">방아</span><div class="bar r" id="mOpBar"><i></i></div><span class="n" id="mOpHp">100</span></div>
@@ -443,8 +520,9 @@ button:disabled{cursor:default}
   <div style="margin-top:12px"><button class="big" id="howB">알겠어요</button></div></div></div>
 <div class="modal" id="rotM" hidden><div class="mcard"><svg width="96" height="72" viewBox="0 0 96 72" aria-hidden="true"><rect x="8" y="14" width="30" height="50" rx="6" fill="none" stroke="#fff" stroke-width="3" opacity=".5"/><rect x="40" y="26" width="50" height="30" rx="6" fill="none" stroke="#ffe36b" stroke-width="3"/><path d="M26,8 Q44,0 58,14" fill="none" stroke="#ffe36b" stroke-width="3" stroke-linecap="round"/><path d="M58,14 l-8,0 M58,14 l1,-8" stroke="#ffe36b" stroke-width="3" stroke-linecap="round"/></svg><h2>휴대폰을 가로로 돌려 주세요</h2><p>넓은 화면에서 하는 게임이에요.<br>이대로 하면 단추가 작아져요.</p><div style="margin-top:16px"><button class="big sub" id="rotB">이대로 하기</button></div></div></div>
 
-<script id="moonshot-sim">
-/*
+<div id="rotHint" role="status" hidden><svg width="44" height="36" viewBox="0 0 44 36" aria-hidden="true"><rect x="3" y="9" width="30" height="18" rx="4" fill="none" stroke="#ffe36b" stroke-width="2.5"/><path d="M37,6 Q42,14 38,24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/><path d="M38,24 l-5,-2 M38,24 l2,-5" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg><span><b>휴대폰을 옆으로 돌려 들어요</b><small>화면 회전 잠금이 켜져 있어도 돼요</small></span></div>
+</div>
+<script id="moonshot-sim">/*
  * 뿅뿅 달나라 대포 — 결정적 엔진(화면 없이 돈다). DOM · 시간 · Math.random 을 쓰지 않는다.
  *  · 화면(game.js) · node 시험(tests/sim.mjs) · (2차) 서버 Python 이식이 같은 규칙을 쓴다.
  *  · 정수만: 위치 · 속도는 1/65536 px 고정소수점(Q16), 한 걸음 = 1/120초, 각도 = 0.1° 정수, 사인은 아래 표(숫자).
@@ -460,8 +538,14 @@ button:disabled{cursor:default}
  *    ev = step(st)             1/120초 걸음 — 사건 배열을 돌려줌(화면이 그리기에 씀)
  *    act(st, 줄)               기록 한 줄을 통째로 적용하고 다음 조준(또는 끝)까지 돌림
  *    botChoose(st, 'easy'|'normal'|'hard') → 기록 한 줄 꼴의 행동 · score(st, side, level) → 점수 내역
+ *  대전(versus/spec.md) — 같은 엔진을 모든 화면이 돌리고 행동 한 줄만 주고받는다
+ *    탈것 4 · 6대(cfg.rovers 길이)면 팀 판: 자리 짝수 = A 팀(왼쪽) · 홀수 = B 팀(오른쪽), 차례는 팀 번갈아 A1 B1 A2 B2(A3 B3) · 쓰러진 탈것 건너뜀
+ *    st.result.winner 는 혼자 하기 · 1:1 이면 자리 번호, 팀 판이면 팀 번호(0 A · 1 B · -1 비김)
+ *    cfg.vs = 1 이면 엔진이 시간 다 됨으로 스스로 넘기지 않음(시계는 연 사람 화면이 정함)
+ *    VER(엔진 판본) · encodeAct / decodeAct(행동 한 줄 글자) · hashes(cfg, log)(차례마다 해시)
+ *    혼자 하기(2대 · 팀 없음)는 고치기 전과 계산 순서 · 결과 · 해시가 한 판도 다르지 않다(versus/baseline-91b8887.json 대조)
  */
-var MOONSHOT = (function () {
+var MOONSHOT = (function moonshotEngine() {
   'use strict';
   var W = 1920, H = 1080, MW = 960, MH = 540, TPS = 120, ONE = 65536;
   var EMPTY = 0, SOIL = 1, ICE = 2, ROCK = 3;
@@ -477,6 +561,10 @@ var MOONSHOT = (function () {
   var TIDE_STEP = 40;
   var TURN_CAP = 120;         // 그래도 안 끝나면 무승부
   var SUB_CHARGE = 3;         // 보조 무기: 내 차례 3번마다 1번
+  // 팀 판(탈것 4 · 6대) — 대전 명세 3.3 · 3.4. 혼자 하기 · 1:1(2대)은 위 상수 그대로
+  var TEAM_FF = 500;          // 같은 팀(자기 말고)이 받는 직접 · 폭발 피해 ‰ — 자기 폭발은 100%
+  var TEAM_TIDE_ROUNDS = 8;   // 이 돌기(= 탈것 수만큼의 차례)부터 밀물, 한 차례 TIDE_STEP 그대로
+  var TEAM_CAP_ROUNDS = 30;   // 상한 돌기 — 넘으면 서 있는 탈것 체력 합이 많은 팀
   // sin(i × 0.1°) × 65536 반올림, i = 0..900 (tools/gen_sintab.mjs 로 한 번 만든 숫자)
   var SIN_Q = [0,114,229,343,458,572,686,801,915,1029,1144,1258,1372,1487,1601,1716,1830,1944,2059,2173,2287,2401,2516,2630,2744,2859,2973,3087,3201,3316,3430,3544,3658,3773,3887,4001,4115,4229,4343,4457,4572,4686,4800,4914,5028,5142,5256,5370,5484,5598,5712,5826,5940,6054,6167,6281,6395,6509,6623,6737,6850,6964,7078,7192,7305,7419,7533,7646,7760,7873,7987,8100,8214,8327,8441,8554,8668,8781,8894,9008,9121,9234,9347,9461,9574,9687,9800,9913,10026,10139,10252,10365,10478,10591,10704,10817,10929,11042,11155,11268,11380,11493,11605,11718,11831,11943,12055,12168,12280,12393,12505,12617,12729,12842,12954,13066,13178,13290,13402,13514,13626,13738,13849,13961,14073,14185,14296,14408,14519,14631,14742,14854,14965,15077,15188,15299,15410,15521,15633,15744,15855,15966,16076,16187,16298,16409,16520,16630,16741,16851,16962,17072,17183,17293,17403,17514,17624,17734,17844,17954,18064,18174,18284,18394,18504,18613,18723,18832,18942,19051,19161,19270,19380,19489,19598,19707,19816,19925,20034,20143,20252,20360,20469,20578,20686,20795,20903,21012,21120,21228,21336,21445,21553,21661,21769,21876,21984,22092,22200,22307,22415,22522,22629,22737,22844,22951,23058,23165,23272,23379,23486,23593,23699,23806,23913,24019,24125,24232,24338,24444,24550,24656,24762,24868,24974,25080,25185,25291,25396,25502,25607,25712,25817,25922,26027,26132,26237,26342,26447,26551,26656,26760,26865,26969,27073,27177,27281,27385,27489,27593,27697,27800,27904,28007,28111,28214,28317,28420,28523,28626,28729,28832,28935,29037,29140,29242,29344,29447,29549,29651,29753,29855,29956,30058,30160,30261,30363,30464,30565,30666,30767,30868,30969,31070,31171,31271,31372,31472,31572,31672,31772,31872,31972,32072,32172,32271,32371,32470,32570,32669,32768,32867,32966,33065,33163,33262,33361,33459,33557,33655,33754,33852,33949,34047,34145,34242,34340,34437,34535,34632,34729,34826,34923,35019,35116,35212,35309,35405,35501,35597,35693,35789,35885,35981,36076,36172,36267,36362,36457,36552,36647,36742,36837,36931,37026,37120,37214,37308,37402,37496,37590,37684,37777,37870,37964,38057,38150,38243,38336,38428,38521,38614,38706,38798,38890,38982,39074,39166,39258,39349,39441,39532,39623,39714,39805,39896,39986,40077,40167,40258,40348,40438,40528,40618,40708,40797,40887,40976,41065,41154,41243,41332,41421,41509,41598,41686,41774,41862,41950,42038,42126,42213,42301,42388,42475,42562,42649,42736,42823,42909,42995,43082,43168,43254,43340,43425,43511,43597,43682,43767,43852,43937,44022,44107,44191,44275,44360,44444,44528,44612,44695,44779,44862,44946,45029,45112,45195,45278,45360,45443,45525,45607,45689,45771,45853,45935,46016,46098,46179,46260,46341,46422,46502,46583,46663,46744,46824,46904,46983,47063,47143,47222,47301,47380,47459,47538,47617,47695,47774,47852,47930,48008,48086,48163,48241,48318,48395,48472,48549,48626,48703,48779,48856,48932,49008,49084,49159,49235,49310,49386,49461,49536,49610,49685,49760,49834,49908,49982,50056,50130,50203,50277,50350,50423,50496,50569,50642,50714,50787,50859,50931,51003,51075,51146,51218,51289,51360,51431,51502,51573,51643,51713,51784,51854,51923,51993,52063,52132,52201,52270,52339,52408,52477,52545,52613,52682,52750,52817,52885,52952,53020,53087,53154,53221,53287,53354,53420,53486,53552,53618,53684,53749,53815,53880,53945,54010,54075,54139,54204,54268,54332,54396,54459,54523,54586,54650,54713,54775,54838,54901,54963,55025,55087,55149,55211,55273,55334,55395,55456,55517,55578,55638,55699,55759,55819,55879,55938,55998,56057,56116,56175,56234,56293,56351,56410,56468,56526,56583,56641,56699,56756,56813,56870,56927,56983,57040,57096,57152,57208,57264,57319,57374,57430,57485,57539,57594,57649,57703,57757,57811,57865,57918,57972,58025,58078,58131,58184,58236,58289,58341,58393,58445,58497,58548,58599,58650,58701,58752,58803,58853,58903,58953,59003,59053,59102,59152,59201,59250,59299,59347,59396,59444,59492,59540,59588,59635,59683,59730,59777,59824,59870,59917,59963,60009,60055,60100,60146,60191,60236,60281,60326,60371,60415,60459,60504,60547,60591,60635,60678,60721,60764,60807,60849,60892,60934,60976,61018,61059,61101,61142,61183,61224,61265,61305,61346,61386,61426,61465,61505,61544,61584,61623,61662,61700,61739,61777,61815,61853,61891,61928,61966,62003,62040,62076,62113,62149,62186,62222,62257,62293,62328,62364,62399,62434,62468,62503,62537,62571,62605,62639,62672,62706,62739,62772,62805,62837,62870,62902,62934,62966,62997,63029,63060,63091,63122,63152,63183,63213,63243,63273,63303,63332,63362,63391,63420,63449,63477,63505,63534,63562,63589,63617,63644,63671,63698,63725,63752,63778,63804,63830,63856,63882,63907,63933,63958,63983,64007,64032,64056,64080,64104,64128,64151,64174,64197,64220,64243,64266,64288,64310,64332,64354,64375,64397,64418,64439,64459,64480,64500,64520,64540,64560,64580,64599,64618,64637,64656,64675,64693,64711,64729,64747,64765,64782,64799,64816,64833,64850,64866,64882,64898,64914,64930,64945,64960,64975,64990,65005,65019,65033,65048,65061,65075,65088,65102,65115,65128,65140,65153,65165,65177,65189,65201,65212,65223,65234,65245,65256,65266,65277,65287,65296,65306,65316,65325,65334,65343,65352,65360,65368,65376,65384,65392,65399,65407,65414,65421,65427,65434,65440,65446,65452,65458,65463,65469,65474,65479,65483,65488,65492,65496,65500,65504,65507,65510,65514,65516,65519,65522,65524,65526,65528,65530,65531,65532,65534,65534,65535,65536,65536,65536];
 
@@ -550,15 +638,39 @@ var MOONSHOT = (function () {
   };
   var ITEM_KEYS = ['again', 'band', 'bubble', 'hole', 'calm', 'king', 'scope'];
   // 맵: gravity · windMul ‰, seaY 처음 별바다 높이, spawn 왼쪽 탈것 x 범위(오른쪽은 거울), y0 탈것을 내려놓기 시작하는 높이
+  //  spawnT: 팀 판 왼쪽 팀 자리마다 x 범위 { 2: [A1, A2], 3: [A1, A2, A3] } — 오른쪽 팀은 거울(W − x)
   var MAPS = {
-    calm:     { name: '고요한 달 바다', gravity: 1000, windMul: 1000, seaY: 1000, gen: 'calm', spawn: [260, 420], y0: 0 },
-    canyon:   { name: '큰 구덩이 협곡', gravity: 1000, windMul: 1000, seaY: 1000, gen: 'canyon', spawn: [190, 320], y0: 0 },
-    ice:      { name: '얼음 혜성 동굴', gravity: 1000, windMul: 600, seaY: 1000, gen: 'ice', spawn: [240, 400], y0: 470 },
-    mushroom: { name: '버섯 행성', gravity: 1150, windMul: 1000, seaY: 1000, gen: 'mushroom', spawn: [262, 392], y0: 0 },
-    ring:     { name: '고리 행성 떠 있는 섬', gravity: 750, windMul: 1400, seaY: 1000, gen: 'ring', spawn: [282, 392], y0: 0 }
+    calm:     { name: '고요한 달 바다', gravity: 1000, windMul: 1000, seaY: 1000, gen: 'calm', spawn: [260, 420], y0: 0,
+                spawnT: { 2: [[160, 300], [480, 640]], 3: [[150, 240], [420, 520], [680, 780]] } },
+    canyon:   { name: '큰 구덩이 협곡', gravity: 1000, windMul: 1000, seaY: 1000, gen: 'canyon', spawn: [190, 320], y0: 0,
+                spawnT: { 2: [[160, 280], [430, 540]], 3: [[150, 220], [380, 450], [620, 700]] } },
+    ice:      { name: '얼음 혜성 동굴', gravity: 1000, windMul: 600, seaY: 1000, gen: 'ice', spawn: [240, 400], y0: 470,
+                spawnT: { 2: [[160, 300], [480, 640]], 3: [[150, 240], [420, 520], [680, 780]] } },
+    mushroom: { name: '버섯 행성', gravity: 1150, windMul: 1000, seaY: 1000, gen: 'mushroom', spawn: [262, 392], y0: 0,
+                spawnT: { 2: [[160, 250], [410, 490]], 3: [[160, 230], [400, 480], [830, 870]] } },
+    ring:     { name: '고리 행성 떠 있는 섬', gravity: 750, windMul: 1400, seaY: 1000, gen: 'ring', spawn: [282, 392], y0: 0,
+                spawnT: { 2: [[180, 280], [700, 790]], 3: [[170, 230], [400, 470], [700, 790]] } }
   };
   var MAP_KEYS = ['calm', 'canyon', 'ice', 'mushroom', 'ring'];
   var GENS = { calm: genCalm, canyon: genCanyon, ice: genIce, mushroom: genMushroom, ring: genRing };
+
+  // ── 팀 ── 팀 값이 없으면(혼자 하기 · 1:1) 자리 번호가 곧 편: isFoe = 서로 다른 자리, foe = 1 − 자리
+  function teamOf(st, k) { return st.teams ? st.teams[k] : k; }
+  function isFoe(st, a, b) { return st.teams ? st.teams[a] !== st.teams[b] : a !== b; }
+  // owner 의 상대 중 x 에서 가장 가까운 서 있는 탈것(같으면 낮은 번호). 팀 판에서 다 쓰러졌으면 첫 상대(쓰러진 채로 — 부르는 쪽이 out 을 봄)
+  function foe(st, owner, x) {
+    if (!st.teams) return st.rovers[1 - owner];
+    var best = null, bd = 0, any = null;
+    for (var k = 0; k < st.rovers.length; k++) {
+      if (!isFoe(st, k, owner)) continue;
+      var q = st.rovers[k]; if (!any) any = q;
+      if (dead(q)) continue;
+      var d = iabs(q.x - x); if (!best || d < bd) { best = q; bd = d; }
+    }
+    return best || any;
+  }
+  function teamDown(st, t) { for (var k = 0; k < st.rovers.length; k++) if (st.teams[k] === t && !dead(st.rovers[k])) return false; return true; }
+  function anyFalling(st) { for (var k = 0; k < st.rovers.length; k++) if (st.rovers[k].falling) return true; return false; }
 
   // ── 마스크 ──
   function cellAt(st, x, y) { if (x < 0 || y < 0 || x >= W || y >= H) return EMPTY; return st.mask[(y >> 1) * MW + (x >> 1)]; }
@@ -737,10 +849,14 @@ var MOONSHOT = (function () {
     if (dm <= 0) return 0;
     if (rv.bubble) { dm = fd(dm * 400 + 500, 1000); rv.bubble = 0; ev.push({ t: 'shield', side: rv.side, k: 'bubble' }); }
     if (rv.guard) { dm = fd(dm * 500 + 500, 1000); rv.guard = 0; ev.push({ t: 'shield', side: rv.side, k: 'guard' }); }
+    // 팀 판: 같은 팀(자기 말고)이 받는 직접 · 폭발 피해는 TEAM_FF ‰(막을 거친 뒤) — 준 피해 · 명중에 안 세고 같은 편 피해로 따로
+    var mate = !!st.teams && rv.side !== st.side && st.teams[rv.side] === st.teams[st.side] && why !== 'fall' && st.phase !== 'aim';
+    if (mate) dm = fd(dm * TEAM_FF + 500, 1000);
     if (dm <= 0) return 0;
     dm = Math.min(dm, rv.hp);
     rv.hp -= dm;
-    if (rv.side !== st.side && st.phase !== 'aim') { st.stats.dealt[st.side] += dm; st.shotHit = true; }
+    if (mate) { st.stats.ff[st.side] += dm; st.stats.ffN[st.side]++; }
+    else if (rv.side !== st.side && st.phase !== 'aim') { st.stats.dealt[st.side] += dm; st.shotHit = true; }
     ev.push({ t: 'dmg', side: rv.side, n: dm, why: why, x: rv.x, y: rv.y - (why === 'fall' ? 0 : rv.spec.h) });
     return dm;
   }
@@ -756,7 +872,7 @@ var MOONSHOT = (function () {
     for (var k = 0; k < dy; k++) {
       if (supported(st, rv, rv.x, rv.y)) break;
       rv.y++;
-      if (rv.y > st.seaY) { rv.out = true; rv.falling = false; ev.push({ t: 'splash', side: rv.side, x: rv.x, y: st.seaY }); if (rv.side !== st.side && st.phase !== 'aim') st.shotHit = true; return; }
+      if (rv.y > st.seaY) { rv.out = true; rv.falling = false; ev.push({ t: 'splash', side: rv.side, x: rv.x, y: st.seaY }); if (isFoe(st, rv.side, st.side) && st.phase !== 'aim') st.shotHit = true; return; }
     }
     if (supported(st, rv, rv.x, rv.y)) {
       rv.falling = false; rv.vy = 0; rv.yq = 0;
@@ -790,7 +906,7 @@ var MOONSHOT = (function () {
       if (px < 0 || px >= W) { sh.x = qx; sh.y = qy; return { t: 'out', x: px, y: py }; }
       if (py >= st.seaY) { sh.x = qx; sh.y = qy; return { t: 'sea', x: px, y: st.seaY }; }
       if (!sh.armed && !inBox(owner, px, py, sr)) sh.armed = true;
-      for (var k = 0; k < 2; k++) {
+      for (var k = 0; k < st.rovers.length; k++) {
         var rv = st.rovers[k];
         if (rv.out || (k === sh.owner && !sh.armed)) continue;
         if (inBox(rv, px, py, sr)) { sh.x = qx; sh.y = qy; return { t: 'rover', x: px, y: py, rv: rv }; }
@@ -805,7 +921,7 @@ var MOONSHOT = (function () {
     var w = WEAPONS[sh.w], r = fd(w.r * sh.rK, 1000), D = fd(w.dmg * sh.dmgK, 1000);
     dig(st, x, y, r);
     ev.push({ t: 'boom', x: x, y: y, r: r, w: sh.w, owner: sh.owner, direct: direct ? direct.side : -1 });
-    for (var k = 0; k < 2; k++) {
+    for (var k = 0; k < st.rovers.length; k++) {
       var rv = st.rovers[k]; if (rv.out) continue;
       var R = rv.spec, bx = clamp(x, rv.x - R.hw, rv.x + R.hw), by = clamp(y, rv.y - R.h, rv.y);
       var d = isqrt((x - bx) * (x - bx) + (y - by) * (y - by)), dm = 0;
@@ -855,7 +971,7 @@ var MOONSHOT = (function () {
     for (var s = 0; s < n; s++) {
       var nx = px + sh.rd;
       if (nx < 0 || nx >= W) { lost(st, sh, { t: 'out', x: nx, y: py }, ev); return false; }
-      for (var k = 0; k < 2; k++) { var rv = st.rovers[k]; if (!rv.out && inBox(rv, nx, py, 7)) { explode(st, nx, py, sh, null, ev); return false; } }   // 굴러 닿음은 직접 맞음 아님
+      for (var k = 0; k < st.rovers.length; k++) { var rv = st.rovers[k]; if (!rv.out && inBox(rv, nx, py, 7)) { explode(st, nx, py, sh, null, ev); return false; } }   // 굴러 닿음은 직접 맞음 아님
       if (solidAt(st, nx, py)) {
         var l = 1; while (l <= 5 && solidAt(st, nx, py - l)) l++;
         if (l > 5) { sh.rd = -sh.rd; sh.rs = fd(sh.rs, 2); ev.push({ t: 'bump', x: px, y: py }); break; }
@@ -879,9 +995,11 @@ var MOONSHOT = (function () {
     for (var s = 1; s <= 2; s++) {
       var qx = x0 + fd(sh.ux * s, 2), qy = y0 + fd(sh.uy * s, 2), px = fd(qx, ONE), py = fd(qy, ONE);
       if (px < 0 || px >= W || py >= st.seaY || py >= H) { lost(st, sh, { t: py >= st.seaY ? 'sea' : 'out', x: px, y: Math.min(py, st.seaY) }, ev); return false; }
-      for (var k = 0; k < 2; k++) { var rv = st.rovers[k]; if (!rv.out && inBox(rv, px, py, 6)) { sh.x = qx; sh.y = qy; explode(st, px, py, sh, rv, ev); return false; } }
-      var tg = st.rovers[1 - sh.owner];
-      if (!tg.out && inBox(tg, px, py, 22)) { sh.x = qx; sh.y = qy; explode(st, px, py, sh, null, ev); return false; }   // 상대 가까이 파고들면 바로 펑
+      for (var k = 0; k < st.rovers.length; k++) { var rv = st.rovers[k]; if (!rv.out && inBox(rv, px, py, 6)) { sh.x = qx; sh.y = qy; explode(st, px, py, sh, rv, ev); return false; } }
+      for (var q = 0; q < st.rovers.length; q++) {   // 상대(팀 판은 상대 팀 누구든) 가까이 파고들면 바로 펑
+        var tg = st.rovers[q]; if (!isFoe(st, q, sh.owner)) continue;
+        if (!tg.out && inBox(tg, px, py, 22)) { sh.x = qx; sh.y = qy; explode(st, px, py, sh, null, ev); return false; }
+      }
       if (cellAt(st, px, py) === ROCK) { sh.x = qx; sh.y = qy; explode(st, px, py, sh, null, ev); return false; }
     }
     sh.x = x0 + sh.ux; sh.y = y0 + sh.uy;
@@ -891,7 +1009,7 @@ var MOONSHOT = (function () {
   }
   // 땅굴 폭탄: 땅 겉면 14px 밑을 상대 쪽으로 기어가(최대 300px) 상대 밑에서 펑
   function crawlStep(st, sh, ev) {
-    var tg = st.rovers[1 - sh.owner], px = fd(sh.x, ONE), py = fd(sh.y, ONE);
+    var tg = st.rovers[sh.tg], px = fd(sh.x, ONE), py = fd(sh.y, ONE);
     sh.racc += 163840; var n = fd(sh.racc, ONE); sh.racc -= n * ONE;   // 2.5 px/걸음 = 300 px/s
     for (var s = 0; s < n; s++) {
       if (tg.out || iabs(px - tg.x) <= 2 || sh.cd >= 300) { explode(st, px, py, sh, null, ev); return false; }
@@ -931,7 +1049,7 @@ var MOONSHOT = (function () {
     },
     rain: {
       launch: function (st, rv, shot) {
-        var w = WEAPONS[shot.w], tg = st.rovers[1 - rv.side], r = new Rng(mix(st.seed, st.turn * 4 + (st.bonus === 2 ? 1 : 0), R_RAIN)), out = [];
+        var w = WEAPONS[shot.w], tg = foe(st, rv.side, rv.x), r = new Rng(mix(st.seed, st.turn * 4 + (st.bonus === 2 ? 1 : 0), R_RAIN)), out = [];
         for (var k = 0; k < w.n; k++) {
           var x = clamp(tg.x + (k - 2) * 44 + r.range(-36, 36), 10, W - 10), y = tg.y - tg.spec.h - 12;
           while (y > 0 && !solidAt(st, x, y)) y--;
@@ -973,9 +1091,9 @@ var MOONSHOT = (function () {
       launch: launchOne,
       tick: function (st, sh, ev) { return sh.mode === 'crawl' ? crawlStep(st, sh, ev) : fly(st, sh, ev); },
       impact: function (st, sh, hit, ev) {
-        var tg = st.rovers[1 - sh.owner];
+        var tg = foe(st, sh.owner, hit.x);
         if (hit.t === 'rover' || tg.out || iabs(tg.x - hit.x) > 300) return boomHere(st, sh, hit, ev);
-        sh.mode = 'crawl'; sh.rd = sgn(tg.x - hit.x) || 1; sh.cd = 0; sh.racc = 0; sh.x = hit.x * ONE; sh.y = (hit.y + 14) * ONE;
+        sh.tg = tg.side; sh.mode = 'crawl'; sh.rd = sgn(tg.x - hit.x) || 1; sh.cd = 0; sh.racc = 0; sh.x = hit.x * ONE; sh.y = (hit.y + 14) * ONE;
         ev.push({ t: 'crawl', x: hit.x, y: hit.y });
         return false;
       }
@@ -1009,8 +1127,9 @@ var MOONSHOT = (function () {
     homing: {
       launch: launchOne,
       tick: function (st, sh, ev) {
-        var tg = st.rovers[1 - sh.owner];
-        if (sh.age >= 30 && sh.vy > 0 && !tg.out) {          // 내려올 때만 휨(올라갈 때 휘면 일찍 꽂힘)
+        var tg = sh.tg != null ? st.rovers[sh.tg] : foe(st, sh.owner, fd(sh.x, ONE));
+        if (sh.age >= 30 && sh.vy > 0 && !tg.out) {          // 내려올 때만 휨(올라갈 때 휘면 일찍 꽂힘) — 처음 휠 때 대상 고정
+          sh.tg = tg.side;
           var dx = tg.x - fd(sh.x, ONE), dy = tg.y - fd(tg.spec.h, 2) - fd(sh.y, ONE), cr = sgn(sh.vx * dy - sh.vy * dx);
           var th = cr * (fd((sh.age + 1) * 150, 120) - fd(sh.age * 150, 120));   // 초당 15°
           if (th) { var c = cos10(th), s = sin10(th), vx = sh.vx; sh.vx = fd(vx * c - sh.vy * s, ONE); sh.vy = fd(vx * s + sh.vy * c, ONE); }
@@ -1022,22 +1141,30 @@ var MOONSHOT = (function () {
   };
 
   // ── 판 ──
-  function newState(seed, mapKey, cfg) {
+  function zeros(n) { var a = []; for (var i = 0; i < n; i++) a.push(0); return a; }
+  function newState(seed, mapKey, cfg, n) {
     var map = MAPS[mapKey];
     return { v: 2, seed: seed, mapKey: mapKey, map: map, mask: new Uint8Array(MW * MH), craters: [], tick: 0, turn: 0, side: 0,
       wind: 0, seaY: map.seaY, g: fd(G_BASE * map.gravity, 1000), rovers: [], shells: [], spawn: [], pev: [], phase: 'aim', wait: 0, aimLeft: AIM_TICKS,
-      log: [], cur: { m: [] }, result: null, stats: { shots: [0, 0], hits: [0, 0], dealt: [0, 0] }, turnsOf: [0, 0], ev0: [],
-      bonus: 0, calmTurn: -1, shotHit: false, shotFired: false, practice: !!cfg.practice, ai: [0, 0], att: 0 };
+      log: [], cur: { m: [] }, result: null, stats: { shots: zeros(n), hits: zeros(n), dealt: zeros(n) }, turnsOf: zeros(n), ev0: [],
+      bonus: 0, calmTurn: -1, shotHit: false, shotFired: false, practice: !!cfg.practice, ai: zeros(n), att: 0,
+      vs: !!cfg.vs, teams: null, tideFrom: TIDE_FROM, turnCap: TURN_CAP, last: null, up: null, startOk: false };
   }
-  function makeRover(k, kind, cfg) {
+  function makeRover(k, kind, cfg, team) {
     var spec = ROVERS[kind] || ROVERS.rabbit, hpK = cfg.hpK && cfg.hpK[k] || 1000, hp = fd(spec.hp * hpK, 1000);
     var items = (cfg.items && cfg.items[k] || []).filter(function (i, n, a) { return ITEMS[i] && a.indexOf(i) === n; }).slice(0, 3);
-    return { side: k, kind: ROVERS[kind] ? kind : 'rabbit', spec: spec, x: 0, y: 0, face: k === 0 ? 1 : -1, hp: hp, maxHp: hp,
+    return { side: k, kind: ROVERS[kind] ? kind : 'rabbit', spec: spec, x: 0, y: 0, face: (team == null ? k === 0 : team === 0) ? 1 : -1, hp: hp, maxHp: hp,
       fuel: spec.fuel, out: false, falling: false, vy: 0, yq: 0, fallFrom: 0, items: items, used: [], charge: 0, stuck: 0, bubble: 0, guard: 0 };
   }
   // 주 무기로 상대 근처를 맞힐 수 있나(바람 0) — 맵 시작 자리 검사
+  //  팀 판: 상대 팀 중 하나라도 맞힐 수 있으면 됨
   function canHit(st, k) {
-    var rv = st.rovers[k], tg = st.rovers[1 - k], R = rv.spec, face = tg.x >= rv.x ? 1 : -1;
+    if (!st.teams) return canHitAt(st, k, 1 - k);
+    for (var q = 0; q < st.rovers.length; q++) if (isFoe(st, q, k) && canHitAt(st, k, q)) return true;
+    return false;
+  }
+  function canHitAt(st, k, q) {
+    var rv = st.rovers[k], tg = st.rovers[q], R = rv.spec, face = tg.x >= rv.x ? 1 : -1;
     for (var a = Math.max(R.angMin, 0); a <= R.angMax; a += 50) {
       var lo = 60, hi = 1000;
       for (var it = 0; it < 12 && lo <= hi; it++) {
@@ -1051,25 +1178,81 @@ var MOONSHOT = (function () {
   }
   function createMatch(cfg) {
     var seed = cfg.seed >>> 0, mapKey = MAPS[cfg.map] ? cfg.map : 'calm', map = MAPS[mapKey];
-    var kinds = cfg.rovers || ['rabbit', 'rabbit'], st = null;
+    var kinds = cfg.rovers || ['rabbit', 'rabbit'], n = kinds.length, st = null;
+    if (n !== 4 && n !== 6) n = 2;                 // 2대(혼자 하기 · 1:1) · 4대(2:2) · 6대(3:3)
+    var size = n >> 1, team = n > 2;
     for (var att = 0; att < 6; att++) {
-      st = newState(seed, mapKey, cfg); st.att = att;
+      st = newState(seed, mapKey, cfg, n); st.att = att;
+      if (team) setupTeams(st, n);
       var rng = new Rng(mix(seed, att, R_MAP));
       GENS[map.gen](st, rng); mirror(st);
-      var x0 = rng.range(map.spawn[0], map.spawn[1]);
-      for (var k = 0; k < 2; k++) { var rv = makeRover(k, kinds[k], cfg); rv.x = k === 0 ? x0 : W - x0; placeRover(st, rv, map.y0); st.rovers.push(rv); }
-      var ok = true;
-      for (k = 0; k < 2; k++) { var q = st.rovers[k]; if (q.y >= st.seaY - 40 || embedded(st, q, q.x, q.y)) ok = false; }
-      if (ok && canHit(st, 0) && canHit(st, 1)) break;
+      if (!team) {
+        var x0 = rng.range(map.spawn[0], map.spawn[1]);
+        for (var k = 0; k < 2; k++) { var rv = makeRover(k, kinds[k], cfg); rv.x = k === 0 ? x0 : W - x0; placeRover(st, rv, map.y0); st.rovers.push(rv); }
+      } else {
+        // 팀 판: 왼쪽 팀 자리 x 를 맵 표에서 하나씩 뽑고 오른쪽 팀은 거울 — 두 팀 조건이 늘 같음
+        var T = map.spawnT[size], xs = [];
+        for (var s = 0; s < size; s++) xs.push(rng.range(T[s][0], T[s][1]));
+        for (k = 0; k < n; k++) { var tv = makeRover(k, kinds[k], cfg, k & 1); tv.x = (k & 1) ? W - xs[k >> 1] : xs[k >> 1]; placeRover(st, tv, map.y0); st.rovers.push(tv); }
+      }
+      if (spawnOk(st)) { st.startOk = true; break; }
     }
-    st.side = new Rng(mix(seed, 0, R_FIRST)).int(2);
+    st.side = new Rng(mix(seed, 0, R_FIRST)).int(2);   // 팀 판: 먼저 하는 팀(= 그 팀 첫 자리 번호)
     beginTurn(st, st.ev0);
     return st;
+  }
+  // 시작 자리 검사 — 모두 묻히지 않음 · 별바다에서 40px 위 · 각자 상대(팀 판은 상대 팀 하나 이상)를 주 무기로 맞힐 수 있음
+  //  팀 판은 더해서 같은 팀끼리 150px 넘게 떨어짐 · 다른 탈것과 몸이 겹치지 않음
+  function spawnOk(st) {
+    var n = st.rovers.length, k, q;
+    for (k = 0; k < n; k++) { q = st.rovers[k]; if (q.y >= st.seaY - 40 || embedded(st, q, q.x, q.y)) return false; }
+    if (st.teams) {
+      for (k = 0; k < n; k++) for (var j = k + 1; j < n; j++) {
+        var a = st.rovers[k], b = st.rovers[j], d = iabs(a.x - b.x);
+        if (st.teams[k] === st.teams[j] && d <= 150) return false;
+        if (d < a.spec.hw + b.spec.hw + 8) return false;
+      }
+    }
+    for (k = 0; k < n; k++) if (!canHit(st, k)) return false;
+    return true;
+  }
+  function setupTeams(st, n) {
+    st.teams = []; for (var k = 0; k < n; k++) st.teams.push(k & 1);
+    st.stats.ff = zeros(n); st.stats.ffN = zeros(n);
+    st.tideFrom = TEAM_TIDE_ROUNDS * n; st.turnCap = TEAM_CAP_ROUNDS * n;
+    st.last = [-1, -1];
+  }
+  // 팀 판 다음 차례: 지금 팀이 아닌 팀의, 그 팀이 지난번 쏜 자리 다음 서 있는 탈것(없으면 같은 팀에서)
+  function nextSeat(st) {
+    var n = st.rovers.length, c = n >> 1, t0 = 1 - st.teams[st.side];
+    for (var p = 0; p < 2; p++) {
+      var t = p === 0 ? t0 : 1 - t0, last = st.last[t], li = last < 0 ? -1 : (last - t) >> 1;
+      for (var i = 1; i <= c; i++) { var k = t + 2 * ((li + i) % c); if (!dead(st.rovers[k])) return k; }
+    }
+    return st.side;
+  }
+  // 팀 판 차례 시작 앞부분: 서 있던 탈것 기록 · 밀물(차례마다) · 잠긴 탈것 판정 · 지금 차례 탈것이 쓰러졌으면 같은 팀 다음 탈것
+  function teamPreTurn(st, ev) {
+    var n = st.rovers.length, k;
+    st.up = []; for (k = 0; k < n; k++) st.up.push(!dead(st.rovers[k]));
+    if (st.turn >= st.tideFrom) {
+      st.seaY -= TIDE_STEP;
+      ev.push({ t: 'tide', seaY: st.seaY });
+      var sunk = false;
+      for (k = 0; k < n; k++) { var q = st.rovers[k]; if (!q.out && q.y > st.seaY) { q.out = true; sunk = true; ev.push({ t: 'splash', side: k, x: q.x, y: st.seaY }); } }
+      if (sunk && judge(st, ev)) return;
+    }
+    if (dead(st.rovers[st.side])) {
+      var t = st.teams[st.side], c = n >> 1, li = (st.side - t) >> 1;
+      for (var i = 1; i <= c; i++) { k = t + 2 * ((li + i) % c); if (!dead(st.rovers[k])) { ev.push({ t: 'skip', side: st.side, to: k }); st.side = k; return; } }
+      judge(st, ev);
+    }
   }
   function beginTurn(st, ev) {
     var r = new Rng(mix(st.seed, st.turn, R_WIND));
     if (st.turn === 0 || r.int(100) < 15) st.wind = r.range(-12, 12);
     else st.wind = clamp(st.wind + r.range(-4, 4), -12, 12);
+    if (st.teams) { teamPreTurn(st, ev); if (st.phase === 'over') return; }
     var rv = st.rovers[st.side];
     rv.charge = Math.min(SUB_CHARGE, rv.charge + 1);
     rv.bubble = 0;                              // 비눗방울 막은 다음 내 차례까지
@@ -1078,7 +1261,7 @@ var MOONSHOT = (function () {
     st.phase = 'aim'; st.aimLeft = AIM_TICKS; st.cur = { m: [] }; st.shells = [];
     ev.push({ t: 'turn', side: st.side, turn: st.turn, wind: st.wind });
     if (rv.stuck) { rv.stuck = 0; rv.fuel = 0; ev.push({ t: 'stuck', side: st.side }); }
-    if (st.turn >= TIDE_FROM) {
+    if (!st.teams && st.turn >= st.tideFrom) {
       st.seaY -= TIDE_STEP;
       ev.push({ t: 'tide', seaY: st.seaY });
       for (var k = 0; k < 2; k++) { var q = st.rovers[k]; if (!q.out && q.y > st.seaY) { q.out = true; ev.push({ t: 'splash', side: k, x: q.x, y: st.seaY }); } }
@@ -1088,14 +1271,38 @@ var MOONSHOT = (function () {
   function dead(rv) { return rv.out || rv.hp <= 0; }
   // 끝났으면 true. 둘이 같이 쓰러지면(밀물에 같이 잠김 · 한 발에 둘 다 체력 0 · 둘 다 퐁당) 남은 체력이 많은 쪽이 이김, 같으면 무승부
   //  how: 'hp' 체력을 다 깎음 · 'sea' 별바다에 빠뜨림 · 'more' 같이 쓰러졌지만 남은 체력이 많아 이김 · 'both' 같이 쓰러져 비김 · 'cap' 너무 오래 걸려 비김
+  //  팀 판: 한 팀이 모두 쓰러지면 상대 팀 이김(winner = 팀 번호). 같이 쓰러지면 이번 차례 시작 때 서 있던 탈것의 남은 체력 합(0 아래 0)이 많은 팀,
+  //  상한이면 서 있는 탈것 체력 합이 많은 팀(how 'cap' — 같으면 비김). 'sea' = 진 팀에서 이번 차례 쓰러진 것 중 별바다에 빠진 게 있음
   function judge(st, ev) {
+    if (st.teams) return judgeTeam(st, ev);
     var d0 = dead(st.rovers[0]), d1 = dead(st.rovers[1]);
-    if (!d0 && !d1 && st.turn + 1 < TURN_CAP) return false;
+    if (!d0 && !d1 && st.turn + 1 < st.turnCap) return false;
     var h0 = Math.max(0, st.rovers[0].hp), h1 = Math.max(0, st.rovers[1].hp);
     var win = d0 && d1 ? (h0 > h1 ? 0 : h1 > h0 ? 1 : -1) : d0 ? 1 : d1 ? 0 : -1;
     var loser = win < 0 ? -1 : 1 - win, how = loser < 0 ? (d0 ? 'both' : 'cap') : d0 && d1 ? 'more' : st.rovers[loser].out ? 'sea' : 'hp';
     st.phase = 'over'; st.result = { winner: win, how: how, turn: st.turn };
     ev.push({ t: 'over', winner: win, how: how });
+    return true;
+  }
+  function judgeTeam(st, ev) {
+    var dA = teamDown(st, 0), dB = teamDown(st, 1);
+    if (!dA && !dB && st.turn + 1 < st.turnCap) return false;
+    var hp = [0, 0], k, rv;
+    for (k = 0; k < st.rovers.length; k++) {
+      rv = st.rovers[k];
+      if (dA && dB ? (st.up && st.up[k]) : !dead(rv)) hp[st.teams[k]] += Math.max(0, rv.hp);
+    }
+    var win = dA && dB ? (hp[0] > hp[1] ? 0 : hp[1] > hp[0] ? 1 : -1) : dA ? 1 : dB ? 0 : (hp[0] > hp[1] ? 0 : hp[1] > hp[0] ? 1 : -1);
+    var how;
+    if (!dA && !dB) how = 'cap';
+    else if (win < 0) how = 'both';
+    else if (dA && dB) how = 'more';
+    else {
+      how = 'hp';
+      for (k = 0; k < st.rovers.length; k++) { rv = st.rovers[k]; if (st.teams[k] !== win && rv.out && (!st.up || st.up[k])) how = 'sea'; }
+    }
+    st.phase = 'over'; st.result = { winner: win, how: how, turn: st.turn, team: 1, hp: hp };
+    ev.push({ t: 'over', winner: win, how: how, team: 1 });
     return true;
   }
   function finishShot(st) {
@@ -1106,7 +1313,8 @@ var MOONSHOT = (function () {
     finishShot(st);
     st.turnsOf[st.side]++;
     if (judge(st, ev)) return;
-    st.turn++; st.side = 1 - st.side;
+    if (st.teams) { st.last[st.teams[st.side]] = st.side; st.turn++; st.side = nextSeat(st); }
+    else { st.turn++; st.side = 1 - st.side; }
     beginTurn(st, ev);
   }
   // 조준 중 · 지금 차례 탈것이 땅에 앉아 있을 때만 이동 · 발사를 받는다(떨어지는 동안은 받지 않음 — 다시 돌리기와 같아지게)
@@ -1162,13 +1370,15 @@ var MOONSHOT = (function () {
     var ev = st.pev; st.pev = [];
     if (st.phase === 'over') return ev;
     st.tick++;
-    roverTick(st, st.rovers[0], ev); roverTick(st, st.rovers[1], ev);
+    for (var r0 = 0; r0 < st.rovers.length; r0++) roverTick(st, st.rovers[r0], ev);
     if (st.phase === 'aim') {
-      if (st.rovers[st.side].out || st.rovers[1 - st.side].out) { st.log.push({ m: st.cur.m, pass: 1 }); finishShot(st); judge(st, ev); return ev; }
+      if (!st.teams) { if (st.rovers[st.side].out || st.rovers[1 - st.side].out) { st.log.push({ m: st.cur.m, pass: 1 }); finishShot(st); judge(st, ev); return ev; } }
+      // 팀 판: 조준 중 내 탈것이 빠지면(이동하다 별바다) 이 차례는 넘김, 한 팀이 다 쓰러졌으면 판정
+      else if (st.rovers[st.side].out || teamDown(st, 0) || teamDown(st, 1)) { st.log.push({ m: st.cur.m, pass: 1 }); endTurn(st, ev); return ev; }
       if (!st.practice) {
         st.aimLeft--;
         if (st.aimLeft === 0) ev.push({ t: 'timeup', side: st.side });
-        if (st.aimLeft <= -GRACE && !st.rovers[st.side].falling) pass(st);
+        if (st.aimLeft <= -GRACE && !st.rovers[st.side].falling && !st.vs) pass(st);   // 대전 판은 연 사람 화면이 넘김을 정함
       }
     } else if (st.phase === 'flight') {
       var keep = []; st.spawn = [];
@@ -1182,9 +1392,9 @@ var MOONSHOT = (function () {
       st.shells = keep; st.spawn = [];
       if (!keep.length) { st.phase = 'settle'; st.wait = SETTLE_MIN; }
     } else if (st.phase === 'settle') {
-      if (st.rovers[0].falling || st.rovers[1].falling) st.wait = Math.max(st.wait, 20);
+      if (anyFalling(st)) st.wait = Math.max(st.wait, 20);
       if (--st.wait <= 0) {
-        if (st.bonus === 1 && !dead(st.rovers[0]) && !dead(st.rovers[1])) {
+        if (st.bonus === 1 && (st.teams ? !dead(st.rovers[st.side]) && !teamDown(st, 0) && !teamDown(st, 1) : !dead(st.rovers[0]) && !dead(st.rovers[1]))) {
           finishShot(st);
           st.bonus = 2; st.phase = 'aim'; st.aimLeft = BONUS_TICKS; st.cur = { m: [] };
           ev.push({ t: 'bonus', side: st.side });
@@ -1201,10 +1411,10 @@ var MOONSHOT = (function () {
   function act(st, a) {
     var ev = [];
     if (st.phase !== 'aim') return ev;
-    var ms = a.m || [];
-    for (var i = 0; i < ms.length; i++) for (var k = 0; k < ms[i][1]; k++) { settleActive(st, ev); if (st.phase !== 'aim') return ev; move(st, ms[i][0]); }
+    var ms = a.m || [], t0 = st.turn;
+    for (var i = 0; i < ms.length; i++) for (var k = 0; k < ms[i][1]; k++) { settleActive(st, ev); if (st.phase !== 'aim' || st.turn !== t0) return ev; move(st, ms[i][0]); }
     settleActive(st, ev);
-    if (st.phase !== 'aim') return ev;
+    if (st.phase !== 'aim' || st.turn !== t0) return ev;
     if (a.pass) pass(st); else fire(st, a);
     var n = 0;
     while (st.phase !== 'aim' && st.phase !== 'over' && n++ < 20000) push(ev, step(st));
@@ -1222,11 +1432,18 @@ var MOONSHOT = (function () {
     function put(v) { v = v >>> 0; for (var b = 0; b < 4; b++) { h = Math.imul(h ^ (v & 255), 16777619); v = v >>> 8; } }
     put(st.turn); put(st.side); put(st.wind); put(st.seaY); put(PH[st.phase]); put(st.craters.length); put(st.bonus);
     put(st.result ? st.result.winner + 2 : 0);
-    for (i = 0; i < 2; i++) {
+    var n = st.rovers.length;
+    for (i = 0; i < n; i++) {
       var rv = st.rovers[i]; put(rv.x); put(rv.y); put(rv.hp); put(rv.fuel); put(rv.out ? 1 : 0); put(rv.face + 1);
       put(rv.charge); put(rv.stuck); put(rv.bubble); put(rv.guard); put(rv.used.length);
     }
-    put(st.stats.shots[0]); put(st.stats.shots[1]); put(st.stats.hits[0]); put(st.stats.hits[1]); put(st.stats.dealt[0]); put(st.stats.dealt[1]);
+    for (i = 0; i < n; i++) put(st.stats.shots[i]);
+    for (i = 0; i < n; i++) put(st.stats.hits[i]);
+    for (i = 0; i < n; i++) put(st.stats.dealt[i]);
+    if (st.teams) {   // 팀 판에만 더 넣음(혼자 하기 해시는 그대로)
+      put(n); put(st.last[0] + 1); put(st.last[1] + 1); put(st.result && st.result.team ? 1 : 0);
+      for (i = 0; i < n; i++) { put(st.teams[i]); put(st.stats.ff[i]); put(st.stats.ffN[i]); }
+    }
     return ('0000000' + (h >>> 0).toString(16)).slice(-8);
   }
 
@@ -1254,9 +1471,12 @@ var MOONSHOT = (function () {
   function cloneState(st, light) {
     var c = {}; for (var k in st) c[k] = st[k];
     c.mask = light ? st.mask : st.mask.slice(); c.craters = light ? st.craters : st.craters.slice();
-    c.rovers = [cloneRover(st.rovers[0]), cloneRover(st.rovers[1])];
+    c.rovers = st.rovers.map(cloneRover);
     c.shells = []; c.spawn = []; c.pev = []; c.log = []; c.cur = { m: st.cur.m.slice() };
     c.stats = { shots: st.stats.shots.slice(), hits: st.stats.hits.slice(), dealt: st.stats.dealt.slice() };
+    if (st.stats.ff) { c.stats.ff = st.stats.ff.slice(); c.stats.ffN = st.stats.ffN.slice(); }
+    if (st.last) c.last = st.last.slice();
+    if (st.up) c.up = st.up.slice();
     c.turnsOf = st.turnsOf.slice(); c.ai = st.ai.slice(); c.ev0 = [];
     return c;
   }
@@ -1290,8 +1510,9 @@ var MOONSHOT = (function () {
   }
   function applyMoves(st, m) { var c = cloneState(st, true), ev = []; for (var i = 0; i < m.length; i++) for (var k = 0; k < m[i][1]; k++) { settleActive(c, ev); move(c, m[i][0]); } settleActive(c, ev); return c; }
   // 그 무기로 상대 쪽에 떨어지게 하는 (각도, 힘) 후보들 — 각도마다 힘 이분 탐색
-  function aimCands(st, w, wind, angN, aimDx) {
-    var side = st.side, rv = st.rovers[side], tg = st.rovers[1 - side], R = rv.spec, face = tg.x >= rv.x ? 1 : -1;
+  //  tgk: 노릴 탈것 번호(생략 = 상대). 팀 판은 같은 팀을 맞히거나 그 곁에 떨어지는 후보를 무겁게 뺌
+  function aimCands(st, w, wind, angN, aimDx, tgk) {
+    var side = st.side, rv = st.rovers[side], tg = st.rovers[tgk == null ? 1 - side : tgk], R = rv.spec, face = tg.x >= rv.x ? 1 : -1;
     var lo0 = Math.max(R.angMin, -50), hi0 = R.angMax, out = [], goal = tg.x - face * (aimDx || 0);
     for (var ai = 0; ai < angN; ai++) {
       var a = angN === 1 ? fd(lo0 + hi0, 2) : lo0 + fd((hi0 - lo0) * ai, angN - 1);
@@ -1300,6 +1521,7 @@ var MOONSHOT = (function () {
         var p = (lo + hi) >> 1, res = traceShot(st, side, a, p, face, { wind: wind, w: w });
         var onT = res.hit && res.hit.t === 'rover' && res.hit.rv === tg, onMe = res.hit && res.hit.t === 'rover' && res.hit.rv === rv;
         var err = iabs(res.x - goal) + (onT ? -400 : 0) + (onMe ? 3000 : 0) + (res.hit && res.hit.t === 'ground' ? 0 : 150) + (iabs(res.x - rv.x) < 90 ? 2000 : 0);
+        if (st.teams) err += mateRisk(st, side, res, w);
         if (!best || err < best.err) best = { w: w, a: a, p: p, f: face, err: err };
         if (onT) break;
         if ((res.x - rv.x) * face < (goal - rv.x) * face) lo = p + 1; else hi = p - 1;
@@ -1308,8 +1530,48 @@ var MOONSHOT = (function () {
     }
     return out;
   }
+  // 팀 판: 같은 팀을 맞히면 +3000, 같은 팀 곁(폭발 반경 + 몸 반폭)에 떨어지면 +1200
+  function mateRisk(st, side, res, w) {
+    var e = 0, rr = WEAPONS[w].r;
+    for (var k = 0; k < st.rovers.length; k++) {
+      var q = st.rovers[k]; if (k === side || q.out || isFoe(st, k, side)) continue;
+      if (res.hit && res.hit.t === 'rover' && res.hit.rv === q) e += 3000;
+      else if (iabs(res.x - q.x) < rr + q.spec.hw) e += 1200;
+    }
+    return e;
+  }
+  // 팀 판 대상 고르기 — 어려움: 체력 낮은 적(같으면 가까운 적) · 그 밖: 가까운 적(같으면 낮은 번호). 혼자 하기는 상대
+  function pickFoe(st, side, L) {
+    if (!st.teams) return 1 - side;
+    var rv = st.rovers[side], best = -1;
+    for (var k = 0; k < st.rovers.length; k++) {
+      var q = st.rovers[k]; if (!isFoe(st, k, side) || dead(q)) continue;
+      if (best < 0) { best = k; continue; }
+      var b = st.rovers[best], dq = iabs(q.x - rv.x), db = iabs(b.x - rv.x);
+      if (L.items >= 2 ? (q.hp < b.hp || (q.hp === b.hp && dq < db)) : dq < db) best = k;
+    }
+    return best < 0 ? foe(st, side, rv.x).side : best;
+  }
+  // 팀 판 끝까지 해 보기 — 적 피해 합 × 10 − 같은 팀 피해 × 13 − 내 피해 × 13, 빠뜨림 · 쓰러뜨림 덤
+  function evalShotTeam(st, cand, wind) {
+    var c = cloneState(st), me = c.side, n = c.rovers.length, hp0 = [], out0 = [], k;
+    for (k = 0; k < n; k++) { hp0.push(c.rovers[k].hp); out0.push(c.rovers[k].out); }
+    c.wind = wind; c.calmTurn = -1;
+    if (!fire(c, cand)) return -9999;
+    if (c.bonus === 1) c.bonus = 0;
+    for (var s = 0; s < 6000 && c.phase !== 'over' && !(c.phase === 'aim' && (c.side !== me || c.bonus === 2)); s++) step(c);
+    var v = 0;
+    for (k = 0; k < n; k++) {
+      var q = c.rovers[k], loss = hp0[k] - q.hp, sunk = q.out && !out0[k];
+      if (isFoe(c, k, me)) { v += loss * 10; if (sunk) v += 1500; if (!q.out && q.hp <= 0 && hp0[k] > 0) v += 400; }
+      else if (k === me) { v -= loss * 13; if (sunk) v -= 4000; }
+      else { v -= loss * 13; if (sunk) v -= 2500; }
+    }
+    return v;
+  }
   // 끝까지 해 보기 — 상대에게 준 것(피해 · 별바다) − 내가 받은 것. wind 는 컴퓨터가 「안다고 믿는」 바람
   function evalShot(st, cand, wind) {
+    if (st.teams) return evalShotTeam(st, cand, wind);
     var c = cloneState(st), me = c.side, rv = c.rovers[me], tg = c.rovers[1 - me];
     var hp0 = tg.hp, my0 = rv.hp;
     c.wind = wind; c.calmTurn = -1;
@@ -1322,7 +1584,8 @@ var MOONSHOT = (function () {
     return v;
   }
   function botChoose(st, level) {
-    var L = LEVELS[level] || LEVELS.normal, side = st.side, rv = st.rovers[side], tg = st.rovers[1 - side], R = rv.spec;
+    var L = LEVELS[level] || LEVELS.normal, side = st.side, rv = st.rovers[side], tgk = pickFoe(st, side, L), tg = st.rovers[tgk], R = rv.spec;
+    var tgA = st.teams ? tgk : undefined;   // aimCands 에 넘길 대상(혼자 하기는 생략 = 상대)
     var r = new Rng(mix(st.seed, st.turn * 2 + (st.bonus === 2 ? 1 : 0), R_BOT + side * 16));
     var act0 = { m: [], a: 450, p: 600, w: R.main, f: tg.x >= rv.x ? 1 : -1 };
     var shots = st.ai[side]; st.ai[side]++;
@@ -1351,7 +1614,7 @@ var MOONSHOT = (function () {
       for (var i = 0; i < weapons.length; i++) {
         var w = weapons[i], kd = WEAPONS[w].kind;
         if (kd === 'rain') { cands.push({ w: w, a: 450, p: 500, f: act0.f, err: 0 }); continue; }
-        var cs = aimCands(s0, w, wind, L.angN, aimDx[kd] || 0); for (var j = 0; j < cs.length; j++) cands.push(cs[j]);
+        var cs = aimCands(s0, w, wind, L.angN, aimDx[kd] || 0, tgA); for (var j = 0; j < cs.length; j++) cands.push(cs[j]);
       }
       cands.sort(function (x, y) { return x.err - y.err || x.a - y.a; });
       var best = cands[0], bestV = null;
@@ -1382,7 +1645,7 @@ var MOONSHOT = (function () {
   }
   // 아무렇게나(시험용 · 끼임 찾기)
   function botRandom(st) {
-    var r = new Rng(mix(st.seed, st.turn * 2 + (st.bonus === 2 ? 1 : 0), R_BOTAIM ^ 0x55)), rv = st.rovers[st.side], tg = st.rovers[1 - st.side], R = rv.spec;
+    var r = new Rng(mix(st.seed, st.turn * 2 + (st.bonus === 2 ? 1 : 0), R_BOTAIM ^ 0x55)), rv = st.rovers[st.side], tg = foe(st, st.side, rv.x), R = rv.spec;
     var m = r.int(100) < 40 ? [[r.int(2) ? 1 : -1, r.range(5, 120)]] : [];
     var f = r.int(100) < 85 ? (tg.x >= rv.x ? 1 : -1) : -(tg.x >= rv.x ? 1 : -1);
     var w = R.sub && r.int(100) < 40 ? R.sub : R.main, i = rv.items.length && r.int(100) < 25 ? rv.items[r.int(rv.items.length)] : undefined;
@@ -1408,7 +1671,45 @@ var MOONSHOT = (function () {
     return { lines: lines, base: base, mult: L.mult, total: total, win: win, lose: lose, hits: s.hits[side], shots: s.shots[side], dealt: s.dealt[side], dealtPct: dealtPct };
   }
 
+  // ── 대전 받침(명세 2.2) ──
+  // 행동 한 줄 글자: 이동 {m:[[±1, 걸음], …]} + {a, p, w, f, i?} 또는 {pass:1}. 키 순서를 정해 JSON 한 줄로 — 두 화면 · 서버가 같은 글자
+  function cleanAct(o) {
+    if (!o || typeof o !== 'object') return null;
+    var m = [], ms = o.m == null ? [] : o.m, tot = 0;
+    if (!Array.isArray(ms) || ms.length > 400) return null;
+    for (var i = 0; i < ms.length; i++) {
+      var e = ms[i]; if (!Array.isArray(e) || e.length !== 2) return null;
+      var d = e[0], k = e[1];
+      if ((d !== 1 && d !== -1) || typeof k !== 'number' || k !== (k | 0) || k < 1 || k > 3000) return null;
+      tot += k; if (tot > 3000) return null;
+      m.push([d, k]);
+    }
+    if (o.pass) return { m: m, pass: 1 };
+    var a = o.a, p = o.p, f = o.f;
+    if (typeof a !== 'number' || a !== (a | 0) || a < -900 || a > 900) return null;
+    if (typeof p !== 'number' || p !== (p | 0) || p < 0 || p > 1000) return null;
+    if (!WEAPONS[o.w] || (f !== 1 && f !== -1)) return null;
+    var out = { m: m, a: a, p: p, w: o.w, f: f };
+    if (o.i != null) { if (!ITEMS[o.i]) return null; out.i = o.i; }
+    return out;
+  }
+  function encodeAct(o) { var c = cleanAct(o); return c ? JSON.stringify(c) : null; }
+  function decodeAct(s) { if (typeof s !== 'string' || s.length > 4000) return null; try { return cleanAct(JSON.parse(s)); } catch (e) { return null; } }
+  // 차례마다 해시: [시작, 1줄 뒤, 2줄 뒤, …] — 두 화면이 맞는지 차례마다 견줌
+  function hashes(cfg, log) {
+    var st = createMatch(cfg), out = [hash(st)];
+    for (var i = 0; i < log.length && st.phase !== 'over'; i++) { act(st, log[i]); out.push(hash(st)); }
+    return out;
+  }
+  // 엔진 판본 — 이 엔진 함수의 글자 전체(표 · 숫자 포함)의 FNV-1a 32비트. 화면 판본이 다르면 대전을 시작하지 않는다
+  function verOf(s) { var h = 0x811c9dc5; for (var i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return 'm1-' + ('0000000' + (h >>> 0).toString(16)).slice(-8); }
+  var VER = verOf(String(moonshotEngine));
+  // 3:3 에 쓰는 맵(시작 자리 검사 통과율 98% 넘음 — versus/stage1-results.txt) · 2:2 는 다섯 맵 모두
+  var TEAM_MAPS = { 2: MAP_KEYS.slice(), 3: MAP_KEYS.slice() };
+
   return {
+    VER: VER, TEAM_FF: TEAM_FF, TEAM_TIDE_ROUNDS: TEAM_TIDE_ROUNDS, TEAM_CAP_ROUNDS: TEAM_CAP_ROUNDS, TEAM_MAPS: TEAM_MAPS, TIDE_STEP: TIDE_STEP, TURN_CAP: TURN_CAP,
+    teamOf: teamOf, isFoe: isFoe, foe: foe, canHit: canHit, spawnOk: spawnOk, encodeAct: encodeAct, decodeAct: decodeAct, hashes: hashes,
     W: W, H: H, MW: MW, MH: MH, TPS: TPS, ONE: ONE, EMPTY: EMPTY, SOIL: SOIL, ICE: ICE, ROCK: ROCK, AIM_TICKS: AIM_TICKS, BONUS_TICKS: BONUS_TICKS, TIDE_FROM: TIDE_FROM, SUB_CHARGE: SUB_CHARGE, SCORE_MAX: SCORE_MAX,
     DATA: { ROVERS: ROVERS, WEAPONS: WEAPONS, ITEMS: ITEMS, MAPS: MAPS, GENS: GENS, KINDS: KINDS, LEVELS: LEVELS, ROVER_KEYS: ROVER_KEYS, ITEM_KEYS: ITEM_KEYS, MAP_KEYS: MAP_KEYS },
     createMatch: createMatch, step: step, move: move, fire: fire, pass: pass, act: act, replay: replay, hash: hash, canAct: canAct, weaponOk: weaponOk, itemOk: itemOk,
@@ -1417,8 +1718,7 @@ var MOONSHOT = (function () {
   };
 })();
 if (typeof module !== 'undefined' && module.exports) module.exports = MOONSHOT;
-else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
-</script>
+else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;</script>
 <script>
 /*
  * 뿅뿅 달나라 대포 — 화면(2단계). 엔진(MOONSHOT)은 1/120초 고정 걸음으로 돌리고, 화면은 프레임마다 그 상태를 그린다.
@@ -1869,7 +2169,8 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
   }
 
   // ── 화면 맞춤 ──
-  // 아케이드 창(같은 주소의 부모 창)이 바깥 화면보다 길면 보이는 띠만 — 가로 휴대폰에서 창 높이 최소 360 + 머리 때문에 아래가 잘림
+  // 보이는 곳(화면 좌표): 아케이드 창(같은 주소의 부모 창)이 바깥 화면보다 길면 보이는 띠만 — 가로 휴대폰에서 창 높이 최소 360 + 머리 때문에 아래가 잘림
+  // 단독이면 visualViewport(주소창 · 아래 도구 막대가 들어가고 나오는 실제 보이는 높이)
   function visArea() {
     var ih = innerHeight, t = 0, h = ih;
     if (inFrame) {
@@ -1878,38 +2179,79 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
         if (fe) { var r = fe.getBoundingClientRect(), ph = window.parent.innerHeight; t = Math.max(0, -r.top); h = Math.min(ih, ph - r.top) - t; }
       } catch (_) { t = 0; h = ih; }
       if (!(h >= 200)) { t = 0; h = ih; }   // 거의 안 보이면(스크롤해 지나감 등) 원래대로
+    } else {
+      var vv = window.visualViewport;
+      if (vv && vv.height > 150 && vv.height < ih - 0.5) { t = Math.max(0, vv.offsetTop || 0); h = Math.min(vv.height, ih - t); }
     }
-    return { t: Math.round(t), h: Math.round(h) };
+    return { t: Math.round(t), h: Math.round(h), iw: innerWidth, ih: ih };
   }
+  // 노치 · 홈 막대(env(safe-area-inset-*)) — 시험용 ?safe=위,오른쪽,아래,왼쪽(단독 · 개발 주소만)
+  var safeQ = (Q.get('safe') || '').split(',').map(Number);
+  function safeIn() {
+    if (safeQ.length === 4 && safeQ.every(function (n) { return n >= 0; })) return { t: safeQ[0], r: safeQ[1], b: safeQ[2], l: safeQ[3] };
+    var cs = getComputedStyle($('safeP')), f = function (k) { return parseFloat(cs[k]) || 0; };
+    return { t: f('paddingTop'), r: f('paddingRight'), b: f('paddingBottom'), l: f('paddingLeft') };
+  }
+  // 세로로 든 휴대폰(터치)이면 게임 판 전체(#rot)를 시계 방향 90° 돌려 화면 가득 — 휴대폰만 옆으로 들면 됨(화면 회전 잠금이 켜져 있어도)
+  var touchDev = (window.matchMedia && matchMedia('(pointer:coarse)').matches) || (navigator.maxTouchPoints || 0) > 0;
+  var TS = 1, LVA = '', rot = false, RT = 0, RIW = 0, hintShown = false, hintT = 0, SL = 0, ST = 0, SW = 0, SH = 0;
+  // 화면 좌표 → 판(#rot) 좌표(돌렸으면 거꾸로 돌림)
+  function pt(e) { return rot ? [e.clientY - RT, RIW - e.clientX] : [e.clientX, e.clientY]; }
   // 휴대폰 판(844×390)이 화면보다 납작하면 옆으로 늘려 왼쪽 무리 · 가운데 무리 · 오른쪽 무리를 양끝 · 가운데에 둔다
   function spreadHudM(dx) {
     $('hudM').style.width = (844 + dx) + 'px';
     document.querySelectorAll('#hudM [data-g]').forEach(function (el) { el.style.left = ''; var b = parseFloat(getComputedStyle(el).left) || 0; el.style.left = (b + dx * (el.getAttribute('data-g') === 'r' ? 1 : 0.5)) + 'px'; });
   }
   function layout() {
-    VW = innerWidth; VH = innerHeight; dpr = Math.min(2, window.devicePixelRatio || 1);
-    var va = visArea(); VT = va.t; VV = va.h;
-    document.documentElement.style.setProperty('--vt', VT + 'px'); document.documentElement.style.setProperty('--vb', Math.max(0, VH - VT - VV) + 'px');
-    portrait = VV > VW && VW < 760;
-    phone = !portrait && VV <= 560 && VW > VV;
-    K = Math.min(VW / W, VV / H); OX = (VW - W * K) / 2; OY = VT + (VV - H * K) / 2;
-    if (portrait && rotOk) { OY = VT + Math.max(8, (VV - H * K) / 3); }
+    var va = visArea(), sa = safeIn(), R = $('rot'), de = document.documentElement;
+    LVA = va.t + ',' + va.h;
+    dpr = Math.min(2, window.devicePixelRatio || 1);
+    rot = touchDev && va.h > va.iw && va.iw < 760;
+    var ins;
+    if (rot) {
+      // 판 = 보이는 띠(화면 위 RT ~ RT+h)를 옆으로 눕힌 것: 판 폭 = 보이는 높이, 판 높이 = 화면 폭
+      RT = va.t; RIW = va.iw;
+      R.style.width = va.h + 'px'; R.style.height = va.iw + 'px'; R.style.transform = 'translate(' + va.iw + 'px,' + va.t + 'px) rotate(90deg)';
+      VW = va.h; VH = va.iw; VT = 0; VV = va.iw;
+      ins = { l: sa.t, r: sa.b, t: sa.r, b: sa.l };   // 판 왼쪽 = 화면 위, 판 위 = 화면 오른쪽
+    } else {
+      R.style.width = ''; R.style.height = ''; R.style.transform = '';
+      VW = va.iw; VH = va.ih; VT = va.t; VV = va.h;
+      ins = { l: sa.l, r: sa.r, t: sa.t, b: sa.b };
+    }
+    de.classList.toggle('rot', rot);
+    // 단추 · 글을 놓는 상자(노치 · 홈 막대 · 주소창 피함) — 하늘 · 땅 그림은 화면 가득
+    SL = ins.l; ST = VT + ins.t; SW = Math.max(200, VW - ins.l - ins.r); SH = Math.max(150, VV - ins.t - ins.b);
+    de.style.setProperty('--vt', ST + 'px'); de.style.setProperty('--vb', Math.max(0, VH - ST - SH) + 'px');
+    de.style.setProperty('--vl', SL + 'px'); de.style.setProperty('--vr', Math.max(0, VW - SL - SW) + 'px');
+    de.classList.toggle('sh', SH <= 500); de.classList.toggle('nw', SW <= 600);
+    portrait = !rot && VV > VW && VW < 760;      // 마우스로 쓰는 좁은 창(PC)만 — 안내 카드
+    phone = !portrait && SH <= 560 && SW > SH;
+    K = Math.min(SW / W, SH / H); OX = SL + (SW - W * K) / 2; OY = ST + (SH - H * K) / 2;
+    // 휴대폰 전장 캔버스 글(이름표 · 각도 · 별바다 · 알림)은 판이 844×390 보다 작아져도 같은 실제 크기(이름표 12px 이상)
+    TS = phone ? Math.max(1, 0.361 / K) : 1;
+    if (portrait && rotOk) { OY = ST + Math.max(8, (SH - H * K) / 3); }
     [bg, cv].forEach(function (c) { c.width = Math.round(VW * dpr); c.height = Math.round(VH * dpr); });
     var d = $('hudD'), m = $('hudM');
     d.hidden = phone || screen !== 'battle'; m.hidden = !phone || screen !== 'battle';
     d.style.transform = 'translate(' + OX + 'px,' + OY + 'px) scale(' + K + ')';
     // PC 판이 많이 줄면(아케이드 창 1280×720 등) 글이 10px 밑으로 — 작은 글에 바닥값(--f)과 덜 중요한 안내 숨기기(.cmp)
     d.style.setProperty('--f', (Math.ceil(100 / K) / 10) + 'px'); d.classList.toggle('cmp', K < 0.75);
-    KM = Math.min(VW / 844, VV / 390);
-    MDX = Math.max(0, Math.min(400, VW / KM - 844)); if (!phone) MDX = 0;
-    m.classList.toggle('bigT', phone && KM < 0.95); spreadHudM(MDX);
-    MX = (VW - (844 + MDX) * KM) / 2; MY = VT + (VV - 390 * KM) / 2;
+    KM = Math.min(SW / 844, SH / 390);
+    MDX = Math.max(0, Math.min(400, SW / KM - 844)); if (!phone) MDX = 0;
+    // 휴대폰 판이 1배보다 작으면(작은 휴대폰 · 아케이드 창) 글 12px · 단추 44px 이 되게 키우는 배율(--u = 1/KM) — .z 배치
+    var zu = phone && KM < 0.995 ? 1 / KM : 1;
+    m.classList.toggle('bigT', phone && KM < 0.95); m.classList.toggle('z', zu > 1); m.style.setProperty('--u', zu.toFixed(4)); spreadHudM(MDX);
+    MX = SL + (SW - (844 + MDX) * KM) / 2; MY = ST + (SH - 390 * KM) / 2;
     m.style.transform = 'translate(' + MX + 'px,' + MY + 'px) scale(' + KM + ')';
-    var mt = 'translate(' + (VW - 844 * KM) / 2 + 'px,' + MY + 'px) scale(' + KM + ')';
-    // 첫 화면 · 고르기도 PC 판과 같은 바닥값(--f), 많이 줄면(.cmp) 아이템 칸 두 줄 · 맵 칸 보조 글 숨김
-    ['titleS', 'pickS'].forEach(function (id) { var e = $(id); e.classList.toggle('P', phone); e.classList.toggle('D', !phone); e.style.transform = phone ? mt : d.style.transform; e.style.setProperty('--f', phone ? '0px' : d.style.getPropertyValue('--f')); e.classList.toggle('cmp', !phone && K < 0.75); });
+    var mt = 'translate(' + (SL + (SW - 844 * KM) / 2) + 'px,' + MY + 'px) scale(' + KM + ')';
+    // 첫 화면 · 고르기도 PC 판과 같은 바닥값(--f), 많이 줄면(.cmp) 아이템 칸 두 줄 · 맵 칸 보조 글 숨김 / 휴대폰 판은 .z(--u)
+    ['titleS', 'pickS'].forEach(function (id) { var e = $(id); e.classList.toggle('P', phone); e.classList.toggle('D', !phone); e.style.transform = phone ? mt : d.style.transform; e.style.setProperty('--f', phone ? '0px' : d.style.getPropertyValue('--f')); e.classList.toggle('cmp', !phone && K < 0.75); e.classList.toggle('z', zu > 1); e.style.setProperty('--u', zu.toFixed(4)); });
     $('titleS').hidden = screen !== 'title'; $('pickS').hidden = screen !== 'pick';
     $('rotM').hidden = !(portrait && !rotOk);
+    // 돌린 화면 안내는 처음 한 번만 짧게(3.5초 · 누르기를 막지 않음)
+    if (rot && !hintShown) { hintShown = true; $('rotHint').hidden = false; clearTimeout(hintT); hintT = setTimeout(function () { $('rotHint').hidden = true; }, 3500); }
+    if (!rot) $('rotHint').hidden = true;
     drawSky();
   }
 
@@ -2013,7 +2355,7 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
     $('pPool').querySelectorAll('.pi').forEach(function (b) { var on = store.items.indexOf(b.getAttribute('data-i')) >= 0; b.classList.toggle('in', on); b.querySelector('.in2').hidden = !on; });
     $('pMaps').querySelectorAll('.mp').forEach(function (b) { b.classList.toggle('sel', b.getAttribute('data-m') === store.map); });
     var mk = store.map;
-    $('pMdesc').innerHTML = mk === 'random' ? '<b>무작위</b> · 다섯 맵 가운데 하나를 골라 줘요' : '<b>' + D.MAPS[mk].name + '</b> · 중력 ' + MUI[mk][2] + ' · 바람 ' + MUI[mk][3] + '<br>' + MUI[mk][1];
+    $('pMdesc').innerHTML = mk === 'random' ? '<b>무작위</b> · 다섯 맵 가운데 하나를 골라 줘요' : '<b>' + D.MAPS[mk].name + '</b> · 중력 ' + MUI[mk][2] + ' · 바람 ' + MUI[mk][3] + '<br><span class="md2">' + MUI[mk][1] + '</span>';
     $('pLv').textContent = '난이도 ' + LVN[level] + (practice ? ' · 연습(순위 없음)' : ' · 점수 ×' + D.LEVELS[level].mult);
     $('pGoT').innerHTML = R.name + (phone ? ' · ' : '<br>') + (mk === 'random' ? '무작위 맵' : D.MAPS[mk].name) + (phone ? '' : '<br>상대: 무작위 탈것');
     $('chip2').classList.toggle('dim', phone && pickStep === 1); $('chip3').classList.toggle('dim', phone && pickStep === 1);
@@ -2121,7 +2463,7 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
   });
   // 전장 끌기 = 각도(마우스: 포신 축 → 마우스 쪽 / 터치: 위아래로 끌기)
   var drag = null;
-  function toField(e) { return [(e.clientX - OX) / K, (e.clientY - OY) / K]; }
+  function toField(e) { var q = pt(e); return [(q[0] - OX) / K, (q[1] - OY) / K]; }
   function aimAt(p) {
     var rv = st.rovers[ME], pv = M.pivotOf({ x: rv.x, y: rv.y, face: aim.face, spec: rv.spec });
     var dx = p[0] - pv.x, dy = pv.y - p[1];
@@ -2133,12 +2475,12 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
   cv.addEventListener('pointerdown', function (e) {
     if (!myTurn() || paused) return;
     try { cv.setPointerCapture(e.pointerId); } catch (_) {}
-    drag = { id: e.pointerId, touch: e.pointerType !== 'mouse', y: e.clientY, a: aim.a };
+    drag = { id: e.pointerId, touch: e.pointerType !== 'mouse', y: pt(e)[1], a: aim.a };
     if (!drag.touch) aimAt(toField(e));
   });
   cv.addEventListener('pointermove', function (e) {
     if (!drag || e.pointerId !== drag.id || !myTurn()) return;
-    if (drag.touch) aim.a = clampA(drag.a + Math.round((drag.y - e.clientY) / (phone ? KM : 1) * 3));
+    if (drag.touch) aim.a = clampA(drag.a + Math.round((drag.y - pt(e)[1]) / (phone ? KM : 1) * 3));
     else aimAt(toField(e));
   });
   var endDrag = function () { drag = null; };
@@ -2362,7 +2704,7 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
     var rv = st.rovers[side]; if (rv.out) return;
     // 이름표는 포신이 가장 높이 들려도 닿지 않는 높이에, 조준 중 포신을 높이 들면(50° 넘게) 포신 반대쪽으로 비켜 조준 점선을 가리지 않게
     var g = artGeo(rv.kind), reach = g ? -g.my + g.bl + g.bt / 2 + 8 : -BARREL[rv.kind][1] * RS + rv.spec.barrel + 10, top = Math.max(112, g ? g.h + 10 : 0, reach);
-    var s = phone ? 1.9 : 1, w = 170 * s, h = 46 * s, mine = side === ME, act = st.side === side && st.phase === 'aim';
+    var s = phone ? 1.9 * TS : 1, w = 170 * s, h = 46 * s, mine = side === ME, act = st.side === side && st.phase === 'aim';
     var vw = roverView(side), kx = act && vw.a > 500 ? Math.min(1, (vw.a - 500) / 200) : 0;
     tagX[side] += ((-vw.face * kx * (w / 2 + 34)) - tagX[side]) * 0.25;
     var x = Math.max(6, Math.min(W - w - 6, rv.x - w / 2 + tagX[side])), y = rv.y - top - h - (phone ? 14 : 0), mx = x + w / 2;
@@ -2388,7 +2730,7 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
     cx.fillStyle = far ? '#8fe0ff' : '#fff36b'; var nextD = 14;
     for (var i = 0; i < tr.pts.length; i++) { var q = tr.pts[i]; if (q[2] >= nextD) { if (q[2] > maxL) break; var kk = off ? Math.max(0, 1 - q[2] / 110) : 0; cx.globalAlpha = 1 - q[2] / (maxL * 1.33); cx.beginPath(); cx.arc(q[0] + (kk ? off[0] * kk : 0), q[1] + (kk ? off[1] * kk : 0), 4.5, 0, 7); cx.fill(); nextD += 16; } }
     cx.globalAlpha = 1;
-    if (phone) { var rv = st.rovers[ME]; cx.fillStyle = '#fff36b'; cx.font = '900 46px ' + FF; cx.textAlign = 'center'; cx.strokeStyle = '#2b2170'; cx.lineWidth = 8; var tx = rv.x + aim.face * 110, ty = rv.y - 60; cx.strokeText(Math.round(aim.a / 10) + '°', tx, ty); cx.fillText(Math.round(aim.a / 10) + '°', tx, ty); }
+    if (phone) { var rv = st.rovers[ME]; cx.fillStyle = '#fff36b'; cx.font = '900 ' + Math.round(46 * TS) + 'px ' + FF; cx.textAlign = 'center'; cx.strokeStyle = '#2b2170'; cx.lineWidth = 8; var tx = rv.x + aim.face * 110, ty = rv.y - 60; cx.strokeText(Math.round(aim.a / 10) + '°', tx, ty); cx.fillText(Math.round(aim.a / 10) + '°', tx, ty); }
   }
   function drawSea(t, seaY) {
     var y = seaY, x0 = -OX / K - 10, x1 = (VW - OX) / K + 10, yb = (VH - OY) / K + 10;
@@ -2404,7 +2746,7 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
     cx.globalAlpha = 1;
     if (screen !== 'battle') return;
     var ly = phone ? Math.min(y + 70, 1060) : y + 46;
-    if (phone || ly < 890) { cx.fillStyle = 'rgba(255,255,255,.9)'; cx.font = '800 ' + (phone ? 52 : 30) + 'px ' + FF; cx.textAlign = 'center'; cx.textBaseline = 'alphabetic'; cx.fillText('별바다', W / 2, ly); }
+    if (phone || ly < 890) { cx.fillStyle = 'rgba(255,255,255,.9)'; cx.font = '800 ' + (phone ? 52 * TS : 30) + 'px ' + FF; cx.textAlign = 'center'; cx.textBaseline = 'alphabetic'; cx.fillText('별바다', W / 2, ly); }
   }
   // 쏜 직후 0.2초 동안 포탄을 그림 포신 끝 쪽으로 끌어 보인다(엔진 자리는 그대로)
   function offK() { if (!fireOff) return 0; var k = 1 - (now - fireOff.t0) / 200; if (k <= 0) { fireOff = null; return 0; } return k * k; }
@@ -2507,7 +2849,7 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
     drawParts(dt);
     drawTag(0); drawTag(1);
     // 떠오르는 글(피해 숫자 등)
-    var fs = phone ? 1.7 : 1;
+    var fs = phone ? 1.7 * TS : 1;
     for (i = floats.length - 1; i >= 0; i--) {
       var q = floats[i], age = (now - q.t0) / 1000; if (age > 1.3) { floats.splice(i, 1); continue; }
       var num = /^[−+]/.test(q.text), pop = age < 0.14 ? 1.45 - age / 0.14 * 0.45 : 1, sz = (num ? (q.big ? 80 : 60) : (q.big ? 52 : 36)) * fs * pop;
@@ -2520,7 +2862,7 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
     if (banner) {
       var bt = (now - banner.t0) / banner.ms; if (bt >= 1) banner = null;
       else {
-        var sc = (banner.pop ? (bt < 0.1 ? 0.6 + 7 * bt : bt < 0.2 ? 1.3 - 3 * (bt - 0.1) : 1) : (bt < 0.15 ? 0.7 + 2 * bt : 1)) * (phone ? 1.8 : 1); cx.globalAlpha = bt > 0.8 ? (1 - bt) / 0.2 : 1;
+        var sc = (banner.pop ? (bt < 0.1 ? 0.6 + 7 * bt : bt < 0.2 ? 1.3 - 3 * (bt - 0.1) : 1) : (bt < 0.15 ? 0.7 + 2 * bt : 1)) * (phone ? 1.8 * TS : 1); cx.globalAlpha = bt > 0.8 ? (1 - bt) / 0.2 : 1;
         cx.font = '900 ' + (64 * sc) + 'px ' + FF; cx.textAlign = 'center'; cx.textBaseline = 'middle';
         var tw = cx.measureText(banner.text).width + 80 * sc; rr(cx, W / 2 - tw / 2, 430 - 50 * sc, tw, 100 * sc, 50 * sc); cx.fillStyle = 'rgba(32,24,92,.72)'; cx.fill();
         cx.fillStyle = banner.color; cx.fillText(banner.text, W / 2, 432); cx.globalAlpha = 1;
@@ -2671,10 +3013,17 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
     else { cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, VW, VH); }
     requestAnimationFrame(frame);
   }
-  addEventListener('resize', function () { layout(); if (screen === 'pick') refreshPick(); });
+  var lastSz = '';
+  function relayout() { lastSz = szKey(); layout(); if (screen === 'pick') refreshPick(); }
+  function szKey() { var v = window.visualViewport; return innerWidth + 'x' + innerHeight + (v ? ':' + Math.round(v.width) + 'x' + Math.round(v.height) + '@' + Math.round(v.offsetTop) : ''); }
+  addEventListener('resize', relayout);
+  // 화면을 돌린 직후 크기가 늦게 바뀌는 브라우저(iOS)가 있어 조금 뒤에 몇 번 더 잼
+  addEventListener('orientationchange', function () { [60, 250, 600].forEach(function (ms) { setTimeout(function () { if (szKey() !== lastSz) relayout(); }, ms); }); });
+  if (window.visualViewport) { visualViewport.addEventListener('resize', relayout); visualViewport.addEventListener('scroll', function () { if (szKey() !== lastSz) relayout(); }); }
+  setInterval(function () { if (szKey() !== lastSz) relayout(); }, 500);
   // 아케이드 창: 바깥 화면 크기 · 바깥 판 스크롤이 바뀌면 보이는 띠를 다시 잼(바뀌었을 때만 다시 배치)
   if (inFrame) {
-    var visQ = false, visChk = function () { if (visQ) return; visQ = true; requestAnimationFrame(function () { visQ = false; var v = visArea(); if (v.t !== VT || v.h !== VV) { layout(); if (screen === 'pick') refreshPick(); } }); };
+    var visQ = false, visChk = function () { if (visQ) return; visQ = true; requestAnimationFrame(function () { visQ = false; var v = visArea(); if (v.t + ',' + v.h !== LVA) { layout(); if (screen === 'pick') refreshPick(); } }); };
     try { window.parent.addEventListener('resize', visChk); window.parent.document.addEventListener('scroll', visChk, true); } catch (_) {}
   }
   if (Q.get('go') === '1') { practice = Q.get('practice') === '1'; if (Q.get('level') && D.LEVELS[Q.get('level')]) level = Q.get('level'); if (Q.get('rover') && D.ROVERS[Q.get('rover')]) store.rover = Q.get('rover'); goTitle(); startMatch(); }
@@ -2687,7 +3036,7 @@ else if (typeof self !== 'undefined') self.MOONSHOT = MOONSHOT;
     };
     boot();
   }
-  if (Q.get('dev') === '1' && !ARC) window.MOONSHOT_DEV = { get st() { return st; }, get screen() { return screen; }, M: M, aim: aim, goPick: goPick, goTitle: goTitle, startMatch: startMatch, store: store, setLevel: function (l) { level = l; }, setPractice: function (p) { practice = p; }, pickStep: function (n) { pickStep = n; refreshPick(); }, sel: function (w, i) { selW = w; armI = i; },
+  if (Q.get('dev') === '1' && !ARC) window.MOONSHOT_DEV = { get st() { return st; }, get screen() { return screen; }, M: M, get aim() { return aim; }, goPick: goPick, goTitle: goTitle, startMatch: startMatch, store: store, setLevel: function (l) { level = l; }, setPractice: function (p) { practice = p; }, pickStep: function (n) { pickStep = n; refreshPick(); }, sel: function (w, i) { selW = w; armI = i; },
     perf: function () { return { work: perfSum(perf.work), gap: perfSum(perf.gap), crater: perfSum(perf.crater), fullPaintMs: +(perf.full || 0).toFixed(1), long: perf.gap.filter(function (g) { return g > 33.4; }).length, longAt: perf.longAt || [] }; }, perfReset: function () { perf.work = []; perf.gap = []; perf.crater = []; },
     art: function () { return { ok: artStat.ok, fail: artStat.fail, firstMs: Math.round(artStat.firstDone), have: Object.keys(ART) }; }, get snd() { return Snd; }, ghostFake: function (p) { ghostFake = p; }, ghost: function () { return Array.prototype.map.call(document.querySelectorAll('.ghost'), function (e) { return e.id || e.className; }); } };
   requestAnimationFrame(frame);
