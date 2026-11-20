@@ -76,6 +76,8 @@ console.log('PASS twist only with the rope covering the moved rope');
   const back = R.applyMove(one.ropes, i0, 'b', 6, holes, one.tw); // 1 → 6: 되돌림
   assert.equal(R.twCount(back.tw), 0, '되돌리면 풀림');
   assert.deepEqual(back.ropes.map(r => [r.id, r.a, r.b]), ropes.map(r => [r.id, r.a, r.b]), '되돌리면 처음과 똑같다(밑 줄은 밑에)');
+  const again = R.applyMove(one.ropes, i0, 'a', 11, holes, one.tw); // 꼬인 채 다른 핀을 덮은 줄 안 넘게 옮김
+  assert.equal(again.ropes.findIndex(r => r.id === 0) < again.ropes.findIndex(r => r.id === 1), true, '꼬인 채로 옮겨도 덮던 줄 위로 올라가지 않는다');
   const slide = R.applyMove(ropes, 0, 'b', 7, holes, {}); // 6 → 7: 덮은 줄을 넘지 않음
   assert.equal(R.twCount(slide.tw), 0, '덮은 줄을 넘지 않고 옮기면 안 꼬임');
   assert.deepEqual(slide.ropes.map(r => r.id), [0, 1], '여전히 덮인 채 밑에 있다');

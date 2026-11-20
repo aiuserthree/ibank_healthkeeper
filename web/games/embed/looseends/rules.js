@@ -151,13 +151,14 @@
     const covered = !movable(holes, ropes, ri, cm), h1 = ropes[ri][end];
     const [r] = next.splice(ri, 1);
     r[end] = hole;
-    if (!covered && !passed.size) {
+    const hooked = Object.keys(ntw).some(k => ntw[k] && k.startsWith(rid + '-'));
+    if (!covered && !passed.size && !hooked) {
       // 옛 규칙: 맨 위 줄을 들어 옮기면 맨 위로. 이 줄이 다른 줄 위로 넘어왔던 기록(ov)은 지운다
       delete r.ov; next.push(r);
       for (const q of next) if (q.ov) { q.ov = q.ov.filter(id => id !== rid); if (!q.ov.length) delete q.ov; }
       return { ropes: next, tw: ntw };
     }
-    // 덮인 줄 · 꼬이거나 풀리는 수: 쌓인 높이는 그대로(그래서 같은 길로 되돌리면 처음과 같다).
+    // 덮인 줄 · 꼬여 있는 줄 · 꼬이거나 풀리는 수: 쌓인 높이는 그대로(그래서 같은 길로 되돌리면 처음과 같다).
     // 핀이 꼬임 없이 넘어간 줄은 이제 내가 그 위에 놓였다(ov), 다시 넘어오면 지운다.
     const ov = new Set((r.ov || []));
     for (const q of next) {

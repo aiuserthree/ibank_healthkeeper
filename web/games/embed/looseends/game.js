@@ -317,6 +317,13 @@
     ctx.strokeStyle = 'rgba(70,40,15,.75)'; ctx.lineWidth = w * 1.32; ropePath(A, B, bend); ctx.stroke();
     ropeBody(A, B, color, rec.settings.thread, w, bend);
     if (opt.flash) { ctx.strokeStyle = opt.flashColor ? `rgba(255,140,40,${opt.flash})` : `rgba(255,255,255,${opt.flash})`; ctx.lineWidth = w * 1.6; ropePath(A, B, bend); ctx.stroke(); }
+    ctx.restore(); PATH = null;
+    if (!opt.noPins) drawPins(rope, opt);
+  }
+  // 핀(머리)은 모든 줄 위에 보이게 따로 그린다
+  function drawPins(rope, opt = {}) {
+    const A = endPos(rope, 'a'), B = endPos(rope, 'b'), color = COLORS[rope.id % 8], off = opt.off || { x: 0, y: 0 };
+    ctx.save(); ctx.globalAlpha = opt.alpha == null ? 1 : opt.alpha; ctx.translate(off.x, off.y);
     for (const [P, end] of [[A, 'a'], [B, 'b']]) {
       let px = P.x, py = P.y;
       if (opt.shake && opt.shake.end === end) px += opt.shake.dx;
@@ -385,7 +392,8 @@
       if (((prev.x - hk.X.x) * ex + (prev.y - hk.X.y) * ey) > ((next.x - hk.X.x) * ex + (next.y - hk.X.y) * ey)) { ex = -ex; ey = -ey; }
       const nx = -ey, ny = ex, side = P => ((P.x - hk.X.x) * nx + (P.y - hk.X.y) * ny) >= 0 ? 1 : -1, sd1 = side(prev), sd2 = side(next);
       let h = hk.turns * 2; if ((h % 2 === 1) !== (sd1 !== sd2)) h = Math.max(1, h - 1);
-      const step = w * 2.6, amp = w * 1.25, L = step * h;
+      const room = Math.min(Math.hypot(prev.x - hk.X.x, prev.y - hk.X.y), Math.hypot(next.x - hk.X.x, next.y - hk.X.y));
+      const step = Math.max(w * 1.2, Math.min(w * 2.6, room * .7 / Math.max(1, h))), amp = Math.min(w * 1.25, room * .35), L = step * h;
       // 덮던 줄을 따라 완만하게 h 번 엇갈리는 받침점
       for (let k = 0; k <= h; k++) { const u = -L / 2 + step * k, y = sd1 * amp * (k % 2 ? -1 : 1); ctrl.push({ x: hk.X.x + ex * u + nx * y, y: hk.X.y + ey * u + ny * y }); }
       prev = ctrl[ctrl.length - 1];
@@ -480,12 +488,17 @@
     const flashT = S.flash ? 1 - (now - S.flash.t0) / 900 : 0;
     const shakeT = S.shake ? (now - S.shake.t0) / 350 : 1;
     if (S.flash && flashT <= 0) S.flash = null; if (S.shake && shakeT >= 1) S.shake = null;
-    const prev = S.preview ? S.preview.map(d => d.id) : [], geoms = [];
+    const prev = S.preview ? S.preview.map(d => d.id) : [], geoms = [], pinOpts = [];
     // 그리는 순서: 쌓인 순서대로, 다만 핀이 넘어와 다른 줄 위에 놓인 줄(ov)은 그 줄들 뒤에 그린다
     const order = S.ropes.slice();
     for (const r of S.ropes) if (r.ov && r.ov.length) {
       const hi = Math.max(...r.ov.map(id => order.findIndex(q => q.id === id))), at = order.indexOf(r);
       if (hi > at) { order.splice(at, 1); order.splice(hi, 0, r); }
+    }
+    // 꼬인 줄은 덮던 줄보다 먼저(아래에) 그린다 — 옮긴 핀 쪽 넘어간 자리만 나중에 위로 덧그림
+    for (const pr of Rules.twPairs(S.tw)) {
+      const li = order.findIndex(q => q.id === pr.x), hi = order.findIndex(q => q.id === pr.y);
+      if (li > hi && hi >= 0) { const [low] = order.splice(li, 1); order.splice(hi, 0, low); }
     }
     for (const rope of order) {
       const opt = { now };
@@ -493,9 +506,10 @@
       if (prev.includes(rope.id)) { opt.flash = .35 + Math.sin(now / 120) * .2; opt.flashColor = true; }
       if (S.shake && S.shake.id === rope.id) opt.shake = { end: S.shake.end, dx: Math.sin(shakeT * Math.PI * 6) * (1 - shakeT) * 6 };
       const g = ropeGeom(rope); if (g) { opt.path = g.pts; geoms.push({ rope, g }); }
-      drawRope(rope, opt);
+      opt.noPins = true; drawRope(rope, opt); pinOpts.push([rope, opt]);
     }
     drawFronts(geoms);
+    for (const [rope, opt] of pinOpts) drawPins(rope, opt);
     // 빠져나가는 줄
     S.anim = S.anim.filter(a => {
       const t = (now - a.t0) / a.dur; if (t >= 1) return false;
