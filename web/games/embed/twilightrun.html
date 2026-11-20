@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#141617">
+  <title>황혼 질주 · Twilight Run</title>
+  <link rel="stylesheet" href="twilightrun/style.css">
+</head>
+<body>
+  <main class="game">
+    <div id="road" role="img" aria-label="황혼 질주 주행 화면" tabindex="-1" hidden>
+      <div class="panorama" aria-hidden="true"></div>
+      <div class="panorama" aria-hidden="true"></div>
+      <canvas data-webgl aria-hidden="true"></canvas>
+      <canvas data-fallback aria-hidden="true" hidden></canvas>
+      <div class="wind-lens" aria-hidden="true"></div>
+      <div class="impact-lens" aria-hidden="true"></div>
+    </div>
+    <section id="home" class="home" aria-labelledby="game-title">
+      <header class="topbar">
+        <div class="wordmark"><i aria-hidden="true"></i> TWILIGHT RUN</div>
+        <div class="toolbar">
+          <span class="credits"><i aria-hidden="true">◆</i> <span id="balance">0</span> <small>크레딧</small></span>
+          <button type="button" id="garage-button" class="button quiet">차고</button>
+          <button type="button" id="sound" class="button quiet" aria-pressed="false">소리 켜기</button>
+        </div>
+      </header>
+      <div class="home-body">
+        <div class="intro">
+          <h1 id="game-title">황혼<span>질주</span></h1>
+          <p>도로 위 교통을 피해<br>최고 기록에 도전하세요.</p>
+        </div>
+        <section class="setup" aria-label="주행 설정">
+          <label for="course">코스</label>
+          <select id="course"></select>
+          <p class="detail" id="course-detail"></p>
+          <div class="course-preview" id="course-preview" aria-hidden="true"></div>
+          <label for="mode">주행 모드</label>
+          <select id="mode"></select>
+          <p class="detail" id="mode-detail"></p>
+          <button type="button" class="button primary start" id="start"><span>출발하기</span><span aria-hidden="true">↗</span></button>
+        </section>
+      </div>
+      <footer class="home-footer">
+        <span class="current-car"><span id="paint-dot" aria-hidden="true"></span><strong id="selected-car">솔라 S</strong></span>
+        <span class="key-help"><kbd>W A S D</kbd> 주행 <kbd>C</kbd> 시점 <kbd>H</kbd> 경적</span>
+        <span class="touch-help">화면 버튼으로 주행</span>
+        <span class="best">최고 <strong id="best">0</strong> 점</span>
+      </footer>
+    </section>
+
+    <section id="hud" class="hud" aria-label="주행 정보" hidden>
+      <div class="race-top">
+        <div class="timing">
+          <p class="race-label" id="race-label"></p>
+          <div class="distance"><b id="distance">0.00</b> <span>km</span></div>
+          <div class="progress" id="progress-track" role="progressbar" aria-label="코스 진행" aria-valuemin="0" aria-valuemax="100"><i id="progress"></i></div>
+          <p class="race-meta" id="remaining"></p>
+          <p class="race-location" id="race-location"></p>
+        </div>
+        <div class="race-actions">
+          <button type="button" id="camera" class="button instrument" aria-keyshortcuts="C">시점</button>
+          <button type="button" id="horn" class="button instrument" aria-keyshortcuts="H">경적</button>
+          <button type="button" id="pause" class="button instrument" aria-keyshortcuts="Escape">멈춤</button>
+        </div>
+        <div class="score-box"><b id="score">0</b> <span>점</span></div>
+      </div>
+      <p id="countdown" class="countdown" role="status" hidden></p>
+      <p id="signal" class="signal" role="status" hidden></p>
+      <div class="dash">
+        <div class="damage"><span id="vehicle-condition">내구도</span><div id="health" aria-label="내구도 3 / 3"><i></i><i></i><i></i></div></div>
+        <div class="speed"><b id="speed">0</b><span> km/h</span><i id="speed-bar"></i></div>
+      </div>
+      <div class="touch-controls" aria-label="터치 조작">
+        <div>
+          <button type="button" data-drive="left" aria-label="왼쪽">←</button>
+          <button type="button" data-drive="right" aria-label="오른쪽">→</button>
+        </div>
+        <div>
+          <button type="button" data-drive="brake" class="pedal" aria-label="브레이크">브레이크</button>
+          <button type="button" data-drive="gas" class="pedal gas" aria-label="가속">가속</button>
+        </div>
+      </div>
+    </section>
+
+    <dialog id="garage" aria-labelledby="garage-title">
+      <header class="dialog-head"><h2 id="garage-title">차고</h2><button type="button" id="close-garage" class="button quiet">닫기</button></header>
+      <p class="dialog-balance">보유 크레딧 <strong id="garage-balance">0</strong></p>
+      <div id="car-list" class="car-list"></div>
+      <p id="garage-status" class="garage-status" role="status"></p>
+    </dialog>
+
+    <dialog id="paused" class="center-dialog" aria-labelledby="pause-title">
+      <h2 id="pause-title">일시정지</h2>
+      <button type="button" class="button primary" id="resume">이어 달리기</button>
+      <button type="button" class="button quiet" id="exit">주행 끝내기</button>
+    </dialog>
+
+    <dialog id="results" class="center-dialog" aria-labelledby="result-title">
+      <p class="result-mode" id="result-mode"></p>
+      <h2 id="result-title"></h2>
+      <dl class="results">
+        <div><dt>점수</dt><dd id="result-score"></dd></div>
+        <div><dt>거리</dt><dd id="result-distance"></dd></div>
+        <div><dt>추월</dt><dd id="result-passes"></dd></div>
+        <div><dt>보상</dt><dd id="result-reward"></dd></div>
+      </dl>
+      <button type="button" class="button primary" id="retry">다시 달리기</button>
+      <button type="button" class="button quiet" id="menu">메뉴로</button>
+    </dialog>
+  </main>
+  <script defer src="twilightrun/vendor/three-r160.min.js"></script>
+  <script type="module" src="twilightrun/game.js"></script>
+</body>
+</html>

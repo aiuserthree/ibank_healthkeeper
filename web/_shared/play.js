@@ -267,6 +267,7 @@ window.HKPlay = (function () {
 
   // 게임별 색 (라운지 카드 · 게임 머리) — [시작, 끝]
   const TINTS = {
+    twilightrun: ["#302722", "#a4b840"],
     stairs: ["#1b2459", "#5a36b8"],
     match3: ["#ff7a59", "#ffb648"],
     crossing: ["#16a06a", "#7bd389"],

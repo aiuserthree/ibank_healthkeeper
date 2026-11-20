@@ -73,9 +73,9 @@ class MoonshotVsStaticTest(unittest.TestCase):
         self.assertTrue(game.game_visible("moonshotvs"))
 
     def test_list_position(self):
-        # 새 게임은 맨 위 — 혼자 하기 · 대전 짝은 대전이 바로 위(bumpervs/sundown · jellyvs/jelly 처럼)
+        # 혼자 하기와 대전은 목록에서 붙어 있어야 한다.
         keys = list(game.GAMES)
-        self.assertEqual(keys[:2], ["moonshotvs", "moonshot"])
+        self.assertEqual(keys.index("moonshot") - keys.index("moonshotvs"), 1)
         self.assertLess(keys.index("bumpervs"), keys.index("sundown"))
         self.assertLess(keys.index("jellyvs"), keys.index("jelly"))
 
