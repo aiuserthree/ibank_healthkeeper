@@ -1,8 +1,8 @@
-import { advanceWreck, cars, carStats, clamp, courses, createRun, modes, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js';
-import { createScene } from './scene.js';
-import { impactDuration } from './impact.js';
-import { assetRoot } from './world.js';
-import { requestYield } from './traffic.js';
+import { advanceWreck, cars, carStats, clamp, courses, createRun, modes, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=2';
+import { createScene } from './scene.js?v=2';
+import { impactDuration } from './impact.js?v=2';
+import { assetRoot } from './world.js?v=2';
+import { requestYield } from './traffic.js?v=2';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');

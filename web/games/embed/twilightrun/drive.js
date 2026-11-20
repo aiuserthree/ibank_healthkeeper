@@ -1,4 +1,4 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=2';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -16,28 +16,28 @@ function course(name, length, curve, wave, grade, sections) {
 }
 
 export const courses = [
-  course('서해 노을길', 4400, 24, 187, 2.7, [
+  course('서해 노을길', 8800, 24, 187, 2.7, [
     ['coast', '노을 해안', 'cliffs'], ['coast', '등대 대교', 'bridge'], ['port', '황혼 부두', 'cranes'],
   ]),
-  course('항만 순환로', 5200, 28, 170, 1.4, [
+  course('항만 순환로', 10400, 28, 170, 1.4, [
     ['port', '컨테이너 터미널', 'cranes'], ['port', '항만 터널', 'tunnel'], ['metro', '강변 고가도로', 'towers'],
   ]),
-  course('붉은 협곡', 5800, 34, 147, 5.4, [
+  course('붉은 협곡', 11600, 34, 147, 5.4, [
     ['ridge', '적벽 협곡', 'columns'], ['desert', '황야 직선로', 'dunes'], ['ridge', '바위 아치', 'arch'],
   ]),
-  course('안개 삼나무길', 4800, 29, 163, 4.8, [
+  course('안개 삼나무길', 9600, 29, 163, 4.8, [
     ['forest', '삼나무 숲', 'trees'], ['meadow', '바람 언덕', 'windmills'], ['forest', '안개 계곡', 'trees'],
   ]),
-  course('네온 순환선', 5600, 25, 164, 2.1, [
+  course('네온 순환선', 11200, 25, 164, 2.1, [
     ['metro', '비 내리는 도심', 'towers'], ['metro', '도심 지하차도', 'tunnel'], ['port', '야경 대교', 'bridge'],
   ]),
-  course('은빛 설산 고개', 6400, 36, 161, 6.3, [
+  course('은빛 설산 고개', 12800, 36, 161, 6.3, [
     ['alpine', '설산 고개', 'snow'], ['forest', '침엽수 산길', 'trees'], ['alpine', '빙벽 전망로', 'snow'],
   ]),
-  course('소금 사막 횡단로', 6800, 22, 214, 1.2, [
+  course('소금 사막 횡단로', 13600, 22, 214, 1.2, [
     ['desert', '소금 평원', 'dunes'], ['ridge', '노을 절벽', 'columns'], ['desert', '사막 풍력단지', 'windmills'],
   ]),
-  course('초록 능선 종주', 7200, 37, 174, 6, [
+  course('초록 능선 종주', 14400, 37, 174, 6, [
     ['meadow', '초원 풍력단지', 'windmills'], ['forest', '숲 사이 고가도로', 'trees'], ['meadow', '목장 능선', 'fields'],
   ]),
 ];
@@ -95,8 +95,8 @@ export function routeMode(course, mode) {
     }
     case 'rival': return { ...mode, goal, detail: `${km} 결승선에 라이벌보다 먼저 도착` };
     case 'overtake': {
-      const passes = Math.round(goal / 160);
-      const time = Math.ceil(goal / 37);
+      const passes = Math.round(goal / 240);
+      const time = Math.ceil(goal / 55);
       return { ...mode, passes, time, detail: `${time}초 안에 교통 차량 ${passes}대 추월` };
     }
     default: return mode;

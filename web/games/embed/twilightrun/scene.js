@@ -1,8 +1,8 @@
-import { clamp, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js';
-import { createFallback } from './scene-fallback.js';
-import { createCarModels } from './models.js';
-import { createImpactFx, impactMotion } from './impact.js';
-import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js';
+import { clamp, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=2';
+import { createFallback } from './scene-fallback.js?v=2';
+import { createCarModels } from './models.js?v=2';
+import { createImpactFx, impactMotion } from './impact.js?v=2';
+import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=2';
 
 const poses = [
   { back: 8.5, height: 2.9 },

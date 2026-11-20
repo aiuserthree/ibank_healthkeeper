@@ -82,12 +82,12 @@ class TwilightrunStaticTest(unittest.TestCase):
         html = PAGE.read_text(encoding="utf-8")
         for src in re.findall(r'(?:src|href)="([^"]+)"', html):
             self.assertNotIn("://", src)
-            self.assertTrue((PAGE.parent / src).is_file(), src)
+            self.assertTrue((PAGE.parent / src.split("?")[0]).is_file(), src)
         for f in list(JS_DIR.glob("*.js")) + [JS_DIR / "style.css"]:
             text = f.read_text(encoding="utf-8")
             self.assertIsNone(re.search(r"(?:import|fetch|url)\s*\(?\s*['\"]https?://", text), f.name)
             for imp in re.findall(r"from '(\./[^']+)'", text):
-                self.assertTrue((JS_DIR / imp).is_file(), imp)
+                self.assertTrue((JS_DIR / imp.split("?")[0]).is_file(), imp)
         total = sum(p.stat().st_size for p in JS_DIR.rglob("*") if p.is_file())
         self.assertLessEqual(total, 1_000_000)
 
