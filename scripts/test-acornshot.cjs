@@ -1,6 +1,27 @@
 /* node scripts/test-acornshot.cjs — physics regressions and real-shot solvability. */
 const assert = require('node:assert/strict');
 const P = require('../web/games/embed/acornshot/physics.js');
+const { Body, Sleeping } = require('../web/games/embed/acornshot/vendor/matter.min.js');
+// Keep the entire rotating enemy sprite (including ears) inside the viewport.
+// Exercise both aiming and flight, including velocities large enough to tunnel
+// through a thin wall. Boundary contact must not count as defeating an enemy.
+for (const flight of [false, true]) {
+  for (const [x, y, vx, vy] of [[40, 180, -100, 0], [1240, 180, 100, 0], [500, 40, 0, -100], [500, 540, 0, 200], [1240, 40, 100, -100]]) {
+    const sim = P.create(0), target = sim.state.targets[0];
+    if (flight) sim.launch(180, 490);
+    Body.setPosition(target, { x, y }); Body.setVelocity(target, { x: vx, y: vy }); Sleeping.set(target, false);
+    sim.step();
+    assert.ok(target.position.x >= 38 && target.position.x <= 1242, 'Enemy stays within horizontal sprite-safe bounds');
+    assert.ok(target.position.y >= 38 && target.position.y <= P.FLOOR - 22, 'Enemy stays below screen top and above ground');
+    assert.equal(sim.state.targets.length, 1, 'Boundary must not delete the enemy');
+    assert.equal(sim.state.score, 0, 'Boundary must not award points');
+    if (x === 40) assert.ok(target.velocity.x >= 0, 'Left edge redirects velocity inward');
+    if (x === 1240) assert.ok(target.velocity.x <= 0, 'Right edge redirects velocity inward');
+    if (y === 40) assert.ok(target.velocity.y >= 0, 'Top edge redirects velocity inward');
+    sim.dispose();
+  }
+}
+console.log('PASS enemy bounds: aim/flight, all edges, corner, high-speed overshoot, no free score.');
 function fire(sim, angle, power, activation = 650) {
   const a = angle * Math.PI / 180, length = power * P.MAX_PULL / 100;
   assert.equal(sim.launch(P.SLING.x - Math.cos(a) * length, P.SLING.y + Math.sin(a) * length), true);

@@ -6,6 +6,8 @@
   'use strict';
   const { Engine, Bodies, Body, Composite, Events, Vector } = M;
   const STEP = 1000 / 120, FLOOR = 574, SLING = { x: 205, y: 432 }, MAX_PULL = 86, SCORE_MAX = 20000;
+  // The rotating sprite extends beyond its 22px collider (ears reach 38px).
+  const TARGET_MARGIN = 38, TARGET_BOUNCE = .25;
   const MATERIAL = {
     wood: { hp: 15, density: .0024, color: '#c58a4d', edge: '#754828', points: 120 },
     ice: { hp: 7, density: .0015, color: '#a2e5e6', edge: '#4a969e', points: 150 },
@@ -137,12 +139,28 @@
       state.stars = won ? (state.spent <= Math.ceil(level.ammo.length / 2) ? 3 : state.spent < level.ammo.length ? 2 : 1) : 0;
       notify({ type: 'finish', won, score: state.score, stars: state.stars });
     }
+    function containTargets() {
+      for (const b of state.targets) {
+        const { x, y } = b.position;
+        const nx = Math.max(TARGET_MARGIN, Math.min(1280 - TARGET_MARGIN, x));
+        const ny = Math.max(TARGET_MARGIN, Math.min(FLOOR - 22, y));
+        if (nx === x && ny === y) continue;
+        let vx = b.velocity.x, vy = b.velocity.y;
+        if ((x < nx && vx < 0) || (x > nx && vx > 0)) vx *= -TARGET_BOUNCE;
+        if ((y < ny && vy < 0) || (y > ny && vy > 0)) vy *= -TARGET_BOUNCE;
+        // Clamp after every physics step, so even high-speed overshoot cannot
+        // render outside the viewport. This boundary itself deals no damage.
+        Body.setPosition(b, { x: nx, y: ny });
+        Body.setVelocity(b, { x: vx, y: vy });
+      }
+    }
     function step() {
       if (state.phase !== 'aim' && state.phase !== 'flight') return;
       Engine.update(engine, STEP); state.time += STEP;
+      containTargets();
       if (state.phase !== 'flight') return;
       state.shotTime += STEP;
-      for (const b of [...state.targets, ...state.blocks]) {
+      for (const b of state.blocks) {
         if (b.position.y > 690 || b.position.x > 1380 || b.position.x < -100) removed.add(b);
       }
       flush();
