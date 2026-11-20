@@ -131,7 +131,7 @@
   const holeXY = i => { const h = S.holes[i]; return { x: geo.cx + h.x * geo.R * .88, y: geo.cy + h.y * geo.R * .88 }; };
   const endPos = (rope, end) => (S.held && S.held.id === rope.id && S.held.end === end) ? { x: S.held.x, y: S.held.y } : holeXY(rope[end]);
   const pegR = () => Math.max(9, geo.R * .066);
-  const ropeW = () => Math.max(7, geo.R * .068);
+  const ropeW = () => Math.max(8, geo.R * .078);
   const toLocal = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
 
   // ---------- 그리기 ----------
@@ -349,49 +349,58 @@
   // 걸린 줄의 길: 아래 줄 r 이 위 줄 s 를 따라 감긴 수만큼 위아래로 번갈아 넘나들며 휘감긴다.
   // 돌려주는 값: { pts: [{x,y}], fronts: [[i0,i1]] } — fronts 는 위 줄보다 앞(위)을 지나는 토막(나중에 덧그린다)
   function quad(P0, C, P1, n) { const out = []; for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; out.push({ x: u * u * P0.x + 2 * u * t * C.x + t * t * P1.x, y: u * u * P0.y + 2 * u * t * C.y + t * t * P1.y }); } return out; }
-  // 꼬인 줄: 줄은 곧게 두고, 위 줄과 만나는 자리에서만 위 줄을 감긴 수만큼 작게 감는다.
-  // 곧은 줄이 위 줄과 엇갈리지 않으면 위 줄에서 가장 가까운 점 쪽으로 살짝만 휜다.
+  // 꼬인 줄(단순하게): 꼬인 줄이 덮던 줄과 감긴 수만큼 완만하게 엇갈리며 위 · 아래가 번갈아 보인다. 고리 · 급한 꺾임 없음.
+  function catmull(P, per) {
+    const out = [P[0]];
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+      for (let k = 1; k <= per; k++) {
+        const t = k / per, t2 = t * t, t3 = t2 * t;
+        out.push({ x: .5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+                   y: .5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3) });
+      }
+    }
+    return out;
+  }
   function ropeGeom(rope) {
     if (S.held && S.held.id === rope.id) return null;
     const A0 = endPos(rope, 'a'), B0 = endPos(rope, 'b');
     const hooks = Rules.twPairs(S.tw).filter(p => p.x === rope.id).map(p => ({ host: S.ropes[ropeIdx(p.y)], turns: Math.min(2, Math.abs(p.w)), sign: Math.sign(p.w) })).filter(h => h.host);
     if (!hooks.length) return null;
-    const w = ropeW(), amp = w * .55, dx0 = B0.x - A0.x, dy0 = B0.y - A0.y, len0 = Math.hypot(dx0, dy0) || 1;
+    const w = ropeW(), dx0 = B0.x - A0.x, dy0 = B0.y - A0.y, len0 = Math.hypot(dx0, dy0) || 1;
     hooks.forEach(h => {
-      const C = endPos(h.host, 'a'), D = endPos(h.host, 'b'), den = dx0 * (D.y - C.y) - dy0 * (D.x - C.x);
-      let X = null;
-      if (Math.abs(den) > 1e-9) {
-        const t = ((C.x - A0.x) * (D.y - C.y) - (C.y - A0.y) * (D.x - C.x)) / den, u = ((C.x - A0.x) * dy0 - (C.y - A0.y) * dx0) / den;
-        if (t > .06 && t < .94 && u > .06 && u < .94) X = { x: A0.x + dx0 * t, y: A0.y + dy0 * t };
-      }
-      if (!X) { // 엇갈리지 않음: 위 줄 위에서 내 줄에 가장 가까운 점
-        let best = null;
-        for (let k = 1; k < 20; k++) { const u = .1 + .8 * k / 20, P = { x: C.x + (D.x - C.x) * u, y: C.y + (D.y - C.y) * u }; const t = Math.max(0, Math.min(1, ((P.x - A0.x) * dx0 + (P.y - A0.y) * dy0) / (len0 * len0))); const Q = { x: A0.x + dx0 * t, y: A0.y + dy0 * t }, d = Math.hypot(P.x - Q.x, P.y - Q.y); if (!best || d < best.d) best = { d, P }; }
-        X = best.P;
-      }
-      h.X = X; h.C = C; h.D = D; h.k = (X.x - A0.x) * dx0 + (X.y - A0.y) * dy0;
+      const C = endPos(h.host, 'a'), D = endPos(h.host, 'b');
+      // 덮던 줄 위에서 내 줄에 가장 가까운 점(엇갈리면 그 자리)
+      let best = null;
+      for (let k = 0; k <= 30; k++) { const u = .15 + .7 * k / 30, P = { x: C.x + (D.x - C.x) * u, y: C.y + (D.y - C.y) * u }; const t = Math.max(.1, Math.min(.9, ((P.x - A0.x) * dx0 + (P.y - A0.y) * dy0) / (len0 * len0))); const Q = { x: A0.x + dx0 * t, y: A0.y + dy0 * t }, d = Math.hypot(P.x - Q.x, P.y - Q.y); if (!best || d < best.d) best = { d, P }; }
+      h.X = best.P; h.C = C; h.D = D; h.k = (h.X.x - A0.x) * dx0 + (h.X.y - A0.y) * dy0;
     });
     hooks.sort((p, q) => p.k - q.k);
-    const pts = [A0], fronts = [];
-    let cur = A0;
+    const ctrl = [A0];
+    let prev = A0;
     hooks.forEach((hk, idx) => {
       const hl = Math.hypot(hk.D.x - hk.C.x, hk.D.y - hk.C.y) || 1;
       let ex = (hk.D.x - hk.C.x) / hl, ey = (hk.D.y - hk.C.y) / hl;
       const next = idx + 1 < hooks.length ? hooks[idx + 1].X : B0;
-      if (((cur.x - hk.X.x) * ex + (cur.y - hk.X.y) * ey) > ((next.x - hk.X.x) * ex + (next.y - hk.X.y) * ey)) { ex = -ex; ey = -ey; }
-      const nx = -ey, ny = ex, L = w * (.9 + 1.3 * hk.turns), X = hk.X;
-      const S1 = { x: X.x - ex * L / 2, y: X.y - ey * L / 2 };
-      const side = P => ((P.x - X.x) * nx + (P.y - X.y) * ny) >= 0 ? 1 : -1, sd1 = side(cur), sd2 = side(next);
+      if (((prev.x - hk.X.x) * ex + (prev.y - hk.X.y) * ey) > ((next.x - hk.X.x) * ex + (next.y - hk.X.y) * ey)) { ex = -ex; ey = -ey; }
+      const nx = -ey, ny = ex, side = P => ((P.x - hk.X.x) * nx + (P.y - hk.X.y) * ny) >= 0 ? 1 : -1, sd1 = side(prev), sd2 = side(next);
       let h = hk.turns * 2; if ((h % 2 === 1) !== (sd1 !== sd2)) h = Math.max(1, h - 1);
-      const at = (u, y) => ({ x: S1.x + ex * L * u + nx * y, y: S1.y + ey * L * u + ny * y });
-      const steps = Math.max(12, h * 10), endY = sd1 * amp * (h % 2 ? -1 : 1);
-      pts.push(...quad(cur, at(0, sd1 * amp * 2.2), at(0, sd1 * amp), 10).slice(1));
-      const base = pts.length - 1;
-      for (let i = 1; i <= steps; i++) { const u = i / steps; pts.push(at(u, sd1 * amp * Math.cos(Math.PI * h * u))); }
-      const startFront = hk.sign > 0 ? 1 : 0; // 감긴 방향에 따라 위로 넘는 자리가 바뀐다
-      for (let c = startFront; c < h; c += 2) { const uc = (c + .5) / h, hw = .5 / h * .8; fronts.push([base + Math.max(0, Math.floor((uc - hw) * steps)), base + Math.min(steps, Math.ceil((uc + hw) * steps))]); }
-      cur = at(1, endY);
-      if (idx + 1 === hooks.length) pts.push(...quad(cur, at(1, endY * 2.2), B0, 10).slice(1));
+      const step = w * 2.6, amp = w * 1.25, L = step * h;
+      // 덮던 줄을 따라 완만하게 h 번 엇갈리는 받침점
+      for (let k = 0; k <= h; k++) { const u = -L / 2 + step * k, y = sd1 * amp * (k % 2 ? -1 : 1); ctrl.push({ x: hk.X.x + ex * u + nx * y, y: hk.X.y + ey * u + ny * y }); }
+      prev = ctrl[ctrl.length - 1];
+    });
+    ctrl.push(B0);
+    const pts = catmull(ctrl, 10), fronts = [];
+    // 덮던 줄을 건너는 자리를 찾아 위 · 아래 번갈아(감긴 방향에 따라 첫 자리가 바뀜)
+    hooks.forEach(hk => {
+      const ex = hk.D.x - hk.C.x, ey = hk.D.y - hk.C.y, sideOf = P => Math.sign((P.x - hk.C.x) * ey - (P.y - hk.C.y) * ex) || 1;
+      let c = 0;
+      for (let i = 1; i < pts.length; i++) if (sideOf(pts[i]) !== sideOf(pts[i - 1])) {
+        const t = ((pts[i].x - hk.C.x) * ex + (pts[i].y - hk.C.y) * ey) / (ex * ex + ey * ey); if (t < 0 || t > 1) continue;
+        if ((c + (hk.sign > 0 ? 1 : 0)) % 2 === 1) { let a = i, b = i; let acc = 0; while (a > 1 && acc < w * 1.3) { acc += Math.hypot(pts[a].x - pts[a - 1].x, pts[a].y - pts[a - 1].y); a--; } acc = 0; while (b < pts.length - 2 && acc < w * 1.3) { acc += Math.hypot(pts[b + 1].x - pts[b].x, pts[b + 1].y - pts[b].y); b++; } fronts.push([a, b]); }
+        c++;
+      }
     });
     return { pts, fronts };
   }
