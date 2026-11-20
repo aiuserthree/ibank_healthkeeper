@@ -27,9 +27,21 @@ class AcornshotIntegrationTest(unittest.TestCase):
         for src in re.findall(r'(?:src|href)="([^"]+)"', page.read_text()):
             self.assertNotIn('://', src)
             self.assertTrue((page.parent / src).is_file(), src)
+        scripts = re.findall(r'<script src="([^"]+)"', page.read_text())
+        self.assertEqual(scripts, ['acornshot/vendor/matter.min.js', 'acornshot/levels.js', 'acornshot/physics.js', 'acornshot/game.js'])
         css = (page.parent / 'acornshot/style.css').read_text()
         for path in re.findall(r"url\('([^']+)'\)", css):
             self.assertTrue((ROOT / 'web' / path.lstrip('/')).is_file(), path)
+        # Generated pictures: same-site files only (the game falls back to canvas drawing without them).
+        js = (page.parent / 'acornshot/game.js').read_text()
+        self.assertIn("ART_BASE = '../../assets/games/acornshot/'", js)
+        art = ROOT / 'web/assets/games/acornshot'
+        names = ['title', 'acorn-seed', 'acorn-bomb', 'acorn-split', 'goblin', 'goblin-hurt', 'sling'] + [f'bg-{p}' for p in ('forest', 'valley', 'swamp', 'snow', 'castle')]
+        for name in names:
+            self.assertIn(f"'{name}'" if not name.startswith('bg-') else "'bg-' + placeKey", js)
+            self.assertTrue((art / f'{name}.webp').is_file(), name)
+        first = sum((art / f'{n}.webp').stat().st_size for n in names[:7])
+        self.assertLess(first, 1_500_000, 'pictures fetched before the first screen stay under 1.5MB')
 
     def test_embed_messages_and_gallery(self):
         js = (ROOT / 'web/games/embed/acornshot/game.js').read_text()
