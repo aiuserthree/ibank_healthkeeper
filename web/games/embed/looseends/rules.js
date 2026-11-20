@@ -65,16 +65,23 @@
     return m;
   }
   // 움직일 수 있나 — 교차하는 줄이 모두 자기 아래에 있어야 한다(위에 덮은 줄이 없어야 한다)
+  // j 가 i 를 덮나: 엇갈리고, j 가 쌓인 순서로 위인데 i 의 핀이 j 너머로 넘어와 i 가 실제로 위에 놓인 경우(ov)는 뺀다.
+  // 거꾸로 i 보다 아래에 쌓였어도 그 줄의 ov 에 i 가 있으면(그 줄이 i 위로 넘어옴) i 를 덮는다.
+  const inOv = (r, id) => !!(r.ov && r.ov.includes(id));
+  function covers(ropes, m, i, j) {
+    if (!m[i][j]) return false;
+    return j > i ? !inOv(ropes[i], ropes[j].id) : inOv(ropes[j], ropes[i].id);
+  }
   function movable(holes, ropes, i, m) {
     m = m || crossMatrix(holes, ropes);
-    for (let j = i + 1; j < ropes.length; j++) if (m[i][j]) return false;
+    for (let j = 0; j < ropes.length; j++) if (j !== i && covers(ropes, m, i, j)) return false;
     return true;
   }
   // 어떤 줄이 무엇을 덮고 있나(힌트 · 안내용): 위에서 덮고 있는 줄 번호들
   function coveredBy(holes, ropes, i, m) {
     m = m || crossMatrix(holes, ropes);
     const out = [];
-    for (let j = i + 1; j < ropes.length; j++) if (m[i][j]) out.push(j);
+    for (let j = 0; j < ropes.length; j++) if (j !== i && covers(ropes, m, i, j)) out.push(j);
     return out;
   }
   // 아무 줄과도 교차하지 않는 줄들
@@ -109,14 +116,15 @@
   }
   // 줄 i 를 end 핀으로 hole 까지 옮길 때 걸림 변화: [{ id(위 줄), w0, w1, over? }]
   //  - 이미 걸린 위 줄: 그 줄을 다시 지나가면 방향대로 ±1(반대로 지나가면 풀림)
-  //  - 아직 안 걸린, 나보다 위에 있는 줄: 그 줄 밑을 지나가면 걸린다
+  //  - 아직 안 걸린 줄: 지금 나를 덮고 있는 줄 밑을 지나가면 걸린다(지나가는 길의 다른 줄은 상관없음)
   //  - 다른 줄을 옮겨서는 걸림이 바뀌지 않는다
   function twistDelta(holes, ropes, ri, end, hole, m, tw) {
-    const r = ropes[ri], h1 = r[end], out = [];
+    const r = ropes[ri], h1 = r[end], out = [], cm = m || crossMatrix(holes, ropes);
     for (let j = 0; j < ropes.length; j++) {
       if (j === ri) continue;
       const s = ropes[j], w0 = twOf(tw, r.id, s.id);
-      if (!w0 && j < ri) continue;
+      // 새로 꼬이는 줄은 지금 나를 덮고 있는 줄(내 위에서 나와 엇갈린 줄)뿐 — 길에 있는 다른 줄은 꼬이지 않는다
+      if (!w0 && !covers(ropes, cm, ri, j)) continue;
       if (!passes(holes, r, end, h1, hole, s)) continue;
       // 방향: 위 줄의 어느 쪽에서 어느 쪽으로 건너갔나(반대로 건너가면 풀림)
       const raw = w0 + sigma(holes, s, h1, hole), w1 = Math.max(-TW_MAX, Math.min(TW_MAX, raw));
@@ -129,24 +137,36 @@
   function entangled(holes, ropes, i, m, tw) {
     m = m || crossMatrix(holes, ropes);
     const out = [], id = ropes[i].id;
-    for (let j = 0; j < ropes.length; j++) if (j !== i && ((j > i && m[i][j]) || twOf(tw, id, ropes[j].id))) out.push(j);
+    for (let j = 0; j < ropes.length; j++) if (j !== i && (covers(ropes, m, i, j) || twOf(tw, id, ropes[j].id))) out.push(j);
     return out;
   }
   const isClean = delta => delta.every(d => !d.over && Math.abs(d.w1) <= Math.abs(d.w0));
   // 한 수 적용. holes 를 주면 { ropes, tw } — 옮긴 줄은 맨 위로 가되, 옮긴 뒤에도 엇갈리거나 걸려 있는 위 줄보다는 아래에 남는다.
   // holes 없이 부르면 옛 방식(맨 위로) 배열만 돌려준다.
   function applyMove(ropes, ri, end, hole, holes, tw) {
-    const next = ropes.map(r => ({ ...r }));
+    const next = ropes.map(r => ({ ...r })), before0 = ropes[ri];
     if (!holes) { const [r] = next.splice(ri, 1); r[end] = hole; next.push(r); return next; }
-    const ntw = { ...(tw || {}) }, rid = ropes[ri].id;
-    for (const d of twistDelta(holes, ropes, ri, end, hole, null, tw)) { const k = pairKey(rid, d.id); if (d.w1) ntw[k] = d.w1; else delete ntw[k]; }
-    const before = { ...ropes[ri] };
+    const ntw = { ...(tw || {}) }, rid = ropes[ri].id, passed = new Set(), cm = crossMatrix(holes, ropes);
+    for (const d of twistDelta(holes, ropes, ri, end, hole, cm, tw)) { passed.add(d.id); const k = pairKey(rid, d.id); if (d.w1) ntw[k] = d.w1; else delete ntw[k]; }
+    const covered = !movable(holes, ropes, ri, cm), h1 = ropes[ri][end];
     const [r] = next.splice(ri, 1);
     r[end] = hole;
-    // 맨 위로 가되, 내가 걸린 위 줄과 원래 나를 덮고 있었고 옮긴 뒤에도 덮고 있는 위 줄보다는 아래에 남는다
-    let at = next.length;
-    for (let j = ri; j < next.length; j++) if (ntw[pairKey(rid, next[j].id)] || (crosses(holes, before, next[j]) && crosses(holes, r, next[j]))) { at = j; break; }
-    next.splice(at, 0, r);
+    if (!covered && !passed.size) {
+      // 옛 규칙: 맨 위 줄을 들어 옮기면 맨 위로. 이 줄이 다른 줄 위로 넘어왔던 기록(ov)은 지운다
+      delete r.ov; next.push(r);
+      for (const q of next) if (q.ov) { q.ov = q.ov.filter(id => id !== rid); if (!q.ov.length) delete q.ov; }
+      return { ropes: next, tw: ntw };
+    }
+    // 덮인 줄 · 꼬이거나 풀리는 수: 쌓인 높이는 그대로(그래서 같은 길로 되돌리면 처음과 같다).
+    // 핀이 꼬임 없이 넘어간 줄은 이제 내가 그 위에 놓였다(ov), 다시 넘어오면 지운다.
+    const ov = new Set((r.ov || []));
+    for (const q of next) {
+      if (q.id === rid || passed.has(q.id)) continue;
+      if (passes(holes, before0, end, h1, hole, q)) { if (ov.has(q.id)) ov.delete(q.id); else if (ropes.indexOf(ropes.find(x => x.id === q.id)) > ri) ov.add(q.id); }
+    }
+    for (const id of [...ov]) { const q = next.find(x => x.id === id); if (!q || !crosses(holes, r, q)) ov.delete(id); }
+    if (ov.size) r.ov = [...ov].sort((x, y) => x - y); else delete r.ov;
+    next.splice(ri, 0, r);
     return { ropes: next, tw: ntw };
   }
   function settle(holes, ropes, tw) {
@@ -154,7 +174,7 @@
       ? { ropes: [], gone: ropes }
       : { ropes, gone: [] };
   }
-  const keyOf = (ropes, tw) => ropes.map(r => (r.a < r.b ? r.a + '-' + r.b : r.b + '-' + r.a)).join('|') + (twCount(tw) ? '#' + Object.keys(tw).filter(k => tw[k]).sort().map(k => k + ':' + tw[k]).join(',') : '');
+  const keyOf = (ropes, tw) => ropes.map(r => (r.a < r.b ? r.a + '-' + r.b : r.b + '-' + r.a) + (r.ov ? '^' + r.ov.join('.') : '')).join('|') + (twCount(tw) ? '#' + Object.keys(tw).filter(k => tw[k]).sort().map(k => k + ':' + tw[k]).join(',') : '');
 
   // 둘 수 있는 수. opts.all 이면 꼬임을 늘리는 수까지, 아니면 깔끔한 수만. 각 수에 delta(꼬임 변화)를 붙인다.
   function moves(holes, ropes, m = crossMatrix(holes, ropes), tw, opts) {
@@ -287,7 +307,7 @@
       if (settle(holes, nx.ropes, nx.tw).gone.length) continue;
       const sol = solve(holes, nx.ropes, { tw: nx.tw, nodes: cap, depth: maxMoves });
       if (!sol || sol.length < 2) continue;
-      return { ...p, ropes: nx.ropes.map(r => ({ a: r.a, b: r.b, id: r.id })), tw: nx.tw, target: sol.length, solution: sol };
+      return { ...p, ropes: nx.ropes.map(r => (r.ov ? { a: r.a, b: r.b, id: r.id, ov: r.ov } : { a: r.a, b: r.b, id: r.id })), tw: nx.tw, target: sol.length, solution: sol };
     }
     return null;
   }

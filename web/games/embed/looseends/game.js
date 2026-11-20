@@ -349,38 +349,49 @@
   // 걸린 줄의 길: 아래 줄 r 이 위 줄 s 를 따라 감긴 수만큼 위아래로 번갈아 넘나들며 휘감긴다.
   // 돌려주는 값: { pts: [{x,y}], fronts: [[i0,i1]] } — fronts 는 위 줄보다 앞(위)을 지나는 토막(나중에 덧그린다)
   function quad(P0, C, P1, n) { const out = []; for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; out.push({ x: u * u * P0.x + 2 * u * t * C.x + t * t * P1.x, y: u * u * P0.y + 2 * u * t * C.y + t * t * P1.y }); } return out; }
+  // 꼬인 줄: 줄은 곧게 두고, 위 줄과 만나는 자리에서만 위 줄을 감긴 수만큼 작게 감는다.
+  // 곧은 줄이 위 줄과 엇갈리지 않으면 위 줄에서 가장 가까운 점 쪽으로 살짝만 휜다.
   function ropeGeom(rope) {
     if (S.held && S.held.id === rope.id) return null;
     const A0 = endPos(rope, 'a'), B0 = endPos(rope, 'b');
-    const hooks = Rules.twPairs(S.tw).filter(p => p.x === rope.id).map(p => ({ host: S.ropes[ropeIdx(p.y)], turns: Math.abs(p.w) })).filter(h => h.host);
+    const hooks = Rules.twPairs(S.tw).filter(p => p.x === rope.id).map(p => ({ host: S.ropes[ropeIdx(p.y)], turns: Math.min(2, Math.abs(p.w)), sign: Math.sign(p.w) })).filter(h => h.host);
     if (!hooks.length) return null;
-    const w = ropeW(), amp = w * .72, dx0 = B0.x - A0.x, dy0 = B0.y - A0.y;
-    hooks.forEach(h => { h.X = hookPoint(rope, h.host); h.k = (h.X.x - A0.x) * dx0 + (h.X.y - A0.y) * dy0; });
+    const w = ropeW(), amp = w * .55, dx0 = B0.x - A0.x, dy0 = B0.y - A0.y, len0 = Math.hypot(dx0, dy0) || 1;
+    hooks.forEach(h => {
+      const C = endPos(h.host, 'a'), D = endPos(h.host, 'b'), den = dx0 * (D.y - C.y) - dy0 * (D.x - C.x);
+      let X = null;
+      if (Math.abs(den) > 1e-9) {
+        const t = ((C.x - A0.x) * (D.y - C.y) - (C.y - A0.y) * (D.x - C.x)) / den, u = ((C.x - A0.x) * dy0 - (C.y - A0.y) * dx0) / den;
+        if (t > .06 && t < .94 && u > .06 && u < .94) X = { x: A0.x + dx0 * t, y: A0.y + dy0 * t };
+      }
+      if (!X) { // 엇갈리지 않음: 위 줄 위에서 내 줄에 가장 가까운 점
+        let best = null;
+        for (let k = 1; k < 20; k++) { const u = .1 + .8 * k / 20, P = { x: C.x + (D.x - C.x) * u, y: C.y + (D.y - C.y) * u }; const t = Math.max(0, Math.min(1, ((P.x - A0.x) * dx0 + (P.y - A0.y) * dy0) / (len0 * len0))); const Q = { x: A0.x + dx0 * t, y: A0.y + dy0 * t }, d = Math.hypot(P.x - Q.x, P.y - Q.y); if (!best || d < best.d) best = { d, P }; }
+        X = best.P;
+      }
+      h.X = X; h.C = C; h.D = D; h.k = (X.x - A0.x) * dx0 + (X.y - A0.y) * dy0;
+    });
     hooks.sort((p, q) => p.k - q.k);
     const pts = [A0], fronts = [];
     let cur = A0;
     hooks.forEach((hk, idx) => {
-      const C = endPos(hk.host, 'a'), D = endPos(hk.host, 'b'), hl = Math.hypot(D.x - C.x, D.y - C.y) || 1;
-      let ex = (D.x - C.x) / hl, ey = (D.y - C.y) / hl;
+      const hl = Math.hypot(hk.D.x - hk.C.x, hk.D.y - hk.C.y) || 1;
+      let ex = (hk.D.x - hk.C.x) / hl, ey = (hk.D.y - hk.C.y) / hl;
       const next = idx + 1 < hooks.length ? hooks[idx + 1].X : B0;
-      // 들어오는 쪽(cur)에서 가까운 끝부터 감기 시작하게 방향을 맞춘다
       if (((cur.x - hk.X.x) * ex + (cur.y - hk.X.y) * ey) > ((next.x - hk.X.x) * ex + (next.y - hk.X.y) * ey)) { ex = -ex; ey = -ey; }
-      const nx = -ey, ny = ex;
-      const L = Math.min(hl * .5, w * (1.2 + 1.9 * hk.turns));
-      const tX = (hk.X.x - C.x) * (ex > 0 || ey > 0 ? 1 : 1) * 0; void tX;
-      const half = L / 2, X = hk.X;
-      const S1 = { x: X.x - ex * half, y: X.y - ey * half };
+      const nx = -ey, ny = ex, L = w * (.9 + 1.3 * hk.turns), X = hk.X;
+      const S1 = { x: X.x - ex * L / 2, y: X.y - ey * L / 2 };
       const side = P => ((P.x - X.x) * nx + (P.y - X.y) * ny) >= 0 ? 1 : -1, sd1 = side(cur), sd2 = side(next);
-      let h = hk.turns * 2; if ((h % 2 === 1) !== (sd1 !== sd2)) h += 1; // 위 줄을 넘는 횟수: 한 번 꼬임 = 밑으로 한 번 + 위로 한 번
+      let h = hk.turns * 2; if ((h % 2 === 1) !== (sd1 !== sd2)) h = Math.max(1, h - 1);
       const at = (u, y) => ({ x: S1.x + ex * L * u + nx * y, y: S1.y + ey * L * u + ny * y });
-      const steps = Math.max(16, h * 12), endY = sd1 * amp * (h % 2 ? -1 : 1);
-      pts.push(...quad(cur, at(-.15, sd1 * amp), at(0, sd1 * amp), 12).slice(1));
+      const steps = Math.max(12, h * 10), endY = sd1 * amp * (h % 2 ? -1 : 1);
+      pts.push(...quad(cur, at(0, sd1 * amp * 2.2), at(0, sd1 * amp), 10).slice(1));
       const base = pts.length - 1;
       for (let i = 1; i <= steps; i++) { const u = i / steps; pts.push(at(u, sd1 * amp * Math.cos(Math.PI * h * u))); }
-      for (let c = 1; c < h; c += 2) { const uc = (c + .5) / h, hw = .5 / h * .8; fronts.push([base + Math.max(0, Math.floor((uc - hw) * steps)), base + Math.min(steps, Math.ceil((uc + hw) * steps))]); }
+      const startFront = hk.sign > 0 ? 1 : 0; // 감긴 방향에 따라 위로 넘는 자리가 바뀐다
+      for (let c = startFront; c < h; c += 2) { const uc = (c + .5) / h, hw = .5 / h * .8; fronts.push([base + Math.max(0, Math.floor((uc - hw) * steps)), base + Math.min(steps, Math.ceil((uc + hw) * steps))]); }
       cur = at(1, endY);
-      if (idx + 1 === hooks.length) pts.push(...quad(cur, at(1.15, endY), B0, 12).slice(1));
-      else { const nxt = hooks[idx + 1].X; pts.push({ x: (cur.x + nxt.x) / 2, y: (cur.y + nxt.y) / 2 }); cur = pts[pts.length - 1]; }
+      if (idx + 1 === hooks.length) pts.push(...quad(cur, at(1, endY * 2.2), B0, 10).slice(1));
     });
     return { pts, fronts };
   }
@@ -458,7 +469,13 @@
     const shakeT = S.shake ? (now - S.shake.t0) / 350 : 1;
     if (S.flash && flashT <= 0) S.flash = null; if (S.shake && shakeT >= 1) S.shake = null;
     const prev = S.preview ? S.preview.map(d => d.id) : [], geoms = [];
-    for (const rope of S.ropes) {
+    // 그리는 순서: 쌓인 순서대로, 다만 핀이 넘어와 다른 줄 위에 놓인 줄(ov)은 그 줄들 뒤에 그린다
+    const order = S.ropes.slice();
+    for (const r of S.ropes) if (r.ov && r.ov.length) {
+      const hi = Math.max(...r.ov.map(id => order.findIndex(q => q.id === id))), at = order.indexOf(r);
+      if (hi > at) { order.splice(at, 1); order.splice(hi, 0, r); }
+    }
+    for (const rope of order) {
       const opt = { now };
       if (S.flash && S.flash.ids.includes(rope.id)) { opt.flash = Math.max(0, Math.sin(flashT * Math.PI * 3)) * .6; opt.flashColor = S.flash.warn; }
       if (prev.includes(rope.id)) { opt.flash = .35 + Math.sin(now / 120) * .2; opt.flashColor = true; }
@@ -536,7 +553,7 @@
   function warnTangle(id, end) {
     const i = ropeIdx(id), ids = Rules.entangled(S.holes, S.ropes, i, S.cm, S.tw).map(j => S.ropes[j].id);
     S.flash = { ids, t0: performance.now(), warn: true };
-    setCoach(`${ids.map(ropeName).join(' · ')}에 걸려 있어요. 이대로 옮기면 꼬여요!`, 2600, true);
+    setCoach(`${ids.map(ropeName).join(' · ')}이 덮고 있어요. 그 줄 너머로 옮기면 꼬여요!`, 2600, true);
   }
   // 집은 핀을 hole 에 놓으면 생길 꼬임 변화(미리 보기)
   function previewAt(id, end, hole) {
@@ -565,7 +582,7 @@
       if (tw1 > tw0) {
         sfx.twist(); const worse = delta.filter(d => Math.abs(d.w1) > Math.abs(d.w0)).map(d => d.id);
         S.flash = { ids: worse, t0: performance.now(), warn: true };
-        setCoach(`${ropeName(id)}이 ${worse.map(ropeName).join(' · ')} 밑으로 지나가다 걸렸어요! 같은 길로 되돌려야 풀려요.`, 4200, true);
+        setCoach(`${ropeName(id)}이 덮고 있던 ${worse.map(ropeName).join(' · ')}과 꼬였어요! 같은 길로 되돌리면 풀려요.`, 4200, true);
       } else if (tw1 < tw0) { sfx.untwist(); setCoach(tw1 ? `걸린 줄 하나가 풀렸어요. 꼬임 ${tw1}개 남았어요.` : '꼬임이 모두 풀렸어요!', 2600); }
       else { sfx.drop(); setCoach(tw1 ? `꼬임 ${tw1}개 — 걸린 줄을 같은 길로 되돌려야 줄이 빠져요.` : S.tip, 0, !!tw1); }
       return true;
@@ -621,7 +638,7 @@
     const pv = previewAt(S.held.id, S.held.end, S.held.hover), was = S.preview;
     S.preview = pv;
     const newHooks = pv ? pv.filter(d => Math.abs(d.w1) > Math.abs(d.w0)) : [];
-    if (newHooks.length && (!was || was.map(d => d.id).join() !== pv.map(d => d.id).join())) setCoach(`여기 놓으면 ${newHooks.map(d => ropeName(d.id)).join(' · ')} 밑에 걸려요!`, 1800, true);
+    if (newHooks.length && (!was || was.map(d => d.id).join() !== pv.map(d => d.id).join())) setCoach(`여기 놓으면 덮고 있는 ${newHooks.map(d => ropeName(d.id)).join(' · ')}과 꼬여요!`, 1800, true);
   });
   const release = (e, cancel) => {
     if (!S || !S.held || e.pointerId !== pointerId) return;

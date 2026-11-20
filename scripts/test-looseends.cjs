@@ -50,35 +50,35 @@ console.log('PASS rules: cross / cover / settle');
 }
 console.log('PASS twist: wind / unwind / no release while wound');
 
-// 덮이지 않은 밑 줄도 위 줄 밑으로 지나가면 걸린다(운영자 2026-11-21 「밑 줄을 옮길 때 위 줄 때문에 꼬여야」)
+// 꼬이는 상대는 나를 덮고 있는 줄뿐: 덮이지 않은 줄이 다른 줄 밑을 지나가도 꼬이지 않는다(운영자 2026-11-21 「꼬임의 원인이 되는 옆의 줄만」)
 {
   const holes = R.layout(8, 0);
-  const ropes = [{ a: 0, b: 1, id: 0 }, { a: 3, b: 7, id: 1 }]; // 0 은 아래, 1 은 위 — 엇갈리지 않음
-  assert.equal(R.freed(holes, ropes).length, 2, '시작은 엇갈림 없음');
-  const one = R.applyMove(ropes, 0, 'b', 5, holes, {}); // 0-1 의 핀 1 → 5: 줄 1(3-7) 밑을 지나간다
-  assert.equal(Math.abs(R.twOf(one.tw, 0, 1)), 1, '밑 줄 핀이 위 줄 밑을 지나가면 걸린다');
-  assert.equal(R.settle(holes, one.ropes, one.tw).gone.length, 0, '걸린 채로는 빠지지 않는다');
-  const back = R.applyMove(one.ropes, one.ropes.findIndex(r => r.id === 0), 'b', 1, holes, one.tw);
-  assert.equal(R.twCount(back.tw), 0, '같은 길로 되돌리면 풀린다');
-  const over = R.applyMove(ropes, 1, 'a', 2, holes, {}); // 위 줄 3-7 의 핀 3 → 2: 아래 줄 0-1 위로 지나감
-  assert.equal(R.twCount(over.tw), 0, '위 줄이 아래 줄 위로 지나가는 것은 걸리지 않는다');
+  const ropes = [{ a: 0, b: 1, id: 0 }, { a: 3, b: 7, id: 1 }]; // 0 은 아래지만 1 과 엇갈리지 않음(덮이지 않음)
+  const one = R.applyMove(ropes, 0, 'b', 5, holes, {});
+  assert.equal(R.twCount(one.tw), 0, '덮지 않은 줄 밑을 지나가면 꼬이지 않는다');
+  // 덮인 줄 + 다른 줄: 덮은 줄과만 꼬인다
+  const h12 = R.layout(12, 0);
+  const rs = [{ a: 0, b: 6, id: 0 }, { a: 2, b: 4, id: 1 }, { a: 3, b: 9, id: 2 }]; // 0 은 2(3-9)에 덮임, 1(2-4)은 0 과 안 엇갈림
+  const d = R.twistDelta(h12, rs, 0, 'b', 1, null, {}); // 6 → 1: 2-4 와 3-9 를 모두 지나감
+  assert.deepEqual(d.map(x => x.id), [2], '덮고 있던 줄과만 꼬인다');
 }
-console.log('PASS hook: lower rope passing under an upper rope gets caught');
+console.log('PASS twist only with the rope covering the moved rope');
 
-// 꼬이는 기준: 핀 길이 위 줄을 가로지를 때만. 같은 쪽으로 또 건너가면 두 번, 반대로 건너가면 풀림, 끝을 돌아가는 것은 안 셈
+// 꼬이는 기준: 덮인 줄의 핀을 덮고 있는 줄 너머로 옮길 때만. 반대로 넘기면 풀리고 처음과 같아진다
 {
   const holes = R.layout(12, 0);
-  const ropes = [{ a: 0, b: 1, id: 0 }, { a: 3, b: 9, id: 1 }]; // 아래 줄 0-1, 위 줄 3-9(세로 가운데)
-  const one = R.applyMove(ropes, 0, 'b', 5, holes, {}); // 1 → 5: 위 줄을 가로지름(오른쪽 → 왼쪽 쪽)
-  assert.equal(Math.abs(R.twOf(one.tw, 0, 1)), 1, '한 번 건너가면 한 번 꼬임');
-  let i0 = one.ropes.findIndex(r => r.id === 0);
-  const around = R.applyMove(one.ropes, i0, 'b', 7, holes, one.tw); // 5 → 7: 같은 쪽 안에서 움직임(가로지르지 않음)
-  assert.equal(R.twOf(around.tw, 0, 1), R.twOf(one.tw, 0, 1), '가로지르지 않으면 그대로');
-  i0 = one.ropes.findIndex(r => r.id === 0);
-  const back = R.applyMove(one.ropes, i0, 'b', 1, holes, one.tw); // 5 → 1: 반대로 건너감
-  assert.equal(R.twCount(back.tw), 0, '반대로 건너가면 풀림');
-  const i1 = one.ropes.findIndex(r => r.id === 0), other = R.applyMove(one.ropes, i1, 'a', 2, holes, one.tw); // 0 → 2: 위 줄 안 건넘
-  assert.equal(Math.abs(R.twOf(other.tw, 0, 1)), 1, '다른 핀을 위 줄 안 건너게 옮기면 그대로');
+  const ropes = [{ a: 0, b: 6, id: 0 }, { a: 3, b: 9, id: 1 }]; // 0 이 아래, 1 이 위에서 덮음(엇갈림)
+  const one = R.applyMove(ropes, 0, 'b', 1, holes, {}); // 6 → 1: 덮은 줄 3-9 를 넘어감
+  assert.equal(Math.abs(R.twOf(one.tw, 0, 1)), 1, '덮은 줄 너머로 옮기면 한 번 꼬임');
+  const i0 = one.ropes.findIndex(r => r.id === 0);
+  const stay = R.applyMove(one.ropes, i0, 'b', 2, holes, one.tw); // 1 → 2: 같은 쪽 안에서
+  assert.equal(R.twOf(stay.tw, 0, 1), R.twOf(one.tw, 0, 1), '덮은 줄을 넘지 않으면 그대로');
+  const back = R.applyMove(one.ropes, i0, 'b', 6, holes, one.tw); // 1 → 6: 되돌림
+  assert.equal(R.twCount(back.tw), 0, '되돌리면 풀림');
+  assert.deepEqual(back.ropes.map(r => [r.id, r.a, r.b]), ropes.map(r => [r.id, r.a, r.b]), '되돌리면 처음과 똑같다(밑 줄은 밑에)');
+  const slide = R.applyMove(ropes, 0, 'b', 7, holes, {}); // 6 → 7: 덮은 줄을 넘지 않음
+  assert.equal(R.twCount(slide.tw), 0, '덮은 줄을 넘지 않고 옮기면 안 꼬임');
+  assert.deepEqual(slide.ropes.map(r => r.id), [0, 1], '여전히 덮인 채 밑에 있다');
 }
 console.log('PASS twist rule: only crossing the upper rope counts, direction = side to side');
 
@@ -147,6 +147,19 @@ console.log('PASS 40 levels solvable, targets match, total target moves', totalT
   for (const mv of t1.solution) { const ri = cur.findIndex(r => r.id === mv.id); const nx = R.applyMove(cur, ri, mv.end, mv.to, t1.holes, tw); cur = nx.ropes; tw = nx.tw; }
   assert.equal(R.settle(t1.holes, cur, tw).gone.length, cur.length, 'twisted start solution clears');
   console.log('PASS twisted start generator, target', t1.target);
+}
+
+
+// 40판 모든 꼬이는 수: 같은 길로 되돌리면 처음과 똑같다(꼬임 0 · 엇갈린 쌍의 위아래 그대로) — 운영자 2026-11-21 「되돌리면 밑에 있어야」
+{
+  const sig = (h, rs) => { const m = R.crossMatrix(h, rs), o = []; for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) if (m[i][j]) o.push(rs[i].id + '<' + rs[j].id); return rs.map(r => r.id + ':' + Math.min(r.a, r.b) + '-' + Math.max(r.a, r.b)).sort().join() + '|' + o.sort().join(); };
+  let n = 0;
+  LV.forEach((d, li) => { const h = R.layout(d.ring, d.inner), r0 = d.ropes.map(([a, b], k) => ({ a, b, id: k }));
+    for (const m of R.moves(h, r0, undefined, {}, { all: true })) { if (!m.delta.length) continue; n++;
+      const id = r0[m.rope].id, from = r0[m.rope][m.end], one = R.applyMove(r0, m.rope, m.end, m.to, h, {}), i = one.ropes.findIndex(r => r.id === id), back = R.applyMove(one.ropes, i, m.end, from, h, one.tw);
+      assert.equal(R.twCount(back.tw), 0, `level ${li + 1} back leaves twist`);
+      assert.equal(sig(h, back.ropes), sig(h, r0), `level ${li + 1} back restores order`); } });
+  console.log('PASS twist then move back restores the start exactly', n);
 }
 
 // 점수 상한: 본편 40판 최대 + 끝없는 실 한도가 서버 상한 이하
