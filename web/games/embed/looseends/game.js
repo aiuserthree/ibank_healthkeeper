@@ -131,7 +131,7 @@
   const holeXY = i => { const h = S.holes[i]; return { x: geo.cx + h.x * geo.R * .88, y: geo.cy + h.y * geo.R * .88 }; };
   const endPos = (rope, end) => (S.held && S.held.id === rope.id && S.held.end === end) ? { x: S.held.x, y: S.held.y } : holeXY(rope[end]);
   const pegR = () => Math.max(9, geo.R * .066);
-  const ropeW = () => Math.max(5, geo.R * .046);
+  const ropeW = () => Math.max(7, geo.R * .068);
   const toLocal = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
 
   // ---------- 그리기 ----------
@@ -244,17 +244,17 @@
   }
 
   // 줄 길: A → B, bend 만큼 가운데가 옆으로 휜다(튕김). off 는 법선 방향으로 평행 이동(밝은 면 · 결).
-  let VIA = null; // 지금 그리는 줄이 걸려 꺾이는 자리(위 줄 위의 점)
+  let PATH = null; // 꼬인 줄: 미리 계산한 점 줄 [{x,y}] — 있으면 이 길로 그린다
   function ropePath(A, B, bend, off = 0) {
     const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
-    if (VIA) { // 위 줄(들)에 걸려 둥글게 꺾인다 — 걸린 자리를 A → B 차례로 지난다
-      const pts = [A, ...VIA, B];
-      ctx.beginPath(); ctx.moveTo(A.x + nx * off, A.y + ny * off);
-      for (let k = 1; k < pts.length - 1; k++) {
-        const P = pts[k], Q = pts[k - 1], R2 = pts[k + 1], rr = Math.min(ropeW() * 2.6, Math.hypot(P.x - Q.x, P.y - Q.y) * .4, Math.hypot(P.x - R2.x, P.y - R2.y) * .4);
-        ctx.arcTo(P.x + nx * off, P.y + ny * off, R2.x + nx * off, R2.y + ny * off, Math.max(1, rr));
+    if (PATH) {
+      ctx.beginPath();
+      for (let k = 0; k < PATH.length; k++) {
+        const P = PATH[k], Q = PATH[Math.min(PATH.length - 1, k + 1)], R0 = PATH[Math.max(0, k - 1)];
+        const tx = Q.x - R0.x, ty = Q.y - R0.y, tl = Math.hypot(tx, ty) || 1, ox = -ty / tl * off, oy = tx / tl * off;
+        if (k) ctx.lineTo(P.x + ox, P.y + oy); else ctx.moveTo(P.x + ox, P.y + oy);
       }
-      ctx.lineTo(B.x + nx * off, B.y + ny * off); return;
+      return;
     }
     ctx.beginPath(); ctx.moveTo(A.x + nx * off, A.y + ny * off);
     if (Math.abs(bend) > .3) ctx.quadraticCurveTo((A.x + B.x) / 2 + nx * (bend * 2 + off), (A.y + B.y) / 2 + ny * (bend * 2 + off), B.x + nx * off, B.y + ny * off);
@@ -266,7 +266,7 @@
     const L = Math.hypot(B.x - A.x, B.y - A.y), nx = -(B.y - A.y) / (L || 1);
     const hiSide = nx < 0 ? -1 : 1; // 화면 위쪽(빛이 오는 쪽)으로 밝은 면
     const twistGrain = (c, a) => { // 꼰 실의 비스듬한 결
-      ctx.save(); ctx.strokeStyle = c; ctx.globalAlpha *= a; ctx.lineWidth = w * .82; ctx.setLineDash([w * .34, w * .5]); ctx.lineCap = 'butt'; line(); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.strokeStyle = c; ctx.globalAlpha *= a; ctx.lineWidth = w * .86; ctx.setLineDash([w * .22, w * .36]); ctx.lineCap = 'butt'; line(); ctx.stroke(); ctx.restore();
     };
     if (style === 'candy') {
       ctx.strokeStyle = '#fff6ec'; ctx.lineWidth = w; line(); ctx.stroke();
@@ -293,8 +293,8 @@
     } else {
       ctx.strokeStyle = color; ctx.lineWidth = w; line(); ctx.stroke();
       ctx.strokeStyle = shade(color, -.3); ctx.lineWidth = w * .34; line(hiSide * w * .26); ctx.globalAlpha *= .7; ctx.stroke(); ctx.globalAlpha /= .7;
-      twistGrain(shade(color, -.42), .55);
-      ctx.strokeStyle = shade(color, .5); ctx.lineWidth = w * .2; line(-hiSide * w * .2); ctx.stroke();
+      twistGrain(shade(color, -.45), .6);
+      ctx.strokeStyle = shade(color, .55); ctx.lineWidth = w * .22; line(-hiSide * w * .22); ctx.stroke();
     }
   }
   function wobbleOf(rope, now) {
@@ -305,7 +305,7 @@
   function drawRope(rope, opt = {}) {
     const A = endPos(rope, 'a'), B = endPos(rope, 'b'), color = COLORS[rope.id % 8], w = ropeW(), off = opt.off || { x: 0, y: 0 };
     const bend = opt.gone ? 0 : wobbleOf(rope, opt.now || 0);
-    VIA = opt.gone ? null : (opt.via || null);
+    PATH = opt.gone ? null : (opt.path || null);
     ctx.save(); ctx.globalAlpha = opt.alpha == null ? 1 : opt.alpha; ctx.translate(off.x, off.y);
     if (opt.spin) { const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2; ctx.translate(mx, my); ctx.rotate(opt.spin); ctx.translate(-mx, -my); }
     // 그림자(아래 줄 위로 진다) — 넓고 옅은 것 + 좁고 진한 것
@@ -332,7 +332,7 @@
       if (!mvOk && !held && !opt.gone) { ctx.fillStyle = 'rgba(40,25,10,.22)'; circle(px, py, rr * .95); ctx.fill(); }
       symbol(px, py, rr * .48, rope.id);
     }
-    ctx.restore(); VIA = null;
+    ctx.restore(); PATH = null;
   }
 
   // 걸린 쌍: 아래 줄(x)이 위 줄(y)의 한 점에 걸려 꺾인다. 그 점은 걸릴 때 핀이 위 줄을 지난 자리(hookT, 위 줄 위의 0~1).
@@ -346,34 +346,48 @@
     t = Math.max(.15, Math.min(.85, t));
     return { x: C.x + (D.x - C.x) * t, y: C.y + (D.y - C.y) * t, ang: Math.atan2(D.y - C.y, D.x - C.x) };
   }
-  function viaOf(rope) {
-    const A = endPos(rope, 'a'), B = endPos(rope, 'b'), dx = B.x - A.x, dy = B.y - A.y, pts = [];
-    for (const pr of Rules.twPairs(S.tw)) if (pr.x === rope.id) { const h = S.ropes[ropeIdx(pr.y)]; if (h) pts.push(hookPoint(rope, h)); }
-    if (!pts.length) return null;
-    return pts.sort((p, q) => ((p.x - A.x) * dx + (p.y - A.y) * dy) - ((q.x - A.x) * dx + (q.y - A.y) * dy));
-  }
-  function drawTwists(now) {
-    const pairs = Rules.twPairs(S.tw); if (!pairs.length) return [];
-    const w = ropeW(), spots = [];
-    for (const pr of pairs) {
-      const r = S.ropes[ropeIdx(pr.x)], s = S.ropes[ropeIdx(pr.y)]; if (!r || !s) continue;
-      const X = hookPoint(r, s), cr = COLORS[r.id % 8], cs = COLORS[s.id % 8], n = Math.abs(pr.w);
-      ctx.save(); ctx.lineCap = 'round'; ctx.translate(X.x, X.y); ctx.rotate(X.ang);
-      // 아래 줄이 위 줄 밑으로 들어갔다가 위로 넘어와 휘감는다: 감긴 수만큼 위 줄을 비스듬히 넘는 띠
-      const lean = pr.w > 0 ? 1 : -1, breathe = gentle() ? 0 : Math.sin(now / 320) * w * .08;
-      for (let k = 0; k < n; k++) {
-        const x = (k + .5) * w * 1.6 * lean, h = w * 2.3 + breathe;
-        const band = () => { ctx.beginPath(); ctx.moveTo(x - w * .95 * lean, -h); ctx.quadraticCurveTo(x + w * .2 * lean, 0, x + w * .95 * lean, h); };
-        ctx.strokeStyle = 'rgba(55,30,8,.25)'; ctx.lineWidth = w * 1.5; ctx.save(); ctx.translate(w * .2, w * .45); band(); ctx.stroke(); ctx.restore();
-        ctx.strokeStyle = 'rgba(70,40,15,.8)'; ctx.lineWidth = w * 1.3; band(); ctx.stroke();
-        ctx.strokeStyle = cr; ctx.lineWidth = w; band(); ctx.stroke();
-        ctx.save(); ctx.strokeStyle = shade(cr, -.42); ctx.globalAlpha = .5; ctx.lineWidth = w * .82; ctx.setLineDash([w * .34, w * .5]); ctx.lineCap = 'butt'; band(); ctx.stroke(); ctx.restore();
-        ctx.strokeStyle = shade(cr, .5); ctx.lineWidth = w * .2; ctx.save(); ctx.translate(-w * .15, -w * .1); band(); ctx.stroke(); ctx.restore();
-      }
-      ctx.restore();
-      spots.push({ P: X, n, dir: pr.w > 0 ? 1 : -1 });
+  // 걸린 줄의 길: 아래 줄 r 이 위 줄 s 를 따라 감긴 수만큼 위아래로 번갈아 넘나들며 휘감긴다.
+  // 돌려주는 값: { pts: [{x,y}], fronts: [[i0,i1]] } — fronts 는 위 줄보다 앞(위)을 지나는 토막(나중에 덧그린다)
+  function quad(P0, C, P1, n) { const out = []; for (let i = 0; i <= n; i++) { const t = i / n, u = 1 - t; out.push({ x: u * u * P0.x + 2 * u * t * C.x + t * t * P1.x, y: u * u * P0.y + 2 * u * t * C.y + t * t * P1.y }); } return out; }
+  function ropeGeom(rope) {
+    if (S.held && S.held.id === rope.id) return null;
+    const pr = Rules.twPairs(S.tw).find(p => p.x === rope.id); if (!pr) return null;
+    const host = S.ropes[ropeIdx(pr.y)]; if (!host) return null;
+    const w = ropeW(), turns = Math.abs(pr.w), X = hookPoint(rope, host);
+    const C = endPos(host, 'a'), D = endPos(host, 'b'), hl = Math.hypot(D.x - C.x, D.y - C.y) || 1;
+    const ex = (D.x - C.x) / hl, ey = (D.y - C.y) / hl, nx = -ey, ny = ex;
+    const L = Math.min(hl * .7, w * (3 + 2.2 * turns)), amp = w * 1.05;
+    // 꼬임 구간을 위 줄 안쪽으로
+    const tX = Math.max(L / 2 + w, Math.min(hl - L / 2 - w, (X.x - C.x) * ex + (X.y - C.y) * ey));
+    const S1 = { x: C.x + ex * (tX - L / 2), y: C.y + ey * (tX - L / 2) }, S2 = { x: C.x + ex * (tX + L / 2), y: C.y + ey * (tX + L / 2) };
+    let E1 = endPos(rope, 'a'), E2 = endPos(rope, 'b');
+    if ((E1.x - C.x) * ex + (E1.y - C.y) * ey > (E2.x - C.x) * ex + (E2.y - C.y) * ey) [E1, E2] = [E2, E1];
+    const side = P => ((P.x - S1.x) * nx + (P.y - S1.y) * ny) >= 0 ? 1 : -1, sd1 = side(E1), sd2 = side(E2);
+    let h = turns * 2; if ((h % 2 === 1) !== (sd1 !== sd2)) h += 1; // 위 줄을 넘는 횟수(끝 두 핀의 쪽에 맞춘다)
+    const off = (u, y) => ({ x: S1.x + ex * L * u + nx * y, y: S1.y + ey * L * u + ny * y });
+    const steps = Math.max(18, h * 10), pts = [], fronts = [];
+    const p0 = off(0, sd1 * amp), p1 = off(1, sd1 * amp * (h % 2 ? -1 : 1));
+    pts.push(...quad(E1, off(-.35, sd1 * amp * 1.3), p0, 14));
+    const base = pts.length - 1;
+    for (let i = 1; i <= steps; i++) { const u = i / steps; pts.push(off(u, sd1 * amp * Math.cos(Math.PI * h * u))); }
+    pts.push(...quad(p1, off(1.35, sd1 * amp * (h % 2 ? -1 : 1) * 1.3), E2, 14).slice(1));
+    // 넘는 자리마다 앞/뒤 번갈아: 첫 번째는 위 줄 밑, 두 번째는 위, …
+    for (let c = 0; c < h; c++) if (c % 2 === 1) {
+      const uc = (c + .5) / h, half = .5 / h * .75;
+      fronts.push([base + Math.max(0, Math.floor((uc - half) * steps)), base + Math.min(steps, Math.ceil((uc + half) * steps))]);
     }
-    return spots;
+    return { pts, fronts };
+  }
+  function drawFronts(geoms) {
+    const w = ropeW();
+    for (const { rope, g } of geoms) for (const [i0, i1] of g.fronts) {
+      PATH = g.pts.slice(i0, i1 + 1); const A = PATH[0], B = PATH[PATH.length - 1], color = COLORS[rope.id % 8];
+      ctx.save(); ctx.lineCap = 'round';
+      ctx.save(); ctx.translate(w * .3, w * .7); ctx.strokeStyle = 'rgba(55,30,8,.22)'; ctx.lineWidth = w * 1.25; ropePath(A, B, 0); ctx.stroke(); ctx.restore();
+      ctx.strokeStyle = 'rgba(70,40,15,.75)'; ctx.lineWidth = w * 1.32; ropePath(A, B, 0); ctx.stroke();
+      ropeBody(A, B, color, rec.settings.thread, w, 0);
+      ctx.restore(); PATH = null;
+    }
   }
   function drawTwistBadges(spots) {
     const r = Math.max(10, geo.R * .052), placed = [];
@@ -437,16 +451,16 @@
     const flashT = S.flash ? 1 - (now - S.flash.t0) / 900 : 0;
     const shakeT = S.shake ? (now - S.shake.t0) / 350 : 1;
     if (S.flash && flashT <= 0) S.flash = null; if (S.shake && shakeT >= 1) S.shake = null;
-    const prev = S.preview ? S.preview.map(d => d.id) : [];
+    const prev = S.preview ? S.preview.map(d => d.id) : [], geoms = [];
     for (const rope of S.ropes) {
       const opt = { now };
       if (S.flash && S.flash.ids.includes(rope.id)) { opt.flash = Math.max(0, Math.sin(flashT * Math.PI * 3)) * .6; opt.flashColor = S.flash.warn; }
       if (prev.includes(rope.id)) { opt.flash = .35 + Math.sin(now / 120) * .2; opt.flashColor = true; }
       if (S.shake && S.shake.id === rope.id) opt.shake = { end: S.shake.end, dx: Math.sin(shakeT * Math.PI * 6) * (1 - shakeT) * 6 };
-      if (!(S.held && S.held.id === rope.id)) opt.via = viaOf(rope);
+      const g = ropeGeom(rope); if (g) { opt.path = g.pts; geoms.push({ rope, g }); }
       drawRope(rope, opt);
     }
-    const spots = drawTwists(now);
+    drawFronts(geoms);
     // 빠져나가는 줄
     S.anim = S.anim.filter(a => {
       const t = (now - a.t0) / a.dur; if (t >= 1) return false;
@@ -455,7 +469,6 @@
       const l = Math.hypot(mx, my) || 1, dx = mx / l, dy = my / l, dist = geo.R * (gentle() ? .12 : .9) * e;
       drawRope(a.rope, { alpha: 1 - e * e, off: { x: dx * dist, y: dy * dist - geo.R * .25 * Math.sin(e * Math.PI) }, spin: gentle() ? 0 : e * a.spin, gone: true, now }); return true;
     });
-    drawTwistBadges(spots);
     drawHint(now);
     // 키보드 / 패드 커서
     if (S.kb && !S.won) {
