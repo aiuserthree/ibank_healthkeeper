@@ -12,7 +12,12 @@ const LV = require('../web/games/embed/looseends/levels.js');
   assert.equal(R.movable(holes, ropes, 1, m), true, '맨 위 줄은 움직일 수 있다');
   assert.equal(R.movable(holes, ropes, 0, m), false, '덮인 줄은 못 움직인다');
   const moved = R.applyMove(ropes, 1, 'a', 7), after = R.settle(holes, moved);
-  assert.ok(after.gone.length >= 1, '교차가 풀리면 줄이 빠진다');
+  assert.equal(after.gone.length, ropes.length, '모든 교차가 풀리면 줄이 한꺼번에 빠진다');
+  const stage = LV[1], stageRopes = stage.ropes.map(([a, b], id) => ({ a, b, id }));
+  const [move] = R.solve(holes, stageRopes);
+  const oneMove = R.applyMove(stageRopes, stageRopes.findIndex(r => r.id === move.id), move.end, move.to);
+  assert.ok(R.freed(holes, oneMove).length > 0, '첫 수로 일부 줄의 교차가 풀린다');
+  assert.deepEqual(R.settle(holes, oneMove), { ropes: oneMove, gone: [] }, '일부만 풀렸을 때 모든 줄과 핀이 남는다');
 }
 console.log('PASS rules: cross / cover / settle');
 

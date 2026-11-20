@@ -113,7 +113,8 @@
   function resize() {
     const r = canvas.getBoundingClientRect(); W = Math.max(1, r.width); H = Math.max(1, r.height); DPR = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
-    const narrow = W < 640, short = H < 430 && !narrow, top = narrow ? 70 : short ? 54 : 80, bot = narrow ? 156 : short ? 58 : 76;
+    const narrow = matchMedia('(max-width: 640px)').matches;
+    const short = H <= 430 && !narrow, top = narrow ? 70 : short ? 54 : 80, bot = narrow ? 156 : short ? 58 : 76;
     const availH = H - top - bot;
     geo = { cx: W / 2, cy: top + availH / 2, R: Math.max(60, Math.min(W * (narrow ? .47 : .4), availH / 2 * .99)) };
     bgCache = null;
@@ -374,7 +375,8 @@
     const now = performance.now();
     for (const r of gone) { S.anim.push({ rope: r, t0: now, dur: gentle() ? 260 : 560 }); sparkle(holeXY(r.a), COLORS[r.id % 8]); sparkle(holeXY(r.b), COLORS[r.id % 8]); }
     recalc(); hud(); setCoach(S.tip);
-    setTimeout(() => { if (!S) return; S.busy = false; hud(); if (!S.ropes.length) win(); }, gentle() ? 300 : 620);
+    const cleared = S;
+    setTimeout(() => { if (S !== cleared) return; S.busy = false; win(); }, gentle() ? 300 : 620);
     return true;
   }
   function undo() {
@@ -510,7 +512,7 @@
   function openHelp(back) {
     const el = openModal('help', '게임 방법', `
       <div class="step"><i>1</i><span>맨 위에 있는 핀을 끌어서 빈 구멍에 놓아요.</span></div>
-      <div class="step"><i>2</i><span>다른 줄과 엇갈리지 않으면 줄이 스르르 빠져요. 전부 풀어 보세요!</span></div>
+      <div class="step"><i>2</i><span>모든 줄이 서로 엇갈리지 않게 옮기면 한꺼번에 빠져요.</span></div>
       <div class="step"><i>3</i><span>막혔다면 한 수 되돌리거나 되돌리기를 눌러요.</span></div>
       <p class="note">키보드: 방향키로 고르고, Enter로 집기 · 놓기, U 되돌리기, H 힌트, Esc 멈춤<br>게임패드: 십자키 + A, B 취소, X 되돌리기, Y 힌트</p>
       <button class="btn teal" data-focus>시작하기!</button>`, { onClose: back });
@@ -617,7 +619,8 @@
   // ---------- 끝 ----------
   function win() {
     S.won = true; const over = Math.max(0, S.moves - S.target), stars = over === 0 ? 3 : over <= 2 ? 2 : 1;
-    const levelScore = 1000 + stars * 500 + Math.max(0, 300 - over * 100), before = total(), starsBefore = starTotal();
+    const levelScore = 1000 + stars * 500 + Math.max(0, 300 - over * 100), starsBefore = starTotal();
+    const campaignCleared = S.kind === 'map' && !rec.stars[S.idx] && rec.stars.every((star, index) => index === S.idx || star > 0);
     if (S.kind === 'map') {
       const i = S.idx; rec.stars[i] = Math.max(rec.stars[i], stars); rec.moves[i] = rec.moves[i] ? Math.min(rec.moves[i], S.moves) : S.moves; rec.score[i] = Math.max(rec.score[i], levelScore);
       rec.cur = Math.min(39, i + 1);
@@ -628,7 +631,7 @@
       d.date = today;
     } else { rec.endless.cleared++; }
     save(); sfx.win(); hud();
-    const after = total(); if (after > before) send('hk:score', { score: after }); else send('hk:live', { score: after });
+    send(campaignCleared ? 'hk:score' : 'hk:live', { score: total() });
     const newly = THREADS.concat(LOOMS).filter(x => x.need > starsBefore && x.need <= starTotal());
     const nx = THREADS.find(x => !threadOk(x));
     const praise = stars === 3 ? '한 수도 낭비 없이!' : stars === 2 ? '아주 좋아요!' : '해냈어요!';

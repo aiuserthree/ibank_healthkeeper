@@ -752,7 +752,9 @@ window.HKPlay = (function () {
       let now = null;
       try { now = scoreFn ? Math.max(0, Math.round(Number(scoreFn()) || 0)) : null; } catch (_) { now = null; }
       // 시작하자마자 나가며 기록만 남기는 걸 막는다 — 30초가 안 됐으면 기록 남기기는 없이
-      const tooShort = now != null && (Date.now() - runStartAt) / 1000 < SAVE_MIN_SEC;
+      // 실타래 풀기는 풀어 놓은 퍼즐의 누적 점수라, 바로 나가도 완료 기록을 남길 수 있다.
+      if (key === "looseends" && now === 0) now = null;
+      const tooShort = key !== "looseends" && now != null && (Date.now() - runStartAt) / 1000 < SAVE_MIN_SEC;
       if (tooShort) now = null;
       let leaveNote = null;
       try { leaveNote = leaveNoteFn ? leaveNoteFn() : null; } catch (_) { leaveNote = null; }

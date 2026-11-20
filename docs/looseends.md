@@ -6,7 +6,7 @@
 
 - 판 둘레(와 안쪽)에 구멍이 있고 줄마다 양 끝 핀이 구멍에 걸려 있다. 줄은 위아래 순서가 있다.
 - 다른 줄과 엇갈리는 줄 가운데 **위에 얹힌 줄이 없을 때만** 그 줄의 핀을 끌 수 있다. 덮인 줄을 누르면 흔들리고, 덮고 있는 줄이 깜박인다.
-- 핀을 빈 구멍에 놓으면 한 수(1 이동). 옮긴 줄은 맨 위로 올라간다. 어떤 줄과도 엇갈리지 않게 되면 줄이 스르르 빠진다. 전부 빼면 클리어.
+- 핀을 빈 구멍에 놓으면 한 수(1 이동). 옮긴 줄은 맨 위로 올라간다. 모든 줄이 서로 엇갈리지 않게 되면 한꺼번에 빠지며 클리어된다. 그 전까지 모든 줄과 핀은 판에 남는다.
 - 별: 이동 수가 목표(풀이기가 구한 최소 수)와 같으면 3개, +2 이내 2개, 그 밖에 1개.
 
 ## 기능
@@ -20,13 +20,13 @@
 ## 아케이드
 
 - 순위 점수 = 단계별 최고 점수 합(단계당 최대 2,800) + 끝없는 실 푼 수 × 250(최대 400판). 서버 상한 250,000.
-- 점수가 오를 때마다 `hk:live`, 새 최고치에서 `hk:score`. `HKEmbed` 규약(`hk:ready/start/live/score/pause/resume/paused/resumed/restart/esc`)을 쓰고 부모 출처와 창을 검사한다.
+- 일반 퍼즐을 풀면 브라우저에 진행을 저장하고 `hk:live`로 현재 점수를 알린다. 순위 점수는 본편 40단계를 모두 완료했을 때(`hk:score`) 또는 아케이드에서 「기록 남기고 나가기」를 선택했을 때 저장한다. `HKEmbed`는 부모 출처와 창을 검사한다.
 
 ## 파일
 
 - 틀: `web/games/looseends.html` · 본체: `web/games/embed/looseends.html`
 - 규칙 · 풀이기 · 생성기: `web/games/embed/looseends/rules.js` (Node 시험과 공용)
-- 본편 40판(자동 생성): `web/games/embed/looseends/levels.js` ← `node scripts/build-looseends-levels.cjs`
+- 본편 40판: `web/games/embed/looseends/levels.js`. 일괄 제거 규칙으로 바꿀 때 기존 판 배치를 유지하고 40단계 목표만 8수로 다시 계산했다. `node scripts/build-looseends-levels.cjs`는 현재 규칙으로 판 배치를 새로 생성한다.
 - 렌더링 · 입력 · 저장 · 연동: `web/games/embed/looseends/game.js`, 모양: `style.css`
 
 ## 검증

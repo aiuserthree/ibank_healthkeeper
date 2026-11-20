@@ -4,7 +4,7 @@
  *  - 판 둘레(와 안쪽)에 구멍이 있고, 줄마다 양 끝 핀이 서로 다른 구멍에 걸려 있다.
  *  - 줄은 위아래 순서(z)가 있다. 다른 줄과 교차할 때 자기가 모두 「위」에 있어야 움직일 수 있다.
  *  - 움직일 수 있는 줄의 핀 하나를 빈 구멍으로 옮긴다(한 번 = 1수). 옮긴 줄은 맨 위로 올라간다.
- *  - 어떤 줄과도 교차하지 않는 줄은 스르르 빠져나간다. 모든 줄을 빼면 끝.
+ *  - 모든 줄의 교차를 풀면 줄이 한꺼번에 빠져나간다. 그 전에는 모든 핀이 판에 남는다.
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
@@ -71,7 +71,7 @@
     for (let j = i + 1; j < ropes.length; j++) if (m[i][j]) out.push(j);
     return out;
   }
-  // 아무 줄과도 교차하지 않는 줄들(빠져나갈 줄)
+  // 아무 줄과도 교차하지 않는 줄들
   function freed(holes, ropes) {
     const m = crossMatrix(holes, ropes), out = [];
     for (let i = 0; i < ropes.length; i++) if (!m[i].some(Boolean)) out.push(i);
@@ -82,7 +82,7 @@
     for (const r of ropes) { set.add(r.a); set.add(r.b); }
     return set;
   }
-  // 한 수 적용: 새 상태(빠질 줄은 아직 안 뺌 = pending) 반환
+  // 한 수 적용: 옮긴 줄을 맨 위로 올린 새 상태 반환
   function applyMove(ropes, ri, end, hole) {
     const next = ropes.map(r => ({ ...r }));
     const [r] = next.splice(ri, 1);
@@ -91,15 +91,14 @@
     return next;
   }
   function settle(holes, ropes) {
-    const gone = freed(holes, ropes);
-    if (!gone.length) return { ropes, gone: [] };
-    const set = new Set(gone);
-    return { ropes: ropes.filter((_, i) => !set.has(i)), gone: gone.map(i => ropes[i]) };
+    return freed(holes, ropes).length === ropes.length
+      ? { ropes: [], gone: ropes }
+      : { ropes, gone: [] };
   }
   const keyOf = ropes => ropes.map(r => (r.a < r.b ? r.a + '-' + r.b : r.b + '-' + r.a)).join('|');
 
-  function moves(holes, ropes) {
-    const out = [], m = crossMatrix(holes, ropes), occ = occupied(ropes);
+  function moves(holes, ropes, m = crossMatrix(holes, ropes)) {
+    const out = [], occ = occupied(ropes);
     const empties = [];
     for (let h = 0; h < holes.length; h++) if (!occ.has(h)) empties.push(h);
     for (let i = 0; i < ropes.length; i++) {
@@ -109,36 +108,45 @@
     return out;
   }
 
-  // 가장 적은 수의 풀이(너비 우선). 한도를 넘으면 null.
+  // 서로 다른 줄로 이루어진 교차 쌍 하나마다 최소 한 번 옮겨야 한다.
+  function moveLowerBound(matrix) {
+    const matched = new Set();
+    for (let i = 0; i < matrix.length; i++) {
+      if (matched.has(i)) continue;
+      for (let j = i + 1; j < matrix.length; j++) {
+        if (!matrix[i][j] || matched.has(j)) continue;
+        matched.add(i); matched.add(j);
+        break;
+      }
+    }
+    return matched.size / 2;
+  }
+
+  // 깊이 제한을 한 수씩 늘려 최소 풀이를 찾는다. 한도를 넘으면 null.
   function solve(holes, ropes, opts) {
     const cap = (opts && opts.nodes) || 120000, maxDepth = (opts && opts.depth) || 12;
-    const start = settle(holes, ropes).ropes;
-    if (!start.length) return [];
-    const seen = new Map([[keyOf(start), null]]);
-    let frontier = [{ ropes: start, key: keyOf(start) }], depth = 0, nodes = 0;
-    const info = new Map([[keyOf(start), { ropes: start, from: null, mv: null }]]);
-    while (frontier.length && depth < maxDepth) {
-      const nextFrontier = [];
-      depth++;
-      for (const node of frontier) {
-        for (const mv of moves(holes, node.ropes)) {
-          if (++nodes > cap) return null;
-          const moved = applyMove(node.ropes, mv.rope, mv.end, mv.to);
-          const { ropes: after } = settle(holes, moved);
-          const key = keyOf(after);
-          if (seen.has(key)) continue;
-          // 어떤 줄이 어떤 구멍으로 갔는지 되돌려 쓰려고 원래 줄의 id 를 남긴다
-          const rec = { ropes: after, from: node.key, mv: { id: node.ropes[mv.rope].id, end: mv.end, to: mv.to } };
-          seen.set(key, true); info.set(key, rec);
-          if (!after.length) {
-            const path = []; let k = key;
-            while (info.get(k).from !== null) { path.push(info.get(k).mv); k = info.get(k).from; }
-            return path.reverse();
-          }
-          nextFrontier.push({ ropes: after, key });
-        }
+    const visited = new Map(), path = [];
+    let nodes = 0;
+    function search(current, remaining) {
+      if (++nodes > cap) return false;
+      const key = keyOf(current);
+      if (visited.get(key) >= remaining) return false;
+      visited.set(key, remaining);
+      const matrix = crossMatrix(holes, current);
+      const bound = moveLowerBound(matrix);
+      if (bound === 0) return true;
+      if (bound > remaining) return false;
+      for (const mv of moves(holes, current, matrix)) {
+        path.push({ id: current[mv.rope].id, end: mv.end, to: mv.to });
+        if (search(applyMove(current, mv.rope, mv.end, mv.to), remaining - 1)) return true;
+        path.pop();
+        if (nodes > cap) return false;
       }
-      frontier = nextFrontier;
+      return false;
+    }
+    const start = moveLowerBound(crossMatrix(holes, ropes));
+    for (let depth = start; depth <= maxDepth && nodes <= cap; depth++) {
+      if (search(ropes, depth)) return path;
     }
     return null;
   }
@@ -155,7 +163,7 @@
       // 위아래 순서는 무작위로 섞는다
       for (let i = ropes.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [ropes[i], ropes[j]] = [ropes[j], ropes[i]]; }
       const m = crossMatrix(holes, ropes);
-      // 시작부터 빠질 줄이 있으면 퍼즐이 시시하다 — 모든 줄이 한 번은 교차해야 한다
+      // 시작할 때는 모든 줄이 한 번 이상 교차해야 한다.
       if (m.some(row => !row.some(Boolean))) continue;
       const sol = solve(holes, ropes, { nodes: opts.nodes || 90000, depth: opts.maxMoves + 1 });
       if (!sol || sol.length < (opts.minMoves || 1) || sol.length > opts.maxMoves) continue;
