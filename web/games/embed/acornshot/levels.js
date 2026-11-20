@@ -6,30 +6,31 @@
   'use strict';
   // 0~11: 처음 12단계. 물리 결과가 바뀌면 안 되므로 자리 · 칸을 그대로 둔다(`place` 만 덧붙임).
   // 예외: 7단계 「돌담 너머」 탄 끝 폭탄 하나(2026-11-20 운영자 지시 — 해법 · 다른 값 그대로).
+  // 2026-11-21 운영자 「적이 너무 안죽어」: 40단계 모두 적 체력 4~8 · 탄 수(보통 탄부터 뺌)를 다시 맞춤, 4 · 7 · 20단계는 첫 탄을 폭탄/세 갈래가 아닌 것으로(한 발 끝 막기).
   // `ground` 는 [x, y] 꺾은선(y 는 바닥 574 로 잘림), 망루마다 평평한 받침이 깔린다.
   const LEGACY = [
-    { name: '숲 입구', place: 'forest', theme: 'meadow', tip: '평평한 풀밭. 아래쪽 나무 기둥을 노려 보세요.', ammo: ['seed', 'seed', 'bomb'], towers: [[800, 1, 'wood']], enemyHp: 7, blockHp: 1.2 },
-    { name: '반짝이는 온실', place: 'forest', theme: 'meadow', tip: '완만한 언덕 위의 얼음탑이에요.', ammo: ['seed', 'split', 'seed'], towers: [[790, 2, 'ice']], enemyHp: 17, blockHp: 2,
+    { name: '숲 입구', place: 'forest', theme: 'meadow', tip: '평평한 풀밭. 아래쪽 나무 기둥을 노려 보세요.', ammo: ['seed', 'seed', 'bomb'], towers: [[800, 1, 'wood']], enemyHp: 4, blockHp: 1.2 },
+    { name: '반짝이는 온실', place: 'forest', theme: 'meadow', tip: '완만한 언덕 위의 얼음탑이에요.', ammo: ['seed', 'split', 'seed'], towers: [[790, 2, 'ice']], enemyHp: 6, blockHp: 2,
       ground: [[0, 574], [520, 574], [700, 536], [1280, 536]] },
-    { name: '쌍둥이 망루', place: 'forest', theme: 'cliff', tip: '높은 언덕 위 망루와 낮은 평지의 망루, 두 높이를 모두 노려요.', ammo: ['split', 'seed', 'seed', 'bomb'], towers: [[700, 2, 'wood'], [1040, 2, 'ice']], enemyHp: 14, blockHp: 1.7,
+    { name: '쌍둥이 망루', place: 'forest', theme: 'cliff', tip: '높은 언덕 위 망루와 낮은 평지의 망루, 두 높이를 모두 노려요.', ammo: ['split', 'seed', 'seed', 'bomb'], towers: [[700, 2, 'wood'], [1040, 2, 'ice']], enemyHp: 5, blockHp: 1.7,
       ground: [[0, 574], [440, 574], [600, 510], [830, 510], [920, 574], [1280, 574]] },
-    { name: '오래된 돌문', place: 'forest', theme: 'stone', tip: '계단처럼 높아지는 지형. 위쪽 망루가 아래쪽을 짓눌러요.', ammo: ['bomb', 'seed', 'seed', 'split'], towers: [[740, 2, 'stone'], [1040, 2, 'wood']], enemyHp: 14, blockHp: 1.6,
+    { name: '오래된 돌문', place: 'forest', theme: 'stone', tip: '계단처럼 높아지는 지형. 위쪽 망루가 아래쪽을 짓눌러요.', ammo: ['seed', 'bomb', 'split'], towers: [[740, 2, 'stone'], [1040, 2, 'wood']], enemyHp: 5, blockHp: 1.6,
       ground: [[0, 574], [560, 574], [620, 546], [860, 546], [920, 510], [1280, 510]] },
-    { name: '바람 언덕', place: 'forest', theme: 'cliff', tip: '앞 망루를 무너뜨린 뒤, 높게 쏴서 절벽 위 망루를 노려요.', ammo: ['seed', 'split', 'bomb', 'seed', 'seed', 'seed'], towers: [[690, 3, 'wood'], [1040, 2, 'stone']], enemyHp: 12, blockHp: 1.5,
+    { name: '바람 언덕', place: 'forest', theme: 'cliff', tip: '앞 망루를 무너뜨린 뒤, 높게 쏴서 절벽 위 망루를 노려요.', ammo: ['seed', 'split', 'bomb', 'seed'], towers: [[690, 3, 'wood'], [1040, 2, 'stone']], enemyHp: 5, blockHp: 1.5,
       ground: [[0, 574], [880, 574], [950, 470], [1280, 470]] },
-    { name: '유리 숲', place: 'forest', theme: 'ice', tip: '두 언덕 사이의 골짜기. 얼음탑이 무너지면 골짜기로 쏟아져요.', ammo: ['split', 'seed', 'bomb', 'seed', 'bomb', 'seed'], towers: [[670, 3, 'ice'], [1040, 3, 'wood']], enemyHp: 16, blockHp: 1.9,
+    { name: '유리 숲', place: 'forest', theme: 'ice', tip: '두 언덕 사이의 골짜기. 얼음탑이 무너지면 골짜기로 쏟아져요.', ammo: ['split', 'seed', 'bomb', 'bomb'], towers: [[670, 3, 'ice'], [1040, 3, 'wood']], enemyHp: 6, blockHp: 1.9,
       ground: [[0, 574], [520, 574], [580, 508], [780, 508], [850, 574], [930, 574], [990, 504], [1280, 504]] },
-    { name: '돌담 너머', place: 'forest', theme: 'stone', tip: '돌담 위로 높이 쏘고, 폭탄은 망루 가까이에서 터뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'seed', 'seed', 'bomb'], towers: [[650, 3, 'stone'], [1040, 3, 'wood']], enemyHp: 26, blockHp: 2.5,
+    { name: '돌담 너머', place: 'forest', theme: 'stone', tip: '돌담 위로 높이 쏘고, 폭탄은 망루 가까이에서 터뜨려요.', ammo: ['split', 'bomb', 'seed', 'bomb', 'seed', 'seed', 'seed', 'bomb'], towers: [[650, 3, 'stone'], [1040, 3, 'wood']], enemyHp: 8, blockHp: 2.5,
       ground: [[0, 574], [380, 574], [440, 466], [520, 466], [580, 574], [1280, 574]] },
-    { name: '도토리 성채', place: 'forest', theme: 'castle', tip: '계단식 절벽 위의 거대한 성채. 아래 받침부터 무너뜨려요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'seed', 'bomb'], towers: [[700, 3, 'wood'], [1040, 3, 'stone']], enemyHp: 15, blockHp: 1.7,
+    { name: '도토리 성채', place: 'forest', theme: 'castle', tip: '계단식 절벽 위의 거대한 성채. 아래 받침부터 무너뜨려요.', ammo: ['bomb', 'split', 'bomb', 'bomb'], towers: [[700, 3, 'wood'], [1040, 3, 'stone']], enemyHp: 6, blockHp: 1.7,
       ground: [[0, 574], [500, 574], [560, 528], [800, 528], [860, 474], [1280, 474]] },
-    { name: '이끼 협곡', place: 'valley', theme: 'meadow', tip: '협곡 건너 세 망루가 멀리 이어져요. 세 갈래 도토리로 넓게 흔들어 보세요.', ammo: ['split', 'seed', 'bomb', 'seed', 'split', 'seed', 'bomb'], towers: [[720, 2, 'wood'], [1060, 2, 'ice'], [1360, 2, 'wood']], enemyHp: 13, blockHp: 1.45,
+    { name: '이끼 협곡', place: 'valley', theme: 'meadow', tip: '협곡 건너 세 망루가 멀리 이어져요. 세 갈래 도토리로 넓게 흔들어 보세요.', ammo: ['split', 'seed', 'bomb', 'split', 'bomb'], towers: [[720, 2, 'wood'], [1060, 2, 'ice'], [1360, 2, 'wood']], enemyHp: 5, blockHp: 1.45,
       ground: [[0, 574], [470, 574], [560, 500], [760, 500], [850, 574], [990, 574], [1070, 520], [1210, 520], [1300, 486], [1500, 486]] },
-    { name: '부서진 다리', place: 'valley', theme: 'cliff', tip: '낮은 다리와 높은 절벽이 번갈아 나와요. 각도를 바꿔 차례로 공략하세요.', ammo: ['bomb', 'seed', 'split', 'seed', 'bomb', 'seed', 'seed'], towers: [[760, 2, 'stone'], [1120, 3, 'wood'], [1390, 2, 'ice']], enemyHp: 15, blockHp: 1.65,
+    { name: '부서진 다리', place: 'valley', theme: 'cliff', tip: '낮은 다리와 높은 절벽이 번갈아 나와요. 각도를 바꿔 차례로 공략하세요.', ammo: ['bomb', 'seed', 'split', 'seed', 'bomb', 'seed'], towers: [[760, 2, 'stone'], [1120, 3, 'wood'], [1390, 2, 'ice']], enemyHp: 6, blockHp: 1.65,
       ground: [[0, 574], [520, 574], [600, 540], [800, 540], [860, 574], [1000, 574], [1070, 462], [1240, 462], [1300, 530], [1500, 530]] },
-    { name: '서리 봉우리', place: 'valley', theme: 'ice', tip: '서로 다른 높이의 얼음 봉우리예요. 높은 탄도로 뒤쪽까지 넘겨 보세요.', ammo: ['split', 'bomb', 'seed', 'split', 'seed', 'bomb', 'seed'], towers: [[700, 3, 'ice'], [1040, 2, 'stone'], [1370, 3, 'ice']], enemyHp: 16, blockHp: 1.75,
+    { name: '서리 봉우리', place: 'valley', theme: 'ice', tip: '서로 다른 높이의 얼음 봉우리예요. 높은 탄도로 뒤쪽까지 넘겨 보세요.', ammo: ['split', 'bomb', 'seed', 'split', 'bomb'], towers: [[700, 3, 'ice'], [1040, 2, 'stone'], [1370, 3, 'ice']], enemyHp: 6, blockHp: 1.75,
       ground: [[0, 574], [500, 574], [570, 490], [790, 490], [850, 560], [940, 560], [1010, 430], [1160, 430], [1230, 574], [1300, 500], [1500, 500]] },
-    { name: '고목 왕성', place: 'valley', theme: 'castle', tip: '가장 넓은 전장과 세 개의 성채예요. 앞 성채의 붕괴를 뒤쪽까지 이어 보세요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'split', 'seed', 'bomb', 'seed'], towers: [[760, 3, 'wood'], [1120, 2, 'stone'], [1390, 2, 'wood']], enemyHp: 15, blockHp: 1.6,
+    { name: '고목 왕성', place: 'valley', theme: 'castle', tip: '가장 넓은 전장과 세 개의 성채예요. 앞 성채의 붕괴를 뒤쪽까지 이어 보세요.', ammo: ['bomb', 'split', 'seed', 'bomb', 'split', 'bomb'], towers: [[760, 3, 'wood'], [1120, 2, 'stone'], [1390, 2, 'wood']], enemyHp: 6, blockHp: 1.6,
       ground: [[0, 574], [520, 574], [590, 532], [850, 532], [920, 486], [1220, 486], [1280, 448], [1500, 448]] },
   ];
   // 12~39: 넓은 전장 28단계 — 이끼 계곡 13~16 · 안개 늪 17~24 · 눈 덮인 산 25~32 · 밤의 성채 33~40.
@@ -37,7 +38,7 @@
   const VALLEY = [
     { name: '굴림돌 비탈', place: 'valley', theme: 'cliff', width: 1600,
       tip: '언덕 위 바위를 받친 노란 쐐기를 맞혀 보세요. 바위가 골짜기로 굴러가요.',
-      ammo: ['seed', 'seed', 'split', 'seed', 'bomb'], enemyHp: 14, blockHp: 1.5, sling: [205], power: 1.05,
+      ammo: ['seed', 'seed', 'split', 'bomb'], enemyHp: 5, blockHp: 1.5, sling: [205], power: 1.05,
       ground: [[0, 574], [560, 574], [660, 420], [820, 420], [1040, 574], [1600, 574]],
       parts: [
         { type: 'pane', x: 730, enemy: true, material: 'ice' },
@@ -47,7 +48,7 @@
       ] },
     { name: '흔들다리 골짜기', place: 'valley', theme: 'cliff', width: 2000, bottom: 690,
       tip: '다리 받침을 부수면 다리 위 밤도깨비가 골짜기 아래로 떨어져요.',
-      ammo: ['seed', 'bomb', 'split', 'seed', 'seed', 'bomb'], enemyHp: 18, blockHp: 1.8, sling: [205], power: 1.15,
+      ammo: ['seed', 'bomb', 'split', 'seed', 'bomb'], enemyHp: 7, blockHp: 1.8, sling: [205], power: 1.15,
       ground: [[0, 520], [380, 520], [440, 574], [700, 574], [760, 450], [900, 450], [920, 690], [1260, 690], [1280, 450], [1440, 450], [1600, 560], [2000, 560]],
       bridges: [{ x0: 900, x1: 1280, y: 450, piers: 2, material: 'wood' }],
       water: [{ x0: 905, x1: 1275, y: 640, pit: true }],
@@ -60,7 +61,7 @@
       ] },
     { name: '통나무 둑', place: 'valley', theme: 'meadow', width: 2100, top: -150,
       tip: '높은 둑에서 내려 쏴요. 건너편 둑 꼭대기의 통나무를 풀면 내리막을 굴러 문을 덮쳐요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed'], enemyHp: 16, blockHp: 1.7, sling: [250], power: 1.1,
+      ammo: ['seed', 'split', 'seed', 'bomb'], enemyHp: 6, blockHp: 1.7, sling: [250], power: 1.1,
       ground: [[0, 440], [420, 440], [540, 574], [1180, 574], [1300, 410], [1440, 410], [1660, 574], [2100, 574]],
       parts: [
         { type: 'pyramid', x: 800, rows: 4, material: 'wood' },
@@ -70,7 +71,7 @@
       ] },
     { name: '이끼 절벽 요새', place: 'valley', theme: 'stone', width: 1800, top: -200,
       tip: '높은 절벽 위 요새예요. 높게 넘겨 쏘고, 공중 섬의 널은 한쪽만 쳐도 기울어요.',
-      ammo: ['split', 'seed', 'bomb', 'seed', 'split', 'seed', 'bomb', 'seed'], enemyHp: 18, blockHp: 1.8, sling: [205], power: 1.15,
+      ammo: ['split', 'seed', 'bomb', 'seed', 'split', 'bomb'], enemyHp: 7, blockHp: 1.8, sling: [205], power: 1.15,
       ground: [[0, 574], [1000, 574], [1080, 380], [1800, 380]],
       platforms: [{ x: 640, y: 330, w: 200, look: 'moss' }],
       parts: [
@@ -83,7 +84,7 @@
   const SWAMP = [
     { name: '안개 나루', place: 'swamp', theme: 'swamp', width: 1800, bottom: 660,
       tip: '늪에 빠진 밤도깨비는 물리쳐져요. 섬 위 널을 흔들어 물에 빠뜨려 보세요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed'], enemyHp: 14, blockHp: 1.5, sling: [205], power: 1.05,
+      ammo: ['seed', 'split', 'seed', 'bomb'], enemyHp: 5, blockHp: 1.5, sling: [205], power: 1.05,
       ground: [[0, 574], [650, 574], [700, 660], [1300, 660], [1350, 574], [1800, 574]],
       water: [{ x0: 700, x1: 1300, y: 600 }],
       platforms: [{ x: 860, y: 520, w: 170, look: 'moss' }, { x: 1150, y: 500, w: 150, look: 'wood' }],
@@ -94,7 +95,7 @@
       ] },
     { name: '버섯 징검다리', place: 'swamp', theme: 'swamp', width: 2000, bottom: 660, top: -200,
       tip: '높은 돌담 뒤가 안 보이죠? 앞의 버섯에 낮게 맞혀 튕겨 넘겨 보세요.',
-      ammo: ['seed', 'seed', 'split', 'bomb', 'seed', 'seed'], enemyHp: 15, blockHp: 1.6, sling: [205], power: 1.1,
+      ammo: ['seed', 'seed', 'split', 'bomb'], enemyHp: 6, blockHp: 1.6, sling: [205], power: 1.1,
       ground: [[0, 574], [1150, 574], [1200, 660], [1500, 660], [1550, 574], [2000, 574]],
       water: [{ x0: 1200, x1: 1500, y: 600 }],
       platforms: [{ x: 1350, y: 560, w: 150, look: 'wood' }],
@@ -106,7 +107,7 @@
       ] },
     { name: '송진 창고', place: 'swamp', theme: 'swamp', width: 1900,
       tip: '돌 벙커는 단단해요. 옆에 놓인 송진 통을 터뜨리면 줄줄이 터져요.',
-      ammo: ['seed', 'seed', 'split', 'seed', 'bomb', 'seed'], enemyHp: 14, blockHp: 1.8, sling: [205], power: 1.05,
+      ammo: ['seed', 'seed', 'split', 'bomb'], enemyHp: 5, blockHp: 1.8, sling: [205], power: 1.05,
       ground: [[0, 574], [1300, 574], [1340, 640], [1480, 640], [1520, 574], [1900, 574]],
       bottom: 640, water: [{ x0: 1340, x1: 1480, y: 600 }],
       parts: [
@@ -119,7 +120,7 @@
       ] },
     { name: '떠 있는 섬들', place: 'swamp', theme: 'swamp', width: 2200, bottom: 680, top: -250,
       tip: '늪 위에 섬이 셋. 섬 가장자리의 짐을 밀어 물로 떨어뜨리면 쉬워요.',
-      ammo: ['split', 'seed', 'seed', 'bomb', 'seed', 'split'], enemyHp: 16, blockHp: 1.6, sling: [205], power: 1.2,
+      ammo: ['seed', 'split', 'bomb', 'split'], enemyHp: 6, blockHp: 1.6, sling: [205], power: 1.2,
       ground: [[0, 574], [640, 574], [700, 680], [1900, 680], [1960, 574], [2200, 574]],
       water: [{ x0: 700, x1: 1900, y: 610 }],
       platforms: [{ x: 880, y: 480, w: 200, look: 'moss' }, { x: 1250, y: 400, w: 180, look: 'wood' }, { x: 1620, y: 500, w: 220, look: 'moss' }],
@@ -131,7 +132,7 @@
       ] },
     { name: '반딧불 둔덕', place: 'swamp', theme: 'swamp', width: 2400, bottom: 670, top: -350,
       tip: '높은 둔덕에서 멀리 쏴요. 건너편 버섯에 떨어뜨리면 망루 꼭대기까지 튀어요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'seed', 'seed'], enemyHp: 13, blockHp: 1.5, sling: [260], power: 1.3,
+      ammo: ['seed', 'split', 'bomb', 'split'], enemyHp: 5, blockHp: 1.5, sling: [260], power: 1.3,
       ground: [[0, 400], [420, 400], [560, 574], [800, 574], [850, 670], [1600, 670], [1650, 574], [2400, 574]],
       water: [{ x0: 850, x1: 1600, y: 610 }],
       parts: [
@@ -142,7 +143,7 @@
       ] },
     { name: '늪 위 매달린 우리', place: 'swamp', theme: 'swamp', width: 2100, bottom: 680, top: -150,
       tip: '나무 들보에 매달린 우리의 밧줄을 끊으면 우리째 늪에 빠져요.',
-      ammo: ['seed', 'seed', 'split', 'seed', 'bomb', 'seed'], enemyHp: 17, blockHp: 1.8, sling: [205], power: 1.15,
+      ammo: ['seed', 'seed', 'split', 'seed', 'bomb'], enemyHp: 6, blockHp: 1.8, sling: [205], power: 1.15,
       ground: [[0, 574], [700, 574], [760, 680], [1560, 680], [1620, 574], [2100, 574]],
       water: [{ x0: 760, x1: 1560, y: 610 }],
       platforms: [{ x: 1150, y: 170, w: 520, h: 22, look: 'wood' }],
@@ -156,7 +157,7 @@
       ] },
     { name: '가라앉은 성터', place: 'swamp', theme: 'swamp', width: 2300, bottom: 680, top: -250,
       tip: '섬마다 벙커와 통이 하나씩. 통 하나로 이웃 섬까지 불을 옮겨요.',
-      ammo: ['seed', 'split', 'seed', 'seed', 'bomb', 'seed', 'split', 'seed'], enemyHp: 16, blockHp: 1.7, sling: [205], power: 1.2,
+      ammo: ['seed', 'split', 'seed', 'seed', 'bomb', 'split'], enemyHp: 6, blockHp: 1.7, sling: [205], power: 1.2,
       ground: [[0, 574], [600, 574], [660, 680], [2300, 680]],
       water: [{ x0: 660, x1: 2300, y: 610 }],
       platforms: [{ x: 860, y: 520, w: 230, look: 'stone' }, { x: 1180, y: 480, w: 250, look: 'stone' }, { x: 1500, y: 520, w: 230, look: 'stone' }, { x: 1950, y: 440, w: 300, look: 'moss' }],
@@ -168,7 +169,7 @@
       ] },
     { name: '늪의 왕', place: 'swamp', theme: 'swamp', width: 2400, bottom: 680, top: -350,
       tip: '늪 한가운데 왕의 망루. 버섯 · 통 · 물을 모두 써야 도토리가 남아요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'seed'], enemyHp: 22, blockHp: 2.1, sling: [205], power: 1.3,
+      ammo: ['seed', 'split', 'bomb', 'split'], enemyHp: 8, blockHp: 2.1, sling: [205], power: 1.3,
       ground: [[0, 574], [560, 574], [620, 680], [1500, 680], [1560, 574], [2400, 574]],
       water: [{ x0: 620, x1: 1500, y: 610 }],
       platforms: [{ x: 820, y: 500, w: 190, look: 'moss' }, { x: 1260, y: 450, w: 340, look: 'wood' }],
@@ -184,7 +185,7 @@
   const SNOW = [
     { name: '눈덩이 비탈', place: 'snow', theme: 'snow', width: 2000, top: -150,
       tip: '언덕 꼭대기의 눈덩이를 풀어 보세요. 턱의 얼음 창을 깨고 한 번 더 굴러 내려가요.',
-      ammo: ['seed', 'seed', 'split', 'seed', 'bomb'], enemyHp: 15, blockHp: 1.6, sling: [205], power: 1.15,
+      ammo: ['seed', 'seed', 'split', 'seed', 'bomb'], enemyHp: 6, blockHp: 1.6, sling: [205], power: 1.15,
       ground: [[0, 574], [600, 574], [820, 330], [920, 330], [1080, 430], [1240, 430], [1420, 574], [2000, 574]],
       parts: [
         { type: 'boulder', x: 950, r: 36, look: 'snow' },
@@ -195,7 +196,7 @@
       ] },
     { name: '얼음 계단', place: 'snow', theme: 'ice', width: 2200, top: -250,
       tip: '계단마다 얼음 창 뒤에 하나씩. 위 계단이 무너지면 아래 계단을 덮쳐요.',
-      ammo: ['split', 'seed', 'seed', 'split', 'seed', 'bomb'], enemyHp: 16, blockHp: 1.7, sling: [205], power: 1.2,
+      ammo: ['split', 'seed', 'seed', 'split', 'bomb'], enemyHp: 6, blockHp: 1.7, sling: [205], power: 1.2,
       ground: [[0, 574], [800, 574], [820, 510], [1100, 510], [1120, 440], [1400, 440], [1420, 370], [1720, 370], [1740, 300], [2200, 300]],
       parts: [
         { type: 'pane', x: 950, enemy: true },
@@ -205,7 +206,7 @@
       ] },
     { name: '고드름 동굴', place: 'snow', theme: 'ice', width: 2400, top: -300,
       tip: '동굴 천장의 고드름을 맞히면 아래로 떨어져요. 낮게 쏴야 동굴 안까지 닿아요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'seed', 'seed'], enemyHp: 10, blockHp: 1.1, sling: [205], power: 1.3,
+      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split'], enemyHp: 4, blockHp: 1.1, sling: [205], power: 1.3,
       ground: [[0, 430], [360, 430], [520, 574], [1150, 574], [1250, 500], [2100, 500], [2180, 574], [2400, 574]],
       roof: [[1250, 140], [2100, 140]],
       parts: [
@@ -218,7 +219,7 @@
       ] },
     { name: '얼음 처마', place: 'snow', theme: 'ice', width: 2500, top: -200,
       tip: '벽 뒤에 숨은 밤도깨비는 바로 위 고드름을 맞혀 떨어뜨려요. 처마 밑으로 살짝 올려 쏘세요.',
-      ammo: ['seed', 'seed', 'split', 'bomb', 'seed', 'split', 'seed', 'bomb'], enemyHp: 15, blockHp: 1.2, sling: [205], power: 1.3,
+      ammo: ['seed', 'seed', 'split', 'bomb', 'seed', 'split', 'bomb'], enemyHp: 6, blockHp: 1.2, sling: [205], power: 1.3,
       ground: [[0, 574], [2500, 574]],
       // 입구 처마(1,160)가 가장 낮고 안쪽으로 조금씩 더 낮아진다 — 처마 밑으로 올려 쏜 탄이 입구 바로 안 고드름에 닿는다.
       roof: [[1150, -240], [1160, 250], [1700, 280], [2200, 300], [2260, -240]],
@@ -232,7 +233,7 @@
       ] },
     { name: '눈사태 골짜기', place: 'snow', theme: 'snow', width: 2700, top: -300, bottom: 620,
       tip: '양쪽 비탈에 눈덩이가 하나씩. 둘 다 풀면 골짜기 가운데서 맞부딪쳐요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'seed'], enemyHp: 19, blockHp: 1.9, sling: [205], power: 1.35,
+      ammo: ['seed', 'split', 'seed', 'bomb', 'seed'], enemyHp: 7, blockHp: 1.9, sling: [205], power: 1.35,
       ground: [[0, 574], [700, 574], [900, 380], [1000, 380], [1300, 620], [1900, 620], [2200, 380], [2300, 380], [2400, 450], [2700, 450]],
       parts: [
         { type: 'boulder', x: 1030, r: 34, look: 'snow' },
@@ -244,7 +245,7 @@
       ] },
     { name: '절벽 위 초소', place: 'snow', theme: 'snow', width: 2600, top: -350,
       tip: '높은 절벽 위 초소예요. 처마 밑 고드름을 맞혀 초소 지붕을 깨 보세요.',
-      ammo: ['seed', 'split', 'seed', 'seed', 'bomb', 'seed', 'split', 'seed'], enemyHp: 14, blockHp: 1.5, sling: [205], power: 1.35,
+      ammo: ['seed', 'split', 'seed', 'seed', 'bomb', 'split'], enemyHp: 5, blockHp: 1.5, sling: [205], power: 1.35,
       ground: [[0, 574], [1150, 574], [1250, 320], [2600, 320]],
       platforms: [{ x: 1600, y: 70, w: 360, h: 26, look: 'ice' }],
       parts: [
@@ -256,7 +257,7 @@
       ] },
     { name: '얼음 성문', place: 'snow', theme: 'ice', width: 2800, top: -350,
       tip: '얼음 동굴 깊은 곳의 성문. 고드름과 눈덩이를 차례로 풀어 문을 무너뜨려요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'seed', 'bomb', 'seed'], enemyHp: 11, blockHp: 1.2, sling: [205], power: 1.4,
+      ammo: ['seed', 'split', 'seed', 'bomb', 'split', 'bomb'], enemyHp: 4, blockHp: 1.2, sling: [205], power: 1.4,
       ground: [[0, 574], [900, 574], [1100, 420], [1200, 420], [1450, 574], [2800, 574]],
       roof: [[1500, 150], [1600, 260], [2600, 260], [2700, 150]],
       parts: [
@@ -270,7 +271,7 @@
       ] },
     { name: '봉우리 저격', place: 'snow', theme: 'snow', width: 2800, top: -400,
       tip: '높은 봉우리에서 멀리 내려 쏴요. 힘을 조금씩 바꿔 거리를 맞추세요.',
-      ammo: ['seed', 'split', 'seed', 'seed', 'bomb', 'seed'], enemyHp: 21, blockHp: 2.1, sling: [260], power: 1.4,
+      ammo: ['seed', 'split', 'seed', 'bomb'], enemyHp: 8, blockHp: 2.1, sling: [260], power: 1.4,
       ground: [[0, 330], [420, 330], [700, 574], [2800, 574]],
       platforms: [{ x: 1500, y: 360, w: 220, look: 'ice' }],
       parts: [
@@ -283,7 +284,7 @@
   const CASTLE = [
     { name: '성문 앞 추', place: 'castle', theme: 'castle', width: 2400, top: -250,
       tip: '아치에 매달린 돌 추를 쳐 보세요. 흔들리며 옆 망루를 부숴요.',
-      ammo: ['seed', 'seed', 'split', 'seed', 'bomb'], enemyHp: 12, blockHp: 1.3, sling: [205], power: 1.3,
+      ammo: ['seed', 'seed', 'split', 'bomb'], enemyHp: 5, blockHp: 1.3, sling: [205], power: 1.3,
       ground: [[0, 574], [2400, 574]],
       platforms: [{ x: 1300, y: 230, w: 260, h: 26, look: 'stone' }],
       parts: [
@@ -293,7 +294,7 @@
       ] },
     { name: '매달린 우리', place: 'castle', theme: 'castle', width: 2600, top: -250, bottom: 680,
       tip: '구덩이 위에 매달린 우리 셋. 밧줄 두 가닥을 함께 끊어 떨어뜨리고, 앞의 돌 벙커는 폭탄으로 열어요.',
-      ammo: ['seed', 'split', 'seed', 'seed', 'bomb', 'seed'], enemyHp: 17, blockHp: 1.8, sling: [205], power: 1.3,
+      ammo: ['seed', 'split', 'seed', 'bomb'], enemyHp: 6, blockHp: 1.8, sling: [205], power: 1.3,
       ground: [[0, 574], [900, 574], [940, 680], [1760, 680], [1800, 574], [2600, 574]],
       water: [{ x0: 940, x1: 1760, y: 640, pit: true }],
       platforms: [{ x: 1350, y: 150, w: 700, h: 24, look: 'wood' }],
@@ -306,7 +307,7 @@
       ] },
     { name: '화약고', place: 'castle', theme: 'castle', width: 2800, top: -300,
       tip: '성 안쪽에 송진 통이 줄지어 있어요. 첫 통에 불을 붙이면 벙커 셋이 차례로 열려요.',
-      ammo: ['seed', 'seed', 'split', 'seed', 'seed', 'bomb', 'seed'], enemyHp: 17, blockHp: 2, sling: [205], power: 1.4,
+      ammo: ['seed', 'seed', 'split', 'seed', 'bomb'], enemyHp: 6, blockHp: 2, sling: [205], power: 1.4,
       ground: [[0, 574], [2800, 574]],
       parts: [
         { type: 'wall', x: 900, rows: 3, cols: 2, material: 'stone', blockHp: .8 },
@@ -317,7 +318,7 @@
       ] },
     { name: '해자 성채', place: 'castle', theme: 'castle', width: 3000, top: -350, bottom: 690,
       tip: '해자 위 도개교의 받침을 깨면 다리째 물에 빠져요. 성벽 위도 잊지 마세요.',
-      ammo: ['seed', 'bomb', 'split', 'seed', 'seed', 'split', 'seed', 'seed'], enemyHp: 13, blockHp: 1.4, sling: [205], power: 1.45,
+      ammo: ['seed', 'bomb', 'split', 'seed', 'split'], enemyHp: 5, blockHp: 1.4, sling: [205], power: 1.45,
       ground: [[0, 574], [1100, 574], [1140, 690], [1700, 690], [1740, 574], [1830, 574], [1870, 470], [3000, 470]],
       bridges: [{ x0: 1100, x1: 1740, y: 574, piers: 2, material: 'wood' }],
       water: [{ x0: 1140, x1: 1700, y: 630 }],
@@ -329,7 +330,7 @@
       ] },
     { name: '망루 다섯 채', place: 'castle', theme: 'castle', width: 3200, top: -350, sling: [230], power: 1.5,
       tip: '성 둑을 따라 망루가 다섯. 앞 망루를 뒤쪽으로 쓰러뜨려 차례로 넘어뜨려요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'seed', 'bomb'], enemyHp: 18, blockHp: 1.9,
+      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'bomb'], enemyHp: 7, blockHp: 1.9,
       ground: [[0, 470], [380, 470], [500, 574], [1200, 574], [1300, 520], [3200, 520]],
       parts: [
         { type: 'tower', x: 1420, floors: 2, material: 'wood' },
@@ -340,7 +341,7 @@
       ] },
     { name: '이중 성벽', place: 'castle', theme: 'castle', width: 3000, top: -350,
       tip: '성벽이 두 겹이에요. 높게 넘겨 벽 뒤에 숨은 밤도깨비를 노리세요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'seed', 'bomb', 'seed'], enemyHp: 14, blockHp: 1.6, sling: [205], power: 1.45,
+      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'bomb'], enemyHp: 5, blockHp: 1.6, sling: [205], power: 1.45,
       ground: [[0, 574], [3000, 574]],
       parts: [
         { type: 'wall', x: 1100, rows: 5, cols: 2, material: 'stone', enemy: 'behind' },
@@ -351,7 +352,7 @@
       ] },
     { name: '추와 우리의 회랑', place: 'castle', theme: 'castle', width: 3400, top: -400,
       tip: '긴 회랑에 추 둘과 우리 하나. 추를 흔들어 망루를 치고, 망루 옆 송진 통으로 끝내요.',
-      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'seed', 'bomb', 'seed', 'seed'], enemyHp: 12, blockHp: 1.3, sling: [205], power: 1.6,
+      ammo: ['seed', 'split', 'seed', 'bomb', 'seed', 'split', 'bomb'], enemyHp: 5, blockHp: 1.3, sling: [205], power: 1.6,
       ground: [[0, 574], [3400, 574]],
       platforms: [{ x: 1500, y: 190, w: 260, h: 22, look: 'stone' }, { x: 2350, y: 170, w: 600, h: 22, look: 'wood' }],
       parts: [
@@ -365,7 +366,7 @@
       ] },
     { name: '밤의 왕성', place: 'castle', theme: 'castle', width: 3600, top: -400, bottom: 680, sling: [240], power: 1.7,
       tip: '마지막 왕성이에요. 해자 · 성벽 · 추 · 우리 · 화약고를 차례로 풀어야 도토리가 남아요.',
-      ammo: ['seed', 'split', 'bomb', 'seed', 'split', 'seed', 'bomb', 'seed', 'split', 'seed'], enemyHp: 14, blockHp: 1.5,
+      ammo: ['seed', 'split', 'bomb', 'seed', 'split', 'bomb', 'split'], enemyHp: 5, blockHp: 1.5,
       ground: [[0, 470], [400, 470], [520, 574], [1300, 574], [1340, 680], [1760, 680], [1800, 574], [3600, 574]],
       water: [{ x0: 1340, x1: 1760, y: 620 }],
       platforms: [{ x: 1550, y: 200, w: 340, h: 22, look: 'wood' }, { x: 2600, y: 200, w: 260, h: 22, look: 'stone' }],

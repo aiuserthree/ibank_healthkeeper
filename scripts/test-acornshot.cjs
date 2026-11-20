@@ -88,6 +88,7 @@ const firstTower = brokenSupport.state.blocks.filter(b => b.position.x < 900);
 const bottomPost = firstTower.find(b => b.game.h > b.game.w && b.position.y > 450);
 const topDeck = firstTower.filter(b => b.game.w > b.game.h).at(-1);
 const topDeckY = topDeck.position.y;
+brokenSupport.state.spent = P.LEVELS[3].ammo.indexOf('bomb'); // fire this stage's bomb
 brokenSupport.launch(135, 450);
 Body.setPosition(brokenSupport.state.active, { x: bottomPost.position.x, y: bottomPost.position.y });
 assert.equal(brokenSupport.ability(), true);
@@ -101,6 +102,7 @@ console.log('PASS broken lower structure cannot leave the upper tower floating.'
 // the projectile to overlap its body at the moment of activation.
 const nearBlast = P.create(6);
 const toughestGuard = nearBlast.state.targets[0];
+nearBlast.state.spent = P.LEVELS[6].ammo.indexOf('bomb'); // fire this stage's bomb
 nearBlast.launch(135, 450);
 Body.setPosition(nearBlast.state.active, { x: toughestGuard.position.x - 35, y: toughestGuard.position.y });
 assert.equal(nearBlast.ability(), true);
@@ -184,6 +186,7 @@ for (let l = 0; l < LEGACY; l++) {
   replay.dispose();
 }
 const bomb = P.create(3);
+bomb.state.spent = P.LEVELS[3].ammo.indexOf('bomb');
 bomb.launch(122, 450);
 const bombBody = bomb.state.active;
 assert.equal(bomb.ability(), true);

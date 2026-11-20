@@ -138,7 +138,7 @@ function randomRates(levelIndex, n = 40) {
 // timing ±80 ms, pull snapped to pixels) after a random 0.5–3 s wait in the aim phase. When
 // the saved shots run out, keep shooting greedily (best of the saved shots and a small grid,
 // judged on a replay of what actually happened) with the same jitter. Share of cleared runs.
-const ROBUST_GRID = [10, 18, 26, 34, 42, 50].flatMap(a => [60, 80, 100].map(p => [a, p]));
+const ROBUST_GRID = [10, 18, 26, 34, 42, 50].flatMap(a => [35, 60, 80, 100].map(p => [a, p]));
 function robust(levelIndex, shots, n = 20) {
   const level = P.LEVELS[levelIndex], rand = rng(levelIndex * 104729 + 3);
   const DEFAULT_ACT = { seed: 0, split: 900, bomb: -1 };

@@ -7,7 +7,7 @@
     const { Engine, Bodies, Body, Composite, Events, Vector, Constraint } = M;
   const STEP = 1000 / 120, FLOOR = 574, WORLD_WIDTH = 1500, SLING = { x: 205, y: 432 }, MAX_PULL = 86, SCORE_MAX = 20000;
   // The rotating sprite extends beyond its 22px collider (ears reach 38px).
-  const TARGET_MARGIN = 38, TARGET_BOUNCE = .25, TARGET_DAMAGE = 1.75;
+  const TARGET_MARGIN = 38, TARGET_BOUNCE = .25, TARGET_DAMAGE = 1.75, TARGET_GRAZE = 2, TARGET_FALL_FROM = 45, TARGET_FALL = .22;
   // New-stage limits: a stronger sling never moves a shot more than 17px per 120 Hz step,
   // so even the thinnest 12px pane cannot be tunnelled by the 13px split seeds.
   const SHOT_MAX_SPEED = 34, MAX_POWER = 1.7, BOUNCE_MAX_SPEED = 30;
@@ -413,6 +413,20 @@
         }
       }
     }
+    // Enemies (2026-11-21): a straight acorn hit, a fall of half a floor or more, a hard tumble
+    // or a falling plank defeat them; a graze, a slight push or a slow lean does not.
+    function targetHit(body, other, impact) {
+      let hit = Math.max(0, impact - TARGET_GRAZE);
+      if (other.game?.kind === 'shot') hit *= 3.8;
+      else if (other.game?.kind === 'block' || other.game?.kind === 'boulder' || other.game?.kind === 'bob') hit *= 2.4 * Math.max(1, Math.sqrt(other.mass) * .8);
+      else hit *= 2.4;
+      const top = body.game.fallTop ?? body.position.y, drop = body.position.y - top;
+      if (drop >= TARGET_FALL_FROM && body.velocity.y - other.velocity.y > 1) {
+        hit += (drop - TARGET_FALL_FROM + 10) * TARGET_FALL;
+        body.game.fallTop = body.position.y;
+      }
+      return hit;
+    }
     function damage(b, value) {
       if (!b.game || removed.has(b) || (b.game.kind !== 'block' && b.game.kind !== 'target')) return;
       b.game.hp -= value * (b.game.kind === 'target' ? TARGET_DAMAGE : 1);
@@ -445,6 +459,7 @@
               pendingImpacts.push({ body, other, energy });
             }
           }
+          if (body.game?.kind === 'target') { damage(body, targetHit(body, other, impact)); continue; }
           const multiplier = other.game?.kind === 'shot' ? 3.8 : 2.4;
           damage(body, (impact - 1.3) * multiplier);
         }
@@ -687,6 +702,9 @@
     }
     function containTargets() {
       for (const b of state.targets) {
+        // Highest point since the enemy last rested: how far it has fallen when it lands.
+        if (b.isSleeping || b.speed < .3) b.game.fallTop = b.position.y;
+        else b.game.fallTop = Math.min(b.game.fallTop ?? b.position.y, b.position.y);
         const { x, y } = b.position;
         const nx = Math.max(TARGET_MARGIN, Math.min(WORLD_WIDTH - TARGET_MARGIN, x));
         const ny = Math.max(WORLD_TOP + TARGET_MARGIN, Math.min(FLOOR - 22, y));
