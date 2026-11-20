@@ -165,7 +165,7 @@
     const pendingImpacts = [];
     const pendingBlasts = [], pendingBounces = [], pendingDrops = new Set(), pendingShatter = new Set();
     let firstHit = null, hitShown = false, blasting = false;
-    let settling = true, quiet = 0, winWait = 0, winQuiet = 0;
+    let settling = true, quiet = 0, winWait = 0, winQuiet = 0, sweep = 0;
     const add = b => { Composite.add(engine.world, b); return b; };
     add(Bodies.rectangle(WORLD_WIDTH / 2, FLOOR + 50, WORLD_WIDTH + 320, 100, { isStatic: true, friction: .8 }));
     // Terrain pieces: convex quads from the ground profile down to the base floor.
@@ -493,6 +493,67 @@
         Body.setVelocity(piece, { x: piece.velocity.x, y: Math.max(piece.velocity.y, .45) });
       }
     }
+    // Matter never wakes a sleeping body when what held it up breaks or slides away, so
+    // after every shot a sweep wakes any sleeping piece with nothing touching its underside
+    // (ground, platform, another body; a rope counts as support). Pieces resting directly on
+    // a woken one are woken with it. Runs only after a launch, so stages stay still before it.
+    const VMIN = M.Vertices;
+    function underside(b) {
+      const pts = [];
+      for (const part of b.parts.length > 1 ? b.parts.slice(1) : [b]) {
+        const v = part.vertices, c = part.position;
+        // The lowest corner too, so a point standing on its tip still counts as resting.
+        const low = v.reduce((m, q) => (q.y > m.y ? q : m), v[0]);
+        pts.push({ x: low.x, y: low.y + 3 });
+        for (let i = 0; i < v.length; i++) {
+          const a = v[i], z = v[(i + 1) % v.length], dx = z.x - a.x, dy = z.y - a.y, len = Math.hypot(dx, dy) || 1;
+          let nx = dy / len, ny = -dx / len;
+          if (nx * ((a.x + z.x) / 2 - c.x) + ny * ((a.y + z.y) / 2 - c.y) < 0) { nx = -nx; ny = -ny; }
+          if (ny < .25) continue;
+          const n = Math.max(1, Math.ceil(len / 6));
+          for (let k = 0; k <= n; k++) pts.push({ x: a.x + dx * k / n + nx * 3, y: a.y + dy * k / n + ny * 3 });
+        }
+      }
+      return pts;
+    }
+    function resting(b, all) {
+      const pts = underside(b), bb = b.bounds;
+      for (const o of all) {
+        if (o === b || o.bounds.max.x < bb.min.x - 4 || o.bounds.min.x > bb.max.x + 4 || o.bounds.max.y < bb.min.y - 4 || o.bounds.min.y > bb.max.y + 4) continue;
+        for (const part of o.parts.length > 1 ? o.parts.slice(1) : [o]) for (const p of pts) if (VMIN.contains(part.vertices, p)) return true;
+      }
+      return false;
+    }
+    function wakeFalling(b) {
+      if (b.game.kind === 'block') b.game.dropTop ??= b.position.y;
+      if (b.game.kind === 'target') b.game.fallTop = Math.min(b.game.fallTop ?? b.position.y, b.position.y);
+      M.Sleeping.set(b, false);
+      Body.setVelocity(b, { x: b.velocity.x, y: Math.max(b.velocity.y, .45) });
+    }
+    function wakeUnsupported() {
+      const all = Composite.allBodies(engine.world);
+      const hung = new Set(state.ropes.filter(r => !r.cut).map(r => r.body));
+      const loose = [...state.blocks, ...state.targets, ...state.devices, ...state.shots].filter(b => !b.isStatic && !removed.has(b));
+      const woken = [];
+      for (const b of loose) {
+        if (!b.isSleeping || hung.has(b) || resting(b, all)) continue;
+        // Woken before and still in the same spot: it is wedged or held from the side, not falling.
+        const at = b.game.sweptAt;
+        if (at && Math.hypot(b.position.x - at.x, b.position.y - at.y) < 2) continue;
+        b.game.sweptAt = { x: b.position.x, y: b.position.y };
+        wakeFalling(b); woken.push(b);
+      }
+      // Whatever sits on a woken piece comes down with it.
+      for (let i = 0; i < woken.length; i++) {
+        const box = woken[i].bounds;
+        for (const b of loose) {
+          if (!b.isSleeping || hung.has(b)) continue;
+          const bb = b.bounds;
+          if (bb.max.x > box.min.x - 2 && bb.min.x < box.max.x + 2 && bb.max.y <= box.min.y + 8 && bb.max.y >= box.min.y - 8) { wakeFalling(b); woken.push(b); }
+        }
+      }
+      return woken.length;
+    }
     function cutRope(r, reason) {
       if (r.cut) return;
       r.cut = true;
@@ -702,8 +763,16 @@
     }
     function containTargets() {
       for (const b of state.targets) {
+        // An enemy that rode a collapse down (on a sliding plank, a tilting deck) never starts a
+        // hard new contact, so its fall is counted when it comes to rest: half a floor or more
+        // lower than where it last rested hurts like the same free drop.
+        const still = b.isSleeping || b.speed < .3;
+        if (still && state.phase === 'flight' && b.game.fallTop != null) {
+          const drop = b.position.y - b.game.fallTop;
+          if (drop >= TARGET_FALL_FROM) damage(b, (drop - TARGET_FALL_FROM + 10) * TARGET_FALL);
+        }
         // Highest point since the enemy last rested: how far it has fallen when it lands.
-        if (b.isSleeping || b.speed < .3) b.game.fallTop = b.position.y;
+        if (still) b.game.fallTop = b.position.y;
         else b.game.fallTop = Math.min(b.game.fallTop ?? b.position.y, b.position.y);
         const { x, y } = b.position;
         const nx = Math.max(TARGET_MARGIN, Math.min(WORLD_WIDTH - TARGET_MARGIN, x));
@@ -789,16 +858,19 @@
       if (pendingBlasts.length) {
         for (const p of pendingBlasts.filter(p => p.at <= state.time)) { pendingBlasts.splice(pendingBlasts.indexOf(p), 1); blast(p); }
       }
+      let woke = 0;
+      if (++sweep % 6 === 0) woke = wakeUnsupported();
       if (!state.targets.length) {
         winWait += STEP;
         const falling = state.blocks.some(b => b.game.dropTop != null && (b.speed > .5 || b.angularSpeed > .025));
-        winQuiet = falling || pendingSupports.length || pendingBlasts.length ? 0 : winQuiet + STEP;
+        winQuiet = woke || falling || pendingSupports.length || pendingBlasts.length ? 0 : winQuiet + STEP;
         if (winWait > 900 && winQuiet > 260) finish(true);
         return;
       }
       const moving = [...state.shots, ...state.blocks, ...state.targets, ...state.devices].some(b => b.position.x > -60 && b.position.x < WORLD_WIDTH + 60 && b.position.y < FLOOR + 76 && !b.isSleeping && !b.isStatic && (b.speed > .65 || b.angularSpeed > .04));
-      quiet = moving ? 0 : quiet + STEP;
-      if (!pendingSupports.length && !pendingBlasts.length && ((state.shotTime > 1800 && quiet > 650) || state.shotTime > 11000)) {
+      quiet = moving || woke ? 0 : quiet + STEP;
+      // Never hand the next shot over while something still hangs in mid-air.
+      if (!pendingSupports.length && !pendingBlasts.length && ((state.shotTime > 1800 && quiet > 650) || state.shotTime > 11000) && (state.shotTime > 12000 || !wakeUnsupported())) {
         retireCurrentShots();
         if (state.spent >= level.ammo.length) finish(false);
         else { state.phase = 'aim'; notify({ type: 'reload' }); }

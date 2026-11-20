@@ -4,6 +4,39 @@ const P = require('../web/games/embed/acornshot/physics.js');
 const { Body, Sleeping, Composite } = require('../web/games/embed/acornshot/vendor/matter.min.js');
 const fs = require('node:fs');
 const solver = require('./acornshot-solve.cjs');
+const { Vertices, Bounds } = require('../web/games/embed/acornshot/vendor/matter.min.js');
+// Floating check (2026-11-21): a sleeping, unhung body with nothing touching its underside
+// is hanging in mid-air. Independent of physics.js: probes 3px below every down-facing edge
+// and the lowest corner against all other bodies.
+function floatingBodies(sim) {
+  const s = sim.state, all = Composite.allBodies(s.engine.world);
+  const hung = new Set(s.ropes.filter(r => !r.cut).map(r => r.body));
+  const out = [];
+  for (const b of [...s.blocks, ...s.targets, ...s.devices, ...s.shots]) {
+    if (b.isStatic || hung.has(b) || !b.isSleeping) continue;
+    const pts = [];
+    for (const part of b.parts.length > 1 ? b.parts.slice(1) : [b]) {
+      const v = part.vertices, c = Vertices.centre(v);
+      const low = v.reduce((m, q) => (q.y > m.y ? q : m), v[0]);
+      pts.push({ x: low.x, y: low.y + 3 });
+      for (let i = 0; i < v.length; i++) {
+        const a = v[i], z = v[(i + 1) % v.length], dx = z.x - a.x, dy = z.y - a.y, len = Math.hypot(dx, dy) || 1;
+        let nx = dy / len, ny = -dx / len;
+        if (nx * ((a.x + z.x) / 2 - c.x) + ny * ((a.y + z.y) / 2 - c.y) < 0) { nx = -nx; ny = -ny; }
+        if (ny < .25) continue;
+        const n = Math.max(1, Math.ceil(len / 6));
+        for (let k = 0; k <= n; k++) pts.push({ x: a.x + dx * k / n + nx * 3, y: a.y + dy * k / n + ny * 3 });
+      }
+    }
+    const box = { min: { x: b.bounds.min.x - 4, y: b.bounds.min.y - 4 }, max: { x: b.bounds.max.x + 4, y: b.bounds.max.y + 4 } };
+    const held = all.some(o => o !== b && Bounds.overlaps(o.bounds, box)
+      && (o.parts.length > 1 ? o.parts.slice(1) : [o]).some(part => pts.some(p => Vertices.contains(part.vertices, p))));
+    if (!held) out.push(`${b.game.kind}@${Math.round(b.position.x)},${Math.round(b.position.y)}`);
+  }
+  return out;
+}
+let floatChecks = 0;
+const noFloat = (sim, where) => { floatChecks++; const f = floatingBodies(sim); assert.deepEqual(f, [], `${where}: nothing may hang in mid-air after a shot (${f.join(' ')})`); };
 // The first LEGACY stages keep the original 1,500px world; their checks below are unchanged.
 const LEGACY = P.LEGACY_COUNT;
 assert.equal(LEGACY, 12, 'The original twelve stages stay at indexes 0-11');
@@ -171,7 +204,7 @@ for (let l = 0; l < LEGACY; l++) {
     assert.ok(best, `Stage ${l + 1} has a playable next shot`);
     path.push(best.choice); won = best.won;
   }
-  const events = [], replay = P.create(l, e => events.push(e));
+  const events = [], replay = P.create(l, e => { events.push(e); if (e.type === 'reload') noFloat(replay, `Stage ${l + 1} shot ${replay.state.spent}`); });
   for (const shot of path) {
     if (replay.state.phase !== 'aim') break;
     fire(replay, ...shot);
@@ -185,6 +218,36 @@ for (let l = 0; l < LEGACY; l++) {
   console.log(`PASS stage ${l + 1}: ${replay.state.spent} shots, ${replay.state.score} points, solution ${JSON.stringify(path)}`);
   replay.dispose();
 }
+// Stage 7 (operator capture, 2026-11-21): the right tower's lower floors are knocked away
+// without breaking; the top floor's posts, roof and guard must come down, not float.
+{
+  const sim = P.create(6), right = [...sim.state.blocks, ...sim.state.targets].filter(b => b.position.x > 900);
+  const top = Math.min(...right.map(b => b.position.y));
+  const upper = right.filter(b => b.position.y < top + 90), lower = right.filter(b => b.position.y > 340);
+  const start = new Map(upper.map(b => [b, b.position.y]));
+  assert.ok(upper.length >= 3 && lower.length >= 4, 'Stage 7 right tower has upper and lower floors');
+  sim.launch(sim.sling.x - 10, sim.sling.y + 5);
+  for (const b of lower) { Composite.remove(sim.state.engine.world, b); sim.state.blocks = sim.state.blocks.filter(v => v !== b); sim.state.targets = sim.state.targets.filter(v => v !== b); }
+  for (let i = 0; i < 1500 && sim.state.phase === 'flight'; i++) sim.step();
+  noFloat(sim, 'Stage 7 knocked-out lower floors');
+  for (const b of upper) assert.ok(!sim.state.blocks.includes(b) && !sim.state.targets.includes(b) || b.position.y - start.get(b) > 50, `Stage 7 top ${b.game.kind} falls when its floors are gone`);
+  sim.dispose();
+}
+// Varied human-like shots on the stages where pieces used to float: after every shot nothing hangs.
+for (const l of [4, 5, 6, 9, 13, 14, 15, 18, 20, 26, 28, 31, 34, 35, 36]) {
+  for (const [angle, power] of [[12, 100], [24, 92], [36, 100], [8, 80]]) {
+    const sim = P.create(l), S = sim.sling;
+    sim.state.spent = 0;
+    for (let k = 0; k < 3 && sim.state.phase === 'aim'; k++) {
+      const a = (angle + k * 5) * Math.PI / 180, len = power * P.MAX_PULL / 100;
+      sim.launch(S.x - Math.cos(a) * len, S.y + Math.sin(a) * len);
+      for (let i = 0; i < 1500 && sim.state.phase === 'flight'; i++) { if (sim.state.shotTime >= 700) sim.ability(); sim.step(); }
+      if (sim.state.phase === 'aim') noFloat(sim, `Stage ${l + 1} angle ${angle + k * 5} power ${power}`);
+    }
+    sim.dispose();
+  }
+}
+console.log(`PASS nothing floats: ${floatChecks} checks after shots (stage 7 capture case, saved and searched solutions, varied shots).`);
 const bomb = P.create(3);
 bomb.state.spent = P.LEVELS[3].ammo.indexOf('bomb');
 bomb.launch(122, 450);
@@ -217,12 +280,14 @@ for (let l = LEGACY; l < P.LEVELS.length; l++) {
   assert.ok(still.ok, `Stage ${l + 1} stays still for 5 s before launch (worst ${still.worst}px ${still.who})`);
   const events = [];
   let outside = null;
+  let reloads = 0, seen = 0;
   const sim = solver.replay(l, entry.shots, s => {
+    if (reloads > seen) { seen = reloads; noFloat(s, `Stage ${l + 1} shot ${s.state.spent}`); }
     for (const b of [...s.state.blocks, ...s.state.targets, ...s.state.shots, ...s.state.devices]) {
       const box = P.shapeBox(b);
       if (box.min.x < -2 || box.max.x > world.width + 2 || box.min.y < world.top - 2 || box.max.y > world.bottom + 2) outside ??= `${b.game.kind} at ${Math.round(b.position.x)},${Math.round(b.position.y)}`;
     }
-  }, e => events.push(e));
+  }, e => { events.push(e); if (e.type === 'reload') reloads++; });
   assert.equal(outside, null, `Stage ${l + 1}: every body stays inside the ${world.width}px world`);
   assert.equal(sim.state.phase, 'won', `Stage ${l + 1} saved solution still clears; shots ${JSON.stringify(entry.shots)}`);
   assert.equal(events.filter(e => e.type === 'finish').length, 1, 'Exactly one result');
@@ -358,4 +423,4 @@ assert.equal(new Set(P.LEVELS.map(L => L.name)).size, 40, 'Stage names are uniqu
   assert.ok(P.blocked(WATER, plat.x, plat.y + 5), 'Inside a platform is blocked');
 }
 console.log('PASS devices: boulder roll, barrel chain delay, mushroom bounce cap, water sink, bridge into pit, rope snap, pendulum swing, icicle drop; terrain queries.');
-console.log(`PASS: stable towers, miss/retry lifecycle, ${P.LEVELS.length} solvable stages (${LEGACY} original + ${P.LEVELS.length - LEGACY} new), score bounds, single finish, bomb and split abilities.`);
+console.log(`PASS: ${floatChecks} no-float checks, stable towers, miss/retry lifecycle, ${P.LEVELS.length} solvable stages (${LEGACY} original + ${P.LEVELS.length - LEGACY} new), score bounds, single finish, bomb and split abilities.`);
