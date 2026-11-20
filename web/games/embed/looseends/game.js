@@ -18,9 +18,9 @@
   ];
   const LOOMS = [{ id: 'linen', name: '리넨 공방', need: 0 }, { id: 'garden', name: '정원', need: 30 }];
   const TIPS = [
-    '동그라미 친 핀을 빈 동그라미로 끌어 놓으세요.', '어느 줄이 위에 걸쳐 있는지 보세요.', '다른 줄에 덮인 줄은 못 움직여요. 위에 있는 줄부터!',
+    '흰 테를 두른 핀을 빈 구멍으로 끌어 놓으세요.', '어느 줄이 위에 걸쳐 있는지 보세요.', '덮인 줄을 억지로 빼면 위 줄과 꼬여요. 위에 있는 줄부터!',
     '길을 터 주면 아래 줄이 풀려요.', '핀을 어디에 놓느냐에 따라 줄이 서로 비켜요.', '빈 구멍은 많을수록 좋아요.',
-    '한 번 옮긴 줄은 맨 위로 올라가요.', '목표 수에 맞추면 별 세 개!', '막히면 힌트를 눌러 보세요.', '되돌리기는 얼마든지 괜찮아요.',
+    '한 번 옮긴 줄은 맨 위로 올라가요.', '목표 수에 맞추면 별 세 개!', '꼬였다면 핀을 반대쪽으로 되돌리면 풀려요.', '되돌리기는 얼마든지 괜찮아요.',
   ];
 
   // ---------- 저장 ----------
@@ -66,6 +66,7 @@
   }
   const sfx = {
     pick: () => tone(520, .1), drop: () => tone(392, .12, 'triangle'), warn: () => tone(170, .18, 'triangle', .06),
+    twist: () => { tone(233, .22, 'sawtooth', .025); tone(196, .26, 'triangle', .05, .06); }, untwist: () => [523, 784].forEach((f, i) => tone(f, .14, 'sine', .04, i * .06)),
     free: () => [660, 880, 1100].forEach((f, i) => tone(f, .16, 'sine', .04, i * .07)),
     win: () => [523, 659, 784, 1046].forEach((f, i) => tone(f, .28, 'sine', .05, i * .1)), click: () => tone(600, .06, 'square', .02),
   };
@@ -79,11 +80,15 @@
     const d = LV[i];
     return { kind: 'map', idx: i, name: d.name, holes: Rules.layout(d.ring, d.inner), ropes: d.ropes.map(([a, b], k) => ({ a, b, id: k })), target: d.target };
   }
-  function genLevel(seed, spec, name, kind, idx) {
+  function genLevel(seed, spec, name, kind, idx, twisted) {
     const [ring, inner, ropes, min, max] = spec;
     for (let k = 0; k < 8; k++) {
       const p = Rules.generate(seed + k * 7919, { ring, inner, ropes, minMoves: Math.max(1, min - (k > 4 ? 1 : 0)), maxMoves: max + (k > 5 ? 1 : 0), tries: 300, nodes: 120000 });
-      if (p) return { kind, idx, name, holes: p.holes, ropes: p.ropes, target: p.target };
+      if (!p) continue;
+      // 처음부터 꼬인 판: 덮인 줄 하나를 억지로 뺀 상태에서 시작(목표는 그 상태의 깔끔한 풀이 최소 수)
+      const t = twisted ? Rules.twist(p, seed + k, { maxMoves: max + 2, nodes: 90000 }) : null;
+      if (t) return { kind, idx, name, holes: t.holes, ropes: t.ropes, tw: t.tw, target: t.target };
+      return { kind, idx, name, holes: p.holes, ropes: p.ropes, target: p.target };
     }
     return mapLevel(Math.min(39, 10 + (seed % 20)));
   }
@@ -92,8 +97,8 @@
 
   function begin(level) {
     closeModal(true);
-    S = { ...level, ropes: level.ropes.map(r => ({ ...r })), moves: 0, hist: [], held: null, sel: null, cursor: 0, kb: false, hint: null, anim: [], busy: false, won: false, shake: null, flash: null, mv: new Set(), tip: '' };
-    S.tip = level.kind === 'map' ? (TIPS[level.idx] || '맨 위 줄의 핀을 빈 구멍으로 옮기세요.') : level.kind === 'daily' ? '오늘의 퍼즐이에요. 차분히 풀어 보세요.' : '끝없이 이어지는 퍼즐이에요.';
+    S = { ...level, ropes: level.ropes.map(r => ({ ...r })), tw: { ...(level.tw || {}) }, wob: {}, preview: null, moves: 0, hist: [], held: null, sel: null, cursor: 0, kb: false, hint: null, anim: [], busy: false, won: false, shake: null, flash: null, mv: new Set(), tip: '' };
+    S.tip = level.kind === 'map' ? (TIPS[level.idx] || '흰 테 두른 핀을 빈 구멍으로 옮기세요.') : Rules.twCount(level.tw) ? '처음부터 꼬여 있어요. 꼬인 줄을 반대쪽으로 돌려 풀어요 — 막히면 힌트!' : level.kind === 'daily' ? '오늘의 퍼즐이에요. 차분히 풀어 보세요.' : '끝없이 이어지는 퍼즐이에요.';
     S.cursor = S.ropes.length ? S.ropes[S.ropes.length - 1].a : 0;
     particles = []; recalc(); setCoach(S.tip); hud();
     if (level.kind === 'map') { rec.cur = level.idx; save(); }
@@ -104,7 +109,8 @@
 
   function recalc() {
     const m = Rules.crossMatrix(S.holes, S.ropes); S.cm = m;
-    S.mv = new Set(); S.ropes.forEach((r, i) => { if (Rules.movable(S.holes, S.ropes, i, m)) S.mv.add(r.id); });
+    // mv: 꼬임 없이 옮길 수 있는 줄(흰 테). 그 밖의 줄도 옮길 수는 있지만 얽힌 줄과 감긴다.
+    S.mv = new Set(); S.ropes.forEach((r, i) => { if (!Rules.entangled(S.holes, S.ropes, i, m, S.tw).length) S.mv.add(r.id); });
   }
   const ropeIdx = id => S.ropes.findIndex(r => r.id === id);
   const occupiedSet = () => Rules.occupied(S.ropes);
@@ -113,15 +119,19 @@
   function resize() {
     const r = canvas.getBoundingClientRect(); W = Math.max(1, r.width); H = Math.max(1, r.height); DPR = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * DPR); canvas.height = Math.round(H * DPR);
-    const narrow = matchMedia('(max-width: 640px)').matches;
-    const short = H <= 430 && !narrow, top = narrow ? 70 : short ? 54 : 80, bot = narrow ? 156 : short ? 58 : 76;
+    const side = getComputedStyle($('side-left')).display !== 'contents';
+    const narrow = !side, short = H <= 430 && side;
+    const top = narrow ? 70 : short ? 50 : 66, bot = narrow ? 156 : short ? 8 : 18;
     const availH = H - top - bot;
-    geo = { cx: W / 2, cy: top + availH / 2, R: Math.max(60, Math.min(W * (narrow ? .47 : .4), availH / 2 * .99)) };
+    let x0 = 0, x1 = W;
+    if (side) { x0 = $('side-left').getBoundingClientRect().right - r.left + 8; x1 = $('side-right').getBoundingClientRect().left - r.left - 8; }
+    geo = { cx: (x0 + x1) / 2, cy: top + availH / 2, R: Math.max(60, Math.min((x1 - x0) / 2 * (narrow ? .94 : .98), availH / 2 * .99)) };
     bgCache = null;
   }
   const holeXY = i => { const h = S.holes[i]; return { x: geo.cx + h.x * geo.R * .88, y: geo.cy + h.y * geo.R * .88 }; };
   const endPos = (rope, end) => (S.held && S.held.id === rope.id && S.held.end === end) ? { x: S.held.x, y: S.held.y } : holeXY(rope[end]);
-  const pegR = () => geo.R * .05;
+  const pegR = () => Math.max(9, geo.R * .066);
+  const ropeW = () => Math.max(5, geo.R * .046);
   const toLocal = e => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
 
   // ---------- 그리기 ----------
@@ -131,10 +141,33 @@
   };
   const shade = (h, t) => t >= 0 ? mix(h, '#ffffff', t) : mix(h, '#000000', -t);
 
+  // 생성 그림(장마다 다른 책상 · 천, 수틀 천). 못 받으면 아래 캔버스 그림이 대신한다.
+  const ART = {};
+  function art(name) {
+    if (!ART[name]) { const im = new Image(); im.onload = () => { bgCache = null; }; im.onerror = () => {}; im.src = `/assets/games/looseends/${name}.webp`; ART[name] = im; }
+    const im = ART[name]; return im.complete && im.naturalWidth ? im : null;
+  }
+  function bgName() {
+    if (rec.settings.loom === 'garden') return 'bg4';
+    if (!S) return 'bg1';
+    if (S.kind === 'map') return 'bg' + (Math.floor(S.idx / 8) + 1);
+    if (S.kind === 'daily') return 'bg3';
+    return 'bg' + (((S.idx || 1) - 1) % 5 + 1);
+  }
+  const bgKeyNow = () => rec.settings.loom + bgName() + W + 'x' + H;
+  function coverDraw(g, im, x, y, w, h) {
+    const k = Math.max(w / im.naturalWidth, h / im.naturalHeight), dw = im.naturalWidth * k, dh = im.naturalHeight * k;
+    g.drawImage(im, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+  }
   function buildBg() {
     const c = document.createElement('canvas'); c.width = Math.round(W * DPR); c.height = Math.round(H * DPR);
     const g = c.getContext('2d'); g.scale(DPR, DPR);
-    const garden = rec.settings.loom === 'garden', rand = Rules.rng(garden ? 99 : 7);
+    const garden = rec.settings.loom === 'garden', rand = Rules.rng(garden ? 99 : 7), photo = art(bgName()), linen = art('linen');
+    if (photo) {
+      coverDraw(g, photo, 0, 0, W, H);
+      const v = g.createRadialGradient(geo.cx, geo.cy, geo.R * .9, geo.cx, geo.cy, Math.max(W, H) * .75); v.addColorStop(0, 'rgba(40,20,5,0)'); v.addColorStop(1, 'rgba(40,20,5,.28)');
+      g.fillStyle = v; g.fillRect(0, 0, W, H);
+    } else {
     const grad = g.createLinearGradient(0, 0, W, H);
     if (garden) { grad.addColorStop(0, '#eceadf'); grad.addColorStop(1, '#cfd3c2'); } else { grad.addColorStop(0, '#e6b97f'); grad.addColorStop(1, '#cf9559'); }
     g.fillStyle = grad; g.fillRect(0, 0, W, H);
@@ -158,6 +191,9 @@
     };
     cloth(W * .08, H * .12, W * .34, H * .3, -.5, garden ? '#e9efe0' : '#f1e3c4', garden ? 'rgba(130,160,120,.5)' : 'rgba(190,80,70,.55)');
     cloth(W * .95, H * .9, W * .3, H * .34, .55, garden ? '#e6e4f1' : '#ead8b0', garden ? 'rgba(150,130,190,.4)' : 'rgba(150,120,80,.4)');
+    }
+    const sideMode = getComputedStyle($('side-left')).display !== 'contents';
+    if (!sideMode && !photo) {
     // 실패(왼쪽 아래)
     const sx = W * .105, sy = H * .79, sw = Math.min(38, W * .05), sh = sw * 1.5;
     g.save(); g.shadowColor = 'rgba(60,35,10,.4)'; g.shadowBlur = 8; g.shadowOffsetY = 4;
@@ -169,6 +205,7 @@
     g.save(); g.translate(W * .93, H * .09); g.rotate(-.9); g.strokeStyle = '#8a8f97'; g.lineWidth = 3; g.lineCap = 'round';
     g.beginPath(); g.moveTo(0, 0); g.lineTo(60, -12); g.moveTo(0, 0); g.lineTo(60, 12); g.stroke();
     g.strokeStyle = '#b5543f'; g.lineWidth = 4; g.beginPath(); g.ellipse(-12, -8, 10, 7, .3, 0, 7); g.moveTo(-2, 9); g.ellipse(-12, 9, 10, 7, -.3, 0, 7); g.stroke(); g.restore();
+    }
 
     // 수틀
     const { cx, cy, R } = geo;
@@ -183,11 +220,12 @@
     // 천 바닥
     g.save(); g.beginPath(); g.arc(cx, cy, R * .77, 0, 7); g.clip();
     g.fillStyle = '#efe2c4'; g.fillRect(cx - R, cy - R, R * 2, R * 2);
+    if (linen) coverDraw(g, linen, cx - R * .77, cy - R * .77, R * 1.54, R * 1.54);
     g.strokeStyle = 'rgba(160,125,80,.22)'; g.lineWidth = 1;
-    for (let k = -R; k < R; k += 4) { g.beginPath(); g.moveTo(cx + k, cy - R); g.lineTo(cx + k, cy + R); g.stroke(); g.beginPath(); g.moveTo(cx - R, cy + k); g.lineTo(cx + R, cy + k); g.stroke(); }
+    if (!linen) for (let k = -R; k < R; k += 4) { g.beginPath(); g.moveTo(cx + k, cy - R); g.lineTo(cx + k, cy + R); g.stroke(); g.beginPath(); g.moveTo(cx - R, cy + k); g.lineTo(cx + R, cy + k); g.stroke(); }
     const ig = g.createRadialGradient(cx, cy, R * .6, cx, cy, R * .77); ig.addColorStop(0, 'rgba(90,55,20,0)'); ig.addColorStop(1, 'rgba(90,55,20,.28)');
     g.fillStyle = ig; g.fillRect(cx - R, cy - R, R * 2, R * 2); g.restore();
-    bgCache = c; bgKey = rec.settings.loom + W + 'x' + H;
+    bgCache = c; bgKey = bgKeyNow();
   }
 
   function circle(x, y, r) { ctx.beginPath(); ctx.arc(x, y, r, 0, 7); }
@@ -205,69 +243,170 @@
     ctx.fill();
   }
 
-  function ropeBody(A, B, color, style, w) {
+  // 줄 길: A → B, bend 만큼 가운데가 옆으로 휜다(튕김). off 는 법선 방향으로 평행 이동(밝은 면 · 결).
+  function ropePath(A, B, bend, off = 0) {
+    const dx = B.x - A.x, dy = B.y - A.y, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
+    ctx.beginPath(); ctx.moveTo(A.x + nx * off, A.y + ny * off);
+    if (Math.abs(bend) > .3) ctx.quadraticCurveTo((A.x + B.x) / 2 + nx * (bend * 2 + off), (A.y + B.y) / 2 + ny * (bend * 2 + off), B.x + nx * off, B.y + ny * off);
+    else ctx.lineTo(B.x + nx * off, B.y + ny * off);
+  }
+  function ropeBody(A, B, color, style, w, bend = 0) {
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    const line = () => { ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); };
+    const line = (o = 0) => ropePath(A, B, bend, o);
+    const L = Math.hypot(B.x - A.x, B.y - A.y), nx = -(B.y - A.y) / (L || 1);
+    const hiSide = nx < 0 ? -1 : 1; // 화면 위쪽(빛이 오는 쪽)으로 밝은 면
+    const twistGrain = (c, a) => { // 꼰 실의 비스듬한 결
+      ctx.save(); ctx.strokeStyle = c; ctx.globalAlpha *= a; ctx.lineWidth = w * .82; ctx.setLineDash([w * .34, w * .5]); ctx.lineCap = 'butt'; line(); ctx.stroke(); ctx.restore();
+    };
     if (style === 'candy') {
       ctx.strokeStyle = '#fff6ec'; ctx.lineWidth = w; line(); ctx.stroke();
-      ctx.strokeStyle = color; ctx.setLineDash([w * 1.1, w * 1.1]); line(); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = color; ctx.lineCap = 'butt'; ctx.setLineDash([w * 1.1, w * 1.1]); line(); ctx.stroke(); ctx.setLineDash([]); ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = w * .2; line(-hiSide * w * .22); ctx.stroke();
     } else if (style === 'ribbon') {
-      ctx.strokeStyle = shade(color, -.28); ctx.lineWidth = w * 2.1; line(); ctx.stroke();
-      ctx.strokeStyle = color; ctx.lineWidth = w * 1.6; line(); ctx.stroke();
-      ctx.strokeStyle = shade(color, .5); ctx.lineWidth = w * .35; line(); ctx.stroke();
+      ctx.strokeStyle = shade(color, -.28); ctx.lineWidth = w * 1.5; line(); ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = w * 1.2; line(); ctx.stroke();
+      ctx.strokeStyle = shade(color, .5); ctx.lineWidth = w * .28; line(-hiSide * w * .25); ctx.stroke();
     } else if (style === 'neon') {
-      ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = w * 3; ctx.strokeStyle = shade(color, .15); ctx.lineWidth = w * .95; line(); ctx.stroke(); ctx.restore();
+      ctx.save(); ctx.shadowColor = color; ctx.shadowBlur = w * 2.4; ctx.strokeStyle = shade(color, .15); ctx.lineWidth = w * .95; line(); ctx.stroke(); ctx.restore();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = w * .3; line(); ctx.stroke();
     } else if (style === 'gold') {
       const g = ctx.createLinearGradient(A.x, A.y, B.x, B.y); g.addColorStop(0, '#fff0a0'); g.addColorStop(.5, '#d9a232'); g.addColorStop(1, '#fff0a0');
-      ctx.strokeStyle = '#a97a1b'; ctx.lineWidth = w * 1.25; line(); ctx.stroke();
       ctx.strokeStyle = g; ctx.lineWidth = w; line(); ctx.stroke();
-      ctx.strokeStyle = 'rgba(120,80,10,.4)'; ctx.lineWidth = w * .7; ctx.setLineDash([1.5, 3.5]); line(); ctx.stroke(); ctx.setLineDash([]);
+      twistGrain('#7a5410', .45);
+      ctx.strokeStyle = 'rgba(255,250,210,.8)'; ctx.lineWidth = w * .2; line(-hiSide * w * .22); ctx.stroke();
     } else if (style === 'rainbow') {
       const g = ctx.createLinearGradient(A.x, A.y, B.x, B.y);
       ['#ef6b6b', '#f3b04b', '#f2e060', '#7cc87c', '#62a9e0', '#a07ad8'].forEach((c, i) => g.addColorStop(i / 5, c));
-      ctx.strokeStyle = 'rgba(70,40,20,.35)'; ctx.lineWidth = w * 1.2; line(); ctx.stroke();
       ctx.strokeStyle = g; ctx.lineWidth = w; line(); ctx.stroke();
+      twistGrain('#3a2410', .25);
+      ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = w * .2; line(-hiSide * w * .22); ctx.stroke();
     } else {
-      ctx.strokeStyle = shade(color, -.22); ctx.lineWidth = w * 1.15; line(); ctx.stroke();
-      ctx.strokeStyle = color; ctx.lineWidth = w * .92; line(); ctx.stroke();
-      ctx.strokeStyle = shade(color, -.3); ctx.globalAlpha *= .55; ctx.lineWidth = w * .9; ctx.setLineDash([1.6, 3.2]); line(); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha /= .55;
-      ctx.strokeStyle = shade(color, .45); ctx.lineWidth = w * .22; line(); ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = w; line(); ctx.stroke();
+      ctx.strokeStyle = shade(color, -.3); ctx.lineWidth = w * .34; line(hiSide * w * .26); ctx.globalAlpha *= .7; ctx.stroke(); ctx.globalAlpha /= .7;
+      twistGrain(shade(color, -.42), .55);
+      ctx.strokeStyle = shade(color, .5); ctx.lineWidth = w * .2; line(-hiSide * w * .2); ctx.stroke();
     }
   }
+  function wobbleOf(rope, now) {
+    const wb = S.wob[rope.id]; if (!wb) return 0;
+    const t = (now - wb.t0) / 1000; if (t > .9) { delete S.wob[rope.id]; return 0; }
+    return wb.amp * Math.sin(t * 26) * Math.exp(-t * 5.5);
+  }
   function drawRope(rope, opt = {}) {
-    const A = endPos(rope, 'a'), B = endPos(rope, 'b'), color = COLORS[rope.id % 8], w = geo.R * .036, off = opt.off || { x: 0, y: 0 };
+    const A = endPos(rope, 'a'), B = endPos(rope, 'b'), color = COLORS[rope.id % 8], w = ropeW(), off = opt.off || { x: 0, y: 0 };
+    const bend = opt.gone ? 0 : wobbleOf(rope, opt.now || 0);
     ctx.save(); ctx.globalAlpha = opt.alpha == null ? 1 : opt.alpha; ctx.translate(off.x, off.y);
-    ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(55,30,8,.3)'; ctx.lineWidth = w + 2.5; ctx.beginPath(); ctx.moveTo(A.x + 1.5, A.y + 3); ctx.lineTo(B.x + 1.5, B.y + 3); ctx.stroke();
-    ropeBody(A, B, color, rec.settings.thread, w);
-    if (opt.flash) { ctx.strokeStyle = `rgba(255,255,255,${opt.flash})`; ctx.lineWidth = w * 1.5; ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke(); }
+    if (opt.spin) { const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2; ctx.translate(mx, my); ctx.rotate(opt.spin); ctx.translate(-mx, -my); }
+    // 그림자(아래 줄 위로 진다) — 넓고 옅은 것 + 좁고 진한 것
+    ctx.lineCap = 'round';
+    ctx.save(); ctx.translate(w * .35, w * .8);
+    ctx.strokeStyle = 'rgba(55,30,8,.13)'; ctx.lineWidth = w * 2; ropePath(A, B, bend); ctx.stroke();
+    ctx.strokeStyle = 'rgba(55,30,8,.22)'; ctx.lineWidth = w * 1.2; ropePath(A, B, bend); ctx.stroke(); ctx.restore();
+    // 가장자리 테 — 겹친 자리에서 아래 줄이 살짝 끊겨 보인다
+    ctx.strokeStyle = 'rgba(70,40,15,.75)'; ctx.lineWidth = w * 1.32; ropePath(A, B, bend); ctx.stroke();
+    ropeBody(A, B, color, rec.settings.thread, w, bend);
+    if (opt.flash) { ctx.strokeStyle = opt.flashColor ? `rgba(255,140,40,${opt.flash})` : `rgba(255,255,255,${opt.flash})`; ctx.lineWidth = w * 1.6; ropePath(A, B, bend); ctx.stroke(); }
     for (const [P, end] of [[A, 'a'], [B, 'b']]) {
       let px = P.x, py = P.y;
       if (opt.shake && opt.shake.end === end) px += opt.shake.dx;
       const r = pegR(), held = S.held && S.held.id === rope.id && S.held.end === end, mvOk = S.mv.has(rope.id) && !opt.gone;
-      if (held) { ctx.fillStyle = 'rgba(40,20,5,.28)'; circle(px + 3, py + 7, r * 1.05); ctx.fill(); py -= 4; }
-      const g = ctx.createRadialGradient(px - r * .3, py - r * .35, r * .1, px, py, r * 1.1); g.addColorStop(0, shade(color, .45)); g.addColorStop(1, shade(color, -.28));
-      ctx.fillStyle = g; circle(px, py, r * (held ? 1.2 : 1)); ctx.fill();
-      ctx.strokeStyle = mvOk ? 'rgba(255,255,255,.95)' : shade(color, -.45); ctx.lineWidth = mvOk ? 2.2 : 1.5; ctx.stroke();
-      symbol(px, py, r * .5, rope.id);
+      if (held) { ctx.fillStyle = 'rgba(40,20,5,.28)'; circle(px + 4, py + 9, r * 1.1); ctx.fill(); py -= 5; }
+      else if (mvOk) { ctx.fillStyle = 'rgba(40,20,5,.3)'; circle(px + 1.5, py + 3.5, r); ctx.fill(); }
+      const rr = r * (held ? 1.22 : 1);
+      // 핀 머리: 금속 테 + 색 구슬
+      ctx.fillStyle = mvOk || held ? '#fffaf0' : shade(color, -.5); circle(px, py, rr * 1.12); ctx.fill();
+      const g = ctx.createRadialGradient(px - rr * .35, py - rr * .4, rr * .1, px, py, rr);
+      g.addColorStop(0, shade(color, .55)); g.addColorStop(.6, color); g.addColorStop(1, shade(color, -.35));
+      ctx.fillStyle = g; circle(px, py, rr * (mvOk || held ? .9 : .95)); ctx.fill();
+      if (!mvOk && !held && !opt.gone) { ctx.fillStyle = 'rgba(40,25,10,.22)'; circle(px, py, rr * .95); ctx.fill(); }
+      symbol(px, py, rr * .48, rope.id);
     }
     ctx.restore();
+  }
+
+  // 감긴 쌍: 두 줄이 만나는 곳(또는 가장 가까운 곳)에 꽈배기 매듭 + 감긴 수 표시
+  function closestOnSeg(P, A, B) {
+    const dx = B.x - A.x, dy = B.y - A.y, l2 = dx * dx + dy * dy || 1, t = Math.max(.12, Math.min(.88, ((P.x - A.x) * dx + (P.y - A.y) * dy) / l2));
+    return { x: A.x + dx * t, y: A.y + dy * t };
+  }
+  function twistSpot(r, s) {
+    const A = endPos(r, 'a'), B = endPos(r, 'b'), C = endPos(s, 'a'), D = endPos(s, 'b');
+    const den = (B.x - A.x) * (D.y - C.y) - (B.y - A.y) * (D.x - C.x);
+    if (Math.abs(den) > 1e-6) {
+      const t = ((C.x - A.x) * (D.y - C.y) - (C.y - A.y) * (D.x - C.x)) / den, u = ((C.x - A.x) * (B.y - A.y) - (C.y - A.y) * (B.x - A.x)) / den;
+      if (t > .04 && t < .96 && u > .04 && u < .96) return { P: { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }, cross: true, A, B, C, D };
+    }
+    // 엇갈리지 않으면: r 의 가운데에서 s 쪽으로 가장 가까운 두 점의 중간
+    let best = null;
+    for (const t of [.25, .5, .75]) { const P = { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }, Q = closestOnSeg(P, C, D), d = Math.hypot(P.x - Q.x, P.y - Q.y); if (!best || d < best.d) best = { d, P, Q }; }
+    return { P: { x: (best.P.x + best.Q.x) / 2, y: (best.P.y + best.Q.y) / 2 }, from: best.P, to: best.Q, cross: false, A, B, C, D };
+  }
+  function drawTwists(now) {
+    const pairs = Rules.twPairs(S.tw); if (!pairs.length) return [];
+    const w = ropeW(), spots = [];
+    for (const pr of pairs) {
+      const r = S.ropes[ropeIdx(pr.x)], s = S.ropes[ropeIdx(pr.y)]; if (!r || !s) continue;
+      const sp = twistSpot(r, s), cr = COLORS[r.id % 8], cs = COLORS[s.id % 8], n = Math.abs(pr.w);
+      const ang = Math.atan2(sp.D.y - sp.C.y, sp.D.x - sp.C.x);
+      ctx.save(); ctx.lineCap = 'round';
+      if (!sp.cross) { // 떨어진 두 줄을 잇는 휘감긴 가닥
+        for (const [F, c] of [[sp.from, cr], [sp.to, cs]]) {
+          ctx.save(); ctx.globalAlpha = .7; ctx.setLineDash([w * .55, w * .45]);
+          ctx.strokeStyle = c; ctx.lineWidth = w * .42; ctx.beginPath(); ctx.moveTo(F.x, F.y); ctx.lineTo(sp.P.x, sp.P.y); ctx.stroke(); ctx.restore();
+        }
+      }
+      // 꽈배기 고리: 감긴 수만큼, 두 색이 번갈아 휘감는다
+      ctx.translate(sp.P.x, sp.P.y); ctx.rotate(ang);
+      const wig = gentle() ? 0 : Math.sin(now / 260) * .08;
+      for (let k = 0; k < n * 2; k++) {
+        const x = (k - (n * 2 - 1) / 2) * w * .95, c = k % 2 ? cs : cr;
+        ctx.save(); ctx.translate(x, 0); ctx.rotate((pr.w > 0 ? .55 : -.55) + wig);
+        ctx.strokeStyle = 'rgba(70,40,15,.8)'; ctx.lineWidth = w * .72; ctx.beginPath(); ctx.ellipse(0, 0, w * .55, w * 1.25, 0, 0, 7); ctx.stroke();
+        ctx.strokeStyle = c; ctx.lineWidth = w * .46; ctx.stroke();
+        ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = w * .14; ctx.beginPath(); ctx.ellipse(0, 0, w * .55, w * 1.25, 0, Math.PI * 1.1, Math.PI * 1.6); ctx.stroke();
+        ctx.restore();
+      }
+      ctx.restore();
+      spots.push({ P: sp.P, n, dir: pr.w > 0 ? 1 : -1 });
+    }
+    return spots;
+  }
+  function drawTwistBadges(spots) {
+    const r = Math.max(10, geo.R * .052), placed = [];
+    for (const rp of S.ropes) for (const e of ['a', 'b']) { const h = holeXY(rp[e]); placed.push({ x: h.x, y: h.y, peg: true }); }
+    for (const sp of spots) {
+      let x = sp.P.x + r * 1.6, y = sp.P.y - r * 1.9;
+      // 표시끼리 겹치지 않게 비켜 놓는다
+      const pr = pegR();
+      const hit = () => placed.some(q => q.peg ? Math.abs(q.x - x) < r * 1.45 + pr * 1.2 && Math.abs(q.y - y) < r * .85 + pr * 1.2 : Math.abs(q.x - x) < r * 3.1 && Math.abs(q.y - y) < r * 1.9);
+      for (let k = 0; k < 10 && hit(); k++) { if (k % 2) y -= r * 2; else x += r * 3.2 * (k % 4 === 0 ? 1 : -1); }
+      placed.push({ x, y });
+      ctx.save(); ctx.fillStyle = '#ee8f45'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.shadowColor = 'rgba(60,30,10,.35)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
+      ctx.beginPath(); ctx.roundRect(x - r * 1.45, y - r * .85, r * 2.9, r * 1.7, r * .85); ctx.fill(); ctx.shadowColor = 'transparent'; ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.font = `900 ${Math.round(r * 1.15)}px 'Baloo 2', Jua, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText((sp.dir > 0 ? '↻' : '↺') + sp.n, x, y + 1); ctx.restore();
+    }
   }
 
   function drawHoles(now) {
     const occ = occupiedSet(), r = pegR();
     for (let i = 0; i < S.holes.length; i++) {
-      const p = holeXY(i), g = ctx.createRadialGradient(p.x, p.y - r * .3, r * .2, p.x, p.y, r * 1.15);
-      g.addColorStop(0, '#2c2118'); g.addColorStop(1, '#5a4430');
-      ctx.fillStyle = g; circle(p.x, p.y, r * (occ.has(i) ? .95 : 1.1)); ctx.fill();
-      ctx.strokeStyle = 'rgba(255,240,205,.55)'; ctx.lineWidth = 1.5; circle(p.x, p.y + .8, r * (occ.has(i) ? .95 : 1.1) + .8); ctx.stroke();
+      const p = holeXY(i), rr = r * (occ.has(i) ? .95 : 1.05);
+      // 놋쇠 테 + 깊은 구멍
+      const rim = ctx.createLinearGradient(p.x, p.y - rr * 1.3, p.x, p.y + rr * 1.3); rim.addColorStop(0, '#f6e2a8'); rim.addColorStop(.5, '#c99a47'); rim.addColorStop(1, '#8a6224');
+      ctx.fillStyle = rim; circle(p.x, p.y, rr * 1.3); ctx.fill();
+      const g = ctx.createRadialGradient(p.x, p.y - rr * .35, rr * .15, p.x, p.y, rr);
+      g.addColorStop(0, '#1d140d'); g.addColorStop(1, '#4a3624');
+      ctx.fillStyle = g; circle(p.x, p.y, rr); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,245,215,.6)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(p.x, p.y, rr * 1.3, Math.PI * 1.1, Math.PI * 1.9); ctx.stroke();
     }
     // 집어 든 핀 / 선택 — 놓을 수 있는 빈 구멍 안내
     const picked = S.held || S.sel;
     if (picked) {
       const pulse = gentle() ? .8 : .55 + Math.sin(now / 230) * .25;
       for (let i = 0; i < S.holes.length; i++) if (!occ.has(i)) {
-        const p = holeXY(i); ctx.strokeStyle = `rgba(255,255,255,${pulse})`; ctx.lineWidth = 2; ctx.setLineDash([4, 4]); circle(p.x, p.y, r * 1.9); ctx.stroke(); ctx.setLineDash([]);
+        const p = holeXY(i); ctx.fillStyle = `rgba(255,255,255,${pulse * .22})`; circle(p.x, p.y, r * 1.85); ctx.fill();
+        ctx.strokeStyle = `rgba(255,255,255,${pulse})`; ctx.lineWidth = 2.5; ctx.setLineDash([5, 4]); circle(p.x, p.y, r * 1.85); ctx.stroke(); ctx.setLineDash([]);
       }
     }
   }
@@ -288,25 +427,30 @@
     const dt = Math.min(.05, (now - lastFrame) / 1000 || .016); lastFrame = now;
     pollPad();
     if (!S) return;
-    if (!bgCache || bgKey !== rec.settings.loom + W + 'x' + H) buildBg();
+    if (!bgCache || bgKey !== bgKeyNow()) buildBg();
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H); ctx.drawImage(bgCache, 0, 0, W, H);
     drawHoles(now);
     const flashT = S.flash ? 1 - (now - S.flash.t0) / 900 : 0;
     const shakeT = S.shake ? (now - S.shake.t0) / 350 : 1;
     if (S.flash && flashT <= 0) S.flash = null; if (S.shake && shakeT >= 1) S.shake = null;
+    const prev = S.preview ? S.preview.map(d => d.id) : [];
     for (const rope of S.ropes) {
-      const opt = {};
-      if (S.flash && S.flash.ids.includes(rope.id)) opt.flash = Math.max(0, Math.sin(flashT * Math.PI * 3)) * .6;
+      const opt = { now };
+      if (S.flash && S.flash.ids.includes(rope.id)) { opt.flash = Math.max(0, Math.sin(flashT * Math.PI * 3)) * .6; opt.flashColor = S.flash.warn; }
+      if (prev.includes(rope.id)) { opt.flash = .35 + Math.sin(now / 120) * .2; opt.flashColor = true; }
       if (S.shake && S.shake.id === rope.id) opt.shake = { end: S.shake.end, dx: Math.sin(shakeT * Math.PI * 6) * (1 - shakeT) * 6 };
       drawRope(rope, opt);
     }
+    const spots = drawTwists(now);
     // 빠져나가는 줄
     S.anim = S.anim.filter(a => {
       const t = (now - a.t0) / a.dur; if (t >= 1) return false;
       const e = t * t * (3 - 2 * t), mx = (holeXY(a.rope.a).x + holeXY(a.rope.b).x) / 2 - geo.cx, my = (holeXY(a.rope.a).y + holeXY(a.rope.b).y) / 2 - geo.cy;
-      const l = Math.hypot(mx, my) || 1, dx = mx / l, dy = my / l, dist = geo.R * (gentle() ? .12 : .55) * e;
-      drawRope(a.rope, { alpha: 1 - e, off: { x: dx * dist, y: dy * dist - geo.R * .1 * e }, gone: true }); return true;
+      if (t < 0) { drawRope(a.rope, { gone: true, now }); return true; }
+      const l = Math.hypot(mx, my) || 1, dx = mx / l, dy = my / l, dist = geo.R * (gentle() ? .12 : .9) * e;
+      drawRope(a.rope, { alpha: 1 - e * e, off: { x: dx * dist, y: dy * dist - geo.R * .25 * Math.sin(e * Math.PI) }, spin: gentle() ? 0 : e * a.spin, gone: true, now }); return true;
     });
+    drawTwistBadges(spots);
     drawHint(now);
     // 키보드 / 패드 커서
     if (S.kb && !S.won) {
@@ -337,11 +481,14 @@
     $('star-total').textContent = `${starTotal()} / 120`;
     $('moves').textContent = S.moves; $('target').textContent = S.target;
     $('btn-undo').disabled = !S.hist.length || S.busy || S.won;
-    $('ropes-dots').innerHTML = S.ropes.map(r => `<i style="background:${COLORS[r.id % 8]}"></i>`).join('');
-    $('ropes-text').textContent = `${S.ropes.length}줄 남음`;
+    const SYM = ['▲', '◆', '●', '■', '★', '✚', '⬢', '♦'];
+    $('ropes-dots').innerHTML = S.ropes.map(r => `<i style="background:${COLORS[r.id % 8]}">${SYM[r.id % 8]}</i>`).join('');
+    $('ropes-text').textContent = S.ropes.length ? `${S.ropes.length}줄 남음` : '모두 풀렸어요!';
+    const tn = Rules.twCount(S.tw), tb = $('twist-badge'); tb.hidden = !tn; tb.textContent = `꼬임 ${tn}`;
+    $('goal').innerHTML = `<span class="s">★★★</span> ${S.target}수 이하<br><span class="s">★★</span> ${S.target + 2}수 이하`;
   }
-  function setCoach(text, ms = 0) {
-    clearTimeout(coachTimer); $('coach').textContent = text || '';
+  function setCoach(text, ms = 0, warn = false) {
+    clearTimeout(coachTimer); $('coach').textContent = text || ''; $('coach').classList.toggle('warn', !!warn);
     if (ms) coachTimer = setTimeout(() => setCoach(S ? S.tip : ''), ms);
   }
 
@@ -359,49 +506,84 @@
     for (let i = 0; i < S.holes.length; i++) if (!occ.has(i)) { const h = holeXY(i), d = Math.hypot(h.x - p.x, h.y - p.y); if (d < bd) { bd = d; best = i; } }
     return best;
   }
-  function warn(id, end) {
-    sfx.warn(); const i = ropeIdx(id), cover = Rules.coveredBy(S.holes, S.ropes, i, S.cm).map(j => S.ropes[j].id);
-    S.shake = { id, end, t0: performance.now() }; S.flash = { ids: cover, t0: performance.now() };
-    setCoach('이 줄은 다른 줄에 덮여 있어요. 위에 있는 줄부터 옮겨 보세요.', 2600);
+  const NAMES = ['분홍', '노랑', '청록', '보라', '연두', '주황', '파랑', '자주'];
+  const ropeName = id => `${NAMES[id % 8]} 줄`;
+  // 덮인 핀을 집을 때: 얽힌 줄을 주황으로 깜박이고 「놓으면 꼬여요」
+  function warnTangle(id, end) {
+    const i = ropeIdx(id), ids = Rules.entangled(S.holes, S.ropes, i, S.cm, S.tw).map(j => S.ropes[j].id);
+    S.flash = { ids, t0: performance.now(), warn: true };
+    setCoach(`${ids.map(ropeName).join(' · ')}에 걸려 있어요. 이대로 옮기면 꼬여요!`, 2600, true);
+  }
+  // 집은 핀을 hole 에 놓으면 생길 꼬임 변화(미리 보기)
+  function previewAt(id, end, hole) {
+    if (hole == null) return null;
+    const d = Rules.twistDelta(S.holes, S.ropes, ropeIdx(id), end, hole, S.cm, S.tw);
+    return d.length ? d : null;
   }
   function doMove(id, end, hole) {
     const i = ropeIdx(id); if (i < 0 || S.busy || S.won) return false;
-    const occ = occupiedSet(); if (occ.has(hole) || !S.mv.has(id)) return false;
-    S.hist.push({ ropes: S.ropes.map(r => ({ ...r })), moves: S.moves }); S.hist.length > 200 && S.hist.shift();
-    const moved = Rules.applyMove(S.ropes, i, end, hole), { ropes: after, gone } = Rules.settle(S.holes, moved);
-    S.moves++; S.hint = null; S.sel = null; S.held = null;
-    if (!gone.length) { S.ropes = after; sfx.drop(); recalc(); hud(); setCoach(S.tip); return true; }
+    const occ = occupiedSet(); if (occ.has(hole)) return false;
+    S.hist.push({ ropes: S.ropes.map(r => ({ ...r })), tw: { ...S.tw }, moves: S.moves, mv: { id, end, from: S.ropes[i][end], to: hole } });
+    const delta = Rules.twistDelta(S.holes, S.ropes, i, end, hole, S.cm, S.tw);
+    const tw0 = Rules.twCount(S.tw), nx = Rules.applyMove(S.ropes, i, end, hole, S.holes, S.tw);
+    const { ropes: after, gone } = Rules.settle(S.holes, nx.ropes, nx.tw);
+    S.moves++; S.hint = null; S.sel = null; S.held = null; S.preview = null; S.tw = nx.tw;
+    const tw1 = Rules.twCount(S.tw);
+    S.wob[id] = { t0: performance.now(), amp: ropeW() * (gentle() ? .4 : 1.3) };
+    for (const d of delta) S.wob[d.id] = { t0: performance.now(), amp: ropeW() * (gentle() ? .3 : .9) };
+    if (!gone.length) {
+      S.ropes = after; recalc(); hud();
+      if (tw1 > tw0) {
+        sfx.twist(); const worse = delta.filter(d => Math.abs(d.w1) > Math.abs(d.w0)).map(d => d.id);
+        S.flash = { ids: worse, t0: performance.now(), warn: true };
+        setCoach(`${ropeName(id)}이 ${worse.map(ropeName).join(' · ')}과 꼬였어요! 핀을 반대쪽으로 되돌리면 풀려요.`, 4200, true);
+      } else if (tw1 < tw0) { sfx.untwist(); setCoach(tw1 ? `꼬임 하나가 풀렸어요. 꼬임 ${tw1}개 남았어요.` : '꼬임이 모두 풀렸어요!', 2600); }
+      else { sfx.drop(); setCoach(tw1 ? `꼬임 ${tw1}개 — 꽈배기를 풀어야 줄이 빠져요.` : S.tip, 0, !!tw1); }
+      return true;
+    }
     S.ropes = after; sfx.free(); S.busy = true;
     const now = performance.now();
-    for (const r of gone) { S.anim.push({ rope: r, t0: now, dur: gentle() ? 260 : 560 }); sparkle(holeXY(r.a), COLORS[r.id % 8]); sparkle(holeXY(r.b), COLORS[r.id % 8]); }
-    recalc(); hud(); setCoach(S.tip);
+    gone.forEach((r, k) => { const st = gentle() ? 0 : k * 70; S.anim.push({ rope: r, t0: now + st, dur: gentle() ? 260 : 620, spin: (k % 2 ? 1 : -1) * (.5 + (r.id % 3) * .25) }); setTimeout(() => { sparkle(holeXY(r.a), COLORS[r.id % 8]); sparkle(holeXY(r.b), COLORS[r.id % 8]); }, st); });
+    recalc(); hud(); setCoach(S.moves < S.target ? '꼬임 지름길! 목표보다 빨리 풀었어요!' : '모두 풀렸어요!');
     const cleared = S;
-    setTimeout(() => { if (S !== cleared) return; S.busy = false; win(); }, gentle() ? 300 : 620);
+    setTimeout(() => { if (S !== cleared) return; S.busy = false; win(); }, gentle() ? 300 : 700 + gone.length * 70);
     return true;
   }
   function undo() {
     if (!S || !S.hist.length || S.busy || S.won) return;
-    const h = S.hist.pop(); S.ropes = h.ropes; S.moves = h.moves; S.hint = null; S.held = null; S.sel = null; S.anim = [];
-    sfx.click(); recalc(); hud(); setCoach(S.tip);
+    const h = S.hist.pop(); S.ropes = h.ropes; S.tw = h.tw || {}; S.moves = h.moves; S.hint = null; S.held = null; S.sel = null; S.anim = []; S.preview = null;
+    $('btn-undo').classList.remove('pulse');
+    sfx.click(); recalc(); hud(); const tn = Rules.twCount(S.tw); setCoach(tn ? `꼬임 ${tn}개 — 꽈배기를 풀어야 줄이 빠져요.` : S.tip, 0, !!tn);
   }
 
   // ---------- 힌트 ----------
+  // ① 꼬임을 늘리지 않는 풀이 ② 꼬임 수까지 쓴 풀이(작은 한도) ③ 그래도 없으면 되돌리기로 꼬이기 전으로
   function showHint(silent) {
     if (!S || S.busy || S.won) return;
     let mv = null;
-    const path = Rules.solve(S.holes, S.ropes, { nodes: 150000, depth: 14 });
+    const tw = Rules.twCount(S.tw);
+    const path = Rules.solve(S.holes, S.ropes, { tw: S.tw, nodes: tw ? 60000 : 150000, depth: 14 });
     if (path && path.length) mv = path[0];
-    else {
-      let bestScore = 1e9; const occ = occupiedSet(); void occ;
-      for (const m of Rules.moves(S.holes, S.ropes)) {
-        const after = Rules.settle(S.holes, Rules.applyMove(S.ropes, m.rope, m.end, m.to)).ropes, cm = Rules.crossMatrix(S.holes, after);
-        let c = 0; for (const row of cm) for (const v of row) if (v) c++;
-        if (c < bestScore) { bestScore = c; mv = { id: S.ropes[m.rope].id, end: m.end, to: m.to }; }
+    else if (tw) {
+      // ② 꼬임을 만든 가장 최근 수를 거꾸로(기록에서) ③ 꼬임 합을 가장 많이 줄이는 수
+      const occ = occupiedSet(), sumAfter = m => { const i = ropeIdx(m.id); return Rules.twCount(Rules.applyMove(S.ropes, i, m.end, m.to, S.holes, S.tw).tw); };
+      for (let k = S.hist.length - 1; k >= 0 && !mv; k--) {
+        const h = S.hist[k].mv; if (!h || occ.has(h.from) || ropeIdx(h.id) < 0 || S.ropes[ropeIdx(h.id)][h.end] !== h.to) continue;
+        const m = { id: h.id, end: h.end, to: h.from }; if (sumAfter(m) < tw) mv = m;
+      }
+      if (!mv) {
+        let best = tw;
+        for (const m of Rules.moves(S.holes, S.ropes, S.cm, S.tw, { all: true })) { if (!m.delta.length) continue; const c = { id: S.ropes[m.rope].id, end: m.end, to: m.to }, v = sumAfter(c); if (v < best) { best = v; mv = c; } }
       }
     }
-    if (!mv) return;
+    if (!mv) {
+      if (S.hist.length) { $('btn-undo').classList.remove('pulse'); void $('btn-undo').offsetWidth; $('btn-undo').classList.add('pulse'); setCoach('많이 꼬였어요. 되돌리기로 꼬이기 전으로 돌아가 보세요.', 4000, true); }
+      else setCoach('다시 하기로 처음부터 풀어 보세요.', 3000, true);
+      return;
+    }
     S.hint = mv; S.sel = null; if (!silent) sfx.click();
-    setCoach(silent ? S.tip : '동그라미 친 핀을 점선 끝의 빈 구멍으로 옮겨 보세요.', silent ? 0 : 4000);
+    const pv = previewAt(mv.id, mv.end, mv.to);
+    setCoach(silent ? S.tip : pv && pv.some(d => Math.abs(d.w1) < Math.abs(d.w0)) ? '점선대로 옮기면 꼬임이 풀려요.' : '동그라미 친 핀을 점선 끝의 빈 구멍으로 옮겨 보세요.', silent ? 0 : 4000);
   }
 
   // ---------- 입력(마우스 · 터치) ----------
@@ -415,18 +597,19 @@
       if (!peg || (peg.id === S.sel.id && peg.end === S.sel.end)) { S.sel = null; return; }
     }
     if (!peg) return;
-    if (!S.mv.has(peg.id)) { warn(peg.id, peg.end); return; }
+    if (!S.mv.has(peg.id)) warnTangle(peg.id, peg.end);
     pointerId = e.pointerId; downAt = p; S.held = { id: peg.id, end: peg.end, x: p.x, y: p.y, hover: null, from: S.ropes[ropeIdx(peg.id)][peg.end] };
     sfx.pick(); canvas.setPointerCapture(e.pointerId); e.preventDefault();
   });
   canvas.addEventListener('pointermove', e => {
     if (!S || !S.held || e.pointerId !== pointerId) return;
     const p = toLocal(e); S.held.x = p.x; S.held.y = p.y; S.held.hover = nearestEmpty(p);
+    S.preview = previewAt(S.held.id, S.held.end, S.held.hover);
   });
   const release = (e, cancel) => {
     if (!S || !S.held || e.pointerId !== pointerId) return;
     const h = S.held, p = toLocal(e), tap = Math.hypot(p.x - downAt.x, p.y - downAt.y) < 9;
-    pointerId = null; S.held = null; try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* 이미 놓임 */ }
+    pointerId = null; S.held = null; S.preview = null; try { canvas.releasePointerCapture(e.pointerId); } catch (_) { /* 이미 놓임 */ }
     if (cancel) return;
     if (tap) { S.sel = { id: h.id, end: h.end }; S.hint = S.hint; setCoach('옮길 빈 구멍을 눌러 주세요.', 2200); return; }
     const hole = nearestEmpty(p);
@@ -444,7 +627,7 @@
       const p = holeXY(i), vx = p.x - from.x, vy = p.y - from.y, along = vx * dx + vy * dy; if (along <= 1) continue;
       const perp = Math.abs(vx * dy - vy * dx), sc = along + perp * 1.7; if (sc < bs) { bs = sc; best = i; }
     }
-    if (best != null) { S.cursor = best; if (S.held && S.held.kb) { const p = holeXY(best); S.held.x = p.x; S.held.y = p.y; S.held.hover = occupiedSet().has(best) ? null : best; } sfx.click(); }
+    if (best != null) { S.cursor = best; if (S.held && S.held.kb) { const p = holeXY(best); S.held.x = p.x; S.held.y = p.y; S.held.hover = occupiedSet().has(best) ? null : best; S.preview = previewAt(S.held.id, S.held.end, S.held.hover); } sfx.click(); }
   }
   function confirmCursor() {
     if (!S || S.busy || S.won) return; S.kb = true;
@@ -455,11 +638,11 @@
       S.held = null; doMove(h.id, h.end, S.cursor); return;
     }
     for (const r of S.ropes) for (const end of ['a', 'b']) if (r[end] === S.cursor) {
-      if (!S.mv.has(r.id)) { warn(r.id, end); return; }
+      if (!S.mv.has(r.id)) warnTangle(r.id, end);
       const p = holeXY(S.cursor); S.held = { id: r.id, end, x: p.x, y: p.y, hover: null, from: S.cursor, kb: true }; sfx.pick(); return;
     }
   }
-  function cancelHeld() { if (S) { S.held = null; S.sel = null; } }
+  function cancelHeld() { if (S) { S.held = null; S.sel = null; S.preview = null; } }
   document.addEventListener('keydown', e => {
     if (e.code === 'Escape') {
       e.preventDefault();
@@ -511,9 +694,10 @@
 
   function openHelp(back) {
     const el = openModal('help', '게임 방법', `
-      <div class="step"><i>1</i><span>맨 위에 있는 핀을 끌어서 빈 구멍에 놓아요.</span></div>
+      <div class="step"><i>1</i><span>흰 테를 두른 핀(맨 위 줄)을 끌어서 빈 구멍에 놓아요.</span></div>
       <div class="step"><i>2</i><span>모든 줄이 서로 엇갈리지 않게 옮기면 한꺼번에 빠져요.</span></div>
-      <div class="step"><i>3</i><span>막혔다면 한 수 되돌리거나 되돌리기를 눌러요.</span></div>
+      <div class="step"><i class="tw">↻</i><span>덮인 줄을 억지로 빼면 위 줄과 <b>꼬여요</b>. 꼬인 줄은 빠지지 않아요 — 핀을 반대쪽으로 되돌리면 풀려요.</span></div>
+      <div class="step"><i>3</i><span>막혔다면 힌트를 보거나 되돌리기를 눌러요.</span></div>
       <p class="note">키보드: 방향키로 고르고, Enter로 집기 · 놓기, U 되돌리기, H 힌트, Esc 멈춤<br>게임패드: 십자키 + A, B 취소, X 되돌리기, Y 힌트</p>
       <button class="btn teal" data-focus>시작하기!</button>`, { onClose: back });
     on(el, '.btn', () => closeModal());
@@ -609,11 +793,11 @@
   }
   function startDaily() {
     const today = kstDate(); setCoach('오늘의 실을 엮는 중…'); closeModal(true);
-    setTimeout(() => { const lv = genLevel(hashStr('looseends' + today) || 5, [12, 4, 6, 4, 6], '오늘의 퍼즐', 'daily', 0); lv.date = today; begin(lv); }, 20);
+    setTimeout(() => { const lv = genLevel(hashStr('looseends' + today) || 5, [12, 4, 6, 4, 6], '오늘의 퍼즐', 'daily', 0, (hashStr('looseends' + today) % 3) !== 0); lv.date = today; begin(lv); }, 20);
   }
   function startEndless() {
     const n = rec.endless.cleared + 1; setCoach('새 실을 엮는 중…'); closeModal(true);
-    setTimeout(() => begin(genLevel(rec.endless.seed * 1009 + n * 31, endlessSpec(n), `끝없는 실 ${n}`, 'endless', n)), 20);
+    setTimeout(() => begin(genLevel(rec.endless.seed * 1009 + n * 31, endlessSpec(n), `끝없는 실 ${n}`, 'endless', n, n >= 9 && n % 2 === 1)), 20);
   }
 
   // ---------- 끝 ----------
@@ -634,7 +818,7 @@
     send(campaignCleared ? 'hk:score' : 'hk:live', { score: total() });
     const newly = THREADS.concat(LOOMS).filter(x => x.need > starsBefore && x.need <= starTotal());
     const nx = THREADS.find(x => !threadOk(x));
-    const praise = stars === 3 ? '한 수도 낭비 없이!' : stars === 2 ? '아주 좋아요!' : '해냈어요!';
+    const praise = S.moves < S.target ? '꼬임 지름길을 찾았어요!' : stars === 3 ? '한 수도 낭비 없이!' : stars === 2 ? '아주 좋아요!' : '해냈어요!';
     const hasNext = S.kind === 'map' ? S.idx < 39 : S.kind === 'endless';
     const el = openModal('result', stars === 3 ? '완벽해요!' : stars === 2 ? '잘했어요!' : '풀었어요!', `
       <div class="result-top"><div style="flex:1"><div class="stars3" aria-label="별 ${stars}개">${[1, 2, 3].map(k => `<span class="${k <= stars ? 'on' : ''}">★</span>`).join('')}</div><p class="praise">${praise}</p></div>
@@ -647,7 +831,7 @@
 
   // ---------- 연결 ----------
   const origBegin = begin;
-  begin = level => { origBegin(level); S.initialLevel = { ...level, ropes: level.ropes.map(r => ({ ...r })) }; S.initial = S.initialLevel.ropes; };
+  begin = level => { origBegin(level); S.initialLevel = { ...level, ropes: level.ropes.map(r => ({ ...r })), tw: { ...(level.tw || {}) } }; S.initial = S.initialLevel.ropes; };
   $('btn-undo').onclick = () => undo(); $('btn-restart').onclick = () => restart(); $('btn-hint').onclick = () => showHint();
   $('btn-help').onclick = () => { sfx.click(); openHelp(); }; $('btn-settings').onclick = () => { sfx.click(); openSettings(); };
   $('btn-map').onclick = () => { sfx.click(); openTrail('map'); }; $('btn-pause').onclick = () => { sfx.click(); EMBED ? send('hk:esc') : openPause(); };
@@ -665,5 +849,5 @@
   resize();
   begin(mapLevel(rec.stars.every(Boolean) ? 39 : Math.min(39, Math.max(0, rec.stars.findIndex(s => !s)))));
   send('hk:ready'); requestAnimationFrame(frame); canvas.focus({ preventScroll: true });
-  window.__looseends = { get state() { return S; }, rec, Rules, mapLevel, begin, doMove, total, win, geo: () => geo, holeXY };
+  window.__looseends = { get state() { return S; }, rec, Rules, mapLevel, begin, doMove, undo, showHint, startDaily, startEndless, total, win, geo: () => geo, holeXY };
 })();
