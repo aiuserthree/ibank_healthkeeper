@@ -1,9 +1,9 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=5';
-import { createScene } from './scene.js?v=5';
-import { impactDuration } from './impact.js?v=5';
-import { assetRoot } from './world.js?v=5';
-import { requestYield } from './traffic.js?v=5';
-import { createShowroom } from './showroom.js?v=5';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=7';
+import { createScene } from './scene.js?v=7';
+import { impactDuration } from './impact.js?v=7';
+import { assetRoot } from './world.js?v=7';
+import { requestYield } from './traffic.js?v=7';
+import { createShowroom } from './showroom.js?v=7';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -189,7 +189,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=5`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=7`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -344,6 +344,9 @@ function paintHud() {
   $('fuel-bar').style.transform = `scaleX(${state.fuel})`;
   $('fuel').setAttribute('aria-valuenow', String(Math.round(state.fuel * 100)));
   $('fuel').classList.toggle('low', state.fuel < .2);
+  $('hunger-bar').style.transform = `scaleX(${state.hunger})`;
+  $('hunger').setAttribute('aria-valuenow', String(Math.round(state.hunger * 100)));
+  $('hunger').classList.toggle('low', state.hunger < .2);
   paintRestSign();
   $('health').setAttribute('aria-label', `내구도 ${health} / ${MAX_HEALTH}`);
   healthLights.forEach((light, i) => light.classList.toggle('lost', i >= health));
@@ -375,26 +378,22 @@ function askRest() {
 // 휴게소: 주행을 멈추고 차에서 내린 화면 — 주유(무료) · 식당(크레딧으로 음식, 휴게소마다 한 가지씩 한 번)
 let restEaten = new Set();
 function restTab(name) {
-  const food = name === 'food';
-  $('tab-station').setAttribute('aria-selected', String(!food));
-  $('tab-food').setAttribute('aria-selected', String(food));
-  $('rest-station').hidden = food;
-  $('rest-food').hidden = !food;
-  $('rest-scene').dataset.scene = food ? 'food' : 'station';
+  $('rest-scene').dataset.scene = name === 'food' ? 'food' : 'station';
 }
 function paintRest() {
   $('tank-bar').style.transform = `scaleX(${state.fuel})`;
   $('tank-value').textContent = `${Math.round(state.fuel * 100)}%`;
   $('refuel').disabled = state.fuel >= .995;
-  $('rest-balance').textContent = number(profile.balance);
+  $('belly-bar').style.transform = `scaleX(${state.hunger})`;
+  $('belly-value').textContent = `${Math.round(state.hunger * 100)}%`;
+  $('rest-balance').textContent = number(state.score);
   $('menu-list').innerHTML = foods.map(food => {
     const eaten = restEaten.has(food.id);
-    const full = (food.id === 'walnut' || food.id === 'udon') && state.health >= MAX_HEALTH && !Object.values(state.damage).some(Boolean);
-    const disabled = eaten || full || profile.balance < food.price;
+    const disabled = eaten || state.score < food.price;
     return `<button type="button" class="dish ${eaten ? 'eaten' : ''}" data-food="${food.id}" ${disabled ? 'disabled' : ''}>
       <img src="${assetRoot}rest/${food.id}.webp?v=1" width="256" height="256" alt="">
       <b>${food.name}</b><small>${food.effect}</small>
-      <em>${eaten ? '먹었어요' : full ? '내구도 가득' : '◆ ' + number(food.price)}</em>
+      <em>${eaten ? '먹었어요' : number(food.price) + ' 점'}</em>
     </button>`;
   }).join('');
 }
@@ -407,11 +406,11 @@ function enterRest() {
   restTab('station');
   paintRest();
   $('rest').showModal();
-  $('refuel').disabled ? $('tab-food').focus() : $('refuel').focus();
+  ($('refuel').disabled ? $('menu-list').querySelector('button:not(:disabled)') || $('depart') : $('refuel')).focus();
   send('hk:paused');
 }
 function departRest() {
-  if (!$('rest').open) return;
+  if (!$('rest').open || $('rest').classList.contains('watching')) return;
   $('rest').close();
   leaveRest(state);
   previous = 0;
@@ -421,27 +420,55 @@ function departRest() {
   send('hk:resumed');
   schedule();
 }
-$('tab-station').addEventListener('click', () => restTab('station'));
-$('tab-food').addEventListener('click', () => restTab('food'));
-$('refuel').addEventListener('click', () => {
+// 식당 쪽에 마우스 · 포커스가 가면 배경이 식당 안으로, 주유소 쪽이면 바깥으로
+for (const [part, scene] of [['rest-station', 'station'], ['rest-food', 'food']]) {
+  $(part).addEventListener('pointerenter', () => restTab(scene));
+  $(part).addEventListener('focusin', () => restTab(scene));
+}
+// 휴게소 영상: 주유(6초) · 메뉴별 음식(4초)을 화면 가득 보여 주고, 끝나거나 건너뛰면 효과가 붙는다 — 영상을 못 불러오면 바로
+const refuelVideo = $('refuel-video');
+const movieRoot = `${assetRoot}rest/`;
+let movieDone = null;
+function playMovie(name, caption, done) {
+  movieDone = done;
+  $('rest').classList.add('watching');
+  $('refuel-movie').hidden = false;
+  $('refuel-caption').textContent = caption;
+  refuelVideo.src = `${movieRoot}${name}.mp4?v=1`;
+  refuelVideo.play().catch(endMovie);
+  $('refuel-skip').focus();
+}
+function endMovie() {
+  if (!$('rest').classList.contains('watching')) return;
+  refuelVideo.pause();
+  $('refuel-movie').hidden = true;
+  $('rest').classList.remove('watching');
+  const done = movieDone;
+  movieDone = null;
+  done?.();
+}
+$('refuel').addEventListener('click', () => playMovie('refuel', '기름 넣는 중…', () => {
   state.fuel = 1;
   $('rest-status').textContent = '기름을 가득 넣었습니다';
   beep(560, .12);
   paintRest();
-});
+  $('depart').focus();
+}));
+refuelVideo.addEventListener('ended', endMovie);
+refuelVideo.addEventListener('error', endMovie);
+$('refuel-skip').addEventListener('click', endMovie);
 $('menu-list').addEventListener('click', event => {
   const button = event.target.closest('[data-food]');
   if (!button || button.disabled) return;
   const food = foods.find(item => item.id === button.dataset.food);
-  if (profile.balance < food.price) return;
-  profile.balance -= food.price;
-  save();
-  eatFood(state, food.id);
+  if (!eatFood(state, food.id)) return;
   restEaten.add(food.id);
-  $('rest-status').textContent = `${food.name} 냠 — ${food.effect}`;
-  beep(700, .1);
   paintRest();
-  $('menu-list').querySelector(`[data-food="${food.id}"]`)?.focus();
+  playMovie(`eat-${food.id}`, `${food.name} 먹는 중…`, () => {
+    $('rest-status').textContent = `${food.name} 냠 — ${food.effect}`;
+    beep(700, .1);
+    ($('menu-list').querySelector('button:not(:disabled)') || $('depart')).focus();
+  });
 });
 $('depart').addEventListener('click', departRest);
 $('rest').addEventListener('cancel', event => event.preventDefault());
@@ -542,6 +569,9 @@ function start() {
   $('results').close();
   $('paused').close();
   $('rest').close();
+  $('rest').classList.remove('watching');
+  $('refuel-movie').hidden = true;
+  refuelVideo.pause();
   wakeAudio();
   clearInput();
   state = createRun(courses[profile.course], modes[profile.mode], carStats(profile.car, profile.upgrades[profile.car]));
@@ -690,6 +720,8 @@ addEventListener('keydown', event => {
   else if (!event.repeat && event.code === 'KeyE') askRest();
 });
 addEventListener('keyup', event => keys.delete(event.code));
+// 게임 화면 어디든 누르면 아케이드의 오른쪽 순위 패널을 닫게 알린다(창 안을 누른 건 바깥에서 모른다)
+addEventListener('pointerdown', () => send('hk:tap'), true);
 addEventListener('blur', clearInput);
 document.addEventListener('visibilitychange', () => { if (document.hidden && screen === 'drive') pause(); });
 touchButtons.forEach(button => {

@@ -1,4 +1,4 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=5';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=7';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -9,15 +9,17 @@ export const PANEL_BREAK = .86;
 export const MAX_HEALTH = 5;
 // 기름 · 휴게소(운영자 요청) — 기름 한 통으로 7 km, 휴게소는 3 km 지점부터 3.2 km 마다. 표지는 1.2 km 앞에서 보인다
 export const FUEL_RANGE = 7000;
+// 배고픔(운영자 제안) — 가득 차면 9 km, 비면 최고 속도 -20%(끝나지는 않음), 식당 음식으로 채운다
+export const HUNGER_RANGE = 9000;
 export const REST_FIRST = 3000;
 export const REST_EVERY = 3200;
 export const REST_SIGN = 1200;
 export const restNames = ['노을 휴게소', '바람재 휴게소', '달빛 휴게소', '솔숲 휴게소', '물안개 휴게소'];
 export const foods = [
-  { id: 'walnut', name: '호두과자', price: 90, effect: '내구도 +1' },
-  { id: 'udon', name: '우동', price: 180, effect: '내구도 가득 · 찌그러짐 펴기' },
-  { id: 'hotbar', name: '핫바', price: 70, effect: '다음 휴게소까지 기름 25% 덜 씀' },
-  { id: 'coffee', name: '커피', price: 110, effect: '3 km 동안 최고 속도 +12 km/h' },
+  { id: 'walnut', name: '호두과자', price: 300, fill: .3, effect: '배 +30% · 내구도 +1' },
+  { id: 'udon', name: '우동', price: 600, fill: .7, effect: '배 +70% · 내구도 가득 · 찌그러짐 펴기' },
+  { id: 'hotbar', name: '핫바', price: 250, fill: .4, effect: '배 +40% · 다음 휴게소까지 기름 25% 덜 씀' },
+  { id: 'coffee', name: '커피', price: 400, fill: .2, effect: '배 +20% · 3 km 동안 최고 속도 +12 km/h' },
 ];
 export const restAt = index => REST_FIRST + index * REST_EVERY;
 export function nextRest(state) {
@@ -32,7 +34,13 @@ export function callRest(state) {
   state.restCall = rest.at;
   return true;
 }
+// 음식은 이번 주행 점수로 산다(크레딧이 0 이어도 사 먹을 수 있게 — 운영자 요청)
 export function eatFood(state, id) {
+  const food = foods.find(item => item.id === id);
+  if (!food || state.score < food.price) return false;
+  state.bonus -= food.price;
+  state.score = Math.max(0, state.score - food.price);
+  state.hunger = Math.min(1, state.hunger + food.fill);
   if (id === 'walnut') state.health = Math.min(MAX_HEALTH, state.health + 1);
   if (id === 'udon') {
     state.health = MAX_HEALTH;
@@ -40,6 +48,7 @@ export function eatFood(state, id) {
   }
   if (id === 'hotbar') state.saver = restAt(state.restStop.index + 1);
   if (id === 'coffee') state.boostUntil = state.distance + 3000;
+  return true;
 }
 // 휴게소에서 나와 본선에 다시 합류 — 오른쪽 끝 차로, 근처 차는 비켜 둔다
 export function leaveRest(state) {
@@ -183,7 +192,7 @@ export function createRun(course, selectedMode, car) {
   const state = {
     course, mode, car, rival, traffic: [], distance: 0, elapsed: 0, remaining: mode.time,
     x: LANES[2], speed: 23, acceleration: 0, steer: 0, wheelAngle: 0, wheelSpin: 0,
-    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, restCall: null, restStop: null, saver: 0, boostUntil: 0, cooldown: 0, score: 0, bonus: 0,
+    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, hunger: 1, restCall: null, restStop: null, saver: 0, boostUntil: 0, cooldown: 0, score: 0, bonus: 0,
     overtakes: 0, closeCalls: 0, nextGate: mode.gate ?? Infinity, checkpoints: 0,
     spawnAt: 90, signal: null, impact: null, trafficImpact: null, damage: { front: 0, rear: 0, left: 0, right: 0 }, outcome: null,
   };
@@ -289,7 +298,7 @@ function collide(state, vehicle, lastX, lastZ, previousGap, length, width) {
 
 function advanceCar(state, input, dt) {
   const { car, course, distance, speed, x } = state;
-  const top = (car.top + (distance < state.boostUntil ? 12 : 0)) / 3.6;
+  const top = (car.top + (distance < state.boostUntil ? 12 : 0)) * (state.hunger > 0 ? 1 : .8) / 3.6;
   const braking = Boolean(input.brake);
   const onShoulder = Math.abs(x) > 6.28;
   const ratio = speed / top;
@@ -329,6 +338,7 @@ function advanceCar(state, input, dt) {
   const lateral = travel * Math.sin(direction) - slope * forward;
   state.distance += forward;
   state.fuel = Math.max(0, state.fuel - Math.max(0, forward) / FUEL_RANGE * (state.distance < state.saver ? .75 : 1));
+  state.hunger = Math.max(0, state.hunger - Math.max(0, forward) / HUNGER_RANGE);
   state.x = clamp(x + lateral, -6.55, 6.55);
   if (state.x !== x + lateral) state.yaw = damp(state.yaw, 0, dt, 6);
   state.wheelSpin = (state.wheelSpin - travel / TIRE_RADIUS) % (Math.PI * 2);
@@ -345,6 +355,7 @@ export function step(state, input, dt) {
   state.cooldown = Math.max(0, state.cooldown - dt);
   state.signal = null;
   const before = state.distance;
+  const hungerBefore = state.hunger;
   const previousX = state.x;
   advanceCar(state, input, dt);
   advanceImpact(state, dt);
@@ -407,6 +418,8 @@ export function step(state, input, dt) {
     state.restCall = null;
   } else if (rest != null && state.distance > rest) state.restCall = null;
   if (state.fuel < .2 && state.fuel + Math.max(0, state.distance - before) / FUEL_RANGE >= .2 && !state.signal) state.signal = '기름 부족  ·  휴게소에 들르세요';
+  if (state.hunger < .2 && hungerBefore >= .2 && !state.signal) state.signal = '배고픔  ·  휴게소 식당에 들르세요';
+  if (state.hunger <= 0 && hungerBefore > 0) state.signal = '배가 고파 힘이 빠져요  ·  최고 속도 -20%';
 
   state.score = Math.min(SCORE_LIMIT, Math.floor(state.distance * .55 + state.bonus));
   if (state.health <= 0) state.outcome = 'wreck';
@@ -415,7 +428,7 @@ export function step(state, input, dt) {
   } else if (mode.passes && state.overtakes >= mode.passes) state.outcome = 'win';
   else if (rival && rival.z >= mode.goal) state.outcome = 'rival';
   else if (mode.time && state.remaining <= 0) state.outcome = 'timeout';
-  else if (state.fuel <= 0 && state.speed < 1.5) state.outcome = 'fuel';
+  else if (state.fuel <= 0) state.outcome = 'fuel';
   if (state.outcome === 'win') state.score = Math.min(SCORE_LIMIT, state.score + 550);
 }
 

@@ -17,6 +17,7 @@
  *   { type: "hk:paused" } / { type: "hk:resumed" } — 게임이 멈췄다 · 다시 움직인다(게임 안 덮개를 눌러 이어 할 때도)
  *   { type: "hk:esc" }     — 게임 창 안에서 Esc 를 눌렀다(헬스키퍼가 멈춤/이어 하기를 정한다)
  *   { type: "hk:restart" } — 다시 하기
+ *   { type: "hk:tap" }     — 게임 화면 어딘가를 눌렀다(창 안을 누른 건 바깥에서 모르니) — 열려 있는 오른쪽 순위 패널을 닫는다
  *
  * 지켜 둔 것
  * - 정해 둔 주소(origin)에서, 우리가 띄운 그 창이 보낸 말만 받는다.
@@ -52,6 +53,16 @@ window.HKEmbed = (() => {
           if (m.type === "hk:paused") { paused = true; return; }
           if (m.type === "hk:resumed") { paused = false; return; }
           if (m.type === "hk:esc") return ctx.togglePause ? ctx.togglePause() : null;
+          if (m.type === "hk:tap") {
+            // 순위 패널(play.js 의 openBoard(false) 와 같은 일) — 열려 있을 때만
+            const board = document.querySelector(".hk-pf .hk-play-board.is-open");
+            if (board) {
+              board.classList.remove("is-open");
+              const scrim = document.getElementById("hk-pf-scrim");
+              if (scrim) scrim.hidden = true;
+            }
+            return;
+          }
           if (m.type === "hk:start") {
             running = true; live = 0;
             ctx.started();

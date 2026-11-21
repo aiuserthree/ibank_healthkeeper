@@ -104,7 +104,16 @@ class TwilightrunStaticTest(unittest.TestCase):
         for name in ("collision", "debris", "horn"):
             self.assertTrue((art / "audio" / f"{name}.mp3").is_file(), name)
         self.assertTrue((art / "hero.jpg").is_file())
-        self.assertLessEqual(sum(p.stat().st_size for p in art.rglob("*") if p.is_file()), 2_000_000)
+        # 그림 · 소리는 합쳐 2MB, 휴게소 영상(주유 12초 · 메뉴별 음식 8초, 소리 없음 960×540)은 따로 5MB
+        files = [p for p in art.rglob("*") if p.is_file()]
+        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix != ".mp4"), 2_000_000)
+        movies = ["refuel", "eat-walnut", "eat-udon", "eat-hotbar", "eat-coffee"]
+        for name in movies:
+            self.assertTrue((art / "rest" / f"{name}.mp4").is_file(), name)
+        game_js = (JS_DIR / "game.js").read_text(encoding="utf-8")
+        self.assertIn("playMovie('refuel'", game_js)
+        self.assertIn("playMovie(`eat-${food.id}`", game_js)
+        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix == ".mp4"), 5_000_000)
 
     def test_tint_and_genre(self):
         self.assertIn('twilightrun: ["#302722", "#a4b840"],', PLAY_JS)
