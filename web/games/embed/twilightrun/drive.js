@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=43';
-import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=43';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=44';
+import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=44';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -225,7 +225,8 @@ export const cars = [
   { name: '스틸 웨지', color: '#b8bdc3', top: 262, power: 12.6, grip: 6.6, wheelbase: 3.4, width: 1.04, shape: 'wedge', plate: 'STEEL WEDGE', price: 8000, tag: '스테인리스 각진 전기 픽업 · 삼각형 지붕선', finish: { metalness: .92, roughness: .34, clearcoat: 0 } },
   { name: '루나 포드', color: '#f3f2ee', top: 284, power: 11.2, grip: 7.0, wheelbase: 2.9, width: 1.0, shape: 'pod', plate: 'LUNA POD', price: 9000, tag: '한 덩어리 유리 · 빛나는 고리 얼굴 · 미래형 전기차' },
   { name: '헥사 팽', color: '#cfd5dc', top: 300, power: 12.4, grip: 7.1, wheelbase: 3.30, width: 1.12, shape: 'hexa', plate: 'HEXA FANG', price: 10500, tag: '액체 크롬 몸 · 라임 빛 · 꼬리 지느러미' },
-  { name: '스틸 로드스터', color: '#e3e4e2', top: 298, power: 12.9, grip: 7.3, wheelbase: 3.0, width: 1.06, shape: 'roadster', plate: 'ROADSTER', price: 12000, tag: '각진 쐐기 · 가로 빛줄 얼굴 · 한 장 유리 지붕', finish: { metalness: .45, roughness: .22 } },
+  { name: '스틸 로드스터', color: '#e3e4e2', top: 298, power: 12.9, grip: 7.3, wheelbase: 3.0, width: 1.06, shape: 'roadster', plate: 'ROADSTER', price: 12000,
+    mesh: { wheel: { brake: '#c9ced6', rim: '#2a2d31', spokes: 5, y: true, big: true, lip: '#c9ced6', nut: '#c9ced6', axles: [-1.174, 1.355], track: .78 }, tail: [.6, .62], head: [.6, .48] }, tag: '각진 쐐기 · 가로 빛줄 얼굴 · 한 장 유리 지붕', finish: { metalness: .45, roughness: .22 } },
   { name: '스트라토 캐노피', color: '#141619', top: 308, power: 12.8, grip: 7.6, wheelbase: 3.44, width: 1.07, shape: 'strato', plate: 'STRATO', price: 14000,
     // 힉스필드 3D 몸통(시험 1대) — 바퀴 자리 · 빛 번짐 자리
     mesh: { wheel: { brake: '#d4271c', rim: '#d7dbe0', spokes: 5, width: .065, big: true, axles: [-1.31, 1.71], track: .89 }, tail: [.62, .62], head: [.7, .52] }, tag: '검정에 빨간 가운데 줄 · 삼각 그물 그릴' },
