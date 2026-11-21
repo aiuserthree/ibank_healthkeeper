@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=23';
-import { createScene } from './scene.js?v=23';
-import { impactDuration } from './impact.js?v=23';
-import { assetRoot } from './world.js?v=23';
-import { requestYield } from './traffic.js?v=23';
-import { createShowroom } from './showroom.js?v=23';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=23';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=24';
+import { createScene } from './scene.js?v=24';
+import { impactDuration } from './impact.js?v=24';
+import { assetRoot } from './world.js?v=24';
+import { requestYield } from './traffic.js?v=24';
+import { createShowroom } from './showroom.js?v=24';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=24';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -43,6 +43,8 @@ function load() {
     course: Number.isInteger(data?.course) && courses[data.course] ? data.course : 0,
     mode: Number.isInteger(data?.mode) && modes[data.mode] ? data.mode : 0,
     sound: data?.sound === true,
+    music: typeof data?.music === 'string' ? data.music : 'citypop',
+    musicVolume: typeof data?.musicVolume === 'number' ? clamp(data.musicVolume, 0, 1) : .45,
     upgrades,
   };
 }
@@ -68,6 +70,14 @@ let impactAge = Infinity;
 let lastTrafficSound = -Infinity;
 
 const soundEnabled = () => hosted ? !arcadeMuted : profile.sound;
+// 드라이브 음악(운영자 요청) — 힉스필드로 만든 오리지널 5곡(가사 없음). 주행 중에만, 고르기 · 끄기 · 크기, 소리를 끄면 안 남
+const tracks = [
+  { id: 'citypop', name: '시티팝 · 노을 드라이브' }, { id: 'synthwave', name: '신스웨이브 · 밤 도시' },
+  { id: 'acoustic', name: '어쿠스틱 · 아침 국도' }, { id: 'lofi', name: '로파이 · 느긋한 저녁' }, { id: 'rock', name: '록 · 고속도로' },
+];
+const music = new Audio();
+music.loop = true;
+music.preload = 'none';
 
 function loadSoundClips(context) {
   for (const name of ['collision', 'debris', 'horn']) {
@@ -190,7 +200,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=23`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=24`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -927,6 +937,42 @@ $('depart').addEventListener('click', departRest);
 $('rest').addEventListener('cancel', event => event.preventDefault());
 $('rest-go').addEventListener('click', askRest);
 
+function syncMusic() {
+  const track = tracks.find(item => item.id === profile.music);
+  const want = track && screen === 'drive' && !$('paused').open && soundEnabled();
+  if (!want) { music.pause(); return; }
+  const src = `${assetRoot}music/${track.id}.mp3?v=1`;
+  if (!music.src.endsWith(src)) music.src = src;
+  music.volume = profile.musicVolume;
+  music.play().catch(() => {});
+}
+function paintMusic() {
+  const track = tracks.find(item => item.id === profile.music);
+  $('music-now').textContent = track ? `♪ ${track.name}` : '음악 꺼짐';
+  $('music-list').innerHTML = [...tracks, { id: '', name: '끄기' }].map(item =>
+    `<button type="button" class="${item.id === profile.music ? 'on' : ''}" data-track="${item.id}">${item.name}</button>`).join('');
+  $('music-volume').value = String(profile.musicVolume);
+}
+function toggleMusicMenu(open = $('music-menu').hidden) {
+  $('music-menu').hidden = !open;
+  $('music').setAttribute('aria-expanded', String(open));
+  if (open) paintMusic();
+}
+$('music').addEventListener('click', () => toggleMusicMenu());
+$('music-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-track]');
+  if (!button) return;
+  profile.music = button.dataset.track;
+  save();
+  paintMusic();
+  syncMusic();
+});
+$('music-volume').addEventListener('input', event => {
+  profile.musicVolume = Number(event.target.value);
+  music.volume = profile.musicVolume;
+  save();
+});
+
 function clearInput() {
   keys.clear();
   touch.clear();
@@ -1041,6 +1087,7 @@ function start() {
   // 판 시작은 카운트다운 전에 알린다 — 아케이드가 이 신호로 순위 패널을 닫는다(전에는 3·2·1 동안 열려 있었음)
   send('hk:start');
   syncCursor();
+  syncMusic();
   $('signal').hidden = true;
   $('race-label').textContent = state.mode.name;
   paintHud();
@@ -1068,6 +1115,8 @@ function finish(outcome) {
   $('result-reward').textContent = `+${number(earned)} 크레딧`;
   $('results').showModal();
   syncCursor();
+  syncMusic();
+  toggleMusicMenu(false);
   send('hk:resumed');
   if (runStarted) send('hk:score', { score: state.score });
   runStarted = false;
@@ -1081,6 +1130,8 @@ function menu() {
   $('paused').close();
   stage.hidden = $('hud').hidden = true;
   $('home').hidden = false;
+  syncMusic();
+  toggleMusicMenu(false);
   homeInfo();
   $('start').focus();
   send('hk:resumed');
@@ -1100,6 +1151,7 @@ function pause() {
   quietEngine();
   $('paused').showModal();
   syncCursor();
+  syncMusic();
   send('hk:paused');
 }
 function resume() {
@@ -1109,6 +1161,7 @@ function resume() {
   wakeAudio();
   stage.focus();
   send('hk:resumed');
+  syncMusic();
   schedule();
 }
 function changeView() {
@@ -1173,6 +1226,7 @@ addEventListener('keydown', event => {
     keys.add(event.code);
   } else if (!event.repeat && event.code === 'KeyC') changeView();
   else if (!event.repeat && event.code === 'KeyH') horn();
+  else if (!event.repeat && event.code === 'KeyM') toggleMusicMenu();
   else if (!event.repeat && event.code === 'KeyE') askRest();
 });
 addEventListener('keyup', event => keys.delete(event.code));
@@ -1220,6 +1274,7 @@ addEventListener('message', event => {
 addEventListener('storage', event => {
   if (!hosted || event.key !== arcadeMuteKey) return;
   arcadeMuted = event.newValue === '1';
+  syncMusic();
   if (arcadeMuted) quietEngine();
   else if (screen === 'drive' && !$('paused').open) wakeAudio();
 });
