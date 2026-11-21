@@ -1,6 +1,9 @@
 // 시간 흐름 · 날씨(운영자 요청) — 코스를 달리는 동안 오전 7시 → 점심 → 오후 → 저녁(노을) → 밤 11시, 끝없는 질주는 하루가 돈다.
 // 날씨는 코스 구간(약 1.2 km)마다 맑음 · 흐림 · 비 · 안개(설산은 눈)로 바뀐다 — 코스마다 늘 같은 순서(씨앗 고정).
-const DAY = 14400; // 끝없는 질주에서 하루 = 14.4 km
+// 운영자: 「시간의 흐름이 너무 빠른 거 아냐?」 — 한 판(코스 끝까지)에 약 6시간, 출발 시각은 판마다 오전 7 · 10시, 오후 2 · 5시 중 하나(밤 11시 전에 끝나게)
+const DAY = 60000; // 끝없는 질주에서 하루 = 60 km
+const RUN_SPAN = .375; // 한 판 = 16시간 중 6시간
+export const DAY_STARTS = [0, .19, .44, .62];
 const phases = [
   { at: 0, sky: 'morning', sun: '#ffd2a0', sunI: 1.85, amb: '#cddcff', ambI: 1.7, fog: '#c2c3c6', exposure: 1.18, night: 0, height: .35 },
   { at: .25, sky: 'noon', sun: '#fff4e2', sunI: 2.6, amb: '#d6e6ff', ambI: 2.0, fog: '#b6c6d6', exposure: 1.12, night: 0, height: 1 },
@@ -13,7 +16,9 @@ const hex = value => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16));
 const mixHex = (a, b, t) => '#' + hex(a).map((v, i) => Math.round(v + (hex(b)[i] - v) * t).toString(16).padStart(2, '0')).join('');
 
 export function dayProgress(state) {
-  return state.mode.goal ? Math.min(1, state.distance / state.mode.goal) : (state.distance % DAY) / DAY;
+  const start = state.dayStart || 0;
+  const span = state.mode.goal ? Math.min(1, state.distance / state.mode.goal) * RUN_SPAN : state.distance / DAY;
+  return (start + span) % 1;
 }
 
 // 하루 중 지금 — 빛 · 안개 색(사이를 부드럽게), 하늘 그림 두 장과 섞는 비율, 시계

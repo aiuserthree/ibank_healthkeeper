@@ -1,9 +1,9 @@
-import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=17';
-import { createFallback } from './scene-fallback.js?v=17';
-import { createCarModels } from './models.js?v=17';
-import { createImpactFx, impactMotion } from './impact.js?v=17';
-import { dayProgress, dayTime, weatherAt } from './daytime.js?v=17';
-import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=17';
+import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=18';
+import { createFallback } from './scene-fallback.js?v=18';
+import { createCarModels } from './models.js?v=18';
+import { createImpactFx, impactMotion } from './impact.js?v=18';
+import { dayProgress, dayTime, weatherAt } from './daytime.js?v=18';
+import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=18';
 
 const poses = [
   { back: 8.5, height: 2.9 },
@@ -297,7 +297,7 @@ function createWebGL(T, stage) {
     const b = atmospheres[next.theme];
     const underpass = world.tunnelAt(viewingZ + 3);
     // 시간 흐름 · 날씨 — 빛 · 안개 · 하늘을 하루 시간에 맞추고, 흐림 · 비 · 안개 · 눈을 더한다
-    const day = dayTime(dayProgress(state), !state.mode.goal);
+    const day = dayTime(dayProgress(state), true);
     const weather = weatherAt(course, distance);
     const w = weather.amount;
     const gloom = { cloudy: .45, rain: .6, fog: .35, snow: .4 }[weather.kind] * w || 0;

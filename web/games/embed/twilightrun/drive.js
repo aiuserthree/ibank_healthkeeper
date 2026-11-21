@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=17';
-import { weatherAt } from './daytime.js?v=17';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=18';
+import { DAY_STARTS, weatherAt } from './daytime.js?v=18';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -17,17 +17,38 @@ export const REST_EVERY = 3200;
 export const REST_SIGN = 1200;
 export const restNames = ['노을 휴게소', '바람재 휴게소', '달빛 휴게소', '솔숲 휴게소', '물안개 휴게소'];
 export const foods = [
-  { id: 'walnut', name: '호두과자', price: 300, fill: .3, effect: '배 +30% · 내구도 +1' },
-  { id: 'udon', name: '우동', price: 600, fill: .7, effect: '배 +70% · 내구도 가득 · 찌그러짐 펴기' },
-  { id: 'hotbar', name: '핫바', price: 250, fill: .4, effect: '배 +40% · 다음 휴게소까지 기름 25% 덜 씀' },
-  { id: 'coffee', name: '커피', price: 400, fill: .2, effect: '배 +20% · 3 km 동안 최고 속도 +12 km/h' },
+  // 값은 보유 크레딧(운영자: 정비소 · 식당 · 주유는 하나의 크레딧으로, 점수로 사 먹기는 뺌)
+  { id: 'walnut', name: '호두과자', price: 100, fill: .3, effect: '배 +30% · 내구도 +1' },
+  { id: 'udon', name: '우동', price: 200, fill: .7, effect: '배 +70% · 내구도 가득 · 찌그러짐 펴기' },
+  { id: 'hotbar', name: '핫바', price: 80, fill: .4, effect: '배 +40% · 다음 휴게소까지 기름 25% 덜 씀' },
+  { id: 'coffee', name: '커피', price: 130, fill: .2, effect: '배 +20% · 3 km 동안 최고 속도 +12 km/h' },
   // 2차 메뉴(운영자 요청)
-  { id: 'tteok', name: '떡볶이', price: 350, fill: .5, effect: '배 +50% · 3 km 동안 핸들이 더 잘 듦' },
-  { id: 'sotteok', name: '소떡소떡', price: 280, fill: .4, effect: '배 +40% · 다음 충돌 1번 막아 줌' },
-  { id: 'tornado', name: '회오리감자', price: 200, fill: .3, effect: '배 +30% · 3 km 동안 추월 점수 2배' },
-  { id: 'hotdog', name: '핫도그', price: 320, fill: .5, effect: '배 +50% · 내구도 +1' },
+  { id: 'tteok', name: '떡볶이', price: 120, fill: .5, effect: '배 +50% · 3 km 동안 핸들이 더 잘 듦' },
+  { id: 'sotteok', name: '소떡소떡', price: 90, fill: .4, effect: '배 +40% · 다음 충돌 1번 막아 줌' },
+  { id: 'tornado', name: '회오리감자', price: 70, fill: .3, effect: '배 +30% · 3 km 동안 추월 점수 2배' },
+  { id: 'hotdog', name: '핫도그', price: 110, fill: .5, effect: '배 +50% · 내구도 +1' },
+  // 마실 것(운영자 요청) — 영상 없이 바로
+  { id: 'water', name: '물', price: 10, fill: .05, still: true, effect: '배 +5% · 다음 휴게소까지 배가 20% 천천히 줄어듦' },
+  { id: 'soda', name: '탄산음료', price: 30, fill: .05, still: true, effect: '배 +5% · 3 km 동안 가속 +5%' },
 ];
 export const restAt = index => REST_FIRST + index * REST_EVERY;
+// 편의점(운영자 요청) — 보유 크레딧, 휴게소마다 종류별 한 번
+export const shopItems = [
+  { id: 'chips', name: '감자칩', price: 40, effect: '배 +15%' },
+  { id: 'chocobar', name: '초코바', price: 35, effect: '배 +10% · 3 km 동안 가속 +5%' },
+  { id: 'energy', name: '에너지음료', price: 60, effect: '3 km 동안 최고 속도 +8 km/h' },
+  { id: 'water', name: '생수', price: 20, effect: '다음 휴게소까지 배가 20% 천천히 줄어듦' },
+  { id: 'gimbap', name: '삼각김밥', price: 50, effect: '배 +35%' },
+  { id: 'gum', name: '껌', price: 15, effect: '3 km 동안 추월 점수 +50%' },
+];
+export function useShopItem(state, id) {
+  const fill = { chips: .15, chocobar: .10, gimbap: .35 }[id] || 0;
+  state.hunger = Math.min(1, state.hunger + fill);
+  if (id === 'chocobar') state.chocoUntil = state.distance + 3000;
+  if (id === 'energy') state.energyUntil = state.distance + 3000;
+  if (id === 'water') state.hungerSaver = restAt(state.restStop.index + 1);
+  if (id === 'gum') state.gumUntil = state.distance + 3000;
+}
 // 정비소(운영자 요청) — 보유 크레딧으로. 수리는 빠진 내구도 한 칸에 60(내구도는 가득인데 찌그러졌으면 60)
 // 타이어 · 엔진오일은 달릴수록 닳는다(운영자 요청: 상태가 보이고, 정비하면 그 상태가 바뀌게)
 export const TIRE_LIFE = 15000, OIL_LIFE = 20000;
@@ -61,16 +82,20 @@ export function serviceCar(state, id) {
   if (id === 'oil') state.oil = 1;
 }
 // 주유 미니게임 결과 — added: 넣은 양(0~1, 넘친 것 포함), grade: regular | premium
+// 크레딧으로 결제(1%당 휘발유 0.5 · 고급 1.5), 30% 까지는 비상 주유로 무료 — 처음 하는 사람(크레딧 0)도 기름이 바닥나지 않게
+export const FUEL_FREE = .3;
+export const fuelRate = grade => grade === 'premium' ? 1.5 : .5;
 export function pumpFuel(state, added, grade, final = true) {
+  const free = Math.max(0, FUEL_FREE - state.fuel);
   const level = state.fuel + added;
   const spilled = Math.max(0, level - 1);
-  const cost = Math.round(added * 100 * (grade === 'premium' ? 3 : 1));
+  const cost = Math.max(0, Math.ceil(Math.max(0, added - free) * 100 * fuelRate(grade) - 1e-6));
   const exact = final && level >= .9 && level <= 1;
   state.fuel = Math.min(1, level);
-  state.bonus += (exact ? 100 : 0) - cost;
-  state.score = Math.max(0, state.score + (exact ? 100 : 0) - cost);
+  state.bonus += exact ? 100 : 0;
+  state.score += exact ? 100 : 0;
   if (grade === 'premium') state.powerUntil = state.distance + 3000;
-  return { cost, spilled, exact, level: state.fuel };
+  return { cost, spilled, exact, level: state.fuel, free: Math.min(free, added) };
 }
 export function nextRest(state) {
   const index = Math.max(0, Math.ceil((state.distance - REST_FIRST) / REST_EVERY));
@@ -87,14 +112,14 @@ export function callRest(state) {
 // 음식은 이번 주행 점수로 산다(크레딧이 0 이어도 사 먹을 수 있게 — 운영자 요청)
 export function eatFood(state, id) {
   const food = foods.find(item => item.id === id);
-  if (!food || state.score < food.price) return false;
-  state.bonus -= food.price;
-  state.score = Math.max(0, state.score - food.price);
+  if (!food) return false;
   state.hunger = Math.min(1, state.hunger + food.fill);
   if (id === 'walnut' || id === 'hotdog') state.health = Math.min(MAX_HEALTH, state.health + 1);
   if (id === 'tteok') state.gripUntil = state.distance + 3000;
   if (id === 'sotteok') state.shield = true;
   if (id === 'tornado') state.passBoostUntil = state.distance + 3000;
+  if (id === 'water') state.hungerSaver = restAt(state.restStop.index + 1);
+  if (id === 'soda') state.sodaUntil = state.distance + 3000;
   if (id === 'udon') {
     state.health = MAX_HEALTH;
     for (const zone of Object.keys(state.damage)) state.damage[zone] *= .2;
@@ -245,7 +270,7 @@ export function createRun(course, selectedMode, car) {
   const state = {
     course, mode, car, rival, traffic: [], distance: 0, elapsed: 0, remaining: mode.time,
     x: LANES[2], speed: 23, acceleration: 0, steer: 0, wheelAngle: 0, wheelSpin: 0,
-    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, hunger: 1, restCall: null, restStop: null, saver: 0, boostUntil: 0, gripUntil: 0, passBoostUntil: 0, shield: false, tire: 1, oil: 1, powerUntil: 0, cooldown: 0, score: 0, bonus: 0,
+    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, hunger: 1, dayStart: DAY_STARTS[Math.floor(Math.random() * DAY_STARTS.length)], restCall: null, restStop: null, saver: 0, boostUntil: 0, gripUntil: 0, passBoostUntil: 0, shield: false, tire: 1, oil: 1, powerUntil: 0, hungerSaver: 0, sodaUntil: 0, chocoUntil: 0, energyUntil: 0, gumUntil: 0, cooldown: 0, score: 0, bonus: 0,
     overtakes: 0, closeCalls: 0, nextGate: mode.gate ?? Infinity, checkpoints: 0,
     spawnAt: 90, signal: null, impact: null, trafficImpact: null, damage: { front: 0, rear: 0, left: 0, right: 0 }, outcome: null,
   };
@@ -366,12 +391,12 @@ function slick(state) {
 
 function advanceCar(state, input, dt) {
   const { car, course, distance, speed, x } = state;
-  const top = (car.top + (distance < state.boostUntil ? 12 : 0)) * (state.hunger > 0 ? 1 : .8) / 3.6;
+  const top = (car.top + (distance < state.boostUntil ? 12 : 0) + (distance < state.energyUntil ? 8 : 0)) * (state.hunger > 0 ? 1 : .8) / 3.6;
   const braking = Boolean(input.brake);
   const onShoulder = Math.abs(x) > 6.28;
   const ratio = speed / top;
   const drag = .5 + 1.75 * ratio ** 2;
-  const tuned = (.9 + .1 * state.oil) * (distance < state.powerUntil ? 1.12 : 1);
+  const tuned = (.9 + .1 * state.oil) * (distance < state.powerUntil ? 1.12 : 1) * (distance < state.sodaUntil ? 1.05 : 1) * (distance < state.chocoUntil ? 1.05 : 1);
   const throttle = input.gas && !braking && state.fuel > 0 ? car.power * tuned * (1 - .61 * ratio) : 0;
   const brake = braking ? 10.2 + 5.2 * Math.min(1, speed / 18) : 0;
   const grade = (roadY(course, distance + 1) - roadY(course, distance - 1)) * 4.9;
@@ -407,7 +432,7 @@ function advanceCar(state, input, dt) {
   const lateral = travel * Math.sin(direction) - slope * forward;
   state.distance += forward;
   state.fuel = Math.max(0, state.fuel - Math.max(0, forward) / FUEL_RANGE * (state.distance < state.saver ? .75 : 1));
-  state.hunger = Math.max(0, state.hunger - Math.max(0, forward) / HUNGER_RANGE);
+  state.hunger = Math.max(0, state.hunger - Math.max(0, forward) / HUNGER_RANGE * (state.distance < state.hungerSaver ? .8 : 1));
   state.tire = Math.max(0, state.tire - Math.max(0, forward) / TIRE_LIFE * (braking ? 1.6 : 1));
   state.oil = Math.max(0, state.oil - Math.max(0, forward) / OIL_LIFE);
   state.x = clamp(x + lateral, -6.55, 6.55);
@@ -453,11 +478,12 @@ export function step(state, input, dt) {
       if (vehicle.bumped || vehicle.clearance < width) continue;
       if (!vehicle.oncoming) {
         state.overtakes++;
-        state.bonus += 45 * (state.distance < state.passBoostUntil ? 2 : 1);
+        const passBoost = (state.distance < state.passBoostUntil ? 2 : 1) * (state.distance < state.gumUntil ? 1.5 : 1);
+        state.bonus += Math.round(45 * passBoost);
       }
       if (vehicle.clearance < width + .82 && state.speed * 3.6 >= 115) {
         state.closeCalls++;
-        const close = 115 * (state.distance < state.passBoostUntil ? 2 : 1);
+        const close = Math.round(115 * (state.distance < state.passBoostUntil ? 2 : 1) * (state.distance < state.gumUntil ? 1.5 : 1));
         state.bonus += close;
         state.signal ||= `아슬아슬 추월  +${close}`;
       }

@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, pumpFuel, serviceCar, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=17';
-import { createScene } from './scene.js?v=17';
-import { impactDuration } from './impact.js?v=17';
-import { assetRoot } from './world.js?v=17';
-import { requestYield } from './traffic.js?v=17';
-import { createShowroom } from './showroom.js?v=17';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=17';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=18';
+import { createScene } from './scene.js?v=18';
+import { impactDuration } from './impact.js?v=18';
+import { assetRoot } from './world.js?v=18';
+import { requestYield } from './traffic.js?v=18';
+import { createShowroom } from './showroom.js?v=18';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=18';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -190,7 +190,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=17`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=18`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -342,7 +342,7 @@ function paintHud() {
   const segment = sectionIndex(course, distance, !mode.goal);
   const locationLabel = `${segment + 1}/${course.sections.length} · ${course.sections[segment].name}`;
   if ($('race-location').textContent !== locationLabel) $('race-location').textContent = locationLabel;
-  const clockLabel = `${dayTime(dayProgress(state), !mode.goal).clock} · ${weatherNames[weatherAt(course, distance).kind]}`;
+  const clockLabel = `${dayTime(dayProgress(state), true).clock} · ${weatherNames[weatherAt(course, distance).kind]}`;
   if ($('race-clock').textContent !== clockLabel) $('race-clock').textContent = clockLabel;
   $('fuel-bar').style.transform = `scaleX(${state.fuel})`;
   $('fuel').setAttribute('aria-valuenow', String(Math.round(state.fuel * 100)));
@@ -382,6 +382,7 @@ function askRest() {
 
 // 휴게소: 주행을 멈추고 차에서 내린 화면 — 주유(무료) · 식당(크레딧으로 음식, 휴게소마다 한 가지씩 한 번)
 let restEaten = new Set();
+let restBought = new Set();
 let restServiced = new Set();
 function restTab(name) {
   $('rest-scene').dataset.scene = name === 'food' ? 'food' : 'station';
@@ -408,7 +409,7 @@ function paintRest() {
   }).join('');
   $('belly-bar').style.transform = `scaleX(${state.hunger})`;
   $('belly-value').textContent = `${Math.round(state.hunger * 100)}%`;
-  $('rest-balance').textContent = number(state.score);
+  $('rest-balance').textContent = number(profile.balance);
   const eaten = foods.filter(food => restEaten.has(food.id)).map(food => food.name);
   $('eaten-list').textContent = eaten.length ? `먹은 것 · ${eaten.join(', ')}` : '키오스크에서 골라 담고 결제하면 번호로 불러 줘요';
   $('open-kiosk').disabled = eaten.length === foods.length;
@@ -417,6 +418,7 @@ function enterRest() {
   clearInput();
   quietEngine();
   restEaten = new Set();
+  restBought = new Set();
   restServiced = new Set();
   $('rest-title').textContent = restNames[state.restStop.index % restNames.length];
   $('rest-status').textContent = '';
@@ -430,7 +432,7 @@ function enterRest() {
     ? $('open-kiosk') : $('refuel')).focus());
 }
 function departRest() {
-  if (!$('rest').open || $('rest').classList.contains('watching') || !$('pump').hidden || !$('kiosk').hidden) return;
+  if (!$('rest').open || $('rest').classList.contains('watching') || !$('pump').hidden || !$('kiosk').hidden || !$('store').hidden) return;
   $('rest').close();
   leaveRest(state);
   previous = 0;
@@ -501,7 +503,7 @@ function pumpStep(step) {
   $('pump-hold').hidden = step !== 'fill';
   $('receipt').hidden = step !== 'done';
   $('pump-close').hidden = step === 'done';
-  $('pump-more').hidden = step !== 'done' || state.fuel >= .995;
+  $('pump-more').hidden = step !== 'done' || state.fuel >= .995 || pump.broke;
   $('fuel-door').classList.toggle('target', step === 'nozzle');
   ({ grade: () => $('grades').querySelector('button')?.focus(), nozzle: () => $('pump-plug').focus(),
     fill: () => $('pump-hold').focus(), done: () => $('pump-done').focus() })[step]?.();
@@ -511,16 +513,22 @@ function paintPump() {
   $('pump-fill').style.transform = `scaleX(${Math.min(1, level)})`;
   $('pump-fill').classList.toggle('over', level > 1);
   $('pump-value').textContent = `${Math.round(level * 100)}%`;
-  $('pump-cost').textContent = `${number(Math.round(pump.added * 100 * (pump.grade === 'premium' ? 3 : 1)))}점`;
+  const free = Math.max(0, FUEL_FREE - state.fuel);
+  $('pump-cost').textContent = `◆ ${number(Math.max(0, Math.ceil(Math.max(0, pump.added - free) * 100 * fuelRate(pump.grade) - 1e-6)))}`;
 }
 function pumpTick(t) {
   if (!pump.holding) return;
   const dt = pump.last ? Math.min(.05, (t - pump.last) / 1000) : 0;
   pump.last = t;
   // 흘리지 않는다(운영자 요청) — 100% 가 되면 저절로 멈춘다
-  pump.added = Math.min(1 - state.fuel, pump.added + dt * .22);
+  // 살 수 있는 만큼만(비상 주유 30% 까지는 무료) — 크레딧이 떨어지면 거기서 멈춘다
+  const free = Math.max(0, FUEL_FREE - state.fuel);
+  const affordable = free + profile.balance / (100 * fuelRate(pump.grade));
+  const cap = Math.min(1 - state.fuel, affordable);
+  pump.added = Math.min(cap, pump.added + dt * .22);
   paintPump();
-  if (state.fuel + pump.added >= .999) {
+  if (pump.added >= cap - .0005) {
+    pump.broke = cap < 1 - state.fuel - .001;
     holdPump(false);
     return;
   }
@@ -539,12 +547,17 @@ function holdPump(on) {
   if (pump.added < .01) return;
   // 계속 넣기를 위해 넣은 만큼씩 결제 — 딱 맞게 보너스는 주유를 마칠 때 한 번(앞에서 받았으면 다시 안 줌)
   const result = pumpFuel(state, pump.added, pump.grade, !pump.bonus);
+  profile.balance = Math.max(0, profile.balance - result.cost);
+  save();
+  $('balance').textContent = number(profile.balance);
+  pump.free = (pump.free || 0) + result.free;
   pump.total += pump.added;
   pump.paid += result.cost;
   pump.spilled += result.spilled;
   if (result.exact) pump.bonus = true;
   pump.added = 0;
-  const lines = [`넣은 양 +${Math.round(pump.total * 100)}% → ${Math.round(result.level * 100)}%`, `결제 ${number(pump.paid)}점`];
+  const lines = [`넣은 양 +${Math.round(pump.total * 100)}% → ${Math.round(result.level * 100)}%`, `결제 ◆ ${number(pump.paid)} 크레딧${pump.free > .005 ? ` (비상 주유 ${Math.round(pump.free * 100)}% 무료)` : ''}`];
+  if (pump.broke) lines.push('크레딧이 모자라 여기까지 넣었어요');
   if (pump.bonus) lines.push('딱 맞게! +100점');
   if (result.level >= .999) lines.push('가득 찼어요');
   if (pump.grade === 'premium') lines.push('고급 휘발유 — 3 km 동안 가속 +12%');
@@ -554,7 +567,8 @@ function holdPump(on) {
   pumpStep('done');
 }
 function openPump() {
-  pump.added = pump.total = pump.paid = pump.spilled = 0;
+  pump.added = pump.total = pump.paid = pump.spilled = pump.free = 0;
+  pump.broke = false;
   pump.bonus = false;
   pump.holding = false;
   $('nozzle').classList.remove('plugged');
@@ -653,18 +667,133 @@ $('service-list').addEventListener('click', event => {
 refuelVideo.addEventListener('ended', endMovie);
 refuelVideo.addEventListener('error', endMovie);
 $('refuel-skip').addEventListener('click', endMovie);
+// 편의점(운영자 요청) — 진열대에서 골라 담고, 직원과 대화(내 차 상태 · 날씨 · 시간에 맞춘 추천) → 계산 대화 → 효과
+let basket = [];
+let storeStep = '';
+const basketTotal = () => basket.reduce((sum, id) => sum + shopItems.find(item => item.id === id).price, 0);
+function clerkSay(text, choices = [], talking = true) {
+  $('bubble').textContent = text;
+  $('clerk').src = `${assetRoot}rest/clerk-${talking ? 'talk' : 'smile'}.webp?v=1`;
+  clearTimeout(clerkSay.timer);
+  clerkSay.timer = setTimeout(() => { $('clerk').src = `${assetRoot}rest/clerk-smile.webp?v=1`; }, 1400);
+  $('choices').innerHTML = choices.map(([key, label]) => `<button type="button" class="button quiet" data-say="${key}">${label}</button>`).join('');
+  beep(520 + Math.random() * 80, .04);
+  $('choices').querySelector('button')?.focus();
+}
+function advice() {
+  const weather = weatherAt(state.course, state.distance).kind;
+  const day = dayTime(dayProgress(state), true);
+  if (state.fuel < .3) return '기름이 얼마 안 남았네요. 나가실 때 주유소 꼭 들르세요!';
+  if (state.tire < .3 || state.oil < .2) return '차가 좀 지쳐 보여요. 옆 정비소에서 타이어랑 오일 한번 보세요.';
+  if (state.hunger < .4) return '출출하시죠? 삼각김밥 하나면 든든해요.';
+  if (weather === 'rain' || weather === 'snow') return `${weatherNames[weather]} 와서 길이 미끄러워요. 천천히 가세요!`;
+  if (day.night > .5) return '밤길엔 졸음이 제일 무서워요. 에너지음료나 껌 챙기세요.';
+  return '오늘 날 좋네요! 감자칩이랑 음료 하나 들고 달리면 딱이죠.';
+}
+function paintStore() {
+  $('store-balance').textContent = number(profile.balance);
+  $('goods').innerHTML = shopItems.map(item => {
+    const bought = restBought.has(item.id), taken = basket.includes(item.id);
+    const off = bought || taken || storeStep === 'checkout';
+    return `<button type="button" class="dish ${bought || taken ? 'eaten' : ''}" data-good="${item.id}" ${off ? 'disabled' : ''} title="${item.effect}">
+      <img src="${assetRoot}rest/shop-${item.id}.webp?v=1" width="256" height="256" alt="">
+      <b>${item.name}</b><em>${bought ? '샀어요' : taken ? '담았어요' : '◆ ' + number(item.price)}</em>
+    </button>`;
+  }).join('');
+  $('basket').textContent = basket.length
+    ? `바구니 · ${basket.map(id => shopItems.find(item => item.id === id).name).join(', ')} · ◆ ${number(basketTotal())}`
+    : '진열대에서 눌러 담으세요';
+}
+const shopping = () => ['buy', '계산할게요'];
+function openStore() {
+  basket = [];
+  storeStep = 'greet';
+  $('store').hidden = false;
+  $('rest').classList.add('pumping');
+  paintStore();
+  clerkSay(`어서 오세요! ${restNames[state.restStop.index % restNames.length]} 편의점이에요. 어디까지 가세요?`,
+    [['far', '끝까지 달려요'], ['browse', '그냥 둘러볼게요'], ['tip', '뭐 추천해 줄래요?']]);
+}
+function closeStore() {
+  $('store').hidden = true;
+  $('rest').classList.remove('pumping');
+  storeStep = '';
+  paintRest();
+  $('open-store').focus();
+}
+$('open-store').addEventListener('click', openStore);
+$('goods').addEventListener('click', event => {
+  const button = event.target.closest('[data-good]');
+  if (!button || button.disabled) return;
+  basket.push(button.dataset.good);
+  storeStep = 'shop';
+  paintStore();
+  const item = shopItems.find(entry => entry.id === button.dataset.good);
+  const lines = { chips: '감자칩은 늘 인기예요!', chocobar: '달달한 게 힘 나죠.', energy: '이거 마시면 눈이 번쩍 뜨여요.', water: '물은 꼭 챙기셔야죠.', gimbap: '오늘 들어온 거라 신선해요.', gum: '껌 씹으면 덜 졸려요.' };
+  clerkSay(`${lines[item.id]} (${item.effect})`, [shopping(), ['more', '더 볼게요'], ['leave', '나갈게요']]);
+});
+$('choices').addEventListener('click', event => {
+  const button = event.target.closest('[data-say]');
+  if (!button) return;
+  const say = button.dataset.say;
+  const total = basketTotal();
+  if (say === 'far') clerkSay(`멀리 가시네요! ${advice()}`, [['browse', '둘러볼게요'], ['leave', '나갈게요']]);
+  else if (say === 'tip') clerkSay(advice(), [['browse', '고마워요, 둘러볼게요'], ['leave', '나갈게요']]);
+  else if (say === 'browse' || say === 'more') { storeStep = 'shop'; paintStore(); clerkSay('천천히 보세요~ 진열대에서 고르시면 돼요.', basket.length ? [shopping(), ['leave', '나갈게요']] : [['leave', '나갈게요']], false); }
+  else if (say === 'buy') {
+    if (!basket.length) { clerkSay('아직 고르신 게 없어요!', [['browse', '둘러볼게요'], ['leave', '나갈게요']]); return; }
+    storeStep = 'checkout';
+    paintStore();
+    if (total > profile.balance) {
+      clerkSay(`${basket.length}개에 ◆ ${number(total)}인데… 크레딧이 ◆ ${number(total - profile.balance)} 모자라요. 하나 빼 드릴까요?`, [['drop', '마지막 거 뺄게요'], ['leave', '다음에 올게요']]);
+      return;
+    }
+    clerkSay(`${basket.length}개, ◆ ${number(total)} 크레딧입니다. 봉투 필요하세요?`, [['bag', '네, 주세요(◆ 2)'], ['nobag', '아니요, 괜찮아요']]);
+  } else if (say === 'drop') {
+    basket.pop();
+    storeStep = 'shop';
+    paintStore();
+    clerkSay('뺐어요! 다시 계산해 드릴까요?', basket.length ? [shopping(), ['more', '더 볼게요']] : [['more', '더 볼게요'], ['leave', '나갈게요']]);
+  } else if (say === 'bag' || say === 'nobag') {
+    const bag = say === 'bag' && profile.balance >= total + 2 ? 2 : 0;
+    storeStep = `pay:${bag}`;
+    clerkSay('포인트 적립해 드릴까요?', [['point', '네, 적립해 주세요'], ['nopoint', '괜찮아요']]);
+  } else if (say === 'point' || say === 'nopoint') {
+    const bag = Number(storeStep.split(':')[1] || 0);
+    const point = say === 'point' ? Math.max(1, Math.round(total * .05)) : 0;
+    profile.balance = Math.max(0, profile.balance - total - bag + point);
+    save();
+    $('balance').textContent = number(profile.balance);
+    for (const id of basket) { useShopItem(state, id); restBought.add(id); }
+    const names = basket.map(id => shopItems.find(item => item.id === id).name).join(', ');
+    basket = [];
+    storeStep = 'done';
+    paintStore();
+    paintHud();
+    $('rest-status').textContent = `편의점에서 ${names} 샀어요`;
+    clerkSay(`결제됐어요${point ? ` · 포인트 ◆ ${point} 적립!` : ''} 감사합니다, 안전 운전하세요!`, [['leave', '나가기']]);
+  } else if (say === 'leave') {
+    basket = [];
+    closeStore();
+  }
+});
+addEventListener('keydown', event => {
+  if ($('store').hidden || event.code !== 'Escape') return;
+  closeStore();
+});
+
 // 식당 키오스크(운영자 요청) — 담기 → 결제(이번 주행 점수) → 주문 번호 · 조리 중 → 「○번 고객님」 → 받으러 가기 → 먹는 영상 차례로 · 효과
 let cart = [];
 let cookFrame = 0;
 const cartTotal = () => cart.reduce((sum, id) => sum + foods.find(food => food.id === id).price, 0);
 function paintKiosk() {
-  $('kiosk-score').textContent = number(state.score);
+  $('kiosk-score').textContent = number(profile.balance);
   $('menu-list').innerHTML = foods.map(food => {
     const eaten = restEaten.has(food.id), taken = cart.includes(food.id);
     return `<button type="button" class="dish ${eaten || taken ? 'eaten' : ''}" data-food="${food.id}" ${eaten || taken ? 'disabled' : ''}>
       <img src="${assetRoot}rest/${food.id}.webp?v=1" width="256" height="256" alt="">
       <b>${food.name}</b><small>${food.effect}</small>
-      <em>${eaten ? '먹었어요' : taken ? '담았어요' : number(food.price) + ' 점'}</em>
+      <em>${eaten ? '먹었어요' : taken ? '담았어요' : '◆ ' + number(food.price)}</em>
     </button>`;
   }).join('');
   $('cart-list').innerHTML = cart.length ? cart.map(id => {
@@ -673,8 +802,8 @@ function paintKiosk() {
   }).join('') : '<li class="empty">메뉴를 눌러 담으세요</li>';
   const total = cartTotal();
   $('cart-total').textContent = number(total);
-  $('kiosk-pay').disabled = !cart.length || total > state.score;
-  $('kiosk-pay').textContent = cart.length && total > state.score ? `${number(total - state.score)}점 모자라요` : '결제하기';
+  $('kiosk-pay').disabled = !cart.length || total > profile.balance;
+  $('kiosk-pay').textContent = cart.length && total > profile.balance ? `크레딧 ${number(total - profile.balance)} 모자라요` : '결제하기';
 }
 function openKiosk() {
   cart = [];
@@ -710,7 +839,10 @@ $('cart-list').addEventListener('click', event => {
   paintKiosk();
 });
 $('kiosk-pay').addEventListener('click', () => {
-  if (!cart.length || cartTotal() > state.score) return;
+  if (!cart.length || cartTotal() > profile.balance) return;
+  profile.balance -= cartTotal();
+  save();
+  $('balance').textContent = number(profile.balance);
   const orderNo = 100 + Math.floor(Math.random() * 900);
   $('kiosk-order').hidden = true;
   $('kiosk-close').hidden = true;
@@ -751,6 +883,7 @@ $('kiosk-pickup').addEventListener('click', () => {
       restEaten.add(id);
       done.push(food.name);
     }
+    if (food.still) { beep(700, .1); next(); return; }
     playMovie(`eat-${id}`, `${food.name} 먹는 중…`, () => { beep(700, .1); next(); });
   };
   next();

@@ -1,4 +1,4 @@
-import { ROAD_WIDTH, roadX, roadY, sectionIndex, trackLook } from './drive.js?v=17';
+import { ROAD_WIDTH, roadX, roadY, sectionIndex, trackLook } from './drive.js?v=18';
 
 export const assetRoot = '/assets/games/twilightrun/';
 export const atmospheres = {
