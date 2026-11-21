@@ -1,5 +1,5 @@
-import { createCarModels } from './models.js?v=36';
-import { glowMap } from './world.js?v=36';
+import { createCarModels } from './models.js?v=37';
+import { glowMap } from './world.js?v=37';
 
 // 첫 화면 · 차고에서 고른 차를 크게 보여 준다 — 주행 때와 같은 3D 모델(model(car, true))을 천천히 돌린다.
 // GPU 를 아끼려고 첫 화면이 보일 때만, 초당 30장까지만 그리고 그림자 맵 대신 바닥 빛 한 장을 쓴다.

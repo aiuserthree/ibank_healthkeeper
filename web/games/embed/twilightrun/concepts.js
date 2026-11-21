@@ -1,5 +1,5 @@
-import { TIRE_RADIUS } from './drive.js?v=36';
-import { bodyFinish, glassFinish } from './finishes.js?v=36';
+import { TIRE_RADIUS } from './drive.js?v=37';
+import { bodyFinish, glassFinish } from './finishes.js?v=37';
 
 // 차고에서 사는 새 차 6대. 기존 4종(매끈 · 투톤 지붕 · 칼날 LED)과 겹치지 않게 차마다 몸통 단면 · 유리 · 얼굴 조명 · 꼬리를 따로 짠다.
 // 모양은 운영자가 준 참고 사진 6장(2026-11-21)을 따라가고, 로고 · 엠블럼 · 글자는 넣지 않는다.
@@ -99,7 +99,7 @@ export function createConcepts(T, kit) {
     const brake = standard(look.brake, .39, .19);
     const rim = standard(look.rim, .24, .72);
     const accent = look.lip ? basic(look.lip) : rim;
-    const cover = look.disc ? new T.CylinderGeometry(.30, .30, .02, 28) : null;
+    const cover = look.disc ? new T.CylinderGeometry(look.coverR || .3, look.coverR || .3, .02, 28) : null;
     for (const s of [-1, 1]) for (const end of [-1, 1]) {
       const assembly = new T.Group(), rotating = new T.Group();
       const front = end < 0;
@@ -111,8 +111,8 @@ export function createConcepts(T, kit) {
       tire.rotation.z = Math.PI / 2;
       if (look.tread) {
         tire.scale.y = 1.3;
-        for (let i = 0; i < 22; i++) {
-          const a = i * Math.PI * 2 / 22;
+        for (let i = 0; i < 16; i++) {
+          const a = i * Math.PI * 2 / 16;
           bar(rotating, rubber, (i % 2 ? .03 : -.03), Math.cos(a) * .362, Math.sin(a) * .362, .24, .026, .07, a);
         }
       }
@@ -143,6 +143,15 @@ export function createConcepts(T, kit) {
       } else for (let i = 0; i < look.spokes; i++) {
         const a = i * Math.PI * 2 / look.spokes;
         bar(rotating, rim, s * .164, Math.cos(a) * .136, Math.sin(a) * .136, .029, .212, look.width || .03, a + (look.twist || 0));
+      }
+      if (look.whitewall) piece(rotating, new T.TorusGeometry(.285, .032, 8, 36), basic('#f4f1e8'), s * .128, 0, 0).rotation.y = Math.PI / 2;
+      if (look.spinner) {
+        piece(rotating, new T.ConeGeometry(.07, .08, 16), rim, s * .2, 0, 0).rotation.z = -s * Math.PI / 2;
+        for (let k = 0; k < 3; k++) bar(rotating, rim, s * .19, Math.cos(k * 2.094) * .07, Math.sin(k * 2.094) * .07, .02, .12, .025, k * 2.094);
+      }
+      if (look.beadlock) for (let k = 0; k < 8; k++) {
+        const a = k * Math.PI / 4;
+        box(rotating, grille, s * .17, Math.cos(a) * .272, Math.sin(a) * .272, .02, .022, .022);
       }
       if (look.nut) piece(rotating, new T.CylinderGeometry(.05, .05, .03, 6), basic(look.nut), s * .182, 0, 0).rotation.z = Math.PI / 2;
       piece(rotating, lug, trim, s * .175, 0, 0).rotation.z = Math.PI / 2;
@@ -246,6 +255,15 @@ export function createConcepts(T, kit) {
     }
     box(bumper, lamp, 0, .32, l + .06, .12, .035, .015);
   }
+  function archFlare(group, material, x, s, zc, r, width, out) {
+    const a = [], b = [];
+    for (let i = 0; i <= 12; i++) {
+      const t = Math.PI * i / 12;
+      a.push([x, TIRE_RADIUS + Math.sin(t) * r, zc + Math.cos(t) * r]);
+      b.push([x + s * out, TIRE_RADIUS + Math.sin(t) * (r + width), zc + Math.cos(t) * (r + width)]);
+    }
+    return ribbon(group, material, a, b);
+  }
   function archRing(group, material, x, zc, r, width = .022) {
     const a = [], b = [];
     for (let i = 0; i <= 18; i++) {
@@ -272,12 +290,31 @@ export function createConcepts(T, kit) {
     const main = [[-l, w * .94, .32, .98, .95], [-l + .06, w * .98, .3, 1.04, .96], [-.85, w, .3, 1.06, .96], [l - .04, w, .3, 1.08, .97], [l, w * .98, .32, 1.06, .97]];
     const surface = wheelArches(main, axle, { front: 0, rear: 0, flare: 0, step: .25, lip: .02 });
     return {
-      surface, body: loft(surface), flat: true, roofMat: expedition ? 'paint' : gloss,
+      surface, body: loft(surface), flat: true, roofMat: expedition ? 'paint' : gloss, glass: '#6a8294',
       cabin: loft([[-.86, w * .93, 1.04, 1.12, .99], [-.78, w * .92, 1.05, 1.82, .96], [l - .06, w * .92, 1.07, 1.82, .96]]),
       roof: loft([[-.8, w * .95, 1.8, 1.88, .97], [l - .04, w * .95, 1.8, 1.88, .97]]),
-      front: -.8, rear: .9, look: { pin: 0 },
+      front: -.8, rear: .9, look: { pin: 0, belt: [.5, 0], lower: '#1d1f21' },
       dress({ chassis, frontPanel, bumper, wing, flank, lamp, paint }) {
         const black = standard('#16181a', .7, .2);
+        const alloy2 = standard('#d9dde1', .2, .9);
+        const crease = standard(expedition ? '#f1d9ad' : '#de4a50', .2, .3);
+        // 공통 다듬기: 헤드램프 크롬 테 + LED 고리, 안개등 · 견인고리 · 알루미늄 하부 보호판, 보닛 통풍구, 앞 펜더 옆 통풍구, 문 틈 · 어깨선, 유리 고무 테, 두툼한 펜더
+        for (const s of [-1, 1]) {
+          piece(frontPanel, new T.TorusGeometry(.1, .014, 8, 28), alloy2, s * w * .68, .87, -l - .03);
+          piece(frontPanel, new T.TorusGeometry(.066, .008, 6, 24), basic('#ffffff'), s * w * .68, .87, -l - .045);
+          piece(frontPanel, new T.CylinderGeometry(.045, .045, .03, 16), basic('#fff4d0'), s * w * .74, .55, -l - .16).rotation.x = Math.PI / 2;
+          box(frontPanel, basic('#d4271c'), s * w * .42, .47, -l - .16, .05, .03, .06);
+          for (let k = 0; k < 2; k++) box(chassis, grille, s * w * .32, 1.088, -1.75 + k * .14, .26, .006, .05);
+          box(flank[s], grille, s * (w + .006), .86, -1.25, .006, .11, .24);
+          for (let k = 0; k < 3; k++) box(flank[s], alloy2, s * (w + .01), .82 + k * .035, -1.25, .006, .008, .22);
+          box(flank[s], crease, s * (w + .006), .985, 0, .006, .014, 2 * l - .3);
+          for (const z of [-.82, -.05, .78]) box(flank[s], grille, s * (w + .004), .74, z, .004, .5, .008);
+          for (const y of [1.08, 1.78]) box(chassis, black, s * w * .925, y, (l - .85) / 2, .02, .03, l + .8);
+          for (const zc of [-axle, axle]) archFlare(flank[s], black, s * (w + .015), s, zc, .48, .1, .07);
+          box(flank[s], alloy2, s * w * 1.0, .35, 0, .18, .02, 1.3);
+          glowSprite(bumper, '#ff3a26', s * w * .88, .82, l + .06, .5, .3);
+        }
+        box(frontPanel, alloy2, 0, .36, -l + .05, w * 1.1, .02, .42);
         const steel = standard(expedition ? '#2a2c2e' : '#bfc4c8', .35, .7);
         box(chassis, expedition ? black : paint, 0, 1.07, -1.45, w * 1.2, .03, .95);
         box(frontPanel, grille, 0, .86, -l - .008, w * .86, .26, .02);
@@ -286,12 +323,14 @@ export function createConcepts(T, kit) {
           box(frontPanel, steel, s * w * .7, .86, -l - .012, .3, .26, .02);
           piece(frontPanel, new T.CylinderGeometry(.085, .085, .03, 20), basic('#fff6dc'), s * w * .68, .87, -l - .03).rotation.x = Math.PI / 2;
           for (const y of [.79, .94]) piece(frontPanel, new T.CylinderGeometry(.024, .024, .02, 10), basic('#ffb02a'), s * w * .86, y, -l - .03).rotation.x = Math.PI / 2;
-          for (const zc of [-axle, axle]) archRing(flank[s], black, s * (w + .02), zc, .5, .07);
-          box(flank[s], black, s * w * 1.0, .34, 0, .16, .04, 1.3);
           for (const z of [-.7, .25]) box(flank[s], steel, s * (w + .012), 1.0, z, .012, .025, .09);
           for (const z of [-.8, -.05, .78, l - .07]) box(chassis, paint, s * w * .93, 1.44, z, .045, .74, .08);
-          box(chassis, black, s * w * 1.06, 1.3, -.76, .05, .16, .12);
-          if (!expedition) box(chassis, standard('#1d2a35', .1, .7), s * w * .8, 1.875, .3, .22, .03, 1.0);
+          box(chassis, black, s * w * 1.07, 1.32, -.76, .06, .2, .15);
+          if (!expedition) {
+            box(chassis, standard('#2c3a46', .05, .85), s * w * .8, 1.875, .3, .22, .03, 1.0);
+            rod(chassis, alloy2, [s * w * .82, 1.95, -.7], [s * w * .82, 1.95, l - .2], .018);
+            for (const z of [-.7, l - .2]) rod(chassis, alloy2, [s * w * .82, 1.87, z], [s * w * .82, 1.95, z], .018);
+          }
           box(bumper, lamp, s * w * .88, .82, l + .012, .07, .22, .012);
           box(bumper, basic('#ffb02a'), s * w * .88, .97, l + .012, .07, .05, .012);
         }
@@ -303,6 +342,10 @@ export function createConcepts(T, kit) {
         spare.rotation.x = Math.PI / 2;
         piece(spare, detailWheel, rubber, 0, 0, 0);
         piece(spare, new T.CylinderGeometry(.24, .24, .2, 20), steel, 0, 0, 0);
+        if (!expedition) {
+          piece(spare, new T.CylinderGeometry(.38, .38, .24, 28, 1, true), paint, 0, 0, 0);
+          piece(spare, new T.CylinderGeometry(.14, .14, .26, 20), alloy2, 0, 0, 0);
+        }
         bumper.add(spare);
         if (expedition) {
           const rack = standard('#202224', .5, .6);
@@ -314,7 +357,7 @@ export function createConcepts(T, kit) {
             for (const x of [.35, .72]) rod(frontPanel, rack, [s * w * x, .5, -l - .17], [s * w * x, .98, -l - .14], .03);
             box(flank[s], black, s * w * .88, .42, axle + .5, .3, .3, .02);
           }
-          for (let k = 0; k <= 8; k++) rod(chassis, rack, [-w * .9, 2.02, lerp(-1, l - .1, k / 8)], [w * .9, 2.02, lerp(-1, l - .1, k / 8)], .02);
+          for (let k = 0; k <= 5; k++) rod(chassis, rack, [-w * .9, 2.02, lerp(-1, l - .1, k / 5)], [w * .9, 2.02, lerp(-1, l - .1, k / 5)], .02);
           rod(frontPanel, rack, [-w * .8, .98, -l - .14], [w * .8, .98, -l - .14], .03);
           for (let k = 0; k < 4; k++) {
             const x = (k - 1.5) * w * .36;
@@ -326,10 +369,19 @@ export function createConcepts(T, kit) {
           box(frontPanel, steel, 0, .53, -l - .17, .3, .1, .1);
           glowSprite(chassis, '#fff3cc', 0, 2.13, -1.1, 1.2, .25);
           rod(chassis, black, [w * 1.03, .98, -.92], [w * 1.03, 1.9, -.86], .045);
+          const can = standard('#4b5a38', .5, .2), ladder = standard('#ff7a1a', .45, .1);
+          for (const x of [-.25, .05]) {
+            box(chassis, can, x * w, 2.2, l - .45, .16, .3, .24);
+            box(chassis, black, x * w, 2.37, l - .45, .1, .03, .05);
+          }
+          for (const x of [-.75, -.55]) box(chassis, ladder, x * w, 2.07, .05, .16, .03, 1.2);
+          piece(chassis, new T.CylinderGeometry(.07, .07, 2.2, 12), black, w * .99, 2.0, .15).rotation.x = Math.PI / 2;
+          for (let k = 0; k < 4; k++) box(bumper, rack, w * .52, .95 + k * .22, l + .06, .3, .022, .022);
+          for (const x of [.38, .66]) box(bumper, rack, x * w, 1.3, l + .06, .022, .85, .022);
         }
         return { plateY: .64, tail: [.88, .82], head: [.68, .87, 0] };
       },
-      wheel: expedition ? { brake: '#555', rim: '#c9a56a', spokes: 8, disc: true, tread: true } : { brake: '#555', rim: '#c8ccd0', spokes: 5, disc: true, tread: true },
+      wheel: expedition ? { brake: '#555', rim: '#c9a56a', spokes: 8, disc: true, tread: true, beadlock: true } : { brake: '#c52d2d', rim: '#d2d6da', spokes: 6, width: .06, tread: true, big: true, nut: '#2a2c2e' },
     };
   }
 
@@ -532,10 +584,30 @@ export function createConcepts(T, kit) {
         roof: [[-.36, w * .5, 1.2, 1.275, .72], [.4, w * .48, 1.21, 1.285, .72], [.95, w * .4, 1.0, 1.065, .78]],
       });
       return {
-        ...c, roofMat: 'paint', glass: '#2c4a3a', style: 2, stripe: '#121212', front: -.7, rear: .9, look: { pin: 0 },
+        ...c, roofMat: 'finish', glass: '#5f8590', style: 2, stripe: '#121212', front: -.7, rear: .9, look: { pin: 0 },
+        paint: { roughness: .13, metalness: .32, clearcoat: 1, clearcoatRoughness: .04, envMapIntensity: 1.25 },
         dress({ chassis, frontPanel, bumper, wing, flank, lamp }) {
           const chrome = standard('#e1e4e8', .08, 1);
           const nose = -l - .055;
+          // 크롬 다듬기: 옆 크롬 띠 · 유리 크롬 테 · 둥근 크롬 범퍼와 범퍼 뿔 · 안개등 · 보닛 장식 · 쌍 배기구 · 크롬 후미등 테
+          for (const s of [-1, 1]) {
+            sideLine(flank[s], chrome, s, z => c.edge(z) + .004, -l + .35, .5, l - .2, .52, .014, 16);
+            const cab = c.cabinList, a = [], b = [];
+            for (let i = 0; i <= 14; i++) {
+              const z = lerp(cab[0][0] + .06, cab.at(-1)[0] - .06, i / 14);
+              a.push([s * (at(cab, z, 1) + .006), at(cab, z, 2) + .03, z]);
+              b.push([s * (at(cab, z, 1) + .006), at(cab, z, 2) + .05, z]);
+            }
+            ribbon(chassis, chrome, a, b);
+            rod(frontPanel, chrome, [s * w * .2, .22, nose - .07], [s * w * .2, .4, nose - .06], .022);
+            piece(frontPanel, new T.TorusGeometry(.04, .01, 6, 18), chrome, s * w * .5, .3, nose - .02);
+            piece(frontPanel, new T.CircleGeometry(.036, 16), basic('#ffd76a'), s * w * .5, .3, nose - .015).rotation.y = Math.PI;
+            piece(bumper, new T.TorusGeometry(.065, .012, 6, 22), chrome, s * c.fx, .62, l + .05);
+            piece(bumper, new T.CylinderGeometry(.035, .035, .14, 12), chrome, s * w * .3, .3, l + .02).rotation.x = Math.PI / 2;
+          }
+          rod(frontPanel, chrome, [-w * .78, .27, nose + .02], [w * .78, .27, nose + .02], .028);
+          rod(bumper, chrome, [-w * .7, .4, l + .06], [w * .7, .4, l + .06], .028);
+          bar(chassis, chrome, 0, top(c.main, -l + .25) + .03, -l + .25, .012, .05, .16, -.3);
           const ring = piece(frontPanel, new T.TorusGeometry(.16, .02, 10, 36), chrome, 0, .43, nose - .01);
           ring.scale.set(1.35, .78, 1);
           const hole = piece(frontPanel, new T.CircleGeometry(.16, 32), grille, 0, .43, nose - .004);
@@ -546,15 +618,13 @@ export function createConcepts(T, kit) {
             const x = s * c.fx;
             piece(frontPanel, new T.TorusGeometry(.105, .022, 10, 32), chrome, x, .62, -l + .1);
             piece(frontPanel, new T.CircleGeometry(.1, 28), basic('#fff3dc'), x, .62, -l + .095).rotation.y = Math.PI;
-            for (let k = 0; k < 6; k++) box(flank[s], grille, s * c.edge(-.62 + k * .05), .6, -.62 + k * .05, .01, .12, .014);
+            for (let k = 0; k < 6; k++) box(flank[s], chrome, s * c.edge(-.62 + k * .05), .6, -.62 + k * .05, .01, .12, .014);
             box(chassis, chrome, s * w * .74, .98, -.66, .1, .06, .08);
             piece(bumper, new T.CircleGeometry(.055, 20), lamp, x, .62, l + .045);
           }
-          box(frontPanel, chrome, 0, .29, nose - .04, w * 1.5, .03, .04);
-          box(bumper, chrome, 0, .4, l + .05, w * 1.4, .03, .04);
           return { plateY: .5, tail: [.72, .62], head: [.72, .62, -.1] };
         },
-        wheel: { brake: '#333', rim: '#d0d3d6', spokes: 0, disc: true },
+        wheel: { brake: '#333', rim: '#e6e9ec', spokes: 0, disc: true, coverR: .19, whitewall: true, spinner: true },
       };
     },
     // 10 스틸 웨지 — 스테인리스 각진 전기 픽업(운영자 참고 사진): 삼각형 지붕선, 앞 끝 전체 가로 빛줄, 각진 검은 펜더, 높은 차체
@@ -683,7 +753,7 @@ export function createConcepts(T, kit) {
     const base = d.glass ? standard(d.glass, .06, .8) : glass;
     const glazing = glassFinish(T, base, { w, front: d.front, rear: d.rear }, crackedGlass);
     if (d.flat) glazing.material.flatShading = true;
-    chassis.add(new T.Mesh(coachwork, finish.material), new T.Mesh(d.cabin, glazing.material), new T.Mesh(d.roof, d.roofMat === 'paint' ? paint : d.roofMat || gloss));
+    chassis.add(new T.Mesh(coachwork, finish.material), new T.Mesh(d.cabin, glazing.material), new T.Mesh(d.roof, d.roofMat === 'finish' ? finish.material : d.roofMat === 'paint' ? paint : d.roofMat || gloss));
     chassis.children.forEach(mesh => { mesh.castShadow = true; });
     group.add(chassis);
     const wheels = wheelSet(group, car, w, d.wheel);
