@@ -1197,7 +1197,21 @@ async function horn() {
   source.start(at);
 }
 
-$('start').addEventListener('click', start);
+// 휴대폰에서 출발하려 하면 PC 권장 안내(운영자 요청) — 손가락 화면이면서 긴 쪽이 1100px 보다 작으면, 「그래도 할게요」 뒤엔 창을 닫을 때까지 안 물음
+const phoneLike = () => matchMedia('(pointer: coarse)').matches && Math.max(innerWidth, innerHeight) < 1100;
+let mobileOk = false;
+try { mobileOk = sessionStorage.getItem('twilightrun-mobile-ok') === '1'; } catch { mobileOk = false; }
+$('start').addEventListener('click', () => {
+  if (phoneLike() && !mobileOk) { $('mobile-note').showModal(); $('mobile-go').focus(); return; }
+  start();
+});
+$('mobile-go').addEventListener('click', () => {
+  mobileOk = true;
+  try { sessionStorage.setItem('twilightrun-mobile-ok', '1'); } catch { /* 저장 못 해도 이번 창에선 기억 */ }
+  $('mobile-note').close();
+  start();
+});
+$('mobile-close').addEventListener('click', () => { $('mobile-note').close(); $('start').focus(); });
 $('retry').addEventListener('click', start);
 $('menu').addEventListener('click', menu);
 $('pause').addEventListener('click', pause);
