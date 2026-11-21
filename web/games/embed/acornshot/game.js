@@ -16,13 +16,14 @@
     if (saved) for (const k of ['best', 'stars']) record[k] = Array.from({ length: N }, (_, i) => Number.isInteger(saved[k]?.[i]) ? Math.max(0, Math.min(k === 'best' ? P.SCORE_MAX : 3, saved[k][i])) : 0);
   } catch (_) { saveAvailable = false; }
 
-  // ---- Places: five places × eight stages, grouped by each stage's `place`.
+  // ---- Places: six places × eight stages, grouped by each stage's `place`.
   const PLACES = [
     { key: 'forest', name: '도토리 숲', en: 'FOREST' },
     { key: 'valley', name: '이끼 계곡', en: 'VALLEY' },
     { key: 'swamp', name: '안개 늪', en: 'SWAMP' },
     { key: 'snow', name: '눈 덮인 산', en: 'SNOW' },
     { key: 'castle', name: '밤의 성채', en: 'CASTLE' },
+    { key: 'summit', name: '달빛 망루', en: 'SUMMIT' },
   ];
   const placeKey = i => { const p = P.LEVELS[i]?.place; return PLACES.some(q => q.key === p) ? p : i < 8 ? 'forest' : 'valley'; };
   const placeIndex = i => PLACES.findIndex(p => p.key === placeKey(i));
@@ -324,6 +325,8 @@
     }
     canvas.focus({ preventScroll: true }); updateHUD();
   }
+  // 받침 있는 말 뒤 「을」, 없는 말 뒤 「를」(밤의 성채를 · 달빛 망루를 · 안개 늪을).
+  const objectOf = w => { const c = w.charCodeAt(w.length - 1) - 0xac00; return w + (c >= 0 && c < 11172 && c % 28 ? '을' : '를'); };
   function finish(e) {
     screen = 'result'; cancelDrag();
     if (e.won) {
@@ -337,7 +340,7 @@
     resultNext = e.won && !finalLevel ? nextStage(levelIndex) : null;
     const list = LISTS[placeIndex(levelIndex)], placeEnd = list.at(-1) === levelIndex;
     $('result-label').textContent = e.won ? (finalLevel ? 'ALL PLACES SAVED' : placeEnd ? 'PLACE CLEAR' : 'STAGE CLEAR') : 'ONE MORE SHOT';
-    $('result-title').textContent = e.won ? (finalLevel ? '모든 장소를 되찾았어요!' : placeEnd ? `${PLACES[placeIndex(levelIndex)].name}을 지켜냈어요!` : '멋진 한 방이었어요!') : '조금만 더 정확하게!';
+    $('result-title').textContent = e.won ? (finalLevel ? '모든 망루를 되찾았어요!' : placeEnd ? `${objectOf(PLACES[placeIndex(levelIndex)].name)} 지켜냈어요!` : '멋진 한 방이었어요!') : '조금만 더 정확하게!';
     $('stars').innerHTML = e.won ? '★'.repeat(e.stars) + `<span class="empty">${'★'.repeat(3 - e.stars)}</span>` : '↻';
     $('result-score').textContent = `${e.score.toLocaleString()}점`;
     const left = P.LEVELS[levelIndex].ammo.length - sim.state.spent;
@@ -722,11 +725,13 @@
     swamp: { sky: ['#a9c3bd', '#c9d6c2', '#d9dcc0'], far: ['#8fa89a', '#7c9688'], mid: '#5f7a66', mid2: '#6b8670', band: '#889c8a', h0: .56, veil: 'rgba(225,238,228,.12)', orb: '#eef3d6', air: 'firefly' },
     snow: { sky: ['#b5d3ea', '#e1eff7', '#f2f7fa'], far: ['#d6e6f1', '#c0d6e6'], mid: '#6f8f9d', mid2: '#a8c2cc', band: '#d9f0fc', h0: .58, veil: 'rgba(40,70,95,.12)', orb: '#ffffff', air: 'snow' },
     castle: { sky: ['#272650', '#463b74', '#74609a'], far: ['#4a4072', '#584b80'], mid: '#3a335e', mid2: '#463e6c', band: '#78668b', h0: .54, orb: '#fff3b8', air: 'star', night: true },
+    // 달빛 망루: 청록 밤하늘 · 은빛 초승달 · 안개 낀 바위 봉우리(bg-summit.webp, 땅 띠는 그림 높이 0.59 부터 #3c6b74).
+    summit: { sky: ['#123a46', '#24596a', '#4a8290'], far: ['#3f6d7a', '#4e7e89'], mid: '#2f5866', mid2: '#3a6773', band: '#3c6b74', h0: .59, orb: '#eef6f4', air: 'glint', night: true },
   };
   const look = () => LOOK[placeKey(levelIndex)] || LOOK.forest;
   let atmosphere = [];
   function setAtmosphere() {
-    const kind = look().air, count = { leaf: 10, mist: 6, firefly: 22, snow: 46, star: 34 }[kind] || 0;
+    const kind = look().air, count = { leaf: 10, mist: 6, firefly: 22, snow: 46, star: 34, glint: 30 }[kind] || 0;
     atmosphere = Array.from({ length: count }, (_, i) => ({ x: hash(i + 1), y: hash(i + 50), s: hash(i + 99), p: hash(i + 7) * 6.28 }));
   }
 
@@ -748,6 +753,7 @@
       ctx.fillStyle = sky; ctx.fillRect(bx, by, bw, bh);
       const u = view.k, shift = cam.x * u * .12;
       ellipse(bx + bw * .78 - shift * .2, by + bh * .2, 72 * u, 72 * u, L.orb + '80'); ellipse(bx + bw * .78 - shift * .2, by + bh * .2, 48 * u, 48 * u, L.orb);
+      if (key === 'summit') ellipse(bx + bw * .78 - shift * .2 - 20 * u, by + bh * .2 - 12 * u, 42 * u, 42 * u, L.sky[0]); // 초승달
       const horizon = (by + bh * .6) * .7 + groundScreen * .3;
       L.far.forEach((color, i) => {
         ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(bx, by + bh);
@@ -756,6 +762,7 @@
           const hgt = key === 'snow' ? Math.abs(Math.sin(wx / 260 + i * 2)) * 120 + Math.sin(wx / 90) * 12
             : key === 'valley' ? (Math.sin(wx / 300 + i) > .2 ? 80 : 30) + Math.sin(wx / 70) * 6
             : key === 'castle' ? (Math.sin(wx / 160 + i * 3) > .55 ? 110 : 40) + Math.sin(wx / 60) * 4
+            : key === 'summit' ? Math.pow(Math.abs(Math.sin(wx / 210 + i * 1.7)), 3) * 150 + Math.sin(wx / 50) * 5
             : Math.sin(wx / 220 + i * 2.3) * 44 + Math.sin(wx / 130 + i) * 13;
           ctx.lineTo(bx + x, horizon - (i ? 30 : 90) * u - hgt * u * .6);
         }
@@ -767,7 +774,17 @@
     const t = renderTime * (reducedMotion.matches ? .2 : 1), mod = (a, m) => ((a % m) + m) % m;
     for (const a of atmosphere) {
       const kind = L.air;
-      if (kind === 'star') {
+      if (kind === 'glint') {
+        // 은빛 별 반짝임(위) + 봉우리 사이를 흐르는 은빛 안개(아래).
+        if (a.s > .35) {
+          const x = bx + mod(a.x * bw * 1.3 - cam.x * view.k * .05, bw * 1.3), y = by + a.y * bh * .42, r = 1.2 + a.s * 1.4, tw = .5 + .5 * Math.sin(t * 2.4 + a.p);
+          ctx.globalAlpha = .35 + .55 * tw; ellipse(x, y, r, r, '#e8fbff');
+          if (a.s > .8) { ctx.globalAlpha = .4 * tw; line([[x - 6 * r, y], [x + 6 * r, y]], '#dff6fb', 1); line([[x, y - 6 * r], [x, y + 6 * r]], '#dff6fb', 1); }
+        } else {
+          const x = bx + mod(a.x * bw * 1.4 + t * 10 - cam.x * view.k * .2, bw * 1.4) - bw * .2, y = by + bh * (.5 + a.y * .3);
+          ctx.globalAlpha = .14; ellipse(x, y, 180 * view.k, 22 * view.k, '#d6eef0');
+        }
+      } else if (kind === 'star') {
         const x = bx + mod(a.x * bw * 1.3 - cam.x * view.k * .05, bw * 1.3), y = by + a.y * bh * .45;
         ctx.globalAlpha = .45 + .45 * Math.sin(t * 2 + a.p); ellipse(x, y, 1.4 + a.s * 1.6, 1.4 + a.s * 1.6, '#fff8d8');
       } else if (kind === 'snow') {
@@ -796,7 +813,7 @@
       ctx.lineTo(right + 24, v.y1 + 40); ctx.closePath(); ctx.fill();
     };
     if (!art('bg-' + key)) { band(base - 216, L.far[0] + 'c0', 55, .2); band(base - 145, L.far[1] + 'd0', 40, 2.5); }
-    const spacing = key === 'castle' ? 260 : key === 'valley' ? 230 : 150;
+    const spacing = key === 'castle' ? 260 : key === 'valley' ? 230 : key === 'summit' ? 280 : 150;
     const i0 = Math.floor((left - cam.x * para) / spacing) - 1, i1 = Math.ceil((right - cam.x * para) / spacing) + 1;
     for (let i = i0; i <= i1; i++) {
       const x = i * spacing + cam.x * para + hash(i) * 40, s = .7 + hash(i + 3) * .6, y = base - 40;
@@ -815,6 +832,17 @@
           ctx.fillStyle = L.mid; ctx.beginPath(); ctx.moveTo(x - w, top + 44 * s); ctx.lineTo(x, top); ctx.lineTo(x + w, top + 44 * s); ctx.fill();
           ctx.fillStyle = '#f4fafc'; ctx.beginPath(); ctx.moveTo(x - w * .45, top + 18 * s); ctx.lineTo(x, top); ctx.lineTo(x + w * .45, top + 18 * s); ctx.fill();
         }
+      } else if (key === 'summit') {
+        // 뾰족한 바위 봉우리, 몇 곳 꼭대기에 작은 망루와 불빛.
+        const h = 130 + hash(i + 9) * 130, w = 90 + hash(i + 4) * 60;
+        ctx.fillStyle = L.mid; ctx.beginPath(); ctx.moveTo(x - w, y + 60); ctx.lineTo(x - w * .35, y - h * .7); ctx.lineTo(x - w * .1, y - h); ctx.lineTo(x + w * .2, y - h * .92); ctx.lineTo(x + w * .45, y - h * .55); ctx.lineTo(x + w, y + 60); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#6f9a8a'; ctx.beginPath(); ctx.moveTo(x - w * .22, y - h * .97); ctx.lineTo(x - w * .1, y - h); ctx.lineTo(x + w * .2, y - h * .92); ctx.lineTo(x + w * .05, y - h * .88); ctx.closePath(); ctx.fill();
+        if (hash(i + 13) > .55) {
+          const tx = x + w * .04, ty = y - h * .96;
+          ctx.fillStyle = '#26444f'; ctx.fillRect(tx - 9, ty - 26, 18, 26);
+          ctx.beginPath(); ctx.moveTo(tx - 14, ty - 26); ctx.lineTo(tx, ty - 38); ctx.lineTo(tx + 14, ty - 26); ctx.fill();
+          ellipse(tx, ty - 15, 10, 10, '#ffd98a26'); ellipse(tx, ty - 15, 3, 4, '#ffdf96');
+        }
       } else if (key === 'castle') {
         const h = 120 + hash(i + 9) * 120, w = 60 + hash(i + 4) * 40;
         ctx.fillStyle = L.mid; ctx.fillRect(x - w / 2, y - h, w, h + 60);
@@ -822,8 +850,8 @@
         if (hash(i + 13) > .35) { ellipse(x, y - h * .6, 5, 8, '#ffd98a'); ellipse(x, y - h * .6, 12, 14, '#ffd98a22'); }
       }
     }
-    band(base - 48, key === 'castle' ? '#4d4572' : key === 'snow' ? '#c9dde6' : L.mid2, 24, 1.2);
-    band(base - 4, key === 'castle' ? '#5d5480' : key === 'snow' ? '#e2eef3' : key === 'swamp' ? '#7c9270' : '#9ab47a', 12, 4);
+    band(base - 48, key === 'castle' ? '#4d4572' : key === 'snow' ? '#c9dde6' : key === 'summit' ? '#46717b' : L.mid2, 24, 1.2);
+    band(base - 4, key === 'castle' ? '#5d5480' : key === 'snow' ? '#e2eef3' : key === 'swamp' ? '#7c9270' : key === 'summit' ? '#557f86' : '#9ab47a', 12, 4);
   }
   function tree(x, y, size, color) {
     line([[x, y], [x - size * .02, y - size * .65]], '#728a66', size * .055);
@@ -841,6 +869,7 @@
     snow: { soil: '#aebfc6', grass: '#f4fafb', light: '#ffffff', pebble: '#93abb4', tuft: '#d5e8ec' },
     swamp: { soil: '#8f8a66', grass: '#55703f', light: '#7f9455', pebble: '#77724f', tuft: '#5d7a45' },
     castle: { soil: '#9d9087', grass: '#6f7c66', light: '#97a58c', pebble: '#85786f', tuft: '#74826b' },
+    summit: { soil: '#8aa3a4', grass: '#6f9a8a', light: '#b8d3cf', pebble: '#6f8b8f', tuft: '#8fb5a6' },
   };
   function terrain(v) {
     if (!groundYs) return;
@@ -851,8 +880,8 @@
     const pts = []; for (let i = i0; i <= i1; i++) pts.push([i * step, ys[i]]);
     if (i0 === 0) pts.unshift([v.x0 - 60, ys[0]]);
     if (i1 === ys.length - 1) pts.push([Math.max(width, v.x1 + 60), ys.at(-1)]);
-    if (key === 'snow' || key === 'castle') {
-      const soil = ctx.createLinearGradient(0, 430, 0, Math.max(760, W().bottom + 120)); soil.addColorStop(0, theme.soil); soil.addColorStop(1, key === 'castle' ? '#6f6470' : '#8aa3ad');
+    if (key === 'snow' || key === 'castle' || key === 'summit') {
+      const soil = ctx.createLinearGradient(0, 430, 0, Math.max(760, W().bottom + 120)); soil.addColorStop(0, theme.soil); soil.addColorStop(1, key === 'castle' ? '#6f6470' : key === 'summit' ? '#4d6e74' : '#8aa3ad');
       ctx.fillStyle = soil;
     } else ctx.fillStyle = theme.soil;
     ctx.beginPath(); ctx.moveTo(pts[0][0], bottom); for (const [x, y] of pts) ctx.lineTo(x, y); ctx.lineTo(pts.at(-1)[0], bottom); ctx.closePath(); ctx.fill();
@@ -866,6 +895,7 @@
       if (key === 'snow') { if (hash(n + 8) > .7) ellipse(x, top - 2, 9, 4, '#ffffff'); }
       else if (key === 'swamp') { if (hash(n + 8) > .72) { line([[x, top + 2], [x - 2, top - 26]], '#5b7444', 2.4); ellipse(x - 2, top - 26, 2.6, 7, '#7b5a3a'); } }
       else if (key === 'castle') { if (hash(n + 8) > .5) line([[x - 10, top + 14], [x + 10, top + 14]], theme.pebble, 2); }
+      else if (key === 'summit') { if (hash(n + 8) > .62) { ellipse(x, top - 1, 7, 3, '#e6f5f2'); } else if (hash(n + 9) > .6) line([[x, top], [x + 3, top - 8], [x + 6, top]], theme.tuft, 2); }
       else line([[x, top], [x + 4, top - 10], [x + 8, top]], theme.tuft, 2);
     }
     // Rock faces make steep steps and cliffs read as solid stone.
@@ -890,6 +920,10 @@
           ctx.fillStyle = '#4f7380'; ctx.beginPath(); ctx.moveTo(40 + ox - w, top + 60); ctx.lineTo(40 + ox, top); ctx.lineTo(40 + ox + w, top + 60); ctx.fill();
           ctx.fillStyle = '#f6fbfc'; ctx.beginPath(); ctx.moveTo(40 + ox - w * .5, top + 24); ctx.lineTo(40 + ox, top); ctx.lineTo(40 + ox + w * .5, top + 24); ctx.fill();
         }
+      } else if (key === 'summit') {
+        ctx.fillStyle = '#2c4f5a'; ctx.beginPath(); ctx.moveTo(-10 + ox, 575 + oy); ctx.lineTo(18 + ox, 430 + oy); ctx.lineTo(44 + ox, 400 + oy); ctx.lineTo(70 + ox, 450 + oy); ctx.lineTo(88 + ox, 575 + oy); ctx.closePath(); ctx.fill();
+        line([[26 + ox, 424 + oy], [44 + ox, 400 + oy], [60 + ox, 430 + oy]], '#9cc3bb', 4);
+        line([[44 + ox, 400 + oy], [44 + ox, 372 + oy]], '#2c4f5a', 3); ellipse(44 + ox, 368 + oy, 12, 12, '#ffe7a630'); ellipse(44 + ox, 368 + oy, 4, 5, '#ffe7a6');
       } else if (key === 'castle') { rounded(30 + ox, 420 + oy, 14, 150, 4, '#3e3a52'); ellipse(37 + ox, 412 + oy, 16, 16, '#ffd98a40'); ellipse(37 + ox, 412 + oy, 8, 9, '#ffe7a6'); }
       else if (key === 'swamp') { line([[40 + ox, 572 + oy], [44 + ox, 430 + oy], [12 + ox, 392 + oy]], '#56664f', 18); line([[44 + ox, 470 + oy], [86 + ox, 430 + oy]], '#56664f', 10); }
       else tree(40 + ox, 570 + oy, 240, key === 'valley' ? '#6f8f52' : '#537c59');

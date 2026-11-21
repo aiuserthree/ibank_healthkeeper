@@ -272,10 +272,13 @@ for (let l = LEGACY; l < P.LEVELS.length; l++) {
   assert.ok(level.width >= 1280 && level.width <= 3600, `Stage ${l + 1} width is within 1,280-3,600`);
   // Human-hand tolerance (solver `robust`: jittered replays, 20 runs): stages 1-4 of a place
   // clear at least 70 %, stages 5-8 at least 35 %. Only a place's first stage may fall to one shot.
-  const inPlace = l % 8;
-  assert.ok(entry.robust && entry.robust.rate >= (inPlace < 4 ? .7 : .35), `Stage ${l + 1} human-hand clear rate ${entry.robust?.rate} is high enough`);
-  assert.ok(inPlace === 0 || entry.spent >= 2, `Stage ${l + 1} is not a one-shot stage`);
-  assert.ok(entry.spare >= 1, `Stage ${l + 1} solution leaves a spare acorn`);
+  // The challenge place 「달빛 망루」(41-48, `summit`) is hard on purpose: ammo is tight (the verified
+  // clear may use every acorn), hand tolerance at least 20 %, and no stage falls to one shot.
+  const inPlace = l % 8, challenge = level.place === 'summit';
+  const handMin = challenge ? .2 : inPlace < 4 ? .7 : .35;
+  assert.ok(entry.robust && entry.robust.rate >= handMin, `Stage ${l + 1} human-hand clear rate ${entry.robust?.rate} is high enough (${handMin})`);
+  assert.ok((inPlace === 0 && !challenge) || entry.spent >= 2, `Stage ${l + 1} is not a one-shot stage`);
+  assert.ok(entry.spare >= (challenge ? 0 : 1), `Stage ${l + 1} solution leaves ${challenge ? 'zero or more' : 'a'} spare acorn`);
   const still = solver.stillness(l);
   assert.ok(still.ok, `Stage ${l + 1} stays still for 5 s before launch (worst ${still.worst}px ${still.who})`);
   const events = [];
@@ -331,9 +334,9 @@ const byPart = type => (sim, kind) => sim.state.devices.find(d => d.game.kind ==
 const stage = name => { const i = P.LEVELS.findIndex(L => L.name === name); assert.ok(i >= LEGACY, `stage ${name} exists`); return i; };
 const BOULDER = stage('굴림돌 비탈'), BARRELS = stage('송진 창고'), MUSHROOM = stage('버섯 징검다리'), WATER = stage('안개 나루');
 const BRIDGE = stage('흔들다리 골짜기'), CAGES = stage('늪 위 매달린 우리'), PENDULUM = stage('성문 앞 추'), ICICLES = stage('고드름 동굴');
-assert.equal(P.LEVELS.length, 40, 'Forty stages: five places of eight');
-for (const [k, place] of ['forest', 'valley', 'swamp', 'snow', 'castle'].entries()) for (let i = 0; i < 8; i++) assert.equal(P.LEVELS[k * 8 + i].place, place, `Stage ${k * 8 + i + 1} belongs to ${place}`);
-assert.equal(new Set(P.LEVELS.map(L => L.name)).size, 40, 'Stage names are unique');
+assert.equal(P.LEVELS.length, 48, 'Forty-eight stages: six places of eight');
+for (const [k, place] of ['forest', 'valley', 'swamp', 'snow', 'castle', 'summit'].entries()) for (let i = 0; i < 8; i++) assert.equal(P.LEVELS[k * 8 + i].place, place, `Stage ${k * 8 + i + 1} belongs to ${place}`);
+assert.equal(new Set(P.LEVELS.map(L => L.name)).size, 48, 'Stage names are unique');
 { // Boulder: freeing the chock lets it roll down and crush the tower below.
   const events = [], sim = P.create(BOULDER, e => events.push(e));
   const boulder = byPart()(sim, 'boulder'), wedge = sim.state.blocks.find(b => b.game.wedge), x0 = boulder.position.x;

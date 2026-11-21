@@ -36,7 +36,7 @@ class AcornshotIntegrationTest(unittest.TestCase):
         js = (page.parent / 'acornshot/game.js').read_text()
         self.assertIn("ART_BASE = '../../assets/games/acornshot/'", js)
         art = ROOT / 'web/assets/games/acornshot'
-        names = ['title', 'acorn-seed', 'acorn-bomb', 'acorn-split', 'goblin', 'goblin-hurt', 'sling'] + [f'bg-{p}' for p in ('forest', 'valley', 'swamp', 'snow', 'castle')]
+        names = ['title', 'acorn-seed', 'acorn-bomb', 'acorn-split', 'goblin', 'goblin-hurt', 'sling'] + [f'bg-{p}' for p in ('forest', 'valley', 'swamp', 'snow', 'castle', 'summit')]
         for name in names:
             self.assertIn(f"'{name}'" if not name.startswith('bg-') else "'bg-' + placeKey", js)
             self.assertTrue((art / f'{name}.webp').is_file(), name)
