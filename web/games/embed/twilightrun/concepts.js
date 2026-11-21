@@ -9,6 +9,21 @@ export function createConcepts(T, kit) {
     rubber, rotor, trim, grille, glass, gloss, alloy, detailWheel, disc, lug, lip, cube } = kit;
   const basic = color => new T.MeshBasicMaterial({ color, side: T.DoubleSide });
   const led = basic('#f1fbff');
+  // 카본 — 짠 무늬(트윌) 결이 보이는 검정, 투명 코팅
+  const carbon = (() => {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+      ctx.fillStyle = (x + y) % 4 < 2 ? '#2a2d31' : '#15171a';
+      ctx.fillRect(x * 4, y * 4, 4, 4);
+    }
+    const map = new T.CanvasTexture(canvas);
+    map.wrapS = map.wrapT = T.RepeatWrapping;
+    map.repeat.set(6, 6);
+    map.colorSpace = T.SRGBColorSpace;
+    return new T.MeshPhysicalMaterial({ map, roughness: .38, metalness: .3, clearcoat: 1, clearcoatRoughness: .12, side: T.DoubleSide });
+  })();
   const cache = new Map();
   const lerp = T.MathUtils.lerp;
   const at = (list, z, k) => {
@@ -101,8 +116,13 @@ export function createConcepts(T, kit) {
           bar(rotating, rubber, (i % 2 ? .03 : -.03), Math.cos(a) * .362, Math.sin(a) * .362, .24, .026, .07, a);
         }
       }
-      piece(assembly, disc, rotor, s * .131, 0, 0).rotation.z = Math.PI / 2;
-      box(assembly, brake, s * .137, .149, .107, .069, .128, .088);
+      const rotorMesh = piece(assembly, disc, rotor, s * .131, 0, 0);
+      rotorMesh.rotation.z = Math.PI / 2;
+      if (look.big) {
+        rotorMesh.scale.set(1.24, 1, 1.24);
+        box(assembly, brake, s * .1, .17, .13, .06, .17, .12);
+        piece(rotating, new T.TorusGeometry(.33, .011, 6, 36), rim, s * .15, 0, 0).rotation.y = Math.PI / 2;
+      } else box(assembly, brake, s * .137, .149, .107, .069, .128, .088);
       piece(rotating, lip, accent, s * .146, 0, 0).rotation.y = Math.PI / 2;
       if (cover) {
         piece(rotating, cover, rim, s * .16, 0, 0).rotation.z = Math.PI / 2;
@@ -110,10 +130,21 @@ export function createConcepts(T, kit) {
           const a = i * Math.PI * 2 / look.spokes;
           bar(rotating, grille, s * .172, Math.cos(a) * .2, Math.sin(a) * .2, .01, .11, .035, a);
         }
+      } else if (look.y) {
+        // Y 자 살 — 다리 둘이 바깥으로 벌어진다(살 사이로 큰 브레이크가 보이게)
+        for (let i = 0; i < look.spokes; i++) {
+          const a = i * Math.PI * 2 / look.spokes;
+          bar(rotating, rim, s * .166, Math.cos(a) * .09, Math.sin(a) * .09, .034, .11, .04, a);
+          for (const d of [-1, 1]) {
+            const b = a + d * .2;
+            bar(rotating, rim, s * .162, Math.cos(b) * .21, Math.sin(b) * .21, .026, .16, .026, b - d * .25);
+          }
+        }
       } else for (let i = 0; i < look.spokes; i++) {
         const a = i * Math.PI * 2 / look.spokes;
         bar(rotating, rim, s * .164, Math.cos(a) * .136, Math.sin(a) * .136, .029, .212, look.width || .03, a + (look.twist || 0));
       }
+      if (look.nut) piece(rotating, new T.CylinderGeometry(.05, .05, .03, 6), basic(look.nut), s * .182, 0, 0).rotation.z = Math.PI / 2;
       piece(rotating, lug, trim, s * .175, 0, 0).rotation.z = Math.PI / 2;
       assembly.add(rotating);
       group.add(assembly);
@@ -146,6 +177,11 @@ export function createConcepts(T, kit) {
     return ribbon(group, material, points, points.map(([x, y, z]) => [x, y + height, z]));
   }
 
+  // 스포츠카 앞 기준 = 스트라토 캐노피(운영자 지시 2026-11-21): 코끝 · 보닛 높이 · 곡면 · 앞 펜더 · 앞바퀴 위치가 모두 같다.
+  // 앞 등 · 색 · 옆 · 뒤 장식은 차마다 다르게 둔다. 휠도 같은 5살 디자인(색만 차마다)
+  const STRATO_FRONT = { tip: .2, tipH: .37, tipW: .64, tipLow: .17, hood: .79, fender: .79 };
+  const STRATO_WHEEL = { spokes: 5, width: .065, big: true };
+
   // ── 공통 슈퍼카 뼈대: 가운데는 낮은 보닛, 바퀴 위로 따로 솟은 앞 · 뒤 펜더, 좁고 둥근 유리 지붕 ──
   function supercar(w, l, axle, o = {}) {
     const tip = o.tip ?? .26, tipH = o.tipH ?? .31, hood = o.hood ?? .79, deck = o.deck ?? .8;
@@ -155,19 +191,60 @@ export function createConcepts(T, kit) {
       [-1, w * .92, .2, hood + .02, .72], [-.6, w * .95, .2, hood + .01, .8], [.3, w * .95, .2, .74, .86], [axle, w * .8, .2, deck, .86],
       [l - .1, w * .86, .24, deck + .01, .88], [l, w * .84, .32, deck - .03, .88]];
     const podF = wheelArches(o.podF || [[-l - .02, .08, .26, tipH + .04, .6], [-l + .3, .2, .22, fender - .2, .6],
-      [-axle, .27, .2, fender - .04, .62], [-1, .27, .2, fender - .07, .64], [-.45, .22, .22, hood - .06, .7]], axle, { front: .01, rear: .01, flare: .035, lip: .02 });
-    const podR = wheelArches(o.podR || [[-.1, .18, .22, .66, .8], [.6, .27, .2, hip - .06, .82], [axle, .29, .2, hip, .84],
+      [-axle, .27, .2, fender - .04, .62], [-1, .27, .2, fender - .07, .64], [-.5, .2, .22, hood - .06, .7], [-.15, .06, .3, .6, .7]], axle, { front: .01, rear: .01, flare: .035, lip: .02 });
+    const podR = wheelArches(o.podR || [[-.4, .05, .3, .6, .8], [-.05, .17, .22, .66, .8], [.6, .27, .2, hip - .06, .82], [axle, .29, .2, hip, .84],
       [l - .1, .28, .24, hip, .85], [l, .24, .3, hip - .04, .85]], axle, { front: .06, rear: .06, flare: .05 });
     const fx = w * (o.fx ?? .76);
     const pods = [podF, podR].flatMap(pod => [-1, 1].map(s => loft(pod, true).translate(s * fx, 0, 0)));
     const inside = (list, z) => z >= list[0][0] && z <= list.at(-1)[0];
     const edge = z => Math.max(inside(main, z) ? at(main, z, 1) : 0, ...[podF, podR].filter(p => inside(p, z)).map(p => fx + at(p, z, 1))) + .012;
     const front = z => Math.max(top(main, z), inside(podF, z) ? top(podF, z) : 0);
+    const cabinList = o.cabin || [[-1.05, w * .6, .58, .64, .95], [-.6, w * .6, .62, .94, .8], [-.1, w * .58, .66, 1.12, .74], [.45, w * .56, .68, 1.1, .74], [1.1, w * .5, .72, .9, .8], [1.6, w * .4, .76, .82, .9]];
     return {
-      main, podF: front, podR, fx, edge, surface: main, body: merge([loft(densify(main, .1), true), ...pods, ...(o.extra || [])]),
-      cabin: loft(densify(o.cabin || [[-1.05, w * .6, .58, .64, .95], [-.6, w * .6, .62, .94, .8], [-.1, w * .58, .66, 1.12, .74], [.45, w * .56, .68, 1.1, .74], [1.1, w * .5, .72, .9, .8], [1.6, w * .4, .76, .82, .9]]), true),
+      main, podF: front, podR, fx, edge, surface: main, cabinList, tipZ: main[0][0], body: merge([loft(densify(main, .1), true), ...pods, ...(o.extra || [])]),
+      cabin: loft(densify(cabinList), true),
       roof: loft(densify(o.roof || [[-.15, w * .44, 1.08, 1.13, .85], [.45, w * .42, 1.07, 1.12, .85], [.9, w * .36, .96, 1.0, .85]]), true),
     };
+  }
+  // ── 멋 부품 세트(슈퍼카 뼈대 차에 공통) — 카본 스플리터 · 카나드 · 사이드 스커트 · 옆 흡기구 · 큰 디퓨저 · 어깨 접힌 선 · 유리 테 ──
+  // 무게 한도: 차 하나당 부품 260개 · 삼각형 4만 개 아래(쇼룸 · 주행 프레임 유지)
+  function aeroKit({ chassis, frontPanel, bumper, flank, lamp }, c, w, l, axle, o) {
+    const accent = basic(o.accent);
+    const crease = standard(o.crease, .18, .4);
+    const nose = c.tipZ;
+    box(frontPanel, carbon, 0, .17, nose + .2, w * 1.25, .022, .34);
+    box(frontPanel, accent, 0, .183, nose + .03, w * 1.15, .008, .012);
+    for (const s of [-1, 1]) {
+      for (let k = 0; k < 2; k++) bar(frontPanel, carbon, s * w * (.78 + k * .03), .27 + k * .065, -l + .02 + k * .07, .2, .012, .13, 0, 0, s * (.22 + k * .1));
+      const f = flank[s];
+      const skirt = 2 * axle - 1.0;
+      box(f, carbon, s * (c.edge(0) + .012), .2, 0, .07, .055, skirt);
+      box(f, accent, s * (c.edge(0) + .05), .228, 0, .006, .008, skirt * .92);
+      // 옆 흡기구 — 어두운 구멍 + 카본 날 셋
+      if (o.intake !== false) {
+        sideLine(f, grille, s, z => c.edge(z) + .004, .2, .3, .92, .36, .24, 8);
+        for (let k = 0; k < 3; k++) sideLine(f, carbon, s, z => c.edge(z) + .01, .25 + k * .05, .36 + k * .06, .9, .42 + k * .06, .014, 6);
+      }
+      // 어깨 접힌 선 — 빛을 받는 밝은 선
+      sideLine(f, crease, s, z => c.edge(z) + .003, -l + .45, .56, l - .25, .73, .016, 16);
+      // 유리 아래 테
+      const cab = c.cabinList;
+      const a = [], b = [];
+      for (let i = 0; i <= 14; i++) {
+        const z = lerp(cab[0][0] + .1, cab.at(-1)[0] - .1, i / 14);
+        const x = s * (at(cab, z, 1) + .006), y = at(cab, z, 2) + .04;
+        a.push([x, y, z]);
+        b.push([x, y + .014, z]);
+      }
+      ribbon(chassis, standard(o.trim || '#d6dbe0', .15, .9), a, b);
+    }
+    // 큰 디퓨저 — 카본 판 + 높은 핀 + 가운데 빗길 등
+    box(bumper, carbon, 0, .2, l - .15, w * 1.5, .03, .4);
+    for (let k = -3; k <= 3; k++) {
+      box(bumper, carbon, k * w * .19, .28, l - .1, .018, .17, .3);
+      box(bumper, accent, k * w * .19, .366, l + .045, .02, .006, .02);
+    }
+    box(bumper, lamp, 0, .32, l + .06, .12, .035, .015);
   }
   function archRing(group, material, x, zc, r, width = .022) {
     const a = [], b = [];
@@ -262,23 +339,23 @@ export function createConcepts(T, kit) {
     expedition: (w, l, axle) => suv(w, l, axle, true),
     // 1 벡터 74 — 흰 쐐기: 낮은 코끝에서 앞유리까지 한 면으로, 각진 어깨선 · 검은 아래 몸 · 모서리 가는 등
     vector(w, l, axle) {
-      const main = [[-l - .22, w * .86, .28, .42, .94], [-l + .02, w * .96, .22, .58, .9], [-axle, w, .2, .76, .88], [-1, w, .2, .77, .87],
-        [-.7, w, .2, .77, .86], [.3, w, .2, .74, .86], [axle, w, .2, .8, .87], [l - .15, w * .98, .22, .84, .9], [l, w * .95, .3, .82, .9]];
-      const surface = wheelArches(main, axle, { front: .01, rear: .05, flare: .05, step: .22, lip: .02 });
+      const c = supercar(w, l, axle, { ...STRATO_FRONT, hip: .84,
+        cabin: [[-.85, w * .74, .7, .78, .96], [-.05, w * .66, .72, 1.1, .76], [.45, w * .66, .74, 1.1, .78], [1.05, w * .7, .76, .84, .9]] });
+      const surface = c.main;
       return {
-        surface, body: loft(surface), flat: true, roofMat: 'paint',
-        cabin: loft([[-.8, w * .86, .7, .79, .96], [-.05, w * .68, .7, 1.1, .76], [.45, w * .68, .72, 1.1, .78], [1.05, w * .76, .74, .84, .9]]),
+        ...c, roofMat: 'paint',
+        cabin: loft([[-.85, w * .74, .7, .78, .96], [-.05, w * .66, .72, 1.1, .76], [.45, w * .66, .74, 1.1, .78], [1.05, w * .7, .76, .84, .9]]),
         roof: loft([[-.06, w * .54, 1.085, 1.125, .9], [.45, w * .54, 1.08, 1.12, .9], [.78, w * .54, .99, 1.03, .9]]),
-        front: -.75, rear: .6, glow: '#ffa21f', look: { belt: [.35, 0], lower: '#1e2124', pin: 0 },
+        front: -.75, rear: .6, glow: '#ffa21f', look: { belt: [.42, .015], lower: '#1e2124', pin: 0 },
         dress({ chassis, frontPanel, bumper, wing, flank, lamp, paint }) {
-          box(frontPanel, grille, 0, .262, -l - .11, w * 1.62, .045, .3);
-          box(frontPanel, grille, 0, .325, -l - .226, w * .44, .05, .012);
+          aeroKit({ chassis, frontPanel, bumper, flank, lamp }, c, w, l, axle, { accent: '#ffa21f', crease: '#ffffff', trim: '#1e2124' });
+          const nose = c.tipZ - .012;
+          box(frontPanel, grille, 0, .25, nose + .006, w * .4, .05, .012);
           for (const s of [-1, 1]) {
-            bar(frontPanel, grille, s * w * .64, .372, -l - .222, w * .32, .03, .012, 0, 0, s * .06);
-            bar(frontPanel, led, s * w * .64, .375, -l - .232, w * .28, .012, .012, 0, 0, s * .06);
+            bar(frontPanel, grille, s * w * .44, .325, nose + .004, w * .3, .032, .012, 0, 0, s * .06);
+            bar(frontPanel, led, s * w * .44, .327, nose - .006, w * .27, .013, .012, 0, 0, s * .06);
             const f = flank[s];
-            box(f, grille, s * w * 1.0, .24, 0, .05, .08, 2.3);
-            box(f, basic('#ffb11f'), s * w * 1.004, .62, .3, .012, .012, .1);
+            box(f, basic('#ffb11f'), s * c.edge(.3), .62, .3, .012, .012, .1);
             box(chassis, grille, s * w * .86, .84, -.62, .14, .06, .1);
           }
           for (let k = 0; k < 5; k++) {
@@ -291,21 +368,22 @@ export function createConcepts(T, kit) {
           for (const s of [-1, 1]) box(bumper, lamp, s * w * .86, .7, l + .022, .03, .08, .012);
           box(bumper, trim, 0, .25, l - .1, w * 1.5, .04, .42);
           for (let k = -2; k <= 2; k++) box(bumper, grille, k * w * .3, .3, l - .02, .03, .11, .22);
-          return { plateY: .5, tail: [.7, .74], head: [.64, .38, .23] };
+          return { plateY: .5, tail: [.7, .74], head: [.44, .33, .2] };
         },
-        wheel: { brake: '#9a6a3c', rim: '#25272b', spokes: 10, width: .04, twist: .28, lip: '#9a6a3c' },
+        wheel: { ...STRATO_WHEEL, brake: '#9a6a3c', rim: '#25272b', lip: '#9a6a3c', nut: '#ffa21f' },
       };
     },
     // 2 네온 글래스 — 진주색 조각 면: 아주 낮고 뾰족한 코, 펜더 끝 가는 눈매, 옆면 사선 크롬 두 줄, 길고 둥근 푸른 유리
     neon(w, l, axle) {
       const c = supercar(w, l, axle, {
-        tip: .3, tipH: .31, tipW: .6, tipLow: .19, hood: .78, fender: .78, hip: .8,
+        ...STRATO_FRONT, hip: .8,
         cabin: [[-1.15, w * .62, .58, .64, .95], [-.7, w * .62, .62, .95, .8], [-.15, w * .6, .66, 1.12, .74], [.5, w * .58, .68, 1.1, .74], [1.2, w * .5, .72, .88, .82], [1.75, w * .36, .76, .8, .9]],
         roof: [[-.4, .012, 1.055, 1.07, 1], [-.1, .014, 1.125, 1.14, 1], [.5, .014, 1.105, 1.12, 1], [1.1, .012, .9, .915, 1]],
       });
       return {
-        ...c, glass: '#1c3d6e', roofMat: basic('#5ff6ff'), glow: '#2fb8ff', front: -.9, rear: .9, look: { pin: 0 }, paint: { iridescence: .45 },
+        ...c, glass: '#1c3d6e', roofMat: basic('#5ff6ff'), glow: '#2fb8ff', front: -.9, rear: .9, look: { pin: 0, belt: [.43, .025], lower: '#131518' }, paint: { iridescence: .45 },
         dress({ chassis, frontPanel, bumper, wing, flank, lamp }) {
+          aeroKit({ chassis, frontPanel, bumper, flank, lamp }, c, w, l, axle, { accent: '#4fd8ff', crease: '#ffffff', trim: '#4fd8ff' });
           const cyan = basic('#4fd8ff');
           const chrome = standard('#cfd6de', .12, .95);
           for (const s of [-1, 1]) {
@@ -316,8 +394,8 @@ export function createConcepts(T, kit) {
             box(flank[s], cyan, s * (w * .95 + .01), .215, 0, .012, .012, 2.1);
             box(chassis, grille, s * w * .7, .86, -.72, .14, .05, .09);
           }
-          box(frontPanel, grille, 0, .25, -l - .2, w * .46, .045, .12);
-          box(frontPanel, cyan, 0, .262, -l - .27, w * .3, .01, .012);
+          box(frontPanel, grille, 0, .23, c.tipZ - .006, w * .44, .05, .012);
+          box(frontPanel, cyan, 0, .3, c.tipZ - .012, w * .5, .012, .012);
           bar(wing, standard('#e9eef3', .3, .3), 0, .84, l - .08, w * 1.7, .03, .16, -.2);
           box(bumper, grille, 0, .68, l + .005, w * 1.7, .1, .03);
           box(bumper, lamp, 0, .69, l + .022, w * 1.66, .018, .012);
@@ -325,25 +403,23 @@ export function createConcepts(T, kit) {
           box(bumper, trim, 0, .26, l - .1, w * 1.3, .04, .4);
           return { plateY: .5, tail: [.7, .69], head: [.76, .6, -.15] };
         },
-        wheel: { brake: '#4fb6ff', rim: '#dfe7f2', spokes: 12, width: .018, twist: .55, lip: '#4fb6ff' },
+        wheel: { ...STRATO_WHEEL, brake: '#4fb6ff', rim: '#dfe7f2', lip: '#4fb6ff', nut: '#4fb6ff' },
       };
     },
     // 3 마그마 GT — 앞엔진 GT: 긴 보닛 가운데 불룩, 큰 그물 그릴 · 흰 테두리, 펜더 위 뒤로 찢어진 등, 두 봉 지붕, 문 뒤 흡기구, 높은 뒷날개
     magma(w, l, axle) {
       const c = supercar(w, l, axle, {
-        main: [[-l - .16, w * .68, .16, .42, .84], [-l + .1, w * .8, .17, .58, .84], [-axle, w * .8, .2, .79, .86], [-1.2, w * .86, .2, .78, .86],
-          [-.5, w * .95, .2, .72, .86], [.6, w * .95, .2, .74, .86], [axle, w * .8, .2, .78, .86], [l - .1, w * .86, .24, .8, .88], [l, w * .82, .32, .76, .88]],
-        podF: [[-l - .02, .1, .26, .44, .7], [-l + .24, .22, .22, .64, .8], [-axle, .28, .2, .79, .82], [-1.2, .28, .2, .77, .82], [-.6, .22, .22, .74, .8]],
+        ...STRATO_FRONT,
         podR: [[.2, .18, .22, .7, .8], [1, .28, .2, .8, .82], [axle, .3, .2, .86, .84], [l - .1, .28, .24, .84, .85], [l, .24, .32, .78, .85]],
-        extra: [loft(densify([[-l + .3, w * .16, .4, .6, .7], [-1.3, w * .22, .5, .8, .7], [-.6, w * .2, .6, .8, .7]], .1), true)],
         cabin: [[-.62, w * .7, .66, .74, .95], [-.15, w * .64, .7, 1.12, .78], [.55, w * .6, .72, 1.12, .78], [1.3, w * .64, .74, .9, .9], [1.95, w * .7, .76, .82, .95]],
       });
       c.roof = merge([-1, 1].map(s => loft(densify([[-.12, .17, 1.09, 1.145, .8], [.55, .17, 1.09, 1.14, .8], [.98, .15, .99, 1.03, .8]]), true).translate(s * .17, 0, 0)));
       return {
-        ...c, glow: '#ff3324', front: -.6, rear: .9, look: { pin: 0 },
+        ...c, glow: '#ff3324', front: -.6, rear: .9, look: { pin: 0, belt: [.42, .02], lower: '#141517' },
         dress({ chassis, frontPanel, bumper, wing, flank, lamp }) {
+          aeroKit({ chassis, frontPanel, bumper, flank, lamp }, c, w, l, axle, { accent: '#ffb13b', crease: '#ff8a72', trim: '#c9ced6' });
           const white = standard('#f2f2f0', .3, .1);
-          const nose = -l - .172;
+          const nose = c.tipZ - .012;
           panel(frontPanel, grille, [[-w * .5, .2, nose], [w * .5, .2, nose], [w * .38, .36, nose], [-w * .38, .36, nose]]);
           for (let k = 0; k < 4; k++) box(frontPanel, trim, 0, .225 + k * .034, nose - .004, w * (.96 - k * .08), .006, .006);
           for (let k = -3; k <= 3; k++) box(frontPanel, trim, k * w * .12, .28, nose - .004, .006, .15, .006);
@@ -352,7 +428,6 @@ export function createConcepts(T, kit) {
             panel(frontPanel, grille, [[s * w * .54, .22, -l - .15], [s * w * .66, .22, -l - .11], [s * w * .69, .34, -l - .06], [s * w * .52, .34, -l - .15]]);
             onTop(frontPanel, grille, c.podF, s * (c.fx - .1), -l - .02, s * (c.fx + .08), -l + .36, .07);
             onTop(frontPanel, led, c.podF, s * (c.fx - .08), -l, s * (c.fx + .1), -l + .34, .02, .016);
-            onTop(chassis, grille, c.main, s * w * .25, -1.5, s * w * .27, -1.05, .05);
             const f = flank[s];
             panel(f, grille, [[s * c.edge(.45), .34, .45], [s * c.edge(1), .62, 1], [s * c.edge(1.15), .34, 1.15]]);
             box(f, grille, s * c.edge(0), .23, 0, .03, .06, 2.4);
@@ -367,17 +442,18 @@ export function createConcepts(T, kit) {
           for (const x of [-.09, .09]) piece(bumper, new T.CylinderGeometry(.05, .05, .1, 14), alloy, x, .3, l - .01).rotation.x = Math.PI / 2;
           return { plateY: .45, tail: [.62, .64], head: [.76, .62, -.12] };
         },
-        wheel: { brake: '#d4271c', rim: '#c9ced6', spokes: 16, width: .016, twist: .4 },
+        wheel: { ...STRATO_WHEEL, brake: '#ffb13b', rim: '#2b2e33', lip: '#c9ced6', nut: '#ffb13b' },
       };
     },
     // 4 보이드 R — 검푸른 하이퍼카: 시안 네온 테두리(그릴 · 바퀴 아치 · 문턱), 점 LED 그릴, 보닛 V 홈, 펜더 위 긴 눈매
     void(w, l, axle) {
-      const c = supercar(w, l, axle, { tip: .24, tipH: .34, tipW: .64, tipLow: .17, hood: .79, fender: .79, hip: .84 });
+      const c = supercar(w, l, axle, { ...STRATO_FRONT, hip: .84 });
       return {
-        ...c, glow: '#22e6ff', front: -.9, rear: .9, look: { pin: 0 },
+        ...c, glow: '#22e6ff', front: -.9, rear: .9, look: { pin: 0, belt: [.42, .02], lower: '#0a0c0e' },
         dress({ chassis, frontPanel, bumper, wing, flank, lamp }) {
+          aeroKit({ chassis, frontPanel, bumper, flank, lamp }, c, w, l, axle, { accent: '#36f0ff', crease: '#5d8a96', trim: '#36f0ff' });
           const cyan = basic('#36f0ff');
-          const nose = -l - .252;
+          const nose = c.tipZ - .012;
           const face = [[-w * .56, .19, nose], [-w * .4, .32, nose], [w * .4, .32, nose], [w * .56, .19, nose]];
           panel(frontPanel, grille, face);
           polyline(frontPanel, cyan, face.map(([x, y, z]) => [x, y, z - .012]), .014);
@@ -392,7 +468,6 @@ export function createConcepts(T, kit) {
               box(frontPanel, led, s * (c.fx - .09 + k * .055 + .03), c.podF(z) + .024, z, .026, .022, .026);
             }
             onTop(frontPanel, cyan, c.podF, s * (c.fx - .12), -l - .06, s * (c.fx + .12), -l + .46, .01, .014);
-            onTop(chassis, grille, c.main, s * w * .05, -l + .05, s * w * .3, -1.05, .02);
             for (const zc of [-axle, axle]) archRing(flank[s], cyan, s * c.edge(zc), zc, .45);
             box(flank[s], cyan, s * (w * .95 + .012), .22, 0, .012, .014, 1.9);
             bar(chassis, grille, s * w * .78, .9, -.56, .12, .05, .1);
@@ -407,17 +482,18 @@ export function createConcepts(T, kit) {
           for (let k = -3; k <= 3; k++) box(bumper, grille, k * w * .2, .3, l - .02, .025, .12, .24);
           return { plateY: .52, tail: [.7, .71], head: [.76, .62, -.18] };
         },
-        wheel: { brake: '#36f0ff', rim: '#1e2328', spokes: 10, width: .03, twist: .2, lip: '#36f0ff' },
+        wheel: { ...STRATO_WHEEL, brake: '#36f0ff', rim: '#1e2328', lip: '#36f0ff', nut: '#36f0ff' },
       };
     },
     // 5 스트라토 캐노피 — 두 줄 흰 줄무늬 슈퍼카: 가운데 거꾸로 된 삼각 그물 그릴 + 양옆 삼각 흡기구, 펜더 위 고양이 눈 등, 둥근 지붕, 문 아래 아가미
     strato(w, l, axle) {
-      const c = supercar(w, l, axle, { tip: .2, tipH: .37, tipW: .64, tipLow: .17, hood: .79, fender: .79, hip: .86 });
+      const c = supercar(w, l, axle, { ...STRATO_FRONT, hip: .86 });
       return {
         ...c, glow: '#ff2a3a', front: -.9, rear: .9, stripe: '#d0102a', look: { spine: .2, pin: 0 },
         dress({ chassis, frontPanel, bumper, wing, flank, lamp, paint }) {
+          aeroKit({ chassis, frontPanel, bumper, flank, lamp }, c, w, l, axle, { accent: '#ff2a3a', crease: '#5a5f66', trim: '#c9ced6' });
           const white = standard('#eef0f2', .25, .1);
-          const nose = -l - .21;
+          const nose = c.tipZ - .01;
           panel(frontPanel, grille, [[-w * .3, .35, nose], [w * .3, .35, nose], [0, .19, nose]]);
           polyline(frontPanel, alloy, [[-w * .32, .35, nose - .006], [0, .18, nose - .006], [w * .32, .35, nose - .006]], .014);
           for (let k = 1; k < 4; k++) box(frontPanel, alloy, 0, .19 + k * .04, nose - .004, w * .6 * k / 4, .005, .006);
@@ -441,7 +517,7 @@ export function createConcepts(T, kit) {
           box(bumper, trim, 0, .25, l - .1, w * 1.4, .04, .42);
           return { plateY: .46, tail: [.62, .66], head: [.72, .62, -.14] };
         },
-        wheel: { brake: '#d4271c', rim: '#d7dbe0', spokes: 5, width: .065 },
+        wheel: { ...STRATO_WHEEL, brake: '#d4271c', rim: '#d7dbe0' },
       };
     },
     // 11 레트로 버블 — 귀여운 클래식 쿠페(운영자 참고 사진): 둥글게 부푼 앞뒤 펜더, 펜더 앞 동그란 눈 + 크롬 테, 가운데 타원 크롬 그릴, 보닛 검은 두 줄, 둥근 지붕
@@ -552,13 +628,14 @@ export function createConcepts(T, kit) {
     // 6 헥사 팽 — 라임 하이퍼카: 아주 뾰족한 코, 빛나는 가는 눈매, 앞은 낮고 뒤로 올라가는 검은 아래 몸, 큰 옆 흡기구, 꼬리 지느러미, 육각 꼬리등
     hexa(w, l, axle) {
       const c = supercar(w, l, axle, {
-        tip: .34, tipH: .29, tipW: .58, tipLow: .19, hood: .77, fender: .77, hip: .8,
+        ...STRATO_FRONT, hip: .8,
         cabin: [[-1.1, w * .56, .56, .62, .95], [-.65, w * .56, .6, .92, .8], [-.15, w * .52, .64, 1.05, .72], [.4, w * .5, .66, 1.03, .72], [1.0, w * .44, .7, .88, .8], [1.5, w * .3, .74, .8, .9]],
         roof: [[-.2, w * .38, 1.01, 1.06, .85], [.4, w * .36, 1, 1.05, .85], [.8, w * .3, .9, .95, .85]],
       });
       return {
         ...c, glow: '#a8ff2a', front: -.9, rear: .9, look: { belt: [.42, .07], lower: '#16191b', pin: 0 }, paint: { metalness: 1, roughness: .07, clearcoat: 1, clearcoatRoughness: .03, envMapIntensity: 1.35 },
         dress({ chassis, frontPanel, bumper, wing, flank, lamp, paint }) {
+          aeroKit({ chassis, frontPanel, bumper, flank, lamp }, c, w, l, axle, { accent: '#c4ff3a', crease: '#ffffff', trim: '#c4ff3a', intake: false });
           const lime = basic('#c4ff3a');
           const glow = basic('#ecffb0');
           for (const s of [-1, 1]) {
@@ -576,7 +653,7 @@ export function createConcepts(T, kit) {
           panel(chassis, paint, [[0, 1.02, .5], [0, 1.0, l - .02], [0, .8, l - .02], [0, .8, .95]]);
           box(chassis, lime, 0, 1.0, l - .03, .012, .012, .04);
           box(frontPanel, grille, 0, .2, -l - .1, w * .7, .03, .3);
-          box(frontPanel, lime, 0, .214, -l - .25, w * .36, .01, .012);
+          box(frontPanel, lime, 0, .3, c.tipZ - .012, w * .4, .01, .012);
           bar(wing, paint, 0, .84, l - .06, w * 1.7, .025, .18, -.24);
           const pipe = piece(bumper, new T.CylinderGeometry(.09, .09, .14, 6), trim, 0, .4, l);
           pipe.rotation.x = Math.PI / 2;
@@ -585,7 +662,7 @@ export function createConcepts(T, kit) {
           for (let k = -3; k <= 3; k++) box(bumper, grille, k * w * .2, .32, l - .03, .03, .16, .28);
           return { plateY: .52, tail: [.58, .62], head: [.76, .5, -.05] };
         },
-        wheel: { brake: '#c4ff3a', rim: '#17191c', spokes: 5, width: .07, lip: '#c4ff3a' },
+        wheel: { ...STRATO_WHEEL, brake: '#c4ff3a', rim: '#17191c', lip: '#c4ff3a', nut: '#c4ff3a' },
       };
     },
   };

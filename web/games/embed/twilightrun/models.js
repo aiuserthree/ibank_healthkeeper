@@ -157,10 +157,9 @@ export function createCarModels(T, glowTexture) {
     const van = shape === 'van';
     const sporty = !!liveries[shape];
     const sections = sporty ? [
-      // 낮은 쐐기 앞코 — 앞끝을 얇게, 보닛이 앞유리까지 길게 솟는다
-      [-l, w * .70, .22, nose - .09, .78], [-l + .08, w * .85, .19, nose - .03, .86],
-      [-l + .22, w * .95, .18, nose + .04, .89], [-l + .40, w * .99, .18, nose + .11, .90],
-      [-l + .62, w, .18, deck * .90, taper],
+      // 앞은 스트라토 캐노피 기준(운영자 지시 2026-11-21) — 낮고 넓은 코끝에서 앞바퀴 위까지 보닛이 둥글게 오른다
+      [-l - .2, w * .64, .17, .37, .6], [-l + .1, w * .8, .19, .59, .62],
+      [-l + .62, w * .97, .18, .79, .68],
     ] : [
       [-l, w * .82, .23, nose, .86], [-l + .13, w * .92, .20, nose + .062, .94],
       [-l + .35, w * .985, .18, nose + .14, .91], [-l + .62, w, .18, van ? .99 : deck * .94, taper],
@@ -172,7 +171,7 @@ export function createCarModels(T, glowTexture) {
     // 내 차(매끈) 4종은 앞바퀴 위가 보닛보다 덜 솟게(lip) · 앞코를 길게
     const surface = detailed ? wheelArches(sections, l - .62, sporty ? { lip: .02 } : undefined) : sections;
     const base = detailed ? loft(surface, true) : loft(sections);
-    if (detailed && sporty) stretchGeometry(base, noseStretch(l));
+
     const end = rear + (van ? .19 : .70);
     const frontGlass = front - (van ? .44 : .92);
     const backGlass = van ? roof - .16 : deck + .065;
@@ -217,16 +216,10 @@ export function createCarModels(T, glowTexture) {
 
   // 기존 4종 앞코를 길게(운영자 요청 2026-11-21) — 앞바퀴 아치 앞쪽(오버행)만 앞으로 늘이고 끝을 조금 좁힌다.
   // 몸통 · 앞 장식(등 · 그릴 · 범퍼)에 같은 변환을 걸어 서로 어긋나지 않게 한다
-  const NOSE = .28;
+  const NOSE = .2;
   function noseStretch(l) {
-    const z0 = -l + .19, k = (.19 + NOSE) / .19;
-    return (x, y, z) => {
-      if (z >= z0) return [x, y, z];
-      // 몸통 끝(-l)보다 앞에 붙은 범퍼 · 등은 늘이지 않고 늘어난 만큼 앞으로만 옮긴다
-      const nz = z < -l ? z - NOSE : z0 + (z - z0) * k;
-      const t = Math.min(1, (z0 - Math.max(nz, -l - NOSE)) / (.19 + NOSE));
-      return [x * (1 - .2 * t * t), y, nz];
-    };
+    // 코끝이 스트라토 기준(-l - .2)으로 나갔으니, 앞면에 붙은 그릴 · 등 · 범퍼를 그만큼 앞으로 옮기고 좁힌다
+    return (x, y, z) => z < -l + .005 ? [x * .8, Math.min(y, .36), z - NOSE] : [x, y, z];
   }
   function stretchGeometry(geometry, fn) {
     const p = geometry.getAttribute('position');
@@ -238,10 +231,7 @@ export function createCarModels(T, glowTexture) {
     for (const child of group.children) {
       if (child.userData.panel) { stretchGeometry(child.geometry, fn); continue; }
       const [x, y, z] = fn(child.position.x, child.position.y, child.position.z);
-      if (z !== child.position.z && !child.isSprite && child.position.z >= -l) {
-        child.scale.z *= (.19 + NOSE) / .19;
-        child.scale.x *= x / (child.position.x || 1) || 1;
-      }
+      if (z !== child.position.z && !child.isSprite) child.scale.x *= .8;
       child.position.set(x, y, z);
     }
   }
@@ -589,12 +579,12 @@ export function createCarModels(T, glowTexture) {
         box(assembly, brakes.get(shape), side * .137, .149, .107, .069, .128, .088);
         const edge = piece(rotating, lip, rims.get(shape), side * .144, 0, 0);
         edge.rotation.y = Math.PI / 2;
-        const count = { coupe: 5, sport: 7, gt: 6, hyper: 9 }[shape];
+        const count = 5; // 휠 디자인도 스트라토 기준(5살) — 색은 차마다
         for (let i = 0; i < count; i++) {
           const angle = i * Math.PI * 2 / count;
           const spoke = box(rotating, shape === 'hyper' ? rotor : rims.get(shape), side * .164,
-            Math.cos(angle) * .136, Math.sin(angle) * .136, .029, .212, shape === 'coupe' ? .047 : .027);
-          spoke.rotation.x = angle + (shape === 'sport' ? -.15 : .10);
+            Math.cos(angle) * .136, Math.sin(angle) * .136, .029, .212, .065);
+          spoke.rotation.x = angle;
         }
         const hub = piece(rotating, lug, trim, side * .175, 0, 0);
         hub.rotation.z = Math.PI / 2;
