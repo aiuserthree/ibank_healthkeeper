@@ -1,8 +1,9 @@
-import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=13';
-import { createFallback } from './scene-fallback.js?v=13';
-import { createCarModels } from './models.js?v=13';
-import { createImpactFx, impactMotion } from './impact.js?v=13';
-import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=13';
+import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=14';
+import { createFallback } from './scene-fallback.js?v=14';
+import { createCarModels } from './models.js?v=14';
+import { createImpactFx, impactMotion } from './impact.js?v=14';
+import { dayProgress, dayTime, weatherAt } from './daytime.js?v=14';
+import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=14';
 
 const poses = [
   { back: 8.5, height: 2.9 },
@@ -48,15 +49,17 @@ function createWeather(T, camera) {
   drizzle.frustumCulled = false;
   drizzle.renderOrder = 3;
   camera.add(drizzle);
-  return (t, wet, speed) => {
+  return (t, wet, speed, snow = false) => {
     drizzle.visible = wet > .015;
     if (!drizzle.visible) return;
-    material.opacity = wet * (.20 + speed * .0015);
+    material.color.set(snow ? '#ffffff' : '#c4d8ee');
+    material.opacity = wet * (snow ? .62 : .20 + speed * .0015);
+    const fall = snow ? .22 : 1, streak = snow ? .25 : 1;
     for (let i = 0; i < rainCount; i++) {
       const x = (random(i * 2) * 2 - 1) * (4.4 + camera.aspect * 2);
-      const y = ((random(i * 3 + 12) - t * (.9 + random(-i) * .7)) % 1 + 1) % 1 * 10 - 5.1;
+      const y = ((random(i * 3 + 12) - t * fall * (.9 + random(-i) * .7)) % 1 + 1) % 1 * 10 - 5.1;
       const z = -2.6 - random(i + 46) * 11;
-      const length = .13 + random(i - 32) * .22 + speed * .003;
+      const length = (.13 + random(i - 32) * .22 + speed * .003) * streak;
       positions.set([x, y, z, x - .055 - speed * .0018, y - length, z - .07], i * 6);
     }
     points.needsUpdate = true;
@@ -128,13 +131,15 @@ function createWebGL(T, stage) {
   new ResizeObserver(fit).observe(stage);
   fit();
 
-  function panoramaState(current, next, mix, heading, underpass) {
+  // 하늘 띠 두 장 — 풍경이 바뀌는 곳은 풍경끼리, 아니면 같은 풍경의 시간대끼리 섞는다(horizons/<풍경>-<시간>.webp)
+  function panoramaState(current, next, mix, heading, underpass, filter = '') {
     const key = current + '/' + next;
     if (panoramaTheme !== key) {
       panoramaTheme = key;
-      farSky.style.backgroundImage = `url("${assetRoot}horizons/${current}.webp")`;
-      nextSky.style.backgroundImage = `url("${assetRoot}horizons/${next}.webp")`;
+      farSky.style.backgroundImage = `url("${assetRoot}horizons/${current}.webp?v=1")`;
+      nextSky.style.backgroundImage = `url("${assetRoot}horizons/${next}.webp?v=1")`;
     }
+    if (farSky.style.filter !== filter) farSky.style.filter = nextSky.style.filter = filter;
     stage.style.setProperty('--pan', `${50 + clamp(heading * 30, -11, 11)}%`);
     stage.style.setProperty('--haze', '#' + haze.getHexString());
     nextSky.style.opacity = current === next ? '0' : mix.toFixed(3);
@@ -241,11 +246,12 @@ function createWebGL(T, stage) {
   }
 
   function prepare(course) {
-    for (const { theme } of course.sections) {
-      if (warmed.has(theme)) continue;
+    for (const { theme } of course.sections) for (const time of ['morning', 'noon', 'sunset', 'night']) {
+      const key = `${theme}-${time}`;
+      if (warmed.has(key)) continue;
       const image = new Image();
-      image.src = `${assetRoot}horizons/${theme}.webp`;
-      warmed.set(theme, image);
+      image.src = `${assetRoot}horizons/${key}.webp?v=1`;
+      warmed.set(key, image);
     }
   }
 
@@ -290,20 +296,35 @@ function createWebGL(T, stage) {
     const a = atmospheres[current.theme];
     const b = atmospheres[next.theme];
     const underpass = world.tunnelAt(viewingZ + 3);
-    const night = Number(Boolean(a.night)) * (1 - mix) + Number(Boolean(b.night)) * mix;
+    // 시간 흐름 · 날씨 — 빛 · 안개 · 하늘을 하루 시간에 맞추고, 흐림 · 비 · 안개 · 눈을 더한다
+    const day = dayTime(dayProgress(state), !state.mode.goal);
+    const weather = weatherAt(course, distance);
+    const w = weather.amount;
+    const gloom = { cloudy: .45, rain: .6, fog: .35, snow: .4 }[weather.kind] * w || 0;
+    const night = day.night;
     tint(haze, a.fog, b.fog, mix);
+    haze.lerp(temporary.set(day.fog), .6);
+    if (weather.kind === 'fog' || weather.kind === 'snow') haze.lerp(temporary.set(night > .5 ? '#3a4150' : '#c9ced4'), .55 * w);
+    if (weather.kind === 'rain') haze.lerp(temporary.set(night > .5 ? '#262c38' : '#7c8590'), .45 * w);
     if (underpass) haze.lerp(temporary.set('#555863'), .76);
     scene.fog.color.copy(haze);
-    scene.fog.near = underpass ? 32 : 72;
-    scene.fog.far = underpass ? 235 : 485;
-    panoramaState(current.theme, next.theme, mix, headingX, underpass);
-    ambient.intensity = underpass ? 1.8 : 1.95 - .27 * night;
-    sun.intensity = underpass ? .55 : 2.42 - 1.22 * night;
-    renderer.toneMappingExposure = underpass ? 1.06 : 1.16 - .07 * night;
-    tint(sun.color, a.light, b.light, mix);
-    tint(ambient.color, a.sky, b.sky, mix);
+    const thick = weather.kind === 'fog' ? w : weather.kind === 'snow' || weather.kind === 'rain' ? w * .45 : 0;
+    scene.fog.near = underpass ? 32 : 72 - 50 * thick;
+    scene.fog.far = underpass ? 235 : 485 - 285 * thick;
+    const skyA = `${current.theme}-${day.skyA}`;
+    const skyFilter = gloom ? `saturate(${1 - gloom * .7}) brightness(${1 - gloom * .35})` : '';
+    if (mix > 0) panoramaState(skyA, `${next.theme}-${day.skyA}`, mix, headingX, underpass, skyFilter);
+    else panoramaState(skyA, `${current.theme}-${day.skyB}`, day.skyMix, headingX, underpass, skyFilter);
+    ambient.intensity = underpass ? 1.8 : day.ambI * (1 - gloom * .2);
+    sun.intensity = underpass ? .55 : day.sunI * (1 - gloom * .6);
+    renderer.toneMappingExposure = underpass ? 1.06 : day.exposure * (1 - gloom * .06);
+    sun.color.set(day.sun);
+    tint(temporary, a.light, b.light, mix);
+    sun.color.lerp(temporary, .2);
+    ambient.color.set(day.amb);
+    world.daylight(1 - night);
     sun.target.position.set(playerX, playerY, origin - distance);
-    sun.position.set(playerX + 13, playerY + 12, origin - distance - 24);
+    sun.position.set(playerX + 13, playerY + 3 + 14 * day.height, origin - distance - 24);
 
     const used = new Set();
     const traffic = state.rival ? [...state.traffic, state.rival] : state.traffic;
@@ -321,8 +342,8 @@ function createWebGL(T, stage) {
     cabinMesh.visible = roofMesh.visible = view !== 2;
     for (const [token, v] of vehicles) if (!used.has(token)) clearVehicle(token, v);
 
-    const wet = (current.theme === 'metro' ? 1 - mix : 0) + (next.theme === 'metro' ? mix : 0);
-    rain(state.elapsed, underpass ? 0 : wet, speed);
+    const falling = weather.kind === 'rain' || weather.kind === 'snow' ? w : 0;
+    rain(state.elapsed, underpass ? 0 : falling, speed, weather.kind === 'snow');
     lens.style.opacity = String(clamp((speed * 3.6 - 158) / 155, 0, .62));
     damageSmoke.forEach((puff, i) => {
       puff.visible = state.health <= 1;

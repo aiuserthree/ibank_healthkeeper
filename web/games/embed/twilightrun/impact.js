@@ -1,4 +1,4 @@
-import { clamp, roadX, roadY } from './drive.js?v=13';
+import { clamp, roadX, roadY } from './drive.js?v=14';
 
 export const impactDuration = 1.52;
 export function impactMotion(impact, age) {

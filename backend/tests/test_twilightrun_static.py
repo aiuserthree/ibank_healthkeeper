@@ -104,9 +104,13 @@ class TwilightrunStaticTest(unittest.TestCase):
         for name in ("collision", "debris", "horn"):
             self.assertTrue((art / "audio" / f"{name}.mp3").is_file(), name)
         self.assertTrue((art / "hero.jpg").is_file())
-        # 그림 · 소리는 합쳐 2MB, 휴게소 영상(주유 12초 · 메뉴별 음식 8초, 소리 없음 1280×720 — 누를 때만 불러옴)은 따로 35MB(1080p, 누를 때만 불러옴)
+        # 그림 · 소리는 합쳐 3.2MB(시간대별 하늘 32장 포함), 휴게소 영상(주유 12초 · 메뉴별 음식 8초, 소리 없음 1280×720 — 누를 때만 불러옴)은 따로 35MB(1080p, 누를 때만 불러옴)
         files = [p for p in art.rglob("*") if p.is_file()]
-        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix != ".mp4"), 2_000_000)
+        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix != ".mp4"), 3_200_000)
+        # 시간대별 하늘 — 코스 풍경 8 × 오전 · 점심 · 노을 · 밤
+        for land in ("coast", "port", "ridge", "forest", "metro", "alpine", "desert", "meadow"):
+            for time in ("morning", "noon", "sunset", "night"):
+                self.assertTrue((art / "horizons" / f"{land}-{time}.webp").is_file(), f"{land}-{time}")
         movies = ["refuel"] + [f"eat-{food}" for food in ("walnut", "udon", "hotbar", "coffee", "tteok", "sotteok", "tornado", "hotdog")]
         for name in movies:
             self.assertTrue((art / "rest" / f"{name}.mp4").is_file(), name)

@@ -1,4 +1,4 @@
-import { ROAD_WIDTH, roadX, roadY, sectionIndex, trackLook } from './drive.js?v=13';
+import { ROAD_WIDTH, roadX, roadY, sectionIndex, trackLook } from './drive.js?v=14';
 
 export const assetRoot = '/assets/games/twilightrun/';
 export const atmospheres = {
@@ -182,6 +182,7 @@ export function createWorld(T, scene) {
     const map = photo(name);
     return [name, new T.MeshStandardMaterial({
       map, alphaTest: .45, side: T.DoubleSide, roughness: .9, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .22,
+      // 밤에는 스스로 빛나지 않게 — scene.js 가 daylight(0~1)로 낮춘다
     })];
   }));
   const cutoutPlane = new T.PlaneGeometry(1, 1).translate(0, .5, 0);
@@ -556,6 +557,11 @@ export function createWorld(T, scene) {
     group.userData.materials.forEach(fabric => fabric.dispose());
   }
 
+  // 하루 빛(1 낮 · 0 밤) — 길가 그림의 자기 빛을 줄인다
+  function daylight(k) {
+    for (const fabric of Object.values(cutouts)) fabric.emissiveIntensity = .22 * k;
+  }
+
   function update(state, cameraZ) {
     clock.value = state.elapsed;
     const fresh = course !== state.course || mode !== state.mode;
@@ -581,5 +587,5 @@ export function createWorld(T, scene) {
     return origin;
   }
 
-  return { update, tunnelAt };
+  return { update, tunnelAt, daylight };
 }

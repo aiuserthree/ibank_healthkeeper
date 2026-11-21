@@ -1,4 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=13';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=14';
+import { weatherAt } from './daytime.js?v=14';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -345,6 +346,12 @@ function collide(state, vehicle, lastX, lastZ, previousGap, length, width) {
     fromX + (toX - fromX) * contact, previousGap + (toZ - previousGap) * contact);
 }
 
+// 비 · 눈이 오면 길이 미끄럽다(접지 -10% · -15%)
+function slick(state) {
+  const { kind, amount } = weatherAt(state.course, state.distance);
+  return 1 - (kind === 'rain' ? .10 : kind === 'snow' ? .15 : 0) * amount;
+}
+
 function advanceCar(state, input, dt) {
   const { car, course, distance, speed, x } = state;
   const top = (car.top + (distance < state.boostUntil ? 12 : 0)) * (state.hunger > 0 ? 1 : .8) / 3.6;
@@ -374,7 +381,7 @@ function advanceCar(state, input, dt) {
 
   // The tyres limit the rate the steering can turn the car. The road tangent provides a neutral heading.
   const velocity = (speed + state.speed) * .5;
-  const grip = car.grip * (onShoulder ? 1.35 : 2.23) * (braking ? .85 : 1) * (distance < state.gripUntil ? 1.25 : 1) * (distance < state.tireUntil ? 1.15 : 1);
+  const grip = car.grip * (onShoulder ? 1.35 : 2.23) * (braking ? .85 : 1) * (distance < state.gripUntil ? 1.25 : 1) * (distance < state.tireUntil ? 1.15 : 1) * slick(state);
   const turnLimit = grip / Math.max(velocity, 3);
   const turning = clamp(velocity * Math.tan(state.steer) / wheelbase, -turnLimit, turnLimit);
   const previousYaw = state.yaw;
@@ -406,6 +413,7 @@ export function step(state, input, dt) {
   state.signal = null;
   const before = state.distance;
   const hungerBefore = state.hunger;
+  const weatherBefore = weatherAt(state.course, state.distance).kind;
   const previousX = state.x;
   advanceCar(state, input, dt);
   advanceImpact(state, dt);
@@ -469,6 +477,10 @@ export function step(state, input, dt) {
     state.restCall = null;
   } else if (rest != null && state.distance > rest) state.restCall = null;
   if (state.fuel < .2 && state.fuel + Math.max(0, state.distance - before) / FUEL_RANGE >= .2 && !state.signal) state.signal = '기름 부족  ·  휴게소에 들르세요';
+  const weatherNow = weatherAt(state.course, state.distance).kind;
+  if (weatherNow !== weatherBefore && !state.signal) {
+    state.signal = { rain: '비가 와요  ·  길이 미끄러워요', snow: '눈이 와요  ·  길이 미끄러워요', fog: '안개가 짙어요', cloudy: '구름이 몰려와요', clear: '날이 개었어요' }[weatherNow];
+  }
   if (state.hunger < .2 && hungerBefore >= .2 && !state.signal) state.signal = '배고픔  ·  휴게소 식당에 들르세요';
   if (state.hunger <= 0 && hungerBefore > 0) state.signal = '배가 고파 힘이 빠져요  ·  최고 속도 -20%';
 
