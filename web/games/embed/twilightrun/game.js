@@ -1,10 +1,11 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=42';
-import { createScene } from './scene.js?v=42';
-import { impactDuration } from './impact.js?v=42';
-import { assetRoot } from './world.js?v=42';
-import { requestYield } from './traffic.js?v=42';
-import { createShowroom } from './showroom.js?v=42';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=42';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=43';
+import { createScene } from './scene.js?v=43';
+import { impactDuration } from './impact.js?v=43';
+import { assetRoot } from './world.js?v=43';
+import { requestYield } from './traffic.js?v=43';
+import { createShowroom } from './showroom.js?v=43';
+import { loadCarMesh } from './meshcar.js?v=43';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=43';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -231,8 +232,10 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=42`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=43`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
+// 힉스필드 3D 몸통이 있는 차는 미리 받아 둔다(못 받으면 코드로 짠 몸통 그대로)
+if (globalThis.THREE) for (const car of cars) if (car.mesh) loadCarMesh(globalThis.THREE, car.shape, assetRoot).catch(error => console.info('Twilight Run: car mesh unavailable', car.shape, error.message));
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
   () => screen === 'home' && !$('home').hidden && carStage.classList.contains('open'));

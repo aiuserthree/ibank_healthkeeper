@@ -1,5 +1,6 @@
-import { TIRE_RADIUS } from './drive.js?v=42';
-import { bodyFinish, glassFinish } from './finishes.js?v=42';
+import { TIRE_RADIUS } from './drive.js?v=43';
+import { bodyFinish, glassFinish } from './finishes.js?v=43';
+import { carMeshes } from './meshcar.js?v=43';
 
 // 차고에서 사는 새 차 6대. 기존 4종(매끈 · 투톤 지붕 · 칼날 LED)과 겹치지 않게 차마다 몸통 단면 · 유리 · 얼굴 조명 · 꼬리를 따로 짠다.
 // 모양은 운영자가 준 참고 사진 6장(2026-11-21)을 따라가고, 로고 · 엠블럼 · 글자는 넣지 않는다.
@@ -104,8 +105,9 @@ export function createConcepts(T, kit) {
     for (const s of [-1, 1]) for (const end of [-1, 1]) {
       const assembly = new T.Group(), rotating = new T.Group();
       const front = end < 0;
-      const halfTrack = w - (front ? .075 : .105);
-      const axle = car.wheelbase / 2;
+      const halfTrack = look.track || w - (front ? .075 : .105);
+      // axles: 힉스필드 몸통은 바퀴 자리가 앞뒤 대칭이 아니다 — 그 자리에 단다
+      const axle = look.axles ? Math.abs(look.axles[front ? 0 : 1]) : car.wheelbase / 2;
       assembly.position.set(s * halfTrack, TIRE_RADIUS, end * axle);
       if (front) piece(group, cube, trim, s * halfTrack * .81, TIRE_RADIUS, -axle, halfTrack * .48, .06, .06);
       const tire = piece(rotating, detailWheel, rubber, 0, 0, 0);
@@ -905,7 +907,37 @@ export function createConcepts(T, kit) {
     },
   };
 
+  // 힉스필드 몸통이 있는 차 — 몸통 · 유리 · 장식이 한 덩어리(텍스처)라 코드 장식은 달지 않고, 바퀴 · 빛 번짐만 단다
+  function buildMesh(car, data) {
+    const w = car.width;
+    const l = car.wheelbase / 2 + .62;
+    const paint = new T.MeshPhysicalMaterial({ map: data.texture, roughness: .3, metalness: .25, clearcoat: .9, clearcoatRoughness: .1, envMapIntensity: 1.1, side: T.DoubleSide });
+    const group = new T.Group(), chassis = new T.Group();
+    const coachwork = data.geometry.clone();
+    const finish = bodyFinish(T, paint, { w, l }, 4, '#111', { pin: 0 });
+    const glazing = glassFinish(T, glass, { w, front: -.9, rear: .9 }, crackedGlass);
+    const empty = new T.BufferGeometry();
+    chassis.add(new T.Mesh(coachwork, finish.material), new T.Mesh(empty, glazing.material), new T.Mesh(empty, gloss));
+    chassis.children[0].castShadow = true;
+    group.add(chassis);
+    const wheels = wheelSet(group, car, w, car.mesh.wheel);
+    const lampMaterial = new T.MeshBasicMaterial({ color: '#ff4633', side: T.DoubleSide });
+    const frontPanel = new T.Group(), bumper = new T.Group(), wing = new T.Group();
+    const flank = { [-1]: new T.Group(), 1: new T.Group() };
+    const { tail, head } = car.mesh;
+    const glows = [-1, 1].map(s => glowSprite(chassis, '#ff321f', s * tail[0], tail[1], l + .05, .7, .23));
+    for (const s of [-1, 1]) glowSprite(frontPanel, '#d6ecff', s * head[0], head[1], -l - .02, .7, .3);
+    const parts = {
+      bumper: mount(chassis, bumper, 0, .35, l), wing: mount(chassis, wing, 0, .75, l - .3),
+      frontPanel: mount(chassis, frontPanel, 0, .27, -l),
+      flanks: { left: mount(chassis, flank[-1], -w * .93, .38, .06), right: mount(chassis, flank[1], w * .93, .38, .06) },
+    };
+    group.userData = { chassis, wheels, lampMaterial, glows, signals: [], ...parts, crumple: crumpling(coachwork, { w, l }), finish, glazing };
+    return group;
+  }
+
   function build(car) {
+    if (car.mesh && carMeshes.has(car.shape)) return buildMesh(car, carMeshes.get(car.shape));
     const w = car.width;
     const l = car.wheelbase / 2 + .62;
     const axle = car.wheelbase / 2;

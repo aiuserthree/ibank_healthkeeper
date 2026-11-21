@@ -1,9 +1,9 @@
-import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=42';
-import { createFallback } from './scene-fallback.js?v=42';
-import { createCarModels } from './models.js?v=42';
-import { createImpactFx, impactMotion } from './impact.js?v=42';
-import { dayProgress, dayTime, weatherAt } from './daytime.js?v=42';
-import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=42';
+import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=43';
+import { createFallback } from './scene-fallback.js?v=43';
+import { createCarModels } from './models.js?v=43';
+import { createImpactFx, impactMotion } from './impact.js?v=43';
+import { dayProgress, dayTime, weatherAt } from './daytime.js?v=43';
+import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=43';
 
 const poses = [
   { back: 8.5, height: 2.9 },

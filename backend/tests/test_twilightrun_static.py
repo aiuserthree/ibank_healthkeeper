@@ -109,7 +109,12 @@ class TwilightrunStaticTest(unittest.TestCase):
         self.assertTrue((art / "hero.jpg").is_file())
         # 그림 · 소리는 합쳐 4MB(시간대별 하늘 32장 · 편의점 · 메뉴 그림 포함), 휴게소 영상(주유 12초 · 메뉴별 음식 8초, 소리 없음 1280×720 — 누를 때만 불러옴)은 따로 50MB(1080p, 누를 때만 불러옴)
         files = [p for p in art.rglob("*") if p.is_file()]
-        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix != ".mp4" and p.parent.name != "music"), 4_000_000)
+        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix != ".mp4" and p.parent.name not in ("music", "cars")), 4_000_000)
+        # 힉스필드 3D 차 몸통(cars/*.bin · *.webp) — 그 차를 쓸 때만 받음, 따로 20MB
+        self.assertLessEqual(sum(p.stat().st_size for p in files if p.parent.name == "cars"), 20_000_000)
+        for f in (art / "cars").glob("*.bin"):
+            self.assertTrue(f.with_suffix(".webp").is_file(), f.name)
+            self.assertIn(f"shape: '{f.stem}'", (JS_DIR / "drive.js").read_text(encoding="utf-8"))
         # 드라이브 음악 5곡(힉스필드 오리지널, 가사 없음) — 주행 중 고른 곡만 불러옴, 따로 16MB
         for track in ("citypop", "synthwave", "acoustic", "lofi", "rock", "jazz", "funk", "house", "chill", "disco"):
             self.assertTrue((art / "music" / f"{track}.mp3").is_file(), track)
