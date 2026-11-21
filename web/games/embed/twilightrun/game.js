@@ -44,7 +44,10 @@ function load() {
     // 처음 하는 사람의 주행 모드는 끝없는 질주(운영자 요청) — 이미 고른 사람은 고른 그대로
     mode: Number.isInteger(data?.mode) && modes[data.mode] ? data.mode : Math.max(0, modes.findIndex(item => item.id === 'endless')),
     sound: data?.sound === true,
-    music: typeof data?.music === 'string' ? data.music : 'citypop',
+    // 음악 기본은 무작위(운영자 요청) — 메뉴에서 직접 고른 적이 있으면 그 곡
+    music: data?.musicPicked && typeof data?.music === 'string' ? data.music : 'random',
+    musicPicked: data?.musicPicked === true,
+    lastMusic: typeof data?.lastMusic === 'string' && data.lastMusic ? data.lastMusic : 'random',
     musicVolume: typeof data?.musicVolume === 'number' ? clamp(data.musicVolume, 0, 1) : .45,
     upgrades,
   };
@@ -77,8 +80,18 @@ const tracks = [
   { id: 'acoustic', name: '어쿠스틱 · 아침 국도' }, { id: 'lofi', name: '로파이 · 느긋한 저녁' }, { id: 'rock', name: '록 · 고속도로' },
 ];
 const music = new Audio();
-music.loop = true;
 music.preload = 'none';
+// 무작위: 판을 시작할 때마다 한 곡, 곡이 끝나면 다른 곡으로
+let shuffled = '';
+const pickShuffle = () => {
+  const pool = tracks.filter(item => item.id !== shuffled);
+  shuffled = pool[Math.floor(Math.random() * pool.length)].id;
+};
+music.addEventListener('ended', () => {
+  if (profile.music !== 'random') return;
+  pickShuffle();
+  syncMusic();
+});
 
 function loadSoundClips(context) {
   for (const name of ['collision', 'debris', 'horn']) {
@@ -939,7 +952,9 @@ $('rest').addEventListener('cancel', event => event.preventDefault());
 $('rest-go').addEventListener('click', askRest);
 
 function syncMusic() {
-  const track = tracks.find(item => item.id === profile.music);
+  if (profile.music === 'random' && !shuffled) pickShuffle();
+  const track = tracks.find(item => item.id === (profile.music === 'random' ? shuffled : profile.music));
+  music.loop = profile.music !== 'random';
   const want = track && screen === 'drive' && !$('paused').open && soundEnabled();
   if (!want) { music.pause(); return; }
   const src = `${assetRoot}music/${track.id}.mp3?v=1`;
@@ -948,11 +963,22 @@ function syncMusic() {
   music.play().catch(() => {});
 }
 function paintMusic() {
-  const track = tracks.find(item => item.id === profile.music);
-  $('music-now').textContent = track ? `♪ ${track.name}` : '음악 꺼짐';
-  $('music-list').innerHTML = [...tracks, { id: '', name: '끄기' }].map(item =>
+  const random = profile.music === 'random';
+  const track = tracks.find(item => item.id === (random ? shuffled : profile.music));
+  $('music-now').textContent = track ? `♪ ${random ? '무작위 · ' : ''}${track.name}` : '음악 꺼짐';
+  $('music-list').innerHTML = [{ id: 'random', name: '무작위(곡이 끝나면 다른 곡)' }, ...tracks, { id: '', name: '끄기' }].map(item =>
     `<button type="button" class="${item.id === profile.music ? 'on' : ''}" data-track="${item.id}">${item.name}</button>`).join('');
   $('music-volume').value = String(profile.musicVolume);
+}
+// N 키로 음악 끄기 · 켜기(운영자 요청) — 켜면 전에 듣던 설정(무작위 또는 고른 곡)으로
+function toggleMusicMute() {
+  if (profile.music) { profile.lastMusic = profile.music; profile.music = ''; }
+  else profile.music = profile.lastMusic || 'random';
+  if (profile.music === 'random') pickShuffle();
+  save();
+  syncMusic();
+  paintMusic();
+  $('music').classList.toggle('off', !profile.music);
 }
 function toggleMusicMenu(open = $('music-menu').hidden) {
   $('music-menu').hidden = !open;
@@ -964,6 +990,10 @@ $('music-list').addEventListener('click', event => {
   const button = event.target.closest('[data-track]');
   if (!button) return;
   profile.music = button.dataset.track;
+  profile.musicPicked = true;
+  if (profile.music) profile.lastMusic = profile.music;
+  $('music').classList.toggle('off', !profile.music);
+  if (profile.music === 'random') pickShuffle();
   save();
   paintMusic();
   syncMusic();
@@ -1088,6 +1118,7 @@ function start() {
   // 판 시작은 카운트다운 전에 알린다 — 아케이드가 이 신호로 순위 패널을 닫는다(전에는 3·2·1 동안 열려 있었음)
   send('hk:start');
   syncCursor();
+  if (profile.music === 'random') pickShuffle();
   syncMusic();
   $('signal').hidden = true;
   $('race-label').textContent = state.mode.name;
@@ -1242,6 +1273,7 @@ addEventListener('keydown', event => {
   } else if (!event.repeat && event.code === 'KeyC') changeView();
   else if (!event.repeat && event.code === 'KeyH') horn();
   else if (!event.repeat && event.code === 'KeyM') toggleMusicMenu();
+  else if (!event.repeat && event.code === 'KeyN') toggleMusicMute();
   else if (!event.repeat && event.code === 'KeyE') askRest();
 });
 addEventListener('keyup', event => keys.delete(event.code));
