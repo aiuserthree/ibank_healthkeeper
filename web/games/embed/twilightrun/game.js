@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=40';
-import { createScene } from './scene.js?v=40';
-import { impactDuration } from './impact.js?v=40';
-import { assetRoot } from './world.js?v=40';
-import { requestYield } from './traffic.js?v=40';
-import { createShowroom } from './showroom.js?v=40';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=40';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=41';
+import { createScene } from './scene.js?v=41';
+import { impactDuration } from './impact.js?v=41';
+import { assetRoot } from './world.js?v=41';
+import { requestYield } from './traffic.js?v=41';
+import { createShowroom } from './showroom.js?v=41';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=41';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -220,14 +220,14 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=40`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=41`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
   () => screen === 'home' && !$('home').hidden && carStage.classList.contains('open'));
-const portraits = showroom ? showroom.portraits(600, 260) : [];
-// picture: 힉스필드로 그린 차고 그림이 있는 차(스틸 로드스터 — 운영자 요청)는 3D 사진 대신 그 그림을 쓴다
-const carPortrait = (car, i) => car.picture ? carPicture(car) : portraits[i] || carPicture(car);
+// 차고 목록 · 차 고르기 그림은 모든 차가 힉스필드로 그린 사진(게임 속 3D 모습을 참고 그림으로, 운영자 요청 2026-11-21).
+// 예전처럼 시작할 때 16대 3D 사진을 찍지 않으니 첫 화면이 가볍다 — 큰 3D 무대(마우스 올림 · 차고)는 그대로 3D 모델
+const carPortrait = car => carPicture(car);
 if (!showroom) {
   carStage.classList.add('still');
   $('car-still').hidden = false;
@@ -264,7 +264,7 @@ function carChoices() {
       <img src="${carPortrait(cars[i], i)}" width="600" height="260" alt="">
       <span>${cars[i].name}</span>
     </label>
-  </div>`).join('') + (left ? `<button type="button" class="car-option car-shop" id="car-shop"><b aria-hidden="true">＋</b><span>새 차 ${left}대</span></button>` : '');
+  </div>`).join('') + (left ? `<button type="button" class="car-option car-shop" id="car-shop"><b aria-hidden="true">＋${left}</b><span aria-label="새 차 ${left}대">새 차</span></button>` : '');
   carInputs = [...carOptions.querySelectorAll('input')];
 }
 carChoices();

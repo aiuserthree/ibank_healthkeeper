@@ -1,5 +1,5 @@
-import { createCarModels } from './models.js?v=40';
-import { glowMap } from './world.js?v=40';
+import { createCarModels } from './models.js?v=41';
+import { glowMap } from './world.js?v=41';
 
 // 첫 화면 · 차고에서 고른 차를 크게 보여 준다 — 주행 때와 같은 3D 모델(model(car, true))을 천천히 돌린다.
 // GPU 를 아끼려고 첫 화면이 보일 때만, 초당 30장까지만 그리고 그림자 맵 대신 바닥 빛 한 장을 쓴다.
@@ -167,28 +167,6 @@ export function createShowroom(canvas, cars, isActive) {
   canvas.addEventListener('pointercancel', release);
   canvas.addEventListener('webglcontextlost', event => { event.preventDefault(); cancelAnimationFrame(frame); });
 
-  // 차고 · 차 고르기 단추에 쓸 정지 사진 — 같은 모델을 같은 조명에서 한 번씩 찍는다
-  function portraits(width, height) {
-    const keep = [current, angle, renderer.getPixelRatio(), size];
-    const shots = [];
-    renderer.setPixelRatio(1);
-    renderer.setSize(width, height, false);
-    frameCamera(width / height);
-    camera.position.multiplyScalar(.80);
-    camera.lookAt(0, .5, 0);
-    for (let i = 0; i < cars.length; i++) {
-      show(i);
-      turntable.rotation.y = .62;
-      renderer.render(scene, camera);
-      shots.push(canvas.toDataURL('image/webp', .9));
-    }
-    show(keep[0] < 0 ? 0 : keep[0]);
-    angle = keep[1];
-    renderer.setPixelRatio(keep[2]);
-    size = [0, 0];
-    return shots;
-  }
-
   // 차가 앞(-Z)을 보므로 0 은 뒷모습, π 는 앞모습. 단추로 돌린 뒤 4초 동안은 저절로 돌지 않는다
   function turnTo(view) {
     target = { front: Math.PI - .35, side: Math.PI / 2, rear: .35 }[view] ?? .72;
@@ -196,5 +174,5 @@ export function createShowroom(canvas, cars, isActive) {
     drawn = 0;
   }
 
-  return { show, portraits, turnTo };
+  return { show, turnTo };
 }
