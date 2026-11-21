@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=41';
-import { createScene } from './scene.js?v=41';
-import { impactDuration } from './impact.js?v=41';
-import { assetRoot } from './world.js?v=41';
-import { requestYield } from './traffic.js?v=41';
-import { createShowroom } from './showroom.js?v=41';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=41';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=42';
+import { createScene } from './scene.js?v=42';
+import { impactDuration } from './impact.js?v=42';
+import { assetRoot } from './world.js?v=42';
+import { requestYield } from './traffic.js?v=42';
+import { createShowroom } from './showroom.js?v=42';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=42';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -31,17 +31,26 @@ const conditionNames = ['내구도', '외판 긁힘', '심한 손상', '차량 �
 const viewNames = ['기본', '멀리', '보닛'];
 const titles = { win: '완주 성공!', wreck: '차량 파손', timeout: '시간 초과', rival: '라이벌 승리', retired: '주행 종료', fuel: '기름 바닥' };
 
+const LAYOUT_BEFORE_ROADSTER = ['coupe', 'sport', 'gt', 'hyper', 'vector', 'retro', 'neon', 'trail', 'magma', 'expedition', 'void', 'wedge', 'pod', 'hexa', 'strato'];
 function load() {
   let data;
   try { data = JSON.parse(localStorage.getItem(storageKey)); } catch { data = null; }
-  const upgrades = cars.map((_, i) => Number.isInteger(data?.upgrades?.[i])
-    ? clamp(data.upgrades[i], 0, maxUpgrade) : 0);
+  // 강화 단계 · 고른 차는 차 이름(shape)으로 저장한다(upgradesBy · carShape). 예전 저장은 「몇 번째 차」 번호뿐이라 차를 중간에 끼워 넣으면
+  // 밀렸다 — 2026-11-21 스틸 로드스터를 스트라토 캐노피 앞에 넣은 판(16대) 전의 저장(15칸)은 그때 차례로 읽는다
+  const layout = Array.isArray(data?.upgrades) && data.upgrades.length === 15 ? LAYOUT_BEFORE_ROADSTER : cars.map(car => car.shape);
+  const levelOf = shape => {
+    const saved = data?.upgradesBy && typeof data.upgradesBy === 'object' ? data.upgradesBy[shape] : data?.upgrades?.[layout.indexOf(shape)];
+    return Number.isInteger(saved) ? clamp(saved, 0, maxUpgrade) : 0;
+  };
+  const upgrades = cars.map(car => levelOf(car.shape));
+  const savedShape = typeof data?.carShape === 'string' ? data.carShape : layout[data?.car];
+  const carIndex = cars.findIndex(car => car.shape === savedShape);
   // 산 차(owned, 차 shape 이름) — 옛 저장에는 없으니 처음부터 있는 4종만 가진 것으로
   const owned = cars.filter(car => !car.price || (Array.isArray(data?.owned) && data.owned.includes(car.shape))).map(car => car.shape);
   return {
     balance: Number.isSafeInteger(data?.balance) ? Math.max(0, data.balance) : 0,
     best: Number.isSafeInteger(data?.best) ? clamp(data.best, 0, SCORE_LIMIT) : 0,
-    car: Number.isInteger(data?.car) && cars[data.car] && owned.includes(cars[data.car].shape) ? data.car : 0,
+    car: carIndex >= 0 && owned.includes(cars[carIndex].shape) ? carIndex : 0,
     owned,
     course: Number.isInteger(data?.course) && courses[data.course] ? data.course : 0,
     // 처음 하는 사람의 주행 모드는 끝없는 질주(운영자 요청) — 이미 고른 사람은 고른 그대로
@@ -57,7 +66,9 @@ function load() {
 }
 const profile = load();
 function save() {
-  try { localStorage.setItem(storageKey, JSON.stringify(profile)); } catch { /* Storage may be disabled. */ }
+  const upgradesBy = Object.fromEntries(cars.map((car, i) => [car.shape, profile.upgrades[i]]));
+  const data = { ...profile, upgradesBy, carShape: cars[profile.car].shape };
+  try { localStorage.setItem(storageKey, JSON.stringify(data)); } catch { /* Storage may be disabled. */ }
 }
 
 let state, audio, engine, volume, impactBus, hornReady, activeHorn;
@@ -220,7 +231,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=41`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=42`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,

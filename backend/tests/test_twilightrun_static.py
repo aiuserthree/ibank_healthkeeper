@@ -89,13 +89,13 @@ class TwilightrunStaticTest(unittest.TestCase):
             for imp in re.findall(r"from '(\./[^']+)'", text):
                 self.assertTrue((JS_DIR / imp.split("?")[0]).is_file(), imp)
         total = sum(p.stat().st_size for p in JS_DIR.rglob("*") if p.is_file())
-        # three.js(약 670KB) 포함. 크레딧으로 사는 새 차 12대 모델(concepts.js) 때문에 1.0MB → 1.1MB
+        # three.js(약 670KB) 포함. 크레딧으로 사는 새 차 15대 모델(concepts.js) 때문에 1.0MB → 1.1MB
         self.assertLessEqual(total, 1_100_000)
 
     def test_art_and_audio_exist(self):
         art = ROOT / "web/assets/games/twilightrun"
-        # 차고 그림 — 처음 4종 + 크레딧으로 사는 새 차 12대(WebGL 이 안 될 때 쓰는 정지 그림)
-        for name in ("coupe", "sport", "gt", "hyper", "vector", "retro", "neon", "trail", "magma", "expedition", "void", "wedge", "pod", "hexa", "roadster", "strato"):
+        # 차고 그림 — 처음 4종 + 크레딧으로 사는 새 차 15대(WebGL 이 안 될 때 쓰는 정지 그림)
+        for name in ("coupe", "sport", "gt", "hyper", "vector", "retro", "neon", "trail", "magma", "expedition", "void", "wedge", "pod", "hexa", "roadster", "strato", "kong", "marsh", "pudding"):
             self.assertTrue((art / "garage" / f"{name}.webp").is_file(), name)
             self.assertIn(f"shape: '{name}'", (JS_DIR / "drive.js").read_text(encoding="utf-8"))
         # 휴게소(차에서 내린 장면 · 식당) 그림과 음식 4종 — 게임 안 drive.js 의 음식 id 와 같아야 한다

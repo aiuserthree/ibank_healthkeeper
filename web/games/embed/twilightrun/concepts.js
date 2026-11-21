@@ -1,5 +1,5 @@
-import { TIRE_RADIUS } from './drive.js?v=41';
-import { bodyFinish, glassFinish } from './finishes.js?v=41';
+import { TIRE_RADIUS } from './drive.js?v=42';
+import { bodyFinish, glassFinish } from './finishes.js?v=42';
 
 // 차고에서 사는 새 차 6대. 기존 4종(매끈 · 투톤 지붕 · 칼날 LED)과 겹치지 않게 차마다 몸통 단면 · 유리 · 얼굴 조명 · 꼬리를 따로 짠다.
 // 모양은 운영자가 준 참고 사진 6장(2026-11-21)을 따라가고, 로고 · 엠블럼 · 글자는 넣지 않는다.
@@ -765,6 +765,104 @@ export function createConcepts(T, kit) {
         wheel: { brake: '#5a8cff', rim: '#f2f2f0', spokes: 5, disc: true, lip: '#5a8cff', slot: '#5a8cff', slotGlow: true, slotR: .18, slotL: .13, slotW: .03, slotTwist: .6, nut: '#c08a5a' },
       };
     },
+    // ── 귀여운 차(운영자 2026-11-21 「레트로 버블처럼 귀여운 차도 더」) — 짧고 둥근 몸, 큰 동그란 눈, 파스텔 · 크림 투톤, 하얀 휠 커버 ──
+    // 13 콩콩 — 알처럼 둥근 초소형 1인승: 몸 위를 덮은 큰 유리 방울, 앞 얼굴에 큰 동그란 눈 둘과 웃는 입, 하얀 지붕 띠
+    kong(w, l, axle) {
+      const main = [[-l - .06, w * .62, .3, .66, .7], [-l + .25, w * .88, .26, .92, .72], [-.3, w * .97, .26, 1.02, .72], [.35, w * .97, .26, 1.0, .72],
+        [l - .22, w * .88, .28, .88, .72], [l + .02, w * .6, .36, .66, .72]];
+      const surface = wheelArches(main, axle, { front: 0, rear: 0, flare: .06, lip: .02 });
+      const dome = [[-.95, w * .6, .88, .96, .9], [-.55, w * .72, .92, 1.36, .62], [.25, w * .72, .94, 1.4, .62], [.75, w * .58, .92, 1.16, .7], [1.0, w * .36, .9, .98, .8]];
+      return {
+        surface, body: loft(surface, true), glass: '#5a7d8a', roofMat: standard('#fbf7f2', .3, .1),
+        cabin: loft(densify(dome), true),
+        roof: loft(densify([[-.45, w * .14, 1.35, 1.415, .8], [.25, w * .16, 1.38, 1.445, .8], [.65, w * .12, 1.2, 1.26, .8]]), true),
+        front: -.6, rear: .7, look: { pin: 0, belt: [.4, 0], lower: '#fbf7f2' }, paint: { roughness: .2, clearcoat: 1, clearcoatRoughness: .05 },
+        dress({ chassis, frontPanel, bumper, flank, lamp }) {
+          const chrome = standard('#e3e6ea', .08, 1);
+          const nose = -l - .06;
+          for (const s of [-1, 1]) {
+            piece(frontPanel, new T.TorusGeometry(.14, .026, 10, 32), chrome, s * w * .38, .6, nose + .02);
+            piece(frontPanel, new T.CircleGeometry(.135, 28), basic('#fffbe6'), s * w * .38, .6, nose + .015).rotation.y = Math.PI;
+            piece(frontPanel, new T.CircleGeometry(.05, 20), basic('#2a2a2a'), s * w * .36, .62, nose + .01).rotation.y = Math.PI;
+            piece(frontPanel, new T.CircleGeometry(.05, 18), basic('#ffb3c7'), s * w * .62, .45, nose + .12).rotation.y = Math.PI;
+            piece(bumper, new T.CircleGeometry(.06, 20), lamp, s * w * .45, .56, l + .03);
+            box(chassis, chrome, s * w * .66, 1.02, -.62, .06, .06, .06);
+          }
+          const smile = [];
+          for (let i = 0; i <= 8; i++) { const t = (i / 8 - .5) * 2; smile.push([t * w * .2, .42 - (1 - t * t) * .045, nose - .004]); }
+          polyline(frontPanel, basic('#3a2a2a'), smile, .016);
+          rod(frontPanel, chrome, [-w * .55, .3, nose + .06], [w * .55, .3, nose + .06], .024);
+          rod(bumper, chrome, [-w * .5, .38, l + .05], [w * .5, .38, l + .05], .024);
+          return { plateY: .48, tail: [.45, .56], head: [.38, .6, -.06] };
+        },
+        wheel: { brake: '#333', rim: '#fbf7f2', spokes: 0, disc: true, coverR: .2, whitewall: true, nut: '#ff9ec7' },
+      };
+    },
+    // 14 마시멜로 — 동그란 박스형 2도어 경차: 높고 둥근 유리 집, 하얀 지붕 투톤, 둥근 눈 · 작은 웃는 그릴, 둥근 후미등
+    marsh(w, l, axle) {
+      const main = [[-l - .02, w * .72, .3, .62, .78], [-l + .15, w * .88, .26, .76, .82], [-axle, w * .92, .26, .82, .84], [0, w * .95, .26, .86, .86],
+        [axle, w * .92, .26, .86, .86], [l - .12, w * .86, .3, .82, .84], [l, w * .72, .36, .72, .8]];
+      const surface = wheelArches(main, axle, { front: .01, rear: .01, flare: .06, lip: .02 });
+      const house = [[-1.0, w * .84, .8, .88, .95], [-.72, w * .8, .84, 1.42, .8], [.8, w * .8, .86, 1.44, .82], [1.35, w * .78, .86, 1.36, .86], [l - .06, w * .74, .84, .92, .92]];
+      return {
+        surface, body: loft(surface, true), glass: '#6a8a96', roofMat: standard('#fbf7f2', .3, .1),
+        cabin: loft(densify(house), true),
+        roof: loft(densify([[-.66, w * .76, 1.4, 1.5, .84], [.85, w * .76, 1.42, 1.52, .86], [1.32, w * .74, 1.34, 1.42, .88]]), true),
+        front: -.8, rear: .9, look: { pin: 0 }, paint: { roughness: .22, clearcoat: 1, clearcoatRoughness: .05 },
+        dress({ chassis, frontPanel, bumper, flank, lamp, top }) {
+          const chrome = standard('#e3e6ea', .08, 1);
+          const cream = standard('#fbf7f2', .3, .1);
+          const nose = -l - .02;
+          for (const s of [-1, 1]) {
+            piece(frontPanel, new T.TorusGeometry(.1, .02, 10, 32), cream, s * w * .58, .62, nose + .07);
+            piece(frontPanel, new T.CircleGeometry(.09, 28), basic('#fffbe6'), s * w * .58, .62, nose + .065).rotation.y = Math.PI;
+            piece(bumper, new T.TorusGeometry(.065, .014, 8, 24), cream, s * w * .62, .66, l + .02);
+            piece(bumper, new T.CircleGeometry(.058, 22), lamp, s * w * .62, .66, l + .025);
+            for (const z of [-.72, .3]) box(top, cream, s * w * .8, 1.14, z, .03, .56, .06);
+            box(flank[s], cream, s * (at(surface, 0, 1) + .006), .5, 0, .006, .04, 2 * axle - .7);
+            box(chassis, cream, s * w * .82, .98, -.75, .1, .08, .08);
+          }
+          const smile = [];
+          for (let i = 0; i <= 8; i++) { const t = (i / 8 - .5) * 2; smile.push([t * w * .26, .44 - (1 - t * t) * .04, nose - .004]); }
+          polyline(frontPanel, chrome, smile, .03);
+          box(frontPanel, cream, 0, .3, nose + .04, w * 1.5, .07, .1);
+          box(bumper, cream, 0, .38, l + .03, w * 1.4, .07, .1);
+          return { plateY: .5, tail: [.62, .66], head: [.58, .62, -.07] };
+        },
+        wheel: { brake: '#333', rim: '#fbf7f2', spokes: 0, disc: true, coverR: .22, nut: '#8fe3c8' },
+      };
+    },
+    // 15 푸딩 밴 — 둥근 레트로 미니밴: 위는 크림 · 아래는 캐러멜 투톤, 큰 창 띠, 둥근 눈 둘 · 크롬 범퍼, 하얀 띠 타이어
+    pudding(w, l, axle) {
+      const main = [[-l - .04, w * .86, .3, .9, .86], [-l + .14, w * .95, .28, 1.0, .9], [-axle, w, .28, 1.04, .92], [axle, w, .28, 1.08, .92],
+        [l - .08, w * .96, .3, 1.04, .92], [l, w * .88, .36, .96, .9]];
+      const surface = wheelArches(main, axle, { front: 0, rear: 0, flare: .04, step: .2, lip: .02 });
+      return {
+        surface, body: loft(surface, true), glass: '#5d7f8c', roofMat: 'paint',
+        cabin: loft([[-l + .2, w * .84, 1.0, 1.04, .98], [-l + .42, w * .84, 1.02, 1.44, .97], [l - .2, w * .84, 1.04, 1.46, .97], [l - .08, w * .82, 1.04, 1.42, .97]]),
+        roof: loft(densify([[-l + .38, w * .8, 1.4, 1.48, .92], [-l + .6, w * .84, 1.4, 1.62, .82], [l - .34, w * .84, 1.42, 1.64, .82], [l - .12, w * .8, 1.42, 1.5, .92]]), true),
+        front: -1.0, rear: 1.0, look: { pin: 0, belt: [.66, 0], lower: '#c9783a' }, paint: { roughness: .25, clearcoat: 1, clearcoatRoughness: .06 },
+        dress({ chassis, frontPanel, bumper, flank, lamp, top }) {
+          const chrome = standard('#e3e6ea', .08, 1);
+          const nose = -l - .04;
+          for (const s of [-1, 1]) {
+            piece(frontPanel, new T.TorusGeometry(.12, .022, 10, 32), chrome, s * w * .6, .72, nose - .01);
+            piece(frontPanel, new T.CircleGeometry(.11, 28), basic('#fffbe6'), s * w * .6, .72, nose - .012).rotation.y = Math.PI;
+            for (const z of [-l + .45, -.3, .55, l - .24]) box(top, standard('#f4e6c8', .3, .1), s * w * .81, 1.22, z, .03, .44, .06);
+            box(bumper, lamp, s * w * .72, .86, l + .015, .08, .16, .012);
+            box(chassis, chrome, s * w * 1.0, 1.05, -l + .45, .06, .1, .1);
+          }
+          // 앞 가운데 웃는 크롬 입 · 둥근 크롬 범퍼(특정 차의 얼굴 무늬는 쓰지 않는다)
+          const smile = [];
+          for (let i = 0; i <= 8; i++) { const t = (i / 8 - .5) * 2; smile.push([t * w * .28, .56 - (1 - t * t) * .05, nose - .008]); }
+          polyline(frontPanel, chrome, smile, .03);
+          rod(frontPanel, chrome, [-w * .86, .42, nose + .02], [w * .86, .42, nose + .02], .035);
+          rod(bumper, chrome, [-w * .86, .44, l + .04], [w * .86, .44, l + .04], .035);
+          return { plateY: .56, tail: [.72, .86], head: [.6, .72, -.02] };
+        },
+        wheel: { brake: '#333', rim: '#f4e6c8', spokes: 0, disc: true, coverR: .2, whitewall: true, nut: '#c9783a' },
+      };
+    },
     // 6 헥사 팽 — 라임 하이퍼카: 아주 뾰족한 코, 빛나는 가는 눈매, 앞은 낮고 뒤로 올라가는 검은 아래 몸, 큰 옆 흡기구, 꼬리 지느러미, 육각 꼬리등
     hexa(w, l, axle) {
       const c = supercar(w, l, axle, {
@@ -823,14 +921,16 @@ export function createConcepts(T, kit) {
     const base = d.glass ? standard(d.glass, .06, .8) : glass;
     const glazing = glassFinish(T, base, { w, front: d.front, rear: d.rear }, crackedGlass);
     if (d.flat) glazing.material.flatShading = true;
-    chassis.add(new T.Mesh(coachwork, finish.material), new T.Mesh(d.cabin, glazing.material), new T.Mesh(d.roof, d.roofMat === 'finish' ? finish.material : d.roofMat === 'paint' ? paint : d.roofMat || gloss));
+    const roofMesh = new T.Mesh(d.roof, d.roofMat === 'finish' ? finish.material : d.roofMat === 'paint' ? paint : d.roofMat || gloss);
+    chassis.add(new T.Mesh(coachwork, finish.material), new T.Mesh(d.cabin, glazing.material), roofMesh);
     chassis.children.forEach(mesh => { mesh.castShadow = true; });
     group.add(chassis);
     const wheels = wheelSet(group, car, w, d.wheel);
     const lampMaterial = new T.MeshBasicMaterial({ color: '#ff4633', side: T.DoubleSide });
     const frontPanel = new T.Group(), bumper = new T.Group(), wing = new T.Group();
     const flank = { [-1]: new T.Group(), 1: new T.Group() };
-    const marks = d.dress({ chassis, frontPanel, bumper, wing, flank, lamp: lampMaterial, paint: finish.material });
+    // top: 지붕에 붙여 두면 보닛 시점에서 지붕과 함께 숨는다(창 기둥 등 — 카메라 앞을 가리지 않게)
+    const marks = d.dress({ chassis, frontPanel, bumper, wing, flank, lamp: lampMaterial, paint: finish.material, top: roofMesh });
     if (d.glow) {
       // 산 차만의 표시 — 차 밑이 차 색 빛으로 은은하게(기존 4종에는 없음)
       const under = piece(chassis, new T.PlaneGeometry(w * 2.4, l * 2.15), new T.MeshBasicMaterial({ color: d.glow, map: glowTexture, opacity: .4, transparent: true, depthWrite: false, blending: T.AdditiveBlending }), 0, .03, 0);

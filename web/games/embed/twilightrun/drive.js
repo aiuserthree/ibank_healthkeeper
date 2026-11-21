@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=41';
-import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=41';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=42';
+import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=42';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -227,6 +227,10 @@ export const cars = [
   { name: '헥사 팽', color: '#cfd5dc', top: 300, power: 12.4, grip: 7.1, wheelbase: 3.30, width: 1.12, shape: 'hexa', plate: 'HEXA FANG', price: 10500, tag: '액체 크롬 몸 · 라임 빛 · 꼬리 지느러미' },
   { name: '스틸 로드스터', color: '#e3e4e2', top: 298, power: 12.9, grip: 7.3, wheelbase: 3.0, width: 1.06, shape: 'roadster', plate: 'ROADSTER', price: 12000, tag: '각진 쐐기 · 가로 빛줄 얼굴 · 한 장 유리 지붕', finish: { metalness: .45, roughness: .22 } },
   { name: '스트라토 캐노피', color: '#141619', top: 308, power: 12.8, grip: 7.6, wheelbase: 3.44, width: 1.07, shape: 'strato', plate: 'STRATO', price: 14000, tag: '검정에 빨간 가운데 줄 · 삼각 그물 그릴' },
+  // 귀여운 차 3대(2026-11-21) — 저장이 차 이름 기준이라 맨 뒤에 붙인다(앞으로도 새 차는 맨 뒤에)
+  { name: '콩콩', color: '#ff9ec7', top: 236, power: 9.0, grip: 7.0, wheelbase: 2.1, width: .86, shape: 'kong', plate: 'KONG', price: 2200, tag: '알처럼 둥근 초소형 · 큰 유리 방울 · 웃는 얼굴' },
+  { name: '마시멜로', color: '#8fe3c8', top: 242, power: 9.3, grip: 6.8, wheelbase: 2.4, width: .92, shape: 'marsh', plate: 'MARSH', price: 2900, tag: '동그란 경차 · 하얀 지붕 · 웃는 그릴' },
+  { name: '푸딩 밴', color: '#f4e6c8', top: 234, power: 9.6, grip: 6.4, wheelbase: 2.9, width: .98, shape: 'pudding', plate: 'PUDDING', price: 3600, tag: '크림 · 캐러멜 투톤 레트로 미니밴' },
 ];
 export const modes = [
   { id: 'sprint', name: '스프린트' },
