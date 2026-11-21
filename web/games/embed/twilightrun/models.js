@@ -1,5 +1,5 @@
-import { TIRE_RADIUS } from './drive.js?v=3';
-import { bodyFinish, fractureMap, glassFinish } from './finishes.js?v=3';
+import { TIRE_RADIUS } from './drive.js?v=4';
+import { bodyFinish, fractureMap, glassFinish } from './finishes.js?v=4';
 
 // Local car coordinates point toward -Z. Lofted cross sections describe the coachwork in metres.
 const profiles = {

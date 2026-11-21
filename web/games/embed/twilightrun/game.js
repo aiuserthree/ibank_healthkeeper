@@ -1,9 +1,9 @@
-import { advanceWreck, cars, carStats, clamp, courses, createRun, damageStage, MAX_HEALTH, modes, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=3';
-import { createScene } from './scene.js?v=3';
-import { impactDuration } from './impact.js?v=3';
-import { assetRoot } from './world.js?v=3';
-import { requestYield } from './traffic.js?v=3';
-import { createShowroom } from './showroom.js?v=3';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=4';
+import { createScene } from './scene.js?v=4';
+import { impactDuration } from './impact.js?v=4';
+import { assetRoot } from './world.js?v=4';
+import { requestYield } from './traffic.js?v=4';
+import { createShowroom } from './showroom.js?v=4';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -28,7 +28,7 @@ const healthLights = [...$('health').children];
 const condition = $('vehicle-condition');
 const conditionNames = ['내구도', '외판 긁힘', '심한 손상', '차량 파손'];
 const viewNames = ['기본', '멀리', '보닛'];
-const titles = { win: '완주 성공!', wreck: '차량 파손', timeout: '시간 초과', rival: '라이벌 승리', retired: '주행 종료' };
+const titles = { win: '완주 성공!', wreck: '차량 파손', timeout: '시간 초과', rival: '라이벌 승리', retired: '주행 종료', fuel: '기름 바닥' };
 
 function load() {
   let data;
@@ -189,7 +189,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=3`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=4`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -341,6 +341,10 @@ function paintHud() {
   const segment = sectionIndex(course, distance, !mode.goal);
   const locationLabel = `${segment + 1}/${course.sections.length} · ${course.sections[segment].name}`;
   if ($('race-location').textContent !== locationLabel) $('race-location').textContent = locationLabel;
+  $('fuel-bar').style.transform = `scaleX(${state.fuel})`;
+  $('fuel').setAttribute('aria-valuenow', String(Math.round(state.fuel * 100)));
+  $('fuel').classList.toggle('low', state.fuel < .2);
+  paintRestSign();
   $('health').setAttribute('aria-label', `내구도 ${health} / ${MAX_HEALTH}`);
   healthLights.forEach((light, i) => light.classList.toggle('lost', i >= health));
   const conditionLabel = conditionNames[damageStage(health)];
@@ -349,6 +353,99 @@ function paintHud() {
     condition.parentElement.dataset.condition = String(damageStage(health));
   }
 }
+
+function paintRestSign() {
+  const rest = state.outcome ? null : nextRest(state);
+  const near = rest && rest.left <= REST_SIGN && rest.left > 0;
+  $('rest-sign').hidden = !near;
+  if (!near) return;
+  const called = state.restCall === rest.at;
+  $('rest-sign').classList.toggle('called', called);
+  $('rest-sign-name').textContent = restNames[rest.index % restNames.length];
+  $('rest-sign-left').textContent = called ? '오른쪽으로 빠집니다' : `${rest.left >= 1000 ? (rest.left / 1000).toFixed(1) + ' km' : Math.round(rest.left / 10) * 10 + ' m'}`;
+}
+function askRest() {
+  if (screen !== 'drive' || $('paused').open || $('rest').open || countdown > 0) return;
+  if (callRest(state)) {
+    beep(660, .09);
+    paintRestSign();
+  }
+}
+
+// 휴게소: 주행을 멈추고 차에서 내린 화면 — 주유(무료) · 식당(크레딧으로 음식, 휴게소마다 한 가지씩 한 번)
+let restEaten = new Set();
+function restTab(name) {
+  const food = name === 'food';
+  $('tab-station').setAttribute('aria-selected', String(!food));
+  $('tab-food').setAttribute('aria-selected', String(food));
+  $('rest-station').hidden = food;
+  $('rest-food').hidden = !food;
+  $('rest-scene').dataset.scene = food ? 'food' : 'station';
+}
+function paintRest() {
+  $('tank-bar').style.transform = `scaleX(${state.fuel})`;
+  $('tank-value').textContent = `${Math.round(state.fuel * 100)}%`;
+  $('refuel').disabled = state.fuel >= .995;
+  $('rest-balance').textContent = number(profile.balance);
+  $('menu-list').innerHTML = foods.map(food => {
+    const eaten = restEaten.has(food.id);
+    const full = (food.id === 'walnut' || food.id === 'udon') && state.health >= MAX_HEALTH && !Object.values(state.damage).some(Boolean);
+    const disabled = eaten || full || profile.balance < food.price;
+    return `<button type="button" class="dish ${eaten ? 'eaten' : ''}" data-food="${food.id}" ${disabled ? 'disabled' : ''}>
+      <img src="${assetRoot}rest/${food.id}.webp?v=1" width="256" height="256" alt="">
+      <b>${food.name}</b><small>${food.effect}</small>
+      <em>${eaten ? '먹었어요' : full ? '내구도 가득' : '◆ ' + number(food.price)}</em>
+    </button>`;
+  }).join('');
+}
+function enterRest() {
+  clearInput();
+  quietEngine();
+  restEaten = new Set();
+  $('rest-title').textContent = restNames[state.restStop.index % restNames.length];
+  $('rest-status').textContent = '';
+  restTab('station');
+  paintRest();
+  $('rest').showModal();
+  $('refuel').disabled ? $('tab-food').focus() : $('refuel').focus();
+  send('hk:paused');
+}
+function departRest() {
+  if (!$('rest').open) return;
+  $('rest').close();
+  leaveRest(state);
+  previous = 0;
+  wakeAudio();
+  stage.focus();
+  paintHud();
+  send('hk:resumed');
+  schedule();
+}
+$('tab-station').addEventListener('click', () => restTab('station'));
+$('tab-food').addEventListener('click', () => restTab('food'));
+$('refuel').addEventListener('click', () => {
+  state.fuel = 1;
+  $('rest-status').textContent = '기름을 가득 넣었습니다';
+  beep(560, .12);
+  paintRest();
+});
+$('menu-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-food]');
+  if (!button || button.disabled) return;
+  const food = foods.find(item => item.id === button.dataset.food);
+  if (profile.balance < food.price) return;
+  profile.balance -= food.price;
+  save();
+  eatFood(state, food.id);
+  restEaten.add(food.id);
+  $('rest-status').textContent = `${food.name} 냠 — ${food.effect}`;
+  beep(700, .1);
+  paintRest();
+  $('menu-list').querySelector(`[data-food="${food.id}"]`)?.focus();
+});
+$('depart').addEventListener('click', departRest);
+$('rest').addEventListener('cancel', event => event.preventDefault());
+$('rest-go').addEventListener('click', askRest);
 
 function clearInput() {
   keys.clear();
@@ -368,7 +465,7 @@ function schedule() {
 }
 function frame(t) {
   raf = 0;
-  if (screen !== 'drive' || $('paused').open) return;
+  if (screen !== 'drive' || $('paused').open || $('rest').open) return;
   const dt = previous ? Math.min(.05, (t - previous) / 1000) : 0;
   previous = t;
   const input = inputState();
@@ -390,6 +487,11 @@ function frame(t) {
     const previousTrafficImpact = state.trafficImpact;
     const wasRunning = !state.outcome;
     if (wasRunning) step(state, input, dt);
+    if (state.restStop && !state.outcome) {
+      paintHud();
+      enterRest();
+      return;
+    }
     else if (state.outcome === 'wreck') advanceWreck(state, dt);
     const newHit = state.impact !== previousImpact;
     if (newHit) {
@@ -442,6 +544,7 @@ function start() {
   $('garage').close();
   $('results').close();
   $('paused').close();
+  $('rest').close();
   wakeAudio();
   clearInput();
   state = createRun(courses[profile.course], modes[profile.mode], carStats(profile.car, profile.upgrades[profile.car]));
@@ -505,6 +608,10 @@ function pause() {
     return;
   }
   if ($('paused').open) return;
+  if ($('rest').open) {
+    send('hk:paused');
+    return;
+  }
   clearInput();
   quietEngine();
   $('paused').showModal();
@@ -564,6 +671,10 @@ $('results').addEventListener('cancel', event => { event.preventDefault(); menu(
 
 addEventListener('keydown', event => {
   if (screen !== 'drive') return;
+  if ($('rest').open) {
+    if (event.code === 'Escape') event.preventDefault();
+    return;
+  }
   if (event.code === 'Escape' && !event.repeat) {
     event.preventDefault();
     if (embedded) send('hk:esc');
@@ -577,6 +688,7 @@ addEventListener('keydown', event => {
     keys.add(event.code);
   } else if (!event.repeat && event.code === 'KeyC') changeView();
   else if (!event.repeat && event.code === 'KeyH') horn();
+  else if (!event.repeat && event.code === 'KeyE') askRest();
 });
 addEventListener('keyup', event => keys.delete(event.code));
 addEventListener('blur', clearInput);

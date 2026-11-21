@@ -95,6 +95,12 @@ class TwilightrunStaticTest(unittest.TestCase):
         art = ROOT / "web/assets/games/twilightrun"
         for name in ("coupe", "sport", "gt", "hyper"):
             self.assertTrue((art / "garage" / f"{name}.webp").is_file(), name)
+        # 휴게소(차에서 내린 장면 · 식당) 그림과 음식 4종 — 게임 안 drive.js 의 음식 id 와 같아야 한다
+        drive = (JS_DIR / "drive.js").read_text(encoding="utf-8")
+        for name in ("exterior", "interior", "walnut", "udon", "hotbar", "coffee"):
+            self.assertTrue((art / "rest" / f"{name}.webp").is_file(), name)
+        for food in ("walnut", "udon", "hotbar", "coffee"):
+            self.assertIn(f"id: '{food}'", drive)
         for name in ("collision", "debris", "horn"):
             self.assertTrue((art / "audio" / f"{name}.mp3").is_file(), name)
         self.assertTrue((art / "hero.jpg").is_file())

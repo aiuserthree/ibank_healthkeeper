@@ -1,4 +1,4 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=3';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=4';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -7,6 +7,50 @@ export const TIRE_RADIUS = .369;
 export const PANEL_BREAK = .86;
 // 내구도 5칸(운영자 요청, 3 → 5) — 차체 손상 그림은 3단계 그대로: 4·3칸 긁힘, 2·1칸 심한 손상, 0칸 파손
 export const MAX_HEALTH = 5;
+// 기름 · 휴게소(운영자 요청) — 기름 한 통으로 7 km, 휴게소는 3 km 지점부터 3.2 km 마다. 표지는 1.2 km 앞에서 보인다
+export const FUEL_RANGE = 7000;
+export const REST_FIRST = 3000;
+export const REST_EVERY = 3200;
+export const REST_SIGN = 1200;
+export const restNames = ['노을 휴게소', '바람재 휴게소', '달빛 휴게소', '솔숲 휴게소', '물안개 휴게소'];
+export const foods = [
+  { id: 'walnut', name: '호두과자', price: 90, effect: '내구도 +1' },
+  { id: 'udon', name: '우동', price: 180, effect: '내구도 가득 · 찌그러짐 펴기' },
+  { id: 'hotbar', name: '핫바', price: 70, effect: '다음 휴게소까지 기름 25% 덜 씀' },
+  { id: 'coffee', name: '커피', price: 110, effect: '3 km 동안 최고 속도 +12 km/h' },
+];
+export const restAt = index => REST_FIRST + index * REST_EVERY;
+export function nextRest(state) {
+  const index = Math.max(0, Math.ceil((state.distance - REST_FIRST) / REST_EVERY));
+  const at = restAt(index);
+  if (state.mode.goal && at > state.mode.goal - 400) return null;
+  return { index, at, left: at - state.distance };
+}
+export function callRest(state) {
+  const rest = nextRest(state);
+  if (!rest || rest.left > REST_SIGN || state.outcome) return false;
+  state.restCall = rest.at;
+  return true;
+}
+export function eatFood(state, id) {
+  if (id === 'walnut') state.health = Math.min(MAX_HEALTH, state.health + 1);
+  if (id === 'udon') {
+    state.health = MAX_HEALTH;
+    for (const zone of Object.keys(state.damage)) state.damage[zone] *= .2;
+  }
+  if (id === 'hotbar') state.saver = restAt(state.restStop.index + 1);
+  if (id === 'coffee') state.boostUntil = state.distance + 3000;
+}
+// 휴게소에서 나와 본선에 다시 합류 — 오른쪽 끝 차로, 근처 차는 비켜 둔다
+export function leaveRest(state) {
+  state.restStop = null;
+  state.restCall = null;
+  state.x = LANES[3];
+  state.speed = Math.max(state.speed, state.car.top / 3.6 * .5);
+  state.yaw = state.steer = state.acceleration = 0;
+  state.cooldown = 2;
+  state.traffic = state.traffic.filter(v => v.oncoming || v.x < 0 || v.z < state.distance - 40 || v.z > state.distance + 110);
+}
 export const damageStage = health => health <= 0 ? 3 : health <= 2 ? 2 : health < MAX_HEALTH ? 1 : 0;
 export const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const range = (low, high) => low + Math.random() * (high - low);
@@ -139,7 +183,7 @@ export function createRun(course, selectedMode, car) {
   const state = {
     course, mode, car, rival, traffic: [], distance: 0, elapsed: 0, remaining: mode.time,
     x: LANES[2], speed: 23, acceleration: 0, steer: 0, wheelAngle: 0, wheelSpin: 0,
-    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, cooldown: 0, score: 0, bonus: 0,
+    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, restCall: null, restStop: null, saver: 0, boostUntil: 0, cooldown: 0, score: 0, bonus: 0,
     overtakes: 0, closeCalls: 0, nextGate: mode.gate ?? Infinity, checkpoints: 0,
     spawnAt: 90, signal: null, impact: null, trafficImpact: null, damage: { front: 0, rear: 0, left: 0, right: 0 }, outcome: null,
   };
@@ -245,12 +289,12 @@ function collide(state, vehicle, lastX, lastZ, previousGap, length, width) {
 
 function advanceCar(state, input, dt) {
   const { car, course, distance, speed, x } = state;
-  const top = car.top / 3.6;
+  const top = (car.top + (distance < state.boostUntil ? 12 : 0)) / 3.6;
   const braking = Boolean(input.brake);
   const onShoulder = Math.abs(x) > 6.28;
   const ratio = speed / top;
   const drag = .5 + 1.75 * ratio ** 2;
-  const throttle = input.gas && !braking ? car.power * (1 - .61 * ratio) : 0;
+  const throttle = input.gas && !braking && state.fuel > 0 ? car.power * (1 - .61 * ratio) : 0;
   const brake = braking ? 10.2 + 5.2 * Math.min(1, speed / 18) : 0;
   const grade = (roadY(course, distance + 1) - roadY(course, distance - 1)) * 4.9;
   const shoulderDrag = onShoulder ? Math.min(8, speed) : 0;
@@ -284,6 +328,7 @@ function advanceCar(state, input, dt) {
   const forward = travel * Math.cos(direction);
   const lateral = travel * Math.sin(direction) - slope * forward;
   state.distance += forward;
+  state.fuel = Math.max(0, state.fuel - Math.max(0, forward) / FUEL_RANGE * (state.distance < state.saver ? .75 : 1));
   state.x = clamp(x + lateral, -6.55, 6.55);
   if (state.x !== x + lateral) state.yaw = damp(state.yaw, 0, dt, 6);
   state.wheelSpin = (state.wheelSpin - travel / TIRE_RADIUS) % (Math.PI * 2);
@@ -356,6 +401,13 @@ export function step(state, input, dt) {
     if (!state.signal) state.signal = '새 구간  ·  내구도 +1';
   }
 
+  const rest = state.restCall;
+  if (rest != null && before < rest && state.distance >= rest) {
+    state.restStop = { index: Math.round((rest - REST_FIRST) / REST_EVERY), at: rest };
+    state.restCall = null;
+  } else if (rest != null && state.distance > rest) state.restCall = null;
+  if (state.fuel < .2 && state.fuel + Math.max(0, state.distance - before) / FUEL_RANGE >= .2 && !state.signal) state.signal = '기름 부족  ·  휴게소에 들르세요';
+
   state.score = Math.min(SCORE_LIMIT, Math.floor(state.distance * .55 + state.bonus));
   if (state.health <= 0) state.outcome = 'wreck';
   else if (mode.goal && state.distance >= mode.goal) {
@@ -363,6 +415,7 @@ export function step(state, input, dt) {
   } else if (mode.passes && state.overtakes >= mode.passes) state.outcome = 'win';
   else if (rival && rival.z >= mode.goal) state.outcome = 'rival';
   else if (mode.time && state.remaining <= 0) state.outcome = 'timeout';
+  else if (state.fuel <= 0 && state.speed < 1.5) state.outcome = 'fuel';
   if (state.outcome === 'win') state.score = Math.min(SCORE_LIMIT, state.score + 550);
 }
 
