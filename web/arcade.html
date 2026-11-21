@@ -239,8 +239,9 @@
       return lead;
     }
 
-    // 새 게임(화면 문구는 「새로 나왔어요」 — 「이번 주」라고 쓰지 않는다) — 들어온 지 두 달 안의 게임을 최근 들어온 순으로. 없으면 영역을 숨긴다. 8개 넘으면 「더 보기」
-    const NEW_SHOW = 8;
+    // 새 게임(화면 문구는 「새로 나왔어요」 — 「이번 주」라고 쓰지 않는다) — 들어온 지 두 달 안의 게임을 최근 들어온 순으로. 없으면 영역을 숨긴다. 세 줄 넘으면 「더 보기」
+    // 처음에는 세 줄만 보인다(운영자 2026-11-21 「디폴트로 세줄 보이게 해」) — 줄당 칸 수는 화면 너비에 따라 4 · 3 · 2 라서, 그리는 때 격자의 실제 칸 수를 재어 세 줄 분량을 정한다(bindNew). NEW_SHOW 는 칸 수를 재기 전 처음 그릴 때 쓰는 값(넓은 화면 4칸 × 3줄)
+    const NEW_ROWS = 3, NEW_SHOW = 12;
     function newHtml(games) {
       const list = games.filter(isNewThisWeek).sort((a, b) => (b.addedOn > a.addedOn ? 1 : b.addedOn < a.addedOn ? -1 : 0));
       if (!list.length) return "";
@@ -253,7 +254,24 @@
         </div>`;
     }
     function bindNew(root) {
-      const more = root.querySelector("#aa-new-more");
+      let more = root.querySelector("#aa-new-more");
+      const grid = root.querySelector(".hk-aa-new__grid");
+      if (grid) {
+        // 실제 칸 수 × 세 줄만 보이게 다시 맞춘다
+        const cols = Math.max(1, (getComputedStyle(grid).gridTemplateColumns || "").split(" ").filter(Boolean).length || 4);
+        const show = cols * NEW_ROWS, items = [...grid.querySelectorAll(".hk-aa-new__item")];
+        items.forEach((x, i) => (x.hidden = i >= show));
+        const rest = Math.max(0, items.length - show);
+        if (!rest && more) { more.remove(); more = null; }
+        else if (rest) {
+          if (!more) {
+            more = document.createElement("button");
+            more.type = "button"; more.className = "hk-aa-pill is-sm hk-aa-new__more"; more.id = "aa-new-more";
+            grid.after(more);
+          }
+          more.textContent = `${rest.toLocaleString("ko-KR")}개 더 보기`;
+        }
+      }
       if (more) more.onclick = () => { root.querySelectorAll(".hk-aa-new__item[hidden]").forEach((x) => (x.hidden = false)); more.remove(); };
     }
 
