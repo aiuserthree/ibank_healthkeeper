@@ -1205,14 +1205,23 @@ window.HKPlay = (function () {
   }
 
   // 순위 버튼(좁은 화면) — 오른쪽에서 밀려 나오는 순위표
-  // 순위표 서랍 — 넓은 화면은 게임을 가리지 않게 어둡게 덮지 않고, 휴대폰은 뒤를 어둡게
+  // 순위표 서랍 — 열려 있는 동안 덮개가 게임 화면(머리줄 아래)을 덮어 누르면 닫는다
+  // (게임이 iframe 이어도 클릭을 받도록). 넓은 화면은 게임을 가리지 않게 투명, 휴대폰은 뒤를 어둡게
+  function placeScrim() {
+    const scrim = document.getElementById("hk-pf-scrim");
+    if (!scrim || scrim.hidden) return;
+    const bar = document.getElementById("hk-play-head");
+    scrim.style.top = (bar ? Math.max(0, Math.round(bar.getBoundingClientRect().bottom)) : 0) + "px";
+    scrim.classList.toggle("is-clear", window.matchMedia("(min-width: 900px)").matches);
+  }
   function openBoard(on) {
     const board = document.querySelector(".hk-pf .hk-play-board");
     const scrim = document.getElementById("hk-pf-scrim");
     if (!board) return;
     board.classList.toggle("is-open", on);
-    if (scrim) scrim.hidden = !on || window.matchMedia("(min-width: 900px)").matches;
+    if (scrim) { scrim.hidden = !on; placeScrim(); }
   }
+  window.addEventListener("resize", placeScrim);
   // 순위 버튼은 판이 끝났을 때만 — 게임 중·시작 전에는 숨긴다
   function showRankBtn(on) {
     const btn = document.getElementById("hk-pf-rank");
