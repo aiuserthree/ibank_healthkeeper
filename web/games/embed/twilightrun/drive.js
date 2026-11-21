@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=18';
-import { DAY_STARTS, weatherAt } from './daytime.js?v=18';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=23';
+import { DAY_STARTS, weatherAt } from './daytime.js?v=23';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -27,9 +27,13 @@ export const foods = [
   { id: 'sotteok', name: '소떡소떡', price: 90, fill: .4, effect: '배 +40% · 다음 충돌 1번 막아 줌' },
   { id: 'tornado', name: '회오리감자', price: 70, fill: .3, effect: '배 +30% · 3 km 동안 추월 점수 2배' },
   { id: 'hotdog', name: '핫도그', price: 110, fill: .5, effect: '배 +50% · 내구도 +1' },
-  // 마실 것(운영자 요청) — 영상 없이 바로
-  { id: 'water', name: '물', price: 10, fill: .05, still: true, effect: '배 +5% · 다음 휴게소까지 배가 20% 천천히 줄어듦' },
-  { id: 'soda', name: '탄산음료', price: 30, fill: .05, still: true, effect: '배 +5% · 3 km 동안 가속 +5%' },
+  // 밥 종류 · 돈가스(운영자 요청)
+  { id: 'bibimbap', name: '비빔밥', price: 150, fill: .6, effect: '배 +60% · 내구도 +1' },
+  { id: 'jeyuk', name: '제육덮밥', price: 160, fill: .6, effect: '배 +60% · 3 km 동안 가속 +5%' },
+  { id: 'donkatsu', name: '돈가스', price: 170, fill: .7, effect: '배 +70% · 3 km 동안 최고 속도 +8 km/h' },
+  // 마실 것(운영자 요청)
+  { id: 'water', name: '물', price: 10, fill: .05, effect: '배 +5% · 다음 휴게소까지 배가 20% 천천히 줄어듦' },
+  { id: 'soda', name: '탄산음료', price: 30, fill: .05, effect: '배 +5% · 3 km 동안 가속 +5%' },
 ];
 export const restAt = index => REST_FIRST + index * REST_EVERY;
 // 편의점(운영자 요청) — 보유 크레딧, 휴게소마다 종류별 한 번
@@ -40,14 +44,21 @@ export const shopItems = [
   { id: 'water', name: '생수', price: 20, effect: '다음 휴게소까지 배가 20% 천천히 줄어듦' },
   { id: 'gimbap', name: '삼각김밥', price: 50, effect: '배 +35%' },
   { id: 'gum', name: '껌', price: 15, effect: '3 km 동안 추월 점수 +50%' },
+  // 더 늘림(운영자 요청)
+  { id: 'cupramen', name: '컵라면', price: 60, effect: '배 +30%' },
+  { id: 'bananamilk', name: '바나나우유', price: 35, effect: '배 +15% · 3 km 동안 가속 +5%' },
+  { id: 'icecream', name: '아이스크림', price: 45, effect: '배 +10% · 3 km 동안 추월 점수 +50%' },
+  { id: 'jelly', name: '젤리', price: 25, effect: '배 +5% · 3 km 동안 추월 점수 +50%' },
+  { id: 'jerky', name: '육포', price: 55, effect: '배 +25%' },
+  { id: 'vitamin', name: '비타민음료', price: 70, effect: '3 km 동안 최고 속도 +8 km/h' },
 ];
 export function useShopItem(state, id) {
-  const fill = { chips: .15, chocobar: .10, gimbap: .35 }[id] || 0;
+  const fill = { chips: .15, chocobar: .10, gimbap: .35, cupramen: .3, bananamilk: .15, icecream: .1, jelly: .05, jerky: .25 }[id] || 0;
   state.hunger = Math.min(1, state.hunger + fill);
-  if (id === 'chocobar') state.chocoUntil = state.distance + 3000;
-  if (id === 'energy') state.energyUntil = state.distance + 3000;
+  if (id === 'chocobar' || id === 'bananamilk') state.chocoUntil = state.distance + 3000;
+  if (id === 'energy' || id === 'vitamin') state.energyUntil = state.distance + 3000;
   if (id === 'water') state.hungerSaver = restAt(state.restStop.index + 1);
-  if (id === 'gum') state.gumUntil = state.distance + 3000;
+  if (id === 'gum' || id === 'icecream' || id === 'jelly') state.gumUntil = state.distance + 3000;
 }
 // 정비소(운영자 요청) — 보유 크레딧으로. 수리는 빠진 내구도 한 칸에 60(내구도는 가득인데 찌그러졌으면 60)
 // 타이어 · 엔진오일은 달릴수록 닳는다(운영자 요청: 상태가 보이고, 정비하면 그 상태가 바뀌게)
@@ -114,7 +125,9 @@ export function eatFood(state, id) {
   const food = foods.find(item => item.id === id);
   if (!food) return false;
   state.hunger = Math.min(1, state.hunger + food.fill);
-  if (id === 'walnut' || id === 'hotdog') state.health = Math.min(MAX_HEALTH, state.health + 1);
+  if (id === 'walnut' || id === 'hotdog' || id === 'bibimbap') state.health = Math.min(MAX_HEALTH, state.health + 1);
+  if (id === 'jeyuk') state.chocoUntil = state.distance + 3000;
+  if (id === 'donkatsu') state.energyUntil = state.distance + 3000;
   if (id === 'tteok') state.gripUntil = state.distance + 3000;
   if (id === 'sotteok') state.shield = true;
   if (id === 'tornado') state.passBoostUntil = state.distance + 3000;

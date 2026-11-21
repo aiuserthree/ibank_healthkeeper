@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=18';
-import { createScene } from './scene.js?v=18';
-import { impactDuration } from './impact.js?v=18';
-import { assetRoot } from './world.js?v=18';
-import { requestYield } from './traffic.js?v=18';
-import { createShowroom } from './showroom.js?v=18';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=18';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=23';
+import { createScene } from './scene.js?v=23';
+import { impactDuration } from './impact.js?v=23';
+import { assetRoot } from './world.js?v=23';
+import { requestYield } from './traffic.js?v=23';
+import { createShowroom } from './showroom.js?v=23';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=23';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -190,7 +190,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=18`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=23`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -414,6 +414,16 @@ function paintRest() {
   $('eaten-list').textContent = eaten.length ? `먹은 것 · ${eaten.join(', ')}` : '키오스크에서 골라 담고 결제하면 번호로 불러 줘요';
   $('open-kiosk').disabled = eaten.length === foods.length;
 }
+// 휴게소 안내 글 — 두 줄이 되어도 「다시 출발」 단추에 가리지 않게 보이는 곳까지 스크롤(운영자 요청)
+function restSay(text) {
+  $('rest-status').textContent = text;
+  showRestStatus();
+}
+// 덮개 화면(편의점 · 키오스크 · 주유)을 닫고 패널이 다시 보일 때도 안내 글이 보이게
+function showRestStatus() {
+  // 안내 글은 「다시 출발」 바로 위 — 패널을 맨 아래로 내리면 보인다(단추가 덮는 자리라 scrollIntoView 로는 안 내려감)
+  if ($('rest-status').textContent) requestAnimationFrame(() => { const panel = $('rest-status').closest('.rest-panel'); panel.scrollTop = panel.scrollHeight; });
+}
 function enterRest() {
   clearInput();
   quietEngine();
@@ -583,10 +593,11 @@ function closePump() {
   pump.holding = false;
   $('pump').hidden = true;
   $('rest').classList.remove('pumping');
-  if (pump.step === 'done') $('rest-status').textContent = `주유 끝 — 기름 ${Math.round(state.fuel * 100)}%`;
+  if (pump.step === 'done') restSay(`주유 끝 — 기름 ${Math.round(state.fuel * 100)}%`);
   pump.step = '';
   paintRest();
-  $('depart').focus();
+  $('depart').focus({ preventScroll: true });
+  showRestStatus();
 }
 function plugNozzle() {
   $('nozzle').classList.add('plugged');
@@ -658,7 +669,7 @@ $('service-list').addEventListener('click', event => {
   serviceCar(state, id);
   restServiced.add(id);
   const item = services.find(entry => entry.id === id);
-  $('rest-status').textContent = `${item.done} — ${carCondition(state, id).text}`;
+  restSay(`${item.done} — ${carCondition(state, id).text}`);
   beep(640, .1);
   $('balance').textContent = number(profile.balance);
   paintRest();
@@ -670,12 +681,14 @@ $('refuel-skip').addEventListener('click', endMovie);
 // 편의점(운영자 요청) — 진열대에서 골라 담고, 직원과 대화(내 차 상태 · 날씨 · 시간에 맞춘 추천) → 계산 대화 → 효과
 let basket = [];
 let storeStep = '';
+// 직원 — 들를 때마다 남자(clerk) · 여자(clerk2) 중 무작위(운영자 요청)
+let clerkSet = 'clerk';
 const basketTotal = () => basket.reduce((sum, id) => sum + shopItems.find(item => item.id === id).price, 0);
 function clerkSay(text, choices = [], talking = true) {
   $('bubble').textContent = text;
-  $('clerk').src = `${assetRoot}rest/clerk-${talking ? 'talk' : 'smile'}.webp?v=1`;
+  $('clerk').src = `${assetRoot}rest/${clerkSet}-${talking ? 'talk' : 'smile'}.webp?v=1`;
   clearTimeout(clerkSay.timer);
-  clerkSay.timer = setTimeout(() => { $('clerk').src = `${assetRoot}rest/clerk-smile.webp?v=1`; }, 1400);
+  clerkSay.timer = setTimeout(() => { $('clerk').src = `${assetRoot}rest/${clerkSet}-smile.webp?v=1`; }, 1400);
   $('choices').innerHTML = choices.map(([key, label]) => `<button type="button" class="button quiet" data-say="${key}">${label}</button>`).join('');
   beep(520 + Math.random() * 80, .04);
   $('choices').querySelector('button')?.focus();
@@ -700,14 +713,17 @@ function paintStore() {
       <b>${item.name}</b><em>${bought ? '샀어요' : taken ? '담았어요' : '◆ ' + number(item.price)}</em>
     </button>`;
   }).join('');
-  $('basket').textContent = basket.length
-    ? `바구니 · ${basket.map(id => shopItems.find(item => item.id === id).name).join(', ')} · ◆ ${number(basketTotal())}`
+  // 바구니 — 담은 것마다 × 로 뺄 수 있다(운영자 요청), 계산 중에는 못 뺌
+  const locked = storeStep === 'checkout' || storeStep.startsWith('pay') || storeStep === 'done';
+  $('basket').innerHTML = basket.length
+    ? `<span>바구니 · ◆ ${number(basketTotal())}</span>` + basket.map(id => `<button type="button" class="pick" data-unpick="${id}" ${locked ? 'disabled' : ''} aria-label="${shopItems.find(item => item.id === id).name} 빼기">${shopItems.find(item => item.id === id).name} ×</button>`).join('')
     : '진열대에서 눌러 담으세요';
 }
 const shopping = () => ['buy', '계산할게요'];
 function openStore() {
   basket = [];
   storeStep = 'greet';
+  clerkSet = Math.random() < .5 ? 'clerk' : 'clerk2';
   $('store').hidden = false;
   $('rest').classList.add('pumping');
   paintStore();
@@ -719,9 +735,18 @@ function closeStore() {
   $('rest').classList.remove('pumping');
   storeStep = '';
   paintRest();
-  $('open-store').focus();
+  $('open-store').focus({ preventScroll: true });
+  showRestStatus();
 }
 $('open-store').addEventListener('click', openStore);
+$('basket').addEventListener('click', event => {
+  const button = event.target.closest('[data-unpick]');
+  if (!button || button.disabled) return;
+  basket = basket.filter(id => id !== button.dataset.unpick);
+  paintStore();
+  const name = shopItems.find(item => item.id === button.dataset.unpick).name;
+  clerkSay(`${name} 빼 드렸어요.`, basket.length ? [shopping(), ['more', '더 볼게요'], ['leave', '나갈게요']] : [['more', '더 볼게요'], ['leave', '나갈게요']], false);
+});
 $('goods').addEventListener('click', event => {
   const button = event.target.closest('[data-good]');
   if (!button || button.disabled) return;
@@ -729,7 +754,7 @@ $('goods').addEventListener('click', event => {
   storeStep = 'shop';
   paintStore();
   const item = shopItems.find(entry => entry.id === button.dataset.good);
-  const lines = { chips: '감자칩은 늘 인기예요!', chocobar: '달달한 게 힘 나죠.', energy: '이거 마시면 눈이 번쩍 뜨여요.', water: '물은 꼭 챙기셔야죠.', gimbap: '오늘 들어온 거라 신선해요.', gum: '껌 씹으면 덜 졸려요.' };
+  const lines = { chips: '감자칩은 늘 인기예요!', chocobar: '달달한 게 힘 나죠.', energy: '이거 마시면 눈이 번쩍 뜨여요.', water: '물은 꼭 챙기셔야죠.', gimbap: '오늘 들어온 거라 신선해요.', gum: '껌 씹으면 덜 졸려요.', cupramen: '뜨거운 물은 저쪽에 있어요!', bananamilk: '휴게소엔 역시 바나나우유죠.', icecream: '녹기 전에 드세요~', jelly: '심심할 때 하나씩 드세요.', jerky: '씹을수록 고소해요.', vitamin: '피곤할 때 딱이에요.' };
   clerkSay(`${lines[item.id]} (${item.effect})`, [shopping(), ['more', '더 볼게요'], ['leave', '나갈게요']]);
 });
 $('choices').addEventListener('click', event => {
@@ -769,12 +794,12 @@ $('choices').addEventListener('click', event => {
     save();
     $('balance').textContent = number(profile.balance);
     for (const id of basket) { useShopItem(state, id); restBought.add(id); }
-    const names = basket.map(id => shopItems.find(item => item.id === id).name).join(', ');
+    const bought = basket.map(id => shopItems.find(item => item.id === id).name);
     basket = [];
     storeStep = 'done';
     paintStore();
     paintHud();
-    $('rest-status').textContent = `편의점에서 ${names} 샀어요`;
+    restSay(bought.length > 2 ? `편의점에서 ${bought.length}개 샀어요 · ${bought[0]} 외 ${bought.length - 1}개` : `편의점에서 ${bought.join(', ')} 샀어요`);
     clerkSay(`결제됐어요${point ? ` · 포인트 ◆ ${point} 적립!` : ''} 감사합니다, 안전 운전하세요!`, [['leave', '나가기']]);
   } else if (say === 'leave') {
     basket = [];
@@ -825,6 +850,7 @@ function closeKiosk() {
   $('kiosk').hidden = true;
   $('rest').classList.remove('pumping');
   paintRest();
+  showRestStatus();
 }
 $('open-kiosk').addEventListener('click', openKiosk);
 $('kiosk-close').addEventListener('click', () => { closeKiosk(); $('open-kiosk').focus(); });
@@ -876,7 +902,7 @@ $('kiosk-pickup').addEventListener('click', () => {
   const next = () => {
     const id = order.shift();
     if (!id) {
-      $('rest-status').textContent = done.length ? `냠 — ${done.join(' · ')}` : '';
+      restSay(!done.length ? '' : done.length > 2 ? `냠 — ${done[0]} 외 ${done.length - 1}개` : `냠 — ${done.join(' · ')}`);
       paintRest();
       paintHud();
       $('depart').focus();

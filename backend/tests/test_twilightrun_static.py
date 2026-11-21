@@ -97,27 +97,27 @@ class TwilightrunStaticTest(unittest.TestCase):
             self.assertTrue((art / "garage" / f"{name}.webp").is_file(), name)
         # 휴게소(차에서 내린 장면 · 식당) 그림과 음식 4종 — 게임 안 drive.js 의 음식 id 와 같아야 한다
         drive = (JS_DIR / "drive.js").read_text(encoding="utf-8")
-        for name in ("exterior", "interior", "pump", "nozzle", "walnut", "udon", "hotbar", "coffee", "tteok", "sotteok", "tornado", "hotdog"):
+        for name in ("exterior", "interior", "pump", "nozzle", "walnut", "udon", "hotbar", "coffee", "tteok", "sotteok", "tornado", "hotdog", "bibimbap", "jeyuk", "donkatsu", "water", "soda"):
             self.assertTrue((art / "rest" / f"{name}.webp").is_file(), name)
-        for food in ("walnut", "udon", "hotbar", "coffee", "tteok", "sotteok", "tornado", "hotdog"):
+        for food in ("walnut", "udon", "hotbar", "coffee", "tteok", "sotteok", "tornado", "hotdog", "bibimbap", "jeyuk", "donkatsu", "water", "soda"):
             self.assertIn(f"id: '{food}'", drive)
         for name in ("collision", "debris", "horn"):
             self.assertTrue((art / "audio" / f"{name}.mp3").is_file(), name)
         self.assertTrue((art / "hero.jpg").is_file())
-        # 그림 · 소리는 합쳐 3.2MB(시간대별 하늘 32장 포함), 휴게소 영상(주유 12초 · 메뉴별 음식 8초, 소리 없음 1280×720 — 누를 때만 불러옴)은 따로 35MB(1080p, 누를 때만 불러옴)
+        # 그림 · 소리는 합쳐 4MB(시간대별 하늘 32장 · 편의점 · 메뉴 그림 포함), 휴게소 영상(주유 12초 · 메뉴별 음식 8초, 소리 없음 1280×720 — 누를 때만 불러옴)은 따로 50MB(1080p, 누를 때만 불러옴)
         files = [p for p in art.rglob("*") if p.is_file()]
-        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix != ".mp4"), 3_200_000)
+        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix != ".mp4"), 4_000_000)
         # 시간대별 하늘 — 코스 풍경 8 × 오전 · 점심 · 노을 · 밤
         for land in ("coast", "port", "ridge", "forest", "metro", "alpine", "desert", "meadow"):
             for time in ("morning", "noon", "sunset", "night"):
                 self.assertTrue((art / "horizons" / f"{land}-{time}.webp").is_file(), f"{land}-{time}")
-        movies = ["refuel"] + [f"eat-{food}" for food in ("walnut", "udon", "hotbar", "coffee", "tteok", "sotteok", "tornado", "hotdog")]
+        movies = ["refuel"] + [f"eat-{food}" for food in ("walnut", "udon", "hotbar", "coffee", "tteok", "sotteok", "tornado", "hotdog", "bibimbap", "jeyuk", "donkatsu", "water", "soda")]
         for name in movies:
             self.assertTrue((art / "rest" / f"{name}.mp4").is_file(), name)
         game_js = (JS_DIR / "game.js").read_text(encoding="utf-8")
         self.assertIn("playMovie('refuel'", game_js)
         self.assertIn("playMovie(`eat-${id}`", game_js)
-        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix == ".mp4"), 35_000_000)
+        self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix == ".mp4"), 50_000_000)
 
     def test_tint_and_genre(self):
         self.assertIn('twilightrun: ["#302722", "#a4b840"],', PLAY_JS)
