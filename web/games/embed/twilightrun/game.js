@@ -1,9 +1,9 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, pumpFuel, serviceCar, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=12';
-import { createScene } from './scene.js?v=12';
-import { impactDuration } from './impact.js?v=12';
-import { assetRoot } from './world.js?v=12';
-import { requestYield } from './traffic.js?v=12';
-import { createShowroom } from './showroom.js?v=12';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, pumpFuel, serviceCar, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=13';
+import { createScene } from './scene.js?v=13';
+import { impactDuration } from './impact.js?v=13';
+import { assetRoot } from './world.js?v=13';
+import { requestYield } from './traffic.js?v=13';
+import { createShowroom } from './showroom.js?v=13';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -189,7 +189,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=12`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=13`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -423,8 +423,10 @@ function enterRest() {
   paintRest();
   $('rest').showModal();
   syncCursor();
-  ($('refuel').disabled ? $('menu-list').querySelector('button:not(:disabled)') || $('depart') : $('refuel')).focus();
   send('hk:paused');
+  // 도착하면 주유 영상(차가 들어와 주유기 옆에 서는 장면)부터 — 끝나거나 건너뛰면 휴게소 화면(운영자 요청)
+  playMovie('refuel', '휴게소에 들어가는 중…', () => ($('refuel').disabled
+    ? $('menu-list').querySelector('button:not(:disabled)') || $('depart') : $('refuel')).focus());
 }
 function departRest() {
   if (!$('rest').open || $('rest').classList.contains('watching') || !$('pump').hidden) return;
@@ -451,7 +453,7 @@ function playMovie(name, caption, done) {
   $('rest').classList.add('watching');
   $('refuel-movie').hidden = false;
   $('refuel-caption').textContent = caption;
-  refuelVideo.src = `${movieRoot}${name}.mp4?v=3`;
+  refuelVideo.src = `${movieRoot}${name}.mp4?v=4`;
   refuelVideo.play().catch(endMovie);
   $('refuel-skip').focus();
 }
