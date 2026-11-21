@@ -434,7 +434,7 @@ function playMovie(name, caption, done) {
   $('rest').classList.add('watching');
   $('refuel-movie').hidden = false;
   $('refuel-caption').textContent = caption;
-  refuelVideo.src = `${movieRoot}${name}.mp4?v=1`;
+  refuelVideo.src = `${movieRoot}${name}.mp4?v=2`;
   refuelVideo.play().catch(endMovie);
   $('refuel-skip').focus();
 }
