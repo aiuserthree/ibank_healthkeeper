@@ -41,7 +41,8 @@ function load() {
     best: Number.isSafeInteger(data?.best) ? clamp(data.best, 0, SCORE_LIMIT) : 0,
     car: Number.isInteger(data?.car) && cars[data.car] ? data.car : 0,
     course: Number.isInteger(data?.course) && courses[data.course] ? data.course : 0,
-    mode: Number.isInteger(data?.mode) && modes[data.mode] ? data.mode : 0,
+    // 처음 하는 사람의 주행 모드는 끝없는 질주(운영자 요청) — 이미 고른 사람은 고른 그대로
+    mode: Number.isInteger(data?.mode) && modes[data.mode] ? data.mode : Math.max(0, modes.findIndex(item => item.id === 'endless')),
     sound: data?.sound === true,
     music: typeof data?.music === 'string' ? data.music : 'citypop',
     musicVolume: typeof data?.musicVolume === 'number' ? clamp(data.musicVolume, 0, 1) : .45,
