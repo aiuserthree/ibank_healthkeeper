@@ -755,11 +755,15 @@ $('choices').addEventListener('click', event => {
     paintStore();
     clerkSay('뺐어요! 다시 계산해 드릴까요?', basket.length ? [shopping(), ['more', '더 볼게요']] : [['more', '더 볼게요'], ['leave', '나갈게요']]);
   } else if (say === 'bag' || say === 'nobag') {
+    if (storeStep !== 'checkout') return;
     const bag = say === 'bag' && profile.balance >= total + 2 ? 2 : 0;
     storeStep = `pay:${bag}`;
     clerkSay('포인트 적립해 드릴까요?', [['point', '네, 적립해 주세요'], ['nopoint', '괜찮아요']]);
   } else if (say === 'point' || say === 'nopoint') {
+    // 결제는 「결제 대기」 단계에서 한 번만 — 단추가 겹쳐 눌려도 두 번 빠지지 않게(시험 중 한 번 크레딧이 더 빠진 적이 있어 막아 둠)
+    if (!storeStep.startsWith('pay:')) return;
     const bag = Number(storeStep.split(':')[1] || 0);
+    storeStep = 'paying';
     const point = say === 'point' ? Math.max(1, Math.round(total * .05)) : 0;
     profile.balance = Math.max(0, profile.balance - total - bag + point);
     save();
