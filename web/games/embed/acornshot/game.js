@@ -1158,18 +1158,30 @@
     return { pts, hit, ghost };
   }
   function trajectory(p) {
+    // Must read on every sky (bright day, snow, night): a thin path line under bold dots,
+    // each dot a bright fill inside an opaque dark rim, sized in screen pixels so zooming out keeps it legible.
     const n = p.pts.length, unit = 1 / Math.min(1, cam.z), night = look().night;
+    // Snow and pale skies swallow white dots — there the dots are warm orange inside a navy rim.
+    const snowy = placeKey(levelIndex) === 'snow' || P.LEVELS[levelIndex].theme === 'ice';
+    const rim = night ? '#1d1838' : snowy ? '#1f2d4a' : '#2f3b2a', fill = night ? '#ffe17a' : snowy ? '#ff8a2a' : '#ffffff';
+    if (n > 1) {
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      for (const [w, c] of [[6 * unit, rim + (snowy ? 'b0' : '80')], [2.4 * unit, fill + 'cc']]) {
+        ctx.lineWidth = w; ctx.strokeStyle = c; ctx.beginPath();
+        p.pts.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y))); ctx.stroke();
+      }
+    }
     p.pts.forEach((q, i) => {
-      if (i % 2) return;
-      const t = i / Math.max(1, n), r = (3.6 - t * 1.2) * unit;
-      ctx.globalAlpha = 1 - t * .45;
-      ellipse(q.x, q.y, r + 1.4 * unit, r + 1.4 * unit, night ? '#2a2347b0' : '#3f5a3a70');
-      ellipse(q.x, q.y, r, r, night ? '#ffe39a' : '#fffbea');
+      if (i % 3) return;
+      const t = i / Math.max(1, n), r = (5.6 - t * 1.6) * unit;
+      ctx.globalAlpha = 1 - t * .2;
+      ellipse(q.x, q.y, r + 2.2 * unit, r + 2.2 * unit, rim);
+      ellipse(q.x, q.y, r, r, fill);
     });
     ctx.globalAlpha = 1;
     if (p.hit) {
-      ctx.lineWidth = 5 * unit; ctx.strokeStyle = night ? '#2a2347a0' : '#3f5a3a60'; ctx.beginPath(); ctx.arc(p.hit.x, p.hit.y, 14 * unit, 0, Math.PI * 2); ctx.stroke();
-      ctx.lineWidth = 2.6 * unit; ctx.strokeStyle = night ? '#ffe39a' : '#fff6d6'; ctx.stroke();
+      ctx.lineWidth = 7 * unit; ctx.strokeStyle = rim; ctx.beginPath(); ctx.arc(p.hit.x, p.hit.y, 16 * unit, 0, Math.PI * 2); ctx.stroke();
+      ctx.lineWidth = 3.4 * unit; ctx.strokeStyle = night ? '#ffe17a' : '#ffd24a'; ctx.stroke();
     }
   }
   // Upcoming acorns wait in the cart, then on the ground behind it.
