@@ -2,7 +2,7 @@
    ffmpeg -f concat -safe 0 -i raw/<게임>/list.txt -vf "fps=30,scale=1280:720,format=yuv420p" -c:v libx264 -crf 18 raw/<게임>.mp4 """
 import json, pathlib, mimetypes, base64, math, sys, time
 from playwright.sync_api import sync_playwright
-WEB = pathlib.Path("/Users/jhcho/Documents/개인 프로젝트/헬스키퍼/web")
+WEB = pathlib.Path(__file__).resolve().parents[2] / "web"  # 이 저장소(작업 폴더)의 web
 OUT = pathlib.Path(__file__).parent / "raw"; OUT.mkdir(exist_ok=True)
 def handle(route):
     url = route.request.url.split("?")[0].replace("http://hk.test", "")
@@ -11,7 +11,7 @@ def handle(route):
     if not p.exists(): return route.fulfill(status=404, body="")
     return route.fulfill(status=200, content_type=mimetypes.guess_type(str(p))[0] or "text/html", body=p.read_bytes())
 WASD = "wasd"
-REC = {"ringcatch": 10.0, "hoops": 10.0, "sundown": 10.0}  # 녹화 길이(초) — 없으면 7초
+REC = {"ringcatch": 10.0, "hoops": 10.0, "sundown": 10.0, "twilightrun": 12.0, "moonshot": 20.0, "looseends": 10.0, "acornshot": 10.0, "ferry": 10.0}  # 녹화 길이(초) — 없으면 7초
 # 옥상 링 캐치 — 가장 먼저 골대 높이에 닿을 공의 떨어질 x 를 계산해 골대를 그 밑으로(림에 안 닿게 가운데로 받아 「완벽」 연속 → 불꽃 공)
 RC_AUTO = """(()=>{const R=window.__rc;if(!R)return 'no __rc';const HH=R.W.hoop.root.position.y;
   const tick=()=>{requestAnimationFrame(tick);if(R.state!=='play')return;let best=null;
@@ -29,8 +29,28 @@ HOOPS_SOLVE = """(()=>{const H=window.__hoops;if(!H||H.state!=='play')return nul
     if(!ok||!hit||hit.vy>-4)continue;const e=Math.abs(hit.x-t.x)+pw*0.08;if(!best||e<best.e)best={e,ang,pw,err:Math.abs(hit.x-t.x)};}
   if(!best||best.err>0.25)return null;const full=Math.max(120,Math.min(300,Math.min(innerWidth,innerHeight)*0.36));
   return {dx:-Math.sin(best.ang)*best.pw*full,dy:Math.cos(best.ang)*best.pw*full,err:best.err};})()"""
+# 실타래 풀기 — 게임 안 풀이(Rules.suggest)로 다음 수를 구해 핀을 마우스로 끌어 옮긴다(창 밖에서 열면 생기는 window.__looseends)
+LE_NEXT = """(()=>{const L=window.__looseends,S=L&&L.state;if(!S||S.busy||S.won||S.held||S.anim.length)return null;
+  const mv=L.Rules.suggest(S.holes,S.ropes,S.tw,S.hist.map(h=>h.mv));if(!mv)return null;const r=S.ropes.find(r=>r.id===mv.id);
+  const a=L.holeXY(r[mv.end]),b=L.holeXY(mv.to);return {x0:a.x,y0:a.y,x1:b.x,y1:b.y};})()"""
+# 통통배 선착장 — 게임 안 풀이(solve)의 첫 수 배를 누른다(창 밖에서 열면 생기는 window.__ferry)
+FERRY_TAP = """(()=>{const F=window.__ferry;if(!F||F.mode!=='play')return null;const r=F.solve(F.state,{limit:20000});if(!r.ok||!r.moves.length)return null;F.tap(r.moves[0]);return r.moves[0];})()"""
+def drag(pg, x0, y0, x1, y1, n=18, hold=200):
+    pg.mouse.move(x0, y0); pg.mouse.down()
+    for k in range(1, n + 1): pg.mouse.move(x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n); pg.wait_for_timeout(30)
+    pg.wait_for_timeout(hold); pg.mouse.up()
 GAMES = [
   # key, url, localStorage, start clicks(text), warmup ms, drive — 가장 새 게임을 맨 위에
+  # 황혼 질주 — 서해 노을길 스프린트, 카운트다운(3초)이 끝나고 속도가 붙은 뒤부터 W 를 밟은 채 차선을 바꿔 가며 달린다
+  ("twilightrun", "/games/embed/twilightrun.html", {}, ["#start"], 5500, "twilight"),
+  # 뿅뿅 달나라 대포 — 보통 · 방아 로버 · 고요한 달 바다, 내 차례에 한 발 쏘고 컴퓨터가 쏴 터지는 장면까지
+  ("moonshot", "/games/embed/moonshot.html", {"moonshot.v1": json.dumps({"mute": True})}, ["#tStart", "#pGo"], 3500, "moonshot"),
+  # 실타래 풀기 — 퍼즐 13(실꾸러미, 줄 5개 · 첫 단계 손가락 안내 없음)
+  ("looseends", "/games/embed/looseends.html", {"looseends.v1": json.dumps({"stars": [3] * 12, "cur": 11})}, [], 1500, "looseends"),
+  # 도토리 새총단 — 이끼 계곡 3「서리 봉우리」(얼음 망루 셋), 두 발 쏴 망루가 와르르
+  ("acornshot", "/games/embed/acornshot.html", {"acornshot.v1": json.dumps({"stars": [3] * 10, "best": [1] * 10})}, ["#start"], 4000, "acornshot"),
+  # 통통배 선착장 — 5단계부터(1단계 손가락 안내 없음), 풀이대로 배를 눌러 빼고 손님을 태워 보낸다
+  ("ferry", "/games/embed/ferry.html", {"ferry1": json.dumps({"level": 5, "mute": True})}, ["#btnStart"], 2500, "ferry"),
   # ringcatch · hoops 는 창 밖에서 열면 생기는 확인용 손잡이(window.__rc · window.__hoops)로 공 자리를 읽어 자동 조작
   ("ringcatch", "/games/embed/ringcatch.html", {"ringcatch3d.v1": json.dumps({"seen":True,"mute":True})}, ["#btnStart"], 2500, "ringcatch"),
   ("hoops", "/games/embed/hoops.html", {"hoops3d.v1": json.dumps({"seenA":True,"mute":True})}, ["#btnStart"], 600, "hoops"),
@@ -78,7 +98,7 @@ with sync_playwright() as p:
         cdp = ctx.new_cdp_session(pg); frames=[]
         cdp.on("Page.screencastFrame", lambda f: (frames.append((f["metadata"]["timestamp"], f["data"])), cdp.send("Page.screencastFrameAck", {"sessionId": f["sessionId"]})))
         cdp.send("Page.startScreencast", {"format":"jpeg","quality":88,"maxWidth":1280,"maxHeight":720,"everyNthFrame":1})
-        t0 = time.time(); held=set()
+        t0 = time.time(); held=set(); nxt=0.0
         def hold(keys):
             for k in list(held):
                 if k not in keys: pg.keyboard.up(k); held.discard(k)
@@ -111,6 +131,21 @@ with sync_playwright() as p:
                     pg.wait_for_timeout(250); pg.mouse.up(); pg.wait_for_timeout(900)
                 elif pg.evaluate("window.__hoops&&window.__hoops.state") == "stage":
                     pg.keyboard.press("Space")
+            elif drive == "twilight":  # 3초마다 차선 하나씩 오른쪽 · 왼쪽으로
+                ph = t % 6.0
+                hold(["w", "d"] if 1.0 < ph < 1.45 else ["w", "a"] if 4.0 < ph < 4.45 else ["w"])
+            elif drive == "moonshot" and t >= nxt:  # 내 차례가 오면 0.6초 뒤 스페이스를 1.1초 눌러 쏜다(그 사이 컴퓨터 차례)
+                if pg.evaluate("(document.getElementById('dTurn')||{}).textContent") == "내 차례":
+                    pg.wait_for_timeout(600); pg.keyboard.down("Space"); pg.wait_for_timeout(1100); pg.keyboard.up("Space"); nxt = time.time() - t0 + 3.0
+            elif drive == "looseends" and t >= nxt:
+                mv = pg.evaluate(LE_NEXT)
+                if mv: drag(pg, mv["x0"], mv["y0"], mv["x1"], mv["y1"], n=20, hold=150); nxt = time.time() - t0 + 1.0
+            elif drive == "acornshot" and t >= nxt:  # 0.3초 · 4.6초에 당겨 쏜다(첫 발은 앞 망루 · 둘째 발은 가운데 돌 망루)
+                s = pg.evaluate("AcornGame.sling()")
+                if nxt == 0.0: drag(pg, s["x"], s["y"], s["x"] - 110, s["y"] + 48, n=20, hold=350); nxt = 4.6
+                elif nxt == 4.6 and pg.evaluate("AcornGame.snapshot().phase") == "aim": drag(pg, s["x"], s["y"], s["x"] - 150, s["y"] + 62, n=20, hold=350); nxt = 99
+            elif drive == "ferry" and t >= nxt:
+                pg.evaluate(FERRY_TAP); nxt = t + 0.8
             elif drive == "jump":
                 if int(t*10) % 9 == 0: pg.keyboard.press("Space")
             pg.wait_for_timeout(50)
