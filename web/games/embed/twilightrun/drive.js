@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=31';
-import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=31';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=34';
+import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=34';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };

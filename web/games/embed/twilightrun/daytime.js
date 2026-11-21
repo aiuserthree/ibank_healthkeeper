@@ -58,7 +58,9 @@ export function trafficBand(progress) {
 }
 
 const seeded = n => { const x = Math.sin(n * 91.7 + 13.1) * 43758.5453; return x - Math.floor(x); };
-const SPAN = 1200;
+// 날씨 구간 2 km, 바뀔 때는 경계 앞뒤 300 m(합 600 m)에 걸쳐 앞 날씨에서 새 날씨로 서서히(운영자: 너무 확확 바뀜)
+const SPAN = 2000;
+const BLEND = 300;
 function weatherKind(course, index) {
   const r = seeded(index * 7.3 + course.length * .013);
   const theme = course.sections.find(part => part.start <= ((index + .5) * SPAN) % course.length) || course.sections[0];
@@ -68,12 +70,23 @@ function weatherKind(course, index) {
   return theme.theme === 'desert' ? 'clear' : 'fog';
 }
 export const weatherNames = { clear: '맑음', cloudy: '흐림', rain: '비', fog: '안개', snow: '눈' };
-// 지금 날씨 — kind, 바뀌는 곳 앞뒤 150 m 는 부드럽게(amount 0~1)
+// 날씨 섞임 — 종류마다 0~1(합 1). 경계 근처에서는 앞 구간 · 다음 구간 날씨를 부드럽게(smoothstep) 섞는다
+export function weatherMix(course, distance) {
+  const d = Math.max(0, distance);
+  const index = Math.floor(d / SPAN);
+  const into = d - index * SPAN;
+  const mix = { clear: 0, cloudy: 0, rain: 0, fog: 0, snow: 0 };
+  let other = null, t = 0;
+  if (index > 0 && into < BLEND) { other = weatherKind(course, index - 1); t = .5 - into / BLEND / 2; }
+  else if (SPAN - into < BLEND) { other = weatherKind(course, index + 1); t = .5 - (SPAN - into) / BLEND / 2; }
+  const s = t * t * (3 - 2 * t);
+  mix[weatherKind(course, index)] += 1 - s;
+  if (other) mix[other] += s;
+  return mix;
+}
+// 지금 날씨 — kind 는 가장 센 날씨(알림 · 기록 칸), amount 는 그 날씨의 세기(맑음이면 0)
 export function weatherAt(course, distance) {
-  const index = Math.floor(Math.max(0, distance) / SPAN);
-  const kind = weatherKind(course, index);
-  const into = Math.max(0, distance) - index * SPAN;
-  const prev = index ? weatherKind(course, index - 1) : kind;
-  const amount = kind === 'clear' ? 0 : prev === kind ? 1 : Math.min(1, into / 150);
-  return { kind, amount, index };
+  const mix = weatherMix(course, distance);
+  const kind = Object.keys(mix).reduce((a, b) => mix[b] > mix[a] ? b : a);
+  return { kind, amount: kind === 'clear' ? 0 : mix[kind], index: Math.floor(Math.max(0, distance) / SPAN), mix };
 }

@@ -1,6 +1,6 @@
-import { ROAD_WIDTH, clamp, frontWheelAngle, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=31';
-import { assetRoot, atmospheres } from './world.js?v=31';
-import { impactDuration, impactMotion } from './impact.js?v=31';
+import { ROAD_WIDTH, clamp, frontWheelAngle, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=34';
+import { assetRoot, atmospheres } from './world.js?v=34';
+import { impactDuration, impactMotion } from './impact.js?v=34';
 
 const palettes = {
   coast: { sky: ['#263549', '#af655a', '#f6b079'], hills: ['#846770', '#625661', '#444651'], land: ['#495454', '#465152'], road: ['#393b42', '#3c3e45'], rail: '#8e817d', sun: '#ffdb9b' },

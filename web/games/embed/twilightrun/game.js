@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=31';
-import { createScene } from './scene.js?v=31';
-import { impactDuration } from './impact.js?v=31';
-import { assetRoot } from './world.js?v=31';
-import { requestYield } from './traffic.js?v=31';
-import { createShowroom } from './showroom.js?v=31';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=31';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=34';
+import { createScene } from './scene.js?v=34';
+import { impactDuration } from './impact.js?v=34';
+import { assetRoot } from './world.js?v=34';
+import { requestYield } from './traffic.js?v=34';
+import { createShowroom } from './showroom.js?v=34';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=34';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -78,6 +78,9 @@ const soundEnabled = () => hosted ? !arcadeMuted : profile.sound;
 const tracks = [
   { id: 'citypop', name: '시티팝 · 노을 드라이브' }, { id: 'synthwave', name: '신스웨이브 · 밤 도시' },
   { id: 'acoustic', name: '어쿠스틱 · 아침 국도' }, { id: 'lofi', name: '로파이 · 느긋한 저녁' }, { id: 'rock', name: '록 · 고속도로' },
+  // 더 넣음(운영자 요청)
+  { id: 'jazz', name: '재즈 · 늦은 밤 국도' }, { id: 'funk', name: '펑크 · 맑은 오후' },
+  { id: 'house', name: '하우스 · 질주' }, { id: 'chill', name: '칠아웃 · 새벽 산길' }, { id: 'disco', name: '디스코 · 밤 드라이브' },
 ];
 const music = new Audio();
 music.preload = 'none';
@@ -214,7 +217,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=31`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=34`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,

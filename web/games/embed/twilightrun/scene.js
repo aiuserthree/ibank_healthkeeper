@@ -1,9 +1,9 @@
-import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=31';
-import { createFallback } from './scene-fallback.js?v=31';
-import { createCarModels } from './models.js?v=31';
-import { createImpactFx, impactMotion } from './impact.js?v=31';
-import { dayProgress, dayTime, weatherAt } from './daytime.js?v=31';
-import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=31';
+import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=34';
+import { createFallback } from './scene-fallback.js?v=34';
+import { createCarModels } from './models.js?v=34';
+import { createImpactFx, impactMotion } from './impact.js?v=34';
+import { dayProgress, dayTime, weatherAt } from './daytime.js?v=34';
+import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=34';
 
 const poses = [
   { back: 8.5, height: 2.9 },
@@ -113,6 +113,7 @@ function createWebGL(T, stage) {
   const warmed = new Map();
   const haze = new T.Color();
   const temporary = new T.Color();
+  const tint2 = new T.Color();
   const carCenter = new T.Vector3();
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
   const tint = (target, source, end, ratio) => target.set(source).lerp(temporary.set(end), ratio);
@@ -299,16 +300,18 @@ function createWebGL(T, stage) {
     // 시간 흐름 · 날씨 — 빛 · 안개 · 하늘을 하루 시간에 맞추고, 흐림 · 비 · 안개 · 눈을 더한다
     const day = dayTime(dayProgress(state), true);
     const weather = weatherAt(course, distance);
+    const wx = weather.mix;
     const w = weather.amount;
-    const gloom = { cloudy: .45, rain: .6, fog: .35, snow: .4 }[weather.kind] * w || 0;
+    // 흐림 정도 — 날씨 섞임을 그대로 더해 부드럽게, 저녁 · 밤에는 원래 어두우니 덜 어둡게(운영자: 시간대 고려해 자연스럽게)
+    const gloom = (wx.cloudy * .45 + wx.rain * .6 + wx.fog * .35 + wx.snow * .4) * (1 - day.night * .55);
     const night = day.night;
     tint(haze, a.fog, b.fog, mix);
     haze.lerp(temporary.set(day.fog), .6);
-    if (weather.kind === 'fog' || weather.kind === 'snow') haze.lerp(temporary.set(night > .5 ? '#3a4150' : '#c9ced4'), .55 * w);
-    if (weather.kind === 'rain') haze.lerp(temporary.set(night > .5 ? '#262c38' : '#7c8590'), .45 * w);
+    haze.lerp(temporary.set('#c9ced4').lerp(tint2.set('#3a4150'), night), .55 * (wx.fog + wx.snow));
+    haze.lerp(temporary.set('#7c8590').lerp(tint2.set('#262c38'), night), .45 * wx.rain);
     if (underpass) haze.lerp(temporary.set('#555863'), .76);
     scene.fog.color.copy(haze);
-    const thick = weather.kind === 'fog' ? w : weather.kind === 'snow' || weather.kind === 'rain' ? w * .45 : 0;
+    const thick = wx.fog + (wx.snow + wx.rain) * .45;
     scene.fog.near = underpass ? 32 : 72 - 50 * thick;
     scene.fog.far = underpass ? 235 : 485 - 285 * thick;
     const skyA = `${current.theme}-${day.skyA}`;
@@ -342,8 +345,8 @@ function createWebGL(T, stage) {
     cabinMesh.visible = roofMesh.visible = view !== 2;
     for (const [token, v] of vehicles) if (!used.has(token)) clearVehicle(token, v);
 
-    const falling = weather.kind === 'rain' || weather.kind === 'snow' ? w : 0;
-    rain(state.elapsed, underpass ? 0 : falling, speed, weather.kind === 'snow');
+    const falling = wx.rain + wx.snow;
+    rain(state.elapsed, underpass ? 0 : falling, speed, wx.snow > wx.rain);
     lens.style.opacity = String(clamp((speed * 3.6 - 158) / 155, 0, .62));
     damageSmoke.forEach((puff, i) => {
       puff.visible = state.health <= 1;
