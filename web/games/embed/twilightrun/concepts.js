@@ -1,5 +1,5 @@
-import { TIRE_RADIUS } from './drive.js?v=37';
-import { bodyFinish, glassFinish } from './finishes.js?v=37';
+import { TIRE_RADIUS } from './drive.js?v=38';
+import { bodyFinish, glassFinish } from './finishes.js?v=38';
 
 // 차고에서 사는 새 차 6대. 기존 4종(매끈 · 투톤 지붕 · 칼날 LED)과 겹치지 않게 차마다 몸통 단면 · 유리 · 얼굴 조명 · 꼬리를 따로 짠다.
 // 모양은 운영자가 준 참고 사진 6장(2026-11-21)을 따라가고, 로고 · 엠블럼 · 글자는 넣지 않는다.
@@ -99,6 +99,7 @@ export function createConcepts(T, kit) {
     const brake = standard(look.brake, .39, .19);
     const rim = standard(look.rim, .24, .72);
     const accent = look.lip ? basic(look.lip) : rim;
+    const slotMat = look.slot ? (look.slotGlow ? basic(look.slot) : standard(look.slot, .3, .6)) : grille;
     const cover = look.disc ? new T.CylinderGeometry(look.coverR || .3, look.coverR || .3, .02, 28) : null;
     for (const s of [-1, 1]) for (const end of [-1, 1]) {
       const assembly = new T.Group(), rotating = new T.Group();
@@ -128,7 +129,7 @@ export function createConcepts(T, kit) {
         piece(rotating, cover, rim, s * .16, 0, 0).rotation.z = Math.PI / 2;
         for (let i = 0; i < look.spokes; i++) {
           const a = i * Math.PI * 2 / look.spokes;
-          bar(rotating, grille, s * .172, Math.cos(a) * .2, Math.sin(a) * .2, .01, .11, .035, a);
+          bar(rotating, slotMat, s * .172, Math.cos(a) * (look.slotR || .2), Math.sin(a) * (look.slotR || .2), .01, look.slotL || .11, look.slotW || .035, a + (look.slotTwist || 0));
         }
       } else if (look.y) {
         // Y 자 살 — 다리 둘이 바깥으로 벌어진다(살 사이로 큰 브레이크가 보이게)
@@ -633,20 +634,33 @@ export function createConcepts(T, kit) {
       const surface = wheelArches(main, axle, { front: 0, rear: 0, flare: 0, step: .3, lip: .02 });
       const tonneau = loft([[.7, w * .84, 1.18, 1.5, .62], [l, w * .94, 1.18, 1.26, .9]]);
       return {
-        surface, body: merge([loft(surface), tonneau]), flat: true, roofMat: 'paint', glass: '#14181d',
+        surface, body: merge([loft(surface), tonneau]), flat: true, roofMat: 'paint', glass: '#4b5968',
         cabin: loft([[-1.35, w * .9, 1.06, 1.14, .96], [-.3, w * .8, 1.16, 1.78, .58], [.75, w * .84, 1.18, 1.48, .62]]),
         roof: loft([[-.32, w * .46, 1.74, 1.8, .8], [.74, w * .52, 1.44, 1.5, .8]]),
         front: -1.0, rear: .7, look: { belt: [.52, 0], lower: '#1b1d1f', pin: 0 },
-        dress({ chassis, frontPanel, bumper, wing, flank, lamp }) {
+        dress({ chassis, frontPanel, bumper, wing, flank, lamp, paint }) {
           const black = standard('#1b1d1f', .75, .2);
-          box(frontPanel, led, 0, .975, -l - .075, w * 1.9, .022, .02);
-          glowSprite(frontPanel, '#e4f2ff', 0, .97, -l - .12, 1.6, .2);
-          box(frontPanel, black, 0, .52, -l - .05, w * 1.92, .2, .1);
+          const steel = standard('#d0d5da', .22, .95);
+          // 앞: 가로 빛줄을 굵고 밝게(빛 번짐 여럿) · 아래 두 번째 빛줄 · 각진 하부 보호판 · 프렁크 틈
+          box(frontPanel, led, 0, .975, -l - .075, w * 1.92, .03, .02);
+          for (let k = -2; k <= 2; k++) glowSprite(frontPanel, '#e4f2ff', k * w * .42, .975, -l - .12, .7, .32);
+          box(frontPanel, black, 0, .5, -l - .04, w * 1.92, .14, .1);
+          box(frontPanel, basic('#9fd8ff'), 0, .58, -l - .095, w * 1.5, .01, .012);
+          bar(frontPanel, steel, 0, .4, -l + .1, w * 1.3, .02, .5, .25);
+          box(chassis, black, 0, 1.065, -1.75, w * 1.7, .004, .012);
+          // 짐칸 덮개 줄 · 뒷문 틈 · 뒤 빛줄 번짐
+          for (let k = 0; k < 6; k++) box(chassis, black, 0, lerp(1.47, 1.29, k / 5) + .004, lerp(.85, l - .1, k / 5), w * 1.6, .004, .014);
+          box(bumper, black, 0, 1.0, l + .015, w * 1.8, .004, .01);
+          for (let k = -2; k <= 2; k++) glowSprite(bumper, '#ff3a26', k * w * .42, 1.2, l + .06, .55, .3);
+          box(chassis, basic('#9fd8ff'), 0, 1.79, -.36, w * .8, .012, .02);
           for (const s of [-1, 1]) {
             for (const zc of [-axle, axle]) {
+              // 각진 펜더 — 바깥으로 비스듬히 나온 두툼한 판
               const pts = [0, .28, .72, 1].map(t => [s * (w + .015), TIRE_RADIUS + Math.sin(Math.PI * t) * .56, zc + Math.cos(Math.PI * t) * .62]);
-              ribbon(flank[s], black, pts, pts.map(([x, y, z], i) => [x, y + (i === 0 || i === 3 ? 0 : .1), z + (i === 0 ? .1 : i === 3 ? -.1 : 0)]));
+              ribbon(flank[s], black, pts, pts.map(([x, y, z], i) => [x + s * .07, y + (i === 0 || i === 3 ? 0 : .14), z + (i === 0 ? .14 : i === 3 ? -.14 : 0)]));
             }
+            box(chassis, steel, s * w * 1.02, 1.3, -.92, .06, .03, .1);
+            box(flank[s], basic('#9fd8ff'), s * (w + .008), .45, 0, .006, .008, 2 * axle - 1.3);
             for (const z of [-.42, .45]) box(flank[s], black, s * (w + .006), .85, z, .008, .7, .01);
             box(flank[s], black, s * w * 1.0, .43, 0, .1, .05, 2.2);
             box(chassis, black, s * w * .96, 1.28, -.95, .05, .1, .14);
@@ -655,7 +669,7 @@ export function createConcepts(T, kit) {
           box(bumper, black, 0, .52, l + .03, w * 1.9, .2, .08);
           return { plateY: .82, tail: [.8, 1.2], head: [.7, .97, .05] };
         },
-        wheel: { brake: '#333', rim: '#1c1d1f', spokes: 6, disc: true, tread: true },
+        wheel: { brake: '#333', rim: '#2a2c30', spokes: 6, disc: true, tread: true, slot: '#8d949c', slotR: .17, slotL: .15, slotW: .06, slotTwist: .5, nut: '#9fd8ff' },
       };
     },
     // 9 루나 포드 — 미래형 전기 콘셉트(운영자 참고 사진): 하얀 한 덩어리 몸, 앞바퀴 위까지 내려온 큰 유리, 가운데 빛나는 고리 얼굴, 구리색 아래 테, 빛나는 휠 커버
@@ -665,34 +679,41 @@ export function createConcepts(T, kit) {
       const surface = wheelArches(main, axle, { front: .01, rear: .01, flare: .04, lip: .02 });
       const bubble = [[-1.62, w * .76, .7, .78, .9], [-1.0, w * .8, .76, 1.18, .72], [-.2, w * .8, .8, 1.46, .66], [.7, w * .76, .82, 1.44, .66], [1.5, w * .6, .84, 1.2, .72], [l - .2, w * .4, .86, .98, .8]];
       return {
-        surface, body: loft(surface, true), glass: '#121820', roofMat: 'paint', glow: '#5a8cff',
+        surface, body: loft(surface, true), glass: '#3e5f88', roofMat: 'paint', glow: '#5a8cff',
         cabin: loft(densify(bubble), true),
         roof: loft(densify([[-.15, w * .5, 1.43, 1.485, .8], [.75, w * .46, 1.41, 1.465, .8], [1.3, w * .38, 1.28, 1.34, .8]]), true),
-        front: -1.0, rear: 1.0, look: { pin: 0 }, paint: { iridescence: .3, roughness: .2 },
+        front: -1.0, rear: 1.0, look: { pin: 0 }, paint: { iridescence: .55, roughness: .16, clearcoat: 1, clearcoatRoughness: .04 },
         dress({ chassis, frontPanel, bumper, wing, flank, lamp, paint }) {
           const halo = basic('#eaf4ff');
           const copper = standard('#c08a5a', .25, .85);
           const blue = basic('#5a8cff');
-          piece(frontPanel, new T.TorusGeometry(.14, .014, 8, 40), halo, 0, .42, -l - .115);
+          piece(frontPanel, new T.TorusGeometry(.16, .018, 8, 40), halo, 0, .42, -l - .115);
+          piece(frontPanel, new T.CircleGeometry(.05, 24), blue, 0, .42, -l - .12).rotation.y = Math.PI;
+          box(frontPanel, blue, 0, .27, -l - .09, w * .9, .01, .012);
           glowSprite(frontPanel, '#cfe4ff', 0, .42, -l - .16, .55, .45);
           polyline(frontPanel, copper, [[-w * .66, .22, -l - .02], [-w * .3, .2, -l - .1], [w * .3, .2, -l - .1], [w * .66, .22, -l - .02]], .02);
           for (const s of [-1, 1]) {
             bar(frontPanel, halo, s * w * .66, .42, -l - .02, .012, .2, .012, 0, 0, s * .25);
             sideLine(flank[s], copper, s, z => at(surface, z, 1) + .012, -l + .25, .24, l - .2, .3, .022);
-            panel(flank[s], standard('#1a2230', .1, .7), [[s * (w * .965), .5, -.55], [s * (w * .965), .82, -.4], [s * (w * .965), .84, .55], [s * (w * .965), .5, .45]]);
+            // 몸 옆 파란 빛 띠 · 문 구리 선
+            sideLine(flank[s], blue, s, z => at(surface, z, 1) + .014, -l + .4, .58, l - .35, .66, .012, 16);
+            for (const z of [-.5, .5]) box(flank[s], copper, s * (at(surface, z, 1) + .01), .55, z, .006, .42, .01);
             glowSprite(chassis, '#3a6bff', s * w * .3, 1.0, -.1, .9, .35);
             for (const zc of [-axle, axle]) {
               const ring = piece(flank[s], new T.TorusGeometry(.2, .01, 6, 30), blue, s * (w + .03), TIRE_RADIUS, zc);
               ring.rotation.y = Math.PI / 2;
             }
-            box(bumper, lamp, s * w * .5, .72, l + .02, w * .42, .016, .012);
+            box(bumper, lamp, s * w * .5, .72, l + .02, w * .42, .022, .012);
+            glowSprite(bumper, '#ff3a26', s * w * .5, .72, l + .06, .6, .3);
+            piece(frontPanel, new T.TorusGeometry(.04, .008, 6, 18), blue, s * w * .62, .3, -l - .06);
           }
           box(bumper, standard('#121820', .2, .6), 0, .7, l + .004, w * 1.4, .12, .02);
           bar(wing, paint, 0, .9, l - .12, w * 1.4, .02, .14, -.15);
           box(bumper, copper, 0, .38, l + .02, w * 1.1, .015, .012);
+          box(bumper, blue, 0, .62, l + .02, w * 1.2, .008, .012);
           return { plateY: .52, tail: [.5, .72], head: [0, .42, .08] };
         },
-        wheel: { brake: '#5a8cff', rim: '#f2f2f0', spokes: 4, disc: true, lip: '#5a8cff' },
+        wheel: { brake: '#5a8cff', rim: '#f2f2f0', spokes: 5, disc: true, lip: '#5a8cff', slot: '#5a8cff', slotGlow: true, slotR: .18, slotL: .13, slotW: .03, slotTwist: .6, nut: '#c08a5a' },
       };
     },
     // 6 헥사 팽 — 라임 하이퍼카: 아주 뾰족한 코, 빛나는 가는 눈매, 앞은 낮고 뒤로 올라가는 검은 아래 몸, 큰 옆 흡기구, 꼬리 지느러미, 육각 꼬리등

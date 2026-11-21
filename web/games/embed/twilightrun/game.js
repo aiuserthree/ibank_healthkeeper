@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=37';
-import { createScene } from './scene.js?v=37';
-import { impactDuration } from './impact.js?v=37';
-import { assetRoot } from './world.js?v=37';
-import { requestYield } from './traffic.js?v=37';
-import { createShowroom } from './showroom.js?v=37';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=37';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=38';
+import { createScene } from './scene.js?v=38';
+import { impactDuration } from './impact.js?v=38';
+import { assetRoot } from './world.js?v=38';
+import { requestYield } from './traffic.js?v=38';
+import { createShowroom } from './showroom.js?v=38';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=38';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -220,7 +220,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=37`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=38`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
