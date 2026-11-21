@@ -1,5 +1,5 @@
-import { TIRE_RADIUS } from './drive.js?v=39';
-import { bodyFinish, glassFinish } from './finishes.js?v=39';
+import { TIRE_RADIUS } from './drive.js?v=40';
+import { bodyFinish, glassFinish } from './finishes.js?v=40';
 
 // 차고에서 사는 새 차 6대. 기존 4종(매끈 · 투톤 지붕 · 칼날 LED)과 겹치지 않게 차마다 몸통 단면 · 유리 · 얼굴 조명 · 꼬리를 따로 짠다.
 // 모양은 운영자가 준 참고 사진 6장(2026-11-21)을 따라가고, 로고 · 엠블럼 · 글자는 넣지 않는다.
@@ -538,6 +538,55 @@ export function createConcepts(T, kit) {
         wheel: { ...STRATO_WHEEL, brake: '#36f0ff', rim: '#1e2328', lip: '#36f0ff', nut: '#36f0ff' },
       };
     },
+    // 12 스틸 로드스터 — 운영자 참고 사진: 낮고 각진 쐐기, 앞 끝 전체 가로 빛줄 + 검은 아래 얼굴, 앞에서 뒤까지 한 장인 갈색 유리 지붕,
+    // 날카로운 어깨선, 뒤로 올라가는 검은 아래 몸, 각진 휠(스틸 웨지와 같은 계열 — 사진 모양을 따르고 로고는 없음)
+    roadster(w, l, axle) {
+      const main = [[-l - .14, w * .9, .47, .55, .97], [-l - .02, w * .95, .22, .58, .97], [-l + .2, w * .99, .2, .62, .96], [-axle, w, .2, .67, .95],
+        [-1.15, w, .2, .7, .93], [-.9, w, .2, .74, .88],
+        [.2, w, .2, .78, .86], [axle, w, .2, .8, .88], [l - .1, w * .98, .24, .8, .9], [l, w * .94, .3, .78, .9]];
+      const surface = wheelArches(main, axle, { front: .01, rear: .02, flare: .04, step: .25, lip: .02 });
+      return {
+        surface, body: loft(surface), flat: true, glass: '#5a4536', roofMat: standard('#3a2c22', .08, .75), glow: '#9fd8ff',
+        cabin: loft([[-1.2, w * .86, .68, .73, .96], [-.2, w * .74, .76, 1.13, .74], [.7, w * .7, .78, 1.11, .76], [l - .2, w * .72, .78, .86, .9]]),
+        roof: loft([[-.2, w * .5, 1.12, 1.135, .9], [.7, w * .48, 1.1, 1.115, .9]]),
+        front: -1.15, rear: .7, look: { belt: [.36, .05], lower: '#25282c', pin: 0 },
+        dress({ chassis, frontPanel, bumper, wing, flank, lamp, paint }) {
+          const dark = standard('#17191c', .5, .3);
+          const crease = standard('#ffffff', .2, .3);
+          // 앞: 코끝 위 모서리를 가로지르는 빛줄(번짐 여럿) · 그 아래 검은 얼굴 · 검은 립
+          box(frontPanel, led, 0, .505, -l - .152, w * 1.74, .016, .016);
+          for (let k = -2; k <= 2; k++) glowSprite(frontPanel, '#e8f4ff', k * w * .4, .505, -l - .2, .4, .14);
+          box(frontPanel, dark, 0, .34, -l - .03, w * 1.76, .24, .012);
+          // 보닛 양옆 날 선 모서리(앞 모서리에서 앞유리 기둥 쪽으로) — 빛을 받는 선
+          for (const s of [-1, 1]) {
+            const a = [], b = [];
+            for (let i = 0; i <= 8; i++) {
+              const z = lerp(-l - .12, -1.2, i / 8), x = s * at(surface, z, 1) * at(surface, z, 4) * .99, y = top(surface, z) + .004;
+              a.push([x, y, z]);
+              b.push([x - s * .02, y, z]);
+            }
+            ribbon(chassis, crease, a, b);
+          }
+          box(frontPanel, carbon, 0, .19, -l + .02, w * 1.7, .025, .3);
+          for (const s of [-1, 1]) {
+            // 날카로운 어깨선 · 문 틈 · 앞 펜더 호박색 표시등 · 작은 카메라 거울
+            sideLine(flank[s], crease, s, z => at(surface, z, 1) + .004, -l + .2, .6, l - .15, .76, .012, 14);
+            for (const z of [-.35, .7]) box(flank[s], dark, s * (at(surface, z, 1) + .004), .55, z, .004, .4, .008);
+            box(flank[s], basic('#ffa23a'), s * (at(surface, -.95, 1) + .006), .66, -.95, .006, .016, .1);
+            box(chassis, dark, s * w * .8, .9, -.85, .1, .035, .06);
+          }
+          // 뒤: 끝을 가로지르는 빨간 빛줄 · 검은 디퓨저
+          box(bumper, dark, 0, .62, l + .004, w * 1.8, .2, .02);
+          box(bumper, lamp, 0, .7, l + .02, w * 1.76, .02, .012);
+          for (let k = -2; k <= 2; k++) glowSprite(bumper, '#ff3a26', k * w * .4, .7, l + .06, .55, .3);
+          box(bumper, carbon, 0, .22, l - .1, w * 1.5, .03, .4);
+          for (let k = -2; k <= 2; k++) box(bumper, carbon, k * w * .25, .29, l - .04, .018, .14, .26);
+          bar(wing, paint, 0, .81, l - .06, w * 1.7, .015, .1, -.2);
+          return { plateY: .45, tail: [.7, .7], head: [.6, .505, .14], headGlow: .12 };
+        },
+        wheel: { brake: '#c9ced6', rim: '#1d1f22', spokes: 5, y: true, big: true, lip: '#c9ced6', nut: '#c9ced6' },
+      };
+    },
     // 5 스트라토 캐노피 — 두 줄 흰 줄무늬 슈퍼카: 가운데 거꾸로 된 삼각 그물 그릴 + 양옆 삼각 흡기구, 펜더 위 고양이 눈 등, 둥근 지붕, 문 아래 아가미
     strato(w, l, axle) {
       const c = supercar(w, l, axle, { ...STRATO_FRONT, hip: .86 });
@@ -791,7 +840,7 @@ export function createConcepts(T, kit) {
     piece(bumper, cube, grille, 0, marks.plateY, l + .012, .4, .11, .02);
     piece(bumper, new T.PlaneGeometry(1, 1), modelPlate(car.plate), 0, marks.plateY, l + .024, .38, .1, 1);
     const glows = [-1, 1].map(s => glowSprite(chassis, '#ff321f', s * w * marks.tail[0], marks.tail[1], l + .07, .74, .23));
-    for (const s of [-1, 1]) glowSprite(frontPanel, '#d6ecff', s * w * marks.head[0], marks.head[1], -l - .04 - (marks.head[2] || 0), .8, .3);
+    for (const s of [-1, 1]) glowSprite(frontPanel, '#d6ecff', s * w * marks.head[0], marks.head[1], -l - .04 - (marks.head[2] || 0), .8, marks.headGlow ?? .3);
     const parts = {
       bumper: mount(chassis, bumper, 0, .35, l), wing: mount(chassis, wing, 0, .75, l - .3),
       frontPanel: mount(chassis, frontPanel, 0, .27, -l),

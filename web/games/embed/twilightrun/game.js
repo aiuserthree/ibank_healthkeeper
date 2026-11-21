@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=39';
-import { createScene } from './scene.js?v=39';
-import { impactDuration } from './impact.js?v=39';
-import { assetRoot } from './world.js?v=39';
-import { requestYield } from './traffic.js?v=39';
-import { createShowroom } from './showroom.js?v=39';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=39';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=40';
+import { createScene } from './scene.js?v=40';
+import { impactDuration } from './impact.js?v=40';
+import { assetRoot } from './world.js?v=40';
+import { requestYield } from './traffic.js?v=40';
+import { createShowroom } from './showroom.js?v=40';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=40';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -220,13 +220,14 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=39`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=40`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
   () => screen === 'home' && !$('home').hidden && carStage.classList.contains('open'));
 const portraits = showroom ? showroom.portraits(600, 260) : [];
-const carPortrait = (car, i) => portraits[i] || carPicture(car);
+// picture: 힉스필드로 그린 차고 그림이 있는 차(스틸 로드스터 — 운영자 요청)는 3D 사진 대신 그 그림을 쓴다
+const carPortrait = (car, i) => car.picture ? carPicture(car) : portraits[i] || carPicture(car);
 if (!showroom) {
   carStage.classList.add('still');
   $('car-still').hidden = false;
