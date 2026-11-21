@@ -1,12 +1,12 @@
-import { TIRE_RADIUS } from './drive.js?v=7';
-import { bodyFinish, fractureMap, glassFinish } from './finishes.js?v=7';
+import { TIRE_RADIUS } from './drive.js?v=9';
+import { bodyFinish, fractureMap, glassFinish } from './finishes.js?v=9';
 
 // Local car coordinates point toward -Z. Lofted cross sections describe the coachwork in metres.
 const profiles = {
-  coupe: { w: 1.03, l: 2.30, deck: .76, roof: 1.22, front: -.40, rear: .40, taper: .90, nose: .46, waist: .87, rearWidth: .97, brake: '#e9ac42', plate: 'SOLAR S' },
-  sport: { w: 1.01, l: 2.16, deck: .79, roof: 1.28, front: -.54, rear: .57, taper: .89, nose: .55, waist: .91, rearWidth: .97, brake: '#97eaff', plate: 'ION RS' },
-  gt: { w: 1.08, l: 2.37, deck: .83, roof: 1.31, front: -.83, rear: .28, taper: .90, nose: .49, waist: .89, rearWidth: 1, brake: '#ee6b40', plate: 'AMBER GT' },
-  hyper: { w: 1.10, l: 2.25, deck: .70, roof: 1.10, front: -.67, rear: .52, taper: .92, nose: .39, waist: .84, rearWidth: .95, brake: '#d6a674', plate: 'PULSE X' },
+  coupe: { w: 1.03, l: 2.30, deck: .76, roof: 1.22, front: -.40, rear: .40, taper: .90, nose: .40, waist: .87, rearWidth: .97, brake: '#e9ac42', plate: 'SOLAR S' },
+  sport: { w: 1.01, l: 2.16, deck: .79, roof: 1.28, front: -.54, rear: .57, taper: .89, nose: .42, waist: .91, rearWidth: .97, brake: '#97eaff', plate: 'ION RS' },
+  gt: { w: 1.08, l: 2.37, deck: .83, roof: 1.31, front: -.83, rear: .28, taper: .90, nose: .41, waist: .89, rearWidth: 1, brake: '#ee6b40', plate: 'AMBER GT' },
+  hyper: { w: 1.10, l: 2.25, deck: .70, roof: 1.10, front: -.67, rear: .52, taper: .92, nose: .34, waist: .84, rearWidth: .95, brake: '#d6a674', plate: 'PULSE X' },
   wagon: { w: .88, l: 2.27, deck: .98, roof: 1.57, front: -1.12, rear: 1.40, taper: .85, nose: .68, waist: .98, rearWidth: .93 },
   sedan: { w: .89, l: 2.19, deck: .91, roof: 1.44, front: -.59, rear: .68, taper: .89, nose: .66, waist: .96, rearWidth: .93 },
   van: { w: 1.02, l: 2.45, deck: 1.18, roof: 1.98, front: -1.03, rear: 1.90, taper: .93, nose: .91, waist: .99, rearWidth: .98 },
@@ -32,10 +32,13 @@ export function createCarModels(T, glowTexture) {
   const rotor = standard('#5c6570', .42, .69);
   const trim = standard('#182029', .47, .38);
   const grille = standard('#0a0e14', .83);
-  const glass = standard('#344957', .20, .58);
+  const glass = standard('#1d2a35', .10, .72);
+  // 내 차의 지붕 · 사이드미러 — 광택 검정 투톤
+  const gloss = new T.MeshPhysicalMaterial({ color: '#0a0d11', roughness: .16, metalness: .45, clearcoat: 1, clearcoatRoughness: .07, side: T.DoubleSide });
   const blackGlass = standard('#172432', .18, .58);
   const seam = standard('#20262c', .74);
   const lampWhite = new T.MeshBasicMaterial({ color: '#dcf2ff' });
+  const led = new T.MeshBasicMaterial({ color: '#eef9ff', side: T.DoubleSide }); // 보닛 칼날 등(면 방향과 상관없이 보이게)
   const indicator = new T.MeshBasicMaterial({ color: '#ffc345' });
   const reflector = standard('#b72e36', .26, .32);
   const plate = standard('#c8cec2', .72);
@@ -58,18 +61,40 @@ export function createCarModels(T, glowTexture) {
   const rims = new Map();
   const crackedGlass = fractureMap(T);
 
-  function loft(sections) {
+  // 단면 — 기본(교통 차량)은 10점, 매끈하게(내 차 · 쇼룸)는 둥근 모서리 22점
+  function outline(w, low, high, taper, smooth) {
+    if (!smooth) {
+      const bevel = Math.min(.091, (high - low) * .32);
+      return [-w * taper, high, w * taper, high,
+        w * .984, high - bevel * .48, w, high - bevel,
+        w * .976, low + bevel * .72, w * .859, low,
+        -w * .859, low, -w * .976, low + bevel * .72,
+        -w, high - bevel, -w * .984, high - bevel * .48];
+    }
+    const points = [];
+    const mid = (low + high) / 2, half = (high - low) / 2;
+    const count = 22;
+    for (let k = 0; k < count; k++) {
+      // 위 가운데 왼쪽에서 시작해 시계 방향(예전 10점과 같은 차례)
+      const t = Math.PI / 2 + Math.PI / count - 2 * Math.PI * k / count;
+      const c = Math.cos(t), sn = Math.sin(t);
+      const ex = Math.sign(c) * Math.abs(c) ** (2 / 9);
+      const ey = Math.sign(sn) * Math.abs(sn) ** (2 / 7);
+      const width = ey > 0 ? T.MathUtils.lerp(w, w * taper, ey ** 6) : T.MathUtils.lerp(w, w * .875, (-ey) ** 8);
+      points.push(ex * width, mid + ey * half);
+    }
+    return points;
+  }
+
+  function loft(sections, smooth = false) {
     const points = [];
     const indices = [];
+    let stride = 0;
     for (const [z, w, low, high, taper] of sections) {
-      const bevel = Math.min(.091, (high - low) * .32);
-      points.push(-w * taper, high, z, w * taper, high, z,
-        w * .984, high - bevel * .48, z, w, high - bevel, z,
-        w * .976, low + bevel * .72, z, w * .859, low, z,
-        -w * .859, low, z, -w * .976, low + bevel * .72, z,
-        -w, high - bevel, z, -w * .984, high - bevel * .48, z);
+      const ring = outline(w, low, high, taper, smooth);
+      stride = ring.length / 2;
+      for (let i = 0; i < ring.length; i += 2) points.push(ring[i], ring[i + 1], z);
     }
-    const stride = 10;
     for (let row = 0; row < sections.length - 1; row++) {
       for (let i = 0; i < stride; i++) {
         const a = row * stride + i;
@@ -86,23 +111,39 @@ export function createCarModels(T, glowTexture) {
     return geometry;
   }
 
+  // 길이 방향: 바퀴 자리를 둥글게 파고, 단면 사이를 Catmull-Rom 으로 부드럽게 잇는다(10cm 간격)
   function wheelArches(sections, axle) {
     const radius = .432;
     const stations = new Set(sections.map(section => section[0]));
-    for (const center of [-axle, axle]) for (let i = 0; i <= 16; i++) {
-      stations.add(center + radius * Math.cos(Math.PI * i / 16));
+    for (const center of [-axle, axle]) for (let i = 0; i <= 20; i++) {
+      stations.add(center + radius * Math.cos(Math.PI * i / 20));
     }
+    for (let z = sections[0][0]; z < sections.at(-1)[0]; z += .1) stations.add(z);
+    const spline = (a, b, c, d, t) => .5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
     return [...stations].sort((a, b) => a - b).map(z => {
       const i = Math.max(1, sections.findIndex(section => section[0] >= z));
-      const left = sections[i - 1];
-      const right = sections[i];
-      const mix = T.MathUtils.clamp((z - left[0]) / (right[0] - left[0]), 0, 1);
-      const [w, low, high, taper] = left.slice(1).map((value, k) => T.MathUtils.lerp(value, right[k + 1], mix));
+      const s0 = sections[Math.max(0, i - 2)], s1 = sections[i - 1], s2 = sections[i], s3 = sections[Math.min(sections.length - 1, i + 1)];
+      const mix = T.MathUtils.clamp((z - s1[0]) / (s2[0] - s1[0]), 0, 1);
+      const [w, low, high, taper] = [1, 2, 3, 4].map(k => spline(s0[k], s1[k], s2[k], s3[k], mix));
       const gap = Math.abs(Math.abs(z) - axle);
       const arch = gap < radius ? Math.sqrt(Math.max(0, 1 - (gap / radius) ** 2)) : 0;
-      const raised = Math.max(high + arch * .12, low + arch * .58 + .07);
+      // 앞바퀴 쪽은 윗면을 덜 올린다(앞코가 불룩한 덩어리가 되지 않게)
+      const raised = Math.max(high + arch * (z < 0 ? .03 : .12), low + arch * .58 + .07);
       return [z, w + arch * .031, low + arch * .56, raised, taper];
     });
+  }
+
+  // 바퀴 자리 없이 단면 사이만 부드럽게(유리 · 지붕)
+  function densify(sections, step = .08) {
+    const spline = (a, b, c, d, t) => .5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
+    const out = [];
+    for (let i = 0; i < sections.length - 1; i++) {
+      const s0 = sections[Math.max(0, i - 1)], s1 = sections[i], s2 = sections[i + 1], s3 = sections[Math.min(sections.length - 1, i + 2)];
+      const steps = Math.max(1, Math.ceil((s2[0] - s1[0]) / step));
+      for (let j = 0; j < steps; j++) out.push([0, 1, 2, 3, 4].map(k => spline(s0[k], s1[k], s2[k], s3[k], j / steps)));
+    }
+    out.push(sections.at(-1));
+    return out;
   }
 
   function shell(shape, detailed) {
@@ -111,18 +152,27 @@ export function createCarModels(T, glowTexture) {
     const data = profiles[shape];
     const { w, l, deck, roof, front, rear, taper, nose, waist, rearWidth } = data;
     const van = shape === 'van';
-    const sections = [
+    const sporty = !!liveries[shape];
+    const sections = sporty ? [
+      // 낮은 쐐기 앞코 — 앞끝을 얇게, 보닛이 앞유리까지 길게 솟는다
+      [-l, w * .70, .22, nose - .09, .78], [-l + .08, w * .85, .19, nose - .03, .86],
+      [-l + .22, w * .95, .18, nose + .04, .89], [-l + .40, w * .99, .18, nose + .11, .90],
+      [-l + .62, w, .18, deck * .90, taper],
+    ] : [
       [-l, w * .82, .23, nose, .86], [-l + .13, w * .92, .20, nose + .062, .94],
       [-l + .35, w * .985, .18, nose + .14, .91], [-l + .62, w, .18, van ? .99 : deck * .94, taper],
+    ];
+    sections.push(
       [-.88, w * waist, .18, deck + .012, taper], [.37, w * (waist + .026), .18, deck, taper],
       [l - .62, w * rearWidth, .18, deck + .04, taper], [l - .32, w * rearWidth, .18, deck + .005, .94],
-      [l - .115, w * .93, .20, deck - .025, .955], [l, w * .87, .27, deck - (van ? .02 : .084), .92],
-    ];
-    const base = loft(detailed ? wheelArches(sections, l - .62) : sections);
+      [l - .115, w * .93, .20, deck - .025, .955], [l, w * .87, .27, deck - (van ? .02 : .084), .92]);
+    const surface = detailed ? wheelArches(sections, l - .62) : sections;
+    const base = detailed ? loft(surface, true) : loft(sections);
     const end = rear + (van ? .19 : .70);
     const frontGlass = front - (van ? .44 : .92);
     const backGlass = van ? roof - .16 : deck + .065;
-    const cabin = loft([
+    const glassFit = detailed ? list => loft(densify(list), true) : list => loft(list);
+    const cabin = glassFit([
       [frontGlass, w * .70, deck - .13, deck + .04, .96],
       [front - .22, w * .712, deck - .02, roof - (van ? .08 : .12), .80],
       [front + .045, w * .669, deck - .03, roof + .004, .82],
@@ -130,11 +180,11 @@ export function createCarModels(T, glowTexture) {
       [rear + .23, w * .695, deck - .052, roof - (van ? .052 : .195), .83],
       [end, w * .72, deck - .119, backGlass, .94],
     ]);
-    const cap = loft([
+    const cap = glassFit([
       [front, w * .513, roof - .037, roof + .012, .92], [front + .14, w * .552, roof - .034, roof + .044, .89],
       [rear * .54, w * .544, roof - .064, roof + .014, .92], [rear + .12, w * .557, roof - .157, roof - .094, .89],
     ]);
-    const result = { ...data, base, cabin, cap };
+    const result = { ...data, base, cabin, cap, sections: surface };
     geometries.set(key, result);
     return result;
   }
@@ -176,6 +226,61 @@ export function createCarModels(T, glowTexture) {
       plates.set(text, new T.MeshStandardMaterial({ map, roughness: .65 }));
     }
     return plates.get(text);
+  }
+
+  // 차체 윗면 높이(앞쪽) — 단면을 이어 대략, 장식을 표면에 붙이는 데 쓴다
+  function topAt(sections, z) {
+    const i = Math.max(1, sections.findIndex(section => section[0] >= z));
+    const a = sections[i - 1], b = sections[i];
+    return T.MathUtils.lerp(a[3], b[3], T.MathUtils.clamp((z - a[0]) / (b[0] - a[0]), 0, 1));
+  }
+  // 앞모습 — 보닛 모서리의 칼날 LED 등 · 범퍼 흡기구 · 보닛 통풍구(차마다 다르게)
+  function frontDesign(group, frontPanel, shape, data, accent) {
+    const { w, l, sections } = data;
+    const on = (x, z, lift = .014) => [x, topAt(sections, z) + lift, z];
+    for (const side of [-1, 1]) {
+      const s = side;
+      // 등 자리(검은 틀) — 보닛 앞 모서리를 비스듬히
+      const housing = {
+        coupe: [[.40, .03], [.86, .05], [.82, .25], [.52, .23]],
+        sport: [[.46, .02], [.88, .04], [.86, .19], [.60, .17]],
+        gt: [[.36, .03], [.88, .06], [.84, .30], [.48, .26]],
+        hyper: [[.30, .02], [.90, .08], [.80, .34], [.62, .22]],
+      }[shape];
+      panel(frontPanel, grille, housing.map(([x, z]) => on(s * w * x, -l + z)));
+      // LED — 차마다 모양
+      if (shape === 'coupe') {
+        for (const [a, b] of [[.07, .12], [.16, .21]]) {
+          panel(frontPanel, led, [on(s * w * .45, -l + a, .028), on(s * w * .83, -l + a + .02, .028), on(s * w * .81, -l + b + .02, .028), on(s * w * .47, -l + b, .028)]);
+        }
+      } else if (shape === 'sport') {
+        panel(frontPanel, led, [on(s * w * .48, -l + .06, .028), on(s * w * .86, -l + .07, .028), on(s * w * .85, -l + .13, .028), on(s * w * .53, -l + .12, .028)]);
+        // 앞면 가로 빛줄(이온 RS 얼굴)
+        if (s > 0) box(frontPanel, led, 0, data.nose - .12, -l - .03, w * 1.2, .018, .02);
+      } else if (shape === 'gt') {
+        panel(frontPanel, led, [on(s * w * .40, -l + .08, .028), on(s * w * .86, -l + .10, .028), on(s * w * .84, -l + .21, .028), on(s * w * .44, -l + .16, .028)]);
+        panel(frontPanel, accent, [on(s * w * .50, -l + .22, .028), on(s * w * .82, -l + .25, .028), on(s * w * .81, -l + .27, .028), on(s * w * .52, -l + .24, .028)]);
+      } else {
+        panel(frontPanel, led, [on(s * w * .32, -l + .04, .028), on(s * w * .88, -l + .10, .028), on(s * w * .60, -l + .19, .028)]);
+        panel(frontPanel, led, [on(s * w * .58, -l + .17, .028), on(s * w * .80, -l + .33, .028), on(s * w * .70, -l + .34, .028)]);
+      }
+      // 범퍼 양옆 흡기구
+      const yTop = data.nose - .14;
+      panel(frontPanel, grille, [
+        [s * w * .52, .215, -l - .045], [s * w * .86, .215, -l - .02],
+        [s * w * .90, yTop, -l + .02], [s * w * .56, yTop + .02, -l - .02],
+      ]);
+      panel(frontPanel, accent, [
+        [s * w * .52, .205, -l - .05], [s * w * .86, .205, -l - .025],
+        [s * w * .86, .218, -l - .025], [s * w * .52, .218, -l - .05],
+      ]);
+      // 보닛 통풍구(앰버 GT · 펄스 X)
+      if (shape === 'gt' || shape === 'hyper') {
+        for (const [x0, x1] of [[.14, .30], [.34, .46]]) {
+          panel(group, grille, [on(s * w * x0, -l + .55, .012), on(s * w * x1, -l + .58, .012), on(s * w * x1, -l + .80, .012), on(s * w * x0, -l + .78, .012)]);
+        }
+      }
+    }
   }
 
   function aero(group, shape, data, paint) {
@@ -223,7 +328,7 @@ export function createCarModels(T, glowTexture) {
           [side * w * .624, .422, l + .051], [side * w * .77, .27, l + .069],
         ]);
       }
-      const mirror = box(group, paint, side * w * .814, roof - .266, front - .075, .25, .084, .165);
+      const mirror = box(group, gloss, side * w * .814, roof - .266, front - .075, .25, .084, .165);
       mirror.rotation.y = side * .18;
       box(group, blackGlass, side * w * .84, roof - .26, front + .011, .18, .063, .022);
       panel(bodySide, grille, [
@@ -264,6 +369,7 @@ export function createCarModels(T, glowTexture) {
       [w * .94, .177, -l + .20], [-w * .94, .177, -l + .20],
     ]);
     box(frontPanel, accent, 0, .198, -l - .112, w * 1.48, .019, .038);
+    frontDesign(group, frontPanel, shape, data, accent);
     const wing = new T.Group();
     const raisedWing = shape === 'gt' || shape === 'hyper';
     for (const side of [-1, 1]) {
@@ -337,6 +443,14 @@ export function createCarModels(T, glowTexture) {
             [outer, nose - .027, head - .046], [inner, nose - .056, head - .046],
           ]);
           box(frontPanel, reflector, side * w * .83, nose - .135, head - .031, w * .053, .025, .025);
+          // 헤드라이트가 은은하게 빛나게(쇼룸 · 앞모습)
+          const beam = new T.Sprite(new T.SpriteMaterial({
+            map: glowTexture, color: '#d6ecff', opacity: .34, transparent: true, depthWrite: false, blending: T.AdditiveBlending,
+          }));
+          // 빛 번짐은 보닛 모서리 칼날 등 자리(눈)에
+          beam.position.set(side * w * .66, topAt(data.sections, -l + .14) + .06, -l + .12);
+          beam.scale.setScalar(.95);
+          frontPanel.add(beam);
         }
       }
       if (!player && !oncoming) {
@@ -402,7 +516,7 @@ export function createCarModels(T, glowTexture) {
     const finish = detail ? bodyFinish(T, paint, data, livery.index, livery.stripe) : null;
     const glazing = detail ? glassFinish(T, glass, data, crackedGlass) : null;
     chassis.add(new T.Mesh(coachwork, finish?.material || paint), new T.Mesh(cabin, glazing?.material || glass),
-      new T.Mesh(cap, detail && (shape === 'hyper' || shape === 'sport') ? blackGlass : paint));
+      new T.Mesh(cap, detail ? gloss : paint));
     group.add(chassis);
     if (detail) chassis.children.forEach(mesh => { mesh.castShadow = true; });
     if (detail && !brakes.has(shape)) {

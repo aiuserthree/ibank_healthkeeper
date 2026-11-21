@@ -1,9 +1,9 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=7';
-import { createScene } from './scene.js?v=7';
-import { impactDuration } from './impact.js?v=7';
-import { assetRoot } from './world.js?v=7';
-import { requestYield } from './traffic.js?v=7';
-import { createShowroom } from './showroom.js?v=7';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=9';
+import { createScene } from './scene.js?v=9';
+import { impactDuration } from './impact.js?v=9';
+import { assetRoot } from './world.js?v=9';
+import { requestYield } from './traffic.js?v=9';
+import { createShowroom } from './showroom.js?v=9';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -189,7 +189,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=7`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=9`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -365,7 +365,9 @@ function paintRestSign() {
   const called = state.restCall === rest.at;
   $('rest-sign').classList.toggle('called', called);
   $('rest-sign-name').textContent = restNames[rest.index % restNames.length];
-  $('rest-sign-left').textContent = called ? '오른쪽으로 빠집니다' : `${rest.left >= 1000 ? (rest.left / 1000).toFixed(1) + ' km' : Math.round(rest.left / 10) * 10 + ' m'}`;
+  // E 를 누른 뒤에도 남은 거리를 계속 보여 준다(운영자 요청)
+  const left = rest.left >= 1000 ? (rest.left / 1000).toFixed(1) + ' km' : Math.round(rest.left / 10) * 10 + ' m';
+  $('rest-sign-left').textContent = called ? `${left} 남음 · 들르는 중` : left;
 }
 function askRest() {
   if (screen !== 'drive' || $('paused').open || $('rest').open || countdown > 0) return;
@@ -406,6 +408,7 @@ function enterRest() {
   restTab('station');
   paintRest();
   $('rest').showModal();
+  syncCursor();
   ($('refuel').disabled ? $('menu-list').querySelector('button:not(:disabled)') || $('depart') : $('refuel')).focus();
   send('hk:paused');
 }
@@ -587,6 +590,7 @@ function start() {
   $('countdown').textContent = '3';
   // 판 시작은 카운트다운 전에 알린다 — 아케이드가 이 신호로 순위 패널을 닫는다(전에는 3·2·1 동안 열려 있었음)
   send('hk:start');
+  syncCursor();
   $('signal').hidden = true;
   $('race-label').textContent = state.mode.name;
   paintHud();
@@ -613,6 +617,7 @@ function finish(outcome) {
   $('result-passes').textContent = `${number(state.overtakes)}대`;
   $('result-reward').textContent = `+${number(earned)} 크레딧`;
   $('results').showModal();
+  syncCursor();
   send('hk:resumed');
   if (runStarted) send('hk:score', { score: state.score });
   runStarted = false;
@@ -644,6 +649,7 @@ function pause() {
   clearInput();
   quietEngine();
   $('paused').showModal();
+  syncCursor();
   send('hk:paused');
 }
 function resume() {
@@ -720,6 +726,18 @@ addEventListener('keydown', event => {
   else if (!event.repeat && event.code === 'KeyE') askRest();
 });
 addEventListener('keyup', event => keys.delete(event.code));
+// 주행 중에는 마우스 포인터를 숨긴다 — 움직이면 1.5초 보였다가 다시 숨김, 멈춤 · 휴게소 · 결과 창에서는 늘 보임(운영자 요청)
+let cursorTimer = 0;
+function syncCursor() {
+  const driving = screen === 'drive' && !$('paused').open && !$('rest').open && !$('results').open;
+  document.body.classList.toggle('hide-cursor', driving);
+}
+addEventListener('mousemove', () => {
+  document.body.classList.remove('hide-cursor');
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(syncCursor, 1500);
+});
+for (const id of ['paused', 'rest', 'results']) $(id).addEventListener('close', () => setTimeout(syncCursor, 1500));
 // 게임 화면 어디든 누르면 아케이드의 오른쪽 순위 패널을 닫게 알린다(창 안을 누른 건 바깥에서 모른다)
 addEventListener('pointerdown', () => send('hk:tap'), true);
 addEventListener('blur', clearInput);

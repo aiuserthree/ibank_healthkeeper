@@ -1,9 +1,36 @@
-import { createCarModels } from './models.js?v=7';
-import { reflections } from './scene.js?v=7';
-import { glowMap } from './world.js?v=7';
+import { createCarModels } from './models.js?v=9';
+import { glowMap } from './world.js?v=9';
 
 // 첫 화면 · 차고에서 고른 차를 크게 보여 준다 — 주행 때와 같은 3D 모델(model(car, true))을 천천히 돌린다.
 // GPU 를 아끼려고 첫 화면이 보일 때만, 초당 30장까지만 그리고 그림자 맵 대신 바닥 빛 한 장을 쓴다.
+// 쇼룸 반사 — 어두운 스튜디오에 긴 조명 띠 셋 · 노을빛 하나: 차체에 광택 선이 흐르게
+function studio(T) {
+  const image = document.createElement('canvas');
+  image.width = 1024;
+  image.height = 512;
+  const ctx = image.getContext('2d');
+  const wall = ctx.createLinearGradient(0, 0, 0, 512);
+  wall.addColorStop(0, '#5a636d');
+  wall.addColorStop(.46, '#39414a');
+  wall.addColorStop(.52, '#4a3f37');
+  wall.addColorStop(1, '#1d2024');
+  ctx.fillStyle = wall;
+  ctx.fillRect(0, 0, 1024, 512);
+  ctx.filter = 'blur(6px)';
+  ctx.fillStyle = '#ffffff';
+  for (const y of [62, 112, 162]) ctx.fillRect(0, y, 1024, 22);
+  ctx.fillStyle = '#f2f6ff';
+  ctx.fillRect(470, 40, 26, 190);
+  ctx.fillStyle = '#ffb072';
+  ctx.fillRect(0, 232, 1024, 16);
+  ctx.fillStyle = '#8fc4ff';
+  ctx.fillRect(0, 300, 1024, 10);
+  const map = new T.CanvasTexture(image);
+  map.colorSpace = T.SRGBColorSpace;
+  map.mapping = T.EquirectangularReflectionMapping;
+  return map;
+}
+
 export function createShowroom(canvas, cars, isActive) {
   const T = globalThis.THREE;
   if (!T) return null;
@@ -20,7 +47,7 @@ export function createShowroom(canvas, cars, isActive) {
   renderer.toneMappingExposure = 1.12;
 
   const scene = new T.Scene();
-  scene.environment = reflections(T);
+  scene.environment = studio(T);
   const camera = new T.PerspectiveCamera(30, 16 / 9, .1, 60);
   const key = new T.DirectionalLight('#ffd0a0', 2.4);
   key.position.set(-5, 7, -4);
