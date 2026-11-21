@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=14';
-import { weatherAt } from './daytime.js?v=14';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=16';
+import { weatherAt } from './daytime.js?v=16';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -49,11 +49,11 @@ export function serviceCar(state, id) {
   if (id === 'oil') state.oilUntil = next;
 }
 // 주유 미니게임 결과 — added: 넣은 양(0~1, 넘친 것 포함), grade: regular | premium
-export function pumpFuel(state, added, grade) {
+export function pumpFuel(state, added, grade, final = true) {
   const level = state.fuel + added;
   const spilled = Math.max(0, level - 1);
   const cost = Math.round(added * 100 * (grade === 'premium' ? 3 : 1));
-  const exact = level >= .9 && level <= 1;
+  const exact = final && level >= .9 && level <= 1;
   state.fuel = Math.min(1, level);
   state.bonus += (exact ? 100 : 0) - cost;
   state.score = Math.max(0, state.score + (exact ? 100 : 0) - cost);

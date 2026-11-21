@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, pumpFuel, serviceCar, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=14';
-import { createScene } from './scene.js?v=14';
-import { impactDuration } from './impact.js?v=14';
-import { assetRoot } from './world.js?v=14';
-import { requestYield } from './traffic.js?v=14';
-import { createShowroom } from './showroom.js?v=14';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=14';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, pumpFuel, serviceCar, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=16';
+import { createScene } from './scene.js?v=16';
+import { impactDuration } from './impact.js?v=16';
+import { assetRoot } from './world.js?v=16';
+import { requestYield } from './traffic.js?v=16';
+import { createShowroom } from './showroom.js?v=16';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=16';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -190,7 +190,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=14`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=16`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -405,15 +405,9 @@ function paintRest() {
   $('belly-bar').style.transform = `scaleX(${state.hunger})`;
   $('belly-value').textContent = `${Math.round(state.hunger * 100)}%`;
   $('rest-balance').textContent = number(state.score);
-  $('menu-list').innerHTML = foods.map(food => {
-    const eaten = restEaten.has(food.id);
-    const disabled = eaten || state.score < food.price;
-    return `<button type="button" class="dish ${eaten ? 'eaten' : ''}" data-food="${food.id}" ${disabled ? 'disabled' : ''}>
-      <img src="${assetRoot}rest/${food.id}.webp?v=1" width="256" height="256" alt="">
-      <b>${food.name}</b><small>${food.effect}</small>
-      <em>${eaten ? '먹었어요' : number(food.price) + ' 점'}</em>
-    </button>`;
-  }).join('');
+  const eaten = foods.filter(food => restEaten.has(food.id)).map(food => food.name);
+  $('eaten-list').textContent = eaten.length ? `먹은 것 · ${eaten.join(', ')}` : '키오스크에서 골라 담고 결제하면 번호로 불러 줘요';
+  $('open-kiosk').disabled = eaten.length === foods.length;
 }
 function enterRest() {
   clearInput();
@@ -429,10 +423,10 @@ function enterRest() {
   send('hk:paused');
   // 도착하면 주유 영상(차가 들어와 주유기 옆에 서는 장면)부터 — 끝나거나 건너뛰면 휴게소 화면(운영자 요청)
   playMovie('refuel', '휴게소에 들어가는 중…', () => ($('refuel').disabled
-    ? $('menu-list').querySelector('button:not(:disabled)') || $('depart') : $('refuel')).focus());
+    ? $('open-kiosk') : $('refuel')).focus());
 }
 function departRest() {
-  if (!$('rest').open || $('rest').classList.contains('watching') || !$('pump').hidden) return;
+  if (!$('rest').open || $('rest').classList.contains('watching') || !$('pump').hidden || !$('kiosk').hidden) return;
   $('rest').close();
   leaveRest(state);
   previous = 0;
@@ -470,12 +464,24 @@ function endMovie() {
   done?.();
 }
 // 직접 주유하기(운영자 요청) — 기름 고르기 → 노즐을 주유구로 끌어 꽂기 → 꾹 눌러 넣기(90~100%에서 떼면 딱 맞게 +100점) → 영수증
-const pump = { step: '', grade: 'regular', added: 0, holding: false, last: 0, frame: 0, drag: null };
+const pump = { step: '', grade: 'regular', added: 0, holding: false, last: 0, frame: 0, drag: null, total: 0, paid: 0, bonus: false, spilled: 0 };
 const holster = { x: .234, y: .50 }, door = { x: .827, y: .625 };
+// 호스 — 주유기 아래쪽에서 노즐 손잡이 끝까지 늘어지는 곡선(운영자 요청: 꽂힐 때 선이 이어지게)
+const hoseRoot = { x: .115, y: .78 };
+function drawHose(x, y) {
+  const plugged = $('nozzle').classList.contains('plugged');
+  const end = { x: x - (plugged ? .112 : .035), y: y + (plugged ? .02 : .012) };
+  const [x0, y0, x1, y1] = [hoseRoot.x * 1600, hoseRoot.y * 905, end.x * 1600, end.y * 905];
+  const sag = Math.max(120, Math.abs(x1 - x0) * .45);
+  const d = `M${x0} ${y0} C${x0 + 40} ${y0 + sag}, ${x1 - sag} ${y1 + sag * .9}, ${x1} ${y1}`;
+  $('hose').setAttribute('d', d);
+  $('hose-shine').setAttribute('d', d);
+}
 function placeNozzle(x, y) {
   const nozzle = $('nozzle');
   nozzle.style.left = `${x * 100}%`;
   nozzle.style.top = `${y * 100}%`;
+  drawHose(x, y);
 }
 function pumpStep(step) {
   pump.step = step;
@@ -491,6 +497,7 @@ function pumpStep(step) {
   $('pump-hold').hidden = step !== 'fill';
   $('receipt').hidden = step !== 'done';
   $('pump-close').hidden = step === 'done';
+  $('pump-more').hidden = step !== 'done' || state.fuel >= .995;
   $('fuel-door').classList.toggle('target', step === 'nozzle');
   ({ grade: () => $('grades').querySelector('button')?.focus(), nozzle: () => $('pump-plug').focus(),
     fill: () => $('pump-hold').focus(), done: () => $('pump-done').focus() })[step]?.();
@@ -521,10 +528,16 @@ function holdPump(on) {
   }
   cancelAnimationFrame(pump.frame);
   if (pump.added < .01) return;
-  const result = pumpFuel(state, pump.added, pump.grade);
-  const lines = [`넣은 양 +${Math.round(pump.added * 100)}% → ${Math.round(result.level * 100)}%`, `결제 ${number(result.cost)}점`];
-  if (result.exact) lines.push('딱 맞게! +100점');
-  if (result.spilled > 0) lines.push(`넘쳤어요 — 흘린 ${Math.round(result.spilled * 100)}% 만큼 돈만 나갔어요`);
+  // 계속 넣기를 위해 넣은 만큼씩 결제 — 딱 맞게 보너스는 주유를 마칠 때 한 번(앞에서 받았으면 다시 안 줌)
+  const result = pumpFuel(state, pump.added, pump.grade, !pump.bonus);
+  pump.total += pump.added;
+  pump.paid += result.cost;
+  pump.spilled += result.spilled;
+  if (result.exact) pump.bonus = true;
+  pump.added = 0;
+  const lines = [`넣은 양 +${Math.round(pump.total * 100)}% → ${Math.round(result.level * 100)}%`, `결제 ${number(pump.paid)}점`];
+  if (pump.bonus) lines.push('딱 맞게! +100점');
+  if (pump.spilled > 0) lines.push(`넘쳤어요 — 흘린 ${Math.round(pump.spilled * 100)}% 만큼 돈만 나갔어요`);
   if (pump.grade === 'premium') lines.push('고급 휘발유 — 3 km 동안 가속 +12%');
   $('receipt-text').innerHTML = lines.map(line => `<span>${line}</span>`).join('');
   beep(result.exact ? 880 : 520, .14);
@@ -532,10 +545,11 @@ function holdPump(on) {
   pumpStep('done');
 }
 function openPump() {
-  pump.added = 0;
+  pump.added = pump.total = pump.paid = pump.spilled = 0;
+  pump.bonus = false;
   pump.holding = false;
-  placeNozzle(holster.x, holster.y);
   $('nozzle').classList.remove('plugged');
+  placeNozzle(holster.x, holster.y);
   $('rest').classList.add('pumping');
   $('pump').hidden = false;
   paintPump();
@@ -552,8 +566,8 @@ function closePump() {
   $('depart').focus();
 }
 function plugNozzle() {
-  placeNozzle(door.x, door.y);
   $('nozzle').classList.add('plugged');
+  placeNozzle(door.x, door.y);
   beep(620, .07);
   pumpStep('fill');
 }
@@ -594,6 +608,7 @@ addEventListener('keydown', event => {
   if ($('pump').hidden) return;
   if (event.code === 'Space') {
     event.preventDefault();
+    if (pump.step === 'done' && !$('pump-more').hidden && !event.repeat) { paintPump(); pumpStep('fill'); }
     if (!event.repeat) holdPump(true);
   } else if (event.code === 'Enter' && pump.step === 'nozzle') {
     event.preventDefault();
@@ -602,6 +617,8 @@ addEventListener('keydown', event => {
 });
 addEventListener('keyup', event => { if (event.code === 'Space' && !$('pump').hidden) holdPump(false); });
 $('pump-done').addEventListener('click', closePump);
+// 계속 넣기 — 꽂힌 그대로 다시 꾹 눌러 더 넣는다
+$('pump-more').addEventListener('click', () => { paintPump(); pumpStep('fill'); });
 $('pump-close').addEventListener('click', closePump);
 $('pump-movie').addEventListener('click', () => {
   closePump();
@@ -627,18 +644,112 @@ $('service-list').addEventListener('click', event => {
 refuelVideo.addEventListener('ended', endMovie);
 refuelVideo.addEventListener('error', endMovie);
 $('refuel-skip').addEventListener('click', endMovie);
+// 식당 키오스크(운영자 요청) — 담기 → 결제(이번 주행 점수) → 주문 번호 · 조리 중 → 「○번 고객님」 → 받으러 가기 → 먹는 영상 차례로 · 효과
+let cart = [];
+let cookFrame = 0;
+const cartTotal = () => cart.reduce((sum, id) => sum + foods.find(food => food.id === id).price, 0);
+function paintKiosk() {
+  $('kiosk-score').textContent = number(state.score);
+  $('menu-list').innerHTML = foods.map(food => {
+    const eaten = restEaten.has(food.id), taken = cart.includes(food.id);
+    return `<button type="button" class="dish ${eaten || taken ? 'eaten' : ''}" data-food="${food.id}" ${eaten || taken ? 'disabled' : ''}>
+      <img src="${assetRoot}rest/${food.id}.webp?v=1" width="256" height="256" alt="">
+      <b>${food.name}</b><small>${food.effect}</small>
+      <em>${eaten ? '먹었어요' : taken ? '담았어요' : number(food.price) + ' 점'}</em>
+    </button>`;
+  }).join('');
+  $('cart-list').innerHTML = cart.length ? cart.map(id => {
+    const food = foods.find(item => item.id === id);
+    return `<li><span>${food.name}</span><em>${number(food.price)}</em><button type="button" data-remove="${id}" aria-label="${food.name} 빼기">×</button></li>`;
+  }).join('') : '<li class="empty">메뉴를 눌러 담으세요</li>';
+  const total = cartTotal();
+  $('cart-total').textContent = number(total);
+  $('kiosk-pay').disabled = !cart.length || total > state.score;
+  $('kiosk-pay').textContent = cart.length && total > state.score ? `${number(total - state.score)}점 모자라요` : '결제하기';
+}
+function openKiosk() {
+  cart = [];
+  $('kiosk-order').hidden = false;
+  $('kiosk-wait').hidden = true;
+  $('kiosk-close').hidden = false;
+  $('kiosk').hidden = false;
+  $('rest').classList.add('pumping');
+  restTab('food');
+  paintKiosk();
+  $('menu-list').querySelector('button:not(:disabled)')?.focus();
+}
+function closeKiosk() {
+  cancelAnimationFrame(cookFrame);
+  $('kiosk').hidden = true;
+  $('rest').classList.remove('pumping');
+  paintRest();
+}
+$('open-kiosk').addEventListener('click', openKiosk);
+$('kiosk-close').addEventListener('click', () => { closeKiosk(); $('open-kiosk').focus(); });
 $('menu-list').addEventListener('click', event => {
   const button = event.target.closest('[data-food]');
   if (!button || button.disabled) return;
-  const food = foods.find(item => item.id === button.dataset.food);
-  if (!eatFood(state, food.id)) return;
-  restEaten.add(food.id);
-  paintRest();
-  playMovie(`eat-${food.id}`, `${food.name} 먹는 중…`, () => {
-    $('rest-status').textContent = `${food.name} 냠 — ${food.effect}`;
-    beep(700, .1);
-    ($('menu-list').querySelector('button:not(:disabled)') || $('depart')).focus();
-  });
+  cart.push(button.dataset.food);
+  beep(760, .05);
+  paintKiosk();
+  ($('menu-list').querySelector('button:not(:disabled)') || $('kiosk-pay')).focus();
+});
+$('cart-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-remove]');
+  if (!button) return;
+  cart = cart.filter(id => id !== button.dataset.remove);
+  paintKiosk();
+});
+$('kiosk-pay').addEventListener('click', () => {
+  if (!cart.length || cartTotal() > state.score) return;
+  const orderNo = 100 + Math.floor(Math.random() * 900);
+  $('kiosk-order').hidden = true;
+  $('kiosk-close').hidden = true;
+  $('kiosk-wait').hidden = false;
+  $('kiosk-pickup').hidden = true;
+  $('order-no').textContent = String(orderNo);
+  $('order-state').textContent = '결제 완료 · 조리 중…';
+  beep(880, .08);
+  const start = performance.now(), cook = 2200 + cart.length * 700;
+  const step = t => {
+    const k = Math.min(1, (t - start) / cook);
+    $('cook-bar').style.transform = `scaleX(${k})`;
+    if (k < 1) { cookFrame = requestAnimationFrame(step); return; }
+    $('order-state').textContent = `${orderNo}번 고객님, 주문하신 음식 나왔습니다!`;
+    beep(990, .12);
+    setTimeout(() => beep(1180, .12), 160);
+    $('kiosk-pickup').hidden = false;
+    $('kiosk-pickup').focus();
+  };
+  cookFrame = requestAnimationFrame(step);
+});
+$('kiosk-pickup').addEventListener('click', () => {
+  const order = cart.slice();
+  cart = [];
+  closeKiosk();
+  const done = [];
+  const next = () => {
+    const id = order.shift();
+    if (!id) {
+      $('rest-status').textContent = done.length ? `냠 — ${done.join(' · ')}` : '';
+      paintRest();
+      paintHud();
+      $('depart').focus();
+      return;
+    }
+    const food = foods.find(item => item.id === id);
+    if (eatFood(state, id)) {
+      restEaten.add(id);
+      done.push(food.name);
+    }
+    playMovie(`eat-${id}`, `${food.name} 먹는 중…`, () => { beep(700, .1); next(); });
+  };
+  next();
+});
+addEventListener('keydown', event => {
+  if ($('kiosk').hidden || event.code !== 'Escape' || $('kiosk-order').hidden) return;
+  closeKiosk();
+  $('open-kiosk').focus();
 });
 $('depart').addEventListener('click', departRest);
 $('rest').addEventListener('cancel', event => event.preventDefault());

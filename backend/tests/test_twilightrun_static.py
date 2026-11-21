@@ -116,7 +116,7 @@ class TwilightrunStaticTest(unittest.TestCase):
             self.assertTrue((art / "rest" / f"{name}.mp4").is_file(), name)
         game_js = (JS_DIR / "game.js").read_text(encoding="utf-8")
         self.assertIn("playMovie('refuel'", game_js)
-        self.assertIn("playMovie(`eat-${food.id}`", game_js)
+        self.assertIn("playMovie(`eat-${id}`", game_js)
         self.assertLessEqual(sum(p.stat().st_size for p in files if p.suffix == ".mp4"), 35_000_000)
 
     def test_tint_and_genre(self):
