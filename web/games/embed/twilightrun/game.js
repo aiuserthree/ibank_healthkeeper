@@ -1,8 +1,9 @@
-import { advanceWreck, cars, carStats, clamp, courses, createRun, modes, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=2';
-import { createScene } from './scene.js?v=2';
-import { impactDuration } from './impact.js?v=2';
-import { assetRoot } from './world.js?v=2';
-import { requestYield } from './traffic.js?v=2';
+import { advanceWreck, cars, carStats, clamp, courses, createRun, damageStage, MAX_HEALTH, modes, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=3';
+import { createScene } from './scene.js?v=3';
+import { impactDuration } from './impact.js?v=3';
+import { assetRoot } from './world.js?v=3';
+import { requestYield } from './traffic.js?v=3';
+import { createShowroom } from './showroom.js?v=3';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -188,12 +189,38 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPortrait = car => `${assetRoot}garage/${car.shape}.webp?v=3`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=3`;
+// 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
+const carStage = $('car-stage');
+const showroom = createShowroom(carStage.querySelector('canvas'), cars,
+  () => screen === 'home' && !$('home').hidden && carStage.classList.contains('open'));
+const portraits = showroom ? showroom.portraits(600, 260) : [];
+const carPortrait = (car, i) => portraits[i] || carPicture(car);
+if (!showroom) {
+  carStage.classList.add('still');
+  $('car-still').hidden = false;
+}
+let peekTimer = 0;
+let peekBy = '';
+function peek(i, by = 'mouse') {
+  clearTimeout(peekTimer);
+  peekBy = by;
+  const car = carStats(i, profile.upgrades[i]);
+  $('peek-name').textContent = cars[i].name;
+  $('peek-spec').textContent = `최고 ${car.top} km/h · 가속 ${car.power.toFixed(1)}`;
+  if (showroom) showroom.show(i);
+  else $('car-still').src = carPicture(cars[i]);
+  carStage.classList.add('open');
+}
+function unpeek(delay = 220) {
+  clearTimeout(peekTimer);
+  peekTimer = setTimeout(() => carStage.classList.remove('open'), delay);
+}
 carOptions.innerHTML = cars.map((car, i) => `
   <div>
     <input id="car-${i}" type="radio" name="car" value="${i}">
     <label class="car-option" for="car-${i}">
-      <img src="${carPortrait(car)}" width="600" height="260" alt="">
+      <img src="${carPortrait(car, i)}" width="600" height="260" alt="">
       <span>${car.name}</span>
     </label>
   </div>`).join('');
@@ -203,10 +230,30 @@ function paintCarSelection() {
   const car = carStats(profile.car, profile.upgrades[profile.car]);
   $('car-spec').textContent = `최고 ${car.top} km/h · 가속 ${car.power.toFixed(1)}`;
 }
+const optionIndex = event => {
+  const label = event.target.closest?.('.car-option');
+  return label ? Number(label.htmlFor.slice(4)) : -1;
+};
+carOptions.addEventListener('pointerover', event => {
+  const i = optionIndex(event);
+  if (event.pointerType === 'mouse' && i >= 0) peek(i);
+});
+carOptions.addEventListener('pointerleave', event => { if (event.pointerType === 'mouse') unpeek(); });
+carOptions.addEventListener('pointerup', event => {
+  const i = optionIndex(event);
+  if (event.pointerType !== 'mouse' && i >= 0) { peek(i, 'touch'); unpeek(2600); }
+});
+carOptions.addEventListener('focusin', event => {
+  if (event.target.matches('input:focus-visible')) peek(Number(event.target.value), 'focus');
+});
+carOptions.addEventListener('focusout', () => { if (peekBy === 'focus') unpeek(); });
+carStage.addEventListener('pointerenter', () => clearTimeout(peekTimer));
+carStage.addEventListener('pointerleave', event => { if (event.pointerType === 'mouse') unpeek(); });
 carOptions.addEventListener('change', event => {
   profile.car = Number(event.target.value);
   save();
   paintCarSelection();
+  if (event.target.matches(':focus-visible')) peek(profile.car, 'focus');
 });
 
 const upgradeCost = (i, level) => 220 + i * 85 + level * 155;
@@ -219,7 +266,7 @@ function garageInfo(focus) {
     const price = upgradeCost(i, level);
     const selectButton = equipped ? '선택됨' : '선택';
     return `<article class="car-card ${equipped ? 'current' : ''}">
-      <img class="car-portrait" src="${carPortrait(car)}" width="600" height="260" alt="">
+      <img class="car-portrait" src="${carPortrait(car, i)}" width="600" height="260" alt="">
       <h3>${car.name}</h3>
       <p class="car-stats"><span>${stats.top} km/h</span><span>가속 ${stats.power.toFixed(1)}</span><span>강화 ${level}/${maxUpgrade}</span></p>
       <div class="car-actions">
@@ -294,12 +341,12 @@ function paintHud() {
   const segment = sectionIndex(course, distance, !mode.goal);
   const locationLabel = `${segment + 1}/${course.sections.length} · ${course.sections[segment].name}`;
   if ($('race-location').textContent !== locationLabel) $('race-location').textContent = locationLabel;
-  $('health').setAttribute('aria-label', `내구도 ${health} / 3`);
+  $('health').setAttribute('aria-label', `내구도 ${health} / ${MAX_HEALTH}`);
   healthLights.forEach((light, i) => light.classList.toggle('lost', i >= health));
-  const conditionLabel = conditionNames[3 - health];
+  const conditionLabel = conditionNames[damageStage(health)];
   if (condition.textContent !== conditionLabel) {
     condition.textContent = conditionLabel;
-    condition.parentElement.dataset.condition = String(3 - health);
+    condition.parentElement.dataset.condition = String(damageStage(health));
   }
 }
 

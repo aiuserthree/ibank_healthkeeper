@@ -1,8 +1,8 @@
-import { clamp, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=2';
-import { createFallback } from './scene-fallback.js?v=2';
-import { createCarModels } from './models.js?v=2';
-import { createImpactFx, impactMotion } from './impact.js?v=2';
-import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=2';
+import { clamp, damageStage as wearStage, frontWheelAngle, PANEL_BREAK, roadSlope, roadX, roadY, TIRE_RADIUS, trackLook } from './drive.js?v=3';
+import { createFallback } from './scene-fallback.js?v=3';
+import { createCarModels } from './models.js?v=3';
+import { createImpactFx, impactMotion } from './impact.js?v=3';
+import { assetRoot, atmospheres, createWorld, glowMap, random } from './world.js?v=3';
 
 const poses = [
   { back: 8.5, height: 2.9 },
@@ -11,7 +11,7 @@ const poses = [
 ];
 const rainCount = 74;
 
-function reflections(T) {
+export function reflections(T) {
   const image = document.createElement('canvas');
   image.width = 512;
   image.height = 256;
@@ -208,7 +208,7 @@ function createWebGL(T, stage) {
       };
       const nose = crush('front'), tail = crush('rear');
       const left = crush('left'), right = crush('right');
-      const damageStage = 3 - state.health;
+      const damageStage = wearStage(state.health);
       finish.regions.set(nose, tail, left, right);
       finish.wear.value = damageStage * .30;
       const shatter = Math.max(0, damageStage - 1);
@@ -316,6 +316,9 @@ function createWebGL(T, stage) {
     const player = playerTokens.get(state.car.name);
     showVehicle({ ...state.car, x, z: distance, speed }, player, state, origin, true, braking, age);
     used.add(player);
+    // 보닛 시점: 카메라가 앞유리 · 지붕 안쪽에 들어가 앞이 막히던 것(앞유리가 길게 뻗은 앰버 GT) — 내 차 지붕 · 유리만 숨긴다
+    const [, cabinMesh, roofMesh] = vehicles.get(player).model.userData.chassis.children;
+    cabinMesh.visible = roofMesh.visible = view !== 2;
     for (const [token, v] of vehicles) if (!used.has(token)) clearVehicle(token, v);
 
     const wet = (current.theme === 'metro' ? 1 - mix : 0) + (next.theme === 'metro' ? mix : 0);

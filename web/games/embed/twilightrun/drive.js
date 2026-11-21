@@ -1,10 +1,13 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=2';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=3';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
 export const SCORE_LIMIT = 1_000_000;
 export const TIRE_RADIUS = .369;
 export const PANEL_BREAK = .86;
+// 내구도 5칸(운영자 요청, 3 → 5) — 차체 손상 그림은 3단계 그대로: 4·3칸 긁힘, 2·1칸 심한 손상, 0칸 파손
+export const MAX_HEALTH = 5;
+export const damageStage = health => health <= 0 ? 3 : health <= 2 ? 2 : health < MAX_HEALTH ? 1 : 0;
 export const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const range = (low, high) => low + Math.random() * (high - low);
 const damp = (from, to, dt, rate) => from + (to - from) * -Math.expm1(-rate * dt);
@@ -136,7 +139,7 @@ export function createRun(course, selectedMode, car) {
   const state = {
     course, mode, car, rival, traffic: [], distance: 0, elapsed: 0, remaining: mode.time,
     x: LANES[2], speed: 23, acceleration: 0, steer: 0, wheelAngle: 0, wheelSpin: 0,
-    yaw: 0, pitch: 0, roll: 0, health: 3, cooldown: 0, score: 0, bonus: 0,
+    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, cooldown: 0, score: 0, bonus: 0,
     overtakes: 0, closeCalls: 0, nextGate: mode.gate ?? Infinity, checkpoints: 0,
     spawnAt: 90, signal: null, impact: null, trafficImpact: null, damage: { front: 0, rear: 0, left: 0, right: 0 }, outcome: null,
   };
@@ -148,14 +151,22 @@ const paint = ['#c3cbd6', '#5d9cc3', '#b14545', '#c7a38b', '#7b789f', '#758875',
 function fillTraffic(state) {
   const { mode, distance } = state;
   while (state.spawnAt < distance + 380) {
-    const blocked = new Set();
-    const amount = state.spawnAt < 110 ? 1 : Math.random() < .37 ? 2 : 1;
+    // 길이 완전히 막히지 않게 — 근처(±35m)에 이미 같은 방향 차가 선 차로는 막힌 것으로 치고, 내 방향 차로를 늘 하나 이상(일방향은 둘) 비워 둔다
+    const ahead = [0, 1, 2, 3].filter(lane => !(mode.twoWay && lane < 2));
+    const blocked = new Set(ahead.filter(lane => state.traffic.some(v => !v.oncoming &&
+      Math.abs(v.x - LANES[lane]) < 1.9 && Math.abs(v.z - state.spawnAt) < 35)));
+    const room = Math.max(0, ahead.length - (mode.twoWay ? 1 : 2) - blocked.size);
+    const wanted = state.spawnAt < 110 ? 1 : Math.random() < .37 ? 2 : 1;
+    const amount = Math.min(wanted, room + (mode.twoWay ? 1 : 0));
     const convoySpeed = range(18, 25);
+    let forward = 0;
     for (let i = 0; i < amount; i++) {
-      const lanes = [0, 1, 2, 3].filter(lane => !blocked.has(lane));
+      const lanes = [0, 1, 2, 3].filter(lane => !blocked.has(lane) && (!ahead.includes(lane) || forward < room));
+      if (!lanes.length) break;
       const lane = lanes[Math.floor(range(0, lanes.length))];
       blocked.add(lane);
       const oncoming = mode.twoWay && lane < 2;
+      if (!oncoming) forward++;
       const shape = Math.random() < .22 ? 'van' : Math.random() < .45 ? 'sedan' : 'wagon';
       state.traffic.push({
         x: LANES[lane], z: state.spawnAt + range(-4, 4), speed: (convoySpeed + range(-1.8, 1.8)) * (oncoming ? -1 : 1),
@@ -163,7 +174,7 @@ function fillTraffic(state) {
         clearance: Infinity,
       });
     }
-    state.spawnAt += range(48, 63) * (mode.passes ? .82 : mode.twoWay ? 1.09 : 1);
+    state.spawnAt += range(52, 68) * (mode.passes ? .85 : mode.twoWay ? 1.25 : 1);
   }
 }
 
@@ -179,7 +190,7 @@ function touchVehicle(state, vehicle, hitX, hitZ, relativeX, relativeZ) {
     Math.abs(Math.sin(state.yaw) * state.speed) / 52, .27, 1);
   const zone = Math.abs(front) >= Math.abs(side) ? front < 0 ? 'rear' : 'front' : side < 0 ? 'left' : 'right';
   const fatal = --state.health === 0;
-  const stage = 3 - state.health;
+  const stage = damageStage(state.health);
   const prior = state.damage[zone];
   const dent = stage === 1 ? .17 + force * .47 : .40 + force * .58;
   const damage = fatal ? 1 : Math.min(stage === 1 ? PANEL_BREAK - .01 : 1, prior + dent);
@@ -338,7 +349,7 @@ export function step(state, input, dt) {
     state.signal ||= `체크포인트  +${mode.extra}초`;
   }
 
-  if (mode.goal && state.health > 0 && state.health < 3 &&
+  if (mode.goal && state.health > 0 && state.health < MAX_HEALTH &&
       sectionIndex(state.course, state.distance) > sectionIndex(state.course, before)) {
     state.health++;
     for (const zone of Object.keys(state.damage)) state.damage[zone] *= .63;

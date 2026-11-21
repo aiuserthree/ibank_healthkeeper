@@ -126,6 +126,44 @@ button, select { -webkit-tap-highlight-color: transparent; }
   border: 1px solid var(--edge);
   border-radius: 4px;
 }
+/* 차 단추에 마우스를 올리면 패널 왼쪽에 크게 뜨는 3D 차 — 평소에는 숨김 */
+.setup { position: relative; }
+.car-stage {
+  position: absolute;
+  z-index: 2;
+  right: calc(100% + 16px);
+  bottom: 0;
+  width: min(600px, 52vw);
+  aspect-ratio: 16 / 9;
+  max-height: calc(100dvh - 40px);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid #e2ebc83d;
+  border-radius: 10px;
+  background: radial-gradient(ellipse at 50% 74%, #3c4436, #1a1f1b 46%, #121513 100%);
+  box-shadow: 0 16px 45px #080b0aa0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(10px);
+  transition: opacity .16s, transform .16s, visibility 0s .16s;
+}
+.car-stage.open { opacity: 1; visibility: visible; transform: none; transition: opacity .16s, transform .16s; }
+.car-stage canvas, .car-still { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.car-stage canvas { cursor: grab; touch-action: pan-y; }
+.car-stage canvas:active { cursor: grabbing; }
+.car-still { object-fit: cover; }
+.car-stage figcaption {
+  position: absolute;
+  inset: 12px 16px auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 10px;
+  pointer-events: none;
+}
+#peek-name { color: var(--accent); font-size: clamp(19px, 2.1vw, 30px); font-weight: 900; font-style: italic; letter-spacing: -.045em; text-shadow: 0 2px 12px #080b0b; }
+.car-hint { margin-left: auto; color: #bdc2b6b0; font-size: .72rem; font-weight: 600; }
+.still .car-hint { display: none; }
 .car-picker { min-inline-size: 0; margin: 0 0 11px; padding: 0; border: 0; }
 .car-picker legend { padding: 0; }
 .car-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
@@ -155,6 +193,7 @@ button, select { -webkit-tap-highlight-color: transparent; }
 .car-options input:checked + .car-option { color: var(--accent); background: #303921; border-color: var(--accent); }
 .car-options input:focus-visible + .car-option { outline: 2px solid var(--accent); outline-offset: 2px; }
 .car-spec { color: var(--muted); font-size: .76rem; min-height: 1.35em; margin-top: 6px; }
+#peek-spec { color: #dfe3d4; font-size: .80rem; font-weight: 650; text-shadow: 0 1px 6px #080b0b; }
 .start { display: flex; justify-content: space-between; font-size: 1rem; min-height: 45px; align-items: center; }
 .start span + span { font-size: 1.25rem; line-height: 1; }
 .home-footer { font-size: .84rem; color: var(--muted); border-top: 1px solid var(--edge); }
@@ -227,6 +266,8 @@ kbd:not(:first-child) { margin-left: 7px; }
 .progress i, #speed-bar { display: block; width: 100%; height: 100%; background: var(--accent); transform-origin: left; transform: scaleX(0); }
 .race-actions { align-self: start; }
 .instrument { pointer-events: auto; background: #131a20e6; padding: 8px 11px; }
+/* 주행 중 단추에 누를 키도 같이 — 터치 화면에서는 숨긴다 */
+.instrument kbd { margin-left: 5px; padding: 2px 5px; font-size: .66rem; color: var(--accent); border-color: #d8f45d55; vertical-align: 1px; }
 .score-box { grid-column: 2; justify-self: end; padding: 4px 11px; margin-top: -5px; }
 .score-box b { font-size: 1.125rem; color: var(--accent); }
 .countdown, .signal {
@@ -265,6 +306,7 @@ dialog {
   color: inherit;
   box-shadow: 0 22px 60px #0009;
 }
+#garage { width: min(880px, calc(100% - 28px)); }
 dialog::backdrop { background: #090c0bbb; }
 .dialog-head, .dialog-balance { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .dialog-head h2, .center-dialog h2 { font-size: clamp(26px, 4vw, 40px); font-weight: 900; letter-spacing: -.055em; }
@@ -316,6 +358,7 @@ dialog::backdrop { background: #090c0bbb; }
   .intro h1 { font-size: clamp(52px, 15vw, 88px); line-height: .90; }
   .intro p { margin-top: 13px; font-size: .90rem; }
   .intro p br { display: none; }
+  .car-stage { right: 0; bottom: calc(100% + 10px); width: 100%; }
   .setup { max-width: 360px; width: 100%; justify-self: end; padding: 12px; }
   .detail { margin-bottom: 9px; }
   .course-preview { height: 42px; margin-bottom: 8px; }
@@ -345,6 +388,7 @@ dialog::backdrop { background: #090c0bbb; }
 @media (pointer: coarse) {
   .key-help { display: none; }
   .touch-help { display: inline; }
+  .instrument kbd { display: none; }
 }
 @media (min-width: 621px) and (max-height: 450px) {
   .topbar, .home-footer { padding-block: 9px; }
@@ -354,6 +398,19 @@ dialog::backdrop { background: #090c0bbb; }
   .setup { padding: 11px; }
   .detail { margin-bottom: 7px; }
   .setup select { padding-block: 5px; }
+  .home-body { gap: 16px; padding: 5px 18px; }
+  .toolbar .button { padding: 6px 11px; }
+  .setup { padding: 9px 11px; }
+  .setup select { padding-block: 4px; }
+  .car-spec { display: none; }
+  .car-stage { width: min(470px, 56vw); }
+  .car-stage figcaption { inset: 8px 10px auto; }
+  .car-hint { display: none; }
+  .setup > label, .car-picker legend { margin-bottom: 4px; }
+  .detail { margin: 3px 0 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .car-option { min-height: 30px; padding: 5px 2px; align-content: center; }
+  .car-option img { display: none; }
+  .start { min-height: 38px; }
 }
 @media (max-height: 520px) { .course-preview { display: none; } }
 /* 아케이드 창(PC 1280×720 에서 창 높이 약 610px)에서 아래 조작 안내(W A S D · C · H)가 창 밖으로 밀려 안 보이던 것 — 위아래 여백만 줄인다 */
