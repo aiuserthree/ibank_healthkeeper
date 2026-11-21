@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=16';
-import { weatherAt } from './daytime.js?v=16';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=17';
+import { weatherAt } from './daytime.js?v=17';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -29,24 +29,36 @@ export const foods = [
 ];
 export const restAt = index => REST_FIRST + index * REST_EVERY;
 // 정비소(운영자 요청) — 보유 크레딧으로. 수리는 빠진 내구도 한 칸에 60(내구도는 가득인데 찌그러졌으면 60)
+// 타이어 · 엔진오일은 달릴수록 닳는다(운영자 요청: 상태가 보이고, 정비하면 그 상태가 바뀌게)
+export const TIRE_LIFE = 15000, OIL_LIFE = 20000;
 export const services = [
-  { id: 'repair', name: '차체 수리', effect: '내구도 가득 · 찌그러짐 펴기' },
-  { id: 'tire', name: '타이어 교체', price: 80, effect: '다음 휴게소까지 접지력 +15%' },
-  { id: 'oil', name: '엔진오일 교환', price: 80, effect: '다음 휴게소까지 가속 +8%' },
+  { id: 'repair', name: '차체 수리', done: '수리 완료', effect: '내구도 가득 · 찌그러짐 펴기' },
+  { id: 'tire', name: '타이어 교체', done: '교체 완료', price: 80, effect: '닳으면 접지력이 최대 20% 떨어짐' },
+  { id: 'oil', name: '엔진오일 교환', done: '교환 완료', price: 80, effect: '줄면 가속이 최대 10% 떨어짐' },
 ];
+// 지금 상태(0~1)와 설명 — 정비소 카드 게이지
+export function carCondition(state, id) {
+  if (id === 'tire') return { value: state.tire, text: `마모 ${Math.round((1 - state.tire) * 100)}%` };
+  if (id === 'oil') return { value: state.oil, text: `오일 ${Math.round(state.oil * 100)}%` };
+  const dent = Math.max(...Object.values(state.damage));
+  return {
+    value: state.health / MAX_HEALTH * (1 - dent * .3),
+    text: `내구도 ${state.health}/${MAX_HEALTH}${dent > .01 ? ` · 찌그러짐 ${Math.round(dent * 100)}%` : ''}`,
+  };
+}
 export function servicePrice(state, id) {
-  if (id !== 'repair') return services.find(item => item.id === id).price;
+  if (id === 'tire') return state.tire > .95 ? 0 : services[1].price;
+  if (id === 'oil') return state.oil > .95 ? 0 : services[2].price;
   const missing = MAX_HEALTH - state.health;
   return missing ? missing * 60 : Object.values(state.damage).some(v => v > .01) ? 60 : 0;
 }
 export function serviceCar(state, id) {
-  const next = restAt(state.restStop.index + 1);
   if (id === 'repair') {
     state.health = MAX_HEALTH;
     for (const zone of Object.keys(state.damage)) state.damage[zone] = 0;
   }
-  if (id === 'tire') state.tireUntil = next;
-  if (id === 'oil') state.oilUntil = next;
+  if (id === 'tire') state.tire = 1;
+  if (id === 'oil') state.oil = 1;
 }
 // 주유 미니게임 결과 — added: 넣은 양(0~1, 넘친 것 포함), grade: regular | premium
 export function pumpFuel(state, added, grade, final = true) {
@@ -233,7 +245,7 @@ export function createRun(course, selectedMode, car) {
   const state = {
     course, mode, car, rival, traffic: [], distance: 0, elapsed: 0, remaining: mode.time,
     x: LANES[2], speed: 23, acceleration: 0, steer: 0, wheelAngle: 0, wheelSpin: 0,
-    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, hunger: 1, restCall: null, restStop: null, saver: 0, boostUntil: 0, gripUntil: 0, passBoostUntil: 0, shield: false, tireUntil: 0, oilUntil: 0, powerUntil: 0, cooldown: 0, score: 0, bonus: 0,
+    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, hunger: 1, restCall: null, restStop: null, saver: 0, boostUntil: 0, gripUntil: 0, passBoostUntil: 0, shield: false, tire: 1, oil: 1, powerUntil: 0, cooldown: 0, score: 0, bonus: 0,
     overtakes: 0, closeCalls: 0, nextGate: mode.gate ?? Infinity, checkpoints: 0,
     spawnAt: 90, signal: null, impact: null, trafficImpact: null, damage: { front: 0, rear: 0, left: 0, right: 0 }, outcome: null,
   };
@@ -359,7 +371,7 @@ function advanceCar(state, input, dt) {
   const onShoulder = Math.abs(x) > 6.28;
   const ratio = speed / top;
   const drag = .5 + 1.75 * ratio ** 2;
-  const tuned = (distance < state.oilUntil ? 1.08 : 1) * (distance < state.powerUntil ? 1.12 : 1);
+  const tuned = (.9 + .1 * state.oil) * (distance < state.powerUntil ? 1.12 : 1);
   const throttle = input.gas && !braking && state.fuel > 0 ? car.power * tuned * (1 - .61 * ratio) : 0;
   const brake = braking ? 10.2 + 5.2 * Math.min(1, speed / 18) : 0;
   const grade = (roadY(course, distance + 1) - roadY(course, distance - 1)) * 4.9;
@@ -381,7 +393,7 @@ function advanceCar(state, input, dt) {
 
   // The tyres limit the rate the steering can turn the car. The road tangent provides a neutral heading.
   const velocity = (speed + state.speed) * .5;
-  const grip = car.grip * (onShoulder ? 1.35 : 2.23) * (braking ? .85 : 1) * (distance < state.gripUntil ? 1.25 : 1) * (distance < state.tireUntil ? 1.15 : 1) * slick(state);
+  const grip = car.grip * (onShoulder ? 1.35 : 2.23) * (braking ? .85 : 1) * (distance < state.gripUntil ? 1.25 : 1) * (.8 + .2 * state.tire) * slick(state);
   const turnLimit = grip / Math.max(velocity, 3);
   const turning = clamp(velocity * Math.tan(state.steer) / wheelbase, -turnLimit, turnLimit);
   const previousYaw = state.yaw;
@@ -396,6 +408,8 @@ function advanceCar(state, input, dt) {
   state.distance += forward;
   state.fuel = Math.max(0, state.fuel - Math.max(0, forward) / FUEL_RANGE * (state.distance < state.saver ? .75 : 1));
   state.hunger = Math.max(0, state.hunger - Math.max(0, forward) / HUNGER_RANGE);
+  state.tire = Math.max(0, state.tire - Math.max(0, forward) / TIRE_LIFE * (braking ? 1.6 : 1));
+  state.oil = Math.max(0, state.oil - Math.max(0, forward) / OIL_LIFE);
   state.x = clamp(x + lateral, -6.55, 6.55);
   if (state.x !== x + lateral) state.yaw = damp(state.yaw, 0, dt, 6);
   state.wheelSpin = (state.wheelSpin - travel / TIRE_RADIUS) % (Math.PI * 2);
@@ -413,6 +427,7 @@ export function step(state, input, dt) {
   state.signal = null;
   const before = state.distance;
   const hungerBefore = state.hunger;
+  const tireBefore = state.tire, oilBefore = state.oil;
   const weatherBefore = weatherAt(state.course, state.distance).kind;
   const previousX = state.x;
   advanceCar(state, input, dt);
@@ -481,6 +496,8 @@ export function step(state, input, dt) {
   if (weatherNow !== weatherBefore && !state.signal) {
     state.signal = { rain: '비가 와요  ·  길이 미끄러워요', snow: '눈이 와요  ·  길이 미끄러워요', fog: '안개가 짙어요', cloudy: '구름이 몰려와요', clear: '날이 개었어요' }[weatherNow];
   }
+  if (state.tire < .3 && tireBefore >= .3 && !state.signal) state.signal = '타이어가 많이 닳았어요  ·  정비소에 들르세요';
+  if (state.oil < .2 && oilBefore >= .2 && !state.signal) state.signal = '엔진오일이 부족해요  ·  정비소에 들르세요';
   if (state.hunger < .2 && hungerBefore >= .2 && !state.signal) state.signal = '배고픔  ·  휴게소 식당에 들르세요';
   if (state.hunger <= 0 && hungerBefore > 0) state.signal = '배가 고파 힘이 빠져요  ·  최고 속도 -20%';
 

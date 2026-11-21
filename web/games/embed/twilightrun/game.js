@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, pumpFuel, serviceCar, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=16';
-import { createScene } from './scene.js?v=16';
-import { impactDuration } from './impact.js?v=16';
-import { assetRoot } from './world.js?v=16';
-import { requestYield } from './traffic.js?v=16';
-import { createShowroom } from './showroom.js?v=16';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=16';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, pumpFuel, serviceCar, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=17';
+import { createScene } from './scene.js?v=17';
+import { impactDuration } from './impact.js?v=17';
+import { assetRoot } from './world.js?v=17';
+import { requestYield } from './traffic.js?v=17';
+import { createShowroom } from './showroom.js?v=17';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=17';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -190,7 +190,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=16`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=17`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -395,11 +395,15 @@ function paintRest() {
   $('service-list').innerHTML = services.map(item => {
     const price = servicePrice(state, item.id);
     const done = restServiced.has(item.id);
-    const needless = item.id === 'repair' && !price;
+    const needless = !done && !price;
     const short = !done && !needless && profile.balance < price;
-    return `<button type="button" class="service" data-service="${item.id}" ${done || needless || short ? 'disabled' : ''}>
-      <span aria-hidden="true">${icons[item.id]}</span><b>${item.name}</b><small>${item.effect}</small>
-      <em>${done ? '했어요' : needless ? '고칠 곳 없음' : short ? `${number(price - profile.balance)} 모자람` : '◆ ' + number(price)}</em>
+    const cond = carCondition(state, item.id);
+    const level = cond.value > .7 ? 'good' : cond.value > .35 ? 'mid' : 'bad';
+    return `<button type="button" class="service ${done ? 'done' : ''}" data-service="${item.id}" ${done || needless || short ? 'disabled' : ''}>
+      <span aria-hidden="true">${icons[item.id]}</span><b>${item.name}</b>
+      <i class="cond ${level}"><b style="transform: scaleX(${cond.value.toFixed(3)})"></b></i>
+      <small>${cond.text}</small>
+      <em>${done ? `${item.done} ✓` : needless ? '상태 좋음' : short ? `${number(price - profile.balance)} 모자람` : '◆ ' + number(price)}</em>
     </button>`;
   }).join('');
   $('belly-bar').style.transform = `scaleX(${state.hunger})`;
@@ -488,7 +492,7 @@ function pumpStep(step) {
   $('pump-step').textContent = {
     grade: '기름을 고르세요',
     nozzle: '주유기에서 노즐을 끌어다 차 주유구에 꽂으세요',
-    fill: '꾹 누르는 동안 기름이 들어가요 — 90~100% 에서 떼면 딱 맞게!',
+    fill: '꾹 누르는 동안 기름이 들어가요 — 100% 가 되면 저절로 멈춰요 · 90% 넘어서 떼면 딱 맞게!',
     done: '주유 끝',
   }[step];
   $('grades').hidden = step !== 'grade';
@@ -513,8 +517,13 @@ function pumpTick(t) {
   if (!pump.holding) return;
   const dt = pump.last ? Math.min(.05, (t - pump.last) / 1000) : 0;
   pump.last = t;
-  pump.added += dt * .22;
+  // 흘리지 않는다(운영자 요청) — 100% 가 되면 저절로 멈춘다
+  pump.added = Math.min(1 - state.fuel, pump.added + dt * .22);
   paintPump();
+  if (state.fuel + pump.added >= .999) {
+    holdPump(false);
+    return;
+  }
   pump.frame = requestAnimationFrame(pumpTick);
 }
 function holdPump(on) {
@@ -537,7 +546,7 @@ function holdPump(on) {
   pump.added = 0;
   const lines = [`넣은 양 +${Math.round(pump.total * 100)}% → ${Math.round(result.level * 100)}%`, `결제 ${number(pump.paid)}점`];
   if (pump.bonus) lines.push('딱 맞게! +100점');
-  if (pump.spilled > 0) lines.push(`넘쳤어요 — 흘린 ${Math.round(pump.spilled * 100)}% 만큼 돈만 나갔어요`);
+  if (result.level >= .999) lines.push('가득 찼어요');
   if (pump.grade === 'premium') lines.push('고급 휘발유 — 3 km 동안 가속 +12%');
   $('receipt-text').innerHTML = lines.map(line => `<span>${line}</span>`).join('');
   beep(result.exact ? 880 : 520, .14);
@@ -635,7 +644,7 @@ $('service-list').addEventListener('click', event => {
   serviceCar(state, id);
   restServiced.add(id);
   const item = services.find(entry => entry.id === id);
-  $('rest-status').textContent = `${item.name} 끝 — ${item.effect}`;
+  $('rest-status').textContent = `${item.done} — ${carCondition(state, id).text}`;
   beep(640, .1);
   $('balance').textContent = number(profile.balance);
   paintRest();
