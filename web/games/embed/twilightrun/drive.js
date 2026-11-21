@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=24';
-import { DAY_STARTS, weatherAt } from './daytime.js?v=24';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=31';
+import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=31';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -318,7 +318,8 @@ function fillTraffic(state) {
         clearance: Infinity,
       });
     }
-    state.spawnAt += range(52, 68) * (mode.passes ? .85 : mode.twoWay ? 1.25 : 1);
+    // 시간대별 교통량 — 차가 많을수록 다음 차까지 간격이 짧다
+    state.spawnAt += range(52, 68) * (mode.passes ? .85 : mode.twoWay ? 1.25 : 1) / trafficBand(dayProgress(state)).density;
   }
 }
 
@@ -531,6 +532,9 @@ export function step(state, input, dt) {
     state.restCall = null;
   } else if (rest != null && state.distance > rest) state.restCall = null;
   if (state.fuel < .2 && state.fuel + Math.max(0, state.distance - before) / FUEL_RANGE >= .2 && !state.signal) state.signal = '기름 부족  ·  휴게소에 들르세요';
+  const bandBefore = trafficBand(dayProgress({ ...state, distance: before })).label;
+  const bandNow = trafficBand(dayProgress(state)).label;
+  if (bandNow !== bandBefore && !state.signal) state.signal = bandNow;
   const weatherNow = weatherAt(state.course, state.distance).kind;
   if (weatherNow !== weatherBefore && !state.signal) {
     state.signal = { rain: '비가 와요  ·  길이 미끄러워요', snow: '눈이 와요  ·  길이 미끄러워요', fog: '안개가 짙어요', cloudy: '구름이 몰려와요', clear: '날이 개었어요' }[weatherNow];

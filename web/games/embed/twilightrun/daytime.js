@@ -42,6 +42,21 @@ export function dayTime(progress, endless = false) {
   };
 }
 
+// 시간대별 교통량(운영자 요청) — 지금 교통량(1)이 가장 많은 쪽(출근 · 퇴근길), 다른 때는 줄기만(운영자: 지금보다 더 많게는 하지 마)
+const trafficBands = [
+  { from: 7, to: 9, density: 1, label: '출근길이라 차가 많아요' },
+  { from: 9, to: 12, density: .85, label: '오전이라 길이 조금 한가해요' },
+  { from: 12, to: 14, density: .9, label: '점심때라 차가 꽤 있어요' },
+  { from: 14, to: 17, density: .8, label: '오후라 길이 한가해요' },
+  { from: 17, to: 19, density: 1, label: '퇴근길이라 차가 많아요' },
+  { from: 19, to: 21, density: .7, label: '저녁이라 차가 줄었어요' },
+  { from: 21, to: 31, density: .5, label: '밤이라 길이 한산해요' },
+];
+export function trafficBand(progress) {
+  const hour = 7 + progress * 16;
+  return trafficBands.find(band => hour >= band.from && hour < band.to) || trafficBands.at(-1);
+}
+
 const seeded = n => { const x = Math.sin(n * 91.7 + 13.1) * 43758.5453; return x - Math.floor(x); };
 const SPAN = 1200;
 function weatherKind(course, index) {
