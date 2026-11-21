@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=38';
-import { createScene } from './scene.js?v=38';
-import { impactDuration } from './impact.js?v=38';
-import { assetRoot } from './world.js?v=38';
-import { requestYield } from './traffic.js?v=38';
-import { createShowroom } from './showroom.js?v=38';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=38';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=39';
+import { createScene } from './scene.js?v=39';
+import { impactDuration } from './impact.js?v=39';
+import { assetRoot } from './world.js?v=39';
+import { requestYield } from './traffic.js?v=39';
+import { createShowroom } from './showroom.js?v=39';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=39';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -220,7 +220,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=38`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=39`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -647,8 +647,9 @@ function pumpTick(t) {
   const affordable = free + profile.balance / (100 * fuelRate(pump.grade));
   const cap = Math.min(1 - state.fuel, affordable);
   pump.added = Math.min(cap, pump.added + dt * .22);
+  if (pump.added >= cap - .0005) pump.added = cap; // 끝까지 넣었으면 남은 빈자리를 정확히 채운다(99.6% 같은 값이 100% 로만 보이지 않게)
   paintPump();
-  if (pump.added >= cap - .0005) {
+  if (pump.added >= cap) {
     pump.broke = cap < 1 - state.fuel - .001;
     holdPump(false);
     return;
@@ -665,7 +666,10 @@ function holdPump(on) {
     return;
   }
   cancelAnimationFrame(pump.frame);
-  if (pump.added < .01) return;
+  // 1% 도 안 되게 살짝 눌렀다 뗀 것은 무시 — 다만 99% 처럼 빈자리가 1% 보다 작아 그만큼 가득 채운 것은 넣은 것으로 친다
+  // (예전엔 이것도 무시해서 게이지만 100% 로 보이고 실제론 안 들어가, 다음으로 안 넘어가고 그만두면 다시 99% 였다)
+  const full = pump.added > 0 && pump.added >= 1 - state.fuel - .0005;
+  if (pump.added < .01 && !full) return;
   // 계속 넣기를 위해 넣은 만큼씩 결제 — 딱 맞게 보너스는 주유를 마칠 때 한 번(앞에서 받았으면 다시 안 줌)
   const result = pumpFuel(state, pump.added, pump.grade, !pump.bonus);
   profile.balance = Math.max(0, profile.balance - result.cost);
