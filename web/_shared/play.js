@@ -1211,7 +1211,10 @@ window.HKPlay = (function () {
     const scrim = document.getElementById("hk-pf-scrim");
     if (!scrim || scrim.hidden) return;
     const bar = document.getElementById("hk-play-head");
-    scrim.style.top = (bar ? Math.max(0, Math.round(bar.getBoundingClientRect().bottom)) : 0) + "px";
+    // 낮은 가로 화면은 머리줄이 왼쪽 세로 막대라 덮개를 위에서부터 (막대 오른쪽만) 덮는다
+    const low = document.querySelector(".hk-pf.is-lowland");
+    scrim.style.top = (!low && bar ? Math.max(0, Math.round(bar.getBoundingClientRect().bottom)) : 0) + "px";
+    scrim.style.left = (low && bar ? Math.max(0, Math.round(bar.getBoundingClientRect().right)) : 0) + "px";
     scrim.classList.toggle("is-clear", window.matchMedia("(min-width: 900px)").matches);
   }
   function openBoard(on) {
@@ -1247,15 +1250,29 @@ window.HKPlay = (function () {
   // (출근길 대작전·비타민 3매치 비율). 화면이 좁으면 화면 폭에 맞춘다. 게임들은 창 크기에 맞춰 다시 그린다
   // wide: 가로로 넓게 보는 게임(3D 레이싱 등) — 창 폭을 가운데 영역 폭 가득 쓴다(휴대폰은 원래도 폭 가득이라 같다)
   const FRAME_RATIO = 0.88;
+  // 낮은 가로 화면 — 가로로 든 휴대폰(844×390 · 주소창이 보이면 340 안팎)처럼 손가락으로 쓰는 화면이 가로가 더 길고 높이가 520 미만.
+  // 넓은 화면 게임(wide)만: 위 머리줄을 왼쪽 세로 막대로 옮겨(가로는 남으니) 게임 창이 화면 높이를 꽉 쓰게 한다.
+  // 예전에는 머리줄 57px + 창 최소 높이 360px 이라 844×390 에서 창 아래 39px(게임은 54px)이 화면 밖으로 잘렸다.
+  // 데스크톱(마우스) · 세로 휴대폰 · 높이 520 이상은 예전 그대로
+  const LOW_LAND_MQ = "(orientation: landscape) and (max-height: 519px) and (hover: none), (orientation: landscape) and (max-height: 519px) and (pointer: coarse)";
+  function isLowLand() { return window.matchMedia(LOW_LAND_MQ).matches; }
   function fitStage(stage, wide) {
     const main = document.getElementById("hk-pf-main");
     const frame = stage.parentElement;
+    const pf = document.querySelector(".hk-pf");
+    function mark() {
+      const on = !!wide && isLowLand();
+      if (pf && pf.classList.contains("is-lowland") !== on) { pf.classList.toggle("is-lowland", on); placeScrim(); }
+      return on;
+    }
     function fit() {
+      const low = mark();
       // 세로·가로 여백을 따로 잰다 (휴대폰은 responsive.css 가 좌우 여백을 다르게 강제한다)
       const cs = getComputedStyle(main);
       const padV = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
       const padH = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-      const H = Math.max(360, main.clientHeight - padV);
+      // 낮은 가로 화면은 360 최소값을 풀어 남은 높이를 그대로 쓴다(너무 작아지지 않게 200 은 둔다)
+      const H = Math.max(low ? 200 : 360, main.clientHeight - padV);
       const W = Math.max(280, wide ? main.clientWidth - padH : Math.min(main.clientWidth - padH, Math.round(H * FRAME_RATIO)));
       if (frame.style.width === `${W}px` && frame.style.height === `${H}px`) return;
       frame.style.width = `${W}px`;
@@ -1265,6 +1282,7 @@ window.HKPlay = (function () {
     fit();
     let timer = null;
     window.addEventListener("resize", () => {
+      mark(); // 돌리자마자 머리줄 자리부터 바꾼다 — 창 크기는 잠깐 뒤에 맞춘다
       clearTimeout(timer);
       timer = setTimeout(fit, 60);
     });

@@ -677,6 +677,23 @@
   $('ability').onclick = () => { sim?.ability(); updateHUD(); canvas.focus(); };
   $('overview').onclick = () => { if (screen === 'play') toggleOverview(); canvas.focus(); };
   $('sound').onclick = () => { sound = !sound; $('sound').setAttribute('aria-pressed', String(sound)); $('sound').setAttribute('aria-label', sound ? '소리 끄기' : '소리 켜기'); $('sound').style.opacity = sound ? '1' : '.55'; tone(660); };
+  // 전체 화면 — 휴대폰에서 아케이드 머리줄 · 주소창 없이 전장을 화면 가득. 전체 화면을 못 쓰는 곳(아이폰 사파리 등)은 단추를 숨긴다
+  (() => {
+    const btn = $('fullscreen'), root = document.documentElement;
+    const can = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled) && !!(root.requestFullscreen || root.webkitRequestFullscreen);
+    if (!can) return;
+    const isOn = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const sync = () => { const on = isOn(); btn.setAttribute('aria-pressed', String(on)); btn.setAttribute('aria-label', on ? '전체 화면 끝내기' : '전체 화면으로'); btn.classList.toggle('is-on', on); };
+    btn.hidden = false;
+    btn.onclick = () => {
+      try {
+        if (isOn()) (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        else { const r = (root.requestFullscreen || root.webkitRequestFullscreen).call(root, { navigationUI: 'hide' }); if (r && r.catch) r.catch(() => {}); }
+      } catch (_) {}
+      canvas.focus();
+    };
+    document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+  })();
   // Swipe the stage map sideways to change place.
   (() => {
     const panel = $('place-panel'); let down = null;
