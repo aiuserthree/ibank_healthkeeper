@@ -1,4 +1,4 @@
-import { ROAD_WIDTH, roadX, roadY, sectionIndex, trackLook } from './drive.js?v=9';
+import { ROAD_WIDTH, roadX, roadY, sectionIndex, trackLook } from './drive.js?v=10';
 
 export const assetRoot = '/assets/games/twilightrun/';
 export const atmospheres = {
@@ -11,6 +11,14 @@ export const atmospheres = {
   desert: { fog: '#b59b91', ground: '#ae8d74', asphalt: '#65565c', concrete: '#a98e80', light: '#ffd4a5', sky: '#d7c3e1' },
   meadow: { fog: '#a4bbb8', ground: '#74834f', asphalt: '#505759', concrete: '#9a9c85', light: '#fff0cc', sky: '#c9edff' },
 };
+// 실사 배경(힉스필드, 운영자 승인) — 길가 그림(잘라낸 실사)과 땅 질감. aspect = 가로 / 세로(잘라낸 뒤)
+const scenery = {
+  pine: { aspect: .59, cross: true }, broadleaf: { aspect: .68, cross: true }, cedar: { aspect: .29, cross: true },
+  snowpine: { aspect: .66, cross: true }, shrub: { aspect: 1, cross: true },
+  rock: { aspect: 1.48, cross: true }, redrock: { aspect: 1.5, cross: true },
+  house: { aspect: 1.52 }, barn: { aspect: 1.53 }, seaside: { aspect: 2.02 },
+};
+const groundOf = { coast: 'dirt', port: 'dirt', ridge: 'sand', forest: 'grass', metro: 'dirt', alpine: 'snow', desert: 'sand', meadow: 'grass' };
 const half = ROAD_WIDTH / 2;
 const chunkSize = 72;
 const rowSize = 4;
@@ -157,11 +165,43 @@ export function createWorld(T, scene) {
   const water = grainMap(T, 'water');
   const clock = { value: 0 };
   const windows = windowMap(T);
+  const loader = new T.TextureLoader();
+  const photo = (file, repeat) => {
+    const map = loader.load(`${assetRoot}scenery/${file}.webp?v=1`);
+    map.colorSpace = T.SRGBColorSpace;
+    map.anisotropy = 4;
+    if (repeat) {
+      map.wrapS = map.wrapT = T.MirroredRepeatWrapping;
+      map.repeat.set(.42, .42);
+    }
+    return map;
+  };
+  const groundMaps = Object.fromEntries(['grass', 'sand', 'snow', 'dirt'].map(kind => [kind, photo(`ground-${kind}`, true)]));
+  // 길가 그림 — 잘라낸 실사 그림, 투명한 곳은 버린다(alphaTest), 뒤에서 비쳐도 너무 어둡지 않게 자기 빛 조금
+  const cutouts = Object.fromEntries(Object.keys(scenery).map(name => {
+    const map = photo(name);
+    return [name, new T.MeshStandardMaterial({
+      map, alphaTest: .45, side: T.DoubleSide, roughness: .9, emissive: '#ffffff', emissiveMap: map, emissiveIntensity: .22,
+    })];
+  }));
+  const cutoutPlane = new T.PlaneGeometry(1, 1).translate(0, .5, 0);
+  const cutoutCross = (() => {
+    const a = new T.PlaneGeometry(1, 1).translate(0, .5, 0);
+    const b = a.clone().rotateY(Math.PI / 2);
+    const geometry = new T.BufferGeometry();
+    for (const name of ['position', 'normal', 'uv']) {
+      geometry.setAttribute(name, new T.Float32BufferAttribute([...a.getAttribute(name).array, ...b.getAttribute(name).array], a.getAttribute(name).itemSize));
+    }
+    geometry.setIndex([...a.index.array, ...[...b.index.array].map(i => i + 4)]);
+    return geometry;
+  })();
   const surfaces = Object.fromEntries(Object.entries(atmospheres).map(([key, t]) => {
     const color = key === 'coast' ? '#3f596b' : '#313856';
+    // 땅: 실사 질감, 색은 그 풍경의 땅빛으로 살짝만 물들인다
+    const landColor = new T.Color(t.ground).lerp(new T.Color('#ffffff'), .55);
     return [key, {
       road: material(t.asphalt, { map: asphalt, bumpMap: asphalt, bumpScale: .022, roughness: t.wet ? .32 : .83, metalness: t.wet ? .24 : 0 }),
-      land: material(t.ground, {map: gravel, vertexColors: true}),
+      land: material(landColor, { map: groundMaps[groundOf[key]], vertexColors: true, roughness: .95 }),
       sea: waterMaterial(T, water, color, t.light, clock),
       shoulder: material(t.concrete, {map: gravel}),
       rail: material(t.concrete, { roughness: .48, metalness: .31, map: gravel }),
@@ -182,8 +222,6 @@ export function createWorld(T, scene) {
   const rock = material('#9a6350', { map: gravel });
   const dirt = material('#67594b', { map: gravel });
   const snow = material('#dbe3ee', { map: gravel });
-  const leaf = material('#254a40', { map: gravel });
-  const leafLight = material('#3d6253', { map: gravel });
   const grass = material('#60744b', { map: gravel });
   const blade = material('#e5e5df', { roughness: .62 });
   const tower = material('#6f7c96', { map: windows, emissive: '#b5d1ff', emissiveMap: windows, emissiveIntensity: .35 });
@@ -198,7 +236,6 @@ export function createWorld(T, scene) {
 
   const cube = new T.BoxGeometry(1, 1, 1);
   const pillar = new T.CylinderGeometry(.72, 1, 1, 8);
-  const pine = new T.ConeGeometry(1, 1, 8);
   const boulder = new T.DodecahedronGeometry(.9, 1);
   const rockVertices = boulder.getAttribute('position');
   for (let i = 0; i < rockVertices.count; i++) {
@@ -339,6 +376,12 @@ export function createWorld(T, scene) {
       queue(cube, fabric);
     }
     const box = (fabric, ...args) => prop(cube, fabric, ...args);
+    // 실사 길가 그림 — 높이 h(m), 나무 · 바위는 십자 판(아무 각도로 돌림), 집은 길 쪽을 보는 한 장
+    function cutout(name, x, z, h, seed, sink = 0) {
+      const { aspect, cross } = scenery[name];
+      const rotation = cross ? random(seed) * Math.PI : (x > 0 ? -1 : 1) * Math.PI / 2 + (random(seed) - .5) * .5;
+      prop(cross ? cutoutCross : cutoutPlane, cutouts[name], x, -sink, z, h * aspect, h, h * aspect, rotation);
+    }
     function streetlight(side, z) {
       const x = side * (half + 1.28);
       box(metal, x, 2.85, z, .13, 5.7, .13);
@@ -346,13 +389,10 @@ export function createWorld(T, scene) {
       box(current.theme === 'metro' ? neon : lamp, x - side * 1.23, 5.64, z, .52, .055, .25);
     }
     function tree(x, z, seed, snowy = false) {
-      const tall = 3.5 + random(seed) * 8.5;
-      prop(pillar, dirt, x, tall * .25, z, tall * .035, tall * .62, tall * .035);
-      for (let i = 0; i < 3; i++) {
-        const spread = tall * (.27 - i * .05);
-        prop(pine, snowy && i ? snow : i % 2 ? leafLight : leaf, x, tall * (.53 + i * .14), z,
-          spread, tall * .46, spread, seed);
-      }
+      const tall = 7 + random(seed) * 9;
+      const kind = snowy ? 'snowpine' : current.theme === 'meadow' || current.theme === 'coast' ? (random(seed + 3) < .6 ? 'broadleaf' : 'pine')
+        : random(seed + 3) < .5 ? 'cedar' : 'pine';
+      cutout(kind, x, z, tall, seed, .3);
     }
     function turbine(x, z, seed) {
       const y = 21 + random(seed) * 10;
@@ -383,7 +423,9 @@ export function createWorld(T, scene) {
           case 'cliffs':
             if (side < 0) {
               prop(boulder, dirt, x * 1.45, .21, z, 4 + random(seed) * 5, 2.6 + random(-seed) * 4, 6.8, seed);
+              cutout('rock', x * 1.15, z + 5, 2.5 + random(seed + 7) * 3, seed, .4);
               if (z % 24 < 10) tree(x * 1.45, z, seed);
+              if (z % 120 < 10) cutout('seaside', x * 2.3, z, 7, seed, .2);
             }
             break;
           case 'cranes':
@@ -411,21 +453,29 @@ export function createWorld(T, scene) {
             break;
           case 'snow':
             prop(boulder, snow, x * 1.45, .1, z, 4 + random(seed) * 5, 2 + random(-seed) * 7, 5.5, seed);
-            prop(boulder, stone, x * 1.44, -.25, z + 4, 3, 5.3, 3.4, -seed);
-            if (z % 24 < 10) tree(x * 1.25, z - 4, seed, true);
+            cutout('rock', x * 1.2, z + 4, 3 + random(-seed) * 2.5, -seed, .5);
+            tree(x * 1.25, z - 4, seed, true);
+            if (z % 24 < 10) tree(x * 1.8, z + 3, seed + 11, true);
             break;
           case 'columns':
           case 'arch':
             prop(boulder, rock, x * 1.30, 1.3, z, 4.5, 4 + random(seed) * 8.2, 6.5, seed);
-            prop(boulder, red, x * 1.50, 1, z + 3, 4.8, 6.5 + random(-seed) * 9.5, 5.3, -seed);
+            cutout('redrock', x * 1.55, z + 3, 6 + random(-seed) * 8, -seed, .5);
+            if (z % 24 < 10) cutout('shrub', x * .95, z - 4, 1.4 + random(seed) * .8, seed);
             break;
           case 'windmills':
             if (z % 96 < 10) turbine(x * (1.6 + random(seed) * 1.4), z, seed);
+            if (z % 36 < 10) tree(x * 1.1, z + 4, seed + 5);
+            if (z % 168 < 10 && side > 0) cutout('house', x * 2, z, 6.5, seed, .2);
             break;
           case 'dunes':
           case 'fields':
             prop(boulder, local.landmark === 'fields' ? grass : pale, x * 1.35, -.6, z, 6.8, .5 + random(seed) * 1.6, 6.3, seed);
-            if (local.landmark === 'fields') beam(dirt, post + side * 3.8, 1, z - 6, post + side * 3.8, 1, z + 6, .13);
+            if (local.landmark === 'fields') {
+              beam(dirt, post + side * 3.8, 1, z - 6, post + side * 3.8, 1, z + 6, .13);
+              if (z % 36 < 10) tree(x * 1.4, z, seed + 9);
+              if (z % 144 < 10) cutout(side > 0 ? 'barn' : 'house', x * 2.1, z + 6, 7.5, seed, .2);
+            } else cutout('shrub', x * .9, z + 3, 1.2 + random(seed) * 1, seed);
             break;
           case 'bridge':
             if (z % 72 < 10) {

@@ -1,4 +1,4 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=9';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=10';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };

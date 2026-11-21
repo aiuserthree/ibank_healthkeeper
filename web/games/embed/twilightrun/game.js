@@ -1,9 +1,9 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=9';
-import { createScene } from './scene.js?v=9';
-import { impactDuration } from './impact.js?v=9';
-import { assetRoot } from './world.js?v=9';
-import { requestYield } from './traffic.js?v=9';
-import { createShowroom } from './showroom.js?v=9';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=10';
+import { createScene } from './scene.js?v=10';
+import { impactDuration } from './impact.js?v=10';
+import { assetRoot } from './world.js?v=10';
+import { requestYield } from './traffic.js?v=10';
+import { createShowroom } from './showroom.js?v=10';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -189,7 +189,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=9`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=10`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
