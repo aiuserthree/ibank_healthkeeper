@@ -1,5 +1,5 @@
-import { TIRE_RADIUS } from './drive.js?v=35';
-import { bodyFinish, glassFinish } from './finishes.js?v=35';
+import { TIRE_RADIUS } from './drive.js?v=36';
+import { bodyFinish, glassFinish } from './finishes.js?v=36';
 
 // 차고에서 사는 새 차 6대. 기존 4종(매끈 · 투톤 지붕 · 칼날 LED)과 겹치지 않게 차마다 몸통 단면 · 유리 · 얼굴 조명 · 꼬리를 따로 짠다.
 // 모양은 운영자가 준 참고 사진 6장(2026-11-21)을 따라가고, 로고 · 엠블럼 · 글자는 넣지 않는다.
