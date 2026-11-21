@@ -510,10 +510,15 @@ const holster = { x: .234, y: .50 }, door = { x: .827, y: .625 };
 const hoseRoot = { x: .115, y: .78 };
 function drawHose(x, y) {
   const plugged = $('nozzle').classList.contains('plugged');
-  const end = { x: x - (plugged ? .112 : .035), y: y + (plugged ? .02 : .012) };
+  // 노즐 그림의 호스 끝(그림 왼쪽 아래 0% · 92%)을 CSS 이동 · 회전대로 계산한 자리 — 걸이(-8°)와 꽂힘(10°)
+  const end = plugged ? { x: x - .1147, y: y + .024 } : { x: x - .0339, y: y + .0563 };
   const [x0, y0, x1, y1] = [hoseRoot.x * 1600, hoseRoot.y * 905, end.x * 1600, end.y * 905];
   const sag = Math.max(120, Math.abs(x1 - x0) * .45);
-  const d = `M${x0} ${y0} C${x0 + 40} ${y0 + sag}, ${x1 - sag} ${y1 + sag * .9}, ${x1} ${y1}`;
+  // 노즐의 호스 토막 방향(그림 속 왼쪽 아래 약 136°)에 회전(-8° · 10°)을 더한 쪽으로 곡선이 빠져나오게 — 이음매가 꺾이지 않게
+  const angle = (136 + (plugged ? 10 : -8)) * Math.PI / 180;
+  const pull = Math.max(140, Math.hypot(x1 - x0, y1 - y0) * .35);
+  const c2 = [x1 + Math.cos(angle) * pull, y1 + Math.sin(angle) * pull];
+  const d = `M${x0} ${y0} C${x0 + 40} ${y0 + sag}, ${c2[0].toFixed(1)} ${c2[1].toFixed(1)}, ${x1} ${y1}`;
   $('hose').setAttribute('d', d);
   $('hose-shine').setAttribute('d', d);
 }
