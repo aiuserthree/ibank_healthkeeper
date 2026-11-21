@@ -1,9 +1,9 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=4';
-import { createScene } from './scene.js?v=4';
-import { impactDuration } from './impact.js?v=4';
-import { assetRoot } from './world.js?v=4';
-import { requestYield } from './traffic.js?v=4';
-import { createShowroom } from './showroom.js?v=4';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=5';
+import { createScene } from './scene.js?v=5';
+import { impactDuration } from './impact.js?v=5';
+import { assetRoot } from './world.js?v=5';
+import { requestYield } from './traffic.js?v=5';
+import { createShowroom } from './showroom.js?v=5';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -189,7 +189,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=4`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=5`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -476,10 +476,7 @@ function frame(t) {
       $('countdown').textContent = label;
       beep(countdown > 0 ? 430 : 740);
     }
-    if (countdown <= 0) {
-      runStarted = true;
-      send('hk:start');
-    }
+    if (countdown <= 0) runStarted = true;
   } else {
     $('countdown').hidden = state.elapsed > .65;
     impactAge += dt;
@@ -558,6 +555,8 @@ function start() {
   $('home').hidden = true;
   stage.hidden = $('hud').hidden = $('countdown').hidden = false;
   $('countdown').textContent = '3';
+  // 판 시작은 카운트다운 전에 알린다 — 아케이드가 이 신호로 순위 패널을 닫는다(전에는 3·2·1 동안 열려 있었음)
+  send('hk:start');
   $('signal').hidden = true;
   $('race-label').textContent = state.mode.name;
   paintHud();
