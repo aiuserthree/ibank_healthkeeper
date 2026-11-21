@@ -1,4 +1,4 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=10';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=12';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -20,8 +20,45 @@ export const foods = [
   { id: 'udon', name: '우동', price: 600, fill: .7, effect: '배 +70% · 내구도 가득 · 찌그러짐 펴기' },
   { id: 'hotbar', name: '핫바', price: 250, fill: .4, effect: '배 +40% · 다음 휴게소까지 기름 25% 덜 씀' },
   { id: 'coffee', name: '커피', price: 400, fill: .2, effect: '배 +20% · 3 km 동안 최고 속도 +12 km/h' },
+  // 2차 메뉴(운영자 요청)
+  { id: 'tteok', name: '떡볶이', price: 350, fill: .5, effect: '배 +50% · 3 km 동안 핸들이 더 잘 듦' },
+  { id: 'sotteok', name: '소떡소떡', price: 280, fill: .4, effect: '배 +40% · 다음 충돌 1번 막아 줌' },
+  { id: 'tornado', name: '회오리감자', price: 200, fill: .3, effect: '배 +30% · 3 km 동안 추월 점수 2배' },
+  { id: 'hotdog', name: '핫도그', price: 320, fill: .5, effect: '배 +50% · 내구도 +1' },
 ];
 export const restAt = index => REST_FIRST + index * REST_EVERY;
+// 정비소(운영자 요청) — 보유 크레딧으로. 수리는 빠진 내구도 한 칸에 60(내구도는 가득인데 찌그러졌으면 60)
+export const services = [
+  { id: 'repair', name: '차체 수리', effect: '내구도 가득 · 찌그러짐 펴기' },
+  { id: 'tire', name: '타이어 교체', price: 80, effect: '다음 휴게소까지 접지력 +15%' },
+  { id: 'oil', name: '엔진오일 교환', price: 80, effect: '다음 휴게소까지 가속 +8%' },
+];
+export function servicePrice(state, id) {
+  if (id !== 'repair') return services.find(item => item.id === id).price;
+  const missing = MAX_HEALTH - state.health;
+  return missing ? missing * 60 : Object.values(state.damage).some(v => v > .01) ? 60 : 0;
+}
+export function serviceCar(state, id) {
+  const next = restAt(state.restStop.index + 1);
+  if (id === 'repair') {
+    state.health = MAX_HEALTH;
+    for (const zone of Object.keys(state.damage)) state.damage[zone] = 0;
+  }
+  if (id === 'tire') state.tireUntil = next;
+  if (id === 'oil') state.oilUntil = next;
+}
+// 주유 미니게임 결과 — added: 넣은 양(0~1, 넘친 것 포함), grade: regular | premium
+export function pumpFuel(state, added, grade) {
+  const level = state.fuel + added;
+  const spilled = Math.max(0, level - 1);
+  const cost = Math.round(added * 100 * (grade === 'premium' ? 3 : 1));
+  const exact = level >= .9 && level <= 1;
+  state.fuel = Math.min(1, level);
+  state.bonus += (exact ? 100 : 0) - cost;
+  state.score = Math.max(0, state.score + (exact ? 100 : 0) - cost);
+  if (grade === 'premium') state.powerUntil = state.distance + 3000;
+  return { cost, spilled, exact, level: state.fuel };
+}
 export function nextRest(state) {
   const index = Math.max(0, Math.ceil((state.distance - REST_FIRST) / REST_EVERY));
   const at = restAt(index);
@@ -41,7 +78,10 @@ export function eatFood(state, id) {
   state.bonus -= food.price;
   state.score = Math.max(0, state.score - food.price);
   state.hunger = Math.min(1, state.hunger + food.fill);
-  if (id === 'walnut') state.health = Math.min(MAX_HEALTH, state.health + 1);
+  if (id === 'walnut' || id === 'hotdog') state.health = Math.min(MAX_HEALTH, state.health + 1);
+  if (id === 'tteok') state.gripUntil = state.distance + 3000;
+  if (id === 'sotteok') state.shield = true;
+  if (id === 'tornado') state.passBoostUntil = state.distance + 3000;
   if (id === 'udon') {
     state.health = MAX_HEALTH;
     for (const zone of Object.keys(state.damage)) state.damage[zone] *= .2;
@@ -192,7 +232,7 @@ export function createRun(course, selectedMode, car) {
   const state = {
     course, mode, car, rival, traffic: [], distance: 0, elapsed: 0, remaining: mode.time,
     x: LANES[2], speed: 23, acceleration: 0, steer: 0, wheelAngle: 0, wheelSpin: 0,
-    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, hunger: 1, restCall: null, restStop: null, saver: 0, boostUntil: 0, cooldown: 0, score: 0, bonus: 0,
+    yaw: 0, pitch: 0, roll: 0, health: MAX_HEALTH, fuel: 1, hunger: 1, restCall: null, restStop: null, saver: 0, boostUntil: 0, gripUntil: 0, passBoostUntil: 0, shield: false, tireUntil: 0, oilUntil: 0, powerUntil: 0, cooldown: 0, score: 0, bonus: 0,
     overtakes: 0, closeCalls: 0, nextGate: mode.gate ?? Infinity, checkpoints: 0,
     spawnAt: 90, signal: null, impact: null, trafficImpact: null, damage: { front: 0, rear: 0, left: 0, right: 0 }, outcome: null,
   };
@@ -292,6 +332,15 @@ function collide(state, vehicle, lastX, lastZ, previousGap, length, width) {
   const toZ = vehicle.z - state.distance;
   const contact = sweptContact(fromX, toX, previousGap, toZ, width, length);
   if (!Number.isFinite(contact)) return;
+  // 소떡소떡: 다음 충돌 1번은 부딪히지 않고 상대 차를 옆으로 밀어낸다
+  if (state.shield) {
+    state.shield = false;
+    vehicle.bumped = true;
+    vehicle.skid = (vehicle.x >= state.x ? 1 : -1) * 7;
+    state.cooldown = 1.2;
+    state.signal = '소떡소떡 힘으로 버텼어요!';
+    return;
+  }
   touchVehicle(state, vehicle, lastX + (state.x - lastX) * contact, lastZ + (state.distance - lastZ) * contact,
     fromX + (toX - fromX) * contact, previousGap + (toZ - previousGap) * contact);
 }
@@ -303,7 +352,8 @@ function advanceCar(state, input, dt) {
   const onShoulder = Math.abs(x) > 6.28;
   const ratio = speed / top;
   const drag = .5 + 1.75 * ratio ** 2;
-  const throttle = input.gas && !braking && state.fuel > 0 ? car.power * (1 - .61 * ratio) : 0;
+  const tuned = (distance < state.oilUntil ? 1.08 : 1) * (distance < state.powerUntil ? 1.12 : 1);
+  const throttle = input.gas && !braking && state.fuel > 0 ? car.power * tuned * (1 - .61 * ratio) : 0;
   const brake = braking ? 10.2 + 5.2 * Math.min(1, speed / 18) : 0;
   const grade = (roadY(course, distance + 1) - roadY(course, distance - 1)) * 4.9;
   const shoulderDrag = onShoulder ? Math.min(8, speed) : 0;
@@ -324,7 +374,7 @@ function advanceCar(state, input, dt) {
 
   // The tyres limit the rate the steering can turn the car. The road tangent provides a neutral heading.
   const velocity = (speed + state.speed) * .5;
-  const grip = car.grip * (onShoulder ? 1.35 : 2.23) * (braking ? .85 : 1);
+  const grip = car.grip * (onShoulder ? 1.35 : 2.23) * (braking ? .85 : 1) * (distance < state.gripUntil ? 1.25 : 1) * (distance < state.tireUntil ? 1.15 : 1);
   const turnLimit = grip / Math.max(velocity, 3);
   const turning = clamp(velocity * Math.tan(state.steer) / wheelbase, -turnLimit, turnLimit);
   const previousYaw = state.yaw;
@@ -380,12 +430,13 @@ export function step(state, input, dt) {
       if (vehicle.bumped || vehicle.clearance < width) continue;
       if (!vehicle.oncoming) {
         state.overtakes++;
-        state.bonus += 45;
+        state.bonus += 45 * (state.distance < state.passBoostUntil ? 2 : 1);
       }
       if (vehicle.clearance < width + .82 && state.speed * 3.6 >= 115) {
         state.closeCalls++;
-        state.bonus += 115;
-        state.signal ||= '아슬아슬 추월  +115';
+        const close = 115 * (state.distance < state.passBoostUntil ? 2 : 1);
+        state.bonus += close;
+        state.signal ||= `아슬아슬 추월  +${close}`;
       }
     }
   }

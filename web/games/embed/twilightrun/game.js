@@ -1,9 +1,9 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=10';
-import { createScene } from './scene.js?v=10';
-import { impactDuration } from './impact.js?v=10';
-import { assetRoot } from './world.js?v=10';
-import { requestYield } from './traffic.js?v=10';
-import { createShowroom } from './showroom.js?v=10';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, pumpFuel, serviceCar, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=12';
+import { createScene } from './scene.js?v=12';
+import { impactDuration } from './impact.js?v=12';
+import { assetRoot } from './world.js?v=12';
+import { requestYield } from './traffic.js?v=12';
+import { createShowroom } from './showroom.js?v=12';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -189,7 +189,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=10`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=12`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -379,6 +379,7 @@ function askRest() {
 
 // 휴게소: 주행을 멈추고 차에서 내린 화면 — 주유(무료) · 식당(크레딧으로 음식, 휴게소마다 한 가지씩 한 번)
 let restEaten = new Set();
+let restServiced = new Set();
 function restTab(name) {
   $('rest-scene').dataset.scene = name === 'food' ? 'food' : 'station';
 }
@@ -386,6 +387,18 @@ function paintRest() {
   $('tank-bar').style.transform = `scaleX(${state.fuel})`;
   $('tank-value').textContent = `${Math.round(state.fuel * 100)}%`;
   $('refuel').disabled = state.fuel >= .995;
+  $('shop-balance').textContent = number(profile.balance);
+  const icons = { repair: '🔧', tire: '🛞', oil: '🛢️' };
+  $('service-list').innerHTML = services.map(item => {
+    const price = servicePrice(state, item.id);
+    const done = restServiced.has(item.id);
+    const needless = item.id === 'repair' && !price;
+    const short = !done && !needless && profile.balance < price;
+    return `<button type="button" class="service" data-service="${item.id}" ${done || needless || short ? 'disabled' : ''}>
+      <span aria-hidden="true">${icons[item.id]}</span><b>${item.name}</b><small>${item.effect}</small>
+      <em>${done ? '했어요' : needless ? '고칠 곳 없음' : short ? `${number(price - profile.balance)} 모자람` : '◆ ' + number(price)}</em>
+    </button>`;
+  }).join('');
   $('belly-bar').style.transform = `scaleX(${state.hunger})`;
   $('belly-value').textContent = `${Math.round(state.hunger * 100)}%`;
   $('rest-balance').textContent = number(state.score);
@@ -403,6 +416,7 @@ function enterRest() {
   clearInput();
   quietEngine();
   restEaten = new Set();
+  restServiced = new Set();
   $('rest-title').textContent = restNames[state.restStop.index % restNames.length];
   $('rest-status').textContent = '';
   restTab('station');
@@ -413,7 +427,7 @@ function enterRest() {
   send('hk:paused');
 }
 function departRest() {
-  if (!$('rest').open || $('rest').classList.contains('watching')) return;
+  if (!$('rest').open || $('rest').classList.contains('watching') || !$('pump').hidden) return;
   $('rest').close();
   leaveRest(state);
   previous = 0;
@@ -437,7 +451,7 @@ function playMovie(name, caption, done) {
   $('rest').classList.add('watching');
   $('refuel-movie').hidden = false;
   $('refuel-caption').textContent = caption;
-  refuelVideo.src = `${movieRoot}${name}.mp4?v=2`;
+  refuelVideo.src = `${movieRoot}${name}.mp4?v=3`;
   refuelVideo.play().catch(endMovie);
   $('refuel-skip').focus();
 }
@@ -450,13 +464,161 @@ function endMovie() {
   movieDone = null;
   done?.();
 }
-$('refuel').addEventListener('click', () => playMovie('refuel', '기름 넣는 중…', () => {
-  state.fuel = 1;
-  $('rest-status').textContent = '기름을 가득 넣었습니다';
-  beep(560, .12);
+// 직접 주유하기(운영자 요청) — 기름 고르기 → 노즐을 주유구로 끌어 꽂기 → 꾹 눌러 넣기(90~100%에서 떼면 딱 맞게 +100점) → 영수증
+const pump = { step: '', grade: 'regular', added: 0, holding: false, last: 0, frame: 0, drag: null };
+const holster = { x: .234, y: .50 }, door = { x: .827, y: .625 };
+function placeNozzle(x, y) {
+  const nozzle = $('nozzle');
+  nozzle.style.left = `${x * 100}%`;
+  nozzle.style.top = `${y * 100}%`;
+}
+function pumpStep(step) {
+  pump.step = step;
+  $('pump-step').textContent = {
+    grade: '기름을 고르세요',
+    nozzle: '주유기에서 노즐을 끌어다 차 주유구에 꽂으세요',
+    fill: '꾹 누르는 동안 기름이 들어가요 — 90~100% 에서 떼면 딱 맞게!',
+    done: '주유 끝',
+  }[step];
+  $('grades').hidden = step !== 'grade';
+  $('pump-plug').hidden = step !== 'nozzle';
+  $('pump-meter').hidden = step !== 'fill' && step !== 'done';
+  $('pump-hold').hidden = step !== 'fill';
+  $('receipt').hidden = step !== 'done';
+  $('pump-close').hidden = step === 'done';
+  $('fuel-door').classList.toggle('target', step === 'nozzle');
+  ({ grade: () => $('grades').querySelector('button')?.focus(), nozzle: () => $('pump-plug').focus(),
+    fill: () => $('pump-hold').focus(), done: () => $('pump-done').focus() })[step]?.();
+}
+function paintPump() {
+  const level = state.fuel + pump.added;
+  $('pump-fill').style.transform = `scaleX(${Math.min(1, level)})`;
+  $('pump-fill').classList.toggle('over', level > 1);
+  $('pump-value').textContent = `${Math.round(level * 100)}%`;
+  $('pump-cost').textContent = `${number(Math.round(pump.added * 100 * (pump.grade === 'premium' ? 3 : 1)))}점`;
+}
+function pumpTick(t) {
+  if (!pump.holding) return;
+  const dt = pump.last ? Math.min(.05, (t - pump.last) / 1000) : 0;
+  pump.last = t;
+  pump.added += dt * .22;
+  paintPump();
+  pump.frame = requestAnimationFrame(pumpTick);
+}
+function holdPump(on) {
+  if (pump.step !== 'fill' || pump.holding === on) return;
+  pump.holding = on;
+  if (on) {
+    pump.last = 0;
+    beep(330, .08);
+    pump.frame = requestAnimationFrame(pumpTick);
+    return;
+  }
+  cancelAnimationFrame(pump.frame);
+  if (pump.added < .01) return;
+  const result = pumpFuel(state, pump.added, pump.grade);
+  const lines = [`넣은 양 +${Math.round(pump.added * 100)}% → ${Math.round(result.level * 100)}%`, `결제 ${number(result.cost)}점`];
+  if (result.exact) lines.push('딱 맞게! +100점');
+  if (result.spilled > 0) lines.push(`넘쳤어요 — 흘린 ${Math.round(result.spilled * 100)}% 만큼 돈만 나갔어요`);
+  if (pump.grade === 'premium') lines.push('고급 휘발유 — 3 km 동안 가속 +12%');
+  $('receipt-text').innerHTML = lines.map(line => `<span>${line}</span>`).join('');
+  beep(result.exact ? 880 : 520, .14);
+  // 게이지는 떼던 순간 그대로 둔다(결제 뒤 state.fuel 에 이미 더해져 다시 그리면 두 번 더해짐)
+  pumpStep('done');
+}
+function openPump() {
+  pump.added = 0;
+  pump.holding = false;
+  placeNozzle(holster.x, holster.y);
+  $('nozzle').classList.remove('plugged');
+  $('rest').classList.add('pumping');
+  $('pump').hidden = false;
+  paintPump();
+  pumpStep('grade');
+}
+function closePump() {
+  cancelAnimationFrame(pump.frame);
+  pump.holding = false;
+  $('pump').hidden = true;
+  $('rest').classList.remove('pumping');
+  if (pump.step === 'done') $('rest-status').textContent = `주유 끝 — 기름 ${Math.round(state.fuel * 100)}%`;
+  pump.step = '';
   paintRest();
   $('depart').focus();
-}));
+}
+function plugNozzle() {
+  placeNozzle(door.x, door.y);
+  $('nozzle').classList.add('plugged');
+  beep(620, .07);
+  pumpStep('fill');
+}
+$('refuel').addEventListener('click', openPump);
+$('grades').addEventListener('click', event => {
+  const button = event.target.closest('[data-grade]');
+  if (!button) return;
+  pump.grade = button.dataset.grade;
+  pumpStep('nozzle');
+});
+$('pump-plug').addEventListener('click', plugNozzle);
+$('nozzle').addEventListener('pointerdown', event => {
+  if (pump.step !== 'nozzle') return;
+  event.preventDefault();
+  $('nozzle').setPointerCapture(event.pointerId);
+  pump.drag = $('pump-frame').getBoundingClientRect();
+});
+$('nozzle').addEventListener('pointermove', event => {
+  if (!pump.drag) return;
+  const { left, top, width, height } = pump.drag;
+  placeNozzle(clamp((event.clientX - left) / width, 0, 1), clamp((event.clientY - top) / height, 0, 1));
+});
+$('nozzle').addEventListener('pointerup', event => {
+  if (!pump.drag) return;
+  const { left, top, width, height } = pump.drag;
+  pump.drag = null;
+  const x = (event.clientX - left) / width, y = (event.clientY - top) / height;
+  if (Math.hypot(x - door.x, (y - door.y) * height / width) < .08) plugNozzle();
+  else placeNozzle(holster.x, holster.y);
+});
+for (const [type, on] of [['pointerdown', true], ['pointerup', false], ['pointerleave', false], ['pointercancel', false]]) {
+  $('pump-hold').addEventListener(type, event => {
+    if (type === 'pointerdown') event.preventDefault();
+    holdPump(on);
+  });
+}
+addEventListener('keydown', event => {
+  if ($('pump').hidden) return;
+  if (event.code === 'Space') {
+    event.preventDefault();
+    if (!event.repeat) holdPump(true);
+  } else if (event.code === 'Enter' && pump.step === 'nozzle') {
+    event.preventDefault();
+    plugNozzle();
+  }
+});
+addEventListener('keyup', event => { if (event.code === 'Space' && !$('pump').hidden) holdPump(false); });
+$('pump-done').addEventListener('click', closePump);
+$('pump-close').addEventListener('click', closePump);
+$('pump-movie').addEventListener('click', () => {
+  closePump();
+  playMovie('refuel', '주유 영상', () => $('depart').focus());
+});
+$('service-list').addEventListener('click', event => {
+  const button = event.target.closest('[data-service]');
+  if (!button || button.disabled) return;
+  const id = button.dataset.service;
+  const price = servicePrice(state, id);
+  if (!price || profile.balance < price) return;
+  profile.balance -= price;
+  save();
+  serviceCar(state, id);
+  restServiced.add(id);
+  const item = services.find(entry => entry.id === id);
+  $('rest-status').textContent = `${item.name} 끝 — ${item.effect}`;
+  beep(640, .1);
+  $('balance').textContent = number(profile.balance);
+  paintRest();
+  paintHud();
+});
 refuelVideo.addEventListener('ended', endMovie);
 refuelVideo.addEventListener('error', endMovie);
 $('refuel-skip').addEventListener('click', endMovie);

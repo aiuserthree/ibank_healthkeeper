@@ -512,3 +512,51 @@ dialog::backdrop { background: #090c0bbb; }
 
 /* 주행 중 마우스 포인터 숨김(game.js syncCursor) */
 body.hide-cursor, body.hide-cursor * { cursor: none !important; }
+
+/* 직접 주유하기 — 화면 가득 주유기 · 차 주유구, 아래 띠에 조작 */
+.pump { grid-column: 1 / -1; grid-row: 1; position: relative; z-index: 3; overflow: hidden; background: #0b0e10; }
+.rest.pumping .rest-panel { visibility: hidden; }
+.pump-frame {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
+  width: max(100%, calc(100vh * 1600 / 905)); aspect-ratio: 1600 / 905;
+  background: url('/assets/games/twilightrun/rest/pump.webp?v=1') center / cover no-repeat;
+}
+.nozzle {
+  position: absolute; width: 13%; height: auto; transform: translate(-30%, -50%) rotate(-8deg);
+  cursor: grab; touch-action: none; filter: drop-shadow(0 6px 10px #000a); transition: left .12s, top .12s;
+}
+.nozzle:active { cursor: grabbing; transition: none; }
+.nozzle.plugged { transform: translate(-82%, -46%) rotate(8deg); cursor: default; }
+.fuel-door { position: absolute; left: 82.7%; top: 62.5%; width: 7%; aspect-ratio: 1; transform: translate(-50%, -50%); border-radius: 50%; pointer-events: none; }
+.fuel-door.target { box-shadow: 0 0 0 3px #d8f45dcc, 0 0 28px 6px #d8f45d88; animation: door 1.1s ease-in-out infinite alternate; }
+@keyframes door { from { opacity: .45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .fuel-door.target { animation: none; } }
+.pump-bar {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px;
+  padding: 12px clamp(14px, 3vw, 36px); background: linear-gradient(#0b0e1000, #0b0e10e6 32%);
+}
+.pump-step { flex: 1 1 100%; font-weight: 800; color: var(--accent); text-shadow: 0 2px 8px #000; }
+.grades { display: flex; gap: 8px; }
+.grades .button { display: grid; text-align: left; gap: 2px; }
+.grades small, .service small { color: var(--muted); font-size: .72rem; font-weight: 600; }
+.pump-meter { display: flex; align-items: center; gap: 10px; flex: 1 1 260px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pump-meter i { position: relative; flex: 1; height: 14px; border-radius: 3px; background: #ffffff22; overflow: hidden; }
+.pump-meter b { display: block; height: 100%; width: 100%; background: var(--accent); transform-origin: left; }
+.pump-meter b.over { background: #ff9361; }
+.pump-meter em { position: absolute; left: 90%; right: 0; top: 0; bottom: 0; border: 2px solid #fff; border-radius: 2px; }
+.pump-meter span { color: var(--muted); font-size: .84rem; }
+#pump-hold { min-width: 180px; min-height: 46px; touch-action: none; user-select: none; }
+.receipt { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.receipt p { display: grid; gap: 2px; font-size: .86rem; min-width: 220px; }
+/* 정비소 */
+.services { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.service { display: grid; gap: 2px; min-width: 0; padding: 7px; text-align: left; border: 1px solid var(--edge); border-radius: 7px; background: #252923; color: inherit; }
+.service:hover:not(:disabled) { border-color: #e5f4bf8d; }
+.service span { font-size: 1.15rem; }
+.service b { font-size: .82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.service em { font-style: normal; color: var(--accent); font-size: .74rem; font-weight: 800; }
+@media (max-height: 520px) {
+  .service small { display: none; }
+  .pump-bar { padding-block: 8px; gap: 6px 10px; }
+  .pump-step { font-size: .84rem; }
+}
