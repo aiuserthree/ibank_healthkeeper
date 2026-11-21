@@ -5,7 +5,8 @@ function coordinates(shader) {
     .replace('#include <begin_vertex>', '#include <begin_vertex>\ncarSurface = position;');
 }
 
-export function bodyFinish(T, paint, { w, l }, style, stripe) {
+// look(새 차): belt = 아래 몸 다른 색 높이 · 기울기, lower = 그 색, spine = 가운데 척추선 반폭, pin = 옆 가는 줄 세기
+export function bodyFinish(T, paint, { w, l }, style, stripe, look = {}) {
   const material = paint.clone();
   const regions = { value: new T.Vector4() };
   const wear = { value: 0 };
@@ -16,13 +17,18 @@ export function bodyFinish(T, paint, { w, l }, style, stripe) {
     shader.uniforms.carSize = { value: new T.Vector2(w, l) };
     shader.uniforms.carStyle = { value: style };
     shader.uniforms.carStripe = { value: new T.Color(stripe) };
+    shader.uniforms.carLower = { value: new T.Color(look.lower || stripe) };
+    shader.uniforms.carBelt = { value: new T.Vector2(...(look.belt || [0, 0])) };
+    shader.uniforms.carSpine = { value: look.spine || 0 };
+    shader.uniforms.carPin = { value: look.pin ?? 1 };
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
         varying vec3 carSurface;
         uniform vec4 carDamage;
         uniform vec2 carSize;
-        uniform vec3 carStripe;
-        uniform float carWear, carStyle;`)
+        uniform vec3 carStripe, carLower;
+        uniform vec2 carBelt;
+        uniform float carWear, carStyle, carSpine, carPin;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec3 p = carSurface;
         float x = abs(p.x);
@@ -35,12 +41,18 @@ export function bodyFinish(T, paint, { w, l }, style, stripe) {
           racing = 1.0 - smoothstep(.275, .283, x + p.z * .035);
         } else if (carStyle < 2.5) {
           racing = 1.0 - smoothstep(.070, .078, abs(x - .148));
-        } else {
+        } else if (carStyle < 3.5) {
           racing = 1.0 - smoothstep(.328, .337, x);
+        } else if (carSpine > 0.0) {
+          racing = 1.0 - smoothstep(carSpine, carSpine + .007, x);
         }
         diffuseColor.rgb = mix(diffuseColor.rgb, carStripe, hood * racing * .95);
+        if (carBelt.x > 0.0) {
+          float lower = 1.0 - smoothstep(-.008, .008, p.y - carBelt.x - carBelt.y * p.z);
+          diffuseColor.rgb = mix(diffuseColor.rgb, carLower, lower);
+        }
         float pin = 1.0 - smoothstep(.011, .019, abs(p.y - (.355 + .065 * p.z)));
-        diffuseColor.rgb = mix(diffuseColor.rgb, carStripe, pin * smoothstep(.80, .97, flank) * .74);
+        diffuseColor.rgb = mix(diffuseColor.rgb, carStripe, pin * smoothstep(.80, .97, flank) * .74 * carPin);
         float face = p.z < 0.0 ? carDamage.x : carDamage.y;
         float sideDamage = p.x < 0.0 ? carDamage.z : carDamage.w;
         float area = max(face * smoothstep(.46, .88, abs(p.z) / carSize.y),

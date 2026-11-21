@@ -1,5 +1,5 @@
-import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=34';
-import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=34';
+import { advanceTraffic, LANES, sweptContact } from './traffic.js?v=35';
+import { DAY_STARTS, dayProgress, trafficBand, weatherAt } from './daytime.js?v=35';
 
 export const ROAD_WIDTH = 14.4;
 export { LANES };
@@ -214,6 +214,18 @@ export const cars = [
   { name: '이온 RS', color: '#34bce9', top: 248, power: 9.2, grip: 6.2, wheelbase: 3.08, shape: 'sport' },
   { name: '앰버 GT', color: '#ee763b', top: 270, power: 10.6, grip: 6.7, wheelbase: 3.50, shape: 'gt' },
   { name: '펄스 X', color: '#cab9ed', top: 296, power: 12.3, grip: 7.3, wheelbase: 3.26, shape: 'hyper' },
+  // 차고에서 보유 크레딧으로 사는 새 차(price) — 값이 오를수록 조금씩 빠르게, 차이는 작게(순위 점수가 지나치게 갈리지 않게)
+  { name: '벡터 74', color: '#e4e6e8', top: 256, power: 9.5, grip: 6.1, wheelbase: 3.30, width: 1.05, shape: 'vector', plate: 'VECTOR 74', price: 1800, tag: '한 면으로 뻗은 쐐기 · 검은 아래 몸' },
+  { name: '레트로 버블', color: '#d8151c', top: 240, power: 9.0, grip: 6.5, wheelbase: 2.7, width: 1.0, shape: 'retro', plate: 'BUBBLE', price: 2600, tag: '귀여운 클래식 쿠페 · 동그란 눈 · 크롬 그릴' },
+  { name: '네온 글래스', color: '#eef0f4', top: 264, power: 10.0, grip: 6.6, wheelbase: 3.30, width: 1.05, shape: 'neon', plate: 'NEON GLS', price: 3200, tag: '조각 같은 진주색 몸 · 사선 크롬 두 줄' },
+  { name: '볼더 4X4', color: '#b3171c', top: 238, power: 9.2, grip: 7.2, wheelbase: 2.96, width: 1.0, shape: 'trail', plate: 'BOULDER', price: 4200, tag: '각진 박스 오프로드 · 둥근 눈 · 뒷문 스페어 타이어' },
+  { name: '마그마 GT', color: '#e2261c', top: 278, power: 10.9, grip: 6.8, wheelbase: 3.56, width: 1.08, shape: 'magma', plate: 'MAGMA GT', price: 5000, tag: '긴 보닛 GT · 큰 그물 그릴 · 높은 뒷날개' },
+  { name: '볼더 익스페디션', color: '#d8b57c', top: 246, power: 9.8, grip: 7.5, wheelbase: 2.96, width: 1.0, shape: 'expedition', plate: 'EXPEDITION', price: 6200, tag: '지붕 짐받이 · 조명 · 케이지 · 범퍼 가드 · 굵은 타이어' },
+  { name: '보이드 R', color: '#12303a', top: 290, power: 11.6, grip: 7.4, wheelbase: 3.36, width: 1.08, shape: 'void', plate: 'VOID R', price: 7500, tag: '시안 네온 테두리 · 점 LED 그릴' },
+  { name: '스틸 웨지', color: '#b8bdc3', top: 262, power: 12.6, grip: 6.6, wheelbase: 3.4, width: 1.04, shape: 'wedge', plate: 'STEEL WEDGE', price: 8000, tag: '스테인리스 각진 전기 픽업 · 삼각형 지붕선', finish: { metalness: .92, roughness: .34, clearcoat: 0 } },
+  { name: '루나 포드', color: '#f3f2ee', top: 284, power: 11.2, grip: 7.0, wheelbase: 2.9, width: 1.0, shape: 'pod', plate: 'LUNA POD', price: 9000, tag: '한 덩어리 유리 · 빛나는 고리 얼굴 · 미래형 전기차' },
+  { name: '헥사 팽', color: '#cfd5dc', top: 300, power: 12.4, grip: 7.1, wheelbase: 3.30, width: 1.12, shape: 'hexa', plate: 'HEXA FANG', price: 10500, tag: '액체 크롬 몸 · 라임 빛 · 꼬리 지느러미' },
+  { name: '스트라토 캐노피', color: '#141619', top: 308, power: 12.8, grip: 7.6, wheelbase: 3.44, width: 1.07, shape: 'strato', plate: 'STRATO', price: 14000, tag: '검정에 빨간 가운데 줄 · 삼각 그물 그릴' },
 ];
 export const modes = [
   { id: 'sprint', name: '스프린트' },

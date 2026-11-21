@@ -1,10 +1,10 @@
-import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=34';
-import { createScene } from './scene.js?v=34';
-import { impactDuration } from './impact.js?v=34';
-import { assetRoot } from './world.js?v=34';
-import { requestYield } from './traffic.js?v=34';
-import { createShowroom } from './showroom.js?v=34';
-import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=34';
+import { advanceWreck, callRest, cars, carStats, clamp, courses, createRun, damageStage, eatFood, foods, leaveRest, MAX_HEALTH, modes, nextRest, carCondition, FUEL_FREE, fuelRate, pumpFuel, serviceCar, shopItems, useShopItem, servicePrice, services, REST_SIGN, restNames, reward, routeMode, SCORE_LIMIT, sectionIndex, step } from './drive.js?v=35';
+import { createScene } from './scene.js?v=35';
+import { impactDuration } from './impact.js?v=35';
+import { assetRoot } from './world.js?v=35';
+import { requestYield } from './traffic.js?v=35';
+import { createShowroom } from './showroom.js?v=35';
+import { dayProgress, dayTime, weatherAt, weatherNames } from './daytime.js?v=35';
 
 const $ = id => document.getElementById(id);
 const stage = $('road');
@@ -36,10 +36,13 @@ function load() {
   try { data = JSON.parse(localStorage.getItem(storageKey)); } catch { data = null; }
   const upgrades = cars.map((_, i) => Number.isInteger(data?.upgrades?.[i])
     ? clamp(data.upgrades[i], 0, maxUpgrade) : 0);
+  // 산 차(owned, 차 shape 이름) — 옛 저장에는 없으니 처음부터 있는 4종만 가진 것으로
+  const owned = cars.filter(car => !car.price || (Array.isArray(data?.owned) && data.owned.includes(car.shape))).map(car => car.shape);
   return {
     balance: Number.isSafeInteger(data?.balance) ? Math.max(0, data.balance) : 0,
     best: Number.isSafeInteger(data?.best) ? clamp(data.best, 0, SCORE_LIMIT) : 0,
-    car: Number.isInteger(data?.car) && cars[data.car] ? data.car : 0,
+    car: Number.isInteger(data?.car) && cars[data.car] && owned.includes(cars[data.car].shape) ? data.car : 0,
+    owned,
     course: Number.isInteger(data?.course) && courses[data.course] ? data.course : 0,
     // 처음 하는 사람의 주행 모드는 끝없는 질주(운영자 요청) — 이미 고른 사람은 고른 그대로
     mode: Number.isInteger(data?.mode) && modes[data.mode] ? data.mode : Math.max(0, modes.findIndex(item => item.id === 'endless')),
@@ -217,7 +220,7 @@ setOptions('course', courses);
 setOptions('mode', modes);
 
 const carOptions = $('car-options');
-const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=34`;
+const carPicture = car => `${assetRoot}garage/${car.shape}.webp?v=35`;
 // 차 단추에 마우스를 올리면(키보드는 포커스, 터치는 누를 때 잠깐) 주행 때와 같은 3D 모델을 패널 옆에 크게 띄운다
 const carStage = $('car-stage');
 const showroom = createShowroom(carStage.querySelector('canvas'), cars,
@@ -228,6 +231,8 @@ if (!showroom) {
   carStage.classList.add('still');
   $('car-still').hidden = false;
 }
+// 값(price)이 있는 차는 차고에서 보유 크레딧으로 산 뒤에만 탈 수 있다
+const owns = i => !cars[i].price || profile.owned.includes(cars[i].shape);
 let peekTimer = 0;
 let peekBy = '';
 function peek(i, by = 'mouse') {
@@ -244,22 +249,37 @@ function unpeek(delay = 220) {
   clearTimeout(peekTimer);
   peekTimer = setTimeout(() => carStage.classList.remove('open'), delay);
 }
-carOptions.innerHTML = cars.map((car, i) => `
+let carInputs = [];
+// 첫 화면 차 고르기 — 가진 차만, 아직 안 산 차가 있으면 끝에 「새 차」 칸(누르면 차고)
+function carChoices() {
+  const mine = cars.map((_, i) => i).filter(owns);
+  const left = cars.length - mine.length;
+  const count = mine.length + (left ? 1 : 0);
+  carOptions.style.setProperty('--cols', count <= 5 ? count : Math.ceil(count / 2));
+  carOptions.innerHTML = mine.map(i => `
   <div>
     <input id="car-${i}" type="radio" name="car" value="${i}">
     <label class="car-option" for="car-${i}">
-      <img src="${carPortrait(car, i)}" width="600" height="260" alt="">
-      <span>${car.name}</span>
+      <img src="${carPortrait(cars[i], i)}" width="600" height="260" alt="">
+      <span>${cars[i].name}</span>
     </label>
-  </div>`).join('');
-const carInputs = [...carOptions.querySelectorAll('input')];
+  </div>`).join('') + (left ? `<button type="button" class="car-option car-shop" id="car-shop"><b aria-hidden="true">＋</b><span>새 차 ${left}대</span></button>` : '');
+  carInputs = [...carOptions.querySelectorAll('input')];
+}
+carChoices();
 function paintCarSelection() {
-  carInputs[profile.car].checked = true;
+  const input = carInputs.find(item => Number(item.value) === profile.car);
+  if (input) {
+    input.checked = true;
+    // 낮은 화면(휴대폰 가로)에서는 차 단추가 옆으로 넘기는 한 줄 — 고른 차가 보이게 옮긴다
+    const box = input.parentElement.getBoundingClientRect(), row = carOptions.getBoundingClientRect();
+    if (box.width && (box.left < row.left || box.right > row.right)) carOptions.scrollLeft += box.left - row.left - (row.width - box.width) / 2;
+  }
   const car = carStats(profile.car, profile.upgrades[profile.car]);
   $('car-spec').textContent = `최고 ${car.top} km/h · 가속 ${car.power.toFixed(1)}`;
 }
 const optionIndex = event => {
-  const label = event.target.closest?.('.car-option');
+  const label = event.target.closest?.('label.car-option');
   return label ? Number(label.htmlFor.slice(4)) : -1;
 };
 carOptions.addEventListener('pointerover', event => {
@@ -275,6 +295,11 @@ carOptions.addEventListener('focusin', event => {
   if (event.target.matches('input:focus-visible')) peek(Number(event.target.value), 'focus');
 });
 carOptions.addEventListener('focusout', () => { if (peekBy === 'focus') unpeek(); });
+carOptions.addEventListener('click', event => {
+  if (!event.target.closest('#car-shop')) return;
+  unpeek(0);
+  openGarage(cars.findIndex((_, i) => !owns(i)));
+});
 carStage.addEventListener('pointerenter', () => clearTimeout(peekTimer));
 carStage.addEventListener('pointerleave', event => { if (event.pointerType === 'mouse') unpeek(); });
 carOptions.addEventListener('change', event => {
@@ -284,48 +309,102 @@ carOptions.addEventListener('change', event => {
   if (event.target.matches(':focus-visible')) peek(profile.car, 'focus');
 });
 
+// 차고 — 왼쪽 큰 3D 무대(앞 · 옆 · 뒤 단추, 끌어서 돌리기), 오른쪽 차 목록. 안 산 차도 미리 볼 수 있고, 크레딧이 되면 「사기」(한 번 더 눌러 확정)
 const upgradeCost = (i, level) => 220 + i * 85 + level * 155;
+let garageRoom = null;
+let focusCar = 0;
+let confirmCar = -1;
+let confirmTimer = 0;
+function garageFocus() {
+  const i = focusCar;
+  const car = cars[i];
+  const mine = owns(i);
+  const level = profile.upgrades[i];
+  const stats = carStats(i, level);
+  $('garage-name').textContent = car.name;
+  $('garage-tag').textContent = car.tag || '처음부터 있는 차';
+  $('garage-stats').innerHTML = `<span>최고 ${stats.top} km/h</span><span>가속 ${stats.power.toFixed(1)}</span><span>손맛 ${stats.grip.toFixed(1)}</span>${mine ? `<span>강화 ${level}/${maxUpgrade}</span>` : ''}`;
+  $('garage-lock').hidden = mine;
+  if (mine) {
+    const equipped = profile.car === i;
+    const price = upgradeCost(i, level);
+    $('garage-actions').innerHTML = `
+      <button type="button" class="button ${equipped ? 'quiet' : 'primary'}" data-action="equip" ${equipped ? 'disabled' : ''}>${equipped ? '타는 중' : '이 차 고르기'}</button>
+      <button type="button" class="button quiet" data-action="upgrade" ${level >= maxUpgrade || profile.balance < price ? 'disabled' : ''}>${level >= maxUpgrade ? '강화 완료' : '강화 · ◆ ' + number(price)}</button>`;
+  } else {
+    const short = car.price - profile.balance;
+    const asking = confirmCar === i;
+    $('garage-actions').innerHTML = `
+      <button type="button" class="button primary buy${asking ? ' asking' : ''}" data-action="buy" ${short > 0 ? 'disabled' : ''}>${short > 0
+        ? `사기 · ◆ ${number(car.price)} <small>(${number(short)} 모자람)</small>` : asking ? `한 번 더 누르면 구매 · ◆ ${number(car.price)}` : `사기 · ◆ ${number(car.price)}`}</button>`;
+  }
+  if (garageRoom) garageRoom.show(i);
+  else $('garage-still').src = carPortrait(car, i);
+}
 function garageInfo(focus) {
   $('garage-balance').textContent = number(profile.balance);
   $('car-list').innerHTML = cars.map((car, i) => {
-    const equipped = profile.car === i;
-    const level = profile.upgrades[i];
-    const stats = carStats(i, level);
-    const price = upgradeCost(i, level);
-    const selectButton = equipped ? '선택됨' : '선택';
-    return `<article class="car-card ${equipped ? 'current' : ''}">
+    const mine = owns(i);
+    const note = profile.car === i ? '타는 중' : mine ? `보유 · 강화 ${profile.upgrades[i]}/${maxUpgrade}` : `🔒 ◆ ${number(car.price)}`;
+    return `<button type="button" class="car-card${profile.car === i ? ' current' : ''}${mine ? '' : ' locked'}${focusCar === i ? ' focused' : ''}" data-pick="${i}" aria-pressed="${focusCar === i}">
       <img class="car-portrait" src="${carPortrait(car, i)}" width="600" height="260" alt="">
-      <h3>${car.name}</h3>
-      <p class="car-stats"><span>${stats.top} km/h</span><span>가속 ${stats.power.toFixed(1)}</span><span>강화 ${level}/${maxUpgrade}</span></p>
-      <div class="car-actions">
-        <button type="button" class="button quiet" data-car="${i}" data-action="equip" ${equipped ? 'disabled' : ''}>${selectButton}</button>
-        <button type="button" class="button quiet" data-car="${i}" data-action="upgrade" ${level >= maxUpgrade || profile.balance < price ? 'disabled' : ''}>${level >= maxUpgrade ? '강화 완료' : '강화 · ' + number(price)}</button>
-      </div>
-    </article>`;
+      <span class="car-name">${car.name}</span><span class="car-note${!mine && car.price <= profile.balance ? ' ready' : ''}">${note}</span>
+    </button>`;
   }).join('');
-  if (focus) {
-    const same = $('car-list').querySelector(`button[data-car="${focus.i}"][data-action="${focus.action}"]:not(:disabled)`);
-    const alternative = $('car-list').querySelector(`button[data-car="${focus.i}"]:not(:disabled)`);
-    (same || alternative || $('close-garage')).focus();
-  }
+  garageFocus();
+  if (focus) ($('garage').querySelector(focus) || $('close-garage')).focus();
 }
-
-$('garage-button').addEventListener('click', () => {
+function openGarage(i = profile.car) {
+  focusCar = i;
+  confirmCar = -1;
   $('garage-status').textContent = '';
+  if (!garageRoom && showroom) garageRoom = createShowroom($('garage-canvas'), cars, () => $('garage').open && !document.hidden);
+  $('garage-still').hidden = !!garageRoom;
   garageInfo();
   $('garage').showModal();
-});
+  $('car-list').querySelector(`[data-pick="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+}
+$('garage-button').addEventListener('click', () => openGarage());
 $('close-garage').addEventListener('click', () => $('garage').close());
+$('garage').addEventListener('click', event => {
+  const turn = event.target.closest('[data-turn]');
+  if (turn) garageRoom?.turnTo(turn.dataset.turn);
+});
 $('car-list').addEventListener('click', event => {
+  const card = event.target.closest('[data-pick]');
+  if (!card) return;
+  focusCar = Number(card.dataset.pick);
+  confirmCar = -1;
+  $('garage-status').textContent = '';
+  garageInfo(`[data-pick="${focusCar}"]`);
+});
+$('garage-actions').addEventListener('click', event => {
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled) return;
-  const i = Number(button.dataset.car);
-  const { action } = button.dataset;
+  const i = focusCar;
   const car = cars[i];
-  if (action === 'equip') {
+  const { action } = button.dataset;
+  clearTimeout(confirmTimer);
+  if (action === 'buy' && !owns(i)) {
+    if (profile.balance < car.price) return;
+    if (confirmCar !== i) {
+      // 잘못 눌러 큰 크레딧이 나가지 않게 — 한 번 더 눌러야 산다(4초 지나면 원래대로)
+      confirmCar = i;
+      confirmTimer = setTimeout(() => { confirmCar = -1; garageFocus(); }, 4000);
+      garageFocus();
+      $('garage-actions').querySelector('[data-action="buy"]')?.focus();
+      return;
+    }
+    confirmCar = -1;
+    profile.balance -= car.price;
+    profile.owned.push(car.shape);
+    profile.car = i;
+    $('garage-status').textContent = `${car.name} 구매 완료! 바로 이 차로 달립니다`;
+    carChoices();
+  } else if (action === 'equip' && owns(i)) {
     profile.car = i;
     $('garage-status').textContent = `${car.name} 선택 완료`;
-  } else if (action === 'upgrade' && profile.upgrades[i] < maxUpgrade) {
+  } else if (action === 'upgrade' && owns(i) && profile.upgrades[i] < maxUpgrade) {
     const price = upgradeCost(i, profile.upgrades[i]);
     if (profile.balance < price) return;
     profile.balance -= price;
@@ -333,7 +412,7 @@ $('car-list').addEventListener('click', event => {
     $('garage-status').textContent = `${car.name} ${profile.upgrades[i]}단계 강화 완료`;
   } else return;
   save();
-  garageInfo({ i, action });
+  garageInfo(action === 'upgrade' ? '[data-action="upgrade"]:not(:disabled)' : `[data-pick="${i}"]`);
   paintCarSelection();
   $('balance').textContent = number(profile.balance);
 });

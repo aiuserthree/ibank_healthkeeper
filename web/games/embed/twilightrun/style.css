@@ -166,7 +166,10 @@ button, select { -webkit-tap-highlight-color: transparent; }
 .still .car-hint { display: none; }
 .car-picker { min-inline-size: 0; margin: 0 0 11px; padding: 0; border: 0; }
 .car-picker legend { padding: 0; }
-.car-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
+.car-options { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); gap: 5px; }
+.car-option span { overflow: hidden; text-overflow: ellipsis; }
+.car-shop { place-content: center; gap: 1px; width: 100%; border-style: dashed; color: var(--accent); font: inherit; font-size: .71rem; font-weight: 750; }
+.car-shop b { font-size: 1.15rem; line-height: 1; }
 .car-options input {
   position: absolute;
   width: 1px;
@@ -307,26 +310,65 @@ dialog {
   color: inherit;
   box-shadow: 0 22px 60px #0009;
 }
-#garage { width: min(880px, calc(100% - 28px)); }
+#garage { width: min(1080px, calc(100% - 28px)); }
+.dialog-head .dialog-balance { margin: 0 0 0 auto; }
 dialog::backdrop { background: #090c0bbb; }
 .dialog-head, .dialog-balance { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .dialog-head h2, .center-dialog h2 { font-size: clamp(26px, 4vw, 40px); font-weight: 900; letter-spacing: -.055em; }
 .dialog-balance { font-size: .90rem; justify-content: end; margin: 9px 0; color: var(--muted); }
 .dialog-balance strong, .results dd, .result-mode { color: var(--accent); }
-.car-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.car-card { min-width: 0; border: 1px solid var(--edge); border-radius: 7px; padding: 11px; background: #262c25; }
-.car-card.current { border-color: #d8f45da0; }
-.car-card h3 { font-size: 1.02rem; margin: 0; }
+.garage-body { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 14px; margin-top: 8px; align-items: start; }
+.garage-show { min-width: 0; }
+.garage-view {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid #a4c0be29;
+  border-radius: 8px;
+  background: radial-gradient(ellipse at 50% 70%, #3c4436, #1a1f1b 50%, #111412 100%);
+}
+.garage-view canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; cursor: grab; touch-action: pan-y; }
+.garage-view canvas:active { cursor: grabbing; }
+.garage-lock { position: absolute; top: 10px; left: 10px; padding: 4px 10px; border-radius: 999px; background: #000b; color: #ffd7a0; font-size: .76rem; font-weight: 750; }
+.garage-angles { position: absolute; right: 8px; bottom: 8px; display: flex; gap: 4px; }
+.garage-angles .button { min-width: 44px; min-height: 36px; padding: 6px 10px; font-size: .80rem; }
+.garage-info { padding-top: 9px; }
+.garage-info h3 { margin: 0; color: var(--accent); font-size: clamp(20px, 2.4vw, 30px); font-weight: 900; font-style: italic; letter-spacing: -.045em; }
+.garage-tag { margin: 2px 0 0; color: var(--muted); font-size: .82rem; }
+.garage-info .car-stats { margin: 6px 0 8px; }
+.garage-info .car-actions .button { min-height: 44px; padding: 9px 15px; font-size: .88rem; }
+.buy small { font-weight: 650; opacity: .78; }
+.buy.asking { background: #ffcf5c; border-color: #ffcf5c; }
+.car-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; max-height: min(64vh, 560px); overflow: auto; padding: 2px; }
+.car-card {
+  display: grid;
+  min-width: 0;
+  padding: 5px 6px 6px;
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  background: #262c25;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.car-card:hover { border-color: #e5f4bf8d; }
+.car-card.focused { border-color: var(--accent); background: #303921; }
+.car-card.locked .car-portrait { filter: saturate(.6) brightness(.82); }
 .car-portrait {
   display: block;
   width: 100%;
   height: auto;
   aspect-ratio: 600 / 260;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
   border: 1px solid #a4c0be29;
   border-radius: 5px;
   background: radial-gradient(ellipse at 49% 62%, #596261, #2a3234 54%, #1c2428 100%);
 }
+.car-name { overflow: hidden; font-size: .84rem; font-weight: 800; white-space: nowrap; text-overflow: ellipsis; }
+.car-note { color: var(--muted); font-size: .72rem; white-space: nowrap; }
+.car-card.current .car-note { color: var(--accent); }
+.car-note.ready { color: #ffcf5c; }
 .car-stats {
   display: flex;
   flex-wrap: wrap;
@@ -338,6 +380,23 @@ dialog::backdrop { background: #090c0bbb; }
 .car-stats span { white-space: nowrap; }
 .car-actions { display: flex; flex-wrap: wrap; gap: 5px; }
 .car-actions .button { font-size: .76rem; padding: 6px 8px; }
+@media (max-width: 620px) { .garage-body { grid-template-columns: 1fr; } .car-list { max-height: none; } }
+@media (max-height: 520px) {
+  #garage { padding: 12px 14px; }
+  #garage { position: fixed; }
+  #garage .dialog-head h2 { font-size: 22px; }
+  #garage .garage-status { position: absolute; top: 16px; left: 96px; right: 260px; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  .garage-view { aspect-ratio: 2.25 / 1; }
+  .garage-tag { display: none; }
+  .car-options { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(66px, 1fr); overflow-x: auto; scrollbar-width: none; }
+  .car-shop { grid-auto-flow: column; gap: 3px; }
+  .car-shop b { font-size: .9rem; }
+  .garage-info { padding-top: 5px; }
+  .garage-info h3 { font-size: 19px; }
+  .garage-info .car-stats { margin: 3px 0 5px; }
+  .garage-info .car-actions .button { min-height: 40px; padding: 7px 12px; }
+  .car-list { max-height: calc(100dvh - 104px); }
+}
 .garage-status { color: var(--accent); font-size: .84rem; min-height: 1.35em; margin-top: 10px; }
 .center-dialog { width: min(370px, calc(100% - 28px)); text-align: center; }
 .center-dialog .button { width: 100%; margin-top: 8px; }

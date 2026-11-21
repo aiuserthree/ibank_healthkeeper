@@ -1,5 +1,6 @@
-import { TIRE_RADIUS } from './drive.js?v=34';
-import { bodyFinish, fractureMap, glassFinish } from './finishes.js?v=34';
+import { TIRE_RADIUS } from './drive.js?v=35';
+import { bodyFinish, fractureMap, glassFinish } from './finishes.js?v=35';
+import { createConcepts } from './concepts.js?v=35';
 
 // Local car coordinates point toward -Z. Lofted cross sections describe the coachwork in metres.
 const profiles = {
@@ -112,13 +113,15 @@ export function createCarModels(T, glowTexture) {
   }
 
   // 길이 방향: 바퀴 자리를 둥글게 파고, 단면 사이를 Catmull-Rom 으로 부드럽게 잇는다(10cm 간격)
-  function wheelArches(sections, axle) {
+  function wheelArches(sections, axle, { front = .03, rear = .12, flare = .031, step = .1, lip = .07 } = {}) {
     const radius = .432;
     const stations = new Set(sections.map(section => section[0]));
     for (const center of [-axle, axle]) for (let i = 0; i <= 20; i++) {
       stations.add(center + radius * Math.cos(Math.PI * i / 20));
     }
-    for (let z = sections[0][0]; z < sections.at(-1)[0]; z += .1) stations.add(z);
+    for (let z = sections[0][0]; z < sections.at(-1)[0]; z += step) stations.add(z);
+    // 몸통 일부만 덮는 조각(새 차의 펜더)은 그 조각 길이 안의 자리만 쓴다
+    for (const z of stations) if (z < sections[0][0] || z > sections.at(-1)[0]) stations.delete(z);
     const spline = (a, b, c, d, t) => .5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t * t + (3 * b - a - 3 * c + d) * t * t * t);
     return [...stations].sort((a, b) => a - b).map(z => {
       const i = Math.max(1, sections.findIndex(section => section[0] >= z));
@@ -128,8 +131,8 @@ export function createCarModels(T, glowTexture) {
       const gap = Math.abs(Math.abs(z) - axle);
       const arch = gap < radius ? Math.sqrt(Math.max(0, 1 - (gap / radius) ** 2)) : 0;
       // 앞바퀴 쪽은 윗면을 덜 올린다(앞코가 불룩한 덩어리가 되지 않게)
-      const raised = Math.max(high + arch * (z < 0 ? .03 : .12), low + arch * .58 + .07);
-      return [z, w + arch * .031, low + arch * .56, raised, taper];
+      const raised = Math.max(high + arch * (z < 0 ? front : rear), low + arch * .58 + lip);
+      return [z, w + arch * flare, low + arch * .56, raised, taper];
     });
   }
 
@@ -495,7 +498,14 @@ export function createCarModels(T, glowTexture) {
     };
   }
 
+  // 차고에서 사는 새 차 6대 — 몸통 · 유리 · 조명 · 날개를 차마다 따로 짠다(concepts.js)
+  const concept = createConcepts(T, {
+    loft, wheelArches, densify, panel, piece, box, crumpling, modelPlate, glowTexture, crackedGlass,
+    standard, rubber, rotor, trim, grille, glass, gloss, alloy, lampWhite, detailWheel, disc, lug, lip, cube,
+  });
+
   return function model(car, player) {
+    if (concept.has(car.shape)) return concept.build(car);
     const shape = profiles[car.shape] ? car.shape : 'sedan';
     const detail = player;
     const data = shell(shape, detail);

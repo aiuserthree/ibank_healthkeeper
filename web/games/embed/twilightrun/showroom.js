@@ -1,5 +1,5 @@
-import { createCarModels } from './models.js?v=34';
-import { glowMap } from './world.js?v=34';
+import { createCarModels } from './models.js?v=35';
+import { glowMap } from './world.js?v=35';
 
 // 첫 화면 · 차고에서 고른 차를 크게 보여 준다 — 주행 때와 같은 3D 모델(model(car, true))을 천천히 돌린다.
 // GPU 를 아끼려고 첫 화면이 보일 때만, 초당 30장까지만 그리고 그림자 맵 대신 바닥 빛 한 장을 쓴다.
@@ -92,6 +92,8 @@ export function createShowroom(canvas, cars, isActive) {
 
   let current = -1;
   let angle = .72;
+  let target = null; // 앞 · 옆 · 뒤 단추로 돌릴 각도
+  let holdUntil = 0;
   let dragging = null;
   let last = 0;
   let drawn = 0;
@@ -139,7 +141,11 @@ export function createShowroom(canvas, cars, isActive) {
     if (t - drawn < 32) return;
     const dt = last ? Math.min(.1, (t - last) / 1000) : 0;
     last = t;
-    if (!dragging && !still.matches) angle += dt * .42;
+    if (target !== null) {
+      const gap = Math.atan2(Math.sin(target - angle), Math.cos(target - angle));
+      angle += gap * Math.min(1, Math.max(dt, .016) * 7);
+      if (Math.abs(gap) < .002) { angle = target; target = null; }
+    } else if (!dragging && !still.matches && t > holdUntil) angle += dt * .42;
     drawn = t;
     draw();
   }
@@ -147,6 +153,8 @@ export function createShowroom(canvas, cars, isActive) {
 
   canvas.addEventListener('pointerdown', event => {
     dragging = { x: event.clientX, angle };
+    target = null;
+    holdUntil = performance.now() + 4000;
     canvas.setPointerCapture(event.pointerId);
   });
   canvas.addEventListener('pointermove', event => {
@@ -181,5 +189,12 @@ export function createShowroom(canvas, cars, isActive) {
     return shots;
   }
 
-  return { show, portraits };
+  // 차가 앞(-Z)을 보므로 0 은 뒷모습, π 는 앞모습. 단추로 돌린 뒤 4초 동안은 저절로 돌지 않는다
+  function turnTo(view) {
+    target = { front: Math.PI - .35, side: Math.PI / 2, rear: .35 }[view] ?? .72;
+    holdUntil = performance.now() + 4000;
+    drawn = 0;
+  }
+
+  return { show, portraits, turnTo };
 }
