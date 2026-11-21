@@ -169,8 +169,10 @@ export function createCarModels(T, glowTexture) {
       [-.88, w * waist, .18, deck + .012, taper], [.37, w * (waist + .026), .18, deck, taper],
       [l - .62, w * rearWidth, .18, deck + .04, taper], [l - .32, w * rearWidth, .18, deck + .005, .94],
       [l - .115, w * .93, .20, deck - .025, .955], [l, w * .87, .27, deck - (van ? .02 : .084), .92]);
-    const surface = detailed ? wheelArches(sections, l - .62) : sections;
+    // 내 차(매끈) 4종은 앞바퀴 위가 보닛보다 덜 솟게(lip) · 앞코를 길게
+    const surface = detailed ? wheelArches(sections, l - .62, sporty ? { lip: .02 } : undefined) : sections;
     const base = detailed ? loft(surface, true) : loft(sections);
+    if (detailed && sporty) stretchGeometry(base, noseStretch(l));
     const end = rear + (van ? .19 : .70);
     const frontGlass = front - (van ? .44 : .92);
     const backGlass = van ? roof - .16 : deck + .065;
@@ -208,7 +210,40 @@ export function createCarModels(T, glowTexture) {
     for (let i = 1; i < points.length - 1; i++) indices.push(0, i, i + 1);
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
-    return piece(group, geometry, material, 0, 0, 0);
+    const mesh = piece(group, geometry, material, 0, 0, 0);
+    mesh.userData.panel = true;
+    return mesh;
+  }
+
+  // 기존 4종 앞코를 길게(운영자 요청 2026-11-21) — 앞바퀴 아치 앞쪽(오버행)만 앞으로 늘이고 끝을 조금 좁힌다.
+  // 몸통 · 앞 장식(등 · 그릴 · 범퍼)에 같은 변환을 걸어 서로 어긋나지 않게 한다
+  const NOSE = .28;
+  function noseStretch(l) {
+    const z0 = -l + .19, k = (.19 + NOSE) / .19;
+    return (x, y, z) => {
+      if (z >= z0) return [x, y, z];
+      // 몸통 끝(-l)보다 앞에 붙은 범퍼 · 등은 늘이지 않고 늘어난 만큼 앞으로만 옮긴다
+      const nz = z < -l ? z - NOSE : z0 + (z - z0) * k;
+      const t = Math.min(1, (z0 - Math.max(nz, -l - NOSE)) / (.19 + NOSE));
+      return [x * (1 - .2 * t * t), y, nz];
+    };
+  }
+  function stretchGeometry(geometry, fn) {
+    const p = geometry.getAttribute('position');
+    for (let i = 0; i < p.count; i++) p.setXYZ(i, ...fn(p.getX(i), p.getY(i), p.getZ(i)));
+    p.needsUpdate = true;
+    geometry.computeVertexNormals();
+  }
+  function stretchParts(group, fn, l) {
+    for (const child of group.children) {
+      if (child.userData.panel) { stretchGeometry(child.geometry, fn); continue; }
+      const [x, y, z] = fn(child.position.x, child.position.y, child.position.z);
+      if (z !== child.position.z && !child.isSprite && child.position.z >= -l) {
+        child.scale.z *= (.19 + NOSE) / .19;
+        child.scale.x *= x / (child.position.x || 1) || 1;
+      }
+      child.position.set(x, y, z);
+    }
   }
 
   function modelPlate(text) {
@@ -572,6 +607,7 @@ export function createCarModels(T, glowTexture) {
     const lampMaterial = new T.MeshBasicMaterial({ color: '#ff4633' });
     const parts = detail ? aero(chassis, shape, data, paint) : {};
     const lights = lamps(chassis, shape, data, lampMaterial, detail, car.oncoming, parts.frontLights);
+    if (detail && liveries[shape]) stretchParts(parts.frontLights, noseStretch(l), l);
     if (detail) {
       piece(parts.bumper.children[0], plane, modelPlate(data.plate), 0, deck - .23, l + .039, .38, .101, 1);
     } else {
